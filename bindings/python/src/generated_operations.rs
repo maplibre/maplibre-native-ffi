@@ -274,7 +274,9 @@ unsafe extern "C" fn generated_callback_mln_camera_transition_handler_callback(
     user_data: *mut std::ffi::c_void,
     end: *const sys::mln_camera_transition_end,
 ) {
-    generated_invoke(
+    let _scope = maplibre_core::callback::CallbackScope::enter();
+
+    let outcome = generated_invoke(
         || (),
         |py| {
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
@@ -291,7 +293,9 @@ unsafe extern "C" fn generated_callback_mln_camera_transition_handler_callback(
             },))?;
             Ok(())
         },
-    )
+    );
+
+    outcome
 }
 
 fn generated_copy_mln_camera_update(
@@ -327,7 +331,9 @@ unsafe extern "C" fn generated_callback_mln_custom_geometry_source_options_fetch
     user_data: *mut std::ffi::c_void,
     tile_id: sys::mln_canonical_tile_id,
 ) {
-    generated_invoke(
+    let _scope = maplibre_core::callback::CallbackScope::enter();
+
+    let outcome = generated_invoke(
         || (),
         |py| {
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
@@ -338,14 +344,18 @@ unsafe extern "C" fn generated_callback_mln_custom_geometry_source_options_fetch
                 .call1((generated_copy_mln_canonical_tile_id(py, &tile_id)?,))?;
             Ok(())
         },
-    )
+    );
+
+    outcome
 }
 
 unsafe extern "C" fn generated_callback_mln_custom_geometry_source_options_cancel_tile(
     user_data: *mut std::ffi::c_void,
     tile_id: sys::mln_canonical_tile_id,
 ) {
-    generated_invoke(
+    let _scope = maplibre_core::callback::CallbackScope::enter();
+
+    let outcome = generated_invoke(
         || (),
         |py| {
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 1) }) else {
@@ -356,7 +366,9 @@ unsafe extern "C" fn generated_callback_mln_custom_geometry_source_options_cance
                 .call1((generated_copy_mln_canonical_tile_id(py, &tile_id)?,))?;
             Ok(())
         },
-    )
+    );
+
+    outcome
 }
 
 fn generated_copy_mln_custom_geometry_source_options(
@@ -427,7 +439,9 @@ unsafe extern "C" fn generated_callback_mln_custom_mvt_vector_source_options_fet
     user_data: *mut std::ffi::c_void,
     tile_id: sys::mln_canonical_tile_id,
 ) {
-    generated_invoke(
+    let _scope = maplibre_core::callback::CallbackScope::enter();
+
+    let outcome = generated_invoke(
         || (),
         |py| {
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
@@ -438,14 +452,18 @@ unsafe extern "C" fn generated_callback_mln_custom_mvt_vector_source_options_fet
                 .call1((generated_copy_mln_canonical_tile_id(py, &tile_id)?,))?;
             Ok(())
         },
-    )
+    );
+
+    outcome
 }
 
 unsafe extern "C" fn generated_callback_mln_custom_mvt_vector_source_options_cancel_tile(
     user_data: *mut std::ffi::c_void,
     tile_id: sys::mln_canonical_tile_id,
 ) {
-    generated_invoke(
+    let _scope = maplibre_core::callback::CallbackScope::enter();
+
+    let outcome = generated_invoke(
         || (),
         |py| {
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 1) }) else {
@@ -456,7 +474,9 @@ unsafe extern "C" fn generated_callback_mln_custom_mvt_vector_source_options_can
                 .call1((generated_copy_mln_canonical_tile_id(py, &tile_id)?,))?;
             Ok(())
         },
-    )
+    );
+
+    outcome
 }
 
 fn generated_copy_mln_custom_mvt_vector_source_options(
@@ -717,12 +737,9 @@ unsafe extern "C" fn generated_callback_mln_http_header_transform_callback(
     url: *const std::ffi::c_char,
     out_response: *mut sys::mln_http_header_transform_response,
 ) -> sys::mln_status {
-    let _policy = GeneratedCallbackPolicy::enter(
-        &["mln_http_header_transform_response_set_header"],
-        out_response as usize as u64,
-    );
+    let _scope = maplibre_core::callback::CallbackScope::enter();
 
-    generated_invoke(
+    let outcome = generated_invoke(
         || sys::MLN_STATUS_NATIVE_ERROR,
         |py| {
             let callback_scope = GeneratedCallbackGuard::new();
@@ -742,7 +759,9 @@ unsafe extern "C" fn generated_callback_mln_http_header_transform_callback(
             ))?;
             result.extract::<sys::mln_status>()
         },
-    )
+    );
+
+    outcome
 }
 
 fn generated_copy_mln_image_content(
@@ -797,9 +816,9 @@ unsafe extern "C" fn generated_callback_mln_log_handler_callback(
     code: i64,
     message: *const std::ffi::c_char,
 ) -> u32 {
-    let _reentry = GeneratedCallbackPolicy::enter(&[], 0);
+    let _scope = maplibre_core::callback::CallbackScope::enter();
 
-    generated_invoke(
+    let outcome = generated_invoke(
         || 0,
         |py| {
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
@@ -813,7 +832,9 @@ unsafe extern "C" fn generated_callback_mln_log_handler_callback(
             ))?;
             result.extract::<u32>()
         },
-    )
+    );
+
+    outcome
 }
 
 fn generated_copy_mln_logical_extent(
@@ -1433,9 +1454,9 @@ fn generated_copy_mln_queried_feature(
 }
 
 unsafe extern "C" fn generated_callback_mln_queue_lock_lock(user_data: *mut std::ffi::c_void) {
-    let _reentry = GeneratedCallbackPolicy::enter(&[], 0);
+    let _scope = maplibre_core::callback::CallbackScope::enter();
 
-    generated_invoke(
+    let outcome = generated_invoke(
         || (),
         |py| {
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
@@ -1444,13 +1465,15 @@ unsafe extern "C" fn generated_callback_mln_queue_lock_lock(user_data: *mut std:
             let _result = callback.bind(py).call1(())?;
             Ok(())
         },
-    )
+    );
+
+    outcome
 }
 
 unsafe extern "C" fn generated_callback_mln_queue_lock_unlock(user_data: *mut std::ffi::c_void) {
-    let _reentry = GeneratedCallbackPolicy::enter(&[], 0);
+    let _scope = maplibre_core::callback::CallbackScope::enter();
 
-    generated_invoke(
+    let outcome = generated_invoke(
         || (),
         |py| {
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 1) }) else {
@@ -1459,7 +1482,9 @@ unsafe extern "C" fn generated_callback_mln_queue_lock_unlock(user_data: *mut st
             let _result = callback.bind(py).call1(())?;
             Ok(())
         },
-    )
+    );
+
+    outcome
 }
 
 fn generated_copy_mln_render_abandon_result(
@@ -1632,28 +1657,22 @@ unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
     request: *const sys::mln_resource_request_info,
     handle: sys::mln_resource_request,
 ) -> sys::mln_resource_provider_decision {
-    let _policy = GeneratedCallbackPolicy::enter(
-        &[
-            "mln_resource_request_complete",
-            "mln_resource_request_pass_through",
-            "mln_resource_request_is_cancelled",
-            "mln_resource_request_set_cancel_callback",
-            "mln_resource_request_release",
-        ],
-        maplibre_core::handle::NativeHandle::to_raw(handle),
-    );
-    let decision_state = match unsafe {
-        maplibre_core::decision::DecisionHandleState::new(handle, RESOURCE_REQUEST_DECISION)
-    } {
-        Ok(state) => state,
-        Err(_) => return sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH,
-    };
+    let _scope = maplibre_core::callback::CallbackScope::enter();
+    let mut decision_state = None;
 
-    generated_invoke(
-        || decision_state.finish_decision(false),
+    let outcome = generated_invoke(
+        || u32::MAX,
         |py| {
+            let decision_owner = unsafe { ResourceRequestHandle::adopt(py, handle, Vec::new()) }?;
+            decision_state = Some(Arc::clone(
+                &decision_owner
+                    .cast_bound::<ResourceRequestHandle>(py)
+                    .unwrap()
+                    .borrow()
+                    .state,
+            ));
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
-                return Ok(decision_state.finish_decision(false));
+                return Ok(u32::MAX);
             };
             let result = callback.bind(py).call1((
                 {
@@ -1665,19 +1684,21 @@ unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
                         generated_copy_mln_resource_request_info(py, &referenced)?
                     }
                 },
-                Py::new(
-                    py,
-                    ResourceRequestHandle {
-                        state: ManuallyDrop::new(Arc::clone(&decision_state)),
-                        cancel_root: Mutex::new(std::sync::Weak::new()),
-                    },
-                )?,
+                decision_owner.clone_ref(py),
             ))?;
-            let decision = result.extract::<u32>()?;
-            Ok(decision_state
-                .finish_decision(decision == sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE))
+            result.extract::<u32>()
         },
-    )
+    );
+    if outcome != sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE {
+        if let Some(state) = decision_state {
+            state
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .handle
+                .hand_off();
+        }
+    }
+    outcome
 }
 
 fn generated_copy_mln_resource_range(
@@ -1688,6 +1709,26 @@ fn generated_copy_mln_resource_range(
     dict.set_item("start", generated_value(py, value.start)?)?;
     dict.set_item("end", generated_value(py, value.end)?)?;
     Ok(dict.into_any().unbind())
+}
+
+unsafe extern "C" fn generated_callback_mln_resource_request_cancel_handler_callback(
+    user_data: *mut std::ffi::c_void,
+    _handle: sys::mln_resource_request,
+) {
+    let _scope = maplibre_core::callback::CallbackScope::enter();
+
+    let outcome = generated_invoke(
+        || (),
+        |py| {
+            let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
+                return Ok(());
+            };
+            let _result = callback.bind(py).call1(())?;
+            Ok(())
+        },
+    );
+
+    outcome
 }
 
 fn generated_copy_mln_resource_request_info(
@@ -1756,8 +1797,10 @@ unsafe extern "C" fn generated_callback_mln_resource_transform_callback(
     url: *const std::ffi::c_char,
     request: sys::mln_resource_transform_request,
 ) {
+    let _scope = maplibre_core::callback::CallbackScope::enter();
+
     let request_adopted = std::cell::Cell::new(false);
-    generated_invoke(
+    let outcome = generated_invoke(
         || {
             if !request_adopted.get() {
                 unsafe { sys::mln_resource_transform_request_release(request) };
@@ -1778,7 +1821,9 @@ unsafe extern "C" fn generated_callback_mln_resource_transform_callback(
             ))?;
             Ok(())
         },
-    )
+    );
+
+    outcome
 }
 
 fn generated_copy_mln_runtime_event(
@@ -1852,7 +1897,9 @@ unsafe extern "C" fn generated_callback_mln_runtime_event_handler_callback(
     user_data: *mut std::ffi::c_void,
     events: *const sys::mln_event_batch_view,
 ) {
-    generated_invoke(
+    let _scope = maplibre_core::callback::CallbackScope::enter();
+
+    let outcome = generated_invoke(
         || (),
         |py| {
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
@@ -1869,7 +1916,9 @@ unsafe extern "C" fn generated_callback_mln_runtime_event_handler_callback(
             },))?;
             Ok(())
         },
-    )
+    );
+
+    outcome
 }
 
 fn generated_copy_mln_runtime_event_offline_region_response_error(
@@ -2456,7 +2505,9 @@ fn generated_copy_mln_vulkan_texture_frame(
 }
 
 unsafe extern "C" fn generated_callback_mln_wake_callback(user_data: *mut std::ffi::c_void) {
-    generated_invoke(
+    let _scope = maplibre_core::callback::CallbackScope::enter();
+
+    let outcome = generated_invoke(
         || (),
         |py| {
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
@@ -2465,7 +2516,9 @@ unsafe extern "C" fn generated_callback_mln_wake_callback(user_data: *mut std::f
             let _result = callback.bind(py).call1(())?;
             Ok(())
         },
-    )
+    );
+
+    outcome
 }
 
 fn generated_copy_mln_webgl_context_descriptor(
@@ -2803,7 +2856,7 @@ fn generated_input_mln_camera_transition_handler<'py>(
     if callback_enabled {
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
-        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
+        raw.release_user_data = Some(generated_release_callbacks);
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_camera_transition_handler_callback)
         } else {
@@ -2892,7 +2945,7 @@ fn generated_input_mln_custom_geometry_source_options<'py>(
             value.getattr("_invoke_fetch_tile")?.unbind(),
             value.getattr("_invoke_cancel_tile")?.unbind(),
         ]);
-        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
+        raw.release_user_data = Some(generated_release_callbacks);
         raw.fetch_tile = if fetch_tile_enabled {
             Some(generated_callback_mln_custom_geometry_source_options_fetch_tile)
         } else {
@@ -2933,7 +2986,7 @@ fn generated_input_mln_custom_mvt_vector_source_options<'py>(
             value.getattr("_invoke_fetch_tile")?.unbind(),
             value.getattr("_invoke_cancel_tile")?.unbind(),
         ]);
-        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
+        raw.release_user_data = Some(generated_release_callbacks);
         raw.fetch_tile = if fetch_tile_enabled {
             Some(generated_callback_mln_custom_mvt_vector_source_options_fetch_tile)
         } else {
@@ -3163,7 +3216,7 @@ fn generated_input_mln_http_header_transform<'py>(
     if callback_enabled {
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
-        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
+        raw.release_user_data = Some(generated_release_callbacks);
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_http_header_transform_callback)
         } else {
@@ -3228,7 +3281,7 @@ fn generated_input_mln_log_handler<'py>(
     if callback_enabled {
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
-        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
+        raw.release_user_data = Some(generated_release_callbacks);
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_log_handler_callback)
         } else {
@@ -3651,7 +3704,7 @@ fn generated_input_mln_queue_lock<'py>(
             value.getattr("_invoke_lock")?.unbind(),
             value.getattr("_invoke_unlock")?.unbind(),
         ]);
-        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
+        raw.release_user_data = Some(generated_release_callbacks);
         raw.lock = if lock_enabled {
             Some(generated_callback_mln_queue_lock_lock)
         } else {
@@ -3759,9 +3812,29 @@ fn generated_input_mln_resource_provider<'py>(
     if callback_enabled {
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
-        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
+        raw.release_user_data = Some(generated_release_callbacks);
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_resource_provider_callback)
+        } else {
+            None
+        };
+    }
+    Ok(raw)
+}
+
+fn generated_input_mln_resource_request_cancel_handler<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_resource_request_cancel_handler> {
+    let mut raw: sys::mln_resource_request_cancel_handler = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_resource_request_cancel_handler>() as _;
+    let callback_enabled = !value.getattr("callback")?.is_none();
+    if callback_enabled {
+        raw.user_data =
+            storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
+        raw.release_user_data = Some(generated_release_callbacks);
+        raw.callback = if callback_enabled {
+            Some(generated_callback_mln_resource_request_cancel_handler_callback)
         } else {
             None
         };
@@ -3833,7 +3906,7 @@ fn generated_input_mln_resource_transform<'py>(
     if callback_enabled {
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
-        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
+        raw.release_user_data = Some(generated_release_callbacks);
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_resource_transform_callback)
         } else {
@@ -3853,7 +3926,7 @@ fn generated_input_mln_runtime_event_handler<'py>(
     if callback_enabled {
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
-        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
+        raw.release_user_data = Some(generated_release_callbacks);
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_runtime_event_handler_callback)
         } else {
@@ -4145,7 +4218,7 @@ fn generated_input_mln_wake<'py>(
     if callback_enabled {
         raw.user_data =
             storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
-        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
+        raw.release_user_data = Some(generated_release_callbacks);
         raw.callback = if callback_enabled {
             Some(generated_callback_mln_wake_callback)
         } else {
@@ -4264,266 +4337,228 @@ fn generated_input_mln_wgl_context_descriptor<'py>(
 }
 #[pyfunction]
 fn _default_animation_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_animation_options_default() };
     generated_copy_mln_animation_options(py, &value)
 }
 
 #[pyfunction]
 fn _default_bound_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_bound_options_default() };
     generated_copy_mln_bound_options(py, &value)
 }
 
 #[pyfunction]
 fn _default_camera_delta(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_camera_delta_default() };
     generated_copy_mln_camera_delta(py, &value)
 }
 
 #[pyfunction]
 fn _default_camera_fit_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_camera_fit_options_default() };
     generated_copy_mln_camera_fit_options(py, &value)
 }
 
 #[pyfunction]
 fn _default_camera_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_camera_options_default() };
     generated_copy_mln_camera_options(py, &value)
 }
 
 #[pyfunction]
 fn _default_camera_update(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_camera_update_default() };
     generated_copy_mln_camera_update(py, &value)
 }
 
 #[pyfunction]
 fn _default_custom_geometry_source_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_custom_geometry_source_options_default() };
     generated_copy_mln_custom_geometry_source_options(py, &value)
 }
 
 #[pyfunction]
 fn _default_custom_mvt_vector_source_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_custom_mvt_vector_source_options_default() };
     generated_copy_mln_custom_mvt_vector_source_options(py, &value)
 }
 
 #[pyfunction]
 fn _default_frame_demand(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_frame_demand_default() };
     generated_copy_mln_frame_demand(py, &value)
 }
 
 #[pyfunction]
 fn _default_free_camera_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_free_camera_options_default() };
     generated_copy_mln_free_camera_options(py, &value)
 }
 
 #[pyfunction]
 fn _default_geojson_source_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_geojson_source_options_default() };
     generated_copy_mln_geojson_source_options(py, &value)
 }
 
 #[pyfunction]
 fn _default_gpu_sync(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_gpu_sync_default() };
     generated_copy_mln_gpu_sync(py, &value)
 }
 
 #[pyfunction]
 fn _default_http_header_rule(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_http_header_rule_default() };
     generated_copy_mln_http_header_rule(py, &value)
 }
 
 #[pyfunction]
 fn _default_logical_extent(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_logical_extent_default() };
     generated_copy_mln_logical_extent(py, &value)
 }
 
 #[pyfunction]
 fn _default_map_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_map_options_default() };
     generated_copy_mln_map_options(py, &value)
 }
 
 #[pyfunction]
 fn _default_map_tile_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_map_tile_options_default() };
     generated_copy_mln_map_tile_options(py, &value)
 }
 
 #[pyfunction]
 fn _default_map_viewport_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_map_viewport_options_default() };
     generated_copy_mln_map_viewport_options(py, &value)
 }
 
 #[pyfunction]
 fn _default_metal_borrowed_texture_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_metal_borrowed_texture_descriptor_default() };
     generated_copy_mln_metal_borrowed_texture_descriptor(py, &value)
 }
 
 #[pyfunction]
 fn _default_metal_owned_texture_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_metal_owned_texture_descriptor_default() };
     generated_copy_mln_metal_owned_texture_descriptor(py, &value)
 }
 
 #[pyfunction]
 fn _default_metal_surface_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_metal_surface_descriptor_default() };
     generated_copy_mln_metal_surface_descriptor(py, &value)
 }
 
 #[pyfunction]
 fn _default_opengl_borrowed_texture_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_opengl_borrowed_texture_descriptor_default() };
     generated_copy_mln_opengl_borrowed_texture_descriptor(py, &value)
 }
 
 #[pyfunction]
 fn _default_opengl_owned_texture_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_opengl_owned_texture_descriptor_default() };
     generated_copy_mln_opengl_owned_texture_descriptor(py, &value)
 }
 
 #[pyfunction]
 fn _default_opengl_surface_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_opengl_surface_descriptor_default() };
     generated_copy_mln_opengl_surface_descriptor(py, &value)
 }
 
 #[pyfunction]
 fn _default_premultiplied_rgba8_image(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_premultiplied_rgba8_image_default() };
     generated_copy_mln_premultiplied_rgba8_image(py, &value)
 }
 
 #[pyfunction]
 fn _default_projection_mode(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_projection_mode_default() };
     generated_copy_mln_projection_mode(py, &value)
 }
 
 #[pyfunction]
 fn _default_render_session_attach_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_render_session_attach_options_default() };
     generated_copy_mln_render_session_attach_options(py, &value)
 }
 
 #[pyfunction]
 fn _default_rendered_feature_query_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_rendered_feature_query_options_default() };
     generated_copy_mln_rendered_feature_query_options(py, &value)
 }
 
 #[pyfunction]
 fn _default_resource_route(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_resource_route_default() };
     generated_copy_mln_resource_route(py, &value)
 }
 
 #[pyfunction]
 fn _default_runtime_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_runtime_options_default() };
     generated_copy_mln_runtime_options(py, &value)
 }
 
 #[pyfunction]
 fn _default_source_feature_query_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_source_feature_query_options_default() };
     generated_copy_mln_source_feature_query_options(py, &value)
 }
 
 #[pyfunction]
 fn _default_style_image_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_style_image_options_default() };
     generated_copy_mln_style_image_options(py, &value)
 }
 
 #[pyfunction]
 fn _default_style_transition_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_style_transition_options_default() };
     generated_copy_mln_style_transition_options(py, &value)
 }
 
 #[pyfunction]
 fn _default_vulkan_borrowed_texture_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_vulkan_borrowed_texture_descriptor_default() };
     generated_copy_mln_vulkan_borrowed_texture_descriptor(py, &value)
 }
 
 #[pyfunction]
 fn _default_vulkan_owned_texture_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_vulkan_owned_texture_descriptor_default() };
     generated_copy_mln_vulkan_owned_texture_descriptor(py, &value)
 }
 
 #[pyfunction]
 fn _default_vulkan_surface_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_vulkan_surface_descriptor_default() };
     generated_copy_mln_vulkan_surface_descriptor(py, &value)
 }
 
 #[pyfunction]
 fn _default_webgpu_borrowed_texture_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_webgpu_borrowed_texture_descriptor_default() };
     generated_copy_mln_webgpu_borrowed_texture_descriptor(py, &value)
 }
 
 #[pyfunction]
 fn _default_webgpu_owned_texture_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_webgpu_owned_texture_descriptor_default() };
     generated_copy_mln_webgpu_owned_texture_descriptor(py, &value)
 }
 
 #[pyfunction]
 fn _default_webgpu_surface_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
     let value = unsafe { sys::mln_webgpu_surface_descriptor_default() };
     generated_copy_mln_webgpu_surface_descriptor(py, &value)
 }
@@ -4564,6 +4599,13 @@ unsafe extern "C" fn generated_dispose_mln_render_session(
     unsafe { sys::mln_render_session_dispose(handle, std::ptr::null_mut()) }
 }
 
+unsafe extern "C" fn generated_dispose_mln_resource_request(
+    handle: sys::mln_resource_request,
+) -> sys::mln_status {
+    unsafe { sys::mln_resource_request_release(handle) };
+    sys::MLN_STATUS_OK
+}
+
 unsafe extern "C" fn generated_dispose_mln_resource_transform_request(
     handle: sys::mln_resource_transform_request,
 ) -> sys::mln_status {
@@ -4579,9 +4621,8 @@ unsafe extern "C" fn generated_dispose_mln_runtime(handle: sys::mln_runtime) -> 
 impl AcquiredFrameHandle {
     #[pyo3(signature = ())]
     fn with_metal_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_acquired_frame_get_metal_texture", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let mut out_frame: sys::mln_metal_texture_frame = unsafe { std::mem::zeroed() };
         out_frame.size = std::mem::size_of::<sys::mln_metal_texture_frame>() as _;
         unsafe {
@@ -4593,12 +4634,8 @@ impl AcquiredFrameHandle {
     }
     #[pyo3(signature = ())]
     fn with_opengl_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_acquired_frame_get_opengl_texture",
-            self.admission(),
-        )?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let mut out_frame: sys::mln_opengl_texture_frame = unsafe { std::mem::zeroed() };
         out_frame.size = std::mem::size_of::<sys::mln_opengl_texture_frame>() as _;
         unsafe {
@@ -4610,9 +4647,8 @@ impl AcquiredFrameHandle {
     }
     #[pyo3(signature = ())]
     fn with_producer_sync(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_acquired_frame_get_producer_sync", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let mut out_sync: sys::mln_gpu_sync = unsafe { sys::mln_gpu_sync_default() };
         out_sync.size = std::mem::size_of::<sys::mln_gpu_sync>() as _;
         unsafe {
@@ -4624,8 +4660,8 @@ impl AcquiredFrameHandle {
     }
     #[pyo3(signature = ())]
     fn get_result(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_acquired_frame_get_result", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let mut out_result: sys::mln_render_frame_result = unsafe { std::mem::zeroed() };
         out_result.size = std::mem::size_of::<sys::mln_render_frame_result>() as _;
         unsafe {
@@ -4637,12 +4673,8 @@ impl AcquiredFrameHandle {
     }
     #[pyo3(signature = ())]
     fn with_vulkan_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_acquired_frame_get_vulkan_texture",
-            self.admission(),
-        )?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let mut out_frame: sys::mln_vulkan_texture_frame = unsafe { std::mem::zeroed() };
         out_frame.size = std::mem::size_of::<sys::mln_vulkan_texture_frame>() as _;
         unsafe {
@@ -4654,12 +4686,8 @@ impl AcquiredFrameHandle {
     }
     #[pyo3(signature = ())]
     fn with_webgpu_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_acquired_frame_get_webgpu_texture",
-            self.admission(),
-        )?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let mut out_frame: sys::mln_webgpu_texture_frame = unsafe { std::mem::zeroed() };
         out_frame.size = std::mem::size_of::<sys::mln_webgpu_texture_frame>() as _;
         unsafe {
@@ -4675,7 +4703,7 @@ impl AcquiredFrameHandle {
         py: Python<'_>,
         consumer_completion: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_acquired_frame_release", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let consumer_completion = consumer_completion.unwrap_or_else(|| py.None().into_bound(py));
         let consumer_completion_value =
@@ -4698,7 +4726,7 @@ impl AcquiredFrameHandle {
 impl GeojsonSourceDataHandle {
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_geojson_source_data_release", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let Some(mut reservation) = self.reserve()? else {
             return Ok(py.None());
         };
@@ -4718,11 +4746,7 @@ impl HttpHeaderTransformResponseScope {
         name: &Bound<'_, PyAny>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_http_header_transform_response_set_header",
-            self.native as u64,
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let name_value = storage.buffer(name.clone(), true)?;
         let value_value = storage.buffer(value.clone(), true)?;
@@ -4751,14 +4775,13 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_add_custom_geometry_source", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_custom_geometry_source_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let future = unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_add_custom_geometry_source(
@@ -4781,14 +4804,13 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_add_custom_geometry_source", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_custom_geometry_source_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let future = unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_add_custom_geometry_source(
@@ -4811,14 +4833,13 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_add_custom_mvt_vector_source", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_custom_mvt_vector_source_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let future = unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_add_custom_mvt_vector_source(
@@ -4841,14 +4862,13 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_add_custom_mvt_vector_source", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_custom_mvt_vector_source_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let future = unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_add_custom_mvt_vector_source(
@@ -4871,11 +4891,11 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         data: &GeojsonSourceDataHandle,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_geojson_source_data", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let data_handle = data.input()?;
-        let handle = self.live()?;
+        let data_handle = data.input();
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_add_geojson_source_data(
@@ -4895,11 +4915,11 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         data: &GeojsonSourceDataHandle,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_geojson_source_data", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let data_handle = data.input()?;
-        let handle = self.live()?;
+        let data_handle = data.input();
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_add_geojson_source_data(
@@ -4920,7 +4940,7 @@ impl MapHandle {
         url: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_geojson_source_url", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let url_value = storage.buffer(url.clone(), true)?;
@@ -4928,7 +4948,7 @@ impl MapHandle {
         let options_value = generated_maybe(&options, |options| {
             generated_input_mln_geojson_source_options(&options, storage)
         })?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_add_geojson_source_url(
@@ -4950,7 +4970,7 @@ impl MapHandle {
         url: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_geojson_source_url", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let url_value = storage.buffer(url.clone(), true)?;
@@ -4958,7 +4978,7 @@ impl MapHandle {
         let options_value = generated_maybe(&options, |options| {
             generated_input_mln_geojson_source_options(&options, storage)
         })?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_add_geojson_source_url(
@@ -4980,7 +5000,7 @@ impl MapHandle {
         coordinates: &Bound<'_, PyAny>,
         image: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_image_source_image", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let coordinates_values = generated_items(coordinates, |item| {
@@ -4988,7 +5008,7 @@ impl MapHandle {
         })?;
         let image = image.unwrap_or_else(|| py.None().into_bound(py));
         let image_value = generated_input_mln_premultiplied_rgba8_image(&image.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_add_image_source_image(
@@ -5011,7 +5031,7 @@ impl MapHandle {
         coordinates: &Bound<'_, PyAny>,
         image: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_image_source_image", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let coordinates_values = generated_items(coordinates, |item| {
@@ -5019,7 +5039,7 @@ impl MapHandle {
         })?;
         let image = image.unwrap_or_else(|| py.None().into_bound(py));
         let image_value = generated_input_mln_premultiplied_rgba8_image(&image.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_add_image_source_image(
@@ -5042,14 +5062,14 @@ impl MapHandle {
         coordinates: &Bound<'_, PyAny>,
         url: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_image_source_url", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let coordinates_values = generated_items(coordinates, |item| {
             generated_input_mln_lat_lng(&item, storage)
         })?;
         let url_value = storage.buffer(url.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_add_image_source_url(
@@ -5072,14 +5092,14 @@ impl MapHandle {
         coordinates: &Bound<'_, PyAny>,
         url: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_image_source_url", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let coordinates_values = generated_items(coordinates, |item| {
             generated_input_mln_lat_lng(&item, storage)
         })?;
         let url_value = storage.buffer(url.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_add_image_source_url(
@@ -5101,12 +5121,12 @@ impl MapHandle {
         layer_json: &Bound<'_, PyAny>,
         before_layer_id: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_style_layer_json", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_json_value = storage.buffer(layer_json.clone(), false)?;
         let before_layer_id = before_layer_id.unwrap_or_else(|| py.None().into_bound(py));
         let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_add_style_layer_json(
@@ -5126,12 +5146,12 @@ impl MapHandle {
         layer_json: &Bound<'_, PyAny>,
         before_layer_id: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_style_layer_json", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_json_value = storage.buffer(layer_json.clone(), false)?;
         let before_layer_id = before_layer_id.unwrap_or_else(|| py.None().into_bound(py));
         let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_add_style_layer_json(
@@ -5151,11 +5171,11 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         source_json: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_style_source_json", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let source_json_value = storage.buffer(source_json.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_add_style_source_json(
@@ -5175,11 +5195,11 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         source_json: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_add_style_source_json", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let source_json_value = storage.buffer(source_json.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_add_style_source_json(
@@ -5198,11 +5218,11 @@ impl MapHandle {
         py: Python<'_>,
         delta: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_apply_camera_delta", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let delta = delta.unwrap_or_else(|| py.None().into_bound(py));
         let delta_value = generated_input_mln_camera_delta(&delta.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let future = unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_apply_camera_delta(handle, &delta_value, completion, diagnostic)
@@ -5218,11 +5238,11 @@ impl MapHandle {
         py: Python<'_>,
         delta: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_apply_camera_delta", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let delta = delta.unwrap_or_else(|| py.None().into_bound(py));
         let delta_value = generated_input_mln_camera_delta(&delta.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let future = unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_apply_camera_delta(handle, &delta_value, completion, diagnostic)
@@ -5239,11 +5259,7 @@ impl MapHandle {
         descriptor: Option<Bound<'_, PyAny>>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_attach_metal_borrowed_texture",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
@@ -5251,7 +5267,7 @@ impl MapHandle {
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let convert = py_none;
         let future = unsafe {
@@ -5287,8 +5303,7 @@ impl MapHandle {
         descriptor: Option<Bound<'_, PyAny>>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_attach_metal_owned_texture", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
@@ -5296,7 +5311,7 @@ impl MapHandle {
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let convert = py_none;
         let future = unsafe {
@@ -5332,7 +5347,7 @@ impl MapHandle {
         descriptor: Option<Bound<'_, PyAny>>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_attach_metal_surface", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
@@ -5340,7 +5355,7 @@ impl MapHandle {
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let convert = py_none;
         let future = unsafe {
@@ -5376,11 +5391,7 @@ impl MapHandle {
         descriptor: Option<Bound<'_, PyAny>>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_attach_opengl_borrowed_texture",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
@@ -5388,7 +5399,7 @@ impl MapHandle {
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let convert = py_none;
         let future = unsafe {
@@ -5424,8 +5435,7 @@ impl MapHandle {
         descriptor: Option<Bound<'_, PyAny>>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_attach_opengl_owned_texture", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
@@ -5433,7 +5443,7 @@ impl MapHandle {
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let convert = py_none;
         let future = unsafe {
@@ -5469,7 +5479,7 @@ impl MapHandle {
         descriptor: Option<Bound<'_, PyAny>>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_attach_opengl_surface", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
@@ -5477,7 +5487,7 @@ impl MapHandle {
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let convert = py_none;
         let future = unsafe {
@@ -5513,11 +5523,7 @@ impl MapHandle {
         descriptor: Option<Bound<'_, PyAny>>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_attach_vulkan_borrowed_texture",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
@@ -5525,7 +5531,7 @@ impl MapHandle {
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let convert = py_none;
         let future = unsafe {
@@ -5561,8 +5567,7 @@ impl MapHandle {
         descriptor: Option<Bound<'_, PyAny>>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_attach_vulkan_owned_texture", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
@@ -5570,7 +5575,7 @@ impl MapHandle {
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let convert = py_none;
         let future = unsafe {
@@ -5606,7 +5611,7 @@ impl MapHandle {
         descriptor: Option<Bound<'_, PyAny>>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_attach_vulkan_surface", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
@@ -5614,7 +5619,7 @@ impl MapHandle {
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let convert = py_none;
         let future = unsafe {
@@ -5650,11 +5655,7 @@ impl MapHandle {
         descriptor: Option<Bound<'_, PyAny>>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_attach_webgpu_borrowed_texture",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
@@ -5662,7 +5663,7 @@ impl MapHandle {
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let convert = py_none;
         let future = unsafe {
@@ -5698,8 +5699,7 @@ impl MapHandle {
         descriptor: Option<Bound<'_, PyAny>>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_attach_webgpu_owned_texture", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
@@ -5707,7 +5707,7 @@ impl MapHandle {
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let convert = py_none;
         let future = unsafe {
@@ -5743,7 +5743,7 @@ impl MapHandle {
         descriptor: Option<Bound<'_, PyAny>>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_attach_webgpu_surface", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
@@ -5751,7 +5751,7 @@ impl MapHandle {
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let convert = py_none;
         let future = unsafe {
@@ -5782,8 +5782,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn begin_command_group(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_begin_command_group", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_begin_command_group(handle, completion, diagnostic)
@@ -5792,8 +5792,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn _discard_begin_command_group(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_begin_command_group", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_begin_command_group(handle, completion, diagnostic)
@@ -5807,14 +5807,14 @@ impl MapHandle {
         geometry: &Bound<'_, PyAny>,
         fit_options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_camera_for_geometry", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let geometry_value = storage.buffer(geometry.clone(), false)?;
         let fit_options = fit_options.unwrap_or_else(|| py.None().into_bound(py));
         let fit_options_value = generated_maybe(&fit_options, |fit_options| {
             generated_input_mln_camera_fit_options(&fit_options, storage)
         })?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_camera_options>(result)?;
             generated_copy_mln_camera_options(py, &value)
@@ -5841,15 +5841,14 @@ impl MapHandle {
         bounds: &Bound<'_, PyAny>,
         fit_options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_camera_for_lat_lng_bounds", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let bounds_value = generated_input_mln_lat_lng_bounds(&bounds.clone(), storage)?;
         let fit_options = fit_options.unwrap_or_else(|| py.None().into_bound(py));
         let fit_options_value = generated_maybe(&fit_options, |fit_options| {
             generated_input_mln_camera_fit_options(&fit_options, storage)
         })?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_camera_options>(result)?;
             generated_copy_mln_camera_options(py, &value)
@@ -5876,7 +5875,7 @@ impl MapHandle {
         coordinates: &Bound<'_, PyAny>,
         fit_options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_camera_for_lat_lngs", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let coordinates_values = generated_items(coordinates, |item| {
             generated_input_mln_lat_lng(&item, storage)
@@ -5885,7 +5884,7 @@ impl MapHandle {
         let fit_options_value = generated_maybe(&fit_options, |fit_options| {
             generated_input_mln_camera_fit_options(&fit_options, storage)
         })?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_camera_options>(result)?;
             generated_copy_mln_camera_options(py, &value)
@@ -5908,9 +5907,8 @@ impl MapHandle {
     }
     #[pyo3(signature = (transition_id))]
     fn cancel_camera_transition(&self, py: Python<'_>, transition_id: u64) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_cancel_camera_transition", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_cancel_camera_transition(handle, transition_id, completion, diagnostic)
@@ -5923,9 +5921,8 @@ impl MapHandle {
         py: Python<'_>,
         transition_id: u64,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_cancel_camera_transition", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_cancel_camera_transition(handle, transition_id, completion, diagnostic)
@@ -5934,8 +5931,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn cancel_transitions(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_cancel_transitions", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_cancel_transitions(handle, completion, diagnostic)
@@ -5944,8 +5941,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn _discard_cancel_transitions(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_cancel_transitions", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_cancel_transitions(handle, completion, diagnostic)
@@ -5954,8 +5951,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn create_projection(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_create_projection", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let mut out_projection: sys::mln_map_projection = unsafe { std::mem::zeroed() };
         unsafe {
             call.status(|diagnostic| {
@@ -5966,8 +5963,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn dump_debug_logs(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_dump_debug_logs", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_dump_debug_logs(handle, completion, diagnostic)
@@ -5976,8 +5973,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn _discard_dump_debug_logs(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_dump_debug_logs", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_dump_debug_logs(handle, completion, diagnostic)
@@ -5986,8 +5983,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn end_command_group(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_end_command_group", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_end_command_group(handle, completion, diagnostic)
@@ -5996,8 +5993,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn _discard_end_command_group(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_end_command_group", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_end_command_group(handle, completion, diagnostic)
@@ -6006,8 +6003,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn get_camera(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_get_camera", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_camera_query_result>(result)?;
             generated_copy_mln_camera_query_result(py, &value)
@@ -6025,11 +6022,11 @@ impl MapHandle {
         py: Python<'_>,
         selector: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_get_feature_state", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let selector_value =
             generated_input_mln_feature_state_selector(&selector.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_buffer_view>(result)?;
             unsafe { generated_bytes(py, value) }
@@ -6045,8 +6042,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn get_global_state(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_get_global_state", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_buffer_view>(result)?;
             unsafe { generated_bytes(py, value) }
@@ -6066,11 +6063,10 @@ impl MapHandle {
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_get_image_source_coordinates", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
             for value in generated_completion_values::<sys::mln_lat_lng>(result)? {
@@ -6094,8 +6090,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn get_loaded_style_json(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_get_loaded_style_json", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_buffer_view>(result)?;
             unsafe { generated_bytes(py, value) }
@@ -6111,8 +6107,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn get_snapshot(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_get_snapshot", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let mut out_snapshot: sys::mln_map_snapshot = unsafe { std::mem::zeroed() };
         out_snapshot.size = std::mem::size_of::<sys::mln_map_snapshot>() as _;
         unsafe {
@@ -6124,10 +6120,10 @@ impl MapHandle {
     }
     #[pyo3(signature = (image_id))]
     fn get_style_image(&self, py: Python<'_>, image_id: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_get_style_image", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let image_id_value = storage.buffer(image_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             if result.value.is_null() {
                 return Ok(py.None());
@@ -6146,10 +6142,10 @@ impl MapHandle {
     }
     #[pyo3(signature = (layer_id))]
     fn get_style_layer(&self, py: Python<'_>, layer_id: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_get_style_layer", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             if result.value.is_null() {
                 return Ok(py.None());
@@ -6172,10 +6168,10 @@ impl MapHandle {
         py: Python<'_>,
         layer_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_get_style_layer_json", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             if result.value.is_null() {
                 return Ok(py.None());
@@ -6206,12 +6202,11 @@ impl MapHandle {
         layer_id: &Bound<'_, PyAny>,
         property_name: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_get_style_layer_property", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_id_value = storage.buffer(layer_id.clone(), true)?;
         let property_name_value = storage.buffer(property_name.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             if result.value.is_null() {
                 return Ok(py.None());
@@ -6242,11 +6237,10 @@ impl MapHandle {
         py: Python<'_>,
         property_name: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_get_style_light_property", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let property_name_value = storage.buffer(property_name.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             if result.value.is_null() {
                 return Ok(py.None());
@@ -6276,10 +6270,10 @@ impl MapHandle {
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_get_style_source", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             if result.value.is_null() {
                 return Ok(py.None());
@@ -6298,9 +6292,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn get_style_transition_options(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_get_style_transition_options", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_style_transition_options>(result)?;
             generated_copy_mln_style_transition_options(py, &value)
@@ -6316,8 +6309,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn get_style_url(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_get_style_url", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_buffer_view>(result)?;
             generated_text(py, value)
@@ -6336,15 +6329,11 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         bounds: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_invalidate_custom_geometry_source_region",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let bounds_value = generated_input_mln_lat_lng_bounds(&bounds.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_invalidate_custom_geometry_source_region(
@@ -6364,15 +6353,11 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         bounds: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_invalidate_custom_geometry_source_region",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let bounds_value = generated_input_mln_lat_lng_bounds(&bounds.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_invalidate_custom_geometry_source_region(
@@ -6392,15 +6377,11 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         tile_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_invalidate_custom_geometry_source_tile",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let tile_id_value = generated_input_mln_canonical_tile_id(&tile_id.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_invalidate_custom_geometry_source_tile(
@@ -6420,15 +6401,11 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         tile_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_invalidate_custom_geometry_source_tile",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let tile_id_value = generated_input_mln_canonical_tile_id(&tile_id.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_invalidate_custom_geometry_source_tile(
@@ -6448,15 +6425,11 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         tile_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_invalidate_custom_mvt_vector_source_tile",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let tile_id_value = generated_input_mln_canonical_tile_id(&tile_id.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_invalidate_custom_mvt_vector_source_tile(
@@ -6476,15 +6449,11 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         tile_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_invalidate_custom_mvt_vector_source_tile",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let tile_id_value = generated_input_mln_canonical_tile_id(&tile_id.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_invalidate_custom_mvt_vector_source_tile(
@@ -6503,12 +6472,11 @@ impl MapHandle {
         py: Python<'_>,
         camera: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_lat_lng_bounds_for_camera", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let camera = camera.unwrap_or_else(|| py.None().into_bound(py));
         let camera_value = generated_input_mln_camera_options(&camera.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_lat_lng_bounds>(result)?;
             generated_copy_mln_lat_lng_bounds(py, &value)
@@ -6533,15 +6501,11 @@ impl MapHandle {
         py: Python<'_>,
         camera: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_lat_lng_bounds_for_camera_unwrapped",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let camera = camera.unwrap_or_else(|| py.None().into_bound(py));
         let camera_value = generated_input_mln_camera_options(&camera.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_lat_lng_bounds>(result)?;
             generated_copy_mln_lat_lng_bounds(py, &value)
@@ -6562,8 +6526,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn list_style_layers(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_list_style_layers", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
             for value in generated_completion_values::<sys::mln_style_layer_info>(result)? {
@@ -6582,8 +6546,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn list_style_sources(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_list_style_sources", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
             for value in generated_completion_values::<sys::mln_style_source_info>(result)? {
@@ -6607,12 +6571,12 @@ impl MapHandle {
         layer_id: &Bound<'_, PyAny>,
         before_layer_id: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_move_style_layer", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_id_value = storage.buffer(layer_id.clone(), true)?;
         let before_layer_id = before_layer_id.unwrap_or_else(|| py.None().into_bound(py));
         let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_move_style_layer(
@@ -6632,12 +6596,12 @@ impl MapHandle {
         layer_id: &Bound<'_, PyAny>,
         before_layer_id: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_move_style_layer", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_id_value = storage.buffer(layer_id.clone(), true)?;
         let before_layer_id = before_layer_id.unwrap_or_else(|| py.None().into_bound(py));
         let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_move_style_layer(
@@ -6652,7 +6616,7 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_release", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let Some(mut reservation) = self.reserve()? else {
             return completed_python_future(py);
         };
@@ -6673,11 +6637,11 @@ impl MapHandle {
         py: Python<'_>,
         selector: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_remove_feature_state", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let selector_value =
             generated_input_mln_feature_state_selector(&selector.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_remove_feature_state(handle, &selector_value, completion, diagnostic)
@@ -6690,11 +6654,11 @@ impl MapHandle {
         py: Python<'_>,
         selector: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_remove_feature_state", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let selector_value =
             generated_input_mln_feature_state_selector(&selector.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_remove_feature_state(handle, &selector_value, completion, diagnostic)
@@ -6707,10 +6671,10 @@ impl MapHandle {
         py: Python<'_>,
         image_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_remove_style_image", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let image_id_value = storage.buffer(image_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_remove_style_image(handle, image_id_value, completion, diagnostic)
@@ -6723,10 +6687,10 @@ impl MapHandle {
         py: Python<'_>,
         image_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_remove_style_image", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let image_id_value = storage.buffer(image_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_remove_style_image(handle, image_id_value, completion, diagnostic)
@@ -6739,10 +6703,10 @@ impl MapHandle {
         py: Python<'_>,
         layer_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_remove_style_layer", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_remove_style_layer(handle, layer_id_value, completion, diagnostic)
@@ -6755,10 +6719,10 @@ impl MapHandle {
         py: Python<'_>,
         layer_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_remove_style_layer", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_remove_style_layer(handle, layer_id_value, completion, diagnostic)
@@ -6771,10 +6735,10 @@ impl MapHandle {
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_remove_style_source", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_remove_style_source(handle, source_id_value, completion, diagnostic)
@@ -6787,10 +6751,10 @@ impl MapHandle {
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_remove_style_source", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_remove_style_source(handle, source_id_value, completion, diagnostic)
@@ -6799,8 +6763,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn request_repaint(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_request_repaint", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_request_repaint(handle, completion, diagnostic)
@@ -6809,8 +6773,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn _discard_request_repaint(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_request_repaint", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_request_repaint(handle, completion, diagnostic)
@@ -6819,8 +6783,8 @@ impl MapHandle {
     }
     #[pyo3(signature = ())]
     fn request_still_image(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_request_still_image", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -6833,11 +6797,11 @@ impl MapHandle {
     }
     #[pyo3(signature = (extent=None))]
     fn resize(&self, py: Python<'_>, extent: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_resize", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let extent = extent.unwrap_or_else(|| py.None().into_bound(py));
         let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_resize(handle, extent_value, completion, diagnostic)
@@ -6850,11 +6814,11 @@ impl MapHandle {
         py: Python<'_>,
         extent: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_resize", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let extent = extent.unwrap_or_else(|| py.None().into_bound(py));
         let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_resize(handle, extent_value, completion, diagnostic)
@@ -6863,11 +6827,11 @@ impl MapHandle {
     }
     #[pyo3(signature = (options=None))]
     fn set_bounds(&self, py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_bounds", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_bound_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_bounds(handle, &options_value, completion, diagnostic)
@@ -6880,11 +6844,11 @@ impl MapHandle {
         py: Python<'_>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_bounds", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_bound_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_bounds(handle, &options_value, completion, diagnostic)
@@ -6899,16 +6863,12 @@ impl MapHandle {
         tile_id: &Bound<'_, PyAny>,
         data: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_set_custom_geometry_source_tile_data",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let tile_id_value = generated_input_mln_canonical_tile_id(&tile_id.clone(), storage)?;
         let data_value = storage.buffer(data.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_custom_geometry_source_tile_data(
@@ -6930,16 +6890,12 @@ impl MapHandle {
         tile_id: &Bound<'_, PyAny>,
         data: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_set_custom_geometry_source_tile_data",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let tile_id_value = generated_input_mln_canonical_tile_id(&tile_id.clone(), storage)?;
         let data_value = storage.buffer(data.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_custom_geometry_source_tile_data(
@@ -6961,16 +6917,12 @@ impl MapHandle {
         tile_id: &Bound<'_, PyAny>,
         data: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_set_custom_mvt_vector_source_tile_data",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let tile_id_value = generated_input_mln_canonical_tile_id(&tile_id.clone(), storage)?;
         let data_value = storage.buffer(data.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_custom_mvt_vector_source_tile_data(
@@ -6992,16 +6944,12 @@ impl MapHandle {
         tile_id: &Bound<'_, PyAny>,
         data: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_set_custom_mvt_vector_source_tile_data",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let tile_id_value = generated_input_mln_canonical_tile_id(&tile_id.clone(), storage)?;
         let data_value = storage.buffer(data.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_custom_mvt_vector_source_tile_data(
@@ -7023,16 +6971,12 @@ impl MapHandle {
         tile_id: &Bound<'_, PyAny>,
         message: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_set_custom_mvt_vector_source_tile_error",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let tile_id_value = generated_input_mln_canonical_tile_id(&tile_id.clone(), storage)?;
         let message_value = storage.buffer(message.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_custom_mvt_vector_source_tile_error(
@@ -7054,16 +6998,12 @@ impl MapHandle {
         tile_id: &Bound<'_, PyAny>,
         message: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_set_custom_mvt_vector_source_tile_error",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let tile_id_value = generated_input_mln_canonical_tile_id(&tile_id.clone(), storage)?;
         let message_value = storage.buffer(message.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_custom_mvt_vector_source_tile_error(
@@ -7083,8 +7023,8 @@ impl MapHandle {
         py: Python<'_>,
         options: sys::mln_map_debug_option,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_debug_options", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_debug_options(handle, options, completion, diagnostic)
@@ -7097,8 +7037,8 @@ impl MapHandle {
         py: Python<'_>,
         options: sys::mln_map_debug_option,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_debug_options", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_debug_options(handle, options, completion, diagnostic)
@@ -7111,8 +7051,8 @@ impl MapHandle {
         py: Python<'_>,
         mask: sys::mln_runtime_event_mask,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_event_mask", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_event_mask(handle, mask, completion, diagnostic)
@@ -7125,8 +7065,8 @@ impl MapHandle {
         py: Python<'_>,
         mask: sys::mln_runtime_event_mask,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_event_mask", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_event_mask(handle, mask, completion, diagnostic)
@@ -7140,12 +7080,12 @@ impl MapHandle {
         selector: &Bound<'_, PyAny>,
         input_state: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_feature_state", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let selector_value =
             generated_input_mln_feature_state_selector(&selector.clone(), storage)?;
         let input_state_value = storage.buffer(input_state.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_feature_state(
@@ -7165,12 +7105,12 @@ impl MapHandle {
         selector: &Bound<'_, PyAny>,
         input_state: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_feature_state", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let selector_value =
             generated_input_mln_feature_state_selector(&selector.clone(), storage)?;
         let input_state_value = storage.buffer(input_state.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_feature_state(
@@ -7189,11 +7129,11 @@ impl MapHandle {
         py: Python<'_>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_free_camera_options", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_free_camera_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_free_camera_options(handle, &options_value, completion, diagnostic)
@@ -7206,11 +7146,11 @@ impl MapHandle {
         py: Python<'_>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_free_camera_options", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_free_camera_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_free_camera_options(handle, &options_value, completion, diagnostic)
@@ -7224,11 +7164,11 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         data: &GeojsonSourceDataHandle,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_geojson_source_data", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let data_handle = data.input()?;
-        let handle = self.live()?;
+        let data_handle = data.input();
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_geojson_source_data(
@@ -7248,11 +7188,11 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         data: &GeojsonSourceDataHandle,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_geojson_source_data", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let data_handle = data.input()?;
-        let handle = self.live()?;
+        let data_handle = data.input();
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_geojson_source_data(
@@ -7272,14 +7212,10 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         enabled: bool,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_set_geojson_source_synchronous_tiling",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_geojson_source_synchronous_tiling(
@@ -7299,14 +7235,10 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         enabled: bool,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_set_geojson_source_synchronous_tiling",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_geojson_source_synchronous_tiling(
@@ -7326,11 +7258,11 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         url: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_geojson_source_url", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let url_value = storage.buffer(url.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_geojson_source_url(
@@ -7350,11 +7282,11 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         url: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_geojson_source_url", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let url_value = storage.buffer(url.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_geojson_source_url(
@@ -7374,12 +7306,11 @@ impl MapHandle {
         property_name: &Bound<'_, PyAny>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_set_global_state_property", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let property_name_value = storage.buffer(property_name.clone(), true)?;
         let value_value = storage.buffer(value.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_global_state_property(
@@ -7399,12 +7330,11 @@ impl MapHandle {
         property_name: &Bound<'_, PyAny>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_set_global_state_property", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let property_name_value = storage.buffer(property_name.clone(), true)?;
         let value_value = storage.buffer(value.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_global_state_property(
@@ -7424,14 +7354,13 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         coordinates: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_set_image_source_coordinates", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let coordinates_values = generated_items(coordinates, |item| {
             generated_input_mln_lat_lng(&item, storage)
         })?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_image_source_coordinates(
@@ -7452,14 +7381,13 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         coordinates: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_set_image_source_coordinates", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let coordinates_values = generated_items(coordinates, |item| {
             generated_input_mln_lat_lng(&item, storage)
         })?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_image_source_coordinates(
@@ -7480,12 +7408,12 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         image: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_image_source_image", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let image = image.unwrap_or_else(|| py.None().into_bound(py));
         let image_value = generated_input_mln_premultiplied_rgba8_image(&image.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_image_source_image(
@@ -7505,12 +7433,12 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         image: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_image_source_image", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let image = image.unwrap_or_else(|| py.None().into_bound(py));
         let image_value = generated_input_mln_premultiplied_rgba8_image(&image.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_image_source_image(
@@ -7530,11 +7458,11 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         url: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_image_source_url", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let url_value = storage.buffer(url.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_image_source_url(
@@ -7554,11 +7482,11 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         url: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_image_source_url", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let url_value = storage.buffer(url.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_image_source_url(
@@ -7577,11 +7505,11 @@ impl MapHandle {
         py: Python<'_>,
         mode: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_projection_mode", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let mode = mode.unwrap_or_else(|| py.None().into_bound(py));
         let mode_value = generated_input_mln_projection_mode(&mode.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_projection_mode(handle, &mode_value, completion, diagnostic)
@@ -7594,11 +7522,11 @@ impl MapHandle {
         py: Python<'_>,
         mode: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_projection_mode", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let mode = mode.unwrap_or_else(|| py.None().into_bound(py));
         let mode_value = generated_input_mln_projection_mode(&mode.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_projection_mode(handle, &mode_value, completion, diagnostic)
@@ -7611,12 +7539,8 @@ impl MapHandle {
         py: Python<'_>,
         enabled: bool,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_set_rendering_stats_view_enabled",
-            self.admission(),
-        )?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_rendering_stats_view_enabled(
@@ -7631,12 +7555,8 @@ impl MapHandle {
         py: Python<'_>,
         enabled: bool,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_set_rendering_stats_view_enabled",
-            self.admission(),
-        )?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_rendering_stats_view_enabled(
@@ -7653,7 +7573,7 @@ impl MapHandle {
         image: Option<Bound<'_, PyAny>>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_style_image", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let image_id_value = storage.buffer(image_id.clone(), true)?;
         let image = image.unwrap_or_else(|| py.None().into_bound(py));
@@ -7662,7 +7582,7 @@ impl MapHandle {
         let options_value = generated_maybe(&options, |options| {
             generated_input_mln_style_image_options(&options, storage)
         })?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_style_image(
@@ -7684,7 +7604,7 @@ impl MapHandle {
         image: Option<Bound<'_, PyAny>>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_style_image", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let image_id_value = storage.buffer(image_id.clone(), true)?;
         let image = image.unwrap_or_else(|| py.None().into_bound(py));
@@ -7693,7 +7613,7 @@ impl MapHandle {
         let options_value = generated_maybe(&options, |options| {
             generated_input_mln_style_image_options(&options, storage)
         })?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_style_image(
@@ -7709,10 +7629,10 @@ impl MapHandle {
     }
     #[pyo3(signature = (json))]
     fn set_style_json(&self, py: Python<'_>, json: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_style_json", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let json_value = storage.buffer(json.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_style_json(handle, json_value, completion, diagnostic)
@@ -7725,10 +7645,10 @@ impl MapHandle {
         py: Python<'_>,
         json: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_style_json", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let json_value = storage.buffer(json.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_style_json(handle, json_value, completion, diagnostic)
@@ -7743,13 +7663,12 @@ impl MapHandle {
         property_name: &Bound<'_, PyAny>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_set_style_layer_property", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_id_value = storage.buffer(layer_id.clone(), true)?;
         let property_name_value = storage.buffer(property_name.clone(), true)?;
         let value_value = storage.buffer(value.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_style_layer_property(
@@ -7771,13 +7690,12 @@ impl MapHandle {
         property_name: &Bound<'_, PyAny>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_set_style_layer_property", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_id_value = storage.buffer(layer_id.clone(), true)?;
         let property_name_value = storage.buffer(property_name.clone(), true)?;
         let value_value = storage.buffer(value.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_style_layer_property(
@@ -7797,10 +7715,10 @@ impl MapHandle {
         py: Python<'_>,
         light_json: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_style_light_json", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let light_json_value = storage.buffer(light_json.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_style_light_json(handle, light_json_value, completion, diagnostic)
@@ -7813,10 +7731,10 @@ impl MapHandle {
         py: Python<'_>,
         light_json: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_style_light_json", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let light_json_value = storage.buffer(light_json.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_style_light_json(handle, light_json_value, completion, diagnostic)
@@ -7830,12 +7748,11 @@ impl MapHandle {
         property_name: &Bound<'_, PyAny>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_set_style_light_property", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let property_name_value = storage.buffer(property_name.clone(), true)?;
         let value_value = storage.buffer(value.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_style_light_property(
@@ -7855,12 +7772,11 @@ impl MapHandle {
         property_name: &Bound<'_, PyAny>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_set_style_light_property", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let property_name_value = storage.buffer(property_name.clone(), true)?;
         let value_value = storage.buffer(value.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_style_light_property(
@@ -7880,11 +7796,10 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         is_volatile: bool,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_set_style_source_volatile", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_style_source_volatile(
@@ -7904,11 +7819,10 @@ impl MapHandle {
         source_id: &Bound<'_, PyAny>,
         is_volatile: bool,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_set_style_source_volatile", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_style_source_volatile(
@@ -7927,13 +7841,12 @@ impl MapHandle {
         py: Python<'_>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_set_style_transition_options", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_style_transition_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_style_transition_options(
@@ -7951,13 +7864,12 @@ impl MapHandle {
         py: Python<'_>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_set_style_transition_options", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_style_transition_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_style_transition_options(
@@ -7971,10 +7883,10 @@ impl MapHandle {
     }
     #[pyo3(signature = (url))]
     fn set_style_url(&self, py: Python<'_>, url: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_style_url", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let url_value = storage.buffer(url.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_style_url(handle, url_value, completion, diagnostic)
@@ -7987,10 +7899,10 @@ impl MapHandle {
         py: Python<'_>,
         url: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_style_url", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let url_value = storage.buffer(url.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_style_url(handle, url_value, completion, diagnostic)
@@ -8003,11 +7915,11 @@ impl MapHandle {
         py: Python<'_>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_tile_options", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_map_tile_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_tile_options(handle, &options_value, completion, diagnostic)
@@ -8020,11 +7932,11 @@ impl MapHandle {
         py: Python<'_>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_tile_options", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_map_tile_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_tile_options(handle, &options_value, completion, diagnostic)
@@ -8037,11 +7949,11 @@ impl MapHandle {
         py: Python<'_>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_viewport_options", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_map_viewport_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_viewport_options(handle, &options_value, completion, diagnostic)
@@ -8054,11 +7966,11 @@ impl MapHandle {
         py: Python<'_>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_set_viewport_options", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_map_viewport_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_viewport_options(handle, &options_value, completion, diagnostic)
@@ -8071,11 +7983,11 @@ impl MapHandle {
         py: Python<'_>,
         update: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_update_camera", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let update = update.unwrap_or_else(|| py.None().into_bound(py));
         let update_value = generated_input_mln_camera_update(&update.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let future = unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_update_camera(handle, &update_value, completion, diagnostic)
@@ -8091,11 +8003,11 @@ impl MapHandle {
         py: Python<'_>,
         update: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_update_camera", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let update = update.unwrap_or_else(|| py.None().into_bound(py));
         let update_value = generated_input_mln_camera_update(&update.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let future = unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_update_camera(handle, &update_value, completion, diagnostic)
@@ -8111,8 +8023,8 @@ impl MapHandle {
 impl MapProjectionHandle {
     #[pyo3(signature = ())]
     fn get_camera(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_projection_get_camera", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let mut out_camera: sys::mln_camera_options = unsafe { sys::mln_camera_options_default() };
         out_camera.size = std::mem::size_of::<sys::mln_camera_options>() as _;
         unsafe {
@@ -8124,11 +8036,10 @@ impl MapProjectionHandle {
     }
     #[pyo3(signature = (point))]
     fn lat_lng_for_pixel(&self, py: Python<'_>, point: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_projection_lat_lng_for_pixel", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let point_value = generated_input_mln_screen_point(&point.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let mut out_coordinate: sys::mln_lat_lng = unsafe { std::mem::zeroed() };
         unsafe {
             call.status(|diagnostic| {
@@ -8148,14 +8059,10 @@ impl MapProjectionHandle {
         py: Python<'_>,
         point: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_projection_lat_lng_for_pixel_unwrapped",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let point_value = generated_input_mln_screen_point(&point.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let mut out_coordinate: sys::mln_lat_lng = unsafe { std::mem::zeroed() };
         unsafe {
             call.status(|diagnostic| {
@@ -8171,12 +8078,8 @@ impl MapProjectionHandle {
     }
     #[pyo3(signature = (latitude))]
     fn meters_per_pixel_at_latitude(&self, py: Python<'_>, latitude: f64) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_projection_meters_per_pixel_at_latitude",
-            self.admission(),
-        )?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let mut out_meters_per_pixel: f64 = unsafe { std::mem::zeroed() };
         unsafe {
             call.status(|diagnostic| {
@@ -8196,11 +8099,10 @@ impl MapProjectionHandle {
         py: Python<'_>,
         coordinate: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_projection_pixel_for_lat_lng", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let coordinate_value = generated_input_mln_lat_lng(&coordinate.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let mut out_point: sys::mln_screen_point = unsafe { std::mem::zeroed() };
         unsafe {
             call.status(|diagnostic| {
@@ -8216,7 +8118,7 @@ impl MapProjectionHandle {
     }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_projection_release", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let Some(mut reservation) = self.reserve()? else {
             return Ok(py.None());
         };
@@ -8227,11 +8129,11 @@ impl MapProjectionHandle {
     }
     #[pyo3(signature = (camera=None))]
     fn set_camera(&self, py: Python<'_>, camera: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_projection_set_camera", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let camera = camera.unwrap_or_else(|| py.None().into_bound(py));
         let camera_value = generated_input_mln_camera_options(&camera.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.status(|diagnostic| {
                 sys::mln_map_projection_set_camera(handle, &camera_value, diagnostic)
@@ -8245,7 +8147,7 @@ impl MapProjectionHandle {
 impl RenderFrameBatchHandle {
     #[pyo3(signature = ())]
     fn get(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_render_frame_batch_get", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let read = self.read()?;
         let handle = read.handle;
         let mut out_view: sys::mln_render_frame_batch_view = unsafe { std::mem::zeroed() };
@@ -8259,7 +8161,7 @@ impl RenderFrameBatchHandle {
     }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_render_frame_batch_release", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let Some(mut reservation) = self.reserve()? else {
             return Ok(py.None());
         };
@@ -8274,7 +8176,7 @@ impl RenderFrameBatchHandle {
 impl RenderSessionHandle {
     #[pyo3(signature = ())]
     fn abandon(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_render_session_abandon", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let Some(reservation) = self.reserve()? else {
             return Ok(py.None());
         };
@@ -8286,14 +8188,12 @@ impl RenderSessionHandle {
                 sys::mln_render_session_abandon(handle, &mut out_result, diagnostic)
             })
         }?;
-        self.state().views_valid = false;
         generated_copy_mln_render_abandon_result(py, &out_result)
     }
     #[pyo3(signature = ())]
     fn acquire_frame(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_render_session_acquire_frame", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let mut out_frame: sys::mln_acquired_frame = unsafe { std::mem::zeroed() };
         let result = unsafe {
             call.status_unless(sys::MLN_STATUS_NOT_READY, |diagnostic| {
@@ -8307,8 +8207,8 @@ impl RenderSessionHandle {
     }
     #[pyo3(signature = ())]
     fn barrier(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_render_session_barrier", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -8321,8 +8221,8 @@ impl RenderSessionHandle {
     }
     #[pyo3(signature = ())]
     fn clear_data(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_render_session_clear_data", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -8335,9 +8235,8 @@ impl RenderSessionHandle {
     }
     #[pyo3(signature = ())]
     fn create_projection(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_render_session_create_projection", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let mut out_projection: sys::mln_map_projection = unsafe { std::mem::zeroed() };
         unsafe {
             call.status(|diagnostic| {
@@ -8348,8 +8247,8 @@ impl RenderSessionHandle {
     }
     #[pyo3(signature = ())]
     fn detach(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_render_session_detach", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -8362,12 +8261,8 @@ impl RenderSessionHandle {
     }
     #[pyo3(signature = ())]
     fn drain_frame_results(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_render_session_drain_frame_results",
-            self.admission(),
-        )?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let mut out_batch: sys::mln_render_frame_batch = unsafe { std::mem::zeroed() };
         let result = unsafe {
             call.status_unless(sys::MLN_STATUS_NOT_READY, |diagnostic| {
@@ -8381,9 +8276,8 @@ impl RenderSessionHandle {
     }
     #[pyo3(signature = ())]
     fn dump_debug_logs(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_render_session_dump_debug_logs", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -8396,9 +8290,8 @@ impl RenderSessionHandle {
     }
     #[pyo3(signature = ())]
     fn get_capabilities(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_render_session_get_capabilities", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let mut out_capabilities: sys::mln_render_session_capabilities =
             unsafe { std::mem::zeroed() };
         out_capabilities.size = std::mem::size_of::<sys::mln_render_session_capabilities>() as _;
@@ -8411,8 +8304,8 @@ impl RenderSessionHandle {
     }
     #[pyo3(signature = ())]
     fn get_snapshot(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_render_session_get_snapshot", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let mut out_snapshot: sys::mln_render_session_snapshot = unsafe { std::mem::zeroed() };
         out_snapshot.size = std::mem::size_of::<sys::mln_render_session_snapshot>() as _;
         unsafe {
@@ -8432,11 +8325,7 @@ impl RenderSessionHandle {
         extension_field: &Bound<'_, PyAny>,
         arguments: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_render_session_query_feature_extensions",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let feature_value = storage.buffer(feature.clone(), false)?;
@@ -8445,7 +8334,7 @@ impl RenderSessionHandle {
         let arguments = arguments.unwrap_or_else(|| py.None().into_bound(py));
         let arguments_value =
             generated_maybe(&arguments, |arguments| storage.buffer(arguments, false))?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_buffer_view>(result)?;
             unsafe { generated_bytes(py, value) }
@@ -8475,11 +8364,7 @@ impl RenderSessionHandle {
         geometry: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_render_session_query_rendered_features",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let geometry_value =
             generated_input_mln_rendered_query_geometry(&geometry.clone(), storage)?;
@@ -8487,7 +8372,7 @@ impl RenderSessionHandle {
         let options_value = generated_maybe(&options, |options| {
             generated_input_mln_rendered_feature_query_options(&options, storage)
         })?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
             for value in generated_completion_values::<sys::mln_queried_feature>(result)? {
@@ -8517,18 +8402,14 @@ impl RenderSessionHandle {
         source_id: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_render_session_query_source_features",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_maybe(&options, |options| {
             generated_input_mln_source_feature_query_options(&options, storage)
         })?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
             for value in generated_completion_values::<sys::mln_queried_feature>(result)? {
@@ -8553,8 +8434,8 @@ impl RenderSessionHandle {
     }
     #[pyo3(signature = ())]
     fn read_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_render_session_read_texture", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_texture_readback_result>(result)?;
             generated_copy_mln_texture_readback_result(py, &value)
@@ -8570,9 +8451,8 @@ impl RenderSessionHandle {
     }
     #[pyo3(signature = ())]
     fn reduce_memory_use(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_render_session_reduce_memory_use", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -8585,7 +8465,7 @@ impl RenderSessionHandle {
     }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_render_session_release", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let Some(mut reservation) = self.reserve()? else {
             return Ok(py.None());
         };
@@ -8600,12 +8480,11 @@ impl RenderSessionHandle {
         py: Python<'_>,
         demand: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_render_session_request_frame", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let demand = demand.unwrap_or_else(|| py.None().into_bound(py));
         let demand_value = generated_input_mln_frame_demand(&demand.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.status(|diagnostic| {
                 sys::mln_render_session_request_frame(handle, &demand_value, diagnostic)
@@ -8615,11 +8494,11 @@ impl RenderSessionHandle {
     }
     #[pyo3(signature = (extent=None))]
     fn resize(&self, py: Python<'_>, extent: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_render_session_resize", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let extent = extent.unwrap_or_else(|| py.None().into_bound(py));
         let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_render_session_resize(handle, extent_value, completion, diagnostic)
@@ -8632,11 +8511,11 @@ impl RenderSessionHandle {
         py: Python<'_>,
         extent: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_render_session_resize", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let extent = extent.unwrap_or_else(|| py.None().into_bound(py));
         let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_render_session_resize(handle, extent_value, completion, diagnostic)
@@ -8645,12 +8524,8 @@ impl RenderSessionHandle {
     }
     #[pyo3(signature = ())]
     fn service_driver_work(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_render_session_service_driver_work",
-            self.admission(),
-        )?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.status(|diagnostic| {
                 sys::mln_render_session_service_driver_work(handle, diagnostic)
@@ -8664,16 +8539,12 @@ impl RenderSessionHandle {
         py: Python<'_>,
         descriptor: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_render_session_set_metal_borrowed_texture_target",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_metal_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -8695,16 +8566,12 @@ impl RenderSessionHandle {
         py: Python<'_>,
         descriptor: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_render_session_set_metal_surface_target",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_metal_surface_descriptor(&descriptor.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -8726,16 +8593,12 @@ impl RenderSessionHandle {
         py: Python<'_>,
         descriptor: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_render_session_set_opengl_borrowed_texture_target",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_opengl_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -8757,16 +8620,12 @@ impl RenderSessionHandle {
         py: Python<'_>,
         descriptor: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_render_session_set_opengl_surface_target",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_opengl_surface_descriptor(&descriptor.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -8788,16 +8647,12 @@ impl RenderSessionHandle {
         py: Python<'_>,
         descriptor: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_render_session_set_vulkan_borrowed_texture_target",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_vulkan_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -8819,16 +8674,12 @@ impl RenderSessionHandle {
         py: Python<'_>,
         descriptor: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_render_session_set_vulkan_surface_target",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_vulkan_surface_descriptor(&descriptor.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -8850,16 +8701,12 @@ impl RenderSessionHandle {
         py: Python<'_>,
         descriptor: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_render_session_set_webgpu_borrowed_texture_target",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_webgpu_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -8881,16 +8728,12 @@ impl RenderSessionHandle {
         py: Python<'_>,
         descriptor: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_render_session_set_webgpu_surface_target",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_webgpu_surface_descriptor(&descriptor.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -8912,33 +8755,21 @@ impl RenderSessionHandle {
 impl ResourceRequestHandle {
     #[pyo3(signature = (response))]
     fn complete(&self, py: Python<'_>, response: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_resource_request_complete",
-            maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle()),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let response_value = generated_input_mln_resource_response(&response.clone(), storage)?;
+        let handle = self.input();
         unsafe {
-            call.run(|| {
-                self.state.complete_with(|handle| {
-                    maplibre_core::check(|diagnostic| {
-                        sys::mln_resource_request_complete(handle, &response_value, diagnostic)
-                    })
-                })
+            call.status(|diagnostic| {
+                sys::mln_resource_request_complete(handle, &response_value, diagnostic)
             })
-        }
-        .map_err(map_error)?;
+        }?;
         Ok(py.None())
     }
     #[pyo3(signature = ())]
     fn is_cancelled(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_resource_request_is_cancelled",
-            maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle()),
-        )?;
-        let handle = self.state.native_for_call().map_err(map_error)?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let mut out_cancelled: bool = unsafe { std::mem::zeroed() };
         unsafe {
             call.status(|diagnostic| {
@@ -8949,64 +8780,53 @@ impl ResourceRequestHandle {
     }
     #[pyo3(signature = ())]
     fn pass_through(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_resource_request_pass_through",
-            maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle()),
-        )?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
-            call.run(|| {
-                self.state.complete_with(|handle| {
-                    maplibre_core::check(|diagnostic| {
-                        sys::mln_resource_request_pass_through(handle, diagnostic)
-                    })
-                })
-            })
-        }
-        .map_err(map_error)?;
+            call.status(|diagnostic| sys::mln_resource_request_pass_through(handle, diagnostic))
+        }?;
         Ok(py.None())
     }
+    #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_resource_request_release",
-            maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle()),
-        )?;
-        unsafe { call.run(|| self.state.close()) };
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve()? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.run(|| sys::mln_resource_request_release(handle)) };
+        reservation.commit();
         Ok(py.None())
     }
-    fn set_cancel_callback(&self, handler: &Bound<'_, PyAny>) -> PyResult<bool> {
-        let callback_owner =
-            maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle());
-        generated_check_operation("mln_resource_request_set_cancel_callback", callback_owner)?;
-        let callback = handler.getattr("callback")?;
-        let mut weak = std::sync::Weak::new();
-        let registration: Option<Box<dyn FnOnce() + Send + 'static>> = if callback.is_none() {
-            None
+    #[pyo3(signature = (handler))]
+    fn set_cancel_callback(
+        &self,
+        py: Python<'_>,
+        handler: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let handler_value =
+            generated_input_mln_resource_request_cancel_handler(&handler.clone(), storage)?;
+        let handle = self.input();
+        let mut out_cancelled: bool = unsafe { std::mem::zeroed() };
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_resource_request_set_cancel_callback(
+                    handle,
+                    &handler_value,
+                    &mut out_cancelled,
+                    diagnostic,
+                )
+            })
+        }?;
+        let callback_roots = if !out_cancelled {
+            call.accept_callbacks()
         } else {
-            if !callback.is_callable() {
-                return Err(invalid_argument_error("callback must be callable"));
-            }
-            let root = GeneratedCallbackRootOwner::new(vec![callback.unbind()]);
-            weak = root.downgrade();
-            Some(Box::new(move || {
-                Python::try_attach(|py| {
-                    if let Some(callback) = root.get(py, 0)
-                        && let Err(error) = callback.bind(py).call0()
-                    {
-                        generated_report_unraisable(py, error);
-                    }
-                });
-            }))
+            Vec::new()
         };
-        let cancelled = self
-            .state
-            .register_cancel(registration)
-            .map_err(map_error)?;
-        if !cancelled {
-            *self.cancel_root.lock().unwrap_or_else(|p| p.into_inner()) = weak;
-        }
-        Ok(cancelled)
+        self.state().retain_callback_roots(callback_roots);
+        generated_value(py, out_cancelled)
     }
 }
 
@@ -9014,14 +8834,10 @@ impl ResourceRequestHandle {
 impl ResourceTransformRequestHandle {
     #[pyo3(signature = (url))]
     fn complete(&self, py: Python<'_>, url: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_resource_transform_request_complete",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let url_value = storage.buffer(url.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         unsafe {
             call.status(|diagnostic| {
                 sys::mln_resource_transform_request_complete(handle, url_value, diagnostic)
@@ -9031,11 +8847,7 @@ impl ResourceTransformRequestHandle {
     }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_resource_transform_request_release",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let Some(mut reservation) = self.reserve()? else {
             return Ok(py.None());
         };
@@ -9050,8 +8862,8 @@ impl ResourceTransformRequestHandle {
 impl RuntimeHandle {
     #[pyo3(signature = ())]
     fn clear_event_handler(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_runtime_clear_event_handler", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -9064,12 +8876,8 @@ impl RuntimeHandle {
     }
     #[pyo3(signature = ())]
     fn clear_http_header_transform(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_runtime_clear_http_header_transform",
-            self.admission(),
-        )?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -9082,9 +8890,8 @@ impl RuntimeHandle {
     }
     #[pyo3(signature = ())]
     fn clear_resource_provider(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_runtime_clear_resource_provider", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -9097,9 +8904,8 @@ impl RuntimeHandle {
     }
     #[pyo3(signature = ())]
     fn clear_resource_transform(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_runtime_clear_resource_transform", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -9112,11 +8918,11 @@ impl RuntimeHandle {
     }
     #[pyo3(signature = (options=None))]
     fn create_map(&self, py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_runtime_create_map", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_map_options(&options.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| unsafe {
             MapHandle::adopt(py, completion_value::<sys::mln_map>(result)?, Vec::new())
         };
@@ -9144,13 +8950,12 @@ impl RuntimeHandle {
         definition: &Bound<'_, PyAny>,
         metadata: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_runtime_create_offline_region", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let definition_value =
             generated_input_mln_offline_region_definition(&definition.clone(), storage)?;
         let metadata_view = storage.buffer(metadata.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_offline_region_info>(result)?;
             generated_copy_mln_offline_region_info(py, &value)
@@ -9173,9 +8978,8 @@ impl RuntimeHandle {
     }
     #[pyo3(signature = (region_id))]
     fn delete_offline_region(&self, py: Python<'_>, region_id: i64) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_runtime_delete_offline_region", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -9190,8 +8994,8 @@ impl RuntimeHandle {
     }
     #[pyo3(signature = ())]
     fn get_event_mask(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_runtime_get_event_mask", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let mut out_mask: sys::mln_runtime_event_mask = unsafe { std::mem::zeroed() };
         unsafe {
             call.status(|diagnostic| {
@@ -9202,8 +9006,8 @@ impl RuntimeHandle {
     }
     #[pyo3(signature = (region_id))]
     fn get_offline_region(&self, py: Python<'_>, region_id: i64) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_runtime_get_offline_region", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             if result.value.is_null() {
                 return Ok(py.None());
@@ -9222,12 +9026,8 @@ impl RuntimeHandle {
     }
     #[pyo3(signature = (region_id))]
     fn get_offline_region_status(&self, py: Python<'_>, region_id: i64) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_runtime_get_offline_region_status",
-            self.admission(),
-        )?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_offline_region_status>(result)?;
             generated_copy_mln_offline_region_status(py, &value)
@@ -9245,12 +9045,8 @@ impl RuntimeHandle {
     }
     #[pyo3(signature = (region_id))]
     fn invalidate_offline_region(&self, py: Python<'_>, region_id: i64) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_runtime_invalidate_offline_region",
-            self.admission(),
-        )?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -9265,9 +9061,8 @@ impl RuntimeHandle {
     }
     #[pyo3(signature = ())]
     fn list_offline_regions(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_runtime_list_offline_regions", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
             for value in generated_completion_values::<sys::mln_offline_region_info>(result)? {
@@ -9290,11 +9085,10 @@ impl RuntimeHandle {
         py: Python<'_>,
         side_database_path: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_runtime_merge_offline_regions", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let side_database_path_value = storage.buffer(side_database_path.clone(), true)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
             for value in generated_completion_values::<sys::mln_offline_region_info>(result)? {
@@ -9318,7 +9112,7 @@ impl RuntimeHandle {
     }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_runtime_release", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let Some(mut reservation) = self.reserve()? else {
             return completed_python_future(py);
         };
@@ -9339,12 +9133,8 @@ impl RuntimeHandle {
         py: Python<'_>,
         operation: sys::mln_ambient_cache_operation,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_runtime_run_ambient_cache_operation",
-            self.admission(),
-        )?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -9359,10 +9149,10 @@ impl RuntimeHandle {
     }
     #[pyo3(signature = (handler))]
     fn set_event_handler(&self, py: Python<'_>, handler: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_runtime_set_event_handler", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let handler_value = generated_input_mln_runtime_event_handler(&handler.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = py_none;
         let future = unsafe {
             call.complete(
@@ -9387,8 +9177,8 @@ impl RuntimeHandle {
         py: Python<'_>,
         mask: sys::mln_runtime_event_mask,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_runtime_set_event_mask", self.admission())?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         unsafe {
             call.status(|diagnostic| sys::mln_runtime_set_event_mask(handle, mask, diagnostic))
         }?;
@@ -9400,15 +9190,11 @@ impl RuntimeHandle {
         py: Python<'_>,
         transform: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_runtime_set_http_header_transform",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let transform_value =
             generated_input_mln_http_header_transform(&transform.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = py_none;
         let future = unsafe {
             call.complete(
@@ -9429,12 +9215,8 @@ impl RuntimeHandle {
     }
     #[pyo3(signature = (size))]
     fn set_maximum_ambient_cache_size(&self, py: Python<'_>, size: u64) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_runtime_set_maximum_ambient_cache_size",
-            self.admission(),
-        )?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -9454,12 +9236,8 @@ impl RuntimeHandle {
         region_id: i64,
         input_state: sys::mln_offline_region_download_state,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_runtime_set_offline_region_download_state",
-            self.admission(),
-        )?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -9483,12 +9261,8 @@ impl RuntimeHandle {
         region_id: i64,
         observed: bool,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_runtime_set_offline_region_observed",
-            self.admission(),
-        )?;
-        let handle = self.live()?;
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
@@ -9507,11 +9281,10 @@ impl RuntimeHandle {
         py: Python<'_>,
         provider: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_runtime_set_resource_provider", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let provider_value = generated_input_mln_resource_provider(&provider.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = py_none;
         let future = unsafe {
             call.complete(
@@ -9536,11 +9309,10 @@ impl RuntimeHandle {
         py: Python<'_>,
         transform: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_runtime_set_resource_transform", self.admission())?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let transform_value = generated_input_mln_resource_transform(&transform.clone(), storage)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = py_none;
         let future = unsafe {
             call.complete(
@@ -9566,14 +9338,10 @@ impl RuntimeHandle {
         region_id: i64,
         metadata: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_runtime_update_offline_region_metadata",
-            self.admission(),
-        )?;
+        let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let metadata_view = storage.buffer(metadata.clone(), false)?;
-        let handle = self.live()?;
+        let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_offline_region_info>(result)?;
             generated_copy_mln_offline_region_info(py, &value)
@@ -9601,7 +9369,8 @@ generated_owner!(
     mln_acquired_frame,
     Some(generated_dispose_mln_acquired_frame),
     None,
-    |py, owner| GeneratedReadScope::with_native::<sys::mln_acquired_frame, _>(
+    false,
+    |py, owner| GeneratedReadScope::with_native::<sys::mln_acquired_frame>(
         py,
         Arc::clone(&owner.state),
         sys::mln_acquired_frame_view_begin,
@@ -9614,7 +9383,8 @@ generated_owner!(
     mln_geojson_source_data,
     Some(generated_dispose_mln_geojson_source_data),
     None,
-    |_, owner| GeneratedReadScope::new::<sys::mln_geojson_source_data, _>(Arc::clone(&owner.state))
+    false,
+    |_, owner| GeneratedReadScope::new::<sys::mln_geojson_source_data>(Arc::clone(&owner.state))
 );
 generated_owner!(
     MapHandle,
@@ -9622,7 +9392,8 @@ generated_owner!(
     mln_map,
     Some(generated_dispose_mln_map),
     None,
-    |_, owner| GeneratedReadScope::new::<sys::mln_map, _>(Arc::clone(&owner.state))
+    false,
+    |_, owner| GeneratedReadScope::new::<sys::mln_map>(Arc::clone(&owner.state))
 );
 generated_owner!(
     MapProjectionHandle,
@@ -9630,7 +9401,8 @@ generated_owner!(
     mln_map_projection,
     Some(generated_dispose_mln_map_projection),
     None,
-    |_, owner| GeneratedReadScope::new::<sys::mln_map_projection, _>(Arc::clone(&owner.state))
+    false,
+    |_, owner| GeneratedReadScope::new::<sys::mln_map_projection>(Arc::clone(&owner.state))
 );
 generated_owner!(
     RenderFrameBatchHandle,
@@ -9638,7 +9410,8 @@ generated_owner!(
     mln_render_frame_batch,
     Some(generated_dispose_mln_render_frame_batch),
     None,
-    |_, owner| GeneratedReadScope::new::<sys::mln_render_frame_batch, _>(Arc::clone(&owner.state))
+    true,
+    |_, owner| GeneratedReadScope::new::<sys::mln_render_frame_batch>(Arc::clone(&owner.state))
 );
 generated_owner!(
     RenderSessionHandle,
@@ -9646,112 +9419,26 @@ generated_owner!(
     mln_render_session,
     Some(generated_dispose_mln_render_session),
     None,
-    |_, owner| GeneratedReadScope::new::<sys::mln_render_session, _>(Arc::clone(&owner.state))
+    false,
+    |_, owner| GeneratedReadScope::new::<sys::mln_render_session>(Arc::clone(&owner.state))
 );
-
-#[pyclass(name = "_ResourceRequestHandle")]
-struct ResourceRequestHandle {
-    // The accepted cancel callback, which native owns until it retires.
-    cancel_root: Mutex<std::sync::Weak<GeneratedCallbackRoot>>,
-    // Dropped by hand, with the GIL released; see the Drop impl below.
-    state:
-        ManuallyDrop<Arc<maplibre_core::decision::DecisionHandleState<sys::mln_resource_request>>>,
-}
-impl Drop for ResourceRequestHandle {
-    fn drop(&mut self) {
-        // SAFETY: drop runs once, and nothing reads the field after this take.
-        let state = unsafe { ManuallyDrop::take(&mut self.state) };
-        // The last reference releases the native handle, and release waits for
-        // a cancel callback running on a MapLibre thread. That callback needs
-        // the GIL this thread holds while collecting the Python owner, so the
-        // release runs detached.
-        generated_finalize(move || drop(state));
-    }
-}
-#[pymethods]
-impl ResourceRequestHandle {
-    #[getter]
-    fn closed(&self) -> bool {
-        self.state.native_for_call().is_err()
-    }
-    #[getter]
-    fn id(&self) -> u64 {
-        maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle())
-    }
-    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
-        let root = self
-            .cancel_root
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .upgrade();
-        if let Some(root) = root {
-            for callback in root.lock().unwrap_or_else(|p| p.into_inner()).iter() {
-                visit.call(callback)?;
-            }
-        }
-        Ok(())
-    }
-    fn __clear__(&self) {
-        let root = self
-            .cancel_root
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .upgrade();
-        if let Some(root) = root {
-            let callbacks = std::mem::take(&mut *root.lock().unwrap_or_else(|p| p.into_inner()));
-            drop(callbacks);
-        }
-    }
-}
-unsafe fn register_resource_request_cancel(
-    handle: sys::mln_resource_request,
-    callback: maplibre_core::decision::CancelCallback<sys::mln_resource_request>,
-    user_data: *mut std::ffi::c_void,
-    release: maplibre_core::decision::ContextCallback,
-    out_cancelled: *mut bool,
-    out_diagnostic: *mut sys::mln_diagnostic,
-) -> sys::mln_status {
-    let mut handler: sys::mln_resource_request_cancel_handler = unsafe { std::mem::zeroed() };
-    handler.size = std::mem::size_of::<sys::mln_resource_request_cancel_handler>() as _;
-    handler.callback = callback;
-    handler.user_data = user_data;
-    handler.release_user_data = release;
-    // SAFETY: the caller passes the decision handle and the outputs that
-    // the C function requires; the handler is borrowed for the call.
-    unsafe {
-        sys::mln_resource_request_set_cancel_callback(
-            handle,
-            &handler,
-            out_cancelled,
-            out_diagnostic,
-        )
-    }
-}
-pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHandleFns<
-    sys::mln_resource_request,
-> = unsafe {
-    maplibre_core::decision::DecisionHandleFns::new(
-        "ResourceRequestHandle",
-        sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE,
-        sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH,
-        sys::mln_resource_request_release,
-        register_resource_request_cancel,
-        &[
-            "mln_resource_request_complete",
-            "mln_resource_request_pass_through",
-            "mln_resource_request_is_cancelled",
-            "mln_resource_request_set_cancel_callback",
-            "mln_resource_request_release",
-        ],
-    )
-};
+generated_owner!(
+    ResourceRequestHandle,
+    "_ResourceRequestHandle",
+    mln_resource_request,
+    Some(generated_dispose_mln_resource_request),
+    None,
+    false,
+    |_, owner| GeneratedReadScope::new::<sys::mln_resource_request>(Arc::clone(&owner.state))
+);
 generated_owner!(
     ResourceTransformRequestHandle,
     "_ResourceTransformRequestHandle",
     mln_resource_transform_request,
     Some(generated_dispose_mln_resource_transform_request),
     None,
-    |_, owner| GeneratedReadScope::new::<sys::mln_resource_transform_request, _>(Arc::clone(
+    false,
+    |_, owner| GeneratedReadScope::new::<sys::mln_resource_transform_request>(Arc::clone(
         &owner.state
     ))
 );
@@ -9767,7 +9454,8 @@ generated_owner!(
     mln_runtime,
     Some(generated_dispose_mln_runtime),
     Some(generated_exit_release_mln_runtime),
-    |_, owner| GeneratedReadScope::new::<sys::mln_runtime, _>(Arc::clone(&owner.state))
+    false,
+    |_, owner| GeneratedReadScope::new::<sys::mln_runtime>(Arc::clone(&owner.state))
 );
 #[pyfunction]
 #[pyo3(signature = (jni_env, context))]
@@ -9776,7 +9464,7 @@ fn android_init(
     jni_env: &Bound<'_, PyAny>,
     context: &Bound<'_, PyAny>,
 ) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_android_init", 0)?;
+    let mut call = GeneratedCall::new(py);
     let jni_env_value = jni_env.clone().extract::<usize>()? as _;
     let context_value = context.clone().extract::<usize>()? as _;
     unsafe {
@@ -9788,7 +9476,7 @@ fn android_init(
 #[pyfunction]
 #[pyo3(signature = ())]
 fn c_version(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_c_version", 0)?;
+    let mut call = GeneratedCall::new(py);
     let result = unsafe { call.run(|| sys::mln_c_version()) };
     generated_value(py, result)
 }
@@ -9800,7 +9488,7 @@ fn geojson_source_data_create(
     data: &Bound<'_, PyAny>,
     options: Option<Bound<'_, PyAny>>,
 ) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_geojson_source_data_create", 0)?;
+    let mut call = GeneratedCall::new(py);
     let storage = &mut call.storage;
     let data_value = storage.buffer(data.clone(), false)?;
     let options = options.unwrap_or_else(|| py.None().into_bound(py));
@@ -9824,7 +9512,7 @@ fn geojson_source_data_create(
 #[pyfunction]
 #[pyo3(signature = (meters))]
 fn lat_lng_for_projected_meters(py: Python<'_>, meters: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_lat_lng_for_projected_meters", 0)?;
+    let mut call = GeneratedCall::new(py);
     let storage = &mut call.storage;
     let meters_value = generated_input_mln_projected_meters(&meters.clone(), storage)?;
     let mut out_coordinate: sys::mln_lat_lng = unsafe { std::mem::zeroed() };
@@ -9839,7 +9527,7 @@ fn lat_lng_for_projected_meters(py: Python<'_>, meters: &Bound<'_, PyAny>) -> Py
 #[pyfunction]
 #[pyo3(signature = ())]
 fn log_clear_callback(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_log_clear_callback", 0)?;
+    let mut call = GeneratedCall::new(py);
     unsafe { call.status(|diagnostic| sys::mln_log_clear_callback(diagnostic)) }?;
     Ok(py.None())
 }
@@ -9850,7 +9538,7 @@ fn log_set_async_severity_mask(
     py: Python<'_>,
     mask: sys::mln_log_severity_mask,
 ) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_log_set_async_severity_mask", 0)?;
+    let mut call = GeneratedCall::new(py);
     unsafe { call.status(|diagnostic| sys::mln_log_set_async_severity_mask(mask, diagnostic)) }?;
     Ok(py.None())
 }
@@ -9858,7 +9546,7 @@ fn log_set_async_severity_mask(
 #[pyfunction]
 #[pyo3(signature = (handler))]
 fn log_set_callback(py: Python<'_>, handler: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_log_set_callback", 0)?;
+    let mut call = GeneratedCall::new(py);
     let storage = &mut call.storage;
     let handler_value = generated_input_mln_log_handler(&handler.clone(), storage)?;
     unsafe { call.status(|diagnostic| sys::mln_log_set_callback(&handler_value, diagnostic)) }?;
@@ -9872,7 +9560,7 @@ fn logical_extent_physical_size(
     py: Python<'_>,
     extent: Option<Bound<'_, PyAny>>,
 ) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_logical_extent_physical_size", 0)?;
+    let mut call = GeneratedCall::new(py);
     let storage = &mut call.storage;
     let extent = extent.unwrap_or_else(|| py.None().into_bound(py));
     let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
@@ -9897,7 +9585,7 @@ fn logical_extent_physical_size(
 #[pyfunction]
 #[pyo3(signature = ())]
 fn network_get_status(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_network_get_status", 0)?;
+    let mut call = GeneratedCall::new(py);
     let mut out_status: sys::mln_network_status = unsafe { std::mem::zeroed() };
     unsafe { call.status(|diagnostic| sys::mln_network_get_status(&mut out_status, diagnostic)) }?;
     generated_value(py, out_status)
@@ -9909,7 +9597,7 @@ fn network_set_status(
     py: Python<'_>,
     input_status: sys::mln_network_status,
 ) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_network_set_status", 0)?;
+    let mut call = GeneratedCall::new(py);
     unsafe { call.status(|diagnostic| sys::mln_network_set_status(input_status, diagnostic)) }?;
     Ok(py.None())
 }
@@ -9917,7 +9605,7 @@ fn network_set_status(
 #[pyfunction]
 #[pyo3(signature = ())]
 fn opengl_supported_context_provider_mask(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_opengl_supported_context_provider_mask", 0)?;
+    let mut call = GeneratedCall::new(py);
     let result = unsafe { call.run(|| sys::mln_opengl_supported_context_provider_mask()) };
     generated_value(py, result)
 }
@@ -9925,7 +9613,7 @@ fn opengl_supported_context_provider_mask(py: Python<'_>) -> PyResult<Py<PyAny>>
 #[pyfunction]
 #[pyo3(signature = ())]
 fn plugin_get_register_function_v1(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_plugin_get_register_function_v1", 0)?;
+    let mut call = GeneratedCall::new(py);
     let result = unsafe { call.run(|| sys::mln_plugin_get_register_function_v1()) };
     generated_value(py, result.map_or(0, |function| function as usize))
 }
@@ -9936,7 +9624,7 @@ fn projected_meters_for_lat_lng(
     py: Python<'_>,
     coordinate: &Bound<'_, PyAny>,
 ) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_projected_meters_for_lat_lng", 0)?;
+    let mut call = GeneratedCall::new(py);
     let storage = &mut call.storage;
     let coordinate_value = generated_input_mln_lat_lng(&coordinate.clone(), storage)?;
     let mut out_meters: sys::mln_projected_meters = unsafe { std::mem::zeroed() };
@@ -9951,7 +9639,7 @@ fn projected_meters_for_lat_lng(
 #[pyfunction]
 #[pyo3(signature = (options=None))]
 fn runtime_create(py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_runtime_create", 0)?;
+    let mut call = GeneratedCall::new(py);
     let storage = &mut call.storage;
     let options = options.unwrap_or_else(|| py.None().into_bound(py));
     let options_value = generated_input_mln_runtime_options(&options.clone(), storage)?;
@@ -9967,7 +9655,7 @@ fn runtime_create(py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult
 #[pyfunction]
 #[pyo3(signature = ())]
 fn supported_render_backend_mask(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_supported_render_backend_mask", 0)?;
+    let mut call = GeneratedCall::new(py);
     let result = unsafe { call.run(|| sys::mln_supported_render_backend_mask()) };
     generated_value(py, result)
 }

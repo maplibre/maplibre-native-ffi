@@ -24,7 +24,7 @@ def test_native_statuses_raise_their_exception_with_code_and_diagnostic(
     ):
         assert isinstance(raised.value, mln.MaplibreError)
         assert raised.value.status == status
-        assert raised.value.native_status_code == status.native_code
+        assert raised.value.native_status_code == int(status)
         assert raised.value.diagnostic
         assert str(raised.value) == raised.value.diagnostic
     assert "network status" in invalid_argument.value.diagnostic
@@ -36,12 +36,12 @@ def test_native_statuses_raise_their_exception_with_code_and_diagnostic(
     assert unknown.native_status_code == 12345
     assert unknown.status is not None
     assert unknown.status.is_unknown
-    assert unknown.status.native_code == 12345
+    assert int(unknown.status) == 12345
     # With no diagnostic, the message names the status.
     assert str(unknown) == "unknown 12345"
 
 
-def test_a_binding_failure_carries_no_native_status() -> None:
+def test_a_closed_handle_reports_the_native_status() -> None:
     runtime = mln.runtime_create()
     result(runtime.close())
 
@@ -49,5 +49,5 @@ def test_a_binding_failure_carries_no_native_status() -> None:
         runtime.create_map()
 
     assert raised.value.status == mln.Status.INVALID_STATE
-    assert raised.value.native_status_code is None
-    assert raised.value.diagnostic == "RuntimeHandle is closed"
+    assert raised.value.native_status_code == int(mln.Status.INVALID_STATE)
+    assert raised.value.diagnostic

@@ -253,7 +253,10 @@
 /python/python/maplibre_native_ffi/_generated_values.py linguist-generated=true
 /python/python/maplibre_native_ffi/_native.pyi linguist-generated=true
 /python/python/maplibre_native_ffi/api.py linguist-generated=true
+/python/python/maplibre_native_ffi/errors.py linguist-generated=true
+/python/src/generated_errors.rs linguist-generated=true
 /python/src/generated_operations.rs linguist-generated=true
+/rust/crates/maplibre-native-ffi-core/src/error_kind.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi-sys/src/generated.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/acquired_frame.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/geojson_source_data.rs linguist-generated=true
@@ -263,6 +266,7 @@
 /rust/crates/maplibre-native-ffi/src/generated/mod.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/render_frame_batch.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/render_session.rs linguist-generated=true
+/rust/crates/maplibre-native-ffi/src/generated/resource_request.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/resource_transform_request.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/runtime.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/values.rs linguist-generated=true

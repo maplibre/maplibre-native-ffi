@@ -2,9 +2,9 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 pub mod abi;
 pub mod callback;
-pub mod decision;
 pub mod error;
 pub mod handle;
+pub mod memory;
 pub mod ptr;
 pub mod report;
 pub mod string;

@@ -8,7 +8,7 @@ native_owner! {
     ///
     /// See `mln_map_projection` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    pub struct MapProjectionHandle(mln_map_projection) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_map_projection_release(raw, out_diagnostic) });
+    pub struct MapProjectionHandle(mln_map_projection) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_map_projection_release(raw, out_diagnostic) }), counted false;
 }
 
 impl MapProjectionHandle {
@@ -17,7 +17,7 @@ impl MapProjectionHandle {
     /// See `mln_map_projection_get_camera` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
     pub fn get_camera(&self) -> Result<CameraOptions> {
-        let mut call = self.inner.call("mln_map_projection_get_camera")?;
+        let mut call = self.inner.call();
         let mut out_camera: sys::mln_camera_options = unsafe { sys::mln_camera_options_default() };
         out_camera.size = std::mem::size_of::<sys::mln_camera_options>() as _;
         call.status(|projection, out_diagnostic| unsafe {
@@ -31,7 +31,7 @@ impl MapProjectionHandle {
     /// See `mln_map_projection_lat_lng_for_pixel` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
     pub fn lat_lng_for_pixel(&self, point: ScreenPoint) -> Result<LatLng> {
-        let mut call = self.inner.call("mln_map_projection_lat_lng_for_pixel")?;
+        let mut call = self.inner.call();
         let mut out_coordinate: sys::mln_lat_lng = unsafe { std::mem::zeroed() };
         let point = call.input(&point)?;
         call.status(|projection, out_diagnostic| unsafe {
@@ -50,9 +50,7 @@ impl MapProjectionHandle {
     /// See `mln_map_projection_lat_lng_for_pixel_unwrapped` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
     pub fn lat_lng_for_pixel_unwrapped(&self, point: ScreenPoint) -> Result<LatLng> {
-        let mut call = self
-            .inner
-            .call("mln_map_projection_lat_lng_for_pixel_unwrapped")?;
+        let mut call = self.inner.call();
         let mut out_coordinate: sys::mln_lat_lng = unsafe { std::mem::zeroed() };
         let point = call.input(&point)?;
         call.status(|projection, out_diagnostic| unsafe {
@@ -72,9 +70,7 @@ impl MapProjectionHandle {
     /// See `mln_map_projection_meters_per_pixel_at_latitude` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
     pub fn meters_per_pixel_at_latitude(&self, latitude: f64) -> Result<f64> {
-        let mut call = self
-            .inner
-            .call("mln_map_projection_meters_per_pixel_at_latitude")?;
+        let mut call = self.inner.call();
         let mut out_meters_per_pixel: f64 = Default::default();
         call.status(|projection, out_diagnostic| unsafe {
             sys::mln_map_projection_meters_per_pixel_at_latitude(
@@ -92,7 +88,7 @@ impl MapProjectionHandle {
     /// See `mln_map_projection_pixel_for_lat_lng` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
     pub fn pixel_for_lat_lng(&self, coordinate: LatLng) -> Result<ScreenPoint> {
-        let mut call = self.inner.call("mln_map_projection_pixel_for_lat_lng")?;
+        let mut call = self.inner.call();
         let mut out_point: sys::mln_screen_point = unsafe { std::mem::zeroed() };
         let coordinate = call.input(&coordinate)?;
         call.status(|projection, out_diagnostic| unsafe {
@@ -124,7 +120,7 @@ impl MapProjectionHandle {
     /// See `mln_map_projection_set_camera` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
     pub fn set_camera(&self, camera: &CameraOptions) -> Result<()> {
-        let mut call = self.inner.call("mln_map_projection_set_camera")?;
+        let mut call = self.inner.call();
         let camera = call.reference(&camera)?;
         call.status(|projection, out_diagnostic| unsafe {
             sys::mln_map_projection_set_camera(projection, camera, out_diagnostic)

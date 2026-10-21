@@ -94,7 +94,9 @@ class RustEmitterTests(unittest.TestCase):
             core_crate = root / "crates/maplibre-native-ffi-core/src"
             safe_crate = root / "crates/maplibre-native-ffi/src"
             shutil.copy(SYS / "lib.rs", sys_crate / "lib.rs")
-            shutil.copytree(CRATES / "maplibre-native-ffi-core/src", core_crate)
+            shutil.copytree(
+                CRATES / "maplibre-native-ffi-core/src", core_crate, dirs_exist_ok=True
+            )
             shutil.copy(PROBE / "core.rs", core_crate / "lib.rs")
             for source in (CRATES / "maplibre-native-ffi/src").glob("*.rs"):
                 shutil.copy(source, safe_crate / source.name)

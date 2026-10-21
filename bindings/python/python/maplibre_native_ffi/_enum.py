@@ -9,11 +9,6 @@ from typing import Self
 class UnknownIntEnum(IntEnum):
     """Integer enum that preserves unknown native values."""
 
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this enum member."""
-        return int(self)
-
     @classmethod
     def _missing_(cls, value: object) -> Self | None:
         if not isinstance(value, int):

@@ -8,7 +8,7 @@ native_owner! {
     ///
     /// See `mln_map` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    pub struct MapHandle(mln_map) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_map_dispose(raw, out_diagnostic) });
+    pub struct MapHandle(mln_map) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_map_dispose(raw, out_diagnostic) }), counted false;
 }
 
 impl MapHandle {
@@ -21,7 +21,7 @@ impl MapHandle {
         source_id: &str,
         options: CustomGeometrySourceOptions,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_add_custom_geometry_source")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let options = call.reference(&options)?;
         call.command(|map, completion, out_diagnostic| unsafe {
@@ -44,7 +44,7 @@ impl MapHandle {
         source_id: &str,
         options: CustomMvtVectorSourceOptions,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_add_custom_mvt_vector_source")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let options = call.reference(&options)?;
         call.command(|map, completion, out_diagnostic| unsafe {
@@ -67,8 +67,8 @@ impl MapHandle {
         source_id: &str,
         data: &GeojsonSourceDataHandle,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_add_geojson_source_data")?;
-        let data = data.inner.native()?;
+        let mut call = self.inner.call();
+        let data = data.inner.native();
         let source_id = call.input(&source_id)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_geojson_source_data(map, source_id, data, completion, out_diagnostic)
@@ -85,7 +85,7 @@ impl MapHandle {
         url: &str,
         options: Option<&GeojsonSourceOptions>,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_add_geojson_source_url")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let url = call.input(&url)?;
         let options = call.optional_reference(options.as_ref())?;
@@ -111,7 +111,7 @@ impl MapHandle {
         coordinates: &[LatLng],
         image: &PremultipliedRgba8Image,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_add_image_source_image")?;
+        let mut call = self.inner.call();
         let coordinate_count = convert::count(coordinates.len())?;
         let source_id = call.input(&source_id)?;
         let coordinates = call.array(coordinates)?;
@@ -139,7 +139,7 @@ impl MapHandle {
         coordinates: &[LatLng],
         url: &str,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_add_image_source_url")?;
+        let mut call = self.inner.call();
         let coordinate_count = convert::count(coordinates.len())?;
         let source_id = call.input(&source_id)?;
         let coordinates = call.array(coordinates)?;
@@ -166,7 +166,7 @@ impl MapHandle {
         layer_json: &[u8],
         before_layer_id: Option<&str>,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_add_style_layer_json")?;
+        let mut call = self.inner.call();
         let layer_json = call.input(&layer_json)?;
         let before_layer_id = call.input(&before_layer_id)?;
         call.command(|map, completion, out_diagnostic| unsafe {
@@ -189,7 +189,7 @@ impl MapHandle {
         source_id: &str,
         source_json: &[u8],
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_add_style_source_json")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let source_json = call.input(&source_json)?;
         call.command(|map, completion, out_diagnostic| unsafe {
@@ -211,7 +211,7 @@ impl MapHandle {
         &self,
         delta: &CameraDelta,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_apply_camera_delta")?;
+        let mut call = self.inner.call();
         let delta = call.reference(&delta)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_apply_camera_delta(map, delta, completion, out_diagnostic)
@@ -230,7 +230,7 @@ impl MapHandle {
         descriptor: &MetalBorrowedTextureDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_map_attach_metal_borrowed_texture")?;
+        let mut call = self.inner.call();
         let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
@@ -263,7 +263,7 @@ impl MapHandle {
         descriptor: &MetalOwnedTextureDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_map_attach_metal_owned_texture")?;
+        let mut call = self.inner.call();
         let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
@@ -296,7 +296,7 @@ impl MapHandle {
         descriptor: &MetalSurfaceDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_map_attach_metal_surface")?;
+        let mut call = self.inner.call();
         let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
@@ -329,7 +329,7 @@ impl MapHandle {
         descriptor: &OpenglBorrowedTextureDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_map_attach_opengl_borrowed_texture")?;
+        let mut call = self.inner.call();
         let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
@@ -362,7 +362,7 @@ impl MapHandle {
         descriptor: &OpenglOwnedTextureDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_map_attach_opengl_owned_texture")?;
+        let mut call = self.inner.call();
         let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
@@ -395,7 +395,7 @@ impl MapHandle {
         descriptor: &OpenglSurfaceDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_map_attach_opengl_surface")?;
+        let mut call = self.inner.call();
         let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
@@ -428,7 +428,7 @@ impl MapHandle {
         descriptor: &VulkanBorrowedTextureDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_map_attach_vulkan_borrowed_texture")?;
+        let mut call = self.inner.call();
         let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
@@ -461,7 +461,7 @@ impl MapHandle {
         descriptor: &VulkanOwnedTextureDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_map_attach_vulkan_owned_texture")?;
+        let mut call = self.inner.call();
         let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
@@ -494,7 +494,7 @@ impl MapHandle {
         descriptor: &VulkanSurfaceDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_map_attach_vulkan_surface")?;
+        let mut call = self.inner.call();
         let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
@@ -527,7 +527,7 @@ impl MapHandle {
         descriptor: &WebgpuBorrowedTextureDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_map_attach_webgpu_borrowed_texture")?;
+        let mut call = self.inner.call();
         let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
@@ -560,7 +560,7 @@ impl MapHandle {
         descriptor: &WebgpuOwnedTextureDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_map_attach_webgpu_owned_texture")?;
+        let mut call = self.inner.call();
         let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
@@ -593,7 +593,7 @@ impl MapHandle {
         descriptor: &WebgpuSurfaceDescriptor,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_map_attach_webgpu_surface")?;
+        let mut call = self.inner.call();
         let parent = self.inner.parent();
         let mut out_session = sys::mln_render_session(0);
         let descriptor = call.reference(&descriptor)?;
@@ -620,7 +620,7 @@ impl MapHandle {
     /// See `mln_map_begin_command_group` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn begin_command_group(&self) -> Result<NativeFuture<CommandCompletion>> {
-        let call = self.inner.call("mln_map_begin_command_group")?;
+        let call = self.inner.call();
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_begin_command_group(map, completion, out_diagnostic)
         })
@@ -635,7 +635,7 @@ impl MapHandle {
         geometry: &[u8],
         fit_options: Option<&CameraFitOptions>,
     ) -> Result<NativeFuture<CameraOptions>> {
-        let mut call = self.inner.call("mln_map_camera_for_geometry")?;
+        let mut call = self.inner.call();
         let geometry = call.input(&geometry)?;
         let fit_options = call.optional_reference(fit_options.as_ref())?;
         call.complete(
@@ -661,7 +661,7 @@ impl MapHandle {
         bounds: LatLngBounds,
         fit_options: Option<&CameraFitOptions>,
     ) -> Result<NativeFuture<CameraOptions>> {
-        let mut call = self.inner.call("mln_map_camera_for_lat_lng_bounds")?;
+        let mut call = self.inner.call();
         let bounds = call.input(&bounds)?;
         let fit_options = call.optional_reference(fit_options.as_ref())?;
         call.complete(
@@ -687,7 +687,7 @@ impl MapHandle {
         coordinates: &[LatLng],
         fit_options: Option<&CameraFitOptions>,
     ) -> Result<NativeFuture<CameraOptions>> {
-        let mut call = self.inner.call("mln_map_camera_for_lat_lngs")?;
+        let mut call = self.inner.call();
         let coordinate_count = convert::count(coordinates.len())?;
         let coordinates = call.array(coordinates)?;
         let fit_options = call.optional_reference(fit_options.as_ref())?;
@@ -715,7 +715,7 @@ impl MapHandle {
         &self,
         transition_id: u64,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let call = self.inner.call("mln_map_cancel_camera_transition")?;
+        let call = self.inner.call();
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_cancel_camera_transition(map, transition_id, completion, out_diagnostic)
         })
@@ -726,7 +726,7 @@ impl MapHandle {
     /// See `mln_map_cancel_transitions` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn cancel_transitions(&self) -> Result<NativeFuture<CommandCompletion>> {
-        let call = self.inner.call("mln_map_cancel_transitions")?;
+        let call = self.inner.call();
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_cancel_transitions(map, completion, out_diagnostic)
         })
@@ -738,7 +738,7 @@ impl MapHandle {
     /// See `mln_map_create_projection` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
     pub fn create_projection(&self) -> Result<MapProjectionHandle> {
-        let mut call = self.inner.call("mln_map_create_projection")?;
+        let mut call = self.inner.call();
         let mut out_projection = sys::mln_map_projection(0);
         call.status(|map, out_diagnostic| unsafe {
             sys::mln_map_create_projection(map, &mut out_projection, out_diagnostic)
@@ -762,7 +762,7 @@ impl MapHandle {
     /// See `mln_map_dump_debug_logs` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn dump_debug_logs(&self) -> Result<NativeFuture<CommandCompletion>> {
-        let call = self.inner.call("mln_map_dump_debug_logs")?;
+        let call = self.inner.call();
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_dump_debug_logs(map, completion, out_diagnostic)
         })
@@ -774,7 +774,7 @@ impl MapHandle {
     /// See `mln_map_end_command_group` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn end_command_group(&self) -> Result<NativeFuture<CommandCompletion>> {
-        let call = self.inner.call("mln_map_end_command_group")?;
+        let call = self.inner.call();
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_end_command_group(map, completion, out_diagnostic)
         })
@@ -785,7 +785,7 @@ impl MapHandle {
     /// See `mln_map_get_camera` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn get_camera(&self) -> Result<NativeFuture<CameraQueryResult>> {
-        let call = self.inner.call("mln_map_get_camera")?;
+        let call = self.inner.call();
         call.complete(
             |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_get_camera(map, completion, out_diagnostic)
@@ -802,7 +802,7 @@ impl MapHandle {
         &self,
         selector: &FeatureStateSelector,
     ) -> Result<NativeFuture<Vec<u8>>> {
-        let mut call = self.inner.call("mln_map_get_feature_state")?;
+        let mut call = self.inner.call();
         let selector = call.reference(&selector)?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
@@ -819,7 +819,7 @@ impl MapHandle {
     /// See `mln_map_get_global_state` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn get_global_state(&self) -> Result<NativeFuture<Vec<u8>>> {
-        let call = self.inner.call("mln_map_get_global_state")?;
+        let call = self.inner.call();
         call.complete(
             |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_get_global_state(map, completion, out_diagnostic)
@@ -836,7 +836,7 @@ impl MapHandle {
         &self,
         source_id: &str,
     ) -> Result<NativeFuture<Vec<LatLng>>> {
-        let mut call = self.inner.call("mln_map_get_image_source_coordinates")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
@@ -856,7 +856,7 @@ impl MapHandle {
     /// See `mln_map_get_loaded_style_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn get_loaded_style_json(&self) -> Result<NativeFuture<Vec<u8>>> {
-        let call = self.inner.call("mln_map_get_loaded_style_json")?;
+        let call = self.inner.call();
         call.complete(
             |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_get_loaded_style_json(map, completion, out_diagnostic)
@@ -870,7 +870,7 @@ impl MapHandle {
     /// See `mln_map_get_snapshot` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn get_snapshot(&self) -> Result<MapSnapshot> {
-        let mut call = self.inner.call("mln_map_get_snapshot")?;
+        let mut call = self.inner.call();
         let mut out_snapshot: sys::mln_map_snapshot = unsafe { std::mem::zeroed() };
         out_snapshot.size = std::mem::size_of::<sys::mln_map_snapshot>() as _;
         call.status(|map, out_diagnostic| unsafe {
@@ -884,7 +884,7 @@ impl MapHandle {
     /// See `mln_map_get_style_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn get_style_image(&self, image_id: &str) -> Result<NativeFuture<Option<StyleImageInfo>>> {
-        let mut call = self.inner.call("mln_map_get_style_image")?;
+        let mut call = self.inner.call();
         let image_id = call.input(&image_id)?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
@@ -899,7 +899,7 @@ impl MapHandle {
     /// See `mln_map_get_style_layer` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn get_style_layer(&self, layer_id: &str) -> Result<NativeFuture<Option<StyleLayerInfo>>> {
-        let mut call = self.inner.call("mln_map_get_style_layer")?;
+        let mut call = self.inner.call();
         let layer_id = call.input(&layer_id)?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
@@ -914,7 +914,7 @@ impl MapHandle {
     /// See `mln_map_get_style_layer_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn get_style_layer_json(&self, layer_id: &str) -> Result<NativeFuture<Option<Vec<u8>>>> {
-        let mut call = self.inner.call("mln_map_get_style_layer_json")?;
+        let mut call = self.inner.call();
         let layer_id = call.input(&layer_id)?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
@@ -933,7 +933,7 @@ impl MapHandle {
         layer_id: &str,
         property_name: &str,
     ) -> Result<NativeFuture<Option<Vec<u8>>>> {
-        let mut call = self.inner.call("mln_map_get_style_layer_property")?;
+        let mut call = self.inner.call();
         let layer_id = call.input(&layer_id)?;
         let property_name = call.input(&property_name)?;
         call.complete(
@@ -958,7 +958,7 @@ impl MapHandle {
         &self,
         property_name: &str,
     ) -> Result<NativeFuture<Option<Vec<u8>>>> {
-        let mut call = self.inner.call("mln_map_get_style_light_property")?;
+        let mut call = self.inner.call();
         let property_name = call.input(&property_name)?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
@@ -981,7 +981,7 @@ impl MapHandle {
         &self,
         source_id: &str,
     ) -> Result<NativeFuture<Option<StyleSourceInfo>>> {
-        let mut call = self.inner.call("mln_map_get_style_source")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
@@ -996,7 +996,7 @@ impl MapHandle {
     /// See `mln_map_get_style_transition_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn get_style_transition_options(&self) -> Result<NativeFuture<StyleTransitionOptions>> {
-        let call = self.inner.call("mln_map_get_style_transition_options")?;
+        let call = self.inner.call();
         call.complete(
             |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_get_style_transition_options(map, completion, out_diagnostic)
@@ -1010,7 +1010,7 @@ impl MapHandle {
     /// See `mln_map_get_style_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn get_style_url(&self) -> Result<NativeFuture<String>> {
-        let call = self.inner.call("mln_map_get_style_url")?;
+        let call = self.inner.call();
         call.complete(
             |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_get_style_url(map, completion, out_diagnostic)
@@ -1028,9 +1028,7 @@ impl MapHandle {
         source_id: &str,
         bounds: LatLngBounds,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self
-            .inner
-            .call("mln_map_invalidate_custom_geometry_source_region")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let bounds = call.input(&bounds)?;
         call.command(|map, completion, out_diagnostic| unsafe {
@@ -1053,9 +1051,7 @@ impl MapHandle {
         source_id: &str,
         tile_id: CanonicalTileId,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self
-            .inner
-            .call("mln_map_invalidate_custom_geometry_source_tile")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let tile_id = call.input(&tile_id)?;
         call.command(|map, completion, out_diagnostic| unsafe {
@@ -1078,9 +1074,7 @@ impl MapHandle {
         source_id: &str,
         tile_id: CanonicalTileId,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self
-            .inner
-            .call("mln_map_invalidate_custom_mvt_vector_source_tile")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let tile_id = call.input(&tile_id)?;
         call.command(|map, completion, out_diagnostic| unsafe {
@@ -1102,7 +1096,7 @@ impl MapHandle {
         &self,
         camera: &CameraOptions,
     ) -> Result<NativeFuture<LatLngBounds>> {
-        let mut call = self.inner.call("mln_map_lat_lng_bounds_for_camera")?;
+        let mut call = self.inner.call();
         let camera = call.reference(&camera)?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
@@ -1120,9 +1114,7 @@ impl MapHandle {
         &self,
         camera: &CameraOptions,
     ) -> Result<NativeFuture<LatLngBounds>> {
-        let mut call = self
-            .inner
-            .call("mln_map_lat_lng_bounds_for_camera_unwrapped")?;
+        let mut call = self.inner.call();
         let camera = call.reference(&camera)?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
@@ -1142,7 +1134,7 @@ impl MapHandle {
     /// See `mln_map_list_style_layers` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn list_style_layers(&self) -> Result<NativeFuture<Vec<StyleLayerInfo>>> {
-        let call = self.inner.call("mln_map_list_style_layers")?;
+        let call = self.inner.call();
         call.complete(
             |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_list_style_layers(map, completion, out_diagnostic)
@@ -1156,7 +1148,7 @@ impl MapHandle {
     /// See `mln_map_list_style_sources` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn list_style_sources(&self) -> Result<NativeFuture<Vec<StyleSourceInfo>>> {
-        let call = self.inner.call("mln_map_list_style_sources")?;
+        let call = self.inner.call();
         call.complete(
             |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_list_style_sources(map, completion, out_diagnostic)
@@ -1174,7 +1166,7 @@ impl MapHandle {
         layer_id: &str,
         before_layer_id: Option<&str>,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_move_style_layer")?;
+        let mut call = self.inner.call();
         let layer_id = call.input(&layer_id)?;
         let before_layer_id = call.input(&before_layer_id)?;
         call.command(|map, completion, out_diagnostic| unsafe {
@@ -1212,7 +1204,7 @@ impl MapHandle {
         &self,
         selector: &FeatureStateSelector,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_remove_feature_state")?;
+        let mut call = self.inner.call();
         let selector = call.reference(&selector)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_remove_feature_state(map, selector, completion, out_diagnostic)
@@ -1224,7 +1216,7 @@ impl MapHandle {
     /// See `mln_map_remove_style_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn remove_style_image(&self, image_id: &str) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_remove_style_image")?;
+        let mut call = self.inner.call();
         let image_id = call.input(&image_id)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_remove_style_image(map, image_id, completion, out_diagnostic)
@@ -1236,7 +1228,7 @@ impl MapHandle {
     /// See `mln_map_remove_style_layer` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn remove_style_layer(&self, layer_id: &str) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_remove_style_layer")?;
+        let mut call = self.inner.call();
         let layer_id = call.input(&layer_id)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_remove_style_layer(map, layer_id, completion, out_diagnostic)
@@ -1248,7 +1240,7 @@ impl MapHandle {
     /// See `mln_map_remove_style_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn remove_style_source(&self, source_id: &str) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_remove_style_source")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_remove_style_source(map, source_id, completion, out_diagnostic)
@@ -1260,7 +1252,7 @@ impl MapHandle {
     /// See `mln_map_request_repaint` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn request_repaint(&self) -> Result<NativeFuture<CommandCompletion>> {
-        let call = self.inner.call("mln_map_request_repaint")?;
+        let call = self.inner.call();
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_request_repaint(map, completion, out_diagnostic)
         })
@@ -1271,7 +1263,7 @@ impl MapHandle {
     /// See `mln_map_request_still_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn request_still_image(&self) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_map_request_still_image")?;
+        let call = self.inner.call();
         call.complete(
             |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_request_still_image(map, completion, out_diagnostic)
@@ -1285,7 +1277,7 @@ impl MapHandle {
     /// See `mln_map_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn resize(&self, extent: LogicalExtent) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_resize")?;
+        let mut call = self.inner.call();
         let extent = call.input(&extent)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_resize(map, extent, completion, out_diagnostic)
@@ -1297,7 +1289,7 @@ impl MapHandle {
     /// See `mln_map_set_bounds` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn set_bounds(&self, options: &BoundOptions) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_bounds")?;
+        let mut call = self.inner.call();
         let options = call.reference(&options)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_bounds(map, options, completion, out_diagnostic)
@@ -1314,9 +1306,7 @@ impl MapHandle {
         tile_id: CanonicalTileId,
         data: &[u8],
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self
-            .inner
-            .call("mln_map_set_custom_geometry_source_tile_data")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let tile_id = call.input(&tile_id)?;
         let data = call.input(&data)?;
@@ -1342,9 +1332,7 @@ impl MapHandle {
         tile_id: CanonicalTileId,
         data: &[u8],
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self
-            .inner
-            .call("mln_map_set_custom_mvt_vector_source_tile_data")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let tile_id = call.input(&tile_id)?;
         let data = call.input(&data)?;
@@ -1370,9 +1358,7 @@ impl MapHandle {
         tile_id: CanonicalTileId,
         message: &str,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self
-            .inner
-            .call("mln_map_set_custom_mvt_vector_source_tile_error")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let tile_id = call.input(&tile_id)?;
         let message = call.input(&message)?;
@@ -1396,9 +1382,9 @@ impl MapHandle {
         &self,
         options: MapDebugOption,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let call = self.inner.call("mln_map_set_debug_options")?;
+        let call = self.inner.call();
         call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_debug_options(map, options.to_native(), completion, out_diagnostic)
+            sys::mln_map_set_debug_options(map, options.bits(), completion, out_diagnostic)
         })
     }
 
@@ -1410,9 +1396,9 @@ impl MapHandle {
         &self,
         mask: RuntimeEventMask,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let call = self.inner.call("mln_map_set_event_mask")?;
+        let call = self.inner.call();
         call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_event_mask(map, mask.to_native(), completion, out_diagnostic)
+            sys::mln_map_set_event_mask(map, mask.bits(), completion, out_diagnostic)
         })
     }
 
@@ -1425,7 +1411,7 @@ impl MapHandle {
         selector: &FeatureStateSelector,
         state: &[u8],
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_feature_state")?;
+        let mut call = self.inner.call();
         let selector = call.reference(&selector)?;
         let state = call.input(&state)?;
         call.command(|map, completion, out_diagnostic| unsafe {
@@ -1441,7 +1427,7 @@ impl MapHandle {
         &self,
         options: &FreeCameraOptions,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_free_camera_options")?;
+        let mut call = self.inner.call();
         let options = call.reference(&options)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_free_camera_options(map, options, completion, out_diagnostic)
@@ -1457,8 +1443,8 @@ impl MapHandle {
         source_id: &str,
         data: &GeojsonSourceDataHandle,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_geojson_source_data")?;
-        let data = data.inner.native()?;
+        let mut call = self.inner.call();
+        let data = data.inner.native();
         let source_id = call.input(&source_id)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_geojson_source_data(map, source_id, data, completion, out_diagnostic)
@@ -1474,9 +1460,7 @@ impl MapHandle {
         source_id: &str,
         enabled: bool,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self
-            .inner
-            .call("mln_map_set_geojson_source_synchronous_tiling")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_geojson_source_synchronous_tiling(
@@ -1498,7 +1482,7 @@ impl MapHandle {
         source_id: &str,
         url: &str,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_geojson_source_url")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let url = call.input(&url)?;
         call.command(|map, completion, out_diagnostic| unsafe {
@@ -1515,7 +1499,7 @@ impl MapHandle {
         property_name: &str,
         value_: &[u8],
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_global_state_property")?;
+        let mut call = self.inner.call();
         let property_name = call.input(&property_name)?;
         let value_ = call.input(&value_)?;
         call.command(|map, completion, out_diagnostic| unsafe {
@@ -1538,7 +1522,7 @@ impl MapHandle {
         source_id: &str,
         coordinates: &[LatLng],
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_image_source_coordinates")?;
+        let mut call = self.inner.call();
         let coordinate_count = convert::count(coordinates.len())?;
         let source_id = call.input(&source_id)?;
         let coordinates = call.array(coordinates)?;
@@ -1563,7 +1547,7 @@ impl MapHandle {
         source_id: &str,
         image: &PremultipliedRgba8Image,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_image_source_image")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let image = call.reference(&image)?;
         call.command(|map, completion, out_diagnostic| unsafe {
@@ -1580,7 +1564,7 @@ impl MapHandle {
         source_id: &str,
         url: &str,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_image_source_url")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let url = call.input(&url)?;
         call.command(|map, completion, out_diagnostic| unsafe {
@@ -1596,7 +1580,7 @@ impl MapHandle {
         &self,
         mode: &ProjectionMode,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_projection_mode")?;
+        let mut call = self.inner.call();
         let mode = call.reference(&mode)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_projection_mode(map, mode, completion, out_diagnostic)
@@ -1611,9 +1595,7 @@ impl MapHandle {
         &self,
         enabled: bool,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let call = self
-            .inner
-            .call("mln_map_set_rendering_stats_view_enabled")?;
+        let call = self.inner.call();
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_rendering_stats_view_enabled(map, enabled, completion, out_diagnostic)
         })
@@ -1629,7 +1611,7 @@ impl MapHandle {
         image: &PremultipliedRgba8Image,
         options: Option<&StyleImageOptions>,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_style_image")?;
+        let mut call = self.inner.call();
         let image_id = call.input(&image_id)?;
         let image = call.reference(&image)?;
         let options = call.optional_reference(options.as_ref())?;
@@ -1643,7 +1625,7 @@ impl MapHandle {
     /// See `mln_map_set_style_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn set_style_json(&self, json: &[u8]) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_style_json")?;
+        let mut call = self.inner.call();
         let json = call.input(&json)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_json(map, json, completion, out_diagnostic)
@@ -1660,7 +1642,7 @@ impl MapHandle {
         property_name: &str,
         value_: &[u8],
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_style_layer_property")?;
+        let mut call = self.inner.call();
         let layer_id = call.input(&layer_id)?;
         let property_name = call.input(&property_name)?;
         let value_ = call.input(&value_)?;
@@ -1684,7 +1666,7 @@ impl MapHandle {
         &self,
         light_json: &[u8],
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_style_light_json")?;
+        let mut call = self.inner.call();
         let light_json = call.input(&light_json)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_light_json(map, light_json, completion, out_diagnostic)
@@ -1701,7 +1683,7 @@ impl MapHandle {
         property_name: &str,
         value_: &[u8],
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_style_light_property")?;
+        let mut call = self.inner.call();
         let property_name = call.input(&property_name)?;
         let value_ = call.input(&value_)?;
         call.command(|map, completion, out_diagnostic| unsafe {
@@ -1725,7 +1707,7 @@ impl MapHandle {
         source_id: &str,
         is_volatile: bool,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_style_source_volatile")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_source_volatile(
@@ -1746,7 +1728,7 @@ impl MapHandle {
         &self,
         options: &StyleTransitionOptions,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_style_transition_options")?;
+        let mut call = self.inner.call();
         let options = call.reference(&options)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_transition_options(map, options, completion, out_diagnostic)
@@ -1758,7 +1740,7 @@ impl MapHandle {
     /// See `mln_map_set_style_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn set_style_url(&self, url: &str) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_style_url")?;
+        let mut call = self.inner.call();
         let url = call.input(&url)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_url(map, url, completion, out_diagnostic)
@@ -1773,7 +1755,7 @@ impl MapHandle {
         &self,
         options: &MapTileOptions,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_tile_options")?;
+        let mut call = self.inner.call();
         let options = call.reference(&options)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_tile_options(map, options, completion, out_diagnostic)
@@ -1788,7 +1770,7 @@ impl MapHandle {
         &self,
         options: &MapViewportOptions,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_viewport_options")?;
+        let mut call = self.inner.call();
         let options = call.reference(&options)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_viewport_options(map, options, completion, out_diagnostic)
@@ -1800,7 +1782,7 @@ impl MapHandle {
     /// See `mln_map_update_camera` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn update_camera(&self, update: &CameraUpdate) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_update_camera")?;
+        let mut call = self.inner.call();
         let update = call.reference(&update)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_update_camera(map, update, completion, out_diagnostic)
@@ -1824,7 +1806,7 @@ impl MapHandleDiscarding<'_> {
         source_id: &str,
         options: CustomGeometrySourceOptions,
     ) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_add_custom_geometry_source")?;
+        let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         let options = call.reference(&options)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
@@ -1847,7 +1829,7 @@ impl MapHandleDiscarding<'_> {
         source_id: &str,
         options: CustomMvtVectorSourceOptions,
     ) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_add_custom_mvt_vector_source")?;
+        let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         let options = call.reference(&options)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
@@ -1870,8 +1852,8 @@ impl MapHandleDiscarding<'_> {
         source_id: &str,
         data: &GeojsonSourceDataHandle,
     ) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_add_geojson_source_data")?;
-        let data = data.inner.native()?;
+        let mut call = self.0.inner.call();
+        let data = data.inner.native();
         let source_id = call.input(&source_id)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_geojson_source_data(map, source_id, data, completion, out_diagnostic)
@@ -1888,7 +1870,7 @@ impl MapHandleDiscarding<'_> {
         url: &str,
         options: Option<&GeojsonSourceOptions>,
     ) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_add_geojson_source_url")?;
+        let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         let url = call.input(&url)?;
         let options = call.optional_reference(options.as_ref())?;
@@ -1914,7 +1896,7 @@ impl MapHandleDiscarding<'_> {
         coordinates: &[LatLng],
         image: &PremultipliedRgba8Image,
     ) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_add_image_source_image")?;
+        let mut call = self.0.inner.call();
         let coordinate_count = convert::count(coordinates.len())?;
         let source_id = call.input(&source_id)?;
         let coordinates = call.array(coordinates)?;
@@ -1942,7 +1924,7 @@ impl MapHandleDiscarding<'_> {
         coordinates: &[LatLng],
         url: &str,
     ) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_add_image_source_url")?;
+        let mut call = self.0.inner.call();
         let coordinate_count = convert::count(coordinates.len())?;
         let source_id = call.input(&source_id)?;
         let coordinates = call.array(coordinates)?;
@@ -1969,7 +1951,7 @@ impl MapHandleDiscarding<'_> {
         layer_json: &[u8],
         before_layer_id: Option<&str>,
     ) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_add_style_layer_json")?;
+        let mut call = self.0.inner.call();
         let layer_json = call.input(&layer_json)?;
         let before_layer_id = call.input(&before_layer_id)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
@@ -1988,7 +1970,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_add_style_source_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn add_style_source_json(&self, source_id: &str, source_json: &[u8]) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_add_style_source_json")?;
+        let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         let source_json = call.input(&source_json)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
@@ -2007,7 +1989,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_apply_camera_delta` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn apply_camera_delta(&self, delta: &CameraDelta) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_apply_camera_delta")?;
+        let mut call = self.0.inner.call();
         let delta = call.reference(&delta)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_apply_camera_delta(map, delta, completion, out_diagnostic)
@@ -2020,7 +2002,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_begin_command_group` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn begin_command_group(&self) -> Result<()> {
-        let call = self.0.inner.call("mln_map_begin_command_group")?;
+        let call = self.0.inner.call();
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_begin_command_group(map, completion, out_diagnostic)
         })
@@ -2032,7 +2014,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_cancel_camera_transition` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn cancel_camera_transition(&self, transition_id: u64) -> Result<()> {
-        let call = self.0.inner.call("mln_map_cancel_camera_transition")?;
+        let call = self.0.inner.call();
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_cancel_camera_transition(map, transition_id, completion, out_diagnostic)
         })
@@ -2043,7 +2025,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_cancel_transitions` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn cancel_transitions(&self) -> Result<()> {
-        let call = self.0.inner.call("mln_map_cancel_transitions")?;
+        let call = self.0.inner.call();
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_cancel_transitions(map, completion, out_diagnostic)
         })
@@ -2054,7 +2036,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_dump_debug_logs` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn dump_debug_logs(&self) -> Result<()> {
-        let call = self.0.inner.call("mln_map_dump_debug_logs")?;
+        let call = self.0.inner.call();
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_dump_debug_logs(map, completion, out_diagnostic)
         })
@@ -2066,7 +2048,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_end_command_group` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn end_command_group(&self) -> Result<()> {
-        let call = self.0.inner.call("mln_map_end_command_group")?;
+        let call = self.0.inner.call();
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_end_command_group(map, completion, out_diagnostic)
         })
@@ -2081,10 +2063,7 @@ impl MapHandleDiscarding<'_> {
         source_id: &str,
         bounds: LatLngBounds,
     ) -> Result<()> {
-        let mut call = self
-            .0
-            .inner
-            .call("mln_map_invalidate_custom_geometry_source_region")?;
+        let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         let bounds = call.input(&bounds)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
@@ -2107,10 +2086,7 @@ impl MapHandleDiscarding<'_> {
         source_id: &str,
         tile_id: CanonicalTileId,
     ) -> Result<()> {
-        let mut call = self
-            .0
-            .inner
-            .call("mln_map_invalidate_custom_geometry_source_tile")?;
+        let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         let tile_id = call.input(&tile_id)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
@@ -2133,10 +2109,7 @@ impl MapHandleDiscarding<'_> {
         source_id: &str,
         tile_id: CanonicalTileId,
     ) -> Result<()> {
-        let mut call = self
-            .0
-            .inner
-            .call("mln_map_invalidate_custom_mvt_vector_source_tile")?;
+        let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         let tile_id = call.input(&tile_id)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
@@ -2155,7 +2128,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_move_style_layer` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn move_style_layer(&self, layer_id: &str, before_layer_id: Option<&str>) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_move_style_layer")?;
+        let mut call = self.0.inner.call();
         let layer_id = call.input(&layer_id)?;
         let before_layer_id = call.input(&before_layer_id)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
@@ -2174,7 +2147,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_remove_feature_state` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn remove_feature_state(&self, selector: &FeatureStateSelector) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_remove_feature_state")?;
+        let mut call = self.0.inner.call();
         let selector = call.reference(&selector)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_remove_feature_state(map, selector, completion, out_diagnostic)
@@ -2186,7 +2159,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_remove_style_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn remove_style_image(&self, image_id: &str) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_remove_style_image")?;
+        let mut call = self.0.inner.call();
         let image_id = call.input(&image_id)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_remove_style_image(map, image_id, completion, out_diagnostic)
@@ -2198,7 +2171,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_remove_style_layer` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn remove_style_layer(&self, layer_id: &str) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_remove_style_layer")?;
+        let mut call = self.0.inner.call();
         let layer_id = call.input(&layer_id)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_remove_style_layer(map, layer_id, completion, out_diagnostic)
@@ -2210,7 +2183,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_remove_style_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn remove_style_source(&self, source_id: &str) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_remove_style_source")?;
+        let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_remove_style_source(map, source_id, completion, out_diagnostic)
@@ -2222,7 +2195,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_request_repaint` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn request_repaint(&self) -> Result<()> {
-        let call = self.0.inner.call("mln_map_request_repaint")?;
+        let call = self.0.inner.call();
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_request_repaint(map, completion, out_diagnostic)
         })
@@ -2233,7 +2206,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn resize(&self, extent: LogicalExtent) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_resize")?;
+        let mut call = self.0.inner.call();
         let extent = call.input(&extent)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_resize(map, extent, completion, out_diagnostic)
@@ -2245,7 +2218,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_bounds` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn set_bounds(&self, options: &BoundOptions) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_bounds")?;
+        let mut call = self.0.inner.call();
         let options = call.reference(&options)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_bounds(map, options, completion, out_diagnostic)
@@ -2262,10 +2235,7 @@ impl MapHandleDiscarding<'_> {
         tile_id: CanonicalTileId,
         data: &[u8],
     ) -> Result<()> {
-        let mut call = self
-            .0
-            .inner
-            .call("mln_map_set_custom_geometry_source_tile_data")?;
+        let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         let tile_id = call.input(&tile_id)?;
         let data = call.input(&data)?;
@@ -2291,10 +2261,7 @@ impl MapHandleDiscarding<'_> {
         tile_id: CanonicalTileId,
         data: &[u8],
     ) -> Result<()> {
-        let mut call = self
-            .0
-            .inner
-            .call("mln_map_set_custom_mvt_vector_source_tile_data")?;
+        let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         let tile_id = call.input(&tile_id)?;
         let data = call.input(&data)?;
@@ -2320,10 +2287,7 @@ impl MapHandleDiscarding<'_> {
         tile_id: CanonicalTileId,
         message: &str,
     ) -> Result<()> {
-        let mut call = self
-            .0
-            .inner
-            .call("mln_map_set_custom_mvt_vector_source_tile_error")?;
+        let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         let tile_id = call.input(&tile_id)?;
         let message = call.input(&message)?;
@@ -2344,9 +2308,9 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_debug_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn set_debug_options(&self, options: MapDebugOption) -> Result<()> {
-        let call = self.0.inner.call("mln_map_set_debug_options")?;
+        let call = self.0.inner.call();
         call.discard(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_debug_options(map, options.to_native(), completion, out_diagnostic)
+            sys::mln_map_set_debug_options(map, options.bits(), completion, out_diagnostic)
         })
     }
 
@@ -2355,9 +2319,9 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_event_mask` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn set_event_mask(&self, mask: RuntimeEventMask) -> Result<()> {
-        let call = self.0.inner.call("mln_map_set_event_mask")?;
+        let call = self.0.inner.call();
         call.discard(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_event_mask(map, mask.to_native(), completion, out_diagnostic)
+            sys::mln_map_set_event_mask(map, mask.bits(), completion, out_diagnostic)
         })
     }
 
@@ -2366,7 +2330,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_feature_state` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn set_feature_state(&self, selector: &FeatureStateSelector, state: &[u8]) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_feature_state")?;
+        let mut call = self.0.inner.call();
         let selector = call.reference(&selector)?;
         let state = call.input(&state)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
@@ -2379,7 +2343,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_free_camera_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn set_free_camera_options(&self, options: &FreeCameraOptions) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_free_camera_options")?;
+        let mut call = self.0.inner.call();
         let options = call.reference(&options)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_free_camera_options(map, options, completion, out_diagnostic)
@@ -2395,8 +2359,8 @@ impl MapHandleDiscarding<'_> {
         source_id: &str,
         data: &GeojsonSourceDataHandle,
     ) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_geojson_source_data")?;
-        let data = data.inner.native()?;
+        let mut call = self.0.inner.call();
+        let data = data.inner.native();
         let source_id = call.input(&source_id)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_geojson_source_data(map, source_id, data, completion, out_diagnostic)
@@ -2412,10 +2376,7 @@ impl MapHandleDiscarding<'_> {
         source_id: &str,
         enabled: bool,
     ) -> Result<()> {
-        let mut call = self
-            .0
-            .inner
-            .call("mln_map_set_geojson_source_synchronous_tiling")?;
+        let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_geojson_source_synchronous_tiling(
@@ -2433,7 +2394,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_geojson_source_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn set_geojson_source_url(&self, source_id: &str, url: &str) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_geojson_source_url")?;
+        let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         let url = call.input(&url)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
@@ -2446,7 +2407,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_global_state_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn set_global_state_property(&self, property_name: &str, value_: &[u8]) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_global_state_property")?;
+        let mut call = self.0.inner.call();
         let property_name = call.input(&property_name)?;
         let value_ = call.input(&value_)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
@@ -2469,7 +2430,7 @@ impl MapHandleDiscarding<'_> {
         source_id: &str,
         coordinates: &[LatLng],
     ) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_image_source_coordinates")?;
+        let mut call = self.0.inner.call();
         let coordinate_count = convert::count(coordinates.len())?;
         let source_id = call.input(&source_id)?;
         let coordinates = call.array(coordinates)?;
@@ -2494,7 +2455,7 @@ impl MapHandleDiscarding<'_> {
         source_id: &str,
         image: &PremultipliedRgba8Image,
     ) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_image_source_image")?;
+        let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         let image = call.reference(&image)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
@@ -2507,7 +2468,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_image_source_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn set_image_source_url(&self, source_id: &str, url: &str) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_image_source_url")?;
+        let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         let url = call.input(&url)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
@@ -2520,7 +2481,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_projection_mode` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn set_projection_mode(&self, mode: &ProjectionMode) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_projection_mode")?;
+        let mut call = self.0.inner.call();
         let mode = call.reference(&mode)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_projection_mode(map, mode, completion, out_diagnostic)
@@ -2532,10 +2493,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_rendering_stats_view_enabled` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn set_rendering_stats_view_enabled(&self, enabled: bool) -> Result<()> {
-        let call = self
-            .0
-            .inner
-            .call("mln_map_set_rendering_stats_view_enabled")?;
+        let call = self.0.inner.call();
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_rendering_stats_view_enabled(map, enabled, completion, out_diagnostic)
         })
@@ -2551,7 +2509,7 @@ impl MapHandleDiscarding<'_> {
         image: &PremultipliedRgba8Image,
         options: Option<&StyleImageOptions>,
     ) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_style_image")?;
+        let mut call = self.0.inner.call();
         let image_id = call.input(&image_id)?;
         let image = call.reference(&image)?;
         let options = call.optional_reference(options.as_ref())?;
@@ -2565,7 +2523,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_style_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn set_style_json(&self, json: &[u8]) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_style_json")?;
+        let mut call = self.0.inner.call();
         let json = call.input(&json)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_json(map, json, completion, out_diagnostic)
@@ -2582,7 +2540,7 @@ impl MapHandleDiscarding<'_> {
         property_name: &str,
         value_: &[u8],
     ) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_style_layer_property")?;
+        let mut call = self.0.inner.call();
         let layer_id = call.input(&layer_id)?;
         let property_name = call.input(&property_name)?;
         let value_ = call.input(&value_)?;
@@ -2603,7 +2561,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_style_light_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn set_style_light_json(&self, light_json: &[u8]) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_style_light_json")?;
+        let mut call = self.0.inner.call();
         let light_json = call.input(&light_json)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_light_json(map, light_json, completion, out_diagnostic)
@@ -2616,7 +2574,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_style_light_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn set_style_light_property(&self, property_name: &str, value_: &[u8]) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_style_light_property")?;
+        let mut call = self.0.inner.call();
         let property_name = call.input(&property_name)?;
         let value_ = call.input(&value_)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
@@ -2636,7 +2594,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_style_source_volatile` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn set_style_source_volatile(&self, source_id: &str, is_volatile: bool) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_style_source_volatile")?;
+        let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_source_volatile(
@@ -2654,7 +2612,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_style_transition_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn set_style_transition_options(&self, options: &StyleTransitionOptions) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_style_transition_options")?;
+        let mut call = self.0.inner.call();
         let options = call.reference(&options)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_transition_options(map, options, completion, out_diagnostic)
@@ -2666,7 +2624,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_style_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn set_style_url(&self, url: &str) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_style_url")?;
+        let mut call = self.0.inner.call();
         let url = call.input(&url)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_url(map, url, completion, out_diagnostic)
@@ -2678,7 +2636,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_tile_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn set_tile_options(&self, options: &MapTileOptions) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_tile_options")?;
+        let mut call = self.0.inner.call();
         let options = call.reference(&options)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_tile_options(map, options, completion, out_diagnostic)
@@ -2690,7 +2648,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_set_viewport_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn set_viewport_options(&self, options: &MapViewportOptions) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_set_viewport_options")?;
+        let mut call = self.0.inner.call();
         let options = call.reference(&options)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_viewport_options(map, options, completion, out_diagnostic)
@@ -2702,7 +2660,7 @@ impl MapHandleDiscarding<'_> {
     /// See `mln_map_update_camera` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn update_camera(&self, update: &CameraUpdate) -> Result<()> {
-        let mut call = self.0.inner.call("mln_map_update_camera")?;
+        let mut call = self.0.inner.call();
         let update = call.reference(&update)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_update_camera(map, update, completion, out_diagnostic)

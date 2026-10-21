@@ -551,7 +551,7 @@ impl CameraTransitionHandler {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_camera_transition_end_callback", None, (), || {
+        callback::invoke("mln_camera_transition_end_callback", (), || {
             callback::require(&state.callback)?(unsafe { convert::copy_reference(end) }?);
             Ok(())
         })
@@ -775,7 +775,7 @@ impl CustomGeometrySourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_custom_source_fetch_tile_callback", None, (), || {
+        callback::invoke("mln_custom_source_fetch_tile_callback", (), || {
             callback::require(&state.fetch_tile)?(unsafe { from_native(tile_id) }?);
             Ok(())
         })
@@ -787,7 +787,7 @@ impl CustomGeometrySourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_custom_source_cancel_tile_callback", None, (), || {
+        callback::invoke("mln_custom_source_cancel_tile_callback", (), || {
             callback::require(&state.cancel_tile)?(unsafe { from_native(tile_id) }?);
             Ok(())
         })
@@ -930,7 +930,7 @@ impl CustomMvtVectorSourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_custom_source_fetch_tile_callback", None, (), || {
+        callback::invoke("mln_custom_source_fetch_tile_callback", (), || {
             callback::require(&state.fetch_tile)?(unsafe { from_native(tile_id) }?);
             Ok(())
         })
@@ -942,7 +942,7 @@ impl CustomMvtVectorSourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_custom_source_cancel_tile_callback", None, (), || {
+        callback::invoke("mln_custom_source_cancel_tile_callback", (), || {
             callback::require(&state.cancel_tile)?(unsafe { from_native(tile_id) }?);
             Ok(())
         })
@@ -1662,10 +1662,6 @@ impl HttpHeaderTransform {
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke_status(
             "mln_http_header_transform_callback",
-            Some((
-                &["mln_http_header_transform_response_set_header"],
-                out_response as usize as u64,
-            )),
             sys::MLN_STATUS_NATIVE_ERROR,
             || {
                 callback::require(&state.callback)?(
@@ -1717,10 +1713,6 @@ impl HttpHeaderTransformResponse<'_> {
     /// See `mln_http_header_transform_response_set_header` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn set_header(&mut self, name: &str, value: &str) -> Result<()> {
-        maplibre_core::callback::check(
-            "mln_http_header_transform_response_set_header",
-            self.raw.as_ptr() as usize as u64,
-        )?;
         let arena = &mut InputArena::default();
         let native_name = to_native(&name, arena)?;
         let native_value = to_native(&value, arena)?;
@@ -1944,7 +1936,7 @@ impl LogHandler {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_log_callback", Some((&[], 0)), 0, || {
+        callback::invoke("mln_log_callback", 0, || {
             let value = callback::require(&state.callback)?(
                 unsafe { from_native(severity) }?,
                 unsafe { from_native(event) }?,
@@ -3599,7 +3591,7 @@ impl QueueLock {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_queue_lock_callback", Some((&[], 0)), (), || {
+        callback::invoke("mln_queue_lock_callback", (), || {
             callback::require(&state.lock)?();
             Ok(())
         })
@@ -3608,7 +3600,7 @@ impl QueueLock {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_queue_lock_callback", Some((&[], 0)), (), || {
+        callback::invoke("mln_queue_lock_callback", (), || {
             callback::require(&state.unlock)?();
             Ok(())
         })
@@ -4269,7 +4261,7 @@ pub struct ResourceProvider {
     /// Decides each request that the routes leave to the provider.
     pub callback: Option<
         std::sync::Arc<
-            dyn Fn(ResourceRequestInfo, ResourceRequest) -> ResourceProviderDecision
+            dyn Fn(ResourceRequestInfo, ResourceRequestHandle) -> ResourceProviderDecision
                 + Send
                 + Sync
                 + 'static,
@@ -4286,7 +4278,7 @@ impl std::fmt::Debug for ResourceProvider {
 impl ResourceProvider {
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
-        F: Fn(ResourceRequestInfo, ResourceRequest) -> ResourceProviderDecision
+        F: Fn(ResourceRequestInfo, ResourceRequestHandle) -> ResourceProviderDecision
             + Send
             + Sync
             + 'static,
@@ -4296,7 +4288,7 @@ impl ResourceProvider {
     }
     pub fn new<F>(callback: F) -> Self
     where
-        F: Fn(ResourceRequestInfo, ResourceRequest) -> ResourceProviderDecision
+        F: Fn(ResourceRequestInfo, ResourceRequestHandle) -> ResourceProviderDecision
             + Send
             + Sync
             + 'static,
@@ -4308,43 +4300,24 @@ impl ResourceProvider {
         request: *const sys::mln_resource_request_info,
         handle: sys::mln_resource_request,
     ) -> u32 {
-        let _policy = callback::enter(Some((
-            &[
-                "mln_resource_request_complete",
-                "mln_resource_request_pass_through",
-                "mln_resource_request_is_cancelled",
-                "mln_resource_request_set_cancel_callback",
-                "mln_resource_request_release",
-            ],
-            handle.0,
-        )));
-        // SAFETY: native lends the callback this live decision handle.
-        let Ok(request_state) = (unsafe {
-            maplibre_core::decision::DecisionHandleState::new(handle, RESOURCE_REQUEST_DECISION)
-        }) else {
-            return sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+        let _scope = maplibre_core::callback::CallbackScope::enter();
+        let Ok(decision_handle) = ResourceRequestHandle::adopt(handle, None) else {
+            return u32::MAX;
         };
-        // SAFETY: native passes the registration that this trampoline's
-        // descriptor transferred.
+        let request_state = std::sync::Arc::clone(&decision_handle.inner);
+        // SAFETY: native keeps the registration alive throughout this callback.
         let state = unsafe { callback::state::<Self>(user_data) };
-        match callback::invoke("mln_resource_provider_callback", None, None, || {
-            Ok(Some(
-                callback::require(&state.callback)?(
-                    unsafe { convert::copy_reference(request) }?,
-                    ResourceRequest {
-                        state: std::sync::Arc::clone(&request_state),
-                        not_sync: std::marker::PhantomData,
-                    },
-                )
-                .to_native(),
-            ))
-        }) {
-            Some(sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE) => request_state.finish_decision(true),
-            Some(sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH) => {
-                request_state.finish_decision(false)
-            }
-            _ => request_state.finish_exception(),
+        let decision = callback::invoke("mln_resource_provider_callback", u32::MAX, || {
+            Ok(callback::require(&state.callback)?(
+                unsafe { convert::copy_reference(request) }?,
+                decision_handle,
+            )
+            .as_raw())
+        });
+        if decision != sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE {
+            request_state.hand_off();
         }
+        decision
     }
 }
 impl ToNative<sys::mln_resource_provider> for ResourceProvider {
@@ -4398,87 +4371,14 @@ impl FromNative<sys::mln_resource_range> for ResourceRange {
     }
 }
 
-/// A resource request that a resource provider handles.
-///
-/// See `mln_resource_request` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-#[derive(Debug)]
-pub struct ResourceRequest {
-    state: std::sync::Arc<maplibre_core::decision::DecisionHandleState<sys::mln_resource_request>>,
-    not_sync: std::marker::PhantomData<std::cell::Cell<()>>,
-}
-impl ResourceRequest {
-    /// Hands an outstanding provider request to the built-in network loader.
-    ///
-    /// See `mln_resource_request_pass_through` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn pass_through(&self) -> Result<()> {
-        let native = self.state.native_for_call()?;
-        maplibre_core::callback::check("mln_resource_request_pass_through", native.0)?;
-        self.state.complete_with(|handle| {
-            maplibre_core::check(|out_diagnostic| unsafe {
-                sys::mln_resource_request_pass_through(handle, out_diagnostic)
-            })
-        })
-    }
-
-    /// Completes a C API resource provider request.
-    ///
-    /// See `mln_resource_request_complete` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn complete(&self, response: &ResourceResponse) -> Result<()> {
-        let native = self.state.native_for_call()?;
-        maplibre_core::callback::check("mln_resource_request_complete", native.0)?;
-        let mut arena = InputArena::default();
-        let response = response.to_native(&mut arena)?;
-        self.state.complete_with(|handle| {
-            maplibre_core::check(|out_diagnostic| unsafe {
-                sys::mln_resource_request_complete(handle, &response, out_diagnostic)
-            })
-        })
-    }
-    /// Reports whether MapLibre has cancelled a C API resource provider
-    /// request.
-    ///
-    /// See `mln_resource_request_is_cancelled` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn is_cancelled(&self) -> Result<bool> {
-        let native = self.state.native_for_call()?;
-        maplibre_core::callback::check("mln_resource_request_is_cancelled", native.0)?;
-        let mut cancelled = false;
-        maplibre_core::check(|out_diagnostic| unsafe {
-            sys::mln_resource_request_is_cancelled(native, &mut cancelled, out_diagnostic)
-        })?;
-        Ok(cancelled)
-    }
-    /// Registers a callback that runs when MapLibre cancels a C API resource
-    /// provider request.
-    ///
-    /// See `mln_resource_request_set_cancel_callback` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn set_cancel_callback(&self, handler: ResourceRequestCancelHandler) -> Result<bool> {
-        let native = self.state.native_for_call()?;
-        maplibre_core::callback::check("mln_resource_request_set_cancel_callback", native.0)?;
-        self.state.register_cancel(handler.callback)
-    }
-    pub fn close(&self) -> Result<()> {
-        maplibre_core::callback::check(
-            "mln_resource_request_release",
-            self.state.issued_handle().0,
-        )?;
-        self.state.close();
-        Ok(())
-    }
-}
-
 /// Cancel callback or queue state for one handled resource request.
 ///
 /// See `mln_resource_request_cancel_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct ResourceRequestCancelHandler {
     /// Required in callback mode; null in queue mode.
-    pub callback: Option<Box<dyn FnOnce() + Send + 'static>>,
+    pub callback: Option<std::sync::Arc<dyn Fn() -> () + Send + Sync + 'static>>,
 }
 impl std::fmt::Debug for ResourceRequestCancelHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -4489,16 +4389,47 @@ impl std::fmt::Debug for ResourceRequestCancelHandler {
 impl ResourceRequestCancelHandler {
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
-        F: FnOnce() + Send + 'static,
+        F: Fn() -> () + Send + Sync + 'static,
     {
-        self.callback = Some(Box::new(callback));
+        self.callback = Some(std::sync::Arc::new(callback));
         self
     }
     pub fn new<F>(callback: F) -> Self
     where
-        F: FnOnce() + Send + 'static,
+        F: Fn() -> () + Send + Sync + 'static,
     {
         Self::default().with_callback(callback)
+    }
+    unsafe extern "C" fn callback_trampoline(
+        user_data: *mut std::ffi::c_void,
+        _handle: sys::mln_resource_request,
+    ) {
+        // SAFETY: native passes the registration that this trampoline's
+        // descriptor transferred.
+        let state = unsafe { callback::state::<Self>(user_data) };
+        callback::invoke("mln_resource_request_cancel_callback", (), || {
+            callback::require(&state.callback)?();
+            Ok(())
+        })
+    }
+}
+impl ToNative<sys::mln_resource_request_cancel_handler> for ResourceRequestCancelHandler {
+    fn to_native(
+        &self,
+        arena: &mut InputArena,
+    ) -> Result<sys::mln_resource_request_cancel_handler> {
+        let mut raw: sys::mln_resource_request_cancel_handler = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_resource_request_cancel_handler>() as _;
+        raw.callback = self
+            .callback
+            .as_ref()
+            .map(|_| Self::callback_trampoline as _);
+        if !(raw.callback.is_none()) {
+            // SAFETY: the release reclaims exactly this state.
+            raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
+            raw.release_user_data = Some(callback::release::<Self>);
+        }
+        Ok(raw)
     }
 }
 
@@ -4719,7 +4650,7 @@ impl ResourceTransform {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_resource_transform_callback", None, (), || {
+        callback::invoke("mln_resource_transform_callback", (), || {
             let request = ResourceTransformRequestHandle::adopt(request, None)?;
             callback::require(&state.callback)?(
                 unsafe { from_native(kind) }?,
@@ -4857,7 +4788,7 @@ impl RuntimeEventHandler {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_runtime_event_callback", None, (), || {
+        callback::invoke("mln_runtime_event_callback", (), || {
             callback::require(&state.callback)?(unsafe { convert::copy_reference(events) }?);
             Ok(())
         })
@@ -6464,7 +6395,7 @@ impl Wake {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_wake_callback", None, (), || {
+        callback::invoke("mln_wake_callback", (), || {
             callback::require(&state.callback)?();
             Ok(())
         })
@@ -6900,46 +6831,3 @@ impl FromNative<sys::mln_wgl_context_descriptor> for WglContextDescriptor {
         })
     }
 }
-
-unsafe fn register_resource_request_cancel(
-    handle: sys::mln_resource_request,
-    callback: maplibre_core::decision::CancelCallback<sys::mln_resource_request>,
-    user_data: *mut std::ffi::c_void,
-    release: maplibre_core::decision::ContextCallback,
-    out_cancelled: *mut bool,
-    out_diagnostic: *mut sys::mln_diagnostic,
-) -> sys::mln_status {
-    let mut handler: sys::mln_resource_request_cancel_handler = unsafe { std::mem::zeroed() };
-    handler.size = std::mem::size_of::<sys::mln_resource_request_cancel_handler>() as _;
-    handler.callback = callback;
-    handler.user_data = user_data;
-    handler.release_user_data = release;
-    // SAFETY: the caller passes the decision handle and the outputs that
-    // the C function requires; the handler is borrowed for the call.
-    unsafe {
-        sys::mln_resource_request_set_cancel_callback(
-            handle,
-            &handler,
-            out_cancelled,
-            out_diagnostic,
-        )
-    }
-}
-pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHandleFns<
-    sys::mln_resource_request,
-> = unsafe {
-    maplibre_core::decision::DecisionHandleFns::new(
-        "ResourceRequest",
-        sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE,
-        sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH,
-        sys::mln_resource_request_release,
-        register_resource_request_cancel,
-        &[
-            "mln_resource_request_complete",
-            "mln_resource_request_pass_through",
-            "mln_resource_request_is_cancelled",
-            "mln_resource_request_set_cancel_callback",
-            "mln_resource_request_release",
-        ],
-    )
-};

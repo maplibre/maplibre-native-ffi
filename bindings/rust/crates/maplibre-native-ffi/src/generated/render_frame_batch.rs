@@ -8,7 +8,7 @@ native_owner! {
     ///
     /// See `mln_render_frame_batch` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    pub struct RenderFrameBatchHandle(mln_render_frame_batch) dispose |raw| { unsafe { sys::mln_render_frame_batch_release(raw) }; Ok(()) };
+    pub struct RenderFrameBatchHandle(mln_render_frame_batch) dispose |raw| { unsafe { sys::mln_render_frame_batch_release(raw) }; Ok(()) }, counted true;
 }
 
 impl RenderFrameBatchHandle {
@@ -17,7 +17,7 @@ impl RenderFrameBatchHandle {
     /// See `mln_render_frame_batch_get` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn get(&self) -> Result<RenderFrameBatchView> {
-        let mut call = self.inner.read("mln_render_frame_batch_get")?;
+        let mut call = self.inner.read()?;
         let mut out_view: sys::mln_render_frame_batch_view = unsafe { std::mem::zeroed() };
         out_view.size = std::mem::size_of::<sys::mln_render_frame_batch_view>() as _;
         call.status(|batch, out_diagnostic| unsafe {

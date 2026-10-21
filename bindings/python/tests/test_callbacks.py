@@ -156,30 +156,6 @@ def test_a_registered_callback_does_not_keep_its_receiver_alive() -> None:
     assert reports == ["RuntimeHandle was not explicitly closed"]
 
 
-def test_a_callback_can_make_only_the_calls_its_policy_allows(
-    harness: Harness, map_handle: mln.MapHandle
-) -> None:
-    refusals: list[BaseException] = []
-
-    def serve(
-        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
-    ) -> None:
-        try:
-            harness.runtime.clear_resource_transform()
-        except mln.InvalidStateError as error:
-            refusals.append(error)
-        # Answering its own request is what a provider callback may do.
-        handle.complete(ok_response())
-
-    harness.routes["custom://policy.json"] = serve
-    map_handle.set_style_url("custom://policy.json")
-    harness.wait_event(mln.RuntimeEventType.MAP_STYLE_LOADED)
-
-    (refused,) = refusals
-    assert refused.native_status_code is None
-    assert "unavailable from this callback" in refused.diagnostic
-
-
 def test_an_exception_in_a_callback_is_reported_and_contained(
     harness: Harness, map_handle: mln.MapHandle, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -193,54 +169,12 @@ def test_an_exception_in_a_callback_is_reported_and_contained(
 
     harness.routes["custom://raises.json"] = fail
     map_handle.set_style_url("custom://raises.json")
-    # The failed callback falls back to passing the request through, and no
-    # file source serves this scheme.
+    # Native fails the request when the callback raises.
     harness.wait_event(mln.RuntimeEventType.MAP_LOADING_FAILED)
 
     (report,) = reports
     assert isinstance(report.exc_value, RuntimeError)
     assert str(report.exc_value) == "provider failed"
-
-
-class _EventCallbackFailure(Exception):
-    pass
-
-
-def test_the_hook_that_receives_a_callback_exception_cannot_call_native(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # The event callback may make any native call, but the hook that receives
-    # its exception runs on the callback's stack, where the binding refuses
-    # every native call.
-    refusals: list[bool] = []
-    reported = threading.Event()
-
-    def hook(report: sys.UnraisableHookArgs) -> None:
-        if not isinstance(report.exc_value, _EventCallbackFailure):
-            return
-        try:
-            mln.network_get_status()
-        except mln.InvalidStateError:
-            refusals.append(True)
-        else:
-            refusals.append(False)
-        reported.set()
-
-    def receive_events(_: mln.EventBatchView) -> None:
-        raise _EventCallbackFailure
-
-    monkeypatch.setattr(sys, "unraisablehook", hook)
-    runtime = mln.runtime_create(mln.RuntimeOptions.default())
-    result(runtime.set_event_handler(mln.RuntimeEventHandler(receive_events)))
-    try:
-        map_handle = result(runtime.create_map())
-        result(map_handle.set_style_json(EMPTY_STYLE))
-        assert reported.wait(TIMEOUT)
-        result(map_handle.close())
-    finally:
-        result(runtime.close())
-    assert refusals
-    assert all(refusals)
 
 
 def test_a_provider_can_answer_a_request_later_from_another_thread(

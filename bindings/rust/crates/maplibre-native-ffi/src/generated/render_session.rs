@@ -8,7 +8,7 @@ native_owner! {
     ///
     /// See `mln_render_session` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    pub struct RenderSessionHandle(mln_render_session) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_render_session_dispose(raw, out_diagnostic) });
+    pub struct RenderSessionHandle(mln_render_session) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_render_session_dispose(raw, out_diagnostic) }), counted false;
 }
 
 impl RenderSessionHandle {
@@ -18,7 +18,7 @@ impl RenderSessionHandle {
     /// See `mln_render_session_abandon` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn abandon(&self) -> Result<RenderAbandonResult> {
-        let mut call = self.inner.call("mln_render_session_abandon")?;
+        let mut call = self.inner.call();
         let mut out_result: sys::mln_render_abandon_result = unsafe { std::mem::zeroed() };
         out_result.size = std::mem::size_of::<sys::mln_render_abandon_result>() as _;
         call.status(|session, out_diagnostic| unsafe {
@@ -33,7 +33,7 @@ impl RenderSessionHandle {
     /// See `mln_render_session_acquire_frame` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn acquire_frame(&self) -> Result<Option<AcquiredFrameHandle>> {
-        let mut call = self.inner.call("mln_render_session_acquire_frame")?;
+        let mut call = self.inner.call();
         let mut out_frame = sys::mln_acquired_frame(0);
         if !call.status_unless(
             sys::MLN_STATUS_NOT_READY,
@@ -56,7 +56,7 @@ impl RenderSessionHandle {
     /// See `mln_render_session_barrier` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn barrier(&self) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_render_session_barrier")?;
+        let call = self.inner.call();
         call.complete(
             |session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_barrier(session, completion, out_diagnostic)
@@ -70,7 +70,7 @@ impl RenderSessionHandle {
     /// See `mln_render_session_clear_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn clear_data(&self) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_render_session_clear_data")?;
+        let call = self.inner.call();
         call.complete(
             |session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_clear_data(session, completion, out_diagnostic)
@@ -88,7 +88,7 @@ impl RenderSessionHandle {
     /// See `mln_render_session_create_projection` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn create_projection(&self) -> Result<MapProjectionHandle> {
-        let mut call = self.inner.call("mln_render_session_create_projection")?;
+        let mut call = self.inner.call();
         let mut out_projection = sys::mln_map_projection(0);
         call.status(|session, out_diagnostic| unsafe {
             sys::mln_render_session_create_projection(session, &mut out_projection, out_diagnostic)
@@ -101,7 +101,7 @@ impl RenderSessionHandle {
     /// See `mln_render_session_detach` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn detach(&self) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_render_session_detach")?;
+        let call = self.inner.call();
         call.complete(
             |session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_detach(session, completion, out_diagnostic)
@@ -130,7 +130,7 @@ impl RenderSessionHandle {
     /// See `mln_render_session_drain_frame_results` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn drain_frame_results(&self) -> Result<Option<RenderFrameBatchHandle>> {
-        let mut call = self.inner.call("mln_render_session_drain_frame_results")?;
+        let mut call = self.inner.call();
         let mut out_batch = sys::mln_render_frame_batch(0);
         if !call.status_unless(
             sys::MLN_STATUS_NOT_READY,
@@ -148,7 +148,7 @@ impl RenderSessionHandle {
     /// See `mln_render_session_dump_debug_logs` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn dump_debug_logs(&self) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_render_session_dump_debug_logs")?;
+        let call = self.inner.call();
         call.complete(
             |session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_dump_debug_logs(session, completion, out_diagnostic)
@@ -162,7 +162,7 @@ impl RenderSessionHandle {
     /// See `mln_render_session_get_capabilities` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn get_capabilities(&self) -> Result<RenderSessionCapabilities> {
-        let mut call = self.inner.call("mln_render_session_get_capabilities")?;
+        let mut call = self.inner.call();
         let mut out_capabilities: sys::mln_render_session_capabilities =
             unsafe { std::mem::zeroed() };
         out_capabilities.size = std::mem::size_of::<sys::mln_render_session_capabilities>() as _;
@@ -177,7 +177,7 @@ impl RenderSessionHandle {
     /// See `mln_render_session_get_snapshot` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn get_snapshot(&self) -> Result<RenderSessionSnapshot> {
-        let mut call = self.inner.call("mln_render_session_get_snapshot")?;
+        let mut call = self.inner.call();
         let mut out_snapshot: sys::mln_render_session_snapshot = unsafe { std::mem::zeroed() };
         out_snapshot.size = std::mem::size_of::<sys::mln_render_session_snapshot>() as _;
         call.status(|session, out_diagnostic| unsafe {
@@ -200,9 +200,7 @@ impl RenderSessionHandle {
         extension_field: &str,
         arguments: Option<&[u8]>,
     ) -> Result<NativeFuture<Vec<u8>>> {
-        let mut call = self
-            .inner
-            .call("mln_render_session_query_feature_extensions")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let feature = call.input(&feature)?;
         let extension = call.input(&extension)?;
@@ -235,9 +233,7 @@ impl RenderSessionHandle {
         geometry: &RenderedQueryGeometry,
         options: Option<&RenderedFeatureQueryOptions>,
     ) -> Result<NativeFuture<Vec<QueriedFeature>>> {
-        let mut call = self
-            .inner
-            .call("mln_render_session_query_rendered_features")?;
+        let mut call = self.inner.call();
         let geometry = call.reference(&geometry)?;
         let options = call.optional_reference(options.as_ref())?;
         call.complete(
@@ -263,9 +259,7 @@ impl RenderSessionHandle {
         source_id: &str,
         options: Option<&SourceFeatureQueryOptions>,
     ) -> Result<NativeFuture<Vec<QueriedFeature>>> {
-        let mut call = self
-            .inner
-            .call("mln_render_session_query_source_features")?;
+        let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let options = call.optional_reference(options.as_ref())?;
         call.complete(
@@ -288,7 +282,7 @@ impl RenderSessionHandle {
     /// See `mln_render_session_read_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     pub fn read_texture(&self) -> Result<NativeFuture<TextureReadbackResult>> {
-        let call = self.inner.call("mln_render_session_read_texture")?;
+        let call = self.inner.call();
         call.complete(
             |session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_read_texture(session, completion, out_diagnostic)
@@ -302,7 +296,7 @@ impl RenderSessionHandle {
     /// See `mln_render_session_reduce_memory_use` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn reduce_memory_use(&self) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_render_session_reduce_memory_use")?;
+        let call = self.inner.call();
         call.complete(
             |session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_reduce_memory_use(session, completion, out_diagnostic)
@@ -334,7 +328,7 @@ impl RenderSessionHandle {
     /// See `mln_render_session_request_frame` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn request_frame(&self, demand: &FrameDemand) -> Result<()> {
-        let mut call = self.inner.call("mln_render_session_request_frame")?;
+        let mut call = self.inner.call();
         let demand = call.reference(&demand)?;
         call.status(|session, out_diagnostic| unsafe {
             sys::mln_render_session_request_frame(session, demand, out_diagnostic)
@@ -352,7 +346,7 @@ impl RenderSessionHandle {
     /// See `mln_render_session_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn resize(&self, extent: LogicalExtent) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_render_session_resize")?;
+        let mut call = self.inner.call();
         let extent = call.input(&extent)?;
         call.command(|session, completion, out_diagnostic| unsafe {
             sys::mln_render_session_resize(session, extent, completion, out_diagnostic)
@@ -368,7 +362,7 @@ impl RenderSessionHandle {
     /// See `mln_render_session_service_driver_work` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn service_driver_work(&self) -> Result<()> {
-        let mut call = self.inner.call("mln_render_session_service_driver_work")?;
+        let mut call = self.inner.call();
         call.status(|session, out_diagnostic| unsafe {
             sys::mln_render_session_service_driver_work(session, out_diagnostic)
         })?;
@@ -387,9 +381,7 @@ impl RenderSessionHandle {
         &self,
         descriptor: &MetalBorrowedTextureDescriptor,
     ) -> Result<NativeFuture<()>> {
-        let mut call = self
-            .inner
-            .call("mln_render_session_set_metal_borrowed_texture_target")?;
+        let mut call = self.inner.call();
         let descriptor = call.reference(&descriptor)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
@@ -415,9 +407,7 @@ impl RenderSessionHandle {
         &self,
         descriptor: &MetalSurfaceDescriptor,
     ) -> Result<NativeFuture<()>> {
-        let mut call = self
-            .inner
-            .call("mln_render_session_set_metal_surface_target")?;
+        let mut call = self.inner.call();
         let descriptor = call.reference(&descriptor)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
@@ -444,9 +434,7 @@ impl RenderSessionHandle {
         &self,
         descriptor: &OpenglBorrowedTextureDescriptor,
     ) -> Result<NativeFuture<()>> {
-        let mut call = self
-            .inner
-            .call("mln_render_session_set_opengl_borrowed_texture_target")?;
+        let mut call = self.inner.call();
         let descriptor = call.reference(&descriptor)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
@@ -472,9 +460,7 @@ impl RenderSessionHandle {
         &self,
         descriptor: &OpenglSurfaceDescriptor,
     ) -> Result<NativeFuture<()>> {
-        let mut call = self
-            .inner
-            .call("mln_render_session_set_opengl_surface_target")?;
+        let mut call = self.inner.call();
         let descriptor = call.reference(&descriptor)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
@@ -501,9 +487,7 @@ impl RenderSessionHandle {
         &self,
         descriptor: &VulkanBorrowedTextureDescriptor,
     ) -> Result<NativeFuture<()>> {
-        let mut call = self
-            .inner
-            .call("mln_render_session_set_vulkan_borrowed_texture_target")?;
+        let mut call = self.inner.call();
         let descriptor = call.reference(&descriptor)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
@@ -529,9 +513,7 @@ impl RenderSessionHandle {
         &self,
         descriptor: &VulkanSurfaceDescriptor,
     ) -> Result<NativeFuture<()>> {
-        let mut call = self
-            .inner
-            .call("mln_render_session_set_vulkan_surface_target")?;
+        let mut call = self.inner.call();
         let descriptor = call.reference(&descriptor)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
@@ -558,9 +540,7 @@ impl RenderSessionHandle {
         &self,
         descriptor: &WebgpuBorrowedTextureDescriptor,
     ) -> Result<NativeFuture<()>> {
-        let mut call = self
-            .inner
-            .call("mln_render_session_set_webgpu_borrowed_texture_target")?;
+        let mut call = self.inner.call();
         let descriptor = call.reference(&descriptor)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
@@ -586,9 +566,7 @@ impl RenderSessionHandle {
         &self,
         descriptor: &WebgpuSurfaceDescriptor,
     ) -> Result<NativeFuture<()>> {
-        let mut call = self
-            .inner
-            .call("mln_render_session_set_webgpu_surface_target")?;
+        let mut call = self.inner.call();
         let descriptor = call.reference(&descriptor)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
@@ -621,7 +599,7 @@ impl RenderSessionHandleDiscarding<'_> {
     /// See `mln_render_session_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn resize(&self, extent: LogicalExtent) -> Result<()> {
-        let mut call = self.0.inner.call("mln_render_session_resize")?;
+        let mut call = self.0.inner.call();
         let extent = call.input(&extent)?;
         call.discard(|session, completion, out_diagnostic| unsafe {
             sys::mln_render_session_resize(session, extent, completion, out_diagnostic)

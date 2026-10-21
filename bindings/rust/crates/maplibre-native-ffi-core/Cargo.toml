@@ -8,8 +8,3 @@ repository.workspace = true
 
 [dependencies]
 maplibre-native-ffi-sys = { path = "../maplibre-native-ffi-sys" }
-
-[features]
-# Lets a test make the C ABI check on its thread see another version. The
-# binding's own tests enable it; nothing else should.
-abi-version-override = []

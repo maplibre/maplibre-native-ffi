@@ -5,7 +5,6 @@
 //! that a Rust type alone does not select: presence fields, counted and
 //! strided arrays, and borrowed references.
 
-use std::any::Any;
 use std::ffi::{c_char, c_void};
 
 use maplibre_native_ffi_core as maplibre_core;
@@ -17,13 +16,13 @@ use crate::{Error, Result};
 ///
 /// Pointers in the result borrow `self` or `arena`, so the result stays valid
 /// while both live.
-pub trait ToNative<N> {
+pub(crate) trait ToNative<N> {
     fn to_native(&self, arena: &mut InputArena) -> Result<N>;
 }
 
 /// Copies a C value of type `N`, and everything it points to, into an owned
 /// value.
-pub trait FromNative<N>: Sized {
+pub(crate) trait FromNative<N>: Sized {
     /// # Safety
     ///
     /// Every pointer in `native` must be readable for the lengths its C
@@ -96,7 +95,7 @@ plain!(
 );
 
 /// A C type with an absent value, which `None` converts to.
-pub trait Nullable {
+pub(crate) trait Nullable {
     const NULL: Self;
 }
 
@@ -305,23 +304,6 @@ pub(crate) fn array<N: 'static, T: ToNative<N>>(
     Ok(arena.array(values))
 }
 
-/// Converts a slice into a C array of fixed length.
-#[allow(
-    dead_code,
-    reason = "a generator shape that the current headers do not use"
-)]
-pub(crate) fn fixed<N, T: ToNative<N>, const LENGTH: usize>(
-    values: &[T],
-    arena: &mut InputArena,
-) -> Result<[N; LENGTH]> {
-    values
-        .iter()
-        .map(|value| value.to_native(arena))
-        .collect::<Result<Vec<_>>>()?
-        .try_into()
-        .map_err(|_| Error::invalid_argument("incorrect fixed array length"))
-}
-
 /// Converts one value into a C pointer that `arena` owns.
 pub(crate) fn reference<N: 'static, T: ToNative<N> + ?Sized>(
     value: &T,
@@ -329,18 +311,6 @@ pub(crate) fn reference<N: 'static, T: ToNative<N> + ?Sized>(
 ) -> Result<*const N> {
     let value = value.to_native(arena)?;
     Ok(arena.store(value))
-}
-
-/// Converts an optional slice into a C array, or a null pointer.
-#[allow(
-    dead_code,
-    reason = "a generator shape that the current headers do not use"
-)]
-pub(crate) fn optional_array<N: 'static, T: ToNative<N>>(
-    values: Option<&[T]>,
-    arena: &mut InputArena,
-) -> Result<*const N> {
-    values.map_or(Ok(std::ptr::null()), |values| array(values, arena))
 }
 
 /// Converts an optional value into a C pointer, or a null pointer.
@@ -369,54 +339,10 @@ pub(crate) unsafe fn copy_array<N: Copy, T: FromNative<N>>(
         .collect()
 }
 
-/// Copies a C array, or `None` for a null pointer.
+/// Copies records whose native stride may exceed their Rust size.
 ///
 /// # Safety
-///
-/// As for [`copy_array`].
-#[allow(
-    dead_code,
-    reason = "a generator shape that the current headers do not use"
-)]
-pub(crate) unsafe fn copy_optional_array<N: Copy, T: FromNative<N>>(
-    pointer: *const N,
-    count: impl TryInto<usize>,
-) -> Result<Option<Vec<T>>> {
-    if pointer.is_null() {
-        return Ok(None);
-    }
-    // SAFETY: the caller upholds the array contract.
-    unsafe { copy_array(pointer, count) }.map(Some)
-}
-
-/// Copies a C array of fixed length.
-///
-/// # Safety
-///
-/// As for [`FromNative::from_native`].
-#[allow(
-    dead_code,
-    reason = "a generator shape that the current headers do not use"
-)]
-pub(crate) unsafe fn copy_fixed<N: Copy, T: FromNative<N>, const LENGTH: usize>(
-    values: [N; LENGTH],
-) -> Result<Vec<T>> {
-    values
-        .into_iter()
-        // SAFETY: the caller upholds the pointer contract.
-        .map(|value| unsafe { T::from_native(value) })
-        .collect()
-}
-
-/// Copies `count` records whose stride may exceed this binding's record size.
-///
-/// # Safety
-///
-/// The pointer must address `count` records at the given stride.
-#[allow(
-    dead_code,
-    reason = "a generator shape that the current headers do not use"
-)]
+/// The pointer must address `count` initialized records at the given stride.
 pub(crate) unsafe fn copy_strided<N: Copy, T: FromNative<N>>(
     pointer: *const N,
     count: impl TryInto<usize>,
@@ -428,23 +354,6 @@ pub(crate) unsafe fn copy_strided<N: Copy, T: FromNative<N>>(
         // SAFETY: as above.
         .map(|value| unsafe { T::from_native(value) })
         .collect()
-}
-
-/// Copies `count` C records without converting them.
-///
-/// # Safety
-///
-/// As for [`copy_array`].
-#[allow(
-    dead_code,
-    reason = "a generator shape that the current headers do not use"
-)]
-pub(crate) unsafe fn items<N: Copy>(
-    pointer: *const N,
-    count: impl TryInto<usize>,
-) -> Result<Vec<N>> {
-    // SAFETY: the caller guarantees count initialized values.
-    Ok(unsafe { slice(pointer, length(count)?) }?.to_vec())
 }
 
 /// Copies `count` strided C records without converting them.
@@ -476,8 +385,8 @@ pub(crate) unsafe fn copy_reference<N: Copy, T: FromNative<N>>(pointer: *const N
 
 /// Owns temporary C input allocations through native submission.
 #[derive(Default)]
-pub struct InputArena {
-    roots: Vec<Box<dyn Any>>,
+pub(crate) struct InputArena {
+    storage: maplibre_core::memory::InputStorage,
     registrations: Vec<PendingRegistration>,
 }
 
@@ -517,23 +426,13 @@ impl InputArena {
     }
 
     pub(crate) fn store<T: 'static>(&mut self, value: T) -> *const T {
-        let value = Box::new(value);
-        let pointer = &*value as *const T;
-        self.roots.push(value);
-        pointer
+        self.storage.store(value)
     }
-
     pub(crate) fn array<T: 'static>(&mut self, values: Vec<T>) -> *const T {
-        let pointer = values.as_ptr();
-        self.roots.push(Box::new(values));
-        pointer
+        self.storage.array(values)
     }
-
     pub(crate) fn c_string(&mut self, value: &str) -> Result<*const c_char> {
-        let value = maplibre_core::string::c_string(value)?;
-        let pointer = value.as_ptr();
-        self.roots.push(Box::new(value));
-        Ok(pointer)
+        self.storage.c_string(value)
     }
 }
 
@@ -542,14 +441,7 @@ impl InputArena {
 /// # Safety
 /// A nonempty array must point to `count` initialized values valid for the borrow.
 unsafe fn slice<'a, T>(pointer: *const T, count: usize) -> Result<&'a [T]> {
-    if count == 0 {
-        return Ok(&[]);
-    }
-    if pointer.is_null() || count > isize::MAX as usize / std::mem::size_of::<T>().max(1) {
-        return Err(Error::invalid_argument("invalid native array"));
-    }
-    // SAFETY: the caller guarantees count initialized values.
-    Ok(unsafe { std::slice::from_raw_parts(pointer, count) })
+    unsafe { maplibre_core::ptr::slice(pointer, count) }
 }
 
 /// Copies a strided native array whose entries may have unaligned addresses.
@@ -622,12 +514,6 @@ macro_rules! native_enum {
                     Self::$unknown(value) => value,
                 }
             }
-            pub fn from_native(raw: $raw) -> Self {
-                Self::from_raw(raw)
-            }
-            pub fn to_native(self) -> $raw {
-                self.as_raw()
-            }
         }
         impl $crate::convert::ToNative<$raw> for $name {
             fn to_native(&self, _: &mut $crate::convert::InputArena) -> $crate::Result<$raw> {
@@ -658,14 +544,6 @@ macro_rules! native_flags {
                 // through unparsed.
                 $($(#[$($flag_meta)*])* const $flag = $value;)*
                 const _ = !0;
-            }
-        }
-        impl $name {
-            pub fn from_native(raw: $raw) -> Self {
-                Self::from_bits_retain(raw)
-            }
-            pub fn to_native(self) -> $raw {
-                self.bits()
             }
         }
         impl $crate::convert::ToNative<$raw> for $name {
@@ -743,5 +621,68 @@ mod tests {
         }
         assert_eq!(calls.load(Ordering::SeqCst), 1);
         assert_eq!(drops.load(Ordering::SeqCst), 2);
+    }
+    #[test]
+    fn a_strided_batch_and_an_unknown_union_arm_decode_without_losing_data() {
+        // A batch from a newer library: each event record is longer than this
+        // binding's, and the second event carries a payload this binding predates.
+        let stride = std::mem::size_of::<sys::mln_runtime_event>() + 24;
+        let messages = b"first\0second\0";
+        let events = [
+            (
+                sys::MLN_RUNTIME_EVENT_MAP_IDLE,
+                sys::MLN_RUNTIME_EVENT_PAYLOAD_NONE,
+                0,
+                5,
+            ),
+            (sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED, 0xfff0, 6, 6),
+        ];
+        let mut storage = vec![0_u8; stride * events.len()];
+        for (index, (event_type, payload_type, offset, length)) in events.into_iter().enumerate() {
+            // SAFETY: the record is plain data, and all zeroes is a valid value.
+            let mut event: sys::mln_runtime_event = unsafe { std::mem::zeroed() };
+            event.type_ = event_type;
+            event.source_type = sys::MLN_RUNTIME_EVENT_SOURCE_MAP;
+            event.source = 0xabcd_0000_0000_0000 | index as u64;
+            event.generation = 0x1_0000_0000 + index as u64;
+            event.payload_type = payload_type;
+            event.message_offset = offset;
+            event.message_size = length;
+            // SAFETY: the storage holds a full stride for every event, and the
+            // write does not rely on its alignment.
+            unsafe {
+                storage
+                    .as_mut_ptr()
+                    .add(index * stride)
+                    .cast::<sys::mln_runtime_event>()
+                    .write_unaligned(event);
+            }
+        }
+        // SAFETY: the view is plain data, and all zeroes is a valid value.
+        let mut raw: sys::mln_event_batch_view = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_event_batch_view>() as u32;
+        raw.event_size = stride as u32;
+        raw.events = storage.as_ptr().cast();
+        raw.event_count = events.len();
+        raw.messages = messages.as_ptr().cast();
+        raw.messages_size = messages.len();
+
+        // SAFETY: every pointer in the view addresses the storage above.
+        let view = unsafe { crate::EventBatchView::from_native(raw) }.unwrap();
+        assert_eq!(view.events.len(), 2);
+        assert_eq!(view.events[0].r#type, crate::RuntimeEventType::MapIdle);
+        assert_eq!(view.events[0].payload, crate::RuntimeEventPayload::Empty);
+        assert_eq!(view.events[0].message, "first");
+        assert_eq!(
+            view.events[1].r#type,
+            crate::RuntimeEventType::MapStyleLoaded
+        );
+        assert_eq!(view.events[1].source, 0xabcd_0000_0000_0001);
+        assert_eq!(view.events[1].generation, 0x1_0000_0001);
+        assert_eq!(
+            view.events[1].payload,
+            crate::RuntimeEventPayload::Unknown(0xfff0)
+        );
+        assert_eq!(view.events[1].message, "second");
     }
 }

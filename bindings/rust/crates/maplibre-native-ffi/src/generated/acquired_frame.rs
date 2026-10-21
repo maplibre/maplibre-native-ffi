@@ -9,7 +9,7 @@ native_owner! {
     /// See `mln_acquired_frame` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     #[must_use = "`AcquiredFrameHandle` must be released with `AcquiredFrameHandle::release`"]
-    pub struct AcquiredFrameHandle(mln_acquired_frame) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_acquired_frame_dispose(raw, out_diagnostic) });
+    pub struct AcquiredFrameHandle(mln_acquired_frame) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_acquired_frame_dispose(raw, out_diagnostic) }), counted false;
 }
 
 impl AcquiredFrameHandle {
@@ -34,7 +34,7 @@ impl AcquiredFrameHandle {
         &self,
         callback: impl FnOnce(&MetalTextureFrame) -> R,
     ) -> Result<R> {
-        let mut call = self.inner.read("mln_acquired_frame_get_metal_texture")?;
+        let mut call = self.inner.call();
         unsafe {
             call.view(
                 sys::mln_acquired_frame_view_begin,
@@ -58,7 +58,7 @@ impl AcquiredFrameHandle {
         &self,
         callback: impl FnOnce(&OpenglTextureFrame) -> R,
     ) -> Result<R> {
-        let mut call = self.inner.read("mln_acquired_frame_get_opengl_texture")?;
+        let mut call = self.inner.call();
         unsafe {
             call.view(
                 sys::mln_acquired_frame_view_begin,
@@ -79,7 +79,7 @@ impl AcquiredFrameHandle {
     /// See `mln_acquired_frame_get_producer_sync` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn get_producer_sync<R>(&self, callback: impl FnOnce(&GpuSync) -> R) -> Result<R> {
-        let mut call = self.inner.read("mln_acquired_frame_get_producer_sync")?;
+        let mut call = self.inner.call();
         unsafe {
             call.view(
                 sys::mln_acquired_frame_view_begin,
@@ -100,7 +100,7 @@ impl AcquiredFrameHandle {
     /// See `mln_acquired_frame_get_result` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn get_result(&self) -> Result<RenderFrameResult> {
-        let mut call = self.inner.call("mln_acquired_frame_get_result")?;
+        let mut call = self.inner.call();
         let mut out_result: sys::mln_render_frame_result = unsafe { std::mem::zeroed() };
         out_result.size = std::mem::size_of::<sys::mln_render_frame_result>() as _;
         call.status(|frame, out_diagnostic| unsafe {
@@ -117,7 +117,7 @@ impl AcquiredFrameHandle {
         &self,
         callback: impl FnOnce(&VulkanTextureFrame) -> R,
     ) -> Result<R> {
-        let mut call = self.inner.read("mln_acquired_frame_get_vulkan_texture")?;
+        let mut call = self.inner.call();
         unsafe {
             call.view(
                 sys::mln_acquired_frame_view_begin,
@@ -141,7 +141,7 @@ impl AcquiredFrameHandle {
         &self,
         callback: impl FnOnce(&WebgpuTextureFrame) -> R,
     ) -> Result<R> {
-        let mut call = self.inner.read("mln_acquired_frame_get_webgpu_texture")?;
+        let mut call = self.inner.call();
         unsafe {
             call.view(
                 sys::mln_acquired_frame_view_begin,

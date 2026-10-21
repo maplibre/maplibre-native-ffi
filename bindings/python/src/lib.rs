@@ -1,11 +1,11 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
+use maplibre_core::handle::NativeHandle;
 use maplibre_native_ffi_core::{self as maplibre_core, Error, ErrorKind};
 use maplibre_native_ffi_sys as sys;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
 use std::ffi::{c_char, c_void};
-use std::mem::ManuallyDrop;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 use std::sync::atomic::Ordering;
@@ -15,37 +15,17 @@ include!("value_support.rs");
 include!("call_support.rs");
 include!("generated_operations.rs");
 
-mod py_errors {
-    pyo3::import_exception!(maplibre_native_ffi.errors, BusyError);
-    pyo3::import_exception!(maplibre_native_ffi.errors, CancelledError);
-    pyo3::import_exception!(maplibre_native_ffi.errors, InvalidArgumentError);
-    pyo3::import_exception!(maplibre_native_ffi.errors, InvalidStateError);
-    pyo3::import_exception!(maplibre_native_ffi.errors, NativeError);
-    pyo3::import_exception!(maplibre_native_ffi.errors, NotFoundError);
-    pyo3::import_exception!(maplibre_native_ffi.errors, NotReadyError);
-    pyo3::import_exception!(maplibre_native_ffi.errors, TargetLostError);
-    pyo3::import_exception!(maplibre_native_ffi.errors, UnknownStatusError);
-    pyo3::import_exception!(maplibre_native_ffi.errors, UnsupportedFeatureError);
-    pyo3::import_exception!(maplibre_native_ffi.errors, WrongThreadError);
-}
+include!("generated_errors.rs");
 
 #[derive(Debug)]
 struct NativeHandleState<T: maplibre_core::handle::NativeHandle> {
-    views_valid: bool,
-    active_reads: usize,
+    handle: maplibre_core::handle::HandleState<T>,
     callback_roots: Vec<std::sync::Weak<GeneratedCallbackRoot>>,
-    id: Option<std::num::NonZeroU64>,
-    // The handle ID the native API issued, kept after close so a closed owner
-    // still matches the IDs that earlier runtime events reported.
-    issued_id: std::num::NonZeroU64,
-    closing: bool,
-    _typed_handle: std::marker::PhantomData<fn() -> T>,
     dispose_abandoned: Option<unsafe extern "C" fn(T) -> sys::mln_status>,
     /// The release that interpreter shutdown starts and waits for, for a
     /// root handle whose release reports retirement through a completion.
     exit_release: Option<ExitReleaseFn<T>>,
     type_name: &'static str,
-    owner_name: &'static str,
 }
 
 impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
@@ -59,23 +39,14 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
     unsafe fn from_handle(
         handle: T,
         type_name: &'static str,
-        owner_name: &'static str,
+        counted: bool,
     ) -> Result<Self, Error> {
-        let Some(id) = std::num::NonZeroU64::new(handle.to_raw()) else {
-            return Err(maplibre_core::ptr::null_handle_error(type_name));
-        };
         Ok(Self {
-            views_valid: true,
-            active_reads: 0,
+            handle: maplibre_core::handle::HandleState::new(handle, counted)?,
             callback_roots: Vec::new(),
-            id: Some(id),
-            issued_id: id,
-            closing: false,
-            _typed_handle: std::marker::PhantomData,
             dispose_abandoned: None,
             exit_release: None,
             type_name,
-            owner_name,
         })
     }
 
@@ -129,28 +100,8 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
         self
     }
 
-    fn live_handle(&self) -> Option<T> {
-        self.id.map(|id| T::from_raw(id.get()))
-    }
-
-    fn require_live(&self) -> PyResult<T> {
-        if self.closing {
-            return Err(self.lifecycle_error("is closing"));
-        }
-        self.live_handle()
-            .ok_or_else(|| self.lifecycle_error("is closed"))
-    }
-
-    fn lifecycle_error(&self, state: &str) -> PyErr {
-        invalid_state_error(format!("{} {state}", self.owner_name))
-    }
-
     fn is_closed(&self) -> bool {
-        self.id.is_none()
-    }
-
-    fn issued_id(&self) -> u64 {
-        self.issued_id.get()
+        self.handle.is_released()
     }
 }
 
@@ -158,18 +109,22 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
     /// Hands the live handle to the finalizer's silent disposal, which reports
     /// a leak if native refuses it.
     fn dispose_abandoned(&mut self) {
-        let (Some(id), Some(dispose)) = (self.id, self.dispose_abandoned) else {
+        if self.handle.is_released() {
+            return;
+        }
+        let Some(dispose) = self.dispose_abandoned else {
             return;
         };
-        self.id = None;
+        let id = self.handle.raw().to_raw();
+        self.handle.hand_off();
         let type_name = self.type_name;
         generated_finalize(move || {
             // SAFETY: the state transferred its sole ownership to this closure.
-            let status = unsafe { dispose(T::from_raw(id.get())) };
+            let status = unsafe { dispose(T::from_raw(id)) };
             if status != sys::MLN_STATUS_OK {
                 maplibre_core::handle::report_leak(maplibre_core::handle::NativeHandleLeak {
                     type_name,
-                    id: id.get(),
+                    id,
                 });
             }
         });
@@ -194,8 +149,8 @@ type ExitReleaseFn<T> = unsafe extern "C" fn(T, *const sys::mln_completion) -> s
 trait ExitOwner: Send + Sync {
     fn releases_at_exit(&self) -> bool;
     fn release_at_exit(&self, raw: u64, completion: &sys::mln_completion) -> sys::mln_status;
-    /// Takes the handle from an idle owner, so neither close nor finalization
-    /// reaches it again. An owner in a read or close on another thread stays.
+    /// Marks an unreleased owner for shutdown. Borrowed output reads keep
+    /// their owner in place until the copy ends.
     fn take_at_exit(&self) -> Option<u64>;
     fn dispose_at_exit(&self, raw: u64);
 }
@@ -212,16 +167,18 @@ impl<T: maplibre_core::handle::NativeHandle> ExitOwner for Mutex<NativeHandleSta
         let Some(release) = self.lock().unwrap_or_else(|p| p.into_inner()).exit_release else {
             return sys::MLN_STATUS_INVALID_STATE;
         };
-        // SAFETY: take_at_exit transferred sole ownership of the handle.
+        // SAFETY: take_at_exit retained this owner's id for shutdown.
         unsafe { release(T::from_raw(raw), completion) }
     }
 
     fn take_at_exit(&self) -> Option<u64> {
         let mut state = self.lock().unwrap_or_else(|p| p.into_inner());
-        if state.closing || state.active_reads != 0 || state.dispose_abandoned.is_none() {
+        if state.handle.is_released() || state.dispose_abandoned.is_none() {
             return None;
         }
-        state.id.take().map(std::num::NonZeroU64::get)
+        let raw = state.handle.begin_release().ok()?.to_raw();
+        state.handle.end_release(true);
+        Some(raw)
     }
 
     fn dispose_at_exit(&self, raw: u64) {
@@ -231,7 +188,7 @@ impl<T: maplibre_core::handle::NativeHandle> ExitOwner for Mutex<NativeHandleSta
         };
         drop(state);
         end_graphics_at_exit::<T>(raw);
-        // SAFETY: take_at_exit transferred sole ownership of the handle here.
+        // SAFETY: take_at_exit retained this owner's id for shutdown.
         if unsafe { dispose(T::from_raw(raw)) } != sys::MLN_STATUS_OK {
             maplibre_core::handle::report_leak(maplibre_core::handle::NativeHandleLeak {
                 type_name,
@@ -425,6 +382,7 @@ unsafe extern "C" fn complete_python_future(
     user_data: *mut c_void,
     result: *const sys::mln_completion_result,
 ) {
+    let _scope = maplibre_core::callback::CallbackScope::enter();
     if user_data.is_null() || result.is_null() {
         return;
     }
@@ -490,6 +448,7 @@ unsafe extern "C" fn complete_python_future(
 }
 
 unsafe extern "C" fn release_python_future(user_data: *mut c_void) {
+    let _scope = maplibre_core::callback::CallbackScope::enter();
     if !user_data.is_null() {
         // SAFETY: native releases accepted completion state exactly once.
         drop(unsafe { Box::from_raw(user_data.cast::<PyCompletionBridge>()) });
@@ -595,34 +554,6 @@ fn invalid_state_error(diagnostic: impl Into<String>) -> PyErr {
 
 fn native_error(diagnostic: impl Into<String>) -> PyErr {
     py_errors::NativeError::new_err(diagnostic.into())
-}
-
-fn map_error(error: Error) -> PyErr {
-    let raw_status = error.raw_status();
-    let diagnostic = error.diagnostic().to_owned();
-    match error.kind() {
-        ErrorKind::NotFound => py_errors::NotFoundError::new_err((diagnostic, raw_status)),
-        ErrorKind::InvalidArgument => {
-            py_errors::InvalidArgumentError::new_err((diagnostic, raw_status))
-        }
-        ErrorKind::InvalidState => py_errors::InvalidStateError::new_err((diagnostic, raw_status)),
-        ErrorKind::WrongThread => py_errors::WrongThreadError::new_err((diagnostic, raw_status)),
-        ErrorKind::Unsupported => {
-            py_errors::UnsupportedFeatureError::new_err((diagnostic, raw_status))
-        }
-        ErrorKind::NativeError => py_errors::NativeError::new_err((diagnostic, raw_status)),
-        ErrorKind::Cancelled => py_errors::CancelledError::new_err((diagnostic, raw_status)),
-        ErrorKind::Busy => py_errors::BusyError::new_err((diagnostic, raw_status)),
-        ErrorKind::TargetLost => py_errors::TargetLostError::new_err((diagnostic, raw_status)),
-        ErrorKind::NotReady => py_errors::NotReadyError::new_err((diagnostic, raw_status)),
-        ErrorKind::UnknownStatus => {
-            py_errors::UnknownStatusError::new_err((diagnostic, raw_status.unwrap_or_default()))
-        }
-        ErrorKind::AbiVersionMismatch => {
-            py_errors::UnsupportedFeatureError::new_err((diagnostic, raw_status))
-        }
-        _ => py_errors::NativeError::new_err((diagnostic, raw_status)),
-    }
 }
 
 #[pymodule]

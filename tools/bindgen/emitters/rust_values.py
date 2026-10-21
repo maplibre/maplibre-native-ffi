@@ -35,10 +35,8 @@ class Values:
     def check(self, value: ValuePlan) -> None:
         if value.response:
             return
-        if value.kind == "handle" and value.native in self.bound.decisions:
-            return
         # A callback adopts an owned handle into its generated owner.
-        if value.kind == "handle" and value.ownership == "owned":
+        if value.kind == "handle":
             return
         if value.registration:
             from .rust_callbacks import validate
@@ -78,20 +76,7 @@ class Values:
         """Uses `value`, which converts to native for "in", from native for
         "out", or both ways."""
         self.check(value)
-        if value.kind == "handle" and value.native not in self.bound.decisions:
-            return self.public(value)
         if value.kind == "handle":
-            if value.native not in self.used:
-                self.used[value.native] = value
-                decision = self.bound.decisions[value.native]
-                complete = self.bound.operations_by_name[decision.complete]
-                for parameter in complete.inputs:
-                    if parameter.name != complete.receiver:
-                        self.add(parameter.value, "in")
-                from .rust_callbacks import cancel_notification
-
-                record = cancel_notification(self.bound, decision)[2]
-                self.used[record.native] = record
             return self.public(value)
         if value.response:
             self.used[value.native] = value
@@ -148,11 +133,7 @@ class Values:
             )
         if value.response:
             return f"{self.name(value)}<'_>"
-        if (
-            value.kind == "handle"
-            and value.ownership == "owned"
-            and value.native not in self.bound.decisions
-        ):
+        if value.kind == "handle":
             from .rust_owners import owner_name
 
             return owner_name(value.native)
@@ -164,20 +145,13 @@ class Values:
     def declaration(self, value: ValuePlan) -> str:
         from .rust_dynamic_values import declaration
 
-        if value.kind == "handle":
-            from .rust_callbacks import decision_declaration
-
-            return decision_declaration(self, value)
         if value.response:
             from .rust_callbacks import response_declaration
 
             return response_declaration(self, value)
         if value.registration:
-            from .rust_callbacks import cancel_declaration, cancel_records
             from .rust_callbacks import declaration as registration
 
-            if value.native in cancel_records(self.bound):
-                return cancel_declaration(self, value)
             return registration(self, value)
         if value.kind == "union":
             members = ", ".join(

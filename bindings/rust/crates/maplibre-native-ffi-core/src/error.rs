@@ -5,22 +5,7 @@ use maplibre_native_ffi_sys as sys;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum ErrorKind {
-    InvalidArgument,
-    InvalidState,
-    WrongThread,
-    Unsupported,
-    Cancelled,
-    Busy,
-    TargetLost,
-    NotReady,
-    NotFound,
-    NativeError,
-    AbiVersionMismatch,
-    UnknownStatus,
-}
+include!("error_kind.rs");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Error {
@@ -99,43 +84,6 @@ pub fn check(call: impl FnOnce(*mut sys::mln_diagnostic) -> sys::mln_status) -> 
     Err(Error::from_status_and_diagnostic(status, unsafe {
         diagnostic_message(raw)
     }))
-}
-
-/// The status that reports `error` to native code.
-pub fn status_for_error(error: &Error) -> sys::mln_status {
-    if let Some(status) = error.raw_status() {
-        return status;
-    }
-    match error.kind() {
-        ErrorKind::InvalidArgument => sys::MLN_STATUS_INVALID_ARGUMENT,
-        ErrorKind::InvalidState => sys::MLN_STATUS_INVALID_STATE,
-        ErrorKind::WrongThread => sys::MLN_STATUS_WRONG_THREAD,
-        ErrorKind::Unsupported => sys::MLN_STATUS_UNSUPPORTED,
-        ErrorKind::Cancelled => sys::MLN_STATUS_CANCELLED,
-        ErrorKind::Busy => sys::MLN_STATUS_BUSY,
-        ErrorKind::TargetLost => sys::MLN_STATUS_TARGET_LOST,
-        ErrorKind::NotReady => sys::MLN_STATUS_NOT_READY,
-        ErrorKind::NotFound => sys::MLN_STATUS_NOT_FOUND,
-        ErrorKind::NativeError | ErrorKind::AbiVersionMismatch | ErrorKind::UnknownStatus => {
-            sys::MLN_STATUS_NATIVE_ERROR
-        }
-    }
-}
-
-fn kind_for_status(status: i32) -> ErrorKind {
-    match status {
-        sys::MLN_STATUS_INVALID_ARGUMENT => ErrorKind::InvalidArgument,
-        sys::MLN_STATUS_INVALID_STATE => ErrorKind::InvalidState,
-        sys::MLN_STATUS_WRONG_THREAD => ErrorKind::WrongThread,
-        sys::MLN_STATUS_UNSUPPORTED => ErrorKind::Unsupported,
-        sys::MLN_STATUS_CANCELLED => ErrorKind::Cancelled,
-        sys::MLN_STATUS_BUSY => ErrorKind::Busy,
-        sys::MLN_STATUS_TARGET_LOST => ErrorKind::TargetLost,
-        sys::MLN_STATUS_NOT_READY => ErrorKind::NotReady,
-        sys::MLN_STATUS_NOT_FOUND => ErrorKind::NotFound,
-        sys::MLN_STATUS_NATIVE_ERROR => ErrorKind::NativeError,
-        _ => ErrorKind::UnknownStatus,
-    }
 }
 
 /// The capacity of a diagnostic's message, including its null byte, which the

@@ -101,6 +101,7 @@ unsafe extern "C" fn complete<T>(
     user_data: *mut c_void,
     result: *const sys::mln_completion_result,
 ) {
+    let _scope = core::callback::CallbackScope::enter();
     if user_data.is_null() || result.is_null() {
         return;
     }
@@ -144,6 +145,7 @@ unsafe extern "C" fn complete<T>(
 }
 
 unsafe extern "C" fn release<T>(user_data: *mut c_void) {
+    let _scope = core::callback::CallbackScope::enter();
     if !user_data.is_null() {
         // SAFETY: native calls release once after accepted completion delivery.
         let bridge = unsafe { Box::from_raw(user_data.cast::<Bridge<T>>()) };
@@ -206,17 +208,6 @@ where
     Ok(NativeFuture { state })
 }
 
-/// An already-complete future, for a call that finished without submitting.
-pub(crate) fn ready<T>(value: T) -> NativeFuture<T> {
-    NativeFuture {
-        state: Arc::new(State {
-            result: Mutex::new(Some(Ok(value))),
-            ready: Condvar::new(),
-            waker: Mutex::new(None),
-        }),
-    }
-}
-
 pub(crate) fn unit(result: &sys::mln_completion_result) -> Result<()> {
     if !result.value.is_null() || result.value_count != 0 {
         return Err(Error::new(
@@ -231,7 +222,7 @@ pub(crate) fn unit(result: &sys::mln_completion_result) -> Result<()> {
 pub(crate) fn command(result: &sys::mln_completion_result) -> Result<CommandCompletion> {
     unit(result)?;
     Ok(CommandCompletion {
-        disposition: crate::CommandDisposition::from_native(result.disposition),
+        disposition: crate::CommandDisposition::from_raw(result.disposition),
         generation: result.generation,
         raw_status: result.status,
         diagnostic: copy_diagnostic(result),
@@ -283,30 +274,6 @@ pub(crate) fn copy_slice<T: Copy>(result: &sys::mln_completion_result) -> Result
     }
 }
 
-#[allow(
-    dead_code,
-    reason = "a generator shape that the current headers do not use"
-)]
-pub(crate) fn optional_value<T: Copy>(result: &sys::mln_completion_result) -> Result<Option<T>> {
-    if result.value_count == 0 {
-        return Ok(None);
-    }
-    copy_value(result).map(Some)
-}
-
-#[allow(
-    dead_code,
-    reason = "a generator shape that the current headers do not use"
-)]
-pub(crate) fn optional_slice<T: Copy>(
-    result: &sys::mln_completion_result,
-) -> Result<Option<Vec<T>>> {
-    if result.value.is_null() {
-        return Ok(None);
-    }
-    copy_slice(result).map(Some)
-}
-
 /// Copies a completion's one value.
 pub(crate) fn value<N: Copy, T: FromNative<N>>(result: &sys::mln_completion_result) -> Result<T> {
     let value = copy_value::<N>(result)?;
@@ -334,20 +301,6 @@ pub(crate) fn list<N: Copy, T: FromNative<N>>(
         // SAFETY: as for `value`.
         .map(|value| unsafe { from_native(value) })
         .collect()
-}
-
-/// Copies every value of a completion, or `None` for a null array.
-#[allow(
-    dead_code,
-    reason = "a generator shape that the current headers do not use"
-)]
-pub(crate) fn optional_list<N: Copy, T: FromNative<N>>(
-    result: &sys::mln_completion_result,
-) -> Result<Option<Vec<T>>> {
-    if result.value.is_null() {
-        return Ok(None);
-    }
-    list::<N, T>(result).map(Some)
 }
 
 #[cfg(test)]

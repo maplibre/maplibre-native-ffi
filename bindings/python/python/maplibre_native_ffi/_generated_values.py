@@ -3449,6 +3449,11 @@ class ResourceRequestCancelHandler:
 
     callback: Callable[[], None] | None = None
 
+    def _invoke_callback(self):
+        callback = self.callback
+        assert callback is not None
+        return callback()
+
 
 @dataclass(frozen=True, slots=True)
 class ResourceRequestInfo:

@@ -22,9 +22,8 @@ pub(crate) struct Call<'a, H: NativeHandle> {
 }
 
 impl Call<'static, ()> {
-    pub(crate) fn global(operation: &'static str) -> Result<Self> {
-        maplibre_core::callback::check(operation, 0)?;
-        Ok(Self::new((), None))
+    pub(crate) fn global() -> Self {
+        Self::new((), None)
     }
 }
 
@@ -69,6 +68,23 @@ impl<'a, H: NativeHandle> Call<'a, H> {
     ) -> Result<()> {
         maplibre_core::check(|diagnostic| call(self.native, diagnostic))?;
         self.arena.accept_registrations();
+        Ok(())
+    }
+
+    /// Keeps registration roots pending when native reports that it kept none.
+    pub(crate) fn status_registered(
+        &mut self,
+        call: impl FnOnce(H, *mut sys::mln_diagnostic) -> (sys::mln_status, bool),
+    ) -> Result<()> {
+        let mut accepted = false;
+        maplibre_core::check(|diagnostic| {
+            let (status, retained) = call(self.native, diagnostic);
+            accepted = retained;
+            status
+        })?;
+        if accepted {
+            self.arena.accept_registrations();
+        }
         Ok(())
     }
 

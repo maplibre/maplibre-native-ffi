@@ -241,7 +241,9 @@ def reads_receiver(plan: OperationPlan) -> bool:
     return bool(
         plan.receiver
         and not plan.consumes
-        and (plan.view or any(borrowed(output.value) for output in plan.outputs))
+        and not plan.view
+        and plan.execution == "immediate"
+        and any(borrowed(output.value) for output in plan.outputs)
     )
 
 
@@ -253,29 +255,12 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         raise Unsupported(
             "status-returning unconditional consumption requires a commit-on-error adapter"
         )
-    if plan.receiver:
-        receiver_value = next(
-            parameter.value
-            for parameter in plan.inputs
-            if parameter.name == plan.receiver
-        )
-        if receiver_value.native in value_types.bound.decisions:
-            value_types.add(receiver_value)
-            return "global", ""
     if plan.scoped_receiver:
         scoped = next(
             p.value.element for p in plan.inputs if p.name == plan.scoped_receiver
         )
         value_types.add(scoped)
         return "global", ""
-    if any(
-        value_types.bound.values[r.descriptor].registration.receiver_owned
-        for r in plan.registrations
-    ):
-        raise Unsupported(
-            "a callback that calls back only into its registering receiver "
-            "needs a decision handle, whose state records the receiver"
-        )
     consuming = bool(plan.consumes)
     receiver_plan = next(
         (
@@ -365,7 +350,11 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         elif value_plan and value_plan.kind == "enum":
             value_types.add(value_plan)
             signature.append(f"{local}: {value_types.public(value_plan)}")
-            args.append(f"{local}.to_native()")
+            args.append(
+                f"{local}.bits()"
+                if value_plan.enum_kind == "bitmask"
+                else f"{local}.as_raw()"
+            )
         elif value_plan and value_plan.kind == "array" and value_plan.element:
             element = value_plan.element
             value_types.add(element, "in")
@@ -387,7 +376,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             if not public:
                 raise Unsupported(f"{value_plan.native}: owner runtime unavailable")
             signature.append(f"{local}: &{public}")
-            prelude.append(f"let {local} = {local}.inner.native()?;")
+            prelude.append(f"let {local} = {local}.inner.native();")
             args.append(local)
         elif value_plan and value_plan.kind in {"scalar", "native_pointer"}:
             signature.append(f"{local}: {value_types.public(value_plan)}")
@@ -567,7 +556,16 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         else:
             if not function.diagnostic:
                 raise Unsupported(f"{function.name}: status return has no diagnostic")
-            ending = [f"call.status({closure} {native})?;", f"Ok({output})"]
+            declined = next(
+                (r.accepted_unless for r in plan.registrations if r.accepted_unless),
+                None,
+            )
+            ending = [
+                f"call.status_registered({closure} {{ let status = {native}; (status, !{names[declined]}) }})?;"
+                if declined
+                else f"call.status({closure} {native})?;",
+                f"Ok({output})",
+            ]
             if plan.absence:
                 if parent_line:
                     prelude.remove(parent_line)
@@ -631,12 +629,11 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             "})",
         ]
     else:
-        operation_name = f'"{function.name}"'
         receiver_self = "self.0" if discard else "self"
         body = [
-            f"let {mutable}call = {receiver_self}.inner.{'read' if read else 'call'}({operation_name})?;"
+            f"let {mutable}call = {receiver_self}.inner.{'read()?' if read else 'call()'};"
             if receiver
-            else f"let {mutable}call = Call::global({operation_name})?;"
+            else f"let {mutable}call = Call::global();"
         ]
         if plan.owned_outputs and receiver is None:
             body.append("maplibre_core::validate_abi_version()?;")
@@ -749,19 +746,14 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         )
         modules.append("global")
     assert not chunks, f"operations without an owner module: {sorted(chunks)}"
-    from .rust_callbacks import decision_table
-
-    decision_tables = [
-        decision_table(bound, decision, pascal(native))
-        for native, decision in sorted(bound.decisions.items())
-    ]
-    declarations = [value_types.render(), *decision_tables]
+    declarations = [value_types.render()]
     files[f"{root}/values.rs"] = marker + "use super::*;\n\n" + "\n".join(declarations)
     files[f"{root}/mod.rs"] = marker + rust_owners.module_index(
         owners, ["values", *modules]
     )
     from . import rust_sys
 
+    files["crates/maplibre-native-ffi-core/src/error_kind.rs"] = error_kinds(bound)
     sys_declarations = rust_sys.declarations(bound)
     files[rust_sys.PATH] = sys_declarations.render()
     for name, reason in sys_declarations.unsupported.items():
@@ -782,3 +774,29 @@ def coverage(api: Api | BoundApi) -> dict:
         "generated": generated,
         "unsupported": unsupported,
     }
+
+
+def error_kinds(bound):
+    statuses = [
+        key
+        for key, _ in bound.values["mln_status"].enum_values
+        if key != "MLN_STATUS_OK"
+    ]
+    names = {key: pascal(key.removeprefix("MLN_STATUS_").lower()) for key in statuses}
+    return (
+        "// Generated from C headers by tools/bindgen. Do not edit.\n"
+        "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\n#[non_exhaustive]\npub enum ErrorKind {\n"
+        + "".join(f"    {name},\n" for name in names.values())
+        + "    AbiVersionMismatch,\n    UnknownStatus,\n}\n"
+        + "fn kind_for_status(status: i32) -> ErrorKind { match status {\n"
+        + "".join(
+            f"    sys::{key} => ErrorKind::{name},\n" for key, name in names.items()
+        )
+        + "    _ => ErrorKind::UnknownStatus,\n} }\n"
+        + "pub fn status_for_error(error: &Error) -> sys::mln_status {\n"
+        + "    if let Some(status) = error.raw_status() { return status; }\n    match error.kind() {\n"
+        + "".join(
+            f"        ErrorKind::{name} => sys::{key},\n" for key, name in names.items()
+        )
+        + "        _ => sys::MLN_STATUS_NATIVE_ERROR,\n    }\n}\n"
+    )

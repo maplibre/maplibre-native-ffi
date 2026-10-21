@@ -1,0 +1,88 @@
+// Generated from C headers by tools/bindgen. Do not edit.
+use super::*;
+
+native_owner! {
+    /// Owns one `mln_resource_request` native handle.
+    ///
+    /// A resource request that a resource provider handles.
+    ///
+    /// See `mln_resource_request` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    pub struct ResourceRequestHandle(mln_resource_request) dispose |raw| { unsafe { sys::mln_resource_request_release(raw) }; Ok(()) }, counted false;
+}
+
+impl ResourceRequestHandle {
+    /// Completes a C API resource provider request.
+    ///
+    /// See `mln_resource_request_complete` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn complete(&self, response: &ResourceResponse) -> Result<()> {
+        let mut call = self.inner.call();
+        let response = call.reference(&response)?;
+        call.status(|handle, out_diagnostic| unsafe {
+            sys::mln_resource_request_complete(handle, response, out_diagnostic)
+        })?;
+        Ok(())
+    }
+
+    /// Reports whether MapLibre has cancelled a C API resource provider
+    /// request.
+    ///
+    /// See `mln_resource_request_is_cancelled` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn is_cancelled(&self) -> Result<bool> {
+        let mut call = self.inner.call();
+        let mut out_cancelled: bool = Default::default();
+        call.status(|handle, out_diagnostic| unsafe {
+            sys::mln_resource_request_is_cancelled(handle, &mut out_cancelled, out_diagnostic)
+        })?;
+        Ok(out_cancelled)
+    }
+
+    /// Hands an outstanding provider request to the built-in network loader.
+    ///
+    /// See `mln_resource_request_pass_through` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn pass_through(&self) -> Result<()> {
+        let mut call = self.inner.call();
+        call.status(|handle, out_diagnostic| unsafe {
+            sys::mln_resource_request_pass_through(handle, out_diagnostic)
+        })?;
+        Ok(())
+    }
+
+    /// Releases the provider's reference to a resource request handle.
+    ///
+    /// See `mln_resource_request_release` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn release(&self) -> Result<()> {
+        self.inner.close(|handle| {
+            let mut call = Call::new(handle, None);
+            call.run(|handle| unsafe { sys::mln_resource_request_release(handle) });
+            Ok(())
+        })
+    }
+
+    /// Registers a callback that runs when MapLibre cancels a C API resource
+    /// provider request.
+    ///
+    /// See `mln_resource_request_set_cancel_callback` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn set_cancel_callback(&self, handler: ResourceRequestCancelHandler) -> Result<bool> {
+        let mut call = self.inner.call();
+        let mut out_cancelled: bool = Default::default();
+        let handler = call.reference(&handler)?;
+        call.status_registered(|handle, out_diagnostic| {
+            let status = unsafe {
+                sys::mln_resource_request_set_cancel_callback(
+                    handle,
+                    handler,
+                    &mut out_cancelled,
+                    out_diagnostic,
+                )
+            };
+            (status, !out_cancelled)
+        })?;
+        Ok(out_cancelled)
+    }
+}

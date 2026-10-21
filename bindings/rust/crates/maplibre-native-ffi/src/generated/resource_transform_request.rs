@@ -8,7 +8,7 @@ native_owner! {
     ///
     /// See `mln_resource_transform_request` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    pub struct ResourceTransformRequestHandle(mln_resource_transform_request) dispose |raw| { unsafe { sys::mln_resource_transform_request_release(raw) }; Ok(()) };
+    pub struct ResourceTransformRequestHandle(mln_resource_transform_request) dispose |raw| { unsafe { sys::mln_resource_transform_request_release(raw) }; Ok(()) }, counted false;
 }
 
 impl ResourceTransformRequestHandle {
@@ -17,7 +17,7 @@ impl ResourceTransformRequestHandle {
     /// See `mln_resource_transform_request_complete` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn complete(&self, url: &str) -> Result<()> {
-        let mut call = self.inner.call("mln_resource_transform_request_complete")?;
+        let mut call = self.inner.call();
         let url = call.input(&url)?;
         call.status(|request, out_diagnostic| unsafe {
             sys::mln_resource_transform_request_complete(request, url, out_diagnostic)

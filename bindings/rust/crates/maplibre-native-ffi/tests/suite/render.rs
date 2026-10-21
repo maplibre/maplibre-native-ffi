@@ -91,9 +91,8 @@ fn a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it() {
     })
     .unwrap();
     assert_eq!(size, (32, 16));
-    // The binding refuses to release a frame while its view is out, and
-    // native refuses to abandon the session that owns it.
-    assert_eq!(frame_release, ErrorKind::InvalidState);
+    // Native keeps the frame and its session busy while the view is open.
+    assert_eq!(frame_release, ErrorKind::Busy);
     assert_eq!(session_abandon, ErrorKind::Busy);
 
     // Once the view's scope ends, both close.

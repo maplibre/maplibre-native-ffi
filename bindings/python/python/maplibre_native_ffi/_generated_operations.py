@@ -1670,6 +1670,11 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
         return self._native.pass_through()
 
     def close(self) -> None:
+        """Releases the provider's reference to a resource request handle.
+
+        See `mln_resource_request_release` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+        """
         return self._native.close()
 
     def set_cancel_callback(self, handler: ResourceRequestCancelHandler) -> bool:

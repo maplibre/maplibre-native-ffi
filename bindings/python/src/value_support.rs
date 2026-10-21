@@ -5,7 +5,7 @@
 #[derive(Default)]
 struct GeneratedInputStorage<'py> {
     roots: Vec<Bound<'py, PyAny>>,
-    arrays: Vec<Box<dyn std::any::Any>>,
+    storage: maplibre_core::memory::InputStorage,
     callbacks: Vec<GeneratedPendingCallback>,
 }
 
@@ -33,42 +33,21 @@ impl<'py> GeneratedInputStorage<'py> {
     }
 
     fn c_string(&mut self, value: Bound<'py, PyAny>) -> PyResult<*const c_char> {
-        let string =
-            maplibre_core::string::c_string(value.extract::<&str>()?).map_err(map_error)?;
-        let pointer = string.as_ptr();
-        self.arrays.push(Box::new(string));
-        Ok(pointer)
+        self.storage
+            .c_string(value.extract::<&str>()?)
+            .map_err(map_error)
     }
-
     fn keep_array<T: 'static>(&mut self, values: Vec<T>) -> *const T {
-        let pointer = values.as_ptr();
-        self.arrays.push(Box::new(values));
-        pointer
+        self.storage.array(values)
     }
-
     fn keep_one<T: 'static>(&mut self, value: T) -> *const T {
-        let value = Box::new(value);
-        let pointer = &*value as *const T;
-        self.arrays.push(value);
-        pointer
+        self.storage.store(value)
     }
 }
 
 /// The generated caller supplies a C-contract borrowed array during its lifetime.
 unsafe fn generated_slice<'a, T>(data: *const T, count: impl TryInto<usize>) -> PyResult<&'a [T]> {
-    let count = generated_count(count)?;
-    if count == 0 {
-        return Ok(&[]);
-    }
-    if data.is_null()
-        || count > (isize::MAX as usize) / std::mem::size_of::<T>().max(1)
-        || !data.is_aligned()
-    {
-        return Err(native_error("invalid native array"));
-    }
-    // SAFETY: the caller's contract supplies count initialized elements, and
-    // the checks above enforce Rust's slice size, alignment, and null rules.
-    Ok(unsafe { std::slice::from_raw_parts(data, count) })
+    unsafe { maplibre_core::ptr::slice(data, generated_count(count)?) }.map_err(map_error)
 }
 
 /// Native array elements lie value_size bytes apart, which may exceed sizeof(T).
@@ -87,107 +66,63 @@ fn generated_completion_values<T: Copy>(
     }
 }
 
-/// Removes a public owner before a consuming call and restores it on rejection.
-/// No state mutex remains locked while native code can invoke host callbacks.
-trait GeneratedOwnerState<T: maplibre_core::handle::NativeHandle> {
-    fn owner_state(&mut self) -> &mut NativeHandleState<T>;
+struct GeneratedHandleReservation<'a, T: maplibre_core::handle::NativeHandle> {
+    state: &'a Mutex<NativeHandleState<T>>,
+    handle: T,
+    accepted: bool,
 }
-
-impl<T: maplibre_core::handle::NativeHandle> GeneratedOwnerState<T> for NativeHandleState<T> {
-    fn owner_state(&mut self) -> &mut NativeHandleState<T> {
-        self
-    }
-}
-
-struct GeneratedHandleReservation<
-    'a,
-    T: maplibre_core::handle::NativeHandle,
-    S: GeneratedOwnerState<T>,
-> {
-    state: &'a Mutex<S>,
-    handle: Option<T>,
-}
-
-impl<'a, T: maplibre_core::handle::NativeHandle, S: GeneratedOwnerState<T>>
-    GeneratedHandleReservation<'a, T, S>
-{
-    fn new(state: &'a Mutex<S>) -> PyResult<Option<Self>> {
-        let mut guard = state.lock().unwrap_or_else(|p| p.into_inner());
-        let owner = guard.owner_state();
-        if owner.closing {
-            return Err(owner.lifecycle_error("is closing"));
-        }
-        if owner.active_reads != 0 {
-            return Err(owner.lifecycle_error("is in use"));
-        }
-        let Some(handle) = owner.id.take() else {
+impl<'a, T: maplibre_core::handle::NativeHandle> GeneratedHandleReservation<'a, T> {
+    fn new(state: &'a Mutex<NativeHandleState<T>>) -> PyResult<Option<Self>> {
+        let mut owner = state.lock().unwrap_or_else(|p| p.into_inner());
+        if owner.handle.is_released() {
             return Ok(None);
-        };
-        owner.closing = true;
+        }
+        let handle = owner.handle.begin_release().map_err(map_error)?;
         Ok(Some(Self {
             state,
-            handle: Some(T::from_raw(handle.get())),
+            handle,
+            accepted: false,
         }))
     }
-
     fn handle(&self) -> T {
-        self.handle.expect("uncommitted owner reservation")
+        self.handle
     }
-
     fn commit(&mut self) {
+        self.accepted = true;
+    }
+}
+impl<T: maplibre_core::handle::NativeHandle> Drop for GeneratedHandleReservation<'_, T> {
+    fn drop(&mut self) {
         self.state
             .lock()
             .unwrap_or_else(|p| p.into_inner())
-            .owner_state()
-            .closing = false;
-        self.handle = None;
+            .handle
+            .end_release(self.accepted);
     }
 }
 
-impl<T: maplibre_core::handle::NativeHandle, S: GeneratedOwnerState<T>> Drop
-    for GeneratedHandleReservation<'_, T, S>
-{
-    fn drop(&mut self) {
-        if let Some(handle) = self.handle {
-            let mut guard = self.state.lock().unwrap_or_else(|p| p.into_inner());
-            let state = guard.owner_state();
-            debug_assert!(state.id.is_none());
-            state.id = std::num::NonZeroU64::new(handle.to_raw());
-            state.closing = false;
-        }
-    }
-}
-
-struct GeneratedReadReservation<
-    'a,
-    T: maplibre_core::handle::NativeHandle,
-    S: GeneratedOwnerState<T>,
-> {
-    state: &'a Mutex<S>,
+struct GeneratedReadReservation<'a, T: maplibre_core::handle::NativeHandle> {
+    state: &'a Mutex<NativeHandleState<T>>,
     handle: T,
 }
-
-impl<'a, T: maplibre_core::handle::NativeHandle, S: GeneratedOwnerState<T>>
-    GeneratedReadReservation<'a, T, S>
-{
-    fn new(state: &'a Mutex<S>) -> PyResult<Self> {
-        let mut guard = state.lock().unwrap_or_else(|p| p.into_inner());
-        let owner = guard.owner_state();
-        let handle = owner.require_live()?;
-        owner.active_reads += 1;
+impl<'a, T: maplibre_core::handle::NativeHandle> GeneratedReadReservation<'a, T> {
+    fn new(state: &'a Mutex<NativeHandleState<T>>) -> PyResult<Self> {
+        let handle = state
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .handle
+            .begin_read()
+            .map_err(map_error)?;
         Ok(Self { state, handle })
     }
 }
-
-impl<T: maplibre_core::handle::NativeHandle, S: GeneratedOwnerState<T>> Drop
-    for GeneratedReadReservation<'_, T, S>
-{
+impl<T: maplibre_core::handle::NativeHandle> Drop for GeneratedReadReservation<'_, T> {
     fn drop(&mut self) {
         self.state
             .lock()
             .unwrap_or_else(|p| p.into_inner())
-            .owner_state()
-            .active_reads -= 1;
+            .handle
+            .end_read();
     }
 }
 
@@ -283,20 +218,6 @@ unsafe fn generated_get_callback(
 /// the interpreter attached when the registration retires.
 struct GeneratedCallbackRootOwner(Arc<GeneratedCallbackRoot>);
 
-impl GeneratedCallbackRootOwner {
-    fn new(callbacks: Vec<Py<PyAny>>) -> Self {
-        Self(Arc::new(Mutex::new(callbacks)))
-    }
-
-    fn downgrade(&self) -> std::sync::Weak<GeneratedCallbackRoot> {
-        Arc::downgrade(&self.0)
-    }
-
-    fn get(&self, py: Python<'_>, index: usize) -> Option<Py<PyAny>> {
-        generated_root_callback(py, &self.0, index)
-    }
-}
-
 impl Drop for GeneratedCallbackRootOwner {
     fn drop(&mut self) {
         let callbacks = std::mem::take(&mut *self.0.lock().unwrap_or_else(|p| p.into_inner()));
@@ -307,6 +228,7 @@ impl Drop for GeneratedCallbackRootOwner {
 }
 
 unsafe extern "C" fn generated_release_callbacks(user_data: *mut c_void) {
+    let _scope = maplibre_core::callback::CallbackScope::enter();
     // SAFETY: native releases the accepted descriptor exactly once at quiescence.
     let root = unsafe { Box::from_raw(user_data.cast::<Arc<GeneratedCallbackRoot>>()) };
     drop(GeneratedCallbackRootOwner(*root));
@@ -339,20 +261,16 @@ where
     py.detach(move || call.invoke()).0
 }
 
-struct GeneratedOwnedRead<T: maplibre_core::handle::NativeHandle, S: GeneratedOwnerState<T>> {
-    state: Arc<Mutex<S>>,
-    _handle: std::marker::PhantomData<fn() -> T>,
+struct GeneratedOwnedRead<T: maplibre_core::handle::NativeHandle> {
+    state: Arc<Mutex<NativeHandleState<T>>>,
 }
-
-impl<T: maplibre_core::handle::NativeHandle, S: GeneratedOwnerState<T>> Drop
-    for GeneratedOwnedRead<T, S>
-{
+impl<T: maplibre_core::handle::NativeHandle> Drop for GeneratedOwnedRead<T> {
     fn drop(&mut self) {
         self.state
             .lock()
             .unwrap_or_else(|p| p.into_inner())
-            .owner_state()
-            .active_reads -= 1;
+            .handle
+            .end_read();
     }
 }
 
@@ -375,63 +293,43 @@ impl Drop for GeneratedNativeRead {
 }
 
 impl GeneratedReadScope {
-    fn with_native<T, S>(
+    fn with_native<T: maplibre_core::handle::NativeHandle>(
         py: Python<'_>,
-        state: Arc<Mutex<S>>,
+        state: Arc<Mutex<NativeHandleState<T>>>,
         begin: unsafe extern "C" fn(
             T,
             *mut *mut c_void,
             *mut sys::mln_diagnostic,
         ) -> sys::mln_status,
         end: unsafe extern "C" fn(*mut c_void),
-    ) -> PyResult<Self>
-    where
-        T: maplibre_core::handle::NativeHandle + 'static,
-        S: GeneratedOwnerState<T> + Send + 'static,
-    {
-        let scope = Self::new::<T, S>(Arc::clone(&state))?;
-        let handle = state
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .owner_state()
-            .require_live()?;
+    ) -> PyResult<Self> {
+        let handle = state.lock().unwrap_or_else(|p| p.into_inner()).handle.raw();
         let mut token = ptr::null_mut();
         maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || begin(handle, &mut token, diagnostic))
         })
         .map_err(map_error)?;
-        let mut lease = scope.lease.lock().unwrap_or_else(|p| p.into_inner());
-        let owner = lease.take();
-        *lease = Some(Box::new((
-            GeneratedNativeRead {
-                token: token as usize,
-                end,
-            },
-            owner,
-        )));
-        drop(lease);
-        Ok(scope)
-    }
-
-    fn new<T, S>(state: Arc<Mutex<S>>) -> PyResult<Self>
-    where
-        T: maplibre_core::handle::NativeHandle + 'static,
-        S: GeneratedOwnerState<T> + Send + 'static,
-    {
-        {
-            let mut guard = state.lock().unwrap_or_else(|p| p.into_inner());
-            let owner = guard.owner_state();
-            owner.require_live()?;
-            if !owner.views_valid {
-                return Err(invalid_state_error("borrowed view owner is no longer live"));
-            }
-            owner.active_reads += 1;
-        }
         Ok(Self {
-            lease: Mutex::new(Some(Box::new(GeneratedOwnedRead::<T, S> {
+            lease: Mutex::new(Some(Box::new((
+                GeneratedNativeRead {
+                    token: token as usize,
+                    end,
+                },
                 state,
-                _handle: std::marker::PhantomData,
-            }))),
+            )))),
+        })
+    }
+    fn new<T: maplibre_core::handle::NativeHandle>(
+        state: Arc<Mutex<NativeHandleState<T>>>,
+    ) -> PyResult<Self> {
+        state
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .handle
+            .begin_read()
+            .map_err(map_error)?;
+        Ok(Self {
+            lease: Mutex::new(Some(Box::new(GeneratedOwnedRead { state }))),
         })
     }
 }
@@ -494,21 +392,6 @@ impl Drop for GeneratedCallbackGuard {
     fn drop(&mut self) {
         self.0.alive.store(false, Ordering::Release);
     }
-}
-
-type GeneratedCallbackPolicy = maplibre_core::callback::PolicyScope;
-
-fn generated_check_reentry() -> PyResult<()> {
-    generated_check_operation("", 0)
-}
-
-fn generated_check_operation(operation: &str, owner: u64) -> PyResult<()> {
-    maplibre_core::callback::check(operation, owner).map_err(map_error)
-}
-
-unsafe extern "C" fn generated_release_callbacks_no_reentry(user_data: *mut c_void) {
-    let _guard = GeneratedCallbackPolicy::enter(&[], 0);
-    unsafe { generated_release_callbacks(user_data) };
 }
 
 fn generated_finalize(call: impl FnOnce() + Send + 'static) {

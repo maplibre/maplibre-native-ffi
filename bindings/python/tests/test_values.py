@@ -99,7 +99,7 @@ def test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native(
     with pytest.raises(mln.InvalidArgumentError) as raised:
         harness.runtime.create_offline_region(unknown, b"")
     # Native saw the arm's tag and refused it; the binding passed it through.
-    assert raised.value.native_status_code == mln.Status.INVALID_ARGUMENT.native_code
+    assert raised.value.native_status_code == int(mln.Status.INVALID_ARGUMENT)
     assert "definition type is invalid" in raised.value.diagnostic
 
 
@@ -112,7 +112,7 @@ def test_integers_are_range_checked_enums_stay_open_and_64_bit_values_round_trip
 
     unknown = mln.RenderResult(777)
     assert unknown.is_unknown
-    assert unknown.native_code == 777
+    assert int(unknown) == 777
 
     # Cancelling the largest identity ends the ease that carries it, so the
     # identity crossed whole both times.

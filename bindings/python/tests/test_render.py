@@ -389,16 +389,10 @@ def test_a_frame_view_holds_its_owners_until_its_scope_ends(
         frame = target.session.acquire_frame()
 
         def inspect(view: object) -> int:
-            # The view reserves the frame and each owner above it, so the
-            # binding refuses to release them before native sees the call.
-            for release, owner in (
-                (frame.close, "AcquiredFrameHandle"),
-                (target.session.abandon, "RenderSessionHandle"),
-            ):
-                with pytest.raises(mln.InvalidStateError) as raised:
+            for release in (frame.close, target.session.abandon):
+                with pytest.raises(mln.BusyError) as raised:
                     release()
-                assert raised.value.native_status_code is None
-                assert raised.value.diagnostic == f"{owner} is in use"
+                assert raised.value.native_status_code == int(mln.Status.BUSY)
             return _texture_name(backend, view)
 
         assert target.with_texture(frame, inspect) != 0
@@ -434,7 +428,7 @@ def test_a_borrow_on_another_thread_holds_off_close(
         borrower.start()
         try:
             assert entered.wait(TIMEOUT)
-            with pytest.raises(mln.InvalidStateError):
+            with pytest.raises(mln.BusyError):
                 frame.close()
             assert not frame.closed
         finally:

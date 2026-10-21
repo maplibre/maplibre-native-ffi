@@ -8,7 +8,7 @@ native_owner! {
     ///
     /// See `mln_runtime` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    pub struct RuntimeHandle(mln_runtime) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_runtime_dispose(raw, out_diagnostic) });
+    pub struct RuntimeHandle(mln_runtime) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_runtime_dispose(raw, out_diagnostic) }), counted false;
 }
 
 impl RuntimeHandle {
@@ -17,7 +17,7 @@ impl RuntimeHandle {
     /// See `mln_runtime_clear_event_handler` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn clear_event_handler(&self) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_runtime_clear_event_handler")?;
+        let call = self.inner.call();
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
                 sys::mln_runtime_clear_event_handler(runtime, completion, out_diagnostic)
@@ -31,7 +31,7 @@ impl RuntimeHandle {
     /// See `mln_runtime_clear_http_header_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn clear_http_header_transform(&self) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_runtime_clear_http_header_transform")?;
+        let call = self.inner.call();
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
                 sys::mln_runtime_clear_http_header_transform(runtime, completion, out_diagnostic)
@@ -45,7 +45,7 @@ impl RuntimeHandle {
     /// See `mln_runtime_clear_resource_provider` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn clear_resource_provider(&self) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_runtime_clear_resource_provider")?;
+        let call = self.inner.call();
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
                 sys::mln_runtime_clear_resource_provider(runtime, completion, out_diagnostic)
@@ -59,7 +59,7 @@ impl RuntimeHandle {
     /// See `mln_runtime_clear_resource_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn clear_resource_transform(&self) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_runtime_clear_resource_transform")?;
+        let call = self.inner.call();
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
                 sys::mln_runtime_clear_resource_transform(runtime, completion, out_diagnostic)
@@ -73,7 +73,7 @@ impl RuntimeHandle {
     /// See `mln_runtime_create_map` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn create_map(&self, options: &MapOptions) -> Result<NativeFuture<MapHandle>> {
-        let mut call = self.inner.call("mln_runtime_create_map")?;
+        let mut call = self.inner.call();
         let parent = self.inner.parent();
         let options = call.reference(&options)?;
         call.complete(
@@ -93,7 +93,7 @@ impl RuntimeHandle {
         definition: &OfflineRegionDefinition,
         metadata: &[u8],
     ) -> Result<NativeFuture<OfflineRegionInfo>> {
-        let mut call = self.inner.call("mln_runtime_create_offline_region")?;
+        let mut call = self.inner.call();
         let metadata_size = convert::count(metadata.len())?;
         let definition = call.reference(&definition)?;
         let metadata = metadata.as_ptr().cast();
@@ -117,7 +117,7 @@ impl RuntimeHandle {
     /// See `mln_runtime_delete_offline_region` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn delete_offline_region(&self, region_id: i64) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_runtime_delete_offline_region")?;
+        let call = self.inner.call();
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
                 sys::mln_runtime_delete_offline_region(
@@ -149,7 +149,7 @@ impl RuntimeHandle {
     /// See `mln_runtime_get_event_mask` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn get_event_mask(&self) -> Result<RuntimeEventMask> {
-        let mut call = self.inner.call("mln_runtime_get_event_mask")?;
+        let mut call = self.inner.call();
         let mut out_mask: u64 = Default::default();
         call.status(|runtime, out_diagnostic| unsafe {
             sys::mln_runtime_get_event_mask(runtime, &mut out_mask, out_diagnostic)
@@ -165,7 +165,7 @@ impl RuntimeHandle {
         &self,
         region_id: i64,
     ) -> Result<NativeFuture<Option<OfflineRegionInfo>>> {
-        let call = self.inner.call("mln_runtime_get_offline_region")?;
+        let call = self.inner.call();
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
                 sys::mln_runtime_get_offline_region(runtime, region_id, completion, out_diagnostic)
@@ -182,7 +182,7 @@ impl RuntimeHandle {
         &self,
         region_id: i64,
     ) -> Result<NativeFuture<OfflineRegionStatus>> {
-        let call = self.inner.call("mln_runtime_get_offline_region_status")?;
+        let call = self.inner.call();
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
                 sys::mln_runtime_get_offline_region_status(
@@ -201,7 +201,7 @@ impl RuntimeHandle {
     /// See `mln_runtime_invalidate_offline_region` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn invalidate_offline_region(&self, region_id: i64) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_runtime_invalidate_offline_region")?;
+        let call = self.inner.call();
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
                 sys::mln_runtime_invalidate_offline_region(
@@ -220,7 +220,7 @@ impl RuntimeHandle {
     /// See `mln_runtime_list_offline_regions` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn list_offline_regions(&self) -> Result<NativeFuture<Vec<OfflineRegionInfo>>> {
-        let call = self.inner.call("mln_runtime_list_offline_regions")?;
+        let call = self.inner.call();
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
                 sys::mln_runtime_list_offline_regions(runtime, completion, out_diagnostic)
@@ -237,7 +237,7 @@ impl RuntimeHandle {
         &self,
         side_database_path: &str,
     ) -> Result<NativeFuture<Vec<OfflineRegionInfo>>> {
-        let mut call = self.inner.call("mln_runtime_merge_offline_regions")?;
+        let mut call = self.inner.call();
         let side_database_path = call.input(&side_database_path)?;
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
@@ -276,12 +276,12 @@ impl RuntimeHandle {
         &self,
         operation: AmbientCacheOperation,
     ) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_runtime_run_ambient_cache_operation")?;
+        let call = self.inner.call();
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
                 sys::mln_runtime_run_ambient_cache_operation(
                     runtime,
-                    operation.to_native(),
+                    operation.as_raw(),
                     completion,
                     out_diagnostic,
                 )
@@ -295,7 +295,7 @@ impl RuntimeHandle {
     /// See `mln_runtime_set_event_handler` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn set_event_handler(&self, handler: RuntimeEventHandler) -> Result<NativeFuture<()>> {
-        let mut call = self.inner.call("mln_runtime_set_event_handler")?;
+        let mut call = self.inner.call();
         let handler = call.reference(&handler)?;
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
@@ -310,9 +310,9 @@ impl RuntimeHandle {
     /// See `mln_runtime_set_event_mask` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn set_event_mask(&self, mask: RuntimeEventMask) -> Result<()> {
-        let mut call = self.inner.call("mln_runtime_set_event_mask")?;
+        let mut call = self.inner.call();
         call.status(|runtime, out_diagnostic| unsafe {
-            sys::mln_runtime_set_event_mask(runtime, mask.to_native(), out_diagnostic)
+            sys::mln_runtime_set_event_mask(runtime, mask.bits(), out_diagnostic)
         })?;
         Ok(())
     }
@@ -325,7 +325,7 @@ impl RuntimeHandle {
         &self,
         transform: HttpHeaderTransform,
     ) -> Result<NativeFuture<()>> {
-        let mut call = self.inner.call("mln_runtime_set_http_header_transform")?;
+        let mut call = self.inner.call();
         let transform = call.reference(&transform)?;
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
@@ -345,9 +345,7 @@ impl RuntimeHandle {
     /// See `mln_runtime_set_maximum_ambient_cache_size` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn set_maximum_ambient_cache_size(&self, size: u64) -> Result<NativeFuture<()>> {
-        let call = self
-            .inner
-            .call("mln_runtime_set_maximum_ambient_cache_size")?;
+        let call = self.inner.call();
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
                 sys::mln_runtime_set_maximum_ambient_cache_size(
@@ -370,15 +368,13 @@ impl RuntimeHandle {
         region_id: i64,
         state: OfflineRegionDownloadState,
     ) -> Result<NativeFuture<()>> {
-        let call = self
-            .inner
-            .call("mln_runtime_set_offline_region_download_state")?;
+        let call = self.inner.call();
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
                 sys::mln_runtime_set_offline_region_download_state(
                     runtime,
                     region_id,
-                    state.to_native(),
+                    state.as_raw(),
                     completion,
                     out_diagnostic,
                 )
@@ -396,7 +392,7 @@ impl RuntimeHandle {
         region_id: i64,
         observed: bool,
     ) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_runtime_set_offline_region_observed")?;
+        let call = self.inner.call();
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
                 sys::mln_runtime_set_offline_region_observed(
@@ -416,7 +412,7 @@ impl RuntimeHandle {
     /// See `mln_runtime_set_resource_provider` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn set_resource_provider(&self, provider: ResourceProvider) -> Result<NativeFuture<()>> {
-        let mut call = self.inner.call("mln_runtime_set_resource_provider")?;
+        let mut call = self.inner.call();
         let provider = call.reference(&provider)?;
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
@@ -437,7 +433,7 @@ impl RuntimeHandle {
     /// See `mln_runtime_set_resource_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn set_resource_transform(&self, transform: ResourceTransform) -> Result<NativeFuture<()>> {
-        let mut call = self.inner.call("mln_runtime_set_resource_transform")?;
+        let mut call = self.inner.call();
         let transform = call.reference(&transform)?;
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
@@ -461,9 +457,7 @@ impl RuntimeHandle {
         region_id: i64,
         metadata: &[u8],
     ) -> Result<NativeFuture<OfflineRegionInfo>> {
-        let call = self
-            .inner
-            .call("mln_runtime_update_offline_region_metadata")?;
+        let call = self.inner.call();
         let metadata_size = convert::count(metadata.len())?;
         let metadata = metadata.as_ptr().cast();
         call.complete(

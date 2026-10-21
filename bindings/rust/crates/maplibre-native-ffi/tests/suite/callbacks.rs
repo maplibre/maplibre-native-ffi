@@ -1,5 +1,5 @@
-//! Callback registrations: rooting and release, the admission policy inside a
-//! callback, panics, decision handles, provider routes, and process-global
+//! Callback registrations: rooting and release, contained panics, request
+//! ownership, provider routes, and process-global
 //! callbacks.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -127,59 +127,6 @@ fn a_registered_callback_does_not_keep_its_runtime_alive() {
 }
 
 #[test]
-fn a_callback_may_answer_its_request_but_not_fence_or_close_its_runtime() {
-    let fixture = Fixture::new();
-    let runtime = Arc::downgrade(fixture.runtime());
-    let (sender, outcomes) = mpsc::channel();
-    let sender = Mutex::new(sender);
-    let deny = denying_provider().callback.unwrap();
-    wait_for(
-        fixture
-            .runtime()
-            .set_resource_provider(ResourceProvider::new(move |request, handle| {
-                if request.requested_url.as_deref() != Some("custom://style.json") {
-                    return deny(request, handle);
-                }
-                let runtime = runtime.upgrade().unwrap();
-                let refusal = |error: Error| {
-                    (
-                        error.kind(),
-                        error.raw_status(),
-                        error.diagnostic().to_owned(),
-                    )
-                };
-                let outcome = (
-                    runtime
-                        .clear_resource_transform()
-                        .map(drop)
-                        .map_err(refusal),
-                    runtime.release().map(drop).map_err(refusal),
-                    handle
-                        .complete(&ok_response(BACKGROUND_STYLE_JSON))
-                        .map_err(|error| error.kind()),
-                );
-                sender.lock().unwrap().send(outcome).unwrap();
-                ResourceProviderDecision::Handle
-            })),
-    );
-
-    fixture.map().set_style_url("custom://style.json").unwrap();
-    fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
-    let (command, release, completed) = outcomes.recv_timeout(timeout()).unwrap();
-    // The binding's callback policy refuses both calls before they reach
-    // native, so neither carries a native status. Native would refuse the
-    // release too, because the fixture's map is live, but with a status.
-    let refused_by_policy = Err((
-        ErrorKind::InvalidState,
-        None,
-        "native operation is unavailable from this callback".to_owned(),
-    ));
-    assert_eq!(command, refused_by_policy);
-    assert_eq!(release, refused_by_policy);
-    assert_eq!(completed, Ok(()));
-}
-
-#[test]
 fn a_failing_callback_is_contained_and_its_error_is_reported() {
     let _global = global_state();
     let reports = capture_reports();
@@ -301,7 +248,7 @@ fn a_provider_hands_its_request_to_another_thread_and_answers_later() {
         handle
             .complete(&ok_response(BACKGROUND_STYLE_JSON))
             .unwrap();
-        handle.close().unwrap();
+        handle.release().unwrap();
     })
     .join()
     .unwrap();
@@ -477,6 +424,6 @@ fn registering_for_an_already_cancelled_request_reports_it_and_roots_nothing() {
     released
         .try_recv()
         .expect("the binding kept a callback that native never took");
-    handle.close().unwrap();
+    handle.release().unwrap();
     wait_for(runtime.release());
 }

@@ -11,7 +11,7 @@
 //! reference cycle that requires an explicit clear or release.
 //!
 //! Native cannot receive a Rust error or panic from a callback, so the binding
-//! contains both and returns the callback's declared failure value to native.
+//! contains both and returns a failure value to native.
 //! A panic reaches the standard panic hook as usual. An error goes to the
 //! reporter that [`set_reporter`] installs, as [`Report::CallbackError`], or to
 //! standard error when none is installed.
@@ -27,7 +27,6 @@ mod generated;
 mod handle;
 
 pub use completion::{CommandCompletion, NativeFuture};
-pub use convert::{FromNative, InputArena, ToNative};
 pub use generated::*;
 pub use maplibre_core::handle::NativeHandleLeak;
 pub use maplibre_core::report::{Report, Reporter, set_reporter};

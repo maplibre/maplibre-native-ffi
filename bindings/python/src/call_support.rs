@@ -1,4 +1,4 @@
-/// One generated method's native call: its admission, the Python storage its
+/// One generated method's native call: the Python storage its
 /// arguments borrow, and the native call with the interpreter detached.
 ///
 /// Every native call that a method makes goes through `status`,
@@ -11,13 +11,12 @@ struct GeneratedCall<'py> {
 }
 
 impl<'py> GeneratedCall<'py> {
-    /// Admits `operation` on the owner whose handle is `owner`, or 0 for none.
-    fn new(py: Python<'py>, operation: &str, owner: u64) -> PyResult<Self> {
-        generated_check_operation(operation, owner)?;
-        Ok(Self {
+    /// Keeps converted inputs alive through the native call.
+    fn new(py: Python<'py>) -> Self {
+        Self {
             py,
             storage: GeneratedInputStorage::default(),
-        })
+        }
     }
 
     /// Makes a call that returns a status.
@@ -141,16 +140,13 @@ impl<'py> GeneratedCall<'py> {
     }
 }
 
-type GeneratedOwnerReservation<'a, O> = GeneratedHandleReservation<
-    'a,
-    <O as GeneratedOwner>::Native,
-    NativeHandleState<<O as GeneratedOwner>::Native>,
->;
+type GeneratedOwnerReservation<'a, O> =
+    GeneratedHandleReservation<'a, <O as GeneratedOwner>::Native>;
 
 trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
     type Native: maplibre_core::handle::NativeHandle;
     const NATIVE: &'static str;
-    const OWNER_NAME: &'static str;
+    const COUNTED: bool;
     /// Disposes a handle that no close consumed, for a handle type with a
     /// disposal.
     const DISPOSE: Option<unsafe extern "C" fn(Self::Native) -> sys::mln_status>;
@@ -164,25 +160,12 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
         self.shared().lock().unwrap_or_else(|p| p.into_inner())
     }
 
-    fn admission(&self) -> u64 {
-        self.state()
-            .live_handle()
-            .map(maplibre_core::handle::NativeHandle::to_raw)
-            .unwrap_or(0)
-    }
-
-    fn input(&self) -> PyResult<Self::Native> {
-        self.state().require_live()
-    }
-
-    fn live(&self) -> PyResult<Self::Native> {
-        self.state().require_live()
+    fn input(&self) -> Self::Native {
+        self.state().handle.raw()
     }
 
     /// Hold off close until borrowed result storage has been copied.
-    fn read(
-        &self,
-    ) -> PyResult<GeneratedReadReservation<'_, Self::Native, NativeHandleState<Self::Native>>> {
+    fn read(&self) -> PyResult<GeneratedReadReservation<'_, Self::Native>> {
         GeneratedReadReservation::new(self.shared())
     }
 
@@ -203,10 +186,9 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
         roots: Vec<std::sync::Weak<GeneratedCallbackRoot>>,
     ) -> PyResult<Py<PyAny>> {
         // SAFETY: the caller transfers ownership of the live handle.
-        let mut state =
-            unsafe { NativeHandleState::from_handle(raw, Self::NATIVE, Self::OWNER_NAME) }
-                .map_err(map_error)?
-                .with_callback_roots(roots);
+        let mut state = unsafe { NativeHandleState::from_handle(raw, Self::NATIVE, Self::COUNTED) }
+            .map_err(map_error)?
+            .with_callback_roots(roots);
         if let Some(dispose) = Self::DISPOSE {
             state = state.with_disposal(dispose);
         }
@@ -218,7 +200,7 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
 }
 
 macro_rules! generated_owner {
-    ($owner:ident, $name:literal, $native:ident, $dispose:expr, $exit_release:expr, $read_scope:expr) => {
+    ($owner:ident, $name:literal, $native:ident, $dispose:expr, $exit_release:expr, $counted:expr, $read_scope:expr) => {
         #[pyclass(name = $name)]
         struct $owner {
             state: Arc<Mutex<NativeHandleState<sys::$native>>>,
@@ -227,7 +209,7 @@ macro_rules! generated_owner {
         impl GeneratedOwner for $owner {
             type Native = sys::$native;
             const NATIVE: &'static str = stringify!($native);
-            const OWNER_NAME: &'static str = stringify!($owner);
+            const COUNTED: bool = $counted;
             const DISPOSE: Option<unsafe extern "C" fn(sys::$native) -> sys::mln_status> = $dispose;
             const EXIT_RELEASE: Option<ExitReleaseFn<sys::$native>> = $exit_release;
 
@@ -249,7 +231,7 @@ macro_rules! generated_owner {
 
             #[getter]
             fn id(&self) -> u64 {
-                self.state().issued_id()
+                self.state().handle.raw().to_raw()
             }
 
             fn __traverse__(
@@ -270,15 +252,13 @@ macro_rules! generated_owner {
             /// that a completion delivered and nothing adopted.
             fn _dispose(&self) -> PyResult<()> {
                 let mut state = self.state();
-                if state.closing || state.active_reads != 0 {
-                    return Err(state.lifecycle_error("is in use"));
-                }
+                state.handle.begin_release().map_err(map_error)?;
                 state.dispose_abandoned();
+                state.handle.end_release(false);
                 Ok(())
             }
 
             fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
-                generated_check_reentry()?;
                 let read_scope: fn(Python<'_>, &Self) -> PyResult<GeneratedReadScope> = $read_scope;
                 read_scope(py, self)
             }
@@ -290,6 +270,7 @@ macro_rules! generated_owner {
 /// An exception is reported as unraisable and, like a panic or a finalized
 /// interpreter, answers native with `failure`.
 fn generated_invoke<R>(failure: impl Fn() -> R, body: impl FnOnce(Python<'_>) -> PyResult<R>) -> R {
+    let _scope = maplibre_core::callback::CallbackScope::enter();
     let result = catch_unwind(AssertUnwindSafe(|| Python::try_attach(body)));
     match result {
         Ok(Some(Ok(result))) => result,
@@ -302,10 +283,9 @@ fn generated_invoke<R>(failure: impl Fn() -> R, body: impl FnOnce(Python<'_>) ->
 }
 
 /// Reports an exception that a native callback raised to `sys.unraisablehook`.
-/// The hook runs on the native callback's stack, so it may make no native
-/// call, whatever the callback itself may call.
+/// The callback scope keeps finalization off the native callback stack.
 fn generated_report_unraisable(py: Python<'_>, error: PyErr) {
-    let _policy = GeneratedCallbackPolicy::enter(&[], 0);
+    let _scope = maplibre_core::callback::CallbackScope::enter();
     error.write_unraisable(py, None);
 }
 

@@ -1,6 +1,5 @@
 """Attach generated operations to their public owner for introspection."""
 
-from contextlib import ExitStack
 from typing import Any
 
 from ._future import map_future
@@ -44,13 +43,7 @@ def _adopt_future(source, owner, parent):
 
 
 def _with_view(owner, read, convert, callback):
-    parents = []
-    while owner is not None:
-        parents.append(owner)
-        owner = getattr(owner, "_parent", None)
-    with ExitStack() as scope:
-        for parent in reversed(parents):
-            scope.enter_context(parent._native._read_scope())
+    with owner._native._read_scope():
         return callback(convert(read()))
 
 

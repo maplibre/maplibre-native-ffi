@@ -1,6 +1,7 @@
 //! Calls the bindings that the probe generated from the fixture headers,
 //! through the binding's handwritten runtime, against protocols_stub.c.
 
+use crate::convert::{FromNative, InputArena, ToNative};
 use crate::*;
 
 pub fn run() {
@@ -41,6 +42,5 @@ pub fn run() {
     let map = MapHandle::adopt(maplibre_native_ffi_sys::mln_map(7), None).unwrap();
     assert_eq!(map.id(), 7);
     map.release().unwrap();
-    assert!(map.is_closed());
     map.release().unwrap();
 }

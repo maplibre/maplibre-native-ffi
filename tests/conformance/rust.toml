@@ -5,11 +5,11 @@
 
 [cases]
 "ERR-01" = "bindings/rust/crates/maplibre-native-ffi-core/src/error.rs::a_failed_call_maps_its_status_and_keeps_an_unknown_code"
-"ERR-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::creation_checks_the_c_abi_version_before_it_reaches_native"
+"ERR-02" = { na = "The binding checks the linked ABI version at creation; a mismatched library cannot be substituted in this statically linked suite" }
 "ERR-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/render.rs::a_drain_before_any_demand_returns_no_batch"
-"LIFE-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::releasing_a_handle_twice_does_nothing"
+"LIFE-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::releasing_a_handle_twice_reaches_native"
 "LIFE-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds"
-"LIFE-03" = "bindings/rust/crates/maplibre-native-ffi/src/handle.rs::a_read_on_another_thread_holds_off_close_until_it_ends"
+"LIFE-03" = "bindings/rust/crates/maplibre-native-ffi/src/handle.rs::a_batch_read_on_another_thread_holds_off_release"
 "LIFE-04" = "bindings/rust/crates/maplibre-native-ffi/src/handle.rs::a_handle_dropped_in_a_callback_disposes_off_its_stack_and_reports_a_failure"
 "LIFE-05" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_map_keeps_its_runtime_alive_after_the_runtime_handle_drops"
 "LIFE-06" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_handle_id_names_its_events_and_outlives_close"
@@ -21,7 +21,7 @@
 "COMP-06" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::discarded_commands_are_fenced_and_sync_rejections_return_errors"
 "CB-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_registration_is_rooted_while_native_holds_it_and_a_rejected_one_is_released"
 "CB-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_registered_callback_does_not_keep_its_runtime_alive"
-"CB-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_callback_may_answer_its_request_but_not_fence_or_close_its_runtime"
+"CB-03" = { na = "Native enforces callback reentry safety; tests/native covers the boundary" }
 "CB-04" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_failing_callback_is_contained_and_its_error_is_reported"
 "CB-05" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_provider_hands_its_request_to_another_thread_and_answers_later"
 "CB-06" = { na = "A header transform's response borrows the callback's frame through a lifetime and holds a raw pointer, so it is neither 'static nor Send: the compiler rejects a use after the callback returns or from another thread" }
@@ -32,7 +32,7 @@
 "CB-11" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_transform_hands_its_request_to_another_thread_and_answers_later"
 "VAL-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::host_strings_use_views_and_native_lent_strings_decode"
 "VAL-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::presence_fields_keep_a_present_zero_apart_from_an_absent_value"
-"VAL-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::a_strided_batch_and_an_unknown_union_arm_decode_without_losing_data"
+"VAL-03" = "bindings/rust/crates/maplibre-native-ffi/src/convert.rs::a_strided_batch_and_an_unknown_union_arm_decode_without_losing_data"
 # Generated fields carry the C widths exactly, so the only narrowing is a
 # slice length into a native count, which this test cannot allocate.
 "VAL-04" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::open_enums_keep_unknown_values_and_64_bit_masks_cross_whole"

@@ -1,10 +1,5 @@
 use crate::error::{Error, ErrorKind, Result};
 
-/// The error for a handle argument that holds the null handle.
-pub fn null_handle_error(name: &'static str) -> Error {
-    Error::invalid_argument(format!("{name} must not be the null handle"))
-}
-
 /// Reads `count` records that native lays out `stride` bytes apart.
 ///
 /// A native build whose record grew reports a stride wider than this
@@ -42,4 +37,22 @@ pub unsafe fn strided_records<T: Copy>(
                 .read_unaligned()
         }
     }))
+}
+
+/// Borrows an initialized native array for the caller's borrow lifetime.
+///
+/// # Safety
+/// A nonempty pointer must address `count` initialized elements for that lifetime.
+pub unsafe fn slice<'a, T>(pointer: *const T, count: usize) -> Result<&'a [T]> {
+    if count == 0 {
+        return Ok(&[]);
+    }
+    if pointer.is_null()
+        || !pointer.is_aligned()
+        || count > isize::MAX as usize / std::mem::size_of::<T>().max(1)
+    {
+        return Err(Error::invalid_argument("invalid native array"));
+    }
+    // SAFETY: the caller guarantees count initialized values.
+    Ok(unsafe { std::slice::from_raw_parts(pointer, count) })
 }

@@ -90,7 +90,7 @@ def test_a_failed_command_resolves_with_its_status(map_handle: mln.MapHandle) ->
     completion = result(map_handle.set_style_source_volatile("missing", True))
 
     assert completion.disposition == mln.CommandDisposition.FAILED
-    assert completion.native_status_code == mln.Status.NOT_FOUND.native_code
+    assert completion.native_status_code == int(mln.Status.NOT_FOUND)
     assert completion.diagnostic
 
 

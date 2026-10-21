@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tools.bindgen.semantic import BoundApi, HandlePlan
 
-from .rust import doc, pascal
+from .rust import doc, pascal, reads_receiver
 
 
 def owner_name(native: str) -> str:
@@ -30,7 +30,7 @@ def owned_handles(bound: BoundApi) -> dict[str, HandlePlan]:
     candidates = {
         native: handle
         for native, handle in bound.public_handles.items()
-        if native not in bound.decisions and disposer(bound, handle)
+        if disposer(bound, handle)
     }
     # An owner retains its parent's state, so a parent without an owner leaves
     # its children without one too.
@@ -51,6 +51,13 @@ def declaration(bound: BoundApi, handle: HandlePlan) -> str:
         finalize = f"|raw| {{ unsafe {{ sys::{dispose.name}(raw) }}; Ok(()) }}"
     else:
         finalize = f"|raw| maplibre_core::check(|out_diagnostic| unsafe {{ sys::{dispose.name}(raw, out_diagnostic) }})"
+    counted = any(
+        reads_receiver(plan)
+        and any(
+            p.name == plan.receiver and p.value.native == native for p in plan.inputs
+        )
+        for plan in bound.operations
+    )
     must_use = ""
     if handle.release_inputs:
         release = handle.release.removeprefix(native + "_")
@@ -60,7 +67,7 @@ def declaration(bound: BoundApi, handle: HandlePlan) -> str:
         f"    /// Owns one `{native}` native handle.\n"
         + (f"    ///\n{summary}" if (summary := doc(bound, native, "    ")) else "")
         + f"{must_use}"
-        f"    pub struct {owner}({native}) dispose {finalize};\n"
+        f"    pub struct {owner}({native}) dispose {finalize}, counted {str(counted).lower()};\n"
         "}\n"
     )
 

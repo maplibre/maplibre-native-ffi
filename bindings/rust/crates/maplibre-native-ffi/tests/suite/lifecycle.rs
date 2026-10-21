@@ -8,45 +8,16 @@ use maplibre_native_ffi::*;
 use crate::support::*;
 
 #[test]
-fn creation_checks_the_c_abi_version_before_it_reaches_native() {
-    // Each entry point that creates a root handle checks the version first,
-    // so a mismatch fails without a native status.
-    use maplibre_native_ffi_core::{EXPECTED_C_ABI_VERSION, set_abi_version_override};
-    set_abi_version_override(Some(EXPECTED_C_ABI_VERSION + 1));
-    let runtime = runtime_create(&RuntimeOptions::default());
-    let geojson =
-        geojson_source_data_create(br#"{"type":"FeatureCollection","features":[]}"#, None);
-    set_abi_version_override(None);
-
-    for error in [runtime.unwrap_err(), geojson.unwrap_err()] {
-        assert_eq!(error.kind(), ErrorKind::AbiVersionMismatch);
-        assert_eq!(error.raw_status(), None);
-        assert!(
-            error
-                .diagnostic()
-                .contains("unsupported MapLibre Native C ABI version")
-        );
-    }
-}
-
-#[test]
-fn releasing_a_handle_twice_does_nothing() {
+fn releasing_a_handle_twice_reaches_native() {
     let fixture = Fixture::new();
     let projection = fixture.map().create_projection().unwrap();
     projection.release().unwrap();
-    // The second release finds the handle closed and never reaches native.
-    projection.release().unwrap();
-    assert!(projection.is_closed());
-    let error = projection.get_camera().unwrap_err();
+    let error = projection.release().unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidState);
-    assert_eq!(error.raw_status(), None);
-    assert_eq!(error.diagnostic(), "MapProjectionHandle is closed");
-
-    // A release that completes asynchronously does the same: the second one
-    // resolves at once.
+    assert_eq!(error.raw_status(), Some(Status::InvalidState.as_raw()));
     let (runtime, map) = fixture.into_parts();
     wait_for(map.release());
-    assert!(map.release().unwrap().is_ready());
+    assert_eq!(map.release().unwrap_err().kind(), ErrorKind::InvalidState);
     wait_for(runtime.release());
 }
 
@@ -74,12 +45,10 @@ fn a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds() {
     let error = runtime.release().unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidState);
     assert!(error.raw_status().is_some());
-    assert!(!runtime.is_closed());
     wait_for(runtime.clear_resource_transform());
 
     wait_for(map.release());
     wait_for(runtime.release());
-    assert!(runtime.is_closed());
 }
 
 #[test]
