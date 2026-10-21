@@ -22,6 +22,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+      - uses: useblacksmith/begin-testbox@233448af4bfdc6fca509a7f0974411ac6d8a8043 # v2
+      - uses: useblacksmith/run-testbox@5ca05834db1d3813554d1dd109e5f2087a8d7cbc # v2
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: pins
