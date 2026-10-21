@@ -175,7 +175,7 @@ kotlin {
         "macosArm64" ->
           listOf("xcrun", "--sdk", "macosx", "clang", "-target", "arm64-apple-macos11.0")
         "iosArm64" ->
-          listOf("xcrun", "--sdk", "iphoneos", "clang", "-target", "arm64-apple-ios14.0")
+          listOf("xcrun", "--sdk", "iphoneos", "clang", "-target", "arm64-apple-ios15.0")
         "iosSimulatorArm64" ->
           listOf(
             "xcrun",
@@ -183,10 +183,10 @@ kotlin {
             "iphonesimulator",
             "clang",
             "-target",
-            "arm64-apple-ios14.0-simulator",
+            "arm64-apple-ios15.0-simulator",
           )
         "tvosArm64" ->
-          listOf("xcrun", "--sdk", "appletvos", "clang", "-target", "arm64-apple-tvos14.0")
+          listOf("xcrun", "--sdk", "appletvos", "clang", "-target", "arm64-apple-tvos15.0")
         "tvosSimulatorArm64" ->
           listOf(
             "xcrun",
@@ -194,7 +194,7 @@ kotlin {
             "appletvsimulator",
             "clang",
             "-target",
-            "arm64-apple-tvos14.0-simulator",
+            "arm64-apple-tvos15.0-simulator",
           )
         else -> null
       }

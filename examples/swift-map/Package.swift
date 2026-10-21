@@ -4,7 +4,7 @@ import PackageDescription
 
 let package = Package(
   name: "swift-map",
-  platforms: [.macOS("14.3"), .iOS("15.5")],
+  platforms: [.macOS("14.3"), .iOS("15.0")],
   products: [
     .executable(name: "swift-map", targets: ["SwiftMap"]),
     .executable(name: "swift-map-ios", targets: ["SwiftMapIOS"]),

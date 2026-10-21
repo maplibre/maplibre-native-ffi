@@ -34,25 +34,26 @@ PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CO
 [tasks.build]
 extends = "ffi:preset"
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$usage_preset"
 export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
+source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset"
 
 # A host build runs the suite; a cross build proves the package and its tests
 # compile and link for the target.
 source "$MISE_MONOREPO_ROOT/scripts/go-cross-env.sh" "$usage_preset"
-source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset"
 if [[ -n "$goos" ]]; then
   exec go test -c -tags "$go_test_tags" -o /dev/null .
 fi
-exec go test -tags "$go_test_tags" ./...
+# Go's test cache cannot see the native library, so always rerun the suite.
+exec go test -count=1 -tags "$go_test_tags" ./...
 '''
 run_windows = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$usage_preset"
+export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
 source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset"
-go test -tags "$go_test_tags" ./...
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+# Go's test cache cannot see the native library, so always rerun the suite.
+go test -count=1 -tags "$go_test_tags" ./...
 '''
 
 [tasks.test]
@@ -66,20 +67,21 @@ case "$usage_preset" in
     ;;
 esac
 
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$usage_preset"
 export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
 source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset"
-go test -tags "$go_test_tags" ./...
+# Go's test cache cannot see the native library, so always rerun the suite.
+go test -count=1 -tags "$go_test_tags" ./...
 go vet -tags "$go_test_tags" ./...
 '''
 # A Vulkan preset builds the render tests on Windows. A WGL preset builds none,
 # because the Go wrapper of tests/graphics has no WGL context.
 run_windows = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$usage_preset"
+export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
 source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset"
-go test -tags "$go_test_tags" ./...
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+# Go's test cache cannot see the native library, so always rerun the suite.
+go test -count=1 -tags "$go_test_tags" ./...
 go vet -tags "$go_test_tags" ./...
 '''
