@@ -17,9 +17,9 @@
     "node": ">=24.11"
   },
   "devDependencies": {
-    "@types/node": "^24.19.2",
+    "@types/node": "^26.6.5",
     "node-api-headers": "^1.9.0",
     "typedoc": "^0.28.20",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   }
 }
