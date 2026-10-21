@@ -10,23 +10,13 @@ import (
 func TestClosingTwiceIsSafe(t *testing.T) {
 	f := newFixture(t)
 	await(t, submitted(f.m.Close()))
-	// The second close finds nothing to release and completes at once.
-	second, err := f.m.Close()
-	if err != nil {
-		t.Fatalf("second map close: %v", err)
+	if _, err := f.m.Close(); !errors.Is(err, StatusInvalidState) {
+		t.Fatalf("second map close: %v, want native invalid state", err)
 	}
-	select {
-	case <-second.Done():
-	default:
-		t.Fatal("the second close submitted native work")
-	}
-	_, err = f.m.SetStyleJson([]byte(emptyStyle))
+	_, err := f.m.SetStyleJson([]byte(emptyStyle))
 	var closed *Error
-	if !errors.As(err, &closed) || !errors.Is(err, ErrInvalidState) || closed.Diagnostic() != "MapHandle is closed" {
-		t.Fatalf("SetStyleJson after close = %v, want ErrInvalidState for a closed MapHandle", err)
-	}
-	if _, hasStatus := closed.RawStatus(); hasStatus {
-		t.Fatalf("SetStyleJson after close = %v, want no native status", err)
+	if !errors.As(err, &closed) || closed.Status != StatusInvalidState || closed.Diagnostic() == "" {
+		t.Fatalf("SetStyleJson after close = %v, want native invalid state", err)
 	}
 
 	data, err := GeojsonSourceDataCreate([]byte(`{"type":"FeatureCollection","features":[]}`), nil)
@@ -46,8 +36,8 @@ func TestRefusedCloseLeavesTheHandleUsable(t *testing.T) {
 	f := newFixture(t)
 	teardown, err := f.runtime.Close()
 	var native *Error
-	if teardown != nil || !errors.As(err, &native) || !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("runtime close with a live map = (%v, %v), want nil and ErrInvalidState", teardown, err)
+	if teardown != nil || !errors.As(err, &native) || !errors.Is(err, StatusInvalidState) {
+		t.Fatalf("runtime close with a live map = (%v, %v), want nil and StatusInvalidState", teardown, err)
 	}
 	if native.Diagnostic() == "" {
 		t.Fatal("the refusal carried no diagnostic")
@@ -75,11 +65,11 @@ func TestHandleIdNamesItsEventsAndOutlivesClose(t *testing.T) {
 
 // A nil pointer or a zero value of a handle type fails with the binding's
 // error instead of reaching native, whether it is the receiver or an input,
-// and a closed input handle fails before its call crosses into C.
+// and native reports a closed input handle stale.
 func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 	for _, session := range []*RenderSessionHandle{nil, {}} {
-		if _, err := session.GetCapabilities(); !errors.Is(err, ErrInvalidState) {
-			t.Fatalf("receiver %#v: %v, want ErrInvalidState", session, err)
+		if _, err := session.GetCapabilities(); !errors.Is(err, StatusInvalidState) {
+			t.Fatalf("receiver %#v: %v, want StatusInvalidState", session, err)
 		}
 	}
 	for _, frame := range []*AcquiredFrameHandle{nil, {}} {
@@ -87,15 +77,15 @@ func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 			t.Fatal("a view callback ran for an invalid frame")
 			return nil
 		})
-		if !errors.Is(err, ErrInvalidState) {
-			t.Fatalf("frame %#v: %v, want ErrInvalidState", frame, err)
+		if !errors.Is(err, StatusInvalidState) {
+			t.Fatalf("frame %#v: %v, want StatusInvalidState", frame, err)
 		}
 	}
 
 	f := newFixture(t)
 	for _, input := range []*GeojsonSourceDataHandle{nil, {}} {
-		if future, err := f.m.AddGeojsonSourceData("source", input); future != nil || !errors.Is(err, ErrInvalidArgument) {
-			t.Fatalf("input %#v: (%v, %v), want nil and ErrInvalidArgument", input, future, err)
+		if future, err := f.m.AddGeojsonSourceData("source", input); future != nil || !errors.Is(err, StatusInvalidArgument) {
+			t.Fatalf("input %#v: (%v, %v), want nil and StatusInvalidArgument", input, future, err)
 		}
 	}
 	data, err := GeojsonSourceDataCreate([]byte(`{"type":"FeatureCollection","features":[]}`), nil)
@@ -105,8 +95,8 @@ func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 	if err := data.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if future, err := f.m.AddGeojsonSourceData("source", data); future != nil || !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("closed input: (%v, %v), want nil and ErrInvalidState", future, err)
+	if future, err := f.m.AddGeojsonSourceData("source", data); future != nil || !errors.Is(err, StatusInvalidState) {
+		t.Fatalf("closed input: (%v, %v), want nil and StatusInvalidState", future, err)
 	}
 }
 

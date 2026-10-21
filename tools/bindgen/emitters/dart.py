@@ -543,9 +543,7 @@ def render_owner(native, handle, bodies, bound, roots):
         + f"final class {public} implements Finalizable{', _CallbackRootOwner' if roots else ''} {{\n"
         f"  {public}._({', '.join(parameters)}) : _state = NativeHandleState(handle, '{public}');\n"
         + "\n".join(fields)
-        + "\n\n  /// Whether this binding object has released its native handle.\n"
-        "  bool get isClosed => _state.isClosed;\n\n"
-        "  /// The native handle id, which runtime events report as their source.\n"
+        + "\n\n  /// The native handle id, which runtime events report as their source.\n"
         "  ///\n"
         "  /// It stays readable after close, so events drained later still match\n"
         "  /// this handle.\n"

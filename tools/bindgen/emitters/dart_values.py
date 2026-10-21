@@ -321,10 +321,7 @@ class Values:
             )
             return f"registrations.add(registrations.roots.wake({expression}.{identifier(field.name)}))"
         roots = ", registrations.roots" if self.queue_callbacks(value) else ""
-        # A callback that calls back only into its registering receiver
-        # arrives after the call, so it is dropped once that receiver closes.
-        closed = ", () => isClosed" if value.registration.receiver_owned else ""
-        return f"registrations.add(_prepare{public_name(value.native)}({expression}{roots}{closed}))"
+        return f"registrations.add(_prepare{public_name(value.native)}({expression}{roots}))"
 
     def native(self, value, expression):
         if value.registration:
@@ -705,18 +702,12 @@ class Values:
         members, args, initializers, writes = self.registration_members(
             value, skip=names
         )
-        # A callback that calls back only into its registering receiver
-        # arrives after the call, so it is dropped once that receiver closes.
-        receiver_owned = value.registration.receiver_owned
         handlers = []
         for field in fields:
             callback = self.bound.callbacks[field.value.native]
             name = identifier(field.name)
             invoke = f"_deliver{public_name(callback.native)}(value.{name}{'!' if field.value.nullable else ''}, batch, index, delivery)"
-            if receiver_owned:
-                invoke = f"{{ if (!receiverClosed()) {{ {invoke}; }} }}"
-            else:
-                invoke = f"=> {invoke}"
+            invoke = f"=> {invoke}"
             handlers.append(
                 ("if (value." + name + " != null) " if field.value.nullable else "")
                 + f"raw.{callback.delivery.constant}: (batch, index, delivery) {invoke},"
@@ -728,9 +719,8 @@ class Values:
             if all(field.value.nullable for field in fields)
             else ""
         )
-        closed = ", bool Function() receiverClosed" if receiver_owned else ""
         conversion = (
-            f"_NativeRegistration<raw.{value.native}> _prepare{public}({public} value, _CallbackRoots roots{closed}) {{\n  final arena = Arena();\n  DeliveryRegistration? registration;\n  try {{\n    final result = arena<raw.{value.native}>();\n"
+            f"_NativeRegistration<raw.{value.native}> _prepare{public}({public} value, _CallbackRoots roots) {{\n  final arena = Arena();\n  DeliveryRegistration? registration;\n  try {{\n    final result = arena<raw.{value.native}>();\n"
             + self.registration_initializer(value)
             + "".join(line + "\n" for line in writes)
             + disabled
@@ -955,6 +945,14 @@ class Values:
                     if bitmask
                     else ""
                 )
+                if not bitmask:
+                    cases = "\n".join(
+                        f"{number} => '{public}.{identifier(name.removeprefix(prefix).lower())}',"
+                        for number, name in {
+                            number: name for name, number in value.enum_values
+                        }.items()
+                    )
+                    operators += f"  @override String toString() => switch (rawValue) {{ {cases} _ => '{public}($rawValue)', }};\n"
                 declarations.append(
                     f"final class {public} extends {base} {{\n  const {public}.fromRawValue(super.rawValue);\n{members}\n{operators}}}\n"
                 )

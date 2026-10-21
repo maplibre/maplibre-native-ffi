@@ -26,124 +26,81 @@ const (
 	bindingCloseAccess
 	// Native always consumes the receiver.
 	bindingConsumeAccess
-	// The call completes the receiver's pending decision.
-	bindingCompleteAccess
 	// The receiver is a response that is valid only inside its callback, on
 	// the callback's thread.
 	bindingScopedAccess
 )
 
 type bindingTarget struct {
-	owner     *bindingOwner
-	access    bindingAccess
-	operation uint32
-	// A scoped receiver's scope and the native address admission checks.
-	scope    *bindingScope
-	identity uint64
+	owner  *bindingOwner
+	access bindingAccess
+	scope  *bindingScope
 }
 
-func bindingGlobal(operation uint32) bindingTarget {
-	return bindingTarget{operation: operation}
+func bindingGlobal() bindingTarget { return bindingTarget{} }
+func bindingLive(owner *bindingOwner) bindingTarget {
+	return bindingTarget{owner: owner, access: bindingLiveAccess}
 }
 
-func bindingLive(owner *bindingOwner, operation uint32) bindingTarget {
-	return bindingTarget{owner: owner, access: bindingLiveAccess, operation: operation}
+func bindingRead(owner *bindingOwner) bindingTarget {
+	return bindingTarget{owner: owner, access: bindingReadAccess}
 }
 
-func bindingRead(owner *bindingOwner, operation uint32) bindingTarget {
-	return bindingTarget{owner: owner, access: bindingReadAccess, operation: operation}
+func bindingClosing(owner *bindingOwner) bindingTarget {
+	return bindingTarget{owner: owner, access: bindingCloseAccess}
 }
 
-func bindingClosing(owner *bindingOwner, operation uint32) bindingTarget {
-	return bindingTarget{owner: owner, access: bindingCloseAccess, operation: operation}
+func bindingConsuming(owner *bindingOwner) bindingTarget {
+	return bindingTarget{owner: owner, access: bindingConsumeAccess}
 }
 
-func bindingConsuming(owner *bindingOwner, operation uint32) bindingTarget {
-	return bindingTarget{owner: owner, access: bindingConsumeAccess, operation: operation}
+func bindingScoped(scope *bindingScope) bindingTarget {
+	return bindingTarget{access: bindingScopedAccess, scope: scope}
 }
 
-func bindingCompleting(owner *bindingOwner, operation uint32) bindingTarget {
-	return bindingTarget{owner: owner, access: bindingCompleteAccess, operation: operation}
-}
-
-// bindingScoped targets a callback-scoped response whose native address is
-// identity. A nil scope reports a nil handle.
-func bindingScoped(scope *bindingScope, identity uint64, operation uint32) bindingTarget {
-	return bindingTarget{access: bindingScopedAccess, operation: operation, scope: scope, identity: identity}
-}
-
-// bindingCloseDecision closes a decision handle. A close while its decision or
-// completion is in flight takes effect when that finishes.
-func bindingCloseDecision(owner *bindingOwner, operation uint32) error {
-	_, err := bindingCall(func() struct{} {
-		if owner == nil || owner.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(operation, owner.state.issued)
-		owner.state.closeDecision()
-		runtime.KeepAlive(owner)
-		return struct{}{}
-	})
-	return err
-}
-
-// bindingRun admits the target's operation, holds its receiver, and runs call
-// with the receiver's raw id and an input arena. A call that returns without
-// panicking succeeded: a close commits, a decision completes, and the callback
-// roots that the inputs registered move to the receiver. A receiver that is
-// already closed makes a closing call return closed's value without running.
-func bindingRun[T any](target bindingTarget, call func(arena *bindingArena, raw uint64) T, closed func() T) T {
+// bindingRun keeps owners reachable until outputs are copied and registrations
+// are rooted. Native leases each id for the duration of its call.
+func bindingRun[T any](target bindingTarget, call func(arena *bindingArena, raw uint64) T, synchronous bool) T {
 	arena := &bindingArena{}
 	defer arena.close()
-	owner := target.owner
-	switch target.access {
-	case bindingGlobalAccess:
-		bindingAdmission(target.operation, 0)
-		value := call(arena, 0)
-		arena.accept(nil)
-		return value
-	case bindingScopedAccess:
-		if target.scope == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(target.operation, target.identity)
+	if target.access == bindingScopedAccess {
 		target.scope.check()
+	}
+	if target.access == bindingGlobalAccess || target.access == bindingScopedAccess {
 		value := call(arena, 0)
 		arena.accept(nil)
 		return value
 	}
+	owner := target.owner
 	if owner == nil || owner.state == nil {
-		panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
+		panic(bindingFailure{newBindingError(StatusInvalidState, "nil handle")})
 	}
-	bindingAdmission(target.operation, owner.state.issued)
 	defer runtime.KeepAlive(owner)
-	var value T
-	switch target.access {
-	case bindingCloseAccess, bindingConsumeAccess:
-		raw, transaction := owner.state.reserveClose()
-		defer transaction.finish()
-		if raw == 0 {
-			if closed == nil {
-				return value
+	state := owner.state
+	if target.access == bindingCloseAccess || target.access == bindingConsumeAccess {
+		if synchronous && state.released.Load() {
+			var zero T
+			return zero
+		}
+		if state.reads != nil {
+			if !state.reads.TryLock() {
+				panic(bindingFailure{newBindingError(StatusInvalidState, state.typeName+" is in use")})
 			}
-			return closed()
+			defer state.reads.Unlock()
 		}
 		if target.access == bindingConsumeAccess {
-			transaction.commit()
+			state.released.Store(true)
 		}
-		value = call(arena, raw)
-		transaction.commit()
-	case bindingCompleteAccess:
-		raw, finish := owner.state.reserveCompletion()
-		accepted := false
-		defer func() { finish(accepted) }()
-		value = call(arena, raw)
-		accepted = true
-	default:
-		raw, done := owner.bindingAcquire(target.access == bindingReadAccess)
-		defer done()
-		value = call(arena, raw)
+		value := call(arena, state.raw)
+		state.released.Store(true)
+		arena.accept(owner)
+		return value
 	}
+	if target.access == bindingReadAccess {
+		state.reads.RLock()
+		defer state.reads.RUnlock()
+	}
+	value := call(arena, state.raw)
 	arena.accept(owner)
 	return value
 }
@@ -164,7 +121,7 @@ func bindingGet[T any](target bindingTarget, call func(arena *bindingArena, raw 
 		return bindingRun(target, func(arena *bindingArena, raw uint64) T {
 			bindingCheck(func(diagnostic *C.mln_diagnostic) int32 { return call(arena, raw, diagnostic) })
 			return result(arena)
-		}, nil)
+		}, true)
 	})
 }
 
@@ -188,34 +145,29 @@ func bindingGetUnless[T any](target bindingTarget, absent int32, call func(arena
 				return none
 			}
 			return result(arena)
-		}, nil)
+		}, true)
 	})
 }
 
 func bindingDirect[T any](target bindingTarget, call func(arena *bindingArena, raw uint64) T) (T, error) {
-	return bindingCall(func() T { return bindingRun(target, call, nil) })
+	return bindingCall(func() T { return bindingRun(target, call, true) })
 }
 
-func bindingStart[T any](target bindingTarget, start func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32, convert func(*C.mln_completion_result) (T, error)) (*Future[T], error) {
-	return bindingStartWith(target, start, convert, func(_ *bindingArena, future *Future[T]) *Future[T] { return future })
+func bindingStart[T any](target bindingTarget, start func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32, convert func(*C.mln_completion_result) (T, error), deliversStatus bool) (*Future[T], error) {
+	return bindingStartWith(target, start, convert, func(_ *bindingArena, future *Future[T]) *Future[T] { return future }, deliversStatus)
 }
 
-func bindingStartWith[T, R any](target bindingTarget, start func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32, convert func(*C.mln_completion_result) (T, error), result func(arena *bindingArena, future *Future[T]) R) (R, error) {
+func bindingStartWith[T, R any](target bindingTarget, start func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32, convert func(*C.mln_completion_result) (T, error), result func(arena *bindingArena, future *Future[T]) R, deliversStatus bool) (R, error) {
 	return bindingCall(func() R {
 		return bindingRun(target, func(arena *bindingArena, raw uint64) R {
 			future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 				return start(arena, raw, completion, diagnostic)
-			}, convert)
+			}, convert, deliversStatus)
 			if err != nil {
 				panic(bindingFailure{err})
 			}
 			return result(arena, future)
-		}, func() R {
-			// Only a close finds its receiver closed, and a close has no
-			// outputs for result to convert.
-			var zero T
-			return result(&bindingArena{}, completedFuture(zero))
-		})
+		}, false)
 	})
 }
 
@@ -243,7 +195,7 @@ func bindingWithView[V any](target bindingTarget, use func(V) error, begin func(
 				panic(bindingFailure{err})
 			}
 			return struct{}{}
-		}, nil)
+		}, true)
 	})
 	return err
 }
@@ -252,31 +204,11 @@ func bindingView[T ~string | ~[]byte](value T, arena *bindingArena) C.mln_buffer
 	return C.mln_buffer_view{data: arena.bytes([]byte(value)), size: C.size_t(len(value))}
 }
 
-// bindingNullableView borrows optional text or bytes, keeping present empty
-// text distinct from absent text with a non-null view.
-func bindingNullableView[T ~string | ~[]byte](value *T, arena *bindingArena) C.mln_buffer_view {
-	if value == nil {
-		return C.mln_buffer_view{}
-	}
-	view := bindingView(*value, arena)
-	if view.data == nil {
-		view.data = arena.allocate(1)
-	}
-	return view
-}
-
 func bindingOptionalView[T ~string | ~[]byte](value *T, arena *bindingArena) C.mln_buffer_view {
 	if value == nil {
 		return C.mln_buffer_view{}
 	}
 	return bindingView(*value, arena)
-}
-
-func bindingOptionalCString(value *string, arena *bindingArena) *C.char {
-	if value == nil {
-		return nil
-	}
-	return arena.cstring(*value)
 }
 
 // Copy completion values before native reuses their storage.
@@ -311,7 +243,7 @@ func completionListOf[N, T any](copy func(N) T) func(*C.mln_completion_result) (
 			return []T{}, nil
 		}
 		if result.value == nil {
-			return nil, newBindingError(ErrInvalidState, "native completion returned a null slice")
+			return nil, newBindingError(StatusInvalidState, "native completion returned a null slice")
 		}
 		copied := make([]T, bindingLength(uint64(result.value_count)))
 		for i := range copied {
@@ -321,32 +253,6 @@ func completionListOf[N, T any](copy func(N) T) func(*C.mln_completion_result) (
 	}
 }
 
-func completionNullableListOf[N, T any](copy func(N) T) func(*C.mln_completion_result) ([]T, error) {
-	convert := completionListOf(copy)
-	return func(result *C.mln_completion_result) ([]T, error) {
-		if result.value == nil {
-			return nil, nil
-		}
-		return convert(result)
-	}
-}
-
 func copyViewText(raw C.mln_buffer_view) string { return bindingString(raw.data, uint64(raw.size)) }
 
 func copyViewBytes(raw C.mln_buffer_view) []byte { return bindingBytes(raw.data, uint64(raw.size)) }
-
-func copyOptionalViewText(raw C.mln_buffer_view) *string {
-	if raw.size == 0 {
-		return nil
-	}
-	value := copyViewText(raw)
-	return &value
-}
-
-func copyOptionalViewBytes(raw C.mln_buffer_view) *[]byte {
-	if raw.size == 0 {
-		return nil
-	}
-	value := copyViewBytes(raw)
-	return &value
-}

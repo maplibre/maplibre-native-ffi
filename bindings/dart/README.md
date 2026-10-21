@@ -79,11 +79,12 @@ copy of the same library.
 
 ## Ownership and execution
 
-Owned handles have an idempotent `close()`, and an acquired frame ends with
-`release()` or `dispose()`. Runtime and map close are asynchronous, so callback
-roots stay alive through native teardown. Close child maps, render sessions,
-frames, and request handles before their parent runtime. A scoped backend value
-is valid until its frame or owner closes.
+Synchronous `close()` is idempotent. Runtime and map close are asynchronous; a
+repeated release reaches native and reports `Status.invalidState`. An acquired
+frame ends with `release()` or `dispose()`. Callback roots stay alive through
+native teardown. Close child maps, render sessions, frames, and request handles
+before their parent runtime. A scoped backend value is valid until its frame or
+owner closes.
 
 Close every handle explicitly. When the collector reclaims a handle that is
 still open, a native finalizer disposes it, and the binding writes
@@ -114,10 +115,11 @@ EGL context that the session creates for itself. That EGL context shares nothing
 with the host, so an EGL session renders to a surface or offers its texture as
 readback rather than as frames to sample. A caller-driven session belongs to the
 native thread that first services it, and `serviceDriverWork()` from any other
-thread throws `WrongThreadException`. Dart can resume an isolate on another
-thread after any `await`, so an isolate has no thread that it can keep for such
-a session. A WGL texture shares the host's context, which only a caller-driven
-session can drive, so a Dart host on Windows renders through Vulkan.
+thread throws `MaplibreException` with `Status.wrongThread`. Dart can resume an
+isolate on another thread after any `await`, so an isolate has no thread that it
+can keep for such a session. A WGL texture shares the host's context, which only
+a caller-driven session can drive, so a Dart host on Windows renders through
+Vulkan.
 
 A pending completion keeps its isolate alive, so every future that the binding
 returns resolves before the isolate finishes. Callback registrations leave the
@@ -141,14 +143,16 @@ graphics queue belongs to the session alone.
 
 `ResourceRequestHandle.setCancelCallback()` registers one callback per request
 that runs when MapLibre discards a request the provider left open. The binding
-queues the callback to the isolate and zone that registered it, and drops it
-once the handle is closed. A request that is already cancelled returns true,
-stores nothing, and never runs the callback. Register, complete, and release
-such a request on that isolate. An exception the callback throws goes to the
-registering zone's error handler.
+queues the callback to the isolate and zone that registered it. A request that
+is already cancelled returns true, stores nothing, and never runs the callback.
+Register, complete, and release such a request on that isolate. An exception the
+callback throws goes to the registering zone's error handler.
 
 Unsigned C `uint64_t` JSON values, feature identifiers, and camera transition
 IDs use Dart `BigInt` so the complete native range is preserved. Native byte
 views are copied into Dart-owned lists before a call returns; the scoped pointer
 accessors that expose native addresses are explicitly unsafe and end with the
 frame or handle that owns them.
+
+Errors carry the generated `Status` and a copied diagnostic in one
+`MaplibreException`. An unknown status retains its `rawValue`.

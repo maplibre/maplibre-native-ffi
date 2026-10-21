@@ -64,16 +64,23 @@ void main() {
         expect(
           () => frame.release(gpuSyncDefault()),
           throwsA(
-            isA<InvalidStateException>()
-                .having((error) => error.nativeStatusCode, 'status', isNull)
-                .having(
-                  (error) => error.diagnostic,
-                  'diagnostic',
-                  'AcquiredFrameHandle is in use',
-                ),
+            isA<MaplibreException>().having(
+              (error) => error.status,
+              'status',
+              Status.busy,
+            ),
           ),
         );
-        expect(session.abandon, throwsA(isA<BusyException>()));
+        expect(
+          session.abandon,
+          throwsA(
+            isA<MaplibreException>().having(
+              (error) => error.status,
+              'status',
+              Status.busy,
+            ),
+          ),
+        );
       });
       // A view that escapes its scope refuses every read.
       expect(readEscapedWidth, throwsA(isA<MaplibreException>()));

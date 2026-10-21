@@ -23,20 +23,18 @@ func TestDiscardedCommandsAreFencedAndSyncRejectionReturnsError(t *testing.T) {
 	if snapshot.DebugOptions != MapDebugOptionTileBorders {
 		t.Fatalf("debug options = %v", snapshot.DebugOptions)
 	}
-	if err := f.m.Discarding().Resize(LogicalExtent{Width: 0, Height: 8, ScaleFactor: 1}); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("Resize = %v, want ErrInvalidArgument", err)
+	if err := f.m.Discarding().Resize(LogicalExtent{Width: 0, Height: 8, ScaleFactor: 1}); !errors.Is(err, StatusInvalidArgument) {
+		t.Fatalf("Resize = %v, want StatusInvalidArgument", err)
 	}
 }
 
-// The first terminal result wins, and a later one is ignored. A value that
-// fails to convert, whether by error or by panic, fails the future instead of
+// A value that fails to convert, whether by error or by panic, fails the future instead of
 // unwinding into native, and an owned value that a failed conversion adopted
 // is disposed: its map no longer holds the runtime open.
 func TestCompletionDeliversExactlyOnce(t *testing.T) {
 	future, deliver := int32CompletionForTest(func(value int32) (int32, error) { return value, nil })
-	first, second := int32(7), int32(8)
+	first := int32(7)
 	deliver(0, &first)
-	deliver(0, &second)
 	for range 2 {
 		if value := await(t, future); value != 7 {
 			t.Fatalf("Await() = %d, want the first delivery", value)
@@ -45,14 +43,14 @@ func TestCompletionDeliversExactlyOnce(t *testing.T) {
 
 	missing, deliver := int32CompletionForTest(func(value int32) (int32, error) { return value, nil })
 	deliver(0, nil)
-	if _, err := missing.Await(context.Background()); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("a result with no value: %v, want ErrInvalidState", err)
+	if _, err := missing.Await(context.Background()); !errors.Is(err, StatusInvalidState) {
+		t.Fatalf("a result with no value: %v, want StatusInvalidState", err)
 	}
 
 	panicking, deliver := int32CompletionForTest(func(int32) (int32, error) { panic("conversion failed") })
 	deliver(0, &first)
-	if _, err := panicking.Await(context.Background()); !errors.Is(err, ErrNative) {
-		t.Fatalf("a panicking conversion: %v, want ErrNative", err)
+	if _, err := panicking.Await(context.Background()); !errors.Is(err, StatusNativeError) {
+		t.Fatalf("a panicking conversion: %v, want StatusNativeError", err)
 	}
 
 	f := newRuntimeFixture(t)
@@ -61,8 +59,8 @@ func TestCompletionDeliversExactlyOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	receive(t, owned.Done(), "the failing map creation")
-	if _, err := owned.Await(context.Background()); !errors.Is(err, ErrNative) {
-		t.Fatalf("a conversion that failed after adopting its map: %v, want ErrNative", err)
+	if _, err := owned.Await(context.Background()); !errors.Is(err, StatusNativeError) {
+		t.Fatalf("a conversion that failed after adopting its map: %v, want StatusNativeError", err)
 	}
 	closeOnceCollected(t, f.runtime, "the disposal of the map the failed conversion adopted")
 }
@@ -77,8 +75,8 @@ func TestArrayCompletionIsReadAtItsValueSize(t *testing.T) {
 		t.Fatalf("Await() = %v, want %v", got, points)
 	}
 	narrow := latLngArrayCompletionForTest(-8, points)
-	if _, err := narrow.Await(context.Background()); !errors.Is(err, ErrNative) {
-		t.Fatalf("a stride below the element size: %v, want ErrNative", err)
+	if _, err := narrow.Await(context.Background()); !errors.Is(err, StatusNativeError) {
+		t.Fatalf("a stride below the element size: %v, want StatusNativeError", err)
 	}
 }
 
@@ -87,8 +85,8 @@ func TestArrayCompletionIsReadAtItsValueSize(t *testing.T) {
 // never calls the completion or its release.
 func TestRejectedSubmissionFreesItsCompletionState(t *testing.T) {
 	handle, err := rejectedSubmissionForTest()
-	if !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("rejected submission: %v, want ErrInvalidState", err)
+	if !errors.Is(err, StatusInvalidState) {
+		t.Fatalf("rejected submission: %v, want StatusInvalidState", err)
 	}
 	defer func() {
 		if recover() == nil {
@@ -104,7 +102,7 @@ func TestFailedCommandDispositionIsData(t *testing.T) {
 	f := newFixture(t)
 	awaitCommitted(t, submitted(f.m.SetStyleJson([]byte(emptyStyle))))
 	completion := await(t, submitted(f.m.RemoveStyleSource("missing")))
-	if completion.Disposition != CommandDispositionFailed || !errors.Is(kindForStatus(completion.RawStatus), ErrNotFound) {
+	if completion.Disposition != CommandDispositionFailed || completion.Status != StatusNotFound {
 		t.Fatalf("RemoveStyleSource(missing) = %+v, want a failed NOT_FOUND disposition", completion)
 	}
 	if completion.Diagnostic == "" {
@@ -138,7 +136,7 @@ func TestAwaitEndsWithItsContext(t *testing.T) {
 
 	var missing *Future[int32]
 	<-missing.Done()
-	if _, err := missing.Await(context.Background()); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("nil Future Await = %v, want ErrInvalidArgument", err)
+	if _, err := missing.Await(context.Background()); !errors.Is(err, StatusInvalidArgument) {
+		t.Fatalf("nil Future Await = %v, want StatusInvalidArgument", err)
 	}
 }

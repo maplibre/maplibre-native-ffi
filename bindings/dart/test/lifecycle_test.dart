@@ -7,39 +7,36 @@ import 'package:test/test.dart';
 import 'support/fixture.dart';
 
 void main() {
-  test(
-    'closing a handle twice is safe and the second close does nothing',
-    () async {
-      final fixture = await openRuntime();
-      final map = await fixture.openMap();
-      final projection = map.createProjection();
+  test('repeated asynchronous release reaches native', () async {
+    final fixture = await openRuntime();
+    final map = await fixture.openMap();
+    final projection = map.createProjection();
 
-      projection.close();
-      projection.close();
-      expect(projection.isClosed, isTrue);
+    projection.close();
+    projection.close();
 
-      // An asynchronous close hands a second caller the first close's future.
-      final first = map.close();
-      final second = map.close();
-      await within(first, 'map close');
-      await within(second, 'the second map close');
-      expect(map.isClosed, isTrue);
-
-      // A closed owner refuses use without reaching native code.
-      expect(
-        map.getSnapshot,
-        throwsA(
-          isA<InvalidStateException>()
-              .having((error) => error.nativeStatusCode, 'status', isNull)
-              .having(
-                (error) => error.diagnostic,
-                'diagnostic',
-                'MapHandle is closed',
-              ),
+    await within(map.close(), 'map close');
+    expect(
+      map.close,
+      throwsA(
+        isA<MaplibreException>().having(
+          (error) => error.status,
+          'status',
+          Status.invalidState,
         ),
-      );
-    },
-  );
+      ),
+    );
+    expect(
+      map.getSnapshot,
+      throwsA(
+        isA<MaplibreException>().having(
+          (error) => error.status,
+          'status',
+          Status.invalidState,
+        ),
+      ),
+    );
+  });
 
   test('a handle id names its events and outlives close', () async {
     final fixture = await openRuntime();
@@ -61,13 +58,21 @@ void main() {
       'map creation',
     );
     addTearDown(() async {
-      await map.close();
-      await runtime.close();
+      await closeIfLive(map.close);
+      await closeIfLive(runtime.close);
     });
 
     // The live map makes native refuse the release before teardown starts.
-    expect(runtime.close, throwsA(isA<InvalidStateException>()));
-    expect(runtime.isClosed, isFalse);
+    expect(
+      runtime.close,
+      throwsA(
+        isA<MaplibreException>().having(
+          (error) => error.status,
+          'status',
+          Status.invalidState,
+        ),
+      ),
+    );
     await within(
       runtime.clearResourceTransform(),
       'a command on the refused runtime',
@@ -75,7 +80,6 @@ void main() {
 
     await within(map.close(), 'map close');
     await within(runtime.close(), 'runtime close');
-    expect(runtime.isClosed, isTrue);
   });
 
   test('handles stay usable after an isolate hop', () async {
@@ -94,11 +98,9 @@ void main() {
         const RuntimeEventMask.fromRawValue(1 << 40),
       ),
       throwsA(
-        isA<InvalidArgumentException>().having(
-          (error) => error.diagnostic,
-          'diagnostic',
-          isNotEmpty,
-        ),
+        isA<MaplibreException>()
+            .having((error) => error.status, 'status', Status.invalidArgument)
+            .having((error) => error.diagnostic, 'diagnostic', isNotEmpty),
       ),
     );
   });

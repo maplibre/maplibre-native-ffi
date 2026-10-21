@@ -1,4 +1,4 @@
-//! Keep the receiver and argument leases live until borrowed outputs are copied.
+//! Native leases each id while its call runs.
 //! Encoded inputs and callback roots remain live until the native call settles.
 
 const std = @import("std");
@@ -8,30 +8,12 @@ const callback = @import("callback.zig");
 const completion = @import("completion.zig");
 const diagnostics = @import("diagnostics.zig");
 const marshal = @import("marshal.zig");
-const owner = @import("owner.zig");
 const status = @import("status.zig");
 
 const Diagnostic = diagnostics.Diagnostic;
 const Error = status.Error;
 
-pub const Access = enum {
-    none,
-    lease,
-    /// The call leases the receiver and holds off its close, because its
-    /// outputs borrow from it until they are copied.
-    borrow,
-    /// The receiver is a response that is valid only inside its callback.
-    scoped,
-    /// The call closes the receiver. A receiver that is already closed makes
-    /// the call a no-op.
-    close,
-    /// The call completes the receiver's pending decision.
-    complete,
-};
-
-/// Which owner an adopted handle retains: none, the receiver, or the handle
-/// passed as the argument at an index.
-pub const Parent = union(enum) { none, receiver, argument: usize };
+pub const Access = enum { none, handle, scoped };
 
 const CString = struct { bytes: []const u8 };
 
@@ -39,25 +21,25 @@ pub fn cString(bytes: []const u8) CString {
     return .{ .bytes = bytes };
 }
 
-fn Output(comptime T: type, comptime sized: bool, comptime parent: Parent) type {
+fn Output(comptime T: type, comptime sized: bool) type {
     return struct {
         pub const Value = T;
         pub const sets_size = sized;
-        pub const retains = parent;
+        pub const output = true;
     };
 }
 
-pub fn out(comptime T: type) Output(T, false, .none) {
+pub fn out(comptime T: type) Output(T, false) {
     return .{};
 }
 
 /// Receives an output record whose `size` field native reads first.
-pub fn sizedOut(comptime T: type) Output(T, true, .none) {
+pub fn sizedOut(comptime T: type) Output(T, true) {
     return .{};
 }
 
-/// Receives a native handle and adopts it as `T`, retaining `parent`.
-pub fn adopt(comptime T: type, comptime parent: Parent) Output(T, false, parent) {
+/// Receives a native handle and adopts it as `T`.
+pub fn adopt(comptime T: type) Output(T, false) {
     return .{};
 }
 
@@ -69,7 +51,7 @@ pub fn len(items: anytype) usize {
 }
 
 fn isOutput(comptime T: type) bool {
-    return @typeInfo(T) == .@"struct" and @hasDecl(T, "retains");
+    return @typeInfo(T) == .@"struct" and @hasDecl(T, "output");
 }
 
 fn isHandle(comptime T: type) bool {
@@ -100,9 +82,7 @@ fn Held(comptime function: anytype, comptime offset: usize, comptime Args: type)
     const fields = argumentTypes(Args);
     var types: [fields.len]type = undefined;
     for (fields, 0..) |Field, index| {
-        types[index] = if (isHandle(Field))
-            Field.Lease
-        else if (isOutput(Field))
+        types[index] = if (isOutput(Field))
             @typeInfo(Param(function, offset + index)).pointer.child
         else
             void;
@@ -118,37 +98,12 @@ fn Native(comptime function: anytype, comptime count: usize) type {
 
 fn Receiver(comptime access: Access, comptime T: type) type {
     return struct {
-        const Self = @This();
-        const State = switch (access) {
-            .none => void,
-            .lease, .borrow, .complete => T.Lease,
-            .scoped => T,
-            .close => T.Close,
-        };
-        state: State,
-
-        /// The owner that callback admission checks the call against.
-        fn admit(comptime name: []const u8, receiver: T) Error!void {
-            switch (access) {
-                .none => try callback.check(name, 0),
-                .scoped => try callback.checkScoped(name, @intFromPtr(receiver.native)),
-                else => try callback.check(name, receiver.raw),
-            }
+        state: T,
+        fn acquire(receiver: T) Error!@This() {
+            if (access == .scoped) try callback.checkScoped(@intFromPtr(receiver.native));
+            return .{ .state = receiver };
         }
-
-        /// The owner that a registration the call retains calls back into.
-        fn acquire(receiver: T, diagnostic: ?*Diagnostic) Error!?Self {
-            return .{ .state = switch (access) {
-                .none => {},
-                .lease => try receiver.lease(diagnostic),
-                .borrow => try receiver.borrow(diagnostic),
-                .complete => try receiver.beginComplete(diagnostic),
-                .scoped => receiver,
-                .close => try receiver.beginClose(diagnostic) orelse return null,
-            } };
-        }
-
-        fn native(self: *Self) switch (access) {
+        fn native(self: *@This()) switch (access) {
             .none => void,
             .scoped => @FieldType(T, "native"),
             else => u64,
@@ -156,44 +111,11 @@ fn Receiver(comptime access: Access, comptime T: type) type {
             return switch (access) {
                 .none => {},
                 .scoped => self.state.native,
-                else => self.state.native,
+                else => self.state.raw,
             };
         }
-
-        /// Whether the native call runs. A close that native must not see yet
-        /// is recorded and committed without one.
-        fn calls(self: Self) bool {
-            return if (access == .close) !self.state.deferred else true;
-        }
-
-        fn anchor(self: Self) ?owner.Anchor {
-            return switch (access) {
-                .lease, .borrow, .complete => self.state.anchor(),
-                else => null,
-            };
-        }
-
-        /// Settles a successful call: a decision is complete before the roots
-        /// are accepted, and a close commits after them.
-        fn succeed(self: Self, roots: *callback.Roots) void {
-            if (access == .complete) self.state.finishComplete(true);
+        fn succeed(_: @This(), roots: *callback.Roots) void {
             roots.accept();
-            if (access == .close) self.state.commit();
-        }
-
-        fn fail(self: Self) void {
-            switch (access) {
-                .close => self.state.rollback(),
-                .complete => self.state.finishComplete(false),
-                else => {},
-            }
-        }
-
-        fn release(self: Self) void {
-            switch (access) {
-                .lease, .borrow => self.state.release(),
-                else => {},
-            }
         }
     };
 }
@@ -212,15 +134,9 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
         arena: if (Allocator == std.mem.Allocator) std.heap.ArenaAllocator else void,
         roots: callback.Roots = .{},
         held: Held(function, offset, Args) = undefined,
-        leased: usize = 0,
-        settled: bool = false,
-        /// The receiver id that a closing call passes by pointer. Native may
-        /// clear it without touching the id the close commits.
-        closing: u64 = 0,
 
-        fn begin(receiver: ReceiverType, allocator: Allocator, diagnostic: ?*Diagnostic) Error!?Self {
-            try Hold.admit(name, receiver);
-            const hold = try Hold.acquire(receiver, diagnostic) orelse return null;
+        fn begin(receiver: ReceiverType, allocator: Allocator, diagnostic: ?*Diagnostic) Error!Self {
+            const hold = try Hold.acquire(receiver);
             return .{
                 .receiver = hold,
                 .roots = .{},
@@ -229,16 +145,8 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
             };
         }
 
-        /// Releases what the call holds. A call that failed before it settled
-        /// rolls back its receiver and releases its roots unaccepted.
+        /// Releases encoded inputs and unaccepted callback roots.
         fn end(self: *Self) void {
-            inline for (fields, 0..) |Field, index| {
-                if (comptime isHandle(Field)) {
-                    if (index < self.leased) self.held[index].release();
-                }
-            }
-            if (!self.settled) self.receiver.fail();
-            self.receiver.release();
             self.roots.deinit();
             if (Allocator == std.mem.Allocator) self.arena.deinit();
         }
@@ -250,19 +158,14 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
 
         fn arguments(self: *Self, args: Args) Error!NativeArgs {
             var native: NativeArgs = undefined;
-            if (access == .close and @typeInfo(Param(function, 0)) == .pointer) {
-                self.closing = self.receiver.state.native;
-                native[0] = &self.closing;
-            } else if (offset == 1) {
+            if (offset == 1) {
                 native[0] = self.receiver.native();
             }
             inline for (fields, 0..) |Field, index| {
                 const Parameter = Param(function, offset + index);
                 const input = args[index];
                 if (comptime isHandle(Field)) {
-                    self.held[index] = try input.lease(self.diagnostic);
-                    self.leased = index + 1;
-                    native[offset + index] = self.held[index].native;
+                    native[offset + index] = input.raw;
                 } else if (comptime isOutput(Field)) {
                     self.held[index] = std.mem.zeroes(@TypeOf(self.held[index]));
                     if (Field.sets_size) self.held[index].size = @sizeOf(@TypeOf(self.held[index]));
@@ -318,7 +221,7 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
             return stored;
         }
 
-        /// Decodes the outputs while the receiver and argument handles are held.
+        /// Copies borrowed outputs before the operation returns.
         fn outputs(self: *Self, allocator: Allocator) Error!Outputs(Args) {
             const indices = comptime outputIndices(Args);
             switch (indices.len) {
@@ -332,22 +235,11 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
             }
         }
 
-        /// The anchor of the owner that an adopted handle retains, borrowed
-        /// from the lease the call holds on it.
-        fn parent(self: *Self, comptime retains: Parent) ?owner.Anchor {
-            return switch (retains) {
-                .none => null,
-                .receiver => self.receiver.anchor(),
-                .argument => |index| self.held[index].anchor(),
-            };
-        }
-
         fn output(self: *Self, comptime index: usize, allocator: Allocator) Error!fields[index].Value {
             const Step = fields[index];
             if (comptime marshal.decodeAllocates(Step.Value) and Allocator != std.mem.Allocator) @compileError(name ++ ": an output needs an allocator parameter");
             return marshal.decode(Step.Value, self.held[index], .{
                 .allocator = if (Allocator == std.mem.Allocator) allocator else null,
-                .parent = self.parent(Step.retains),
             });
         }
     };
@@ -359,14 +251,6 @@ fn outputIndices(comptime Args: type) []const usize {
         if (isOutput(Field)) indices = indices ++ .{index};
     }
     return indices;
-}
-
-fn closed(comptime T: type) Error!T {
-    if (T == void) return;
-    if (T == completion.Future(void)) return completion.completed(void, {});
-    // Only a closing call finds its receiver closed, and a close returns no
-    // value of its own.
-    unreachable;
 }
 
 pub fn invoke(
@@ -390,12 +274,11 @@ fn invokeInner(
     args: anytype,
 ) Error!Outputs(@TypeOf(args)) {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
-    var op = try Op.begin(receiver, allocator, diagnostic) orelse return closed(Outputs(@TypeOf(args)));
+    var op = try Op.begin(receiver, allocator, diagnostic);
     defer op.end();
     const native = try op.arguments(args);
-    if (op.receiver.calls()) try status.call(@field(c, name), native, diagnostic);
+    try status.call(@field(c, name), native, diagnostic);
     op.receiver.succeed(&op.roots);
-    op.settled = true;
     return op.outputs(allocator);
 }
 
@@ -424,13 +307,11 @@ fn invokeUnlessInner(
     args: anytype,
 ) Error!?Outputs(@TypeOf(args)) {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
-    // Only a closing call finds its receiver closed, and a close has no output.
-    var op = (try Op.begin(receiver, allocator, diagnostic)).?;
+    var op = try Op.begin(receiver, allocator, diagnostic);
     defer op.end();
     const native = try op.arguments(args);
     const present = try status.callUnless(@field(c, name), native, diagnostic, absent);
     op.receiver.succeed(&op.roots);
-    op.settled = true;
     if (!present) return null;
     return try op.outputs(allocator);
 }
@@ -461,15 +342,13 @@ fn invokeDeclinableInner(
 ) Error!bool {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
     if (Outputs(@TypeOf(args)) != bool) @compileError(name ++ ": a declinable call has one boolean output");
-    // Only a closing call finds its receiver closed, and a close declines nothing.
-    var op = (try Op.begin(receiver, allocator, diagnostic)).?;
+    var op = try Op.begin(receiver, allocator, diagnostic);
     defer op.end();
     const native = try op.arguments(args);
     try status.call(@field(c, name), native, diagnostic);
     const declined = try op.outputs(allocator);
     var kept: callback.Roots = .{};
     op.receiver.succeed(if (declined) &kept else &op.roots);
-    op.settled = true;
     return declined;
 }
 
@@ -482,18 +361,16 @@ pub fn direct(
     args: anytype,
 ) Error!T {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
-    var op = try Op.begin(receiver, allocator, null) orelse return closed(T);
+    var op = try Op.begin(receiver, allocator, null);
     defer op.end();
     const native = try op.arguments(args);
     if (T == void) {
-        if (op.receiver.calls()) @call(.auto, @field(c, name), native);
+        @call(.auto, @field(c, name), native);
         op.receiver.succeed(&op.roots);
-        op.settled = true;
         return;
     }
     const raw = @call(.auto, @field(c, name), native);
     op.receiver.succeed(&op.roots);
-    op.settled = true;
     if (comptime marshal.decodeAllocates(T) and @TypeOf(allocator) != std.mem.Allocator) @compileError(name ++ ": the result needs an allocator parameter");
     return marshal.decode(T, raw, .{ .allocator = if (@TypeOf(allocator) == std.mem.Allocator) allocator else null });
 }
@@ -506,13 +383,9 @@ fn Submitted(comptime Copy: type, comptime Args: type) type {
     return if (Outputs(Args) == void) completion.Future(Copy.Value) else Started(Copy.Value, Args);
 }
 
-/// The context a completion copier receives: the caller's allocator and a
-/// retained parent for an adopted handle.
+/// The allocator that a completion copier receives.
 const CopyContext = struct {
     decode: marshal.Decode,
-    pub fn deinit(self: *CopyContext) void {
-        if (self.decode.parent) |parent| parent.release();
-    }
 };
 
 pub fn submit(
@@ -539,27 +412,24 @@ fn submitInner(
 ) Error!Submitted(Copy, @TypeOf(args)) {
     const Allocator = @TypeOf(allocator);
     const Op = Operation(name, access, @TypeOf(receiver), Allocator, @TypeOf(args));
-    var op = try Op.begin(receiver, allocator, diagnostic) orelse return closed(Submitted(Copy, @TypeOf(args)));
+    var op = try Op.begin(receiver, allocator, diagnostic);
     defer op.end();
     const native = try op.arguments(args);
     const function = @field(c, name);
     const allocates = comptime marshal.decodeAllocates(Copy.Value);
     if (allocates and Allocator != std.mem.Allocator) @compileError(name ++ ": the result needs an allocator parameter");
-    const adopts = comptime marshal.decodeAdopts(Copy.Value);
-    var ready = if (allocates or adopts) try completion.submitWithCopyContext(Copy.Value, CopyContext, diagnostic, struct {
+    var ready = if (allocates) try completion.submitWithCopyContext(Copy.Value, CopyContext, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, context: *CopyContext) Error!Copy.Value {
             return Copy.copy(result, context.decode);
         }
     }.copy, .{ .decode = .{
         .allocator = if (Allocator == std.mem.Allocator) allocator else null,
-        .parent = if (comptime @hasDecl(Copy, "retains")) if (op.parent(Copy.retains)) |anchor| anchor.retain() else null else null,
     } }, function, native) else try completion.submit(Copy.Value, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result) Error!Copy.Value {
             return Copy.copy(result, .{});
         }
     }.copy, function, native);
     op.receiver.succeed(&op.roots);
-    op.settled = true;
     if (Outputs(@TypeOf(args)) == void) return ready;
     errdefer ready.deinit();
     return .{ .outputs = try op.outputs(allocator), .ready = ready };
@@ -586,12 +456,11 @@ fn discardInner(
     args: anytype,
 ) Error!void {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
-    var op = (try Op.begin(receiver, allocator, diagnostic)).?;
+    var op = try Op.begin(receiver, allocator, diagnostic);
     defer op.end();
     const native = try op.arguments(args);
     try status.call(@field(c, name), native ++ .{@as(?*const c.mln_completion, null)}, diagnostic);
     op.receiver.succeed(&op.roots);
-    op.settled = true;
 }
 
 pub fn scopedView(
@@ -620,16 +489,13 @@ fn scopedViewInner(
     comptime use: *const fn (@TypeOf(context), Value) anyerror!Result,
     diagnostic: ?*Diagnostic,
 ) anyerror!Result {
-    try callback.check(name, receiver.raw);
-    const lease = try receiver.borrow(diagnostic);
-    defer lease.release();
     var token: ?*anyopaque = null;
-    try status.call(@field(c, begin), .{ lease.native, &token }, diagnostic);
+    try status.call(@field(c, begin), .{ receiver.raw, &token }, diagnostic);
     defer @field(c, end)(token);
     const Raw = @typeInfo(Param(@field(c, name), 1)).pointer.child;
     var raw: Raw = std.mem.zeroes(Raw);
     raw.size = @sizeOf(Raw);
-    try status.call(@field(c, name), .{ lease.native, &raw }, diagnostic);
+    try status.call(@field(c, name), .{ receiver.raw, &raw }, diagnostic);
     return use(context, Value.fromNative(raw));
 }
 
@@ -658,12 +524,12 @@ pub fn value(comptime T: type, comptime Raw: type) type {
     };
 }
 
-pub fn handle(comptime T: type, comptime Raw: type, comptime parent: Parent) type {
+pub fn handle(comptime T: type, comptime Raw: type) type {
     return struct {
         pub const Value = T;
-        pub const retains = parent;
-        pub fn copy(result: *const c.mln_completion_result, context: marshal.Decode) Error!Value {
-            return T.adopt(try completion.value(Raw)(result), context.parent);
+        pub const output = true;
+        pub fn copy(result: *const c.mln_completion_result, _: marshal.Decode) Error!Value {
+            return T.adopt(try completion.value(Raw)(result));
         }
     };
 }
@@ -673,20 +539,6 @@ pub fn orNull(comptime Copy: type) type {
         pub const Value = ?Copy.Value;
         pub fn copy(result: *const c.mln_completion_result, context: marshal.Decode) Error!Value {
             if (result.value == null) return null;
-            return try Copy.copy(result, context);
-        }
-    };
-}
-
-/// A copier's value, or null when native completes with an empty payload: an
-/// empty buffer, or no value.
-pub fn orEmpty(comptime Copy: type, comptime Raw: type) type {
-    return struct {
-        pub const Value = ?Copy.Value;
-        pub fn copy(result: *const c.mln_completion_result, context: marshal.Decode) Error!Value {
-            if (Raw == c.mln_buffer_view) {
-                if ((try completion.value(Raw)(result)).size == 0) return null;
-            } else if (result.value_count == 0) return null;
             return try Copy.copy(result, context);
         }
     };

@@ -44,7 +44,7 @@ func submitted[T any](future *Future[T], err error) *Future[T] {
 	if err == nil {
 		return future
 	}
-	state := &futureState[T]{ready: make(chan struct{}), completed: true}
+	state := &futureState[T]{ready: make(chan struct{})}
 	state.result.err = err
 	close(state.ready)
 	return &Future[T]{state: state}
@@ -89,8 +89,13 @@ func newFixtureWith(t *testing.T, options MapOptions) *fixture {
 	t.Helper()
 	f := newRuntimeFixture(t)
 	f.m = await(t, submitted(f.runtime.CreateMap(options)))
-	// A test that closed the map already gets a completed future here.
-	t.Cleanup(func() { await(t, submitted(f.m.Close())) })
+	// A test may already have released its fixture owner.
+	t.Cleanup(func() {
+		future, err := f.m.Close()
+		if !errors.Is(err, StatusInvalidState) {
+			await(t, submitted(future, err))
+		}
+	})
 	return f
 }
 
@@ -111,7 +116,12 @@ func newRuntimeFixture(t *testing.T) *fixture {
 			f.pendingEvents <- event
 		}
 	}})))
-	t.Cleanup(func() { await(t, submitted(f.runtime.Close())) })
+	t.Cleanup(func() {
+		future, err := f.runtime.Close()
+		if !errors.Is(err, StatusInvalidState) {
+			await(t, submitted(future, err))
+		}
+	})
 	await(t, submitted(runtime.SetResourceProvider(denyingProvider())))
 	return f
 }
@@ -222,7 +232,7 @@ func closeOnceCollected(t *testing.T, runtime *RuntimeHandle, what string) {
 		stdruntime.GC()
 		await(t, submitted(runtime.ClearResourceTransform()))
 		teardown, err := runtime.Close()
-		if errors.Is(err, ErrInvalidState) {
+		if errors.Is(err, StatusInvalidState) {
 			return false
 		}
 		await(t, submitted(teardown, err))

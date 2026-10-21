@@ -11,6 +11,7 @@ package maplibre
 import "C"
 
 import (
+	"fmt"
 	"runtime"
 	"unsafe"
 )
@@ -23,6 +24,20 @@ const (
 	AmbientCacheOperationInvalidate    AmbientCacheOperation = AmbientCacheOperation(C.MLN_AMBIENT_CACHE_OPERATION_INVALIDATE)
 	AmbientCacheOperationClear         AmbientCacheOperation = AmbientCacheOperation(C.MLN_AMBIENT_CACHE_OPERATION_CLEAR)
 )
+
+func (value AmbientCacheOperation) String() string {
+	switch value {
+	case 1:
+		return "AmbientCacheOperationResetDatabase"
+	case 2:
+		return "AmbientCacheOperationPackDatabase"
+	case 3:
+		return "AmbientCacheOperationInvalidate"
+	case 4:
+		return "AmbientCacheOperationClear"
+	}
+	return fmt.Sprintf("AmbientCacheOperation(%d)", value)
+}
 
 // AnimationOptionField corresponds to mln_animation_option_field. Field mask
 // values for mln_animation_options.
@@ -79,6 +94,16 @@ const (
 	// The camera moved as part of an animated transition.
 	CameraChangeModeAnimated CameraChangeMode = CameraChangeMode(C.MLN_CAMERA_CHANGE_MODE_ANIMATED)
 )
+
+func (value CameraChangeMode) String() string {
+	switch value {
+	case 0:
+		return "CameraChangeModeImmediate"
+	case 1:
+		return "CameraChangeModeAnimated"
+	}
+	return fmt.Sprintf("CameraChangeMode(%d)", value)
+}
 
 // CameraDeltaField corresponds to mln_camera_delta_field. Field mask values for
 // mln_camera_delta.
@@ -152,6 +177,18 @@ const (
 	CameraTransitionOutcomeClosed CameraTransitionOutcome = CameraTransitionOutcome(C.MLN_CAMERA_TRANSITION_OUTCOME_CLOSED)
 )
 
+func (value CameraTransitionOutcome) String() string {
+	switch value {
+	case 0:
+		return "CameraTransitionOutcomeCompleted"
+	case 1:
+		return "CameraTransitionOutcomeCancelled"
+	case 2:
+		return "CameraTransitionOutcomeClosed"
+	}
+	return fmt.Sprintf("CameraTransitionOutcome(%d)", value)
+}
+
 // CameraUpdateMode corresponds to mln_camera_update_mode. Camera transition
 // behavior for mln_camera_update.
 //
@@ -164,6 +201,18 @@ const (
 	CameraUpdateModeEase CameraUpdateMode = CameraUpdateMode(C.MLN_CAMERA_UPDATE_MODE_EASE)
 	CameraUpdateModeFly  CameraUpdateMode = CameraUpdateMode(C.MLN_CAMERA_UPDATE_MODE_FLY)
 )
+
+func (value CameraUpdateMode) String() string {
+	switch value {
+	case 0:
+		return "CameraUpdateModeJump"
+	case 1:
+		return "CameraUpdateModeEase"
+	case 2:
+		return "CameraUpdateModeFly"
+	}
+	return fmt.Sprintf("CameraUpdateMode(%d)", value)
+}
 
 // CommandDisposition corresponds to mln_command_disposition. Terminal
 // dispositions reported by command completions.
@@ -179,6 +228,20 @@ const (
 	CommandDispositionCancelled  CommandDisposition = CommandDisposition(C.MLN_COMMAND_DISPOSITION_CANCELLED)
 )
 
+func (value CommandDisposition) String() string {
+	switch value {
+	case 0:
+		return "CommandDispositionCommitted"
+	case 1:
+		return "CommandDispositionSuperseded"
+	case 2:
+		return "CommandDispositionFailed"
+	case 3:
+		return "CommandDispositionCancelled"
+	}
+	return fmt.Sprintf("CommandDisposition(%d)", value)
+}
+
 // ConstrainMode corresponds to mln_constrain_mode. Map constraint modes used by
 // mln_map_viewport_options.
 //
@@ -192,6 +255,20 @@ const (
 	ConstrainModeWidthAndHeight ConstrainMode = ConstrainMode(C.MLN_CONSTRAIN_MODE_WIDTH_AND_HEIGHT)
 	ConstrainModeScreen         ConstrainMode = ConstrainMode(C.MLN_CONSTRAIN_MODE_SCREEN)
 )
+
+func (value ConstrainMode) String() string {
+	switch value {
+	case 0:
+		return "ConstrainModeNone"
+	case 1:
+		return "ConstrainModeHeightOnly"
+	case 2:
+		return "ConstrainModeWidthAndHeight"
+	case 3:
+		return "ConstrainModeScreen"
+	}
+	return fmt.Sprintf("ConstrainMode(%d)", value)
+}
 
 // CustomGeometrySourceOptionField corresponds to
 // mln_custom_geometry_source_option_field. Field mask values for
@@ -342,6 +419,22 @@ const (
 	GesturePhaseCancel GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_CANCEL)
 )
 
+func (value GesturePhase) String() string {
+	switch value {
+	case 0:
+		return "GesturePhaseNone"
+	case 1:
+		return "GesturePhaseBegin"
+	case 2:
+		return "GesturePhaseUpdate"
+	case 3:
+		return "GesturePhaseEnd"
+	case 4:
+		return "GesturePhaseCancel"
+	}
+	return fmt.Sprintf("GesturePhase(%d)", value)
+}
+
 // GpuSyncKind corresponds to mln_gpu_sync_kind. Synchronization payload kind
 // for acquired texture frames.
 //
@@ -358,6 +451,16 @@ const (
 	// caller-graphics-thread driver. object is nonzero.
 	GpuSyncKindOpenglFence GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_OPENGL_FENCE)
 )
+
+func (value GpuSyncKind) String() string {
+	switch value {
+	case 0:
+		return "GpuSyncKindCpuComplete"
+	case 3:
+		return "GpuSyncKindOpenglFence"
+	}
+	return fmt.Sprintf("GpuSyncKind(%d)", value)
+}
 
 // LogEvent corresponds to mln_log_event. Log event categories emitted by
 // MapLibre Native.
@@ -386,6 +489,46 @@ const (
 	LogEventTiming          LogEvent = LogEvent(C.MLN_LOG_EVENT_TIMING)
 )
 
+func (value LogEvent) String() string {
+	switch value {
+	case 0:
+		return "LogEventGeneral"
+	case 1:
+		return "LogEventSetup"
+	case 2:
+		return "LogEventShader"
+	case 3:
+		return "LogEventParseStyle"
+	case 4:
+		return "LogEventParseTile"
+	case 5:
+		return "LogEventRender"
+	case 6:
+		return "LogEventStyle"
+	case 7:
+		return "LogEventDatabase"
+	case 8:
+		return "LogEventHttpRequest"
+	case 9:
+		return "LogEventSprite"
+	case 10:
+		return "LogEventImage"
+	case 11:
+		return "LogEventGraphicsBackend"
+	case 12:
+		return "LogEventJni"
+	case 13:
+		return "LogEventAndroid"
+	case 14:
+		return "LogEventCrash"
+	case 15:
+		return "LogEventGlyph"
+	case 16:
+		return "LogEventTiming"
+	}
+	return fmt.Sprintf("LogEvent(%d)", value)
+}
+
 // LogSeverity corresponds to mln_log_severity. Log severity values emitted by
 // MapLibre Native.
 //
@@ -398,6 +541,18 @@ const (
 	LogSeverityWarning LogSeverity = LogSeverity(C.MLN_LOG_SEVERITY_WARNING)
 	LogSeverityError   LogSeverity = LogSeverity(C.MLN_LOG_SEVERITY_ERROR)
 )
+
+func (value LogSeverity) String() string {
+	switch value {
+	case 1:
+		return "LogSeverityInfo"
+	case 2:
+		return "LogSeverityWarning"
+	case 3:
+		return "LogSeverityError"
+	}
+	return fmt.Sprintf("LogSeverity(%d)", value)
+}
 
 // LogSeverityMask corresponds to mln_log_severity_mask. Bitmask values for log
 // severities dispatched asynchronously.
@@ -451,6 +606,18 @@ const (
 	MapModeTile MapMode = MapMode(C.MLN_MAP_MODE_TILE)
 )
 
+func (value MapMode) String() string {
+	switch value {
+	case 0:
+		return "MapModeContinuous"
+	case 1:
+		return "MapModeStatic"
+	case 2:
+		return "MapModeTile"
+	}
+	return fmt.Sprintf("MapMode(%d)", value)
+}
+
 // MapTileOptionField corresponds to mln_map_tile_option_field. Field mask
 // values for mln_map_tile_options.
 //
@@ -494,6 +661,16 @@ const (
 	NetworkStatusOffline NetworkStatus = NetworkStatus(C.MLN_NETWORK_STATUS_OFFLINE)
 )
 
+func (value NetworkStatus) String() string {
+	switch value {
+	case 1:
+		return "NetworkStatusOnline"
+	case 2:
+		return "NetworkStatusOffline"
+	}
+	return fmt.Sprintf("NetworkStatus(%d)", value)
+}
+
 // NorthOrientation corresponds to mln_north_orientation. Map north orientation
 // values used by mln_map_viewport_options.
 //
@@ -508,6 +685,20 @@ const (
 	NorthOrientationLeft  NorthOrientation = NorthOrientation(C.MLN_NORTH_ORIENTATION_LEFT)
 )
 
+func (value NorthOrientation) String() string {
+	switch value {
+	case 0:
+		return "NorthOrientationUp"
+	case 1:
+		return "NorthOrientationRight"
+	case 2:
+		return "NorthOrientationDown"
+	case 3:
+		return "NorthOrientationLeft"
+	}
+	return fmt.Sprintf("NorthOrientation(%d)", value)
+}
+
 type OfflineRegionDefinitionType uint32
 
 const (
@@ -515,12 +706,32 @@ const (
 	OfflineRegionDefinitionTypeGeometry    OfflineRegionDefinitionType = OfflineRegionDefinitionType(C.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY)
 )
 
+func (value OfflineRegionDefinitionType) String() string {
+	switch value {
+	case 1:
+		return "OfflineRegionDefinitionTypeTilePyramid"
+	case 2:
+		return "OfflineRegionDefinitionTypeGeometry"
+	}
+	return fmt.Sprintf("OfflineRegionDefinitionType(%d)", value)
+}
+
 type OfflineRegionDownloadState uint32
 
 const (
 	OfflineRegionDownloadStateInactive OfflineRegionDownloadState = OfflineRegionDownloadState(C.MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE)
 	OfflineRegionDownloadStateActive   OfflineRegionDownloadState = OfflineRegionDownloadState(C.MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE)
 )
+
+func (value OfflineRegionDownloadState) String() string {
+	switch value {
+	case 0:
+		return "OfflineRegionDownloadStateInactive"
+	case 1:
+		return "OfflineRegionDownloadStateActive"
+	}
+	return fmt.Sprintf("OfflineRegionDownloadState(%d)", value)
+}
 
 // OpenglClientApi corresponds to mln_opengl_client_api. OpenGL client API a
 // dedicated EGL session creates its context for.
@@ -538,6 +749,18 @@ const (
 	OpenglClientApiGles OpenglClientApi = OpenglClientApi(C.MLN_OPENGL_CLIENT_API_GLES)
 )
 
+func (value OpenglClientApi) String() string {
+	switch value {
+	case 0:
+		return "OpenglClientApiUnspecified"
+	case 1:
+		return "OpenglClientApiGl"
+	case 2:
+		return "OpenglClientApiGles"
+	}
+	return fmt.Sprintf("OpenglClientApi(%d)", value)
+}
+
 // OpenglContextOwnership corresponds to mln_opengl_context_ownership. How a
 // session's OpenGL context relates to its driver thread and host graphics
 // state.
@@ -552,6 +775,16 @@ const (
 	// The session owns its thread's OpenGL context.
 	OpenglContextOwnershipDedicated OpenglContextOwnership = OpenglContextOwnership(C.MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED)
 )
+
+func (value OpenglContextOwnership) String() string {
+	switch value {
+	case 0:
+		return "OpenglContextOwnershipShared"
+	case 1:
+		return "OpenglContextOwnershipDedicated"
+	}
+	return fmt.Sprintf("OpenglContextOwnership(%d)", value)
+}
 
 // OpenglContextPlatform corresponds to mln_opengl_context_platform. OpenGL
 // platform context provider used by a context descriptor.
@@ -568,6 +801,20 @@ const (
 	// Emscripten WebGL context handle.
 	OpenglContextPlatformWebgl OpenglContextPlatform = OpenglContextPlatform(C.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL)
 )
+
+func (value OpenglContextPlatform) String() string {
+	switch value {
+	case 0:
+		return "OpenglContextPlatformUnspecified"
+	case 1:
+		return "OpenglContextPlatformWgl"
+	case 2:
+		return "OpenglContextPlatformEgl"
+	case 3:
+		return "OpenglContextPlatformWebgl"
+	}
+	return fmt.Sprintf("OpenglContextPlatform(%d)", value)
+}
 
 // OpenglContextProviderFlag corresponds to mln_opengl_context_provider_flag.
 // OpenGL context providers supported by this build.
@@ -631,6 +878,16 @@ const (
 	RenderAbandonDispositionQuarantined RenderAbandonDisposition = RenderAbandonDisposition(C.MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED)
 )
 
+func (value RenderAbandonDisposition) String() string {
+	switch value {
+	case 0:
+		return "RenderAbandonDispositionClean"
+	case 1:
+		return "RenderAbandonDispositionQuarantined"
+	}
+	return fmt.Sprintf("RenderAbandonDisposition(%d)", value)
+}
+
 // RenderBackendFlag corresponds to mln_render_backend_flag. Render backend
 // support flags reported by this native library build.
 //
@@ -663,6 +920,16 @@ const (
 	RenderDriverKindCallerGraphicsThread RenderDriverKind = RenderDriverKind(C.MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD)
 )
 
+func (value RenderDriverKind) String() string {
+	switch value {
+	case 1:
+		return "RenderDriverKindCoreWorker"
+	case 2:
+		return "RenderDriverKindCallerGraphicsThread"
+	}
+	return fmt.Sprintf("RenderDriverKind(%d)", value)
+}
+
 // RenderMode corresponds to mln_render_mode. Render modes reported by render
 // observer events.
 //
@@ -674,6 +941,16 @@ const (
 	RenderModePartial RenderMode = RenderMode(C.MLN_RENDER_MODE_PARTIAL)
 	RenderModeFull    RenderMode = RenderMode(C.MLN_RENDER_MODE_FULL)
 )
+
+func (value RenderMode) String() string {
+	switch value {
+	case 0:
+		return "RenderModePartial"
+	case 1:
+		return "RenderModeFull"
+	}
+	return fmt.Sprintf("RenderMode(%d)", value)
+}
 
 // RenderResult corresponds to mln_render_result. Terminal disposition of one
 // accepted frame demand.
@@ -699,6 +976,20 @@ const (
 	// A newer IF_NEEDED demand with the same flags replaced this demand.
 	RenderResultSuperseded RenderResult = RenderResult(C.MLN_RENDER_RESULT_SUPERSEDED)
 )
+
+func (value RenderResult) String() string {
+	switch value {
+	case 0:
+		return "RenderResultRendered"
+	case 1:
+		return "RenderResultNoUpdate"
+	case 3:
+		return "RenderResultTargetNotReady"
+	case 4:
+		return "RenderResultSuperseded"
+	}
+	return fmt.Sprintf("RenderResult(%d)", value)
+}
 
 // RenderSessionCapabilityFlag corresponds to
 // mln_render_session_capability_flag. Optional render-session capabilities.
@@ -734,6 +1025,24 @@ const (
 	RenderSessionStateAbandoned  RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_ABANDONED)
 )
 
+func (value RenderSessionState) String() string {
+	switch value {
+	case 1:
+		return "RenderSessionStateAttaching"
+	case 2:
+		return "RenderSessionStateAttached"
+	case 3:
+		return "RenderSessionStateDetaching"
+	case 4:
+		return "RenderSessionStateDetached"
+	case 5:
+		return "RenderSessionStateTargetLost"
+	case 6:
+		return "RenderSessionStateAbandoned"
+	}
+	return fmt.Sprintf("RenderSessionState(%d)", value)
+}
+
 // RenderedFeatureQueryOptionField corresponds to
 // mln_rendered_feature_query_option_field. Optional fields for
 // mln_rendered_feature_query_options.
@@ -764,6 +1073,18 @@ const (
 	RenderedQueryGeometryTypeLineString RenderedQueryGeometryType = RenderedQueryGeometryType(C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING)
 )
 
+func (value RenderedQueryGeometryType) String() string {
+	switch value {
+	case 1:
+		return "RenderedQueryGeometryTypePoint"
+	case 2:
+		return "RenderedQueryGeometryTypeBox"
+	case 3:
+		return "RenderedQueryGeometryTypeLineString"
+	}
+	return fmt.Sprintf("RenderedQueryGeometryType(%d)", value)
+}
+
 type ResourceErrorReason uint32
 
 const (
@@ -774,6 +1095,24 @@ const (
 	ResourceErrorReasonRateLimit  ResourceErrorReason = ResourceErrorReason(C.MLN_RESOURCE_ERROR_REASON_RATE_LIMIT)
 	ResourceErrorReasonOther      ResourceErrorReason = ResourceErrorReason(C.MLN_RESOURCE_ERROR_REASON_OTHER)
 )
+
+func (value ResourceErrorReason) String() string {
+	switch value {
+	case 0:
+		return "ResourceErrorReasonNone"
+	case 1:
+		return "ResourceErrorReasonNotFound"
+	case 2:
+		return "ResourceErrorReasonServer"
+	case 3:
+		return "ResourceErrorReasonConnection"
+	case 4:
+		return "ResourceErrorReasonRateLimit"
+	case 5:
+		return "ResourceErrorReasonOther"
+	}
+	return fmt.Sprintf("ResourceErrorReason(%d)", value)
+}
 
 type ResourceKind uint32
 
@@ -787,6 +1126,28 @@ const (
 	ResourceKindSpriteJson  ResourceKind = ResourceKind(C.MLN_RESOURCE_KIND_SPRITE_JSON)
 	ResourceKindImage       ResourceKind = ResourceKind(C.MLN_RESOURCE_KIND_IMAGE)
 )
+
+func (value ResourceKind) String() string {
+	switch value {
+	case 0:
+		return "ResourceKindUnknown"
+	case 1:
+		return "ResourceKindStyle"
+	case 2:
+		return "ResourceKindSource"
+	case 3:
+		return "ResourceKindTile"
+	case 4:
+		return "ResourceKindGlyphs"
+	case 5:
+		return "ResourceKindSpriteImage"
+	case 6:
+		return "ResourceKindSpriteJson"
+	case 7:
+		return "ResourceKindImage"
+	}
+	return fmt.Sprintf("ResourceKind(%d)", value)
+}
 
 // ResourceKindMask corresponds to mln_resource_kind_mask. The resource kinds
 // that a route or rule matches, one bit per mln_resource_kind value.
@@ -819,6 +1180,18 @@ const (
 	ResourceLoadingMethodNetworkOnly ResourceLoadingMethod = ResourceLoadingMethod(C.MLN_RESOURCE_LOADING_METHOD_NETWORK_ONLY)
 )
 
+func (value ResourceLoadingMethod) String() string {
+	switch value {
+	case 0:
+		return "ResourceLoadingMethodAll"
+	case 1:
+		return "ResourceLoadingMethodCacheOnly"
+	case 2:
+		return "ResourceLoadingMethodNetworkOnly"
+	}
+	return fmt.Sprintf("ResourceLoadingMethod(%d)", value)
+}
+
 type ResourcePriority uint32
 
 const (
@@ -826,12 +1199,32 @@ const (
 	ResourcePriorityLow     ResourcePriority = ResourcePriority(C.MLN_RESOURCE_PRIORITY_LOW)
 )
 
+func (value ResourcePriority) String() string {
+	switch value {
+	case 0:
+		return "ResourcePriorityRegular"
+	case 1:
+		return "ResourcePriorityLow"
+	}
+	return fmt.Sprintf("ResourcePriority(%d)", value)
+}
+
 type ResourceProviderDecision uint32
 
 const (
 	ResourceProviderDecisionPassThrough ResourceProviderDecision = ResourceProviderDecision(C.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH)
 	ResourceProviderDecisionHandle      ResourceProviderDecision = ResourceProviderDecision(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE)
 )
+
+func (value ResourceProviderDecision) String() string {
+	switch value {
+	case 0:
+		return "ResourceProviderDecisionPassThrough"
+	case 1:
+		return "ResourceProviderDecisionHandle"
+	}
+	return fmt.Sprintf("ResourceProviderDecision(%d)", value)
+}
 
 // ResourceRequestField corresponds to mln_resource_request_field. Field mask
 // values for mln_resource_request_info.
@@ -883,6 +1276,20 @@ const (
 	ResourceResponseStatusNotModified ResourceResponseStatus = ResourceResponseStatus(C.MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED)
 )
 
+func (value ResourceResponseStatus) String() string {
+	switch value {
+	case 0:
+		return "ResourceResponseStatusOk"
+	case 1:
+		return "ResourceResponseStatusError"
+	case 2:
+		return "ResourceResponseStatusNoContent"
+	case 3:
+		return "ResourceResponseStatusNotModified"
+	}
+	return fmt.Sprintf("ResourceResponseStatus(%d)", value)
+}
+
 type ResourceStoragePolicy uint32
 
 const (
@@ -890,12 +1297,32 @@ const (
 	ResourceStoragePolicyVolatile  ResourceStoragePolicy = ResourceStoragePolicy(C.MLN_RESOURCE_STORAGE_POLICY_VOLATILE)
 )
 
+func (value ResourceStoragePolicy) String() string {
+	switch value {
+	case 0:
+		return "ResourceStoragePolicyPermanent"
+	case 1:
+		return "ResourceStoragePolicyVolatile"
+	}
+	return fmt.Sprintf("ResourceStoragePolicy(%d)", value)
+}
+
 type ResourceUsage uint32
 
 const (
 	ResourceUsageOnline  ResourceUsage = ResourceUsage(C.MLN_RESOURCE_USAGE_ONLINE)
 	ResourceUsageOffline ResourceUsage = ResourceUsage(C.MLN_RESOURCE_USAGE_OFFLINE)
 )
+
+func (value ResourceUsage) String() string {
+	switch value {
+	case 0:
+		return "ResourceUsageOnline"
+	case 1:
+		return "ResourceUsageOffline"
+	}
+	return fmt.Sprintf("ResourceUsage(%d)", value)
+}
 
 // RuntimeEventMask corresponds to mln_runtime_event_mask. Bit values for the
 // map and runtime event subscription masks.
@@ -953,6 +1380,26 @@ const (
 	RuntimeEventPayloadTypeOfflineRegionTileCountLimit RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT)
 )
 
+func (value RuntimeEventPayloadType) String() string {
+	switch value {
+	case 0:
+		return "RuntimeEventPayloadTypeNone"
+	case 1:
+		return "RuntimeEventPayloadTypeRenderFrame"
+	case 2:
+		return "RuntimeEventPayloadTypeRenderMap"
+	case 4:
+		return "RuntimeEventPayloadTypeTileAction"
+	case 5:
+		return "RuntimeEventPayloadTypeOfflineRegionStatus"
+	case 6:
+		return "RuntimeEventPayloadTypeOfflineRegionResponseError"
+	case 7:
+		return "RuntimeEventPayloadTypeOfflineRegionTileCountLimit"
+	}
+	return fmt.Sprintf("RuntimeEventPayloadType(%d)", value)
+}
+
 // RuntimeEventSourceType corresponds to mln_runtime_event_source_type. Source
 // kinds used by mln_runtime_event.source_type.
 //
@@ -964,6 +1411,16 @@ const (
 	RuntimeEventSourceTypeRuntime RuntimeEventSourceType = RuntimeEventSourceType(C.MLN_RUNTIME_EVENT_SOURCE_RUNTIME)
 	RuntimeEventSourceTypeMap     RuntimeEventSourceType = RuntimeEventSourceType(C.MLN_RUNTIME_EVENT_SOURCE_MAP)
 )
+
+func (value RuntimeEventSourceType) String() string {
+	switch value {
+	case 0:
+		return "RuntimeEventSourceTypeRuntime"
+	case 1:
+		return "RuntimeEventSourceTypeMap"
+	}
+	return fmt.Sprintf("RuntimeEventSourceType(%d)", value)
+}
 
 // RuntimeEventType corresponds to mln_runtime_event_type. Runtime event types
 // carried by mln_runtime_event.type.
@@ -993,6 +1450,50 @@ const (
 	RuntimeEventTypeOfflineRegionTileCountLimitExceeded RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
 	RuntimeEventTypeMapSourceChanged                    RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED)
 )
+
+func (value RuntimeEventType) String() string {
+	switch value {
+	case 1:
+		return "RuntimeEventTypeMapCameraWillChange"
+	case 2:
+		return "RuntimeEventTypeMapCameraIsChanging"
+	case 3:
+		return "RuntimeEventTypeMapCameraDidChange"
+	case 4:
+		return "RuntimeEventTypeMapStyleLoaded"
+	case 5:
+		return "RuntimeEventTypeMapLoadingStarted"
+	case 6:
+		return "RuntimeEventTypeMapLoadingFinished"
+	case 7:
+		return "RuntimeEventTypeMapLoadingFailed"
+	case 8:
+		return "RuntimeEventTypeMapIdle"
+	case 10:
+		return "RuntimeEventTypeMapRenderError"
+	case 13:
+		return "RuntimeEventTypeMapRenderFrameStarted"
+	case 14:
+		return "RuntimeEventTypeMapRenderFrameFinished"
+	case 15:
+		return "RuntimeEventTypeMapRenderMapStarted"
+	case 16:
+		return "RuntimeEventTypeMapRenderMapFinished"
+	case 17:
+		return "RuntimeEventTypeMapStyleImageMissing"
+	case 18:
+		return "RuntimeEventTypeMapTileAction"
+	case 19:
+		return "RuntimeEventTypeOfflineRegionStatusChanged"
+	case 20:
+		return "RuntimeEventTypeOfflineRegionResponseError"
+	case 21:
+		return "RuntimeEventTypeOfflineRegionTileCountLimitExceeded"
+	case 23:
+		return "RuntimeEventTypeMapSourceChanged"
+	}
+	return fmt.Sprintf("RuntimeEventType(%d)", value)
+}
 
 // SourceFeatureQueryOptionField corresponds to
 // mln_source_feature_query_option_field. Optional fields for
@@ -1041,6 +1542,36 @@ const (
 	// A call named an ID with no live object behind it.
 	StatusNotFound Status = Status(C.MLN_STATUS_NOT_FOUND)
 )
+
+func (value Status) String() string {
+	switch value {
+	case 0:
+		return "StatusOk"
+	case -1:
+		return "StatusInvalidArgument"
+	case -2:
+		return "StatusInvalidState"
+	case -3:
+		return "StatusWrongThread"
+	case -4:
+		return "StatusUnsupported"
+	case -5:
+		return "StatusNativeError"
+	case -6:
+		return "StatusCancelled"
+	case -7:
+		return "StatusBusy"
+	case -8:
+		return "StatusTargetLost"
+	case -9:
+		return "StatusNotReady"
+	case -10:
+		return "StatusNotFound"
+	}
+	return fmt.Sprintf("Status(%d)", value)
+}
+
+func (value Status) Error() string { return value.String() }
 
 // StyleImageInfoField corresponds to mln_style_image_info_field. Field mask
 // values for mln_style_image_info.
@@ -1092,6 +1623,18 @@ const (
 	StyleImageTextFitProportional    StyleImageTextFit = StyleImageTextFit(C.MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL)
 )
 
+func (value StyleImageTextFit) String() string {
+	switch value {
+	case 0:
+		return "StyleImageTextFitStretchOrShrink"
+	case 1:
+		return "StyleImageTextFitStretchOnly"
+	case 2:
+		return "StyleImageTextFitProportional"
+	}
+	return fmt.Sprintf("StyleImageTextFit(%d)", value)
+}
+
 // StyleLayerVisibility corresponds to mln_style_layer_visibility. Layer
 // visibility values used by the visibility setter and layer info.
 //
@@ -1104,6 +1647,16 @@ const (
 	StyleLayerVisibilityNone    StyleLayerVisibility = StyleLayerVisibility(C.MLN_STYLE_LAYER_VISIBILITY_NONE)
 )
 
+func (value StyleLayerVisibility) String() string {
+	switch value {
+	case 0:
+		return "StyleLayerVisibilityVisible"
+	case 1:
+		return "StyleLayerVisibilityNone"
+	}
+	return fmt.Sprintf("StyleLayerVisibility(%d)", value)
+}
+
 // StyleRasterDemEncoding corresponds to mln_style_raster_dem_encoding. DEM
 // raster encoding values.
 //
@@ -1115,6 +1668,16 @@ const (
 	StyleRasterDemEncodingMapbox    StyleRasterDemEncoding = StyleRasterDemEncoding(C.MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX)
 	StyleRasterDemEncodingTerrarium StyleRasterDemEncoding = StyleRasterDemEncoding(C.MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM)
 )
+
+func (value StyleRasterDemEncoding) String() string {
+	switch value {
+	case 0:
+		return "StyleRasterDemEncodingMapbox"
+	case 1:
+		return "StyleRasterDemEncodingTerrarium"
+	}
+	return fmt.Sprintf("StyleRasterDemEncoding(%d)", value)
+}
 
 // StyleSourceInfoField corresponds to mln_style_source_info_field. Fields
 // available in mln_style_source_info.
@@ -1162,6 +1725,32 @@ const (
 	StyleSourceTypeCustomMvtVector StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR)
 )
 
+func (value StyleSourceType) String() string {
+	switch value {
+	case 0:
+		return "StyleSourceTypeUnknown"
+	case 1:
+		return "StyleSourceTypeVector"
+	case 2:
+		return "StyleSourceTypeRaster"
+	case 3:
+		return "StyleSourceTypeRasterDem"
+	case 4:
+		return "StyleSourceTypeGeojson"
+	case 5:
+		return "StyleSourceTypeImage"
+	case 6:
+		return "StyleSourceTypeVideo"
+	case 7:
+		return "StyleSourceTypeAnnotations"
+	case 8:
+		return "StyleSourceTypeCustomVector"
+	case 9:
+		return "StyleSourceTypeCustomMvtVector"
+	}
+	return fmt.Sprintf("StyleSourceType(%d)", value)
+}
+
 // StyleTileScheme corresponds to mln_style_tile_scheme. Tile URL coordinate
 // scheme values.
 //
@@ -1173,6 +1762,16 @@ const (
 	StyleTileSchemeXyz StyleTileScheme = StyleTileScheme(C.MLN_STYLE_TILE_SCHEME_XYZ)
 	StyleTileSchemeTms StyleTileScheme = StyleTileScheme(C.MLN_STYLE_TILE_SCHEME_TMS)
 )
+
+func (value StyleTileScheme) String() string {
+	switch value {
+	case 0:
+		return "StyleTileSchemeXyz"
+	case 1:
+		return "StyleTileSchemeTms"
+	}
+	return fmt.Sprintf("StyleTileScheme(%d)", value)
+}
 
 // StyleTransitionOptionField corresponds to mln_style_transition_option_field.
 // Field mask values for mln_style_transition_options.
@@ -1203,6 +1802,16 @@ const (
 	StyleVectorTileEncodingMlt StyleVectorTileEncoding = StyleVectorTileEncoding(C.MLN_STYLE_VECTOR_TILE_ENCODING_MLT)
 )
 
+func (value StyleVectorTileEncoding) String() string {
+	switch value {
+	case 0:
+		return "StyleVectorTileEncodingMvt"
+	case 1:
+		return "StyleVectorTileEncodingMlt"
+	}
+	return fmt.Sprintf("StyleVectorTileEncoding(%d)", value)
+}
+
 // TileLodMode corresponds to mln_tile_lod_mode. Tile LOD algorithms used by
 // mln_map_tile_options.
 //
@@ -1214,6 +1823,16 @@ const (
 	TileLodModeDefault  TileLodMode = TileLodMode(C.MLN_TILE_LOD_MODE_DEFAULT)
 	TileLodModeDistance TileLodMode = TileLodMode(C.MLN_TILE_LOD_MODE_DISTANCE)
 )
+
+func (value TileLodMode) String() string {
+	switch value {
+	case 0:
+		return "TileLodModeDefault"
+	case 1:
+		return "TileLodModeDistance"
+	}
+	return fmt.Sprintf("TileLodMode(%d)", value)
+}
 
 // TileOperation corresponds to mln_tile_operation. Tile operations reported by
 // tile observer events.
@@ -1233,6 +1852,30 @@ const (
 	TileOperationCancelled            TileOperation = TileOperation(C.MLN_TILE_OPERATION_CANCELLED)
 	TileOperationNull                 TileOperation = TileOperation(C.MLN_TILE_OPERATION_NULL)
 )
+
+func (value TileOperation) String() string {
+	switch value {
+	case 0:
+		return "TileOperationRequestedFromCache"
+	case 1:
+		return "TileOperationRequestedFromNetwork"
+	case 2:
+		return "TileOperationLoadFromNetwork"
+	case 3:
+		return "TileOperationLoadFromCache"
+	case 4:
+		return "TileOperationStartParse"
+	case 5:
+		return "TileOperationEndParse"
+	case 6:
+		return "TileOperationError"
+	case 7:
+		return "TileOperationCancelled"
+	case 8:
+		return "TileOperationNull"
+	}
+	return fmt.Sprintf("TileOperation(%d)", value)
+}
 
 // UrlMatchFlags corresponds to mln_url_match_flags. How a rule or route
 // compares its url against a request URL.
@@ -1261,6 +1904,16 @@ const (
 	ViewportModeFlippedY ViewportMode = ViewportMode(C.MLN_VIEWPORT_MODE_FLIPPED_Y)
 )
 
+func (value ViewportMode) String() string {
+	switch value {
+	case 0:
+		return "ViewportModeDefault"
+	case 1:
+		return "ViewportModeFlippedY"
+	}
+	return fmt.Sprintf("ViewportMode(%d)", value)
+}
+
 // WebglContextKind corresponds to mln_webgl_context_kind. WebGL context
 // placement.
 //
@@ -1275,6 +1928,16 @@ const (
 	// WebGL 2 context there.
 	WebglContextKindTransferredCanvas WebglContextKind = WebglContextKind(C.MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS)
 )
+
+func (value WebglContextKind) String() string {
+	switch value {
+	case 0:
+		return "WebglContextKindExisting"
+	case 1:
+		return "WebglContextKindTransferredCanvas"
+	}
+	return fmt.Sprintf("WebglContextKind(%d)", value)
+}
 
 // OfflineRegionDefinitionData corresponds to
 // mln_offline_region_definition_data. Offline region definition data.
@@ -1678,7 +2341,7 @@ func nativeCameraTransitionHandler(input CameraTransitionHandler, arena *binding
 	raw := C.mln_camera_transition_handler{}
 	if input.Callback != nil {
 		raw.user_data = arena.register(input)
-		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_camera_transition_end_callback(C.binding_mln_camera_transition_handler_callback)
 		}
@@ -1790,7 +2453,7 @@ func nativeCustomGeometrySourceOptions(input CustomGeometrySourceOptions, arena 
 	bindingMasked(&raw.fields, C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP, &raw.wrap, input.Wrap, arena, bindingBool[bool, C.bool])
 	if input.FetchTile != nil || input.CancelTile != nil {
 		raw.user_data = arena.register(input)
-		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.FetchTile != nil {
 			raw.fetch_tile = C.mln_custom_source_fetch_tile_callback(C.binding_mln_custom_geometry_source_options_fetch_tile)
 		}
@@ -1834,7 +2497,7 @@ func nativeCustomMvtVectorSourceOptions(input CustomMvtVectorSourceOptions, aren
 	bindingMasked(&raw.fields, C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, input.MaxZoom, arena, bindingNumber[float64, C.double])
 	if input.FetchTile != nil || input.CancelTile != nil {
 		raw.user_data = arena.register(input)
-		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.FetchTile != nil {
 			raw.fetch_tile = C.mln_custom_source_fetch_tile_callback(C.binding_mln_custom_mvt_vector_source_options_fetch_tile)
 		}
@@ -2253,7 +2916,7 @@ func nativeHttpHeaderTransform(input HttpHeaderTransform, arena *bindingArena) C
 	}
 	if input.Callback != nil {
 		raw.user_data = arena.register(input)
-		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_http_header_transform_callback(C.binding_mln_http_header_transform_callback)
 		}
@@ -2266,11 +2929,11 @@ type HttpHeaderTransformResponseScope struct {
 	scope  *bindingScope
 }
 
-func (response *HttpHeaderTransformResponseScope) target(operation uint32) bindingTarget {
+func (response *HttpHeaderTransformResponseScope) target() bindingTarget {
 	if response == nil {
-		return bindingScoped(nil, 0, operation)
+		return bindingScoped(nil)
 	}
-	return bindingScoped(response.scope, uint64(uintptr(unsafe.Pointer(response.native))), operation)
+	return bindingScoped(response.scope)
 }
 
 // ImageContent corresponds to mln_image_content. Content-box insets in image
@@ -2391,7 +3054,7 @@ func nativeLogHandler(input LogHandler, arena *bindingArena) C.mln_log_handler {
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Callback != nil {
 		raw.user_data = arena.register(input)
-		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_log_callback(C.binding_mln_log_handler_callback)
 		}
@@ -3405,7 +4068,7 @@ func nativeQueueLock(input QueueLock, arena *bindingArena) C.mln_queue_lock {
 	raw := C.mln_queue_lock{}
 	if input.Lock != nil || input.Unlock != nil {
 		raw.user_data = arena.register(input)
-		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Lock != nil {
 			raw.lock = C.mln_queue_lock_callback(C.binding_mln_queue_lock_lock)
 		}
@@ -3751,7 +4414,7 @@ func nativeResourceProvider(input ResourceProvider, arena *bindingArena) C.mln_r
 	}
 	if input.Callback != nil {
 		raw.user_data = arena.register(input)
-		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_resource_provider_callback(C.binding_mln_resource_provider_callback)
 		}
@@ -3794,7 +4457,7 @@ func nativeResourceRequestCancelHandler(input ResourceRequestCancelHandler, aren
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Callback != nil {
 		raw.user_data = arena.register(input)
-		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_resource_request_cancel_callback(C.binding_mln_resource_request_cancel_handler_callback)
 		}
@@ -3941,7 +4604,7 @@ func nativeResourceTransform(input ResourceTransform, arena *bindingArena) C.mln
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Callback != nil {
 		raw.user_data = arena.register(input)
-		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_resource_transform_callback(C.binding_mln_resource_transform_callback)
 		}
@@ -4013,7 +4676,7 @@ func nativeRuntimeEventHandler(input RuntimeEventHandler, arena *bindingArena) C
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Callback != nil {
 		raw.user_data = arena.register(input)
-		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_runtime_event_callback(C.binding_mln_runtime_event_handler_callback)
 		}
@@ -5019,7 +5682,7 @@ func nativeWake(input Wake, arena *bindingArena) C.mln_wake {
 	raw := C.mln_wake{}
 	if input.Callback != nil {
 		raw.user_data = arena.register(input)
-		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_wake_callback(C.binding_mln_wake_callback)
 		}
@@ -5755,7 +6418,7 @@ func (view WebgpuTextureFrameView) Format() (uint32, error) {
 type AcquiredFrameHandle struct{ *bindingOwner }
 
 func adoptAcquiredFrameHandle(raw uint64, parent any) *AcquiredFrameHandle {
-	owner := &AcquiredFrameHandle{bindingAdopt(raw, parent, "AcquiredFrameHandle", func(raw uint64) { C.mln_acquired_frame_dispose(C.mln_acquired_frame(raw), nil) })}
+	owner := &AcquiredFrameHandle{bindingAdopt(raw, parent, "AcquiredFrameHandle", false, func(raw uint64) { C.mln_acquired_frame_dispose(C.mln_acquired_frame(raw), nil) })}
 	return owner
 }
 
@@ -5775,7 +6438,7 @@ func (handle *AcquiredFrameHandle) owner() *bindingOwner {
 type GeojsonSourceDataHandle struct{ *bindingOwner }
 
 func adoptGeojsonSourceDataHandle(raw uint64, parent any) *GeojsonSourceDataHandle {
-	owner := &GeojsonSourceDataHandle{bindingAdopt(raw, parent, "GeojsonSourceDataHandle", func(raw uint64) { C.mln_geojson_source_data_release(C.mln_geojson_source_data(raw)) })}
+	owner := &GeojsonSourceDataHandle{bindingAdopt(raw, parent, "GeojsonSourceDataHandle", false, func(raw uint64) { C.mln_geojson_source_data_release(C.mln_geojson_source_data(raw)) })}
 	return owner
 }
 
@@ -5795,7 +6458,7 @@ func (handle *GeojsonSourceDataHandle) owner() *bindingOwner {
 type MapHandle struct{ *bindingOwner }
 
 func adoptMapHandle(raw uint64, parent any) *MapHandle {
-	owner := &MapHandle{bindingAdopt(raw, parent, "MapHandle", func(raw uint64) { C.mln_map_dispose(C.mln_map(raw), nil) })}
+	owner := &MapHandle{bindingAdopt(raw, parent, "MapHandle", false, func(raw uint64) { C.mln_map_dispose(C.mln_map(raw), nil) })}
 	return owner
 }
 
@@ -5815,7 +6478,7 @@ func (handle *MapHandle) owner() *bindingOwner {
 type MapProjectionHandle struct{ *bindingOwner }
 
 func adoptMapProjectionHandle(raw uint64, parent any) *MapProjectionHandle {
-	owner := &MapProjectionHandle{bindingAdopt(raw, parent, "MapProjectionHandle", func(raw uint64) { C.mln_map_projection_release(C.mln_map_projection(raw), nil) })}
+	owner := &MapProjectionHandle{bindingAdopt(raw, parent, "MapProjectionHandle", false, func(raw uint64) { C.mln_map_projection_release(C.mln_map_projection(raw), nil) })}
 	return owner
 }
 
@@ -5835,7 +6498,7 @@ func (handle *MapProjectionHandle) owner() *bindingOwner {
 type RenderFrameBatchHandle struct{ *bindingOwner }
 
 func adoptRenderFrameBatchHandle(raw uint64, parent any) *RenderFrameBatchHandle {
-	owner := &RenderFrameBatchHandle{bindingAdopt(raw, parent, "RenderFrameBatchHandle", func(raw uint64) { C.mln_render_frame_batch_release(C.mln_render_frame_batch(raw)) })}
+	owner := &RenderFrameBatchHandle{bindingAdopt(raw, parent, "RenderFrameBatchHandle", true, func(raw uint64) { C.mln_render_frame_batch_release(C.mln_render_frame_batch(raw)) })}
 	return owner
 }
 
@@ -5855,7 +6518,7 @@ func (handle *RenderFrameBatchHandle) owner() *bindingOwner {
 type RenderSessionHandle struct{ *bindingOwner }
 
 func adoptRenderSessionHandle(raw uint64, parent any) *RenderSessionHandle {
-	owner := &RenderSessionHandle{bindingAdopt(raw, parent, "RenderSessionHandle", func(raw uint64) { C.mln_render_session_dispose(C.mln_render_session(raw), nil) })}
+	owner := &RenderSessionHandle{bindingAdopt(raw, parent, "RenderSessionHandle", false, func(raw uint64) { C.mln_render_session_dispose(C.mln_render_session(raw), nil) })}
 	return owner
 }
 
@@ -5875,7 +6538,7 @@ func (handle *RenderSessionHandle) owner() *bindingOwner {
 type ResourceRequestHandle struct{ *bindingOwner }
 
 func adoptResourceRequestHandle(raw uint64, parent any) *ResourceRequestHandle {
-	owner := &ResourceRequestHandle{bindingAdopt(raw, parent, "ResourceRequestHandle", func(raw uint64) { C.mln_resource_request_release(C.mln_resource_request(raw)) })}
+	owner := &ResourceRequestHandle{bindingAdopt(raw, parent, "ResourceRequestHandle", false, func(raw uint64) { C.mln_resource_request_release(C.mln_resource_request(raw)) })}
 	return owner
 }
 
@@ -5895,7 +6558,7 @@ func (handle *ResourceRequestHandle) owner() *bindingOwner {
 type ResourceTransformRequestHandle struct{ *bindingOwner }
 
 func adoptResourceTransformRequestHandle(raw uint64, parent any) *ResourceTransformRequestHandle {
-	owner := &ResourceTransformRequestHandle{bindingAdopt(raw, parent, "ResourceTransformRequestHandle", func(raw uint64) { C.mln_resource_transform_request_release(C.mln_resource_transform_request(raw)) })}
+	owner := &ResourceTransformRequestHandle{bindingAdopt(raw, parent, "ResourceTransformRequestHandle", false, func(raw uint64) { C.mln_resource_transform_request_release(C.mln_resource_transform_request(raw)) })}
 	return owner
 }
 
@@ -5915,7 +6578,7 @@ func (handle *ResourceTransformRequestHandle) owner() *bindingOwner {
 type RuntimeHandle struct{ *bindingOwner }
 
 func adoptRuntimeHandle(raw uint64, parent any) *RuntimeHandle {
-	owner := &RuntimeHandle{bindingAdopt(raw, parent, "RuntimeHandle", func(raw uint64) { C.mln_runtime_dispose(C.mln_runtime(raw), nil) })}
+	owner := &RuntimeHandle{bindingAdopt(raw, parent, "RuntimeHandle", false, func(raw uint64) { C.mln_runtime_dispose(C.mln_runtime(raw), nil) })}
 	return owner
 }
 
@@ -5944,7 +6607,7 @@ func (receiver *RenderSessionHandle) Discarding() RenderSessionHandleDiscarding 
 func (receiver *AcquiredFrameHandle) WithMetalTexture(callback func(MetalTextureFrameView) error) error {
 	var outFrame C.mln_metal_texture_frame
 	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
-	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_metal_texture), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
+	return bindingWithView(bindingLive(receiver.owner()), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
 	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_get_metal_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
@@ -5960,7 +6623,7 @@ func (receiver *AcquiredFrameHandle) WithMetalTexture(callback func(MetalTexture
 func (receiver *AcquiredFrameHandle) WithOpenglTexture(callback func(OpenglTextureFrameView) error) error {
 	var outFrame C.mln_opengl_texture_frame
 	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
-	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_opengl_texture), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
+	return bindingWithView(bindingLive(receiver.owner()), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
 	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_get_opengl_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
@@ -5977,7 +6640,7 @@ func (receiver *AcquiredFrameHandle) WithOpenglTexture(callback func(OpenglTextu
 func (receiver *AcquiredFrameHandle) WithProducerSync(callback func(GpuSyncView) error) error {
 	outSync := C.mln_gpu_sync_default()
 	outSync.size = C.uint32_t(unsafe.Sizeof(outSync))
-	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_producer_sync), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
+	return bindingWithView(bindingLive(receiver.owner()), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
 	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_get_producer_sync(C.mln_acquired_frame(raw), &outSync, diagnostic))
@@ -5991,7 +6654,7 @@ func (receiver *AcquiredFrameHandle) WithProducerSync(callback func(GpuSyncView)
 func (receiver *AcquiredFrameHandle) GetResult() (RenderFrameResult, error) {
 	var outResult C.mln_render_frame_result
 	outResult.size = C.uint32_t(unsafe.Sizeof(outResult))
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_acquired_frame_get_result), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_get_result(C.mln_acquired_frame(raw), &outResult, diagnostic))
 	}, func(arena *bindingArena) RenderFrameResult {
 		return copyRenderFrameResult(outResult)
@@ -6005,7 +6668,7 @@ func (receiver *AcquiredFrameHandle) GetResult() (RenderFrameResult, error) {
 func (receiver *AcquiredFrameHandle) WithVulkanTexture(callback func(VulkanTextureFrameView) error) error {
 	var outFrame C.mln_vulkan_texture_frame
 	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
-	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_vulkan_texture), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
+	return bindingWithView(bindingLive(receiver.owner()), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
 	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_get_vulkan_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
@@ -6021,7 +6684,7 @@ func (receiver *AcquiredFrameHandle) WithVulkanTexture(callback func(VulkanTextu
 func (receiver *AcquiredFrameHandle) WithWebgpuTexture(callback func(WebgpuTextureFrameView) error) error {
 	var outFrame C.mln_webgpu_texture_frame
 	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
-	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_webgpu_texture), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
+	return bindingWithView(bindingLive(receiver.owner()), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
 	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_get_webgpu_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
@@ -6035,7 +6698,7 @@ func (receiver *AcquiredFrameHandle) WithWebgpuTexture(callback func(WebgpuTextu
 // See mln_acquired_frame_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *AcquiredFrameHandle) Close(consumerCompletion GpuSync) error {
-	return bindingDo(bindingClosing(receiver.owner(), C.binding_operation_mln_acquired_frame_release), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_release(C.mln_acquired_frame(raw), bindingStore(nativeGpuSync(consumerCompletion, arena), arena), diagnostic))
 	})
 }
@@ -6045,7 +6708,7 @@ func (receiver *AcquiredFrameHandle) Close(consumerCompletion GpuSync) error {
 // See mln_android_init in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
 func AndroidInit(jniEnv uintptr, context uintptr) error {
-	return bindingDo(bindingGlobal(C.binding_operation_mln_android_init), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_android_init(unsafe.Pointer(C.binding_address(C.uintptr_t(jniEnv))), unsafe.Pointer(C.binding_address(C.uintptr_t(context))), diagnostic))
 	})
 }
@@ -6056,7 +6719,7 @@ func AndroidInit(jniEnv uintptr, context uintptr) error {
 // See mln_c_version in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
 func CVersion() (uint32, error) {
-	return bindingDirect(bindingGlobal(C.binding_operation_mln_c_version), func(arena *bindingArena, raw uint64) uint32 {
+	return bindingDirect(bindingGlobal(), func(arena *bindingArena, raw uint64) uint32 {
 		return uint32(C.mln_c_version())
 	})
 }
@@ -6068,7 +6731,7 @@ func CVersion() (uint32, error) {
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func GeojsonSourceDataCreate(data []byte, options *GeojsonSourceOptions) (*GeojsonSourceDataHandle, error) {
 	var outData C.mln_geojson_source_data
-	return bindingGet(bindingGlobal(C.binding_operation_mln_geojson_source_data_create), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_geojson_source_data_create(bindingView(data, arena), bindingStoreOptional(options, arena, nativeGeojsonSourceOptions), &outData, diagnostic))
 	}, func(arena *bindingArena) *GeojsonSourceDataHandle {
 		adopted := adoptGeojsonSourceDataHandle(uint64(outData), nil)
@@ -6081,7 +6744,7 @@ func GeojsonSourceDataCreate(data []byte, options *GeojsonSourceOptions) (*Geojs
 // See mln_geojson_source_data_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *GeojsonSourceDataHandle) Close() error {
-	_, err := bindingDirect(bindingConsuming(receiver.owner(), C.binding_operation_mln_geojson_source_data_release), func(arena *bindingArena, raw uint64) struct{} {
+	_, err := bindingDirect(bindingConsuming(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_geojson_source_data_release(C.mln_geojson_source_data(raw))
 		return struct{}{}
 	})
@@ -6094,7 +6757,7 @@ func (receiver *GeojsonSourceDataHandle) Close() error {
 // See mln_http_header_transform_response_set_header in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *HttpHeaderTransformResponseScope) SetHeader(name string, value string) error {
-	return bindingDo(receiver.target(C.binding_operation_mln_http_header_transform_response_set_header), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(receiver.target(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_http_header_transform_response_set_header(receiver.native, bindingView(name, arena), bindingView(value, arena), diagnostic))
 	})
 }
@@ -6106,7 +6769,7 @@ func (receiver *HttpHeaderTransformResponseScope) SetHeader(name string, value s
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
 func LatLngForProjectedMeters(meters ProjectedMeters) (LatLng, error) {
 	var outCoordinate C.mln_lat_lng
-	return bindingGet(bindingGlobal(C.binding_operation_mln_lat_lng_for_projected_meters), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_lat_lng_for_projected_meters(nativeProjectedMeters(meters, arena), &outCoordinate, diagnostic))
 	}, func(arena *bindingArena) LatLng {
 		return copyLatLng(outCoordinate)
@@ -6118,7 +6781,7 @@ func LatLngForProjectedMeters(meters ProjectedMeters) (LatLng, error) {
 // See mln_log_clear_callback in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html
 func LogClearCallback() error {
-	return bindingDo(bindingGlobal(C.binding_operation_mln_log_clear_callback), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_log_clear_callback(diagnostic))
 	})
 }
@@ -6129,7 +6792,7 @@ func LogClearCallback() error {
 // See mln_log_set_async_severity_mask in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html
 func LogSetAsyncSeverityMask(mask LogSeverityMask) error {
-	return bindingDo(bindingGlobal(C.binding_operation_mln_log_set_async_severity_mask), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_log_set_async_severity_mask(C.uint32_t(mask), diagnostic))
 	})
 }
@@ -6139,7 +6802,7 @@ func LogSetAsyncSeverityMask(mask LogSeverityMask) error {
 // See mln_log_set_callback in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html
 func LogSetCallback(handler LogHandler) error {
-	return bindingDo(bindingGlobal(C.binding_operation_mln_log_set_callback), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_log_set_callback(bindingStore(nativeLogHandler(handler, arena), arena), diagnostic))
 	})
 }
@@ -6157,7 +6820,7 @@ type LogicalExtentPhysicalSizeResult struct {
 func LogicalExtentPhysicalSize(extent LogicalExtent) (LogicalExtentPhysicalSizeResult, error) {
 	var outWidth C.uint32_t
 	var outHeight C.uint32_t
-	return bindingGet(bindingGlobal(C.binding_operation_mln_logical_extent_physical_size), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_logical_extent_physical_size(nativeLogicalExtent(extent, arena), &outWidth, &outHeight, diagnostic))
 	}, func(arena *bindingArena) LogicalExtentPhysicalSizeResult {
 		return LogicalExtentPhysicalSizeResult{Width: uint32(outWidth), Height: uint32(outHeight)}
@@ -6169,9 +6832,9 @@ func LogicalExtentPhysicalSize(extent LogicalExtent) (LogicalExtentPhysicalSizeR
 // See mln_map_add_custom_geometry_source in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) AddCustomGeometrySource(sourceId string, options CustomGeometrySourceOptions) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_custom_geometry_source), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_custom_geometry_source(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativeCustomGeometrySourceOptions(options, arena), arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // AddCustomMvtVectorSource adds a custom MVT vector source.
@@ -6179,9 +6842,9 @@ func (receiver *MapHandle) AddCustomGeometrySource(sourceId string, options Cust
 // See mln_map_add_custom_mvt_vector_source in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) AddCustomMvtVectorSource(sourceId string, options CustomMvtVectorSourceOptions) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_custom_mvt_vector_source), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_custom_mvt_vector_source(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativeCustomMvtVectorSourceOptions(options, arena), arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // AddGeojsonSourceData adds a GeoJSON source with prepared inline data.
@@ -6189,9 +6852,9 @@ func (receiver *MapHandle) AddCustomMvtVectorSource(sourceId string, options Cus
 // See mln_map_add_geojson_source_data in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) AddGeojsonSourceData(sourceId string, data *GeojsonSourceDataHandle) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_geojson_source_data), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_geojson_source_data(C.mln_map(raw), bindingView(sourceId, arena), C.mln_geojson_source_data(arena.lease(data.owner())), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // AddGeojsonSourceUrl adds a GeoJSON source with URL data.
@@ -6199,9 +6862,9 @@ func (receiver *MapHandle) AddGeojsonSourceData(sourceId string, data *GeojsonSo
 // See mln_map_add_geojson_source_url in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) AddGeojsonSourceUrl(sourceId string, url string, options *GeojsonSourceOptions) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_geojson_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_geojson_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeGeojsonSourceOptions), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // AddImageSourceImage adds an image source with inline image pixels.
@@ -6209,9 +6872,9 @@ func (receiver *MapHandle) AddGeojsonSourceUrl(sourceId string, url string, opti
 // See mln_map_add_image_source_image in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) AddImageSourceImage(sourceId string, coordinates []LatLng, image PremultipliedRgba8Image) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_image_source_image), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_image_source_image(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // AddImageSourceUrl adds an image source that loads its image from a URL.
@@ -6219,9 +6882,9 @@ func (receiver *MapHandle) AddImageSourceImage(sourceId string, coordinates []La
 // See mln_map_add_image_source_url in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) AddImageSourceUrl(sourceId string, coordinates []LatLng, url string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_image_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_image_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingView(url, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // AddStyleLayerJson adds one style layer from a full style-spec layer JSON
@@ -6230,9 +6893,9 @@ func (receiver *MapHandle) AddImageSourceUrl(sourceId string, coordinates []LatL
 // See mln_map_add_style_layer_json in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) AddStyleLayerJson(layerJson []byte, beforeLayerId *string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_style_layer_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_style_layer_json(C.mln_map(raw), bindingView(layerJson, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // AddStyleSourceJson adds one style source from a style-spec source JSON
@@ -6241,9 +6904,9 @@ func (receiver *MapHandle) AddStyleLayerJson(layerJson []byte, beforeLayerId *st
 // See mln_map_add_style_source_json in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) AddStyleSourceJson(sourceId string, sourceJson []byte) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_style_source_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_style_source_json(C.mln_map(raw), bindingView(sourceId, arena), bindingView(sourceJson, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // ApplyCameraDelta submits one atomic relative camera update.
@@ -6251,9 +6914,9 @@ func (receiver *MapHandle) AddStyleSourceJson(sourceId string, sourceJson []byte
 // See mln_map_apply_camera_delta in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) ApplyCameraDelta(delta CameraDelta) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_apply_camera_delta), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_apply_camera_delta(C.mln_map(raw), bindingStore(nativeCameraDelta(delta, arena), arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 type MapAttachMetalBorrowedTextureResult struct {
@@ -6268,13 +6931,13 @@ type MapAttachMetalBorrowedTextureResult struct {
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 func (receiver *MapHandle) AttachMetalBorrowedTexture(descriptor MetalBorrowedTextureDescriptor, options RenderSessionAttachOptions) (MapAttachMetalBorrowedTextureResult, error) {
 	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_metal_borrowed_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStartWith(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_attach_metal_borrowed_texture(C.mln_map(raw), bindingStore(nativeMetalBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachMetalBorrowedTextureResult {
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachMetalBorrowedTextureResult{Session: adopted, Completion: future}
-	})
+	}, false)
 }
 
 type MapAttachMetalOwnedTextureResult struct {
@@ -6289,13 +6952,13 @@ type MapAttachMetalOwnedTextureResult struct {
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 func (receiver *MapHandle) AttachMetalOwnedTexture(descriptor MetalOwnedTextureDescriptor, options RenderSessionAttachOptions) (MapAttachMetalOwnedTextureResult, error) {
 	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_metal_owned_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStartWith(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_attach_metal_owned_texture(C.mln_map(raw), bindingStore(nativeMetalOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachMetalOwnedTextureResult {
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachMetalOwnedTextureResult{Session: adopted, Completion: future}
-	})
+	}, false)
 }
 
 type MapAttachMetalSurfaceResult struct {
@@ -6309,13 +6972,13 @@ type MapAttachMetalSurfaceResult struct {
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
 func (receiver *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor, options RenderSessionAttachOptions) (MapAttachMetalSurfaceResult, error) {
 	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_metal_surface), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStartWith(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_attach_metal_surface(C.mln_map(raw), bindingStore(nativeMetalSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachMetalSurfaceResult {
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachMetalSurfaceResult{Session: adopted, Completion: future}
-	})
+	}, false)
 }
 
 type MapAttachOpenglBorrowedTextureResult struct {
@@ -6330,13 +6993,13 @@ type MapAttachOpenglBorrowedTextureResult struct {
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 func (receiver *MapHandle) AttachOpenglBorrowedTexture(descriptor OpenglBorrowedTextureDescriptor, options RenderSessionAttachOptions) (MapAttachOpenglBorrowedTextureResult, error) {
 	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_opengl_borrowed_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStartWith(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_attach_opengl_borrowed_texture(C.mln_map(raw), bindingStore(nativeOpenglBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachOpenglBorrowedTextureResult {
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachOpenglBorrowedTextureResult{Session: adopted, Completion: future}
-	})
+	}, false)
 }
 
 type MapAttachOpenglOwnedTextureResult struct {
@@ -6351,13 +7014,13 @@ type MapAttachOpenglOwnedTextureResult struct {
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 func (receiver *MapHandle) AttachOpenglOwnedTexture(descriptor OpenglOwnedTextureDescriptor, options RenderSessionAttachOptions) (MapAttachOpenglOwnedTextureResult, error) {
 	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_opengl_owned_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStartWith(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_attach_opengl_owned_texture(C.mln_map(raw), bindingStore(nativeOpenglOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachOpenglOwnedTextureResult {
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachOpenglOwnedTextureResult{Session: adopted, Completion: future}
-	})
+	}, false)
 }
 
 type MapAttachOpenglSurfaceResult struct {
@@ -6371,13 +7034,13 @@ type MapAttachOpenglSurfaceResult struct {
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
 func (receiver *MapHandle) AttachOpenglSurface(descriptor OpenglSurfaceDescriptor, options RenderSessionAttachOptions) (MapAttachOpenglSurfaceResult, error) {
 	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_opengl_surface), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStartWith(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_attach_opengl_surface(C.mln_map(raw), bindingStore(nativeOpenglSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachOpenglSurfaceResult {
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachOpenglSurfaceResult{Session: adopted, Completion: future}
-	})
+	}, false)
 }
 
 type MapAttachVulkanBorrowedTextureResult struct {
@@ -6392,13 +7055,13 @@ type MapAttachVulkanBorrowedTextureResult struct {
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 func (receiver *MapHandle) AttachVulkanBorrowedTexture(descriptor VulkanBorrowedTextureDescriptor, options RenderSessionAttachOptions) (MapAttachVulkanBorrowedTextureResult, error) {
 	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_vulkan_borrowed_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStartWith(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_attach_vulkan_borrowed_texture(C.mln_map(raw), bindingStore(nativeVulkanBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachVulkanBorrowedTextureResult {
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachVulkanBorrowedTextureResult{Session: adopted, Completion: future}
-	})
+	}, false)
 }
 
 type MapAttachVulkanOwnedTextureResult struct {
@@ -6413,13 +7076,13 @@ type MapAttachVulkanOwnedTextureResult struct {
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 func (receiver *MapHandle) AttachVulkanOwnedTexture(descriptor VulkanOwnedTextureDescriptor, options RenderSessionAttachOptions) (MapAttachVulkanOwnedTextureResult, error) {
 	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_vulkan_owned_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStartWith(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_attach_vulkan_owned_texture(C.mln_map(raw), bindingStore(nativeVulkanOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachVulkanOwnedTextureResult {
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachVulkanOwnedTextureResult{Session: adopted, Completion: future}
-	})
+	}, false)
 }
 
 type MapAttachVulkanSurfaceResult struct {
@@ -6433,13 +7096,13 @@ type MapAttachVulkanSurfaceResult struct {
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
 func (receiver *MapHandle) AttachVulkanSurface(descriptor VulkanSurfaceDescriptor, options RenderSessionAttachOptions) (MapAttachVulkanSurfaceResult, error) {
 	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_vulkan_surface), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStartWith(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_attach_vulkan_surface(C.mln_map(raw), bindingStore(nativeVulkanSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachVulkanSurfaceResult {
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachVulkanSurfaceResult{Session: adopted, Completion: future}
-	})
+	}, false)
 }
 
 type MapAttachWebgpuBorrowedTextureResult struct {
@@ -6454,13 +7117,13 @@ type MapAttachWebgpuBorrowedTextureResult struct {
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 func (receiver *MapHandle) AttachWebgpuBorrowedTexture(descriptor WebgpuBorrowedTextureDescriptor, options RenderSessionAttachOptions) (MapAttachWebgpuBorrowedTextureResult, error) {
 	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_webgpu_borrowed_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStartWith(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_attach_webgpu_borrowed_texture(C.mln_map(raw), bindingStore(nativeWebgpuBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachWebgpuBorrowedTextureResult {
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachWebgpuBorrowedTextureResult{Session: adopted, Completion: future}
-	})
+	}, false)
 }
 
 type MapAttachWebgpuOwnedTextureResult struct {
@@ -6475,13 +7138,13 @@ type MapAttachWebgpuOwnedTextureResult struct {
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 func (receiver *MapHandle) AttachWebgpuOwnedTexture(descriptor WebgpuOwnedTextureDescriptor, options RenderSessionAttachOptions) (MapAttachWebgpuOwnedTextureResult, error) {
 	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_webgpu_owned_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStartWith(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_attach_webgpu_owned_texture(C.mln_map(raw), bindingStore(nativeWebgpuOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachWebgpuOwnedTextureResult {
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachWebgpuOwnedTextureResult{Session: adopted, Completion: future}
-	})
+	}, false)
 }
 
 type MapAttachWebgpuSurfaceResult struct {
@@ -6495,13 +7158,13 @@ type MapAttachWebgpuSurfaceResult struct {
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
 func (receiver *MapHandle) AttachWebgpuSurface(descriptor WebgpuSurfaceDescriptor, options RenderSessionAttachOptions) (MapAttachWebgpuSurfaceResult, error) {
 	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_webgpu_surface), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStartWith(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_attach_webgpu_surface(C.mln_map(raw), bindingStore(nativeWebgpuSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachWebgpuSurfaceResult {
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachWebgpuSurfaceResult{Session: adopted, Completion: future}
-	})
+	}, false)
 }
 
 // BeginCommandGroup begins a command group, which holds this map's render
@@ -6510,9 +7173,9 @@ func (receiver *MapHandle) AttachWebgpuSurface(descriptor WebgpuSurfaceDescripto
 // See mln_map_begin_command_group in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *MapHandle) BeginCommandGroup() (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_begin_command_group), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_begin_command_group(C.mln_map(raw), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // CameraForGeometry starts an ordered query for a camera that fits a GeoJSON
@@ -6521,9 +7184,9 @@ func (receiver *MapHandle) BeginCommandGroup() (*Future[CommandCompletion], erro
 // See mln_map_camera_for_geometry in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) CameraForGeometry(geometry []byte, fitOptions *CameraFitOptions) (*Future[CameraOptions], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_camera_for_geometry), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_camera_for_geometry(C.mln_map(raw), bindingView(geometry, arena), bindingStoreOptional(fitOptions, arena, nativeCameraFitOptions), completion, diagnostic))
-	}, completionOf(copyCameraOptions))
+	}, completionOf(copyCameraOptions), false)
 }
 
 // CameraForLatLngBounds starts an ordered query for a camera that fits
@@ -6532,9 +7195,9 @@ func (receiver *MapHandle) CameraForGeometry(geometry []byte, fitOptions *Camera
 // See mln_map_camera_for_lat_lng_bounds in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) CameraForLatLngBounds(bounds LatLngBounds, fitOptions *CameraFitOptions) (*Future[CameraOptions], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_camera_for_lat_lng_bounds), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_camera_for_lat_lng_bounds(C.mln_map(raw), nativeLatLngBounds(bounds, arena), bindingStoreOptional(fitOptions, arena, nativeCameraFitOptions), completion, diagnostic))
-	}, completionOf(copyCameraOptions))
+	}, completionOf(copyCameraOptions), false)
 }
 
 // CameraForLatLngs starts an ordered query for a camera that fits geographic
@@ -6543,9 +7206,9 @@ func (receiver *MapHandle) CameraForLatLngBounds(bounds LatLngBounds, fitOptions
 // See mln_map_camera_for_lat_lngs in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) CameraForLatLngs(coordinates []LatLng, fitOptions *CameraFitOptions) (*Future[CameraOptions], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_camera_for_lat_lngs), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_camera_for_lat_lngs(C.mln_map(raw), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingStoreOptional(fitOptions, arena, nativeCameraFitOptions), completion, diagnostic))
-	}, completionOf(copyCameraOptions))
+	}, completionOf(copyCameraOptions), false)
 }
 
 // CancelCameraTransition cancels the camera transitions of the commands whose
@@ -6554,9 +7217,9 @@ func (receiver *MapHandle) CameraForLatLngs(coordinates []LatLng, fitOptions *Ca
 // See mln_map_cancel_camera_transition in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) CancelCameraTransition(transitionId uint64) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_cancel_camera_transition), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_cancel_camera_transition(C.mln_map(raw), C.uint64_t(transitionId), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // CancelTransitions cancels the camera transitions running when this command
@@ -6565,9 +7228,9 @@ func (receiver *MapHandle) CancelCameraTransition(transitionId uint64) (*Future[
 // See mln_map_cancel_transitions in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) CancelTransitions() (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_cancel_transitions), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_cancel_transitions(C.mln_map(raw), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // CreateProjection creates a standalone projection from the map's latest
@@ -6577,7 +7240,7 @@ func (receiver *MapHandle) CancelTransitions() (*Future[CommandCompletion], erro
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
 func (receiver *MapHandle) CreateProjection() (*MapProjectionHandle, error) {
 	var outProjection C.mln_map_projection
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_create_projection), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_create_projection(C.mln_map(raw), &outProjection, diagnostic))
 	}, func(arena *bindingArena) *MapProjectionHandle {
 		adopted := adoptMapProjectionHandle(uint64(outProjection), nil)
@@ -6590,9 +7253,9 @@ func (receiver *MapHandle) CreateProjection() (*MapProjectionHandle, error) {
 // See mln_map_dump_debug_logs in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) DumpDebugLogs() (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_dump_debug_logs), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_dump_debug_logs(C.mln_map(raw), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // EndCommandGroup ends the innermost command group that
@@ -6601,9 +7264,9 @@ func (receiver *MapHandle) DumpDebugLogs() (*Future[CommandCompletion], error) {
 // See mln_map_end_command_group in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *MapHandle) EndCommandGroup() (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_end_command_group), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_end_command_group(C.mln_map(raw), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // GetCamera starts an ordered camera read.
@@ -6611,9 +7274,9 @@ func (receiver *MapHandle) EndCommandGroup() (*Future[CommandCompletion], error)
 // See mln_map_get_camera in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) GetCamera() (*Future[CameraQueryResult], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_camera), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_camera(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(copyCameraQueryResult))
+	}, completionOf(copyCameraQueryResult), false)
 }
 
 // GetFeatureState starts an ordered read of per-feature state from this map.
@@ -6621,9 +7284,9 @@ func (receiver *MapHandle) GetCamera() (*Future[CameraQueryResult], error) {
 // See mln_map_get_feature_state in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *MapHandle) GetFeatureState(selector FeatureStateSelector) (*Future[[]byte], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_feature_state), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_feature_state(C.mln_map(raw), bindingStore(nativeFeatureStateSelector(selector, arena), arena), completion, diagnostic))
-	}, completionOf(copyViewBytes))
+	}, completionOf(copyViewBytes), false)
 }
 
 // GetGlobalState queries the global-state JSON object, including style
@@ -6633,9 +7296,9 @@ func (receiver *MapHandle) GetFeatureState(selector FeatureStateSelector) (*Futu
 // See mln_map_get_global_state in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) GetGlobalState() (*Future[[]byte], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_global_state), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_global_state(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(copyViewBytes))
+	}, completionOf(copyViewBytes), false)
 }
 
 // GetImageSourceCoordinates copies image source coordinates.
@@ -6643,9 +7306,9 @@ func (receiver *MapHandle) GetGlobalState() (*Future[[]byte], error) {
 // See mln_map_get_image_source_coordinates in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) GetImageSourceCoordinates(sourceId string) (*Future[[]LatLng], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_image_source_coordinates), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_image_source_coordinates(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionListOf(copyLatLng))
+	}, completionListOf(copyLatLng), false)
 }
 
 // GetLoadedStyleJson starts an ordered copy of the last successfully parsed
@@ -6654,9 +7317,9 @@ func (receiver *MapHandle) GetImageSourceCoordinates(sourceId string) (*Future[[
 // See mln_map_get_loaded_style_json in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *MapHandle) GetLoadedStyleJson() (*Future[[]byte], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_loaded_style_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_loaded_style_json(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(copyViewBytes))
+	}, completionOf(copyViewBytes), false)
 }
 
 // GetSnapshot copies the map's latest published snapshot.
@@ -6666,7 +7329,7 @@ func (receiver *MapHandle) GetLoadedStyleJson() (*Future[[]byte], error) {
 func (receiver *MapHandle) GetSnapshot() (MapSnapshot, error) {
 	var outSnapshot C.mln_map_snapshot
 	outSnapshot.size = C.uint32_t(unsafe.Sizeof(outSnapshot))
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_snapshot), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_snapshot(C.mln_map(raw), &outSnapshot, diagnostic))
 	}, func(arena *bindingArena) MapSnapshot {
 		return copyMapSnapshot(outSnapshot)
@@ -6678,9 +7341,9 @@ func (receiver *MapHandle) GetSnapshot() (MapSnapshot, error) {
 // See mln_map_get_style_image in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) GetStyleImage(imageId string) (*Future[*StyleImageInfo], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_image), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_image(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyStyleImageInfo)))
+	}, completionNullable(completionOf(copyStyleImageInfo)), false)
 }
 
 // GetStyleLayer copies the complete metadata of one style layer.
@@ -6688,9 +7351,9 @@ func (receiver *MapHandle) GetStyleImage(imageId string) (*Future[*StyleImageInf
 // See mln_map_get_style_layer in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) GetStyleLayer(layerId string) (*Future[*StyleLayerInfo], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_layer(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyStyleLayerInfo)))
+	}, completionNullable(completionOf(copyStyleLayerInfo)), false)
 }
 
 // GetStyleLayerJson serializes one style layer as a full style-spec layer JSON
@@ -6699,9 +7362,9 @@ func (receiver *MapHandle) GetStyleLayer(layerId string) (*Future[*StyleLayerInf
 // See mln_map_get_style_layer_json in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) GetStyleLayerJson(layerId string) (*Future[*[]byte], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_layer_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_layer_json(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewBytes)))
+	}, completionNullable(completionOf(copyViewBytes)), false)
 }
 
 // GetStyleLayerProperty serializes one layer property as a style-spec JSON
@@ -6710,9 +7373,9 @@ func (receiver *MapHandle) GetStyleLayerJson(layerId string) (*Future[*[]byte], 
 // See mln_map_get_style_layer_property in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) GetStyleLayerProperty(layerId string, propertyName string) (*Future[*[]byte], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_layer_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_layer_property(C.mln_map(raw), bindingView(layerId, arena), bindingView(propertyName, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewBytes)))
+	}, completionNullable(completionOf(copyViewBytes)), false)
 }
 
 // GetStyleLightProperty serializes one style light property as a style-spec
@@ -6721,9 +7384,9 @@ func (receiver *MapHandle) GetStyleLayerProperty(layerId string, propertyName st
 // See mln_map_get_style_light_property in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) GetStyleLightProperty(propertyName string) (*Future[*[]byte], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_light_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_light_property(C.mln_map(raw), bindingView(propertyName, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewBytes)))
+	}, completionNullable(completionOf(copyViewBytes)), false)
 }
 
 // GetStyleSource copies the complete metadata of one style source.
@@ -6731,9 +7394,9 @@ func (receiver *MapHandle) GetStyleLightProperty(propertyName string) (*Future[*
 // See mln_map_get_style_source in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) GetStyleSource(sourceId string) (*Future[*StyleSourceInfo], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_source), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_source(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyStyleSourceInfo)))
+	}, completionNullable(completionOf(copyStyleSourceInfo)), false)
 }
 
 // GetStyleTransitionOptions reads the style's global transition options.
@@ -6741,9 +7404,9 @@ func (receiver *MapHandle) GetStyleSource(sourceId string) (*Future[*StyleSource
 // See mln_map_get_style_transition_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) GetStyleTransitionOptions() (*Future[StyleTransitionOptions], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_transition_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_transition_options(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(copyStyleTransitionOptions))
+	}, completionOf(copyStyleTransitionOptions), false)
 }
 
 // GetStyleUrl starts an ordered copy of the last requested style URL.
@@ -6751,9 +7414,9 @@ func (receiver *MapHandle) GetStyleTransitionOptions() (*Future[StyleTransitionO
 // See mln_map_get_style_url in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *MapHandle) GetStyleUrl() (*Future[string], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_url(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(copyViewText))
+	}, completionOf(copyViewText), false)
 }
 
 // InvalidateCustomGeometrySourceRegion invalidates custom geometry source data
@@ -6762,9 +7425,9 @@ func (receiver *MapHandle) GetStyleUrl() (*Future[string], error) {
 // See mln_map_invalidate_custom_geometry_source_region in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) InvalidateCustomGeometrySourceRegion(sourceId string, bounds LatLngBounds) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_invalidate_custom_geometry_source_region), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_invalidate_custom_geometry_source_region(C.mln_map(raw), bindingView(sourceId, arena), nativeLatLngBounds(bounds, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // InvalidateCustomGeometrySourceTile invalidates custom geometry source data
@@ -6773,9 +7436,9 @@ func (receiver *MapHandle) InvalidateCustomGeometrySourceRegion(sourceId string,
 // See mln_map_invalidate_custom_geometry_source_tile in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) InvalidateCustomGeometrySourceTile(sourceId string, tileId CanonicalTileId) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_invalidate_custom_geometry_source_tile), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_invalidate_custom_geometry_source_tile(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // InvalidateCustomMvtVectorSourceTile invalidates custom MVT vector source data
@@ -6784,9 +7447,9 @@ func (receiver *MapHandle) InvalidateCustomGeometrySourceTile(sourceId string, t
 // See mln_map_invalidate_custom_mvt_vector_source_tile in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) InvalidateCustomMvtVectorSourceTile(sourceId string, tileId CanonicalTileId) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_invalidate_custom_mvt_vector_source_tile), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_invalidate_custom_mvt_vector_source_tile(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // LatLngBoundsForCamera starts an ordered wrapped-bounds query for a copied
@@ -6795,9 +7458,9 @@ func (receiver *MapHandle) InvalidateCustomMvtVectorSourceTile(sourceId string, 
 // See mln_map_lat_lng_bounds_for_camera in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) LatLngBoundsForCamera(camera CameraOptions) (*Future[LatLngBounds], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_lat_lng_bounds_for_camera), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_lat_lng_bounds_for_camera(C.mln_map(raw), bindingStore(nativeCameraOptions(camera, arena), arena), completion, diagnostic))
-	}, completionOf(copyLatLngBounds))
+	}, completionOf(copyLatLngBounds), false)
 }
 
 // LatLngBoundsForCameraUnwrapped starts an ordered unwrapped-bounds query for a
@@ -6806,9 +7469,9 @@ func (receiver *MapHandle) LatLngBoundsForCamera(camera CameraOptions) (*Future[
 // See mln_map_lat_lng_bounds_for_camera_unwrapped in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) LatLngBoundsForCameraUnwrapped(camera CameraOptions) (*Future[LatLngBounds], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_lat_lng_bounds_for_camera_unwrapped), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_lat_lng_bounds_for_camera_unwrapped(C.mln_map(raw), bindingStore(nativeCameraOptions(camera, arena), arena), completion, diagnostic))
-	}, completionOf(copyLatLngBounds))
+	}, completionOf(copyLatLngBounds), false)
 }
 
 // ListStyleLayers starts an ordered query of every style layer in style order.
@@ -6816,9 +7479,9 @@ func (receiver *MapHandle) LatLngBoundsForCameraUnwrapped(camera CameraOptions) 
 // See mln_map_list_style_layers in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) ListStyleLayers() (*Future[[]StyleLayerInfo], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_list_style_layers), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_list_style_layers(C.mln_map(raw), completion, diagnostic))
-	}, completionListOf(copyStyleLayerInfo))
+	}, completionListOf(copyStyleLayerInfo), false)
 }
 
 // ListStyleSources lists every style source in style order.
@@ -6826,9 +7489,9 @@ func (receiver *MapHandle) ListStyleLayers() (*Future[[]StyleLayerInfo], error) 
 // See mln_map_list_style_sources in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) ListStyleSources() (*Future[[]StyleSourceInfo], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_list_style_sources), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_list_style_sources(C.mln_map(raw), completion, diagnostic))
-	}, completionListOf(copyStyleSourceInfo))
+	}, completionListOf(copyStyleSourceInfo), false)
 }
 
 // MoveStyleLayer moves one style layer before another layer or to the top.
@@ -6836,9 +7499,9 @@ func (receiver *MapHandle) ListStyleSources() (*Future[[]StyleSourceInfo], error
 // See mln_map_move_style_layer in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) MoveStyleLayer(layerId string, beforeLayerId *string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_move_style_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_move_style_layer(C.mln_map(raw), bindingView(layerId, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // GetCamera copies the projection camera into out_camera.
@@ -6848,7 +7511,7 @@ func (receiver *MapHandle) MoveStyleLayer(layerId string, beforeLayerId *string)
 func (receiver *MapProjectionHandle) GetCamera() (CameraOptions, error) {
 	outCamera := C.mln_camera_options_default()
 	outCamera.size = C.uint32_t(unsafe.Sizeof(outCamera))
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_get_camera), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_projection_get_camera(C.mln_map_projection(raw), &outCamera, diagnostic))
 	}, func(arena *bindingArena) CameraOptions {
 		return copyCameraOptions(outCamera)
@@ -6861,7 +7524,7 @@ func (receiver *MapProjectionHandle) GetCamera() (CameraOptions, error) {
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
 func (receiver *MapProjectionHandle) LatLngForPixel(point ScreenPoint) (LatLng, error) {
 	var outCoordinate C.mln_lat_lng
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_lat_lng_for_pixel), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_projection_lat_lng_for_pixel(C.mln_map_projection(raw), nativeScreenPoint(point, arena), &outCoordinate, diagnostic))
 	}, func(arena *bindingArena) LatLng {
 		return copyLatLng(outCoordinate)
@@ -6875,7 +7538,7 @@ func (receiver *MapProjectionHandle) LatLngForPixel(point ScreenPoint) (LatLng, 
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
 func (receiver *MapProjectionHandle) LatLngForPixelUnwrapped(point ScreenPoint) (LatLng, error) {
 	var outCoordinate C.mln_lat_lng
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_lat_lng_for_pixel_unwrapped), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_projection_lat_lng_for_pixel_unwrapped(C.mln_map_projection(raw), nativeScreenPoint(point, arena), &outCoordinate, diagnostic))
 	}, func(arena *bindingArena) LatLng {
 		return copyLatLng(outCoordinate)
@@ -6889,7 +7552,7 @@ func (receiver *MapProjectionHandle) LatLngForPixelUnwrapped(point ScreenPoint) 
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
 func (receiver *MapProjectionHandle) MetersPerPixelAtLatitude(latitude float64) (float64, error) {
 	var outMetersPerPixel C.double
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_meters_per_pixel_at_latitude), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_projection_meters_per_pixel_at_latitude(C.mln_map_projection(raw), C.double(latitude), &outMetersPerPixel, diagnostic))
 	}, func(arena *bindingArena) float64 {
 		return float64(outMetersPerPixel)
@@ -6902,7 +7565,7 @@ func (receiver *MapProjectionHandle) MetersPerPixelAtLatitude(latitude float64) 
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
 func (receiver *MapProjectionHandle) PixelForLatLng(coordinate LatLng) (ScreenPoint, error) {
 	var outPoint C.mln_screen_point
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_pixel_for_lat_lng), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_projection_pixel_for_lat_lng(C.mln_map_projection(raw), nativeLatLng(coordinate, arena), &outPoint, diagnostic))
 	}, func(arena *bindingArena) ScreenPoint {
 		return copyScreenPoint(outPoint)
@@ -6914,7 +7577,7 @@ func (receiver *MapProjectionHandle) PixelForLatLng(coordinate LatLng) (ScreenPo
 // See mln_map_projection_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
 func (receiver *MapProjectionHandle) Close() error {
-	return bindingDo(bindingClosing(receiver.owner(), C.binding_operation_mln_map_projection_release), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_projection_release(C.mln_map_projection(raw), diagnostic))
 	})
 }
@@ -6924,7 +7587,7 @@ func (receiver *MapProjectionHandle) Close() error {
 // See mln_map_projection_set_camera in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
 func (receiver *MapProjectionHandle) SetCamera(camera CameraOptions) error {
-	return bindingDo(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_set_camera), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_projection_set_camera(C.mln_map_projection(raw), bindingStore(nativeCameraOptions(camera, arena), arena), diagnostic))
 	})
 }
@@ -6934,9 +7597,9 @@ func (receiver *MapProjectionHandle) SetCamera(camera CameraOptions) error {
 // See mln_map_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *MapHandle) Close() (*Future[struct{}], error) {
-	return bindingStart(bindingClosing(receiver.owner(), C.binding_operation_mln_map_release), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_release(C.mln_map(raw), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // RemoveFeatureState removes per-feature state from this map.
@@ -6944,9 +7607,9 @@ func (receiver *MapHandle) Close() (*Future[struct{}], error) {
 // See mln_map_remove_feature_state in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *MapHandle) RemoveFeatureState(selector FeatureStateSelector) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_remove_feature_state), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_remove_feature_state(C.mln_map(raw), bindingStore(nativeFeatureStateSelector(selector, arena), arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // RemoveStyleImage removes one runtime style image by ID.
@@ -6954,9 +7617,9 @@ func (receiver *MapHandle) RemoveFeatureState(selector FeatureStateSelector) (*F
 // See mln_map_remove_style_image in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) RemoveStyleImage(imageId string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_remove_style_image), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_remove_style_image(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // RemoveStyleLayer removes one style layer by ID.
@@ -6964,9 +7627,9 @@ func (receiver *MapHandle) RemoveStyleImage(imageId string) (*Future[CommandComp
 // See mln_map_remove_style_layer in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) RemoveStyleLayer(layerId string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_remove_style_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_remove_style_layer(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // RemoveStyleSource removes one style source by ID.
@@ -6974,9 +7637,9 @@ func (receiver *MapHandle) RemoveStyleLayer(layerId string) (*Future[CommandComp
 // See mln_map_remove_style_source in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) RemoveStyleSource(sourceId string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_remove_style_source), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_remove_style_source(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // RequestRepaint requests a repaint for a continuous map.
@@ -6984,9 +7647,9 @@ func (receiver *MapHandle) RemoveStyleSource(sourceId string) (*Future[CommandCo
 // See mln_map_request_repaint in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *MapHandle) RequestRepaint() (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_request_repaint), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_request_repaint(C.mln_map(raw), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // RequestStillImage requests one still image for a static or tile map.
@@ -6994,9 +7657,9 @@ func (receiver *MapHandle) RequestRepaint() (*Future[CommandCompletion], error) 
 // See mln_map_request_still_image in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *MapHandle) RequestStillImage() (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_request_still_image), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_request_still_image(C.mln_map(raw), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // Resize submits the sole post-creation logical extent update.
@@ -7004,9 +7667,9 @@ func (receiver *MapHandle) RequestStillImage() (*Future[struct{}], error) {
 // See mln_map_resize in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *MapHandle) Resize(extent LogicalExtent) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_resize), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_resize(C.mln_map(raw), nativeLogicalExtent(extent, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetBounds submits a copied camera-constraint command.
@@ -7014,9 +7677,9 @@ func (receiver *MapHandle) Resize(extent LogicalExtent) (*Future[CommandCompleti
 // See mln_map_set_bounds in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) SetBounds(options BoundOptions) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_bounds), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_bounds(C.mln_map(raw), bindingStore(nativeBoundOptions(options, arena), arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetCustomGeometrySourceTileData sets custom geometry source data for one
@@ -7025,9 +7688,9 @@ func (receiver *MapHandle) SetBounds(options BoundOptions) (*Future[CommandCompl
 // See mln_map_set_custom_geometry_source_tile_data in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) SetCustomGeometrySourceTileData(sourceId string, tileId CanonicalTileId, data []byte) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_custom_geometry_source_tile_data), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_custom_geometry_source_tile_data(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(data, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetCustomMvtVectorSourceTileData sets custom MVT vector source data for one
@@ -7036,9 +7699,9 @@ func (receiver *MapHandle) SetCustomGeometrySourceTileData(sourceId string, tile
 // See mln_map_set_custom_mvt_vector_source_tile_data in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) SetCustomMvtVectorSourceTileData(sourceId string, tileId CanonicalTileId, data []byte) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_custom_mvt_vector_source_tile_data), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_custom_mvt_vector_source_tile_data(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(data, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetCustomMvtVectorSourceTileError reports a custom MVT vector source error
@@ -7047,9 +7710,9 @@ func (receiver *MapHandle) SetCustomMvtVectorSourceTileData(sourceId string, til
 // See mln_map_set_custom_mvt_vector_source_tile_error in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) SetCustomMvtVectorSourceTileError(sourceId string, tileId CanonicalTileId, message string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_custom_mvt_vector_source_tile_error), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_custom_mvt_vector_source_tile_error(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(message, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetDebugOptions submits a debug-overlay command.
@@ -7057,9 +7720,9 @@ func (receiver *MapHandle) SetCustomMvtVectorSourceTileError(sourceId string, ti
 // See mln_map_set_debug_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) SetDebugOptions(options MapDebugOption) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_debug_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_debug_options(C.mln_map(raw), C.uint32_t(options), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetEventMask selects which map-originated event types this map queues.
@@ -7067,9 +7730,9 @@ func (receiver *MapHandle) SetDebugOptions(options MapDebugOption) (*Future[Comm
 // See mln_map_set_event_mask in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *MapHandle) SetEventMask(mask RuntimeEventMask) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_event_mask), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_event_mask(C.mln_map(raw), C.uint64_t(mask), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetFeatureState submits a copied per-feature-state command.
@@ -7077,9 +7740,9 @@ func (receiver *MapHandle) SetEventMask(mask RuntimeEventMask) (*Future[CommandC
 // See mln_map_set_feature_state in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *MapHandle) SetFeatureState(selector FeatureStateSelector, state []byte) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_feature_state), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_feature_state(C.mln_map(raw), bindingStore(nativeFeatureStateSelector(selector, arena), arena), bindingView(state, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetFreeCameraOptions submits a copied free-camera command.
@@ -7087,9 +7750,9 @@ func (receiver *MapHandle) SetFeatureState(selector FeatureStateSelector, state 
 // See mln_map_set_free_camera_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_free_camera_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_free_camera_options(C.mln_map(raw), bindingStore(nativeFreeCameraOptions(options, arena), arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetGeojsonSourceData updates one GeoJSON source with prepared inline data.
@@ -7097,9 +7760,9 @@ func (receiver *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) (*Fut
 // See mln_map_set_geojson_source_data in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) SetGeojsonSourceData(sourceId string, data *GeojsonSourceDataHandle) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_geojson_source_data), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geojson_source_data(C.mln_map(raw), bindingView(sourceId, arena), C.mln_geojson_source_data(arena.lease(data.owner())), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetGeojsonSourceSynchronousTiling overrides one GeoJSON source's synchronous
@@ -7108,9 +7771,9 @@ func (receiver *MapHandle) SetGeojsonSourceData(sourceId string, data *GeojsonSo
 // See mln_map_set_geojson_source_synchronous_tiling in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) SetGeojsonSourceSynchronousTiling(sourceId string, enabled bool) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_geojson_source_synchronous_tiling), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geojson_source_synchronous_tiling(C.mln_map(raw), bindingView(sourceId, arena), C.bool(enabled), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetGeojsonSourceUrl updates one GeoJSON source to load data from a URL.
@@ -7118,9 +7781,9 @@ func (receiver *MapHandle) SetGeojsonSourceSynchronousTiling(sourceId string, en
 // See mln_map_set_geojson_source_url in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) SetGeojsonSourceUrl(sourceId string, url string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_geojson_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geojson_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetGlobalStateProperty submits a global-state JSON value. JSON null restores
@@ -7129,9 +7792,9 @@ func (receiver *MapHandle) SetGeojsonSourceUrl(sourceId string, url string) (*Fu
 // See mln_map_set_global_state_property in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) SetGlobalStateProperty(propertyName string, value []byte) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_global_state_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_global_state_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetImageSourceCoordinates updates image source coordinates.
@@ -7139,9 +7802,9 @@ func (receiver *MapHandle) SetGlobalStateProperty(propertyName string, value []b
 // See mln_map_set_image_source_coordinates in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) SetImageSourceCoordinates(sourceId string, coordinates []LatLng) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_image_source_coordinates), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_image_source_coordinates(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetImageSourceImage updates an image source with inline image pixels.
@@ -7149,9 +7812,9 @@ func (receiver *MapHandle) SetImageSourceCoordinates(sourceId string, coordinate
 // See mln_map_set_image_source_image in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) SetImageSourceImage(sourceId string, image PremultipliedRgba8Image) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_image_source_image), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_image_source_image(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetImageSourceUrl updates an image source to load its image from a URL.
@@ -7159,9 +7822,9 @@ func (receiver *MapHandle) SetImageSourceImage(sourceId string, image Premultipl
 // See mln_map_set_image_source_url in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) SetImageSourceUrl(sourceId string, url string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_image_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_image_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetProjectionMode submits copied axonometric rendering option fields.
@@ -7169,9 +7832,9 @@ func (receiver *MapHandle) SetImageSourceUrl(sourceId string, url string) (*Futu
 // See mln_map_set_projection_mode in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) SetProjectionMode(mode ProjectionMode) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_projection_mode), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_projection_mode(C.mln_map(raw), bindingStore(nativeProjectionMode(mode, arena), arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetRenderingStatsViewEnabled submits a rendering-stats visibility command.
@@ -7179,9 +7842,9 @@ func (receiver *MapHandle) SetProjectionMode(mode ProjectionMode) (*Future[Comma
 // See mln_map_set_rendering_stats_view_enabled in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) SetRenderingStatsViewEnabled(enabled bool) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_rendering_stats_view_enabled), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_rendering_stats_view_enabled(C.mln_map(raw), C.bool(enabled), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetStyleImage sets one runtime style image.
@@ -7189,9 +7852,9 @@ func (receiver *MapHandle) SetRenderingStatsViewEnabled(enabled bool) (*Future[C
 // See mln_map_set_style_image in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) SetStyleImage(imageId string, image PremultipliedRgba8Image, options *StyleImageOptions) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_image), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_image(C.mln_map(raw), bindingView(imageId, arena), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), bindingStoreOptional(options, arena, nativeStyleImageOptions), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetStyleJson queues an inline style JSON command.
@@ -7199,9 +7862,9 @@ func (receiver *MapHandle) SetStyleImage(imageId string, image PremultipliedRgba
 // See mln_map_set_style_json in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *MapHandle) SetStyleJson(json []byte) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_json(C.mln_map(raw), bindingView(json, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetStyleLayerProperty sets one layer property using its MapLibre style-spec
@@ -7210,9 +7873,9 @@ func (receiver *MapHandle) SetStyleJson(json []byte) (*Future[CommandCompletion]
 // See mln_map_set_style_layer_property in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) SetStyleLayerProperty(layerId string, propertyName string, value []byte) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_layer_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_layer_property(C.mln_map(raw), bindingView(layerId, arena), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetStyleLightJson sets the style light from a style-spec light JSON object.
@@ -7220,9 +7883,9 @@ func (receiver *MapHandle) SetStyleLayerProperty(layerId string, propertyName st
 // See mln_map_set_style_light_json in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) SetStyleLightJson(lightJson []byte) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_light_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_light_json(C.mln_map(raw), bindingView(lightJson, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetStyleLightProperty sets one style light property using its MapLibre
@@ -7231,9 +7894,9 @@ func (receiver *MapHandle) SetStyleLightJson(lightJson []byte) (*Future[CommandC
 // See mln_map_set_style_light_property in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) SetStyleLightProperty(propertyName string, value []byte) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_light_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_light_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetStyleSourceVolatile sets whether one style source stores fetched tiles in
@@ -7242,9 +7905,9 @@ func (receiver *MapHandle) SetStyleLightProperty(propertyName string, value []by
 // See mln_map_set_style_source_volatile in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) SetStyleSourceVolatile(sourceId string, isVolatile bool) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_source_volatile), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_source_volatile(C.mln_map(raw), bindingView(sourceId, arena), C.bool(isVolatile), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetStyleTransitionOptions sets the style's global transition options.
@@ -7252,9 +7915,9 @@ func (receiver *MapHandle) SetStyleSourceVolatile(sourceId string, isVolatile bo
 // See mln_map_set_style_transition_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 func (receiver *MapHandle) SetStyleTransitionOptions(options StyleTransitionOptions) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_transition_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_transition_options(C.mln_map(raw), bindingStore(nativeStyleTransitionOptions(options, arena), arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetStyleUrl queues a style URL command.
@@ -7262,9 +7925,9 @@ func (receiver *MapHandle) SetStyleTransitionOptions(options StyleTransitionOpti
 // See mln_map_set_style_url in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *MapHandle) SetStyleUrl(url string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_url(C.mln_map(raw), bindingView(url, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetTileOptions submits a copied tile-options command.
@@ -7272,9 +7935,9 @@ func (receiver *MapHandle) SetStyleUrl(url string) (*Future[CommandCompletion], 
 // See mln_map_set_tile_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) SetTileOptions(options MapTileOptions) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_tile_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_tile_options(C.mln_map(raw), bindingStore(nativeMapTileOptions(options, arena), arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // SetViewportOptions submits a copied viewport-options command.
@@ -7282,9 +7945,9 @@ func (receiver *MapHandle) SetTileOptions(options MapTileOptions) (*Future[Comma
 // See mln_map_set_viewport_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) SetViewportOptions(options MapViewportOptions) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_viewport_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_viewport_options(C.mln_map(raw), bindingStore(nativeMapViewportOptions(options, arena), arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // UpdateCamera submits one atomic camera update.
@@ -7292,9 +7955,9 @@ func (receiver *MapHandle) SetViewportOptions(options MapViewportOptions) (*Futu
 // See mln_map_update_camera in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) UpdateCamera(update CameraUpdate) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_update_camera), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_update_camera(C.mln_map(raw), bindingStore(nativeCameraUpdate(update, arena), arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // NetworkGetStatus reads MapLibre Native's process-global network status.
@@ -7303,7 +7966,7 @@ func (receiver *MapHandle) UpdateCamera(update CameraUpdate) (*Future[CommandCom
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func NetworkGetStatus() (NetworkStatus, error) {
 	var outStatus C.uint32_t
-	return bindingGet(bindingGlobal(C.binding_operation_mln_network_get_status), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_network_get_status(&outStatus, diagnostic))
 	}, func(arena *bindingArena) NetworkStatus {
 		return NetworkStatus(outStatus)
@@ -7315,7 +7978,7 @@ func NetworkGetStatus() (NetworkStatus, error) {
 // See mln_network_set_status in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func NetworkSetStatus(status NetworkStatus) error {
-	return bindingDo(bindingGlobal(C.binding_operation_mln_network_set_status), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_network_set_status(C.uint32_t(status), diagnostic))
 	})
 }
@@ -7326,7 +7989,7 @@ func NetworkSetStatus(status NetworkStatus) error {
 // See mln_opengl_supported_context_provider_mask in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 func OpenglSupportedContextProviderMask() (OpenglContextProviderFlag, error) {
-	return bindingDirect(bindingGlobal(C.binding_operation_mln_opengl_supported_context_provider_mask), func(arena *bindingArena, raw uint64) OpenglContextProviderFlag {
+	return bindingDirect(bindingGlobal(), func(arena *bindingArena, raw uint64) OpenglContextProviderFlag {
 		return OpenglContextProviderFlag(C.mln_opengl_supported_context_provider_mask())
 	})
 }
@@ -7337,7 +8000,7 @@ func OpenglSupportedContextProviderMask() (OpenglContextProviderFlag, error) {
 // See mln_plugin_get_register_function_v1 in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html
 func PluginGetRegisterFunctionV1() (uintptr, error) {
-	return bindingDirect(bindingGlobal(C.binding_operation_mln_plugin_get_register_function_v1), func(arena *bindingArena, raw uint64) uintptr {
+	return bindingDirect(bindingGlobal(), func(arena *bindingArena, raw uint64) uintptr {
 		return uintptr(unsafe.Pointer(C.mln_plugin_get_register_function_v1()))
 	})
 }
@@ -7349,7 +8012,7 @@ func PluginGetRegisterFunctionV1() (uintptr, error) {
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
 func ProjectedMetersForLatLng(coordinate LatLng) (ProjectedMeters, error) {
 	var outMeters C.mln_projected_meters
-	return bindingGet(bindingGlobal(C.binding_operation_mln_projected_meters_for_lat_lng), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_projected_meters_for_lat_lng(nativeLatLng(coordinate, arena), &outMeters, diagnostic))
 	}, func(arena *bindingArena) ProjectedMeters {
 		return copyProjectedMeters(outMeters)
@@ -7363,7 +8026,7 @@ func ProjectedMetersForLatLng(coordinate LatLng) (ProjectedMeters, error) {
 func (receiver *RenderFrameBatchHandle) Get() (RenderFrameBatchView, error) {
 	var outView C.mln_render_frame_batch_view
 	outView.size = C.uint32_t(unsafe.Sizeof(outView))
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_frame_batch_get), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingRead(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_frame_batch_get(C.mln_render_frame_batch(raw), &outView, diagnostic))
 	}, func(arena *bindingArena) RenderFrameBatchView {
 		return copyRenderFrameBatchView(outView)
@@ -7375,7 +8038,7 @@ func (receiver *RenderFrameBatchHandle) Get() (RenderFrameBatchView, error) {
 // See mln_render_frame_batch_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *RenderFrameBatchHandle) Close() error {
-	_, err := bindingDirect(bindingConsuming(receiver.owner(), C.binding_operation_mln_render_frame_batch_release), func(arena *bindingArena, raw uint64) struct{} {
+	_, err := bindingDirect(bindingConsuming(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_render_frame_batch_release(C.mln_render_frame_batch(raw))
 		return struct{}{}
 	})
@@ -7390,7 +8053,7 @@ func (receiver *RenderFrameBatchHandle) Close() error {
 func (receiver *RenderSessionHandle) Abandon() (RenderAbandonResult, error) {
 	var outResult C.mln_render_abandon_result
 	outResult.size = C.uint32_t(unsafe.Sizeof(outResult))
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_abandon), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_abandon(C.mln_render_session(raw), &outResult, diagnostic))
 	}, func(arena *bindingArena) RenderAbandonResult {
 		return copyRenderAbandonResult(outResult)
@@ -7404,7 +8067,7 @@ func (receiver *RenderSessionHandle) Abandon() (RenderAbandonResult, error) {
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *RenderSessionHandle) AcquireFrame() (*AcquiredFrameHandle, error) {
 	var outFrame C.mln_acquired_frame
-	return bindingGetUnless(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_acquire_frame), int32(C.MLN_STATUS_NOT_READY), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGetUnless(bindingLive(receiver.owner()), int32(C.MLN_STATUS_NOT_READY), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_acquire_frame(C.mln_render_session(raw), &outFrame, diagnostic))
 	}, func(arena *bindingArena) *AcquiredFrameHandle {
 		adopted := adoptAcquiredFrameHandle(uint64(outFrame), receiver)
@@ -7421,9 +8084,9 @@ func (receiver *RenderSessionHandle) AcquireFrame() (*AcquiredFrameHandle, error
 // See mln_render_session_barrier in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *RenderSessionHandle) Barrier() (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_barrier), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_barrier(C.mln_render_session(raw), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // ClearData starts asynchronous renderer-data clearing.
@@ -7431,9 +8094,9 @@ func (receiver *RenderSessionHandle) Barrier() (*Future[struct{}], error) {
 // See mln_render_session_clear_data in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *RenderSessionHandle) ClearData() (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_clear_data), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_clear_data(C.mln_render_session(raw), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // CreateProjection copies the last completed rendered transform into an
@@ -7446,7 +8109,7 @@ func (receiver *RenderSessionHandle) ClearData() (*Future[struct{}], error) {
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *RenderSessionHandle) CreateProjection() (*MapProjectionHandle, error) {
 	var outProjection C.mln_map_projection
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_create_projection), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_create_projection(C.mln_render_session(raw), &outProjection, diagnostic))
 	}, func(arena *bindingArena) *MapProjectionHandle {
 		adopted := adoptMapProjectionHandle(uint64(outProjection), nil)
@@ -7459,9 +8122,9 @@ func (receiver *RenderSessionHandle) CreateProjection() (*MapProjectionHandle, e
 // See mln_render_session_detach in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *RenderSessionHandle) Detach() (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_detach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_detach(C.mln_render_session(raw), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // DrainFrameResults drains every currently queued terminal frame result into an
@@ -7472,7 +8135,7 @@ func (receiver *RenderSessionHandle) Detach() (*Future[struct{}], error) {
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *RenderSessionHandle) DrainFrameResults() (*RenderFrameBatchHandle, error) {
 	var outBatch C.mln_render_frame_batch
-	return bindingGetUnless(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_drain_frame_results), int32(C.MLN_STATUS_NOT_READY), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGetUnless(bindingLive(receiver.owner()), int32(C.MLN_STATUS_NOT_READY), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_drain_frame_results(C.mln_render_session(raw), &outBatch, diagnostic))
 	}, func(arena *bindingArena) *RenderFrameBatchHandle {
 		adopted := adoptRenderFrameBatchHandle(uint64(outBatch), nil)
@@ -7485,9 +8148,9 @@ func (receiver *RenderSessionHandle) DrainFrameResults() (*RenderFrameBatchHandl
 // See mln_render_session_dump_debug_logs in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *RenderSessionHandle) DumpDebugLogs() (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_dump_debug_logs), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_dump_debug_logs(C.mln_render_session(raw), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // GetCapabilities returns the immutable capabilities fixed during attachment.
@@ -7497,7 +8160,7 @@ func (receiver *RenderSessionHandle) DumpDebugLogs() (*Future[struct{}], error) 
 func (receiver *RenderSessionHandle) GetCapabilities() (RenderSessionCapabilities, error) {
 	var outCapabilities C.mln_render_session_capabilities
 	outCapabilities.size = C.uint32_t(unsafe.Sizeof(outCapabilities))
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_get_capabilities), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_get_capabilities(C.mln_render_session(raw), &outCapabilities, diagnostic))
 	}, func(arena *bindingArena) RenderSessionCapabilities {
 		return copyRenderSessionCapabilities(outCapabilities)
@@ -7511,7 +8174,7 @@ func (receiver *RenderSessionHandle) GetCapabilities() (RenderSessionCapabilitie
 func (receiver *RenderSessionHandle) GetSnapshot() (RenderSessionSnapshot, error) {
 	var outSnapshot C.mln_render_session_snapshot
 	outSnapshot.size = C.uint32_t(unsafe.Sizeof(outSnapshot))
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_get_snapshot), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_get_snapshot(C.mln_render_session(raw), &outSnapshot, diagnostic))
 	}, func(arena *bindingArena) RenderSessionSnapshot {
 		return copyRenderSessionSnapshot(outSnapshot)
@@ -7525,9 +8188,9 @@ func (receiver *RenderSessionHandle) GetSnapshot() (RenderSessionSnapshot, error
 // See mln_render_session_query_feature_extensions in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
 func (receiver *RenderSessionHandle) QueryFeatureExtensions(sourceId string, feature []byte, extension string, extensionField string, arguments *[]byte) (*Future[[]byte], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_query_feature_extensions), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_query_feature_extensions(C.mln_render_session(raw), bindingView(sourceId, arena), bindingView(feature, arena), bindingView(extension, arena), bindingView(extensionField, arena), bindingStoreOptional(arguments, arena, bindingView[[]byte]), completion, diagnostic))
-	}, completionOf(copyViewBytes))
+	}, completionOf(copyViewBytes), false)
 }
 
 // QueryRenderedFeatures starts a rendered-feature query against the session's
@@ -7536,9 +8199,9 @@ func (receiver *RenderSessionHandle) QueryFeatureExtensions(sourceId string, fea
 // See mln_render_session_query_rendered_features in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
 func (receiver *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) (*Future[[]QueriedFeature], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_query_rendered_features), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_query_rendered_features(C.mln_render_session(raw), bindingStore(nativeRenderedQueryGeometry(geometry, arena), arena), bindingStoreOptional(options, arena, nativeRenderedFeatureQueryOptions), completion, diagnostic))
-	}, completionListOf(copyQueriedFeature))
+	}, completionListOf(copyQueriedFeature), false)
 }
 
 // QuerySourceFeatures starts a source-feature query against the session's
@@ -7547,9 +8210,9 @@ func (receiver *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQuer
 // See mln_render_session_query_source_features in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
 func (receiver *RenderSessionHandle) QuerySourceFeatures(sourceId string, options *SourceFeatureQueryOptions) (*Future[[]QueriedFeature], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_query_source_features), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_query_source_features(C.mln_render_session(raw), bindingView(sourceId, arena), bindingStoreOptional(options, arena, nativeSourceFeatureQueryOptions), completion, diagnostic))
-	}, completionListOf(copyQueriedFeature))
+	}, completionListOf(copyQueriedFeature), false)
 }
 
 // ReadTexture reads back the latest frame of the session's owned texture as
@@ -7558,9 +8221,9 @@ func (receiver *RenderSessionHandle) QuerySourceFeatures(sourceId string, option
 // See mln_render_session_read_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 func (receiver *RenderSessionHandle) ReadTexture() (*Future[TextureReadbackResult], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_read_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_read_texture(C.mln_render_session(raw), completion, diagnostic))
-	}, completionOf(copyTextureReadbackResult))
+	}, completionOf(copyTextureReadbackResult), false)
 }
 
 // ReduceMemoryUse starts best-effort release of renderer caches.
@@ -7568,9 +8231,9 @@ func (receiver *RenderSessionHandle) ReadTexture() (*Future[TextureReadbackResul
 // See mln_render_session_reduce_memory_use in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *RenderSessionHandle) ReduceMemoryUse() (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_reduce_memory_use), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_reduce_memory_use(C.mln_render_session(raw), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // Close retires a detached or abandoned session handle. The call is CPU-only
@@ -7581,7 +8244,7 @@ func (receiver *RenderSessionHandle) ReduceMemoryUse() (*Future[struct{}], error
 // See mln_render_session_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *RenderSessionHandle) Close() error {
-	return bindingDo(bindingClosing(receiver.owner(), C.binding_operation_mln_render_session_release), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_release(C.mln_render_session(raw), diagnostic))
 	})
 }
@@ -7593,7 +8256,7 @@ func (receiver *RenderSessionHandle) Close() error {
 // See mln_render_session_request_frame in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *RenderSessionHandle) RequestFrame(demand FrameDemand) error {
-	return bindingDo(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_request_frame), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_request_frame(C.mln_render_session(raw), bindingStore(nativeFrameDemand(demand, arena), arena), diagnostic))
 	})
 }
@@ -7608,9 +8271,9 @@ func (receiver *RenderSessionHandle) RequestFrame(demand FrameDemand) error {
 // See mln_render_session_resize in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *RenderSessionHandle) Resize(extent LogicalExtent) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_resize), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_resize(C.mln_render_session(raw), nativeLogicalExtent(extent, arena), completion, diagnostic))
-	}, completionCommand)
+	}, completionCommand, true)
 }
 
 // ServiceDriverWork services every queued item for a caller-graphics-thread
@@ -7622,7 +8285,7 @@ func (receiver *RenderSessionHandle) Resize(extent LogicalExtent) (*Future[Comma
 // See mln_render_session_service_driver_work in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *RenderSessionHandle) ServiceDriverWork() error {
-	return bindingDo(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_service_driver_work), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_service_driver_work(C.mln_render_session(raw), diagnostic))
 	})
 }
@@ -7633,9 +8296,9 @@ func (receiver *RenderSessionHandle) ServiceDriverWork() error {
 // See mln_render_session_set_metal_borrowed_texture_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 func (receiver *RenderSessionHandle) SetMetalBorrowedTextureTarget(descriptor MetalBorrowedTextureDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_set_metal_borrowed_texture_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_metal_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeMetalBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // SetMetalSurfaceTarget starts an ordered Metal surface replacement.
@@ -7643,9 +8306,9 @@ func (receiver *RenderSessionHandle) SetMetalBorrowedTextureTarget(descriptor Me
 // See mln_render_session_set_metal_surface_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
 func (receiver *RenderSessionHandle) SetMetalSurfaceTarget(descriptor MetalSurfaceDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_set_metal_surface_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_metal_surface_target(C.mln_render_session(raw), bindingStore(nativeMetalSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // SetOpenglBorrowedTextureTarget starts an ordered replacement of every texture
@@ -7654,9 +8317,9 @@ func (receiver *RenderSessionHandle) SetMetalSurfaceTarget(descriptor MetalSurfa
 // See mln_render_session_set_opengl_borrowed_texture_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 func (receiver *RenderSessionHandle) SetOpenglBorrowedTextureTarget(descriptor OpenglBorrowedTextureDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_set_opengl_borrowed_texture_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_opengl_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeOpenglBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // SetOpenglSurfaceTarget starts an ordered OpenGL surface replacement.
@@ -7664,9 +8327,9 @@ func (receiver *RenderSessionHandle) SetOpenglBorrowedTextureTarget(descriptor O
 // See mln_render_session_set_opengl_surface_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
 func (receiver *RenderSessionHandle) SetOpenglSurfaceTarget(descriptor OpenglSurfaceDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_set_opengl_surface_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_opengl_surface_target(C.mln_render_session(raw), bindingStore(nativeOpenglSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // SetVulkanBorrowedTextureTarget starts an ordered replacement of every image
@@ -7675,9 +8338,9 @@ func (receiver *RenderSessionHandle) SetOpenglSurfaceTarget(descriptor OpenglSur
 // See mln_render_session_set_vulkan_borrowed_texture_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 func (receiver *RenderSessionHandle) SetVulkanBorrowedTextureTarget(descriptor VulkanBorrowedTextureDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_set_vulkan_borrowed_texture_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_vulkan_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeVulkanBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // SetVulkanSurfaceTarget starts an ordered Vulkan surface replacement.
@@ -7685,9 +8348,9 @@ func (receiver *RenderSessionHandle) SetVulkanBorrowedTextureTarget(descriptor V
 // See mln_render_session_set_vulkan_surface_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
 func (receiver *RenderSessionHandle) SetVulkanSurfaceTarget(descriptor VulkanSurfaceDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_set_vulkan_surface_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_vulkan_surface_target(C.mln_render_session(raw), bindingStore(nativeVulkanSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // SetWebgpuBorrowedTextureTarget starts an ordered replacement of every texture
@@ -7696,9 +8359,9 @@ func (receiver *RenderSessionHandle) SetVulkanSurfaceTarget(descriptor VulkanSur
 // See mln_render_session_set_webgpu_borrowed_texture_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 func (receiver *RenderSessionHandle) SetWebgpuBorrowedTextureTarget(descriptor WebgpuBorrowedTextureDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_set_webgpu_borrowed_texture_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_webgpu_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeWebgpuBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // SetWebgpuSurfaceTarget starts an ordered WebGPU surface replacement.
@@ -7706,9 +8369,9 @@ func (receiver *RenderSessionHandle) SetWebgpuBorrowedTextureTarget(descriptor W
 // See mln_render_session_set_webgpu_surface_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
 func (receiver *RenderSessionHandle) SetWebgpuSurfaceTarget(descriptor WebgpuSurfaceDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_set_webgpu_surface_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_webgpu_surface_target(C.mln_render_session(raw), bindingStore(nativeWebgpuSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // Complete completes a C API resource provider request.
@@ -7716,7 +8379,7 @@ func (receiver *RenderSessionHandle) SetWebgpuSurfaceTarget(descriptor WebgpuSur
 // See mln_resource_request_complete in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *ResourceRequestHandle) Complete(response ResourceResponse) error {
-	return bindingDo(bindingCompleting(receiver.owner(), C.binding_operation_mln_resource_request_complete), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_resource_request_complete(C.mln_resource_request(raw), bindingStore(nativeResourceResponse(response, arena), arena), diagnostic))
 	})
 }
@@ -7728,7 +8391,7 @@ func (receiver *ResourceRequestHandle) Complete(response ResourceResponse) error
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *ResourceRequestHandle) IsCancelled() (bool, error) {
 	var outCancelled C.bool
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_resource_request_is_cancelled), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_resource_request_is_cancelled(C.mln_resource_request(raw), &outCancelled, diagnostic))
 	}, func(arena *bindingArena) bool {
 		return bool(outCancelled)
@@ -7741,7 +8404,7 @@ func (receiver *ResourceRequestHandle) IsCancelled() (bool, error) {
 // See mln_resource_request_pass_through in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *ResourceRequestHandle) PassThrough() error {
-	return bindingDo(bindingCompleting(receiver.owner(), C.binding_operation_mln_resource_request_pass_through), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_resource_request_pass_through(C.mln_resource_request(raw), diagnostic))
 	})
 }
@@ -7751,7 +8414,11 @@ func (receiver *ResourceRequestHandle) PassThrough() error {
 // See mln_resource_request_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *ResourceRequestHandle) Close() error {
-	return bindingCloseDecision(receiver.owner(), C.binding_operation_mln_resource_request_release)
+	_, err := bindingDirect(bindingConsuming(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
+		C.mln_resource_request_release(C.mln_resource_request(raw))
+		return struct{}{}
+	})
+	return err
 }
 
 // SetCancelCallback registers a callback that runs when MapLibre cancels a C
@@ -7761,7 +8428,7 @@ func (receiver *ResourceRequestHandle) Close() error {
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *ResourceRequestHandle) SetCancelCallback(handler ResourceRequestCancelHandler) (bool, error) {
 	var outCancelled C.bool
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_resource_request_set_cancel_callback), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_resource_request_set_cancel_callback(C.mln_resource_request(raw), bindingStore(nativeResourceRequestCancelHandler(handler, arena), arena), &outCancelled, diagnostic))
 	}, func(arena *bindingArena) bool {
 		if bool(outCancelled) {
@@ -7776,7 +8443,7 @@ func (receiver *ResourceRequestHandle) SetCancelCallback(handler ResourceRequest
 // See mln_resource_transform_request_complete in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *ResourceTransformRequestHandle) Complete(url string) error {
-	return bindingDo(bindingLive(receiver.owner(), C.binding_operation_mln_resource_transform_request_complete), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_resource_transform_request_complete(C.mln_resource_transform_request(raw), bindingView(url, arena), diagnostic))
 	})
 }
@@ -7786,7 +8453,7 @@ func (receiver *ResourceTransformRequestHandle) Complete(url string) error {
 // See mln_resource_transform_request_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *ResourceTransformRequestHandle) Close() error {
-	_, err := bindingDirect(bindingConsuming(receiver.owner(), C.binding_operation_mln_resource_transform_request_release), func(arena *bindingArena, raw uint64) struct{} {
+	_, err := bindingDirect(bindingConsuming(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_resource_transform_request_release(C.mln_resource_transform_request(raw))
 		return struct{}{}
 	})
@@ -7798,9 +8465,9 @@ func (receiver *ResourceTransformRequestHandle) Close() error {
 // See mln_runtime_clear_event_handler in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *RuntimeHandle) ClearEventHandler() (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_clear_event_handler), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_clear_event_handler(C.mln_runtime(raw), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // ClearHttpHeaderTransform clears the runtime-scoped outgoing HTTP header
@@ -7809,9 +8476,9 @@ func (receiver *RuntimeHandle) ClearEventHandler() (*Future[struct{}], error) {
 // See mln_runtime_clear_http_header_transform in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *RuntimeHandle) ClearHttpHeaderTransform() (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_clear_http_header_transform), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_clear_http_header_transform(C.mln_runtime(raw), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // ClearResourceProvider clears the runtime-scoped network resource provider.
@@ -7819,9 +8486,9 @@ func (receiver *RuntimeHandle) ClearHttpHeaderTransform() (*Future[struct{}], er
 // See mln_runtime_clear_resource_provider in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *RuntimeHandle) ClearResourceProvider() (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_clear_resource_provider), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_clear_resource_provider(C.mln_runtime(raw), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // ClearResourceTransform clears the runtime-scoped URL transform for network
@@ -7830,9 +8497,9 @@ func (receiver *RuntimeHandle) ClearResourceProvider() (*Future[struct{}], error
 // See mln_runtime_clear_resource_transform in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *RuntimeHandle) ClearResourceTransform() (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_clear_resource_transform), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_clear_resource_transform(C.mln_runtime(raw), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // RuntimeCreate creates a runtime.
@@ -7841,7 +8508,7 @@ func (receiver *RuntimeHandle) ClearResourceTransform() (*Future[struct{}], erro
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func RuntimeCreate(options RuntimeOptions) (*RuntimeHandle, error) {
 	var outRuntime C.mln_runtime
-	return bindingGet(bindingGlobal(C.binding_operation_mln_runtime_create), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_create(bindingStore(nativeRuntimeOptions(options, arena), arena), &outRuntime, diagnostic))
 	}, func(arena *bindingArena) *RuntimeHandle {
 		adopted := adoptRuntimeHandle(uint64(outRuntime), nil)
@@ -7854,9 +8521,9 @@ func RuntimeCreate(options RuntimeOptions) (*RuntimeHandle, error) {
 // See mln_runtime_create_map in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *RuntimeHandle) CreateMap(options MapOptions) (*Future[*MapHandle], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_create_map), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_create_map(C.mln_runtime(raw), bindingStore(nativeMapOptions(options, arena), arena), completion, diagnostic))
-	}, completionOf(func(raw C.mln_map) *MapHandle { return adoptMapHandle(uint64(raw), receiver) }))
+	}, completionOf(func(raw C.mln_map) *MapHandle { return adoptMapHandle(uint64(raw), receiver) }), false)
 }
 
 // CreateOfflineRegion starts creating an offline region.
@@ -7864,9 +8531,9 @@ func (receiver *RuntimeHandle) CreateMap(options MapOptions) (*Future[*MapHandle
 // See mln_runtime_create_offline_region in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *RuntimeHandle) CreateOfflineRegion(definition OfflineRegionDefinition, metadata []byte) (*Future[OfflineRegionInfo], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_create_offline_region), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_create_offline_region(C.mln_runtime(raw), bindingStore(nativeOfflineRegionDefinition(definition, arena), arena), (*C.uint8_t)(arena.bytes(metadata)), bindingCount[C.size_t](len(metadata)), completion, diagnostic))
-	}, completionOf(copyOfflineRegionInfo))
+	}, completionOf(copyOfflineRegionInfo), false)
 }
 
 // DeleteOfflineRegion deletes an offline region.
@@ -7874,9 +8541,9 @@ func (receiver *RuntimeHandle) CreateOfflineRegion(definition OfflineRegionDefin
 // See mln_runtime_delete_offline_region in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *RuntimeHandle) DeleteOfflineRegion(regionId int64) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_delete_offline_region), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_delete_offline_region(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // GetEventMask reports which runtime-scoped event types this runtime queues.
@@ -7885,7 +8552,7 @@ func (receiver *RuntimeHandle) DeleteOfflineRegion(regionId int64) (*Future[stru
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *RuntimeHandle) GetEventMask() (RuntimeEventMask, error) {
 	var outMask C.uint64_t
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_get_event_mask), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_get_event_mask(C.mln_runtime(raw), &outMask, diagnostic))
 	}, func(arena *bindingArena) RuntimeEventMask {
 		return RuntimeEventMask(outMask)
@@ -7897,9 +8564,9 @@ func (receiver *RuntimeHandle) GetEventMask() (RuntimeEventMask, error) {
 // See mln_runtime_get_offline_region in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *RuntimeHandle) GetOfflineRegion(regionId int64) (*Future[*OfflineRegionInfo], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_get_offline_region), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_get_offline_region(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
-	}, completionNullable(completionOf(copyOfflineRegionInfo)))
+	}, completionNullable(completionOf(copyOfflineRegionInfo)), false)
 }
 
 // GetOfflineRegionStatus starts getting the current download status for an
@@ -7908,9 +8575,9 @@ func (receiver *RuntimeHandle) GetOfflineRegion(regionId int64) (*Future[*Offlin
 // See mln_runtime_get_offline_region_status in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *RuntimeHandle) GetOfflineRegionStatus(regionId int64) (*Future[OfflineRegionStatus], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_get_offline_region_status), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_get_offline_region_status(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
-	}, completionOf(copyOfflineRegionStatus))
+	}, completionOf(copyOfflineRegionStatus), false)
 }
 
 // InvalidateOfflineRegion invalidates cached resources for an offline region.
@@ -7918,9 +8585,9 @@ func (receiver *RuntimeHandle) GetOfflineRegionStatus(regionId int64) (*Future[O
 // See mln_runtime_invalidate_offline_region in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *RuntimeHandle) InvalidateOfflineRegion(regionId int64) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_invalidate_offline_region), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_invalidate_offline_region(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // ListOfflineRegions starts listing the offline regions in the runtime
@@ -7929,9 +8596,9 @@ func (receiver *RuntimeHandle) InvalidateOfflineRegion(regionId int64) (*Future[
 // See mln_runtime_list_offline_regions in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *RuntimeHandle) ListOfflineRegions() (*Future[[]OfflineRegionInfo], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_list_offline_regions), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_list_offline_regions(C.mln_runtime(raw), completion, diagnostic))
-	}, completionListOf(copyOfflineRegionInfo))
+	}, completionListOf(copyOfflineRegionInfo), false)
 }
 
 // MergeOfflineRegions starts merging offline regions from another MapLibre
@@ -7940,9 +8607,9 @@ func (receiver *RuntimeHandle) ListOfflineRegions() (*Future[[]OfflineRegionInfo
 // See mln_runtime_merge_offline_regions in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *RuntimeHandle) MergeOfflineRegions(sideDatabasePath string) (*Future[[]OfflineRegionInfo], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_merge_offline_regions), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_merge_offline_regions(C.mln_runtime(raw), bindingView(sideDatabasePath, arena), completion, diagnostic))
-	}, completionListOf(copyOfflineRegionInfo))
+	}, completionListOf(copyOfflineRegionInfo), false)
 }
 
 // Close starts release of a runtime after checking its children.
@@ -7950,9 +8617,9 @@ func (receiver *RuntimeHandle) MergeOfflineRegions(sideDatabasePath string) (*Fu
 // See mln_runtime_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *RuntimeHandle) Close() (*Future[struct{}], error) {
-	return bindingStart(bindingClosing(receiver.owner(), C.binding_operation_mln_runtime_release), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_release(C.mln_runtime(raw), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // RunAmbientCacheOperation starts a MapLibre ambient cache maintenance
@@ -7961,9 +8628,9 @@ func (receiver *RuntimeHandle) Close() (*Future[struct{}], error) {
 // See mln_runtime_run_ambient_cache_operation in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *RuntimeHandle) RunAmbientCacheOperation(operation AmbientCacheOperation) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_run_ambient_cache_operation), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_run_ambient_cache_operation(C.mln_runtime(raw), C.uint32_t(operation), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // SetEventHandler selects how runtime and map events reach the host.
@@ -7971,9 +8638,9 @@ func (receiver *RuntimeHandle) RunAmbientCacheOperation(operation AmbientCacheOp
 // See mln_runtime_set_event_handler in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *RuntimeHandle) SetEventHandler(handler RuntimeEventHandler) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_set_event_handler), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_event_handler(C.mln_runtime(raw), bindingStore(nativeRuntimeEventHandler(handler, arena), arena), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // SetEventMask selects which runtime-scoped event types this runtime queues.
@@ -7981,7 +8648,7 @@ func (receiver *RuntimeHandle) SetEventHandler(handler RuntimeEventHandler) (*Fu
 // See mln_runtime_set_event_mask in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *RuntimeHandle) SetEventMask(mask RuntimeEventMask) error {
-	return bindingDo(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_set_event_mask), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_event_mask(C.mln_runtime(raw), C.uint64_t(mask), diagnostic))
 	})
 }
@@ -7992,9 +8659,9 @@ func (receiver *RuntimeHandle) SetEventMask(mask RuntimeEventMask) error {
 // See mln_runtime_set_http_header_transform in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *RuntimeHandle) SetHttpHeaderTransform(transform HttpHeaderTransform) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_set_http_header_transform), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_http_header_transform(C.mln_runtime(raw), bindingStore(nativeHttpHeaderTransform(transform, arena), arena), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // SetMaximumAmbientCacheSize starts a change to this runtime's maximum ambient
@@ -8003,9 +8670,9 @@ func (receiver *RuntimeHandle) SetHttpHeaderTransform(transform HttpHeaderTransf
 // See mln_runtime_set_maximum_ambient_cache_size in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *RuntimeHandle) SetMaximumAmbientCacheSize(size uint64) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_set_maximum_ambient_cache_size), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_maximum_ambient_cache_size(C.mln_runtime(raw), C.uint64_t(size), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // SetOfflineRegionDownloadState sets an offline region's native download state.
@@ -8013,9 +8680,9 @@ func (receiver *RuntimeHandle) SetMaximumAmbientCacheSize(size uint64) (*Future[
 // See mln_runtime_set_offline_region_download_state in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *RuntimeHandle) SetOfflineRegionDownloadState(regionId int64, state OfflineRegionDownloadState) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_set_offline_region_download_state), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_offline_region_download_state(C.mln_runtime(raw), C.mln_offline_region_id(regionId), C.uint32_t(state), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // SetOfflineRegionObserved enables or disables runtime events for an offline
@@ -8024,9 +8691,9 @@ func (receiver *RuntimeHandle) SetOfflineRegionDownloadState(regionId int64, sta
 // See mln_runtime_set_offline_region_observed in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *RuntimeHandle) SetOfflineRegionObserved(regionId int64, observed bool) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_set_offline_region_observed), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_offline_region_observed(C.mln_runtime(raw), C.mln_offline_region_id(regionId), C.bool(observed), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // SetResourceProvider registers or replaces a runtime-scoped network resource
@@ -8035,9 +8702,9 @@ func (receiver *RuntimeHandle) SetOfflineRegionObserved(regionId int64, observed
 // See mln_runtime_set_resource_provider in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *RuntimeHandle) SetResourceProvider(provider ResourceProvider) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_set_resource_provider), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_resource_provider(C.mln_runtime(raw), bindingStore(nativeResourceProvider(provider, arena), arena), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // SetResourceTransform registers or updates a runtime-scoped URL transform for
@@ -8046,9 +8713,9 @@ func (receiver *RuntimeHandle) SetResourceProvider(provider ResourceProvider) (*
 // See mln_runtime_set_resource_transform in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *RuntimeHandle) SetResourceTransform(transform ResourceTransform) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_set_resource_transform), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_resource_transform(C.mln_runtime(raw), bindingStore(nativeResourceTransform(transform, arena), arena), completion, diagnostic))
-	}, completionUnit)
+	}, completionUnit, false)
 }
 
 // UpdateOfflineRegionMetadata starts updating opaque binary metadata for an
@@ -8057,9 +8724,9 @@ func (receiver *RuntimeHandle) SetResourceTransform(transform ResourceTransform)
 // See mln_runtime_update_offline_region_metadata in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *RuntimeHandle) UpdateOfflineRegionMetadata(regionId int64, metadata []byte) (*Future[OfflineRegionInfo], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_update_offline_region_metadata), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return bindingStart(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_update_offline_region_metadata(C.mln_runtime(raw), C.mln_offline_region_id(regionId), (*C.uint8_t)(arena.bytes(metadata)), bindingCount[C.size_t](len(metadata)), completion, diagnostic))
-	}, completionOf(copyOfflineRegionInfo))
+	}, completionOf(copyOfflineRegionInfo), false)
 }
 
 // SupportedRenderBackendMask reports the render backends available in this
@@ -8068,386 +8735,384 @@ func (receiver *RuntimeHandle) UpdateOfflineRegionMetadata(regionId int64, metad
 // See mln_supported_render_backend_mask in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
 func SupportedRenderBackendMask() (RenderBackendFlag, error) {
-	return bindingDirect(bindingGlobal(C.binding_operation_mln_supported_render_backend_mask), func(arena *bindingArena, raw uint64) RenderBackendFlag {
+	return bindingDirect(bindingGlobal(), func(arena *bindingArena, raw uint64) RenderBackendFlag {
 		return RenderBackendFlag(C.mln_supported_render_backend_mask())
 	})
 }
 
 func (view MapHandleDiscarding) AddCustomGeometrySource(sourceId string, options CustomGeometrySourceOptions) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_custom_geometry_source), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_custom_geometry_source(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativeCustomGeometrySourceOptions(options, arena), arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) AddCustomMvtVectorSource(sourceId string, options CustomMvtVectorSourceOptions) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_custom_mvt_vector_source), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_custom_mvt_vector_source(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativeCustomMvtVectorSourceOptions(options, arena), arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) AddGeojsonSourceData(sourceId string, data *GeojsonSourceDataHandle) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_geojson_source_data), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_geojson_source_data(C.mln_map(raw), bindingView(sourceId, arena), C.mln_geojson_source_data(arena.lease(data.owner())), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) AddGeojsonSourceUrl(sourceId string, url string, options *GeojsonSourceOptions) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_geojson_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_geojson_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeGeojsonSourceOptions), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) AddImageSourceImage(sourceId string, coordinates []LatLng, image PremultipliedRgba8Image) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_image_source_image), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_image_source_image(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) AddImageSourceUrl(sourceId string, coordinates []LatLng, url string) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_image_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_image_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingView(url, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) AddStyleLayerJson(layerJson []byte, beforeLayerId *string) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_style_layer_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_style_layer_json(C.mln_map(raw), bindingView(layerJson, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) AddStyleSourceJson(sourceId string, sourceJson []byte) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_style_source_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_style_source_json(C.mln_map(raw), bindingView(sourceId, arena), bindingView(sourceJson, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) ApplyCameraDelta(delta CameraDelta) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_apply_camera_delta), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_apply_camera_delta(C.mln_map(raw), bindingStore(nativeCameraDelta(delta, arena), arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) BeginCommandGroup() error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_begin_command_group), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_begin_command_group(C.mln_map(raw), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) CancelCameraTransition(transitionId uint64) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_cancel_camera_transition), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_cancel_camera_transition(C.mln_map(raw), C.uint64_t(transitionId), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) CancelTransitions() error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_cancel_transitions), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_cancel_transitions(C.mln_map(raw), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) DumpDebugLogs() error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_dump_debug_logs), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_dump_debug_logs(C.mln_map(raw), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) EndCommandGroup() error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_end_command_group), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_end_command_group(C.mln_map(raw), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) InvalidateCustomGeometrySourceRegion(sourceId string, bounds LatLngBounds) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_invalidate_custom_geometry_source_region), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_invalidate_custom_geometry_source_region(C.mln_map(raw), bindingView(sourceId, arena), nativeLatLngBounds(bounds, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) InvalidateCustomGeometrySourceTile(sourceId string, tileId CanonicalTileId) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_invalidate_custom_geometry_source_tile), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_invalidate_custom_geometry_source_tile(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) InvalidateCustomMvtVectorSourceTile(sourceId string, tileId CanonicalTileId) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_invalidate_custom_mvt_vector_source_tile), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_invalidate_custom_mvt_vector_source_tile(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) MoveStyleLayer(layerId string, beforeLayerId *string) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_move_style_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_move_style_layer(C.mln_map(raw), bindingView(layerId, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) RemoveFeatureState(selector FeatureStateSelector) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_remove_feature_state), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_remove_feature_state(C.mln_map(raw), bindingStore(nativeFeatureStateSelector(selector, arena), arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) RemoveStyleImage(imageId string) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_remove_style_image), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_remove_style_image(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) RemoveStyleLayer(layerId string) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_remove_style_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_remove_style_layer(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) RemoveStyleSource(sourceId string) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_remove_style_source), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_remove_style_source(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) RequestRepaint() error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_request_repaint), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_request_repaint(C.mln_map(raw), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) Resize(extent LogicalExtent) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_resize), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_resize(C.mln_map(raw), nativeLogicalExtent(extent, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetBounds(options BoundOptions) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_bounds), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_bounds(C.mln_map(raw), bindingStore(nativeBoundOptions(options, arena), arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetCustomGeometrySourceTileData(sourceId string, tileId CanonicalTileId, data []byte) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_custom_geometry_source_tile_data), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_custom_geometry_source_tile_data(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(data, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetCustomMvtVectorSourceTileData(sourceId string, tileId CanonicalTileId, data []byte) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_custom_mvt_vector_source_tile_data), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_custom_mvt_vector_source_tile_data(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(data, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetCustomMvtVectorSourceTileError(sourceId string, tileId CanonicalTileId, message string) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_custom_mvt_vector_source_tile_error), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_custom_mvt_vector_source_tile_error(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(message, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetDebugOptions(options MapDebugOption) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_debug_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_debug_options(C.mln_map(raw), C.uint32_t(options), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetEventMask(mask RuntimeEventMask) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_event_mask), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_event_mask(C.mln_map(raw), C.uint64_t(mask), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetFeatureState(selector FeatureStateSelector, state []byte) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_feature_state), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_feature_state(C.mln_map(raw), bindingStore(nativeFeatureStateSelector(selector, arena), arena), bindingView(state, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetFreeCameraOptions(options FreeCameraOptions) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_free_camera_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_free_camera_options(C.mln_map(raw), bindingStore(nativeFreeCameraOptions(options, arena), arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetGeojsonSourceData(sourceId string, data *GeojsonSourceDataHandle) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_geojson_source_data), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geojson_source_data(C.mln_map(raw), bindingView(sourceId, arena), C.mln_geojson_source_data(arena.lease(data.owner())), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetGeojsonSourceSynchronousTiling(sourceId string, enabled bool) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_geojson_source_synchronous_tiling), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geojson_source_synchronous_tiling(C.mln_map(raw), bindingView(sourceId, arena), C.bool(enabled), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetGeojsonSourceUrl(sourceId string, url string) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_geojson_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geojson_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetGlobalStateProperty(propertyName string, value []byte) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_global_state_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_global_state_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetImageSourceCoordinates(sourceId string, coordinates []LatLng) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_image_source_coordinates), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_image_source_coordinates(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetImageSourceImage(sourceId string, image PremultipliedRgba8Image) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_image_source_image), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_image_source_image(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetImageSourceUrl(sourceId string, url string) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_image_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_image_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetProjectionMode(mode ProjectionMode) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_projection_mode), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_projection_mode(C.mln_map(raw), bindingStore(nativeProjectionMode(mode, arena), arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetRenderingStatsViewEnabled(enabled bool) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_rendering_stats_view_enabled), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_rendering_stats_view_enabled(C.mln_map(raw), C.bool(enabled), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetStyleImage(imageId string, image PremultipliedRgba8Image, options *StyleImageOptions) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_image), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_image(C.mln_map(raw), bindingView(imageId, arena), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), bindingStoreOptional(options, arena, nativeStyleImageOptions), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetStyleJson(json []byte) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_json(C.mln_map(raw), bindingView(json, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetStyleLayerProperty(layerId string, propertyName string, value []byte) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_layer_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_layer_property(C.mln_map(raw), bindingView(layerId, arena), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetStyleLightJson(lightJson []byte) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_light_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_light_json(C.mln_map(raw), bindingView(lightJson, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetStyleLightProperty(propertyName string, value []byte) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_light_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_light_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetStyleSourceVolatile(sourceId string, isVolatile bool) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_source_volatile), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_source_volatile(C.mln_map(raw), bindingView(sourceId, arena), C.bool(isVolatile), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetStyleTransitionOptions(options StyleTransitionOptions) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_transition_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_transition_options(C.mln_map(raw), bindingStore(nativeStyleTransitionOptions(options, arena), arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetStyleUrl(url string) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_url(C.mln_map(raw), bindingView(url, arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetTileOptions(options MapTileOptions) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_tile_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_tile_options(C.mln_map(raw), bindingStore(nativeMapTileOptions(options, arena), arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) SetViewportOptions(options MapViewportOptions) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_viewport_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_viewport_options(C.mln_map(raw), bindingStore(nativeMapViewportOptions(options, arena), arena), completion, diagnostic))
 	})
 }
 
 func (view MapHandleDiscarding) UpdateCamera(update CameraUpdate) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_map_update_camera), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_update_camera(C.mln_map(raw), bindingStore(nativeCameraUpdate(update, arena), arena), completion, diagnostic))
 	})
 }
 
 func (view RenderSessionHandleDiscarding) Resize(extent LogicalExtent) error {
 	receiver := view.owner
-	return callDiscard(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_resize), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+	return callDiscard(bindingLive(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_resize(C.mln_render_session(raw), nativeLogicalExtent(extent, arena), completion, diagnostic))
 	})
 }
 
 //export mlnGo_mln_log_handler_callback
 func mlnGo_mln_log_handler_callback(native_user_data unsafe.Pointer, native_severity C.uint32_t, native_event C.uint32_t, native_code C.int64_t, native_message *C.char) (result C.uint32_t) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	result = 0
 	defer func() {
 		if failure := recover(); failure != nil {
@@ -8465,8 +9130,6 @@ func mlnGo_mln_log_handler_callback(native_user_data unsafe.Pointer, native_seve
 
 //export mlnGo_mln_custom_geometry_source_options_fetch_tile
 func mlnGo_mln_custom_geometry_source_options_fetch_tile(native_user_data unsafe.Pointer, native_tile_id C.mln_canonical_tile_id) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_custom_source_fetch_tile_callback", failure)
@@ -8482,8 +9145,6 @@ func mlnGo_mln_custom_geometry_source_options_fetch_tile(native_user_data unsafe
 
 //export mlnGo_mln_custom_geometry_source_options_cancel_tile
 func mlnGo_mln_custom_geometry_source_options_cancel_tile(native_user_data unsafe.Pointer, native_tile_id C.mln_canonical_tile_id) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_custom_source_cancel_tile_callback", failure)
@@ -8499,8 +9160,6 @@ func mlnGo_mln_custom_geometry_source_options_cancel_tile(native_user_data unsaf
 
 //export mlnGo_mln_custom_mvt_vector_source_options_fetch_tile
 func mlnGo_mln_custom_mvt_vector_source_options_fetch_tile(native_user_data unsafe.Pointer, native_tile_id C.mln_canonical_tile_id) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_custom_source_fetch_tile_callback", failure)
@@ -8516,8 +9175,6 @@ func mlnGo_mln_custom_mvt_vector_source_options_fetch_tile(native_user_data unsa
 
 //export mlnGo_mln_custom_mvt_vector_source_options_cancel_tile
 func mlnGo_mln_custom_mvt_vector_source_options_cancel_tile(native_user_data unsafe.Pointer, native_tile_id C.mln_canonical_tile_id) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_custom_source_cancel_tile_callback", failure)
@@ -8533,8 +9190,6 @@ func mlnGo_mln_custom_mvt_vector_source_options_cancel_tile(native_user_data uns
 
 //export mlnGo_mln_camera_transition_handler_callback
 func mlnGo_mln_camera_transition_handler_callback(native_user_data unsafe.Pointer, native_end *C.mln_camera_transition_end) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_camera_transition_end_callback", failure)
@@ -8550,8 +9205,6 @@ func mlnGo_mln_camera_transition_handler_callback(native_user_data unsafe.Pointe
 
 //export mlnGo_mln_wake_callback
 func mlnGo_mln_wake_callback(native_user_data unsafe.Pointer) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_wake_callback", failure)
@@ -8567,8 +9220,6 @@ func mlnGo_mln_wake_callback(native_user_data unsafe.Pointer) {
 
 //export mlnGo_mln_queue_lock_lock
 func mlnGo_mln_queue_lock_lock(native_user_data unsafe.Pointer) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_queue_lock_callback", failure)
@@ -8584,8 +9235,6 @@ func mlnGo_mln_queue_lock_lock(native_user_data unsafe.Pointer) {
 
 //export mlnGo_mln_queue_lock_unlock
 func mlnGo_mln_queue_lock_unlock(native_user_data unsafe.Pointer) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_queue_lock_callback", failure)
@@ -8601,8 +9250,6 @@ func mlnGo_mln_queue_lock_unlock(native_user_data unsafe.Pointer) {
 
 //export mlnGo_mln_resource_request_cancel_handler_callback
 func mlnGo_mln_resource_request_cancel_handler_callback(native_user_data unsafe.Pointer, native_handle C.mln_resource_request) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_resource_request_cancel_callback", failure)
@@ -8618,8 +9265,6 @@ func mlnGo_mln_resource_request_cancel_handler_callback(native_user_data unsafe.
 
 //export mlnGo_mln_runtime_event_handler_callback
 func mlnGo_mln_runtime_event_handler_callback(native_user_data unsafe.Pointer, native_events *C.mln_event_batch_view) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_runtime_event_callback", failure)
@@ -8635,8 +9280,6 @@ func mlnGo_mln_runtime_event_handler_callback(native_user_data unsafe.Pointer, n
 
 //export mlnGo_mln_http_header_transform_callback
 func mlnGo_mln_http_header_transform_callback(native_user_data unsafe.Pointer, native_kind C.uint32_t, native_url *C.char, native_out_response *C.mln_http_header_transform_response) (result C.mln_status) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	result = C.MLN_STATUS_NATIVE_ERROR
 	defer func() {
 		if failure := recover(); failure != nil {
@@ -8656,19 +9299,18 @@ func mlnGo_mln_http_header_transform_callback(native_user_data unsafe.Pointer, n
 
 //export mlnGo_mln_resource_provider_callback
 func mlnGo_mln_resource_provider_callback(native_user_data unsafe.Pointer, native_request *C.mln_resource_request_info, native_handle C.mln_resource_request) (result C.uint32_t) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-	result = C.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH
+	result = ^C.uint32_t(0)
 	request := adoptResourceRequestHandle(uint64(native_handle), nil)
-	request.state.beginDecision()
 	defer func() {
-		result = C.uint32_t(request.state.finishDecision(uint32(result), uint32(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE), uint32(C.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH)))
+		if uint32(result) != uint32(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
+			request.state.released.Store(true)
+		}
 		runtime.KeepAlive(request)
 	}()
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_resource_provider_callback", failure)
-			result = C.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH
+			result = ^C.uint32_t(0)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[ResourceProvider](native_user_data)
@@ -8681,8 +9323,6 @@ func mlnGo_mln_resource_provider_callback(native_user_data unsafe.Pointer, nativ
 
 //export mlnGo_mln_resource_transform_callback
 func mlnGo_mln_resource_transform_callback(native_user_data unsafe.Pointer, native_kind C.uint32_t, native_url *C.char, native_request C.mln_resource_transform_request) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	owned_request := adoptResourceTransformRequestHandle(uint64(native_request), nil)
 	defer func() {
 		if failure := recover(); failure != nil {

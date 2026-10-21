@@ -73,8 +73,5 @@ void validateCAbiVersion(int actualVersion) {
   if (actualVersion == expectedCAbiVersion) {
     return;
   }
-  throw MaplibreException.abiVersionMismatch(
-    'MapLibre Native C ABI version $actualVersion is incompatible with this '
-    'binding; expected $expectedCAbiVersion.',
-  );
+  throw AbiVersionMismatchException(expectedCAbiVersion, actualVersion);
 }

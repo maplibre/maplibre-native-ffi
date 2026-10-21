@@ -279,9 +279,6 @@ class Values:
                 for method in (
                     "fromNative",
                     "toNative",
-                    "contains",
-                    "isEmpty",
-                    "unionWith",
                 )
             )
             return f"pub const {public} = struct {{\n{fields}\n    unknown_bits: {raw} = 0,\n    pub const native_bits = [_]{raw}{{ {bits} }};\n    const methods = marshal.FlagMethods(@This());\n{methods}{constants}}};\n"

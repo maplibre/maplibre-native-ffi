@@ -7,7 +7,6 @@
 const std = @import("std");
 
 const c = @import("c.zig").raw;
-const owner = @import("owner.zig");
 const status = @import("status.zig");
 
 /// A copied native value and the allocator that frees it. Move it rather than
@@ -112,7 +111,7 @@ pub fn EnumMethods(comptime T: type) type {
     };
 }
 
-/// The native conversions and set operations of a generated flag set.
+/// The native conversions of a generated flag set.
 ///
 /// `T` declares one bool field per named flag, in the order of its
 /// `native_bits`, and an `unknown_bits` field that keeps bits this binding does
@@ -138,21 +137,11 @@ pub fn FlagMethods(comptime T: type) type {
             }
             return raw;
         }
-        pub fn contains(self: T, other: T) bool {
-            return toNative(self) & toNative(other) == toNative(other);
-        }
-        pub fn isEmpty(self: T) bool {
-            return toNative(self) == 0;
-        }
-        pub fn unionWith(self: T, other: T) T {
-            return fromNative(toNative(self) | toNative(other));
-        }
     };
 }
 
 pub const Decode = struct {
     allocator: ?std.mem.Allocator = null,
-    parent: ?owner.Anchor = null,
 
     fn alloc(self: Decode) std.mem.Allocator {
         return self.allocator orelse unreachable;
@@ -166,27 +155,19 @@ pub fn decodeAllocates(comptime T: type) bool {
     };
 }
 
-pub fn decodeAdopts(comptime T: type) bool {
-    return switch (@typeInfo(T)) {
-        .optional => |optional| decodeAdopts(optional.child),
-        .@"struct" => @hasDecl(T, "native_name"),
-        else => false,
-    };
-}
-
 pub fn decode(comptime T: type, raw: anytype, context: Decode) status.Error!T {
     const Raw = @TypeOf(raw);
     if (T == Raw) return raw;
     if (comptime isOwned(T)) {
         var arena = std.heap.ArenaAllocator.init(context.alloc());
         errdefer arena.deinit();
-        const value = try decode(T.Value, raw, .{ .allocator = arena.allocator(), .parent = context.parent });
+        const value = try decode(T.Value, raw, .{ .allocator = arena.allocator() });
         return .{ .arena = arena, .value = value };
     }
     if (T == []const u8 and Raw == c.mln_buffer_view) return copyView(context.alloc(), raw);
     switch (@typeInfo(T)) {
         .@"struct", .@"enum", .@"union" => {
-            if (@hasDecl(T, "native_name")) return T.adopt(raw, context.parent);
+            if (@hasDecl(T, "native_name")) return T.adopt(raw);
             if (@hasDecl(T, "fromNative")) {
                 return switch (@typeInfo(@TypeOf(T.fromNative)).@"fn".param_types.len) {
                     1 => T.fromNative(raw),

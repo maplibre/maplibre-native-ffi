@@ -190,11 +190,20 @@ void main() {
 
   test('a dropped creation is disposed once its owner is collected', () async {
     final runtime = runtimeCreate(runtimeOptionsDefault());
-    addTearDown(runtime.close);
+    addTearDown(() => closeIfLive(runtime.close));
     final map = await _droppedMapCreation(runtime);
     expect(map.target, isNotNull);
     // The live map holds off the runtime's release.
-    expect(runtime.close, throwsA(isA<InvalidStateException>()));
+    expect(
+      runtime.close,
+      throwsA(
+        isA<MaplibreException>().having(
+          (error) => error.status,
+          'status',
+          Status.invalidState,
+        ),
+      ),
+    );
 
     // Collecting the map runs its native finalizer, which disposes the map
     // outside any callback, and then the runtime releases.

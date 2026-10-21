@@ -29,7 +29,13 @@ void main() {
         () => map.discarding.resize(
           LogicalExtent(width: 0, height: 8, scaleFactor: 1),
         ),
-        throwsA(isA<InvalidArgumentException>()),
+        throwsA(
+          isA<MaplibreException>().having(
+            (error) => error.status,
+            'status',
+            Status.invalidArgument,
+          ),
+        ),
       );
     },
   );
@@ -115,7 +121,13 @@ void main() {
         decode: (_) {},
         onRejected: () => rejections += 1,
       ),
-      throwsA(isA<InvalidArgumentException>()),
+      throwsA(
+        isA<MaplibreException>().having(
+          (error) => error.status,
+          'status',
+          Status.invalidArgument,
+        ),
+      ),
     );
     expect(rejections, 1);
 
@@ -136,7 +148,7 @@ void main() {
       'source removal',
     );
     expect(completion.disposition, CommandDisposition.failed);
-    expect(completion.status, MaplibreStatus.notFound);
+    expect(completion.status, Status.notFound);
     expect(completion.diagnostic, isNotEmpty);
   });
 
@@ -162,7 +174,16 @@ void main() {
 
     // The binding still delivers the completion to the future the waiter
     // gave up on, once closing the map cancels the request.
-    final cancelled = expectLater(image, throwsA(isA<CancelledException>()));
+    final cancelled = expectLater(
+      image,
+      throwsA(
+        isA<MaplibreException>().having(
+          (error) => error.status,
+          'status',
+          Status.cancelled,
+        ),
+      ),
+    );
     await within(map.close(), 'map close');
     await within(cancelled, 'the cancelled still image');
   });

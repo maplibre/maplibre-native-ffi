@@ -86,7 +86,6 @@ final class WorkerSession {
 
 /// Abandons [session] unless it already released its target, then closes it.
 void _release(RenderSessionHandle session) {
-  if (session.isClosed) return;
   try {
     session.abandon();
   } on MaplibreException {

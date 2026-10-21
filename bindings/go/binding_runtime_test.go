@@ -5,6 +5,7 @@ package maplibre
 import (
 	"errors"
 	"math"
+	"sync"
 	"testing"
 	"unsafe"
 )
@@ -39,8 +40,8 @@ func expectBindingError(t *testing.T, want error, what string, call func()) {
 // below has a bit set above the low 32 that a pointer-width carrier would drop
 // on a 32-bit target.
 func TestIntegerCarriersKeepTheirValues(t *testing.T) {
-	expectBindingError(t, ErrInvalidArgument, "a count above uint16", func() { bindingCount[uint16](math.MaxUint16 + 1) })
-	expectBindingError(t, ErrInvalidArgument, "a negative count", func() { bindingCount[uint64](-1) })
+	expectBindingError(t, StatusInvalidArgument, "a count above uint16", func() { bindingCount[uint16](math.MaxUint16 + 1) })
+	expectBindingError(t, StatusInvalidArgument, "a negative count", func() { bindingCount[uint64](-1) })
 	if got := bindingCount[uint16](math.MaxUint16); got != math.MaxUint16 {
 		t.Fatalf("bindingCount[uint16](max) = %d", got)
 	}
@@ -71,19 +72,19 @@ func TestNativeLayoutsAreChecked(t *testing.T) {
 	var storage [4]uint64
 	base := unsafe.Pointer(&storage[0])
 	size, align := unsafe.Sizeof(storage[0]), unsafe.Alignof(storage[0])
-	expect(ErrNative, "a null array", func() { bindingElement(nil, 0, uint64(size), size, align) })
-	expect(ErrNative, "a stride below the element size", func() { bindingElement(base, 1, uint64(size-align), size, align) })
-	expect(ErrNative, "a misaligned stride", func() { bindingElement(base, 1, uint64(size+1), size, align) })
+	expect(StatusNativeError, "a null array", func() { bindingElement(nil, 0, uint64(size), size, align) })
+	expect(StatusNativeError, "a stride below the element size", func() { bindingElement(base, 1, uint64(size-align), size, align) })
+	expect(StatusNativeError, "a misaligned stride", func() { bindingElement(base, 1, uint64(size+1), size, align) })
 	if got := bindingElement(base, 2, uint64(size), size, align); got != unsafe.Pointer(&storage[2]) {
 		t.Fatalf("bindingElement(2) = %p, want %p", got, &storage[2])
 	}
 
 	arena := []byte("abcdef")
 	pointer := unsafe.Pointer(&arena[0])
-	expect(ErrNative, "an offset past the arena", func() { bindingArenaString(pointer, 6, 7, 0) })
-	expect(ErrNative, "a range past the arena", func() { bindingArenaString(pointer, 6, 4, 3) })
-	expect(ErrNative, "a message in a null arena", func() { bindingArenaString(nil, 6, 0, 1) })
-	expect(ErrNative, "bytes from a null buffer", func() { bindingBytes(nil, 1) })
+	expect(StatusNativeError, "an offset past the arena", func() { bindingArenaString(pointer, 6, 7, 0) })
+	expect(StatusNativeError, "a range past the arena", func() { bindingArenaString(pointer, 6, 4, 3) })
+	expect(StatusNativeError, "a message in a null arena", func() { bindingArenaString(nil, 6, 0, 1) })
+	expect(StatusNativeError, "bytes from a null buffer", func() { bindingBytes(nil, 1) })
 	if got := bindingArenaString(pointer, 6, 2, 3); got != "cde" {
 		t.Fatalf("bindingArenaString(2, 3) = %q, want cde", got)
 	}
@@ -96,7 +97,41 @@ func TestExportsRecoverFromPanics(t *testing.T) {
 	stale, free := staleCallbackCellForTest()
 	defer free()
 	mlnGoCallbackRelease(stale)
-	if got := receive(t, panics, "the release's panic log"); got != (callbackPanic{"mlnGoCallbackRelease", "runtime/cgo: misuse of an invalid Handle", true}) {
+	if got := receive(t, panics, "the release's panic log"); got != (callbackPanic{"mlnGoCallbackRelease", "runtime/cgo: misuse of an invalid Handle"}) {
 		t.Fatalf("release panic log = %+v", got)
+	}
+}
+
+// A copied batch output remains valid until its decoder returns, including
+// while another goroutine attempts to release its owner.
+func TestBatchCopyHoldsOffClose(t *testing.T) {
+	owner := bindingAdopt(71, nil, "batch", true, func(uint64) {})
+	entered, release, copied := make(chan struct{}), make(chan struct{}), make(chan error, 1)
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(release) }) }
+	defer unblock()
+	go func() {
+		_, err := bindingDirect(bindingRead(owner), func(*bindingArena, uint64) struct{} {
+			close(entered)
+			<-release
+			return struct{}{}
+		})
+		copied <- err
+	}()
+	receive(t, entered, "the batch decoder")
+	_, err := bindingDirect(bindingClosing(owner), func(*bindingArena, uint64) struct{} {
+		t.Error("release reached native during the borrowed copy")
+		return struct{}{}
+	})
+	if !errors.Is(err, StatusInvalidState) {
+		t.Fatalf("Close during copy = %v", err)
+	}
+	unblock()
+	if err := receive(t, copied, "the copied batch"); err != nil {
+		t.Fatal(err)
+	}
+	_, err = bindingDirect(bindingClosing(owner), func(*bindingArena, uint64) struct{} { return struct{}{} })
+	if err != nil {
+		t.Fatal(err)
 	}
 }

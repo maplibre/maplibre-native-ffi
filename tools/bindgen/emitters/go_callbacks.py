@@ -75,21 +75,9 @@ def sources(values, plan):
             + p.name
             for p in callback.parameters
         )
-        policy = callback.reentry_policy
-        guard, unguard = "", ""
-        if callback.reentry != "allow":
-            operations = policy.operations if policy else ()
-            names = ", ".join("binding_operation_" + op for op in operations) or "0"
-            owner = f"(uint64_t)(uintptr_t){policy.owner_parameter}" if policy else "0"
-            guard = f"static const uint32_t operations[] = {{{names}}}; binding_policy policy = {{NULL, operations, {len(operations)}, {owner}}}; binding_policy_enter(&policy);"
-            unguard = "binding_policy_leave(&policy);"
         call = f"{export}({arguments})"
-        body = (
-            f"{call}; {unguard}"
-            if ret == "void"
-            else f"{ret} result = {call}; {unguard} return result;"
-        )
-        c.append(f"{ret} {symbol}({params}) {{ {guard} {body} }}")
+        body = f"{call};" if ret == "void" else f"return {call};"
+        c.append(f"{ret} {symbol}({params}) {{ {body} }}")
         parameters = list(callback.arguments)
         go_params = ", ".join(
             "native_" + native_identifier(p.name) + " " + values.c_type(p.value)
@@ -103,18 +91,20 @@ def sources(values, plan):
             if ret == "void"
             else "result = "
             + (
-                "C." + callback.failure
+                f"^{values.c_type(callback.result)}(0)"
+                if callback.decision
+                else "C." + callback.failure
                 if callback.failure.startswith("MLN_")
                 else callback.failure
             )
         )
-        setup = ["runtime.LockOSThread(); defer runtime.UnlockOSThread()", failure]
+        setup = [failure]
         copied = []
         decision = callback.decision
         if decision:
             owner = values.owner(decision.handle.native)
             setup.append(
-                f"request := adopt{owner}(uint64(native_{decision.parameter}), nil); request.state.beginDecision(); defer func() {{ result = {values.c_type(callback.result)}(request.state.finishDecision(uint32(result), uint32(C.{decision.accept}), uint32(C.{decision.pass_through}))); runtime.KeepAlive(request) }}()"
+                f"request := adopt{owner}(uint64(native_{decision.parameter}), nil); defer func() {{ if uint32(result) != uint32(C.{decision.accept}) {{ request.state.released.Store(true) }}; runtime.KeepAlive(request) }}()"
             )
         # A handle the callback owns is adopted first; a callback that never
         # runs or panics closes it, so native never waits on it.
@@ -176,7 +166,7 @@ def registration_input(values, plan):
     release_type = next(
         f.value.native for f in plan.fields if f.name == descriptor.release
     )
-    release = "binding_release_forbid"
+    release = "binding_release"
     lines = [
         f"if {enabled} {{",
         f"raw.{native_identifier(descriptor.user_data)} = arena.register(input)",

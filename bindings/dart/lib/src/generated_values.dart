@@ -7,6 +7,14 @@ final class AmbientCacheOperation extends _Enum {
   static const packDatabase = AmbientCacheOperation.fromRawValue(2);
   static const invalidate = AmbientCacheOperation.fromRawValue(3);
   static const clear = AmbientCacheOperation.fromRawValue(4);
+  @override
+  String toString() => switch (rawValue) {
+    1 => 'AmbientCacheOperation.resetDatabase',
+    2 => 'AmbientCacheOperation.packDatabase',
+    3 => 'AmbientCacheOperation.invalidate',
+    4 => 'AmbientCacheOperation.clear',
+    _ => 'AmbientCacheOperation($rawValue)',
+  };
 }
 
 /// Field mask values for `mln_animation_options`.
@@ -63,6 +71,12 @@ final class CameraChangeMode extends _Enum {
 
   /// The camera moved as part of an animated transition.
   static const animated = CameraChangeMode.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'CameraChangeMode.immediate',
+    1 => 'CameraChangeMode.animated',
+    _ => 'CameraChangeMode($rawValue)',
+  };
 }
 
 /// Field mask values for `mln_camera_delta`.
@@ -132,6 +146,13 @@ final class CameraTransitionOutcome extends _Enum {
 
   /// The map closed before the transitions ended.
   static const closed = CameraTransitionOutcome.fromRawValue(2);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'CameraTransitionOutcome.completed',
+    1 => 'CameraTransitionOutcome.cancelled',
+    2 => 'CameraTransitionOutcome.closed',
+    _ => 'CameraTransitionOutcome($rawValue)',
+  };
 }
 
 /// Camera transition behavior for `mln_camera_update`.
@@ -143,6 +164,13 @@ final class CameraUpdateMode extends _Enum {
   static const jump = CameraUpdateMode.fromRawValue(0);
   static const ease = CameraUpdateMode.fromRawValue(1);
   static const fly = CameraUpdateMode.fromRawValue(2);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'CameraUpdateMode.jump',
+    1 => 'CameraUpdateMode.ease',
+    2 => 'CameraUpdateMode.fly',
+    _ => 'CameraUpdateMode($rawValue)',
+  };
 }
 
 /// Terminal dispositions reported by command completions.
@@ -155,6 +183,14 @@ final class CommandDisposition extends _Enum {
   static const superseded = CommandDisposition.fromRawValue(1);
   static const failed = CommandDisposition.fromRawValue(2);
   static const cancelled = CommandDisposition.fromRawValue(3);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'CommandDisposition.committed',
+    1 => 'CommandDisposition.superseded',
+    2 => 'CommandDisposition.failed',
+    3 => 'CommandDisposition.cancelled',
+    _ => 'CommandDisposition($rawValue)',
+  };
 }
 
 /// Map constraint modes used by `mln_map_viewport_options`.
@@ -167,6 +203,14 @@ final class ConstrainMode extends _Enum {
   static const heightOnly = ConstrainMode.fromRawValue(1);
   static const widthAndHeight = ConstrainMode.fromRawValue(2);
   static const screen = ConstrainMode.fromRawValue(3);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'ConstrainMode.none',
+    1 => 'ConstrainMode.heightOnly',
+    2 => 'ConstrainMode.widthAndHeight',
+    3 => 'ConstrainMode.screen',
+    _ => 'ConstrainMode($rawValue)',
+  };
 }
 
 /// Field mask values for `mln_custom_geometry_source_options`.
@@ -309,6 +353,15 @@ final class GesturePhase extends _Enum {
   /// Cancels transitions running after the camera write, then clears the
   /// gesture flag.
   static const cancel = GesturePhase.fromRawValue(4);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'GesturePhase.none',
+    1 => 'GesturePhase.begin',
+    2 => 'GesturePhase.update',
+    3 => 'GesturePhase.end',
+    4 => 'GesturePhase.cancel',
+    _ => 'GesturePhase($rawValue)',
+  };
 }
 
 /// Synchronization payload kind for acquired texture frames.
@@ -326,6 +379,12 @@ final class GpuSyncKind extends _Enum {
   /// GLsync in the shared EGL or WGL context's share group, used only by a
   /// caller-graphics-thread driver. object is nonzero.
   static const openglFence = GpuSyncKind.fromRawValue(3);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'GpuSyncKind.cpuComplete',
+    3 => 'GpuSyncKind.openglFence',
+    _ => 'GpuSyncKind($rawValue)',
+  };
 }
 
 /// Log event categories emitted by MapLibre Native.
@@ -351,6 +410,27 @@ final class LogEvent extends _Enum {
   static const crash = LogEvent.fromRawValue(14);
   static const glyph = LogEvent.fromRawValue(15);
   static const timing = LogEvent.fromRawValue(16);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'LogEvent.general',
+    1 => 'LogEvent.setup',
+    2 => 'LogEvent.shader',
+    3 => 'LogEvent.parseStyle',
+    4 => 'LogEvent.parseTile',
+    5 => 'LogEvent.render',
+    6 => 'LogEvent.style',
+    7 => 'LogEvent.database',
+    8 => 'LogEvent.httpRequest',
+    9 => 'LogEvent.sprite',
+    10 => 'LogEvent.image',
+    11 => 'LogEvent.graphicsBackend',
+    12 => 'LogEvent.jni',
+    13 => 'LogEvent.android',
+    14 => 'LogEvent.crash',
+    15 => 'LogEvent.glyph',
+    16 => 'LogEvent.timing',
+    _ => 'LogEvent($rawValue)',
+  };
 }
 
 /// Log severity values emitted by MapLibre Native.
@@ -362,6 +442,13 @@ final class LogSeverity extends _Enum {
   static const info = LogSeverity.fromRawValue(1);
   static const warning = LogSeverity.fromRawValue(2);
   static const error = LogSeverity.fromRawValue(3);
+  @override
+  String toString() => switch (rawValue) {
+    1 => 'LogSeverity.info',
+    2 => 'LogSeverity.warning',
+    3 => 'LogSeverity.error',
+    _ => 'LogSeverity($rawValue)',
+  };
 }
 
 /// Bitmask values for log severities dispatched asynchronously.
@@ -411,6 +498,13 @@ final class MapMode extends _Enum {
 
   /// Produces one-off still images for a single tile.
   static const tile = MapMode.fromRawValue(2);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'MapMode.continuous',
+    1 => 'MapMode.static',
+    2 => 'MapMode.tile',
+    _ => 'MapMode($rawValue)',
+  };
 }
 
 /// Field mask values for `mln_map_tile_options`.
@@ -449,6 +543,12 @@ final class NetworkStatus extends _Enum {
   const NetworkStatus.fromRawValue(super.rawValue);
   static const online = NetworkStatus.fromRawValue(1);
   static const offline = NetworkStatus.fromRawValue(2);
+  @override
+  String toString() => switch (rawValue) {
+    1 => 'NetworkStatus.online',
+    2 => 'NetworkStatus.offline',
+    _ => 'NetworkStatus($rawValue)',
+  };
 }
 
 /// Map north orientation values used by `mln_map_viewport_options`.
@@ -461,18 +561,38 @@ final class NorthOrientation extends _Enum {
   static const right = NorthOrientation.fromRawValue(1);
   static const down = NorthOrientation.fromRawValue(2);
   static const left = NorthOrientation.fromRawValue(3);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'NorthOrientation.up',
+    1 => 'NorthOrientation.right',
+    2 => 'NorthOrientation.down',
+    3 => 'NorthOrientation.left',
+    _ => 'NorthOrientation($rawValue)',
+  };
 }
 
 final class OfflineRegionDefinitionType extends _Enum {
   const OfflineRegionDefinitionType.fromRawValue(super.rawValue);
   static const tilePyramid = OfflineRegionDefinitionType.fromRawValue(1);
   static const geometry = OfflineRegionDefinitionType.fromRawValue(2);
+  @override
+  String toString() => switch (rawValue) {
+    1 => 'OfflineRegionDefinitionType.tilePyramid',
+    2 => 'OfflineRegionDefinitionType.geometry',
+    _ => 'OfflineRegionDefinitionType($rawValue)',
+  };
 }
 
 final class OfflineRegionDownloadState extends _Enum {
   const OfflineRegionDownloadState.fromRawValue(super.rawValue);
   static const inactive = OfflineRegionDownloadState.fromRawValue(0);
   static const active = OfflineRegionDownloadState.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'OfflineRegionDownloadState.inactive',
+    1 => 'OfflineRegionDownloadState.active',
+    _ => 'OfflineRegionDownloadState($rawValue)',
+  };
 }
 
 /// OpenGL client API a dedicated EGL session creates its context for.
@@ -490,6 +610,13 @@ final class OpenglClientApi extends _Enum {
 
   /// OpenGL ES, as EGL_OPENGL_ES_API names it.
   static const gles = OpenglClientApi.fromRawValue(2);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'OpenglClientApi.unspecified',
+    1 => 'OpenglClientApi.gl',
+    2 => 'OpenglClientApi.gles',
+    _ => 'OpenglClientApi($rawValue)',
+  };
 }
 
 /// How a session's OpenGL context relates to its driver thread and host
@@ -505,6 +632,12 @@ final class OpenglContextOwnership extends _Enum {
 
   /// The session owns its thread's OpenGL context.
   static const dedicated = OpenglContextOwnership.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'OpenglContextOwnership.shared',
+    1 => 'OpenglContextOwnership.dedicated',
+    _ => 'OpenglContextOwnership($rawValue)',
+  };
 }
 
 /// OpenGL platform context provider used by a context descriptor.
@@ -521,6 +654,14 @@ final class OpenglContextPlatform extends _Enum {
 
   /// Emscripten WebGL context handle.
   static const webgl = OpenglContextPlatform.fromRawValue(3);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'OpenglContextPlatform.unspecified',
+    1 => 'OpenglContextPlatform.wgl',
+    2 => 'OpenglContextPlatform.egl',
+    3 => 'OpenglContextPlatform.webgl',
+    _ => 'OpenglContextPlatform($rawValue)',
+  };
 }
 
 /// OpenGL context providers supported by this build.
@@ -580,6 +721,12 @@ final class RenderAbandonDisposition extends _Enum {
 
   /// Abandon kept graphics resources that it could not safely destroy.
   static const quarantined = RenderAbandonDisposition.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'RenderAbandonDisposition.clean',
+    1 => 'RenderAbandonDisposition.quarantined',
+    _ => 'RenderAbandonDisposition($rawValue)',
+  };
 }
 
 /// Render backend support flags reported by this native library build.
@@ -611,6 +758,12 @@ final class RenderDriverKind extends _Enum {
   /// The host services driver work on the thread or realm where its graphics
   /// context is current.
   static const callerGraphicsThread = RenderDriverKind.fromRawValue(2);
+  @override
+  String toString() => switch (rawValue) {
+    1 => 'RenderDriverKind.coreWorker',
+    2 => 'RenderDriverKind.callerGraphicsThread',
+    _ => 'RenderDriverKind($rawValue)',
+  };
 }
 
 /// Render modes reported by render observer events.
@@ -621,6 +774,12 @@ final class RenderMode extends _Enum {
   const RenderMode.fromRawValue(super.rawValue);
   static const partial = RenderMode.fromRawValue(0);
   static const full = RenderMode.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'RenderMode.partial',
+    1 => 'RenderMode.full',
+    _ => 'RenderMode($rawValue)',
+  };
 }
 
 /// Terminal disposition of one accepted frame demand.
@@ -648,6 +807,14 @@ final class RenderResult extends _Enum {
 
   /// A newer IF_NEEDED demand with the same flags replaced this demand.
   static const superseded = RenderResult.fromRawValue(4);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'RenderResult.rendered',
+    1 => 'RenderResult.noUpdate',
+    3 => 'RenderResult.targetNotReady',
+    4 => 'RenderResult.superseded',
+    _ => 'RenderResult($rawValue)',
+  };
 }
 
 /// Optional render-session capabilities.
@@ -678,6 +845,16 @@ final class RenderSessionState extends _Enum {
   static const detached = RenderSessionState.fromRawValue(4);
   static const targetLost = RenderSessionState.fromRawValue(5);
   static const abandoned = RenderSessionState.fromRawValue(6);
+  @override
+  String toString() => switch (rawValue) {
+    1 => 'RenderSessionState.attaching',
+    2 => 'RenderSessionState.attached',
+    3 => 'RenderSessionState.detaching',
+    4 => 'RenderSessionState.detached',
+    5 => 'RenderSessionState.targetLost',
+    6 => 'RenderSessionState.abandoned',
+    _ => 'RenderSessionState($rawValue)',
+  };
 }
 
 /// Optional fields for `mln_rendered_feature_query_options`.
@@ -703,6 +880,13 @@ final class RenderedQueryGeometryType extends _Enum {
   static const point = RenderedQueryGeometryType.fromRawValue(1);
   static const box = RenderedQueryGeometryType.fromRawValue(2);
   static const lineString = RenderedQueryGeometryType.fromRawValue(3);
+  @override
+  String toString() => switch (rawValue) {
+    1 => 'RenderedQueryGeometryType.point',
+    2 => 'RenderedQueryGeometryType.box',
+    3 => 'RenderedQueryGeometryType.lineString',
+    _ => 'RenderedQueryGeometryType($rawValue)',
+  };
 }
 
 final class ResourceErrorReason extends _Enum {
@@ -713,6 +897,16 @@ final class ResourceErrorReason extends _Enum {
   static const connection = ResourceErrorReason.fromRawValue(3);
   static const rateLimit = ResourceErrorReason.fromRawValue(4);
   static const other = ResourceErrorReason.fromRawValue(5);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'ResourceErrorReason.none',
+    1 => 'ResourceErrorReason.notFound',
+    2 => 'ResourceErrorReason.server',
+    3 => 'ResourceErrorReason.connection',
+    4 => 'ResourceErrorReason.rateLimit',
+    5 => 'ResourceErrorReason.other',
+    _ => 'ResourceErrorReason($rawValue)',
+  };
 }
 
 final class ResourceKind extends _Enum {
@@ -725,6 +919,18 @@ final class ResourceKind extends _Enum {
   static const spriteImage = ResourceKind.fromRawValue(5);
   static const spriteJson = ResourceKind.fromRawValue(6);
   static const image = ResourceKind.fromRawValue(7);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'ResourceKind.unknown',
+    1 => 'ResourceKind.style',
+    2 => 'ResourceKind.source',
+    3 => 'ResourceKind.tile',
+    4 => 'ResourceKind.glyphs',
+    5 => 'ResourceKind.spriteImage',
+    6 => 'ResourceKind.spriteJson',
+    7 => 'ResourceKind.image',
+    _ => 'ResourceKind($rawValue)',
+  };
 }
 
 /// The resource kinds that a route or rule matches, one bit per
@@ -753,18 +959,37 @@ final class ResourceLoadingMethod extends _Enum {
   static const all = ResourceLoadingMethod.fromRawValue(0);
   static const cacheOnly = ResourceLoadingMethod.fromRawValue(1);
   static const networkOnly = ResourceLoadingMethod.fromRawValue(2);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'ResourceLoadingMethod.all',
+    1 => 'ResourceLoadingMethod.cacheOnly',
+    2 => 'ResourceLoadingMethod.networkOnly',
+    _ => 'ResourceLoadingMethod($rawValue)',
+  };
 }
 
 final class ResourcePriority extends _Enum {
   const ResourcePriority.fromRawValue(super.rawValue);
   static const regular = ResourcePriority.fromRawValue(0);
   static const low = ResourcePriority.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'ResourcePriority.regular',
+    1 => 'ResourcePriority.low',
+    _ => 'ResourcePriority($rawValue)',
+  };
 }
 
 final class ResourceProviderDecision extends _Enum {
   const ResourceProviderDecision.fromRawValue(super.rawValue);
   static const passThrough = ResourceProviderDecision.fromRawValue(0);
   static const handle = ResourceProviderDecision.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'ResourceProviderDecision.passThrough',
+    1 => 'ResourceProviderDecision.handle',
+    _ => 'ResourceProviderDecision($rawValue)',
+  };
 }
 
 /// Field mask values for `mln_resource_request_info`.
@@ -817,18 +1042,38 @@ final class ResourceResponseStatus extends _Enum {
   static const error = ResourceResponseStatus.fromRawValue(1);
   static const noContent = ResourceResponseStatus.fromRawValue(2);
   static const notModified = ResourceResponseStatus.fromRawValue(3);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'ResourceResponseStatus.ok',
+    1 => 'ResourceResponseStatus.error',
+    2 => 'ResourceResponseStatus.noContent',
+    3 => 'ResourceResponseStatus.notModified',
+    _ => 'ResourceResponseStatus($rawValue)',
+  };
 }
 
 final class ResourceStoragePolicy extends _Enum {
   const ResourceStoragePolicy.fromRawValue(super.rawValue);
   static const permanent = ResourceStoragePolicy.fromRawValue(0);
   static const volatile = ResourceStoragePolicy.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'ResourceStoragePolicy.permanent',
+    1 => 'ResourceStoragePolicy.volatile',
+    _ => 'ResourceStoragePolicy($rawValue)',
+  };
 }
 
 final class ResourceUsage extends _Enum {
   const ResourceUsage.fromRawValue(super.rawValue);
   static const online = ResourceUsage.fromRawValue(0);
   static const offline = ResourceUsage.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'ResourceUsage.online',
+    1 => 'ResourceUsage.offline',
+    _ => 'ResourceUsage($rawValue)',
+  };
 }
 
 /// Bit values for the map and runtime event subscription masks.
@@ -892,6 +1137,17 @@ final class RuntimeEventPayloadType extends _Enum {
       RuntimeEventPayloadType.fromRawValue(6);
   static const offlineRegionTileCountLimit =
       RuntimeEventPayloadType.fromRawValue(7);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'RuntimeEventPayloadType.none',
+    1 => 'RuntimeEventPayloadType.renderFrame',
+    2 => 'RuntimeEventPayloadType.renderMap',
+    4 => 'RuntimeEventPayloadType.tileAction',
+    5 => 'RuntimeEventPayloadType.offlineRegionStatus',
+    6 => 'RuntimeEventPayloadType.offlineRegionResponseError',
+    7 => 'RuntimeEventPayloadType.offlineRegionTileCountLimit',
+    _ => 'RuntimeEventPayloadType($rawValue)',
+  };
 }
 
 /// Source kinds used by `mln_runtime_event.source_type`.
@@ -902,6 +1158,12 @@ final class RuntimeEventSourceType extends _Enum {
   const RuntimeEventSourceType.fromRawValue(super.rawValue);
   static const runtime = RuntimeEventSourceType.fromRawValue(0);
   static const map = RuntimeEventSourceType.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'RuntimeEventSourceType.runtime',
+    1 => 'RuntimeEventSourceType.map',
+    _ => 'RuntimeEventSourceType($rawValue)',
+  };
 }
 
 /// Runtime event types carried by `mln_runtime_event.type`.
@@ -930,6 +1192,29 @@ final class RuntimeEventType extends _Enum {
   static const offlineRegionTileCountLimitExceeded =
       RuntimeEventType.fromRawValue(21);
   static const mapSourceChanged = RuntimeEventType.fromRawValue(23);
+  @override
+  String toString() => switch (rawValue) {
+    1 => 'RuntimeEventType.mapCameraWillChange',
+    2 => 'RuntimeEventType.mapCameraIsChanging',
+    3 => 'RuntimeEventType.mapCameraDidChange',
+    4 => 'RuntimeEventType.mapStyleLoaded',
+    5 => 'RuntimeEventType.mapLoadingStarted',
+    6 => 'RuntimeEventType.mapLoadingFinished',
+    7 => 'RuntimeEventType.mapLoadingFailed',
+    8 => 'RuntimeEventType.mapIdle',
+    10 => 'RuntimeEventType.mapRenderError',
+    13 => 'RuntimeEventType.mapRenderFrameStarted',
+    14 => 'RuntimeEventType.mapRenderFrameFinished',
+    15 => 'RuntimeEventType.mapRenderMapStarted',
+    16 => 'RuntimeEventType.mapRenderMapFinished',
+    17 => 'RuntimeEventType.mapStyleImageMissing',
+    18 => 'RuntimeEventType.mapTileAction',
+    19 => 'RuntimeEventType.offlineRegionStatusChanged',
+    20 => 'RuntimeEventType.offlineRegionResponseError',
+    21 => 'RuntimeEventType.offlineRegionTileCountLimitExceeded',
+    23 => 'RuntimeEventType.mapSourceChanged',
+    _ => 'RuntimeEventType($rawValue)',
+  };
 }
 
 /// Optional fields for `mln_source_feature_query_options`.
@@ -983,6 +1268,21 @@ final class Status extends _Enum {
 
   /// A call named an ID with no live object behind it.
   static const notFound = Status.fromRawValue(-10);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'Status.ok',
+    -1 => 'Status.invalidArgument',
+    -2 => 'Status.invalidState',
+    -3 => 'Status.wrongThread',
+    -4 => 'Status.unsupported',
+    -5 => 'Status.nativeError',
+    -6 => 'Status.cancelled',
+    -7 => 'Status.busy',
+    -8 => 'Status.targetLost',
+    -9 => 'Status.notReady',
+    -10 => 'Status.notFound',
+    _ => 'Status($rawValue)',
+  };
 }
 
 /// Field mask values for `mln_style_image_info`.
@@ -1032,6 +1332,13 @@ final class StyleImageTextFit extends _Enum {
   static const stretchOrShrink = StyleImageTextFit.fromRawValue(0);
   static const stretchOnly = StyleImageTextFit.fromRawValue(1);
   static const proportional = StyleImageTextFit.fromRawValue(2);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'StyleImageTextFit.stretchOrShrink',
+    1 => 'StyleImageTextFit.stretchOnly',
+    2 => 'StyleImageTextFit.proportional',
+    _ => 'StyleImageTextFit($rawValue)',
+  };
 }
 
 /// Layer visibility values used by the visibility setter and layer info.
@@ -1042,6 +1349,12 @@ final class StyleLayerVisibility extends _Enum {
   const StyleLayerVisibility.fromRawValue(super.rawValue);
   static const visible = StyleLayerVisibility.fromRawValue(0);
   static const none = StyleLayerVisibility.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'StyleLayerVisibility.visible',
+    1 => 'StyleLayerVisibility.none',
+    _ => 'StyleLayerVisibility($rawValue)',
+  };
 }
 
 /// DEM raster encoding values.
@@ -1052,6 +1365,12 @@ final class StyleRasterDemEncoding extends _Enum {
   const StyleRasterDemEncoding.fromRawValue(super.rawValue);
   static const mapbox = StyleRasterDemEncoding.fromRawValue(0);
   static const terrarium = StyleRasterDemEncoding.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'StyleRasterDemEncoding.mapbox',
+    1 => 'StyleRasterDemEncoding.terrarium',
+    _ => 'StyleRasterDemEncoding($rawValue)',
+  };
 }
 
 /// Fields available in `mln_style_source_info`.
@@ -1102,6 +1421,20 @@ final class StyleSourceType extends _Enum {
   static const annotations = StyleSourceType.fromRawValue(7);
   static const customVector = StyleSourceType.fromRawValue(8);
   static const customMvtVector = StyleSourceType.fromRawValue(9);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'StyleSourceType.unknown',
+    1 => 'StyleSourceType.vector',
+    2 => 'StyleSourceType.raster',
+    3 => 'StyleSourceType.rasterDem',
+    4 => 'StyleSourceType.geojson',
+    5 => 'StyleSourceType.image',
+    6 => 'StyleSourceType.video',
+    7 => 'StyleSourceType.annotations',
+    8 => 'StyleSourceType.customVector',
+    9 => 'StyleSourceType.customMvtVector',
+    _ => 'StyleSourceType($rawValue)',
+  };
 }
 
 /// Tile URL coordinate scheme values.
@@ -1112,6 +1445,12 @@ final class StyleTileScheme extends _Enum {
   const StyleTileScheme.fromRawValue(super.rawValue);
   static const xyz = StyleTileScheme.fromRawValue(0);
   static const tms = StyleTileScheme.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'StyleTileScheme.xyz',
+    1 => 'StyleTileScheme.tms',
+    _ => 'StyleTileScheme($rawValue)',
+  };
 }
 
 /// Field mask values for `mln_style_transition_options`.
@@ -1138,6 +1477,12 @@ final class StyleVectorTileEncoding extends _Enum {
   const StyleVectorTileEncoding.fromRawValue(super.rawValue);
   static const mvt = StyleVectorTileEncoding.fromRawValue(0);
   static const mlt = StyleVectorTileEncoding.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'StyleVectorTileEncoding.mvt',
+    1 => 'StyleVectorTileEncoding.mlt',
+    _ => 'StyleVectorTileEncoding($rawValue)',
+  };
 }
 
 /// Tile LOD algorithms used by `mln_map_tile_options`.
@@ -1148,6 +1493,12 @@ final class TileLodMode extends _Enum {
   const TileLodMode.fromRawValue(super.rawValue);
   static const defaultValue = TileLodMode.fromRawValue(0);
   static const distance = TileLodMode.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'TileLodMode.defaultValue',
+    1 => 'TileLodMode.distance',
+    _ => 'TileLodMode($rawValue)',
+  };
 }
 
 /// Tile operations reported by tile observer events.
@@ -1165,6 +1516,19 @@ final class TileOperation extends _Enum {
   static const error = TileOperation.fromRawValue(6);
   static const cancelled = TileOperation.fromRawValue(7);
   static const nullValue = TileOperation.fromRawValue(8);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'TileOperation.requestedFromCache',
+    1 => 'TileOperation.requestedFromNetwork',
+    2 => 'TileOperation.loadFromNetwork',
+    3 => 'TileOperation.loadFromCache',
+    4 => 'TileOperation.startParse',
+    5 => 'TileOperation.endParse',
+    6 => 'TileOperation.error',
+    7 => 'TileOperation.cancelled',
+    8 => 'TileOperation.nullValue',
+    _ => 'TileOperation($rawValue)',
+  };
 }
 
 /// How a rule or route compares its url against a request URL.
@@ -1189,6 +1553,12 @@ final class ViewportMode extends _Enum {
   const ViewportMode.fromRawValue(super.rawValue);
   static const defaultValue = ViewportMode.fromRawValue(0);
   static const flippedY = ViewportMode.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'ViewportMode.defaultValue',
+    1 => 'ViewportMode.flippedY',
+    _ => 'ViewportMode($rawValue)',
+  };
 }
 
 /// WebGL context placement.
@@ -1204,6 +1574,12 @@ final class WebglContextKind extends _Enum {
   /// Transfer the canvas named by canvas_selector to a native worker and create
   /// a WebGL 2 context there.
   static const transferredCanvas = WebglContextKind.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'WebglContextKind.existing',
+    1 => 'WebglContextKind.transferredCanvas',
+    _ => 'WebglContextKind($rawValue)',
+  };
 }
 
 /// Metal frame acquired from a texture ring.

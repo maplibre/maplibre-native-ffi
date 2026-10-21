@@ -1,4 +1,4 @@
-//! Owner handles: copies, closes, parents, and the futures that create them.
+//! Owner handles: copies, native retirement, and the futures that create them.
 
 const std = @import("std");
 const testing = std.testing;
@@ -6,9 +6,8 @@ const testing = std.testing;
 const maplibre = @import("maplibre_native_ffi");
 const support = @import("fixture.zig");
 
-// A handle value is a copy of an ID in the owner registry, so every copy sees
-// the close that one of them performed, and a second close does nothing.
-test "copied handles share one close and close twice safely" {
+// Every copy carries the same native id, which native validates after release.
+test "copied handles report native invalid state after release" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
     const map_copy = fixture.map;
@@ -17,19 +16,19 @@ test "copied handles share one close and close twice safely" {
     const projection_copy = projection;
 
     try maplibre.mapProjectionRelease(projection, null);
-    try maplibre.mapProjectionRelease(projection_copy, null);
+    try testing.expectError(error.InvalidState, maplibre.mapProjectionRelease(projection_copy, null));
     try testing.expectError(error.InvalidState, maplibre.mapProjectionGetCamera(projection_copy, null));
 
     try fixture.closeMap();
-    try support.closeMapHandle(map_copy);
+    try testing.expectError(error.InvalidState, support.closeMapHandle(map_copy));
     var diagnostic: maplibre.Diagnostic = .{};
     try testing.expectError(error.InvalidState, maplibre.mapGetSnapshot(map_copy, &diagnostic));
-    try testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
-    try testing.expectEqualStrings("Map is closed", diagnostic.message());
+    try testing.expectEqual(@as(?i32, -2), diagnostic.raw_status);
+    try testing.expect(diagnostic.message().len != 0);
 
     try support.closeRuntimeHandle(runtime_copy);
     fixture.runtime_open = false;
-    try support.closeRuntimeHandle(fixture.runtime);
+    try testing.expectError(error.InvalidState, support.closeRuntimeHandle(fixture.runtime));
     try testing.expectError(error.InvalidState, maplibre.runtimeGetEventMask(runtime_copy, null));
 }
 
@@ -47,8 +46,7 @@ test "a handle's raw value names its events and outlives close" {
     try testing.expectEqual(loaded.value.source, map.raw);
 }
 
-// Native refuses to release a runtime with a live map. The refusal rolls the
-// binding's close back, so the runtime keeps working and closes later.
+// Native refuses to release a runtime with a live map, which leaves its id usable.
 test "a refused close leaves the handle usable and a later close succeeds" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
@@ -67,7 +65,7 @@ fn countRelease(context: ?*anyopaque) void {
     counter.add();
 }
 
-// A map anchors its runtime, and native retirement of a disposed runtime waits
+// Native retirement of a disposed runtime waits
 // for its live maps, so the runtime's callback registrations stay rooted until
 // the last map goes.
 test "a child map keeps its disposed runtime's callbacks alive" {

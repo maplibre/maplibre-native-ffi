@@ -7,7 +7,6 @@ package maplibre
 import "C"
 
 import (
-	"fmt"
 	"log/slog"
 	"runtime"
 	"runtime/cgo"
@@ -31,10 +30,7 @@ func init() {
 
 func checkCABIVersion(version uint32) error {
 	if version != bindingCABIVersion {
-		return newBindingError(ErrUnsupported, fmt.Sprintf(
-			"unsupported MapLibre Native C ABI version %d; this binding supports %d",
-			version, bindingCABIVersion,
-		))
+		return &ABIVersionMismatchError{Expected: bindingCABIVersion, Actual: version}
 	}
 	return nil
 }
@@ -70,20 +66,19 @@ type bindingArena struct {
 	pins        runtime.Pinner
 	allocations []unsafe.Pointer
 	callbacks   []*bindingCallbackTicket
-	leases      []func()
+	owners      []*bindingOwner
 }
 
 func (arena *bindingArena) lease(owner *bindingOwner) uint64 {
-	if owner == nil {
+	if owner == nil || owner.state == nil {
 		arena.fail("nil input handle")
 	}
-	raw, done := owner.bindingAcquire(false)
-	arena.leases = append(arena.leases, done)
-	return raw
+	arena.owners = append(arena.owners, owner)
+	return owner.state.raw
 }
 
 func (arena *bindingArena) fail(message string) {
-	panic(bindingFailure{newBindingError(ErrInvalidArgument, message)})
+	panic(bindingFailure{newBindingError(StatusInvalidArgument, message)})
 }
 
 func (arena *bindingArena) allocate(size uintptr) unsafe.Pointer {
@@ -92,7 +87,7 @@ func (arena *bindingArena) allocate(size uintptr) unsafe.Pointer {
 	}
 	result := C.calloc(1, C.size_t(size))
 	if result == nil {
-		panic(bindingFailure{newBindingError(ErrNative, "native input allocation failed")})
+		panic(bindingFailure{newBindingError(StatusNativeError, "native input allocation failed")})
 	}
 	arena.allocations = append(arena.allocations, result)
 	return result
@@ -117,9 +112,7 @@ func (arena *bindingArena) cstring(value string) *C.char {
 }
 
 func (arena *bindingArena) close() {
-	for _, done := range arena.leases {
-		done()
-	}
+	defer runtime.KeepAlive(arena.owners)
 	defer arena.pins.Unpin()
 	for _, ticket := range arena.callbacks {
 		ticket.release()
@@ -168,7 +161,7 @@ func (arena *bindingArena) array(count int, size uintptr) unsafe.Pointer {
 func bindingCount[T ~int8 | ~int16 | ~int32 | ~int64 | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~int | ~uint](count int) T {
 	result := T(count)
 	if count < 0 || result < 0 || uint64(result) != uint64(count) {
-		panic(bindingFailure{newBindingError(ErrInvalidArgument, "input count exceeds C capacity")})
+		panic(bindingFailure{newBindingError(StatusInvalidArgument, "input count exceeds C capacity")})
 	}
 	return result
 }
@@ -179,14 +172,14 @@ func bindingCountLike[T ~int8 | ~int16 | ~int32 | ~int64 | ~uint8 | ~uint16 | ~u
 
 func bindingLength(count uint64) int {
 	if count > uint64(^uint(0)>>1) {
-		panic(bindingFailure{newBindingError(ErrNative, "native count exceeds Go capacity")})
+		panic(bindingFailure{newBindingError(StatusNativeError, "native count exceeds Go capacity")})
 	}
 	return int(count)
 }
 
 func bindingElement(pointer unsafe.Pointer, index int, stride uint64, minimum, alignment uintptr) unsafe.Pointer {
 	if pointer == nil || uintptr(pointer)%alignment != 0 || stride%uint64(alignment) != 0 || stride < uint64(minimum) || uint64(index) > uint64(^uint(0)>>1)/stride {
-		panic(bindingFailure{newBindingError(ErrNative, "invalid native array layout")})
+		panic(bindingFailure{newBindingError(StatusNativeError, "invalid native array layout")})
 	}
 	return unsafe.Add(pointer, uintptr(index)*uintptr(stride))
 }
@@ -194,7 +187,7 @@ func bindingElement(pointer unsafe.Pointer, index int, stride uint64, minimum, a
 func bindingBytes(pointer unsafe.Pointer, count uint64) []byte {
 	length := bindingLength(count)
 	if length != 0 && pointer == nil {
-		panic(bindingFailure{newBindingError(ErrNative, "null native buffer")})
+		panic(bindingFailure{newBindingError(StatusNativeError, "null native buffer")})
 	}
 	return append([]byte{}, unsafe.Slice((*byte)(pointer), length)...)
 }
@@ -202,36 +195,30 @@ func bindingBytes(pointer unsafe.Pointer, count uint64) []byte {
 func bindingString(pointer unsafe.Pointer, count uint64) string {
 	length := bindingLength(count)
 	if length != 0 && pointer == nil {
-		panic(bindingFailure{newBindingError(ErrNative, "null native text")})
+		panic(bindingFailure{newBindingError(StatusNativeError, "null native text")})
 	}
 	return string(unsafe.Slice((*byte)(pointer), length))
 }
 
 func bindingArenaString(pointer unsafe.Pointer, size, offset, count uint64) string {
 	if offset > size || count > size-offset {
-		panic(bindingFailure{newBindingError(ErrNative, "invalid native message range")})
+		panic(bindingFailure{newBindingError(StatusNativeError, "invalid native message range")})
 	}
 	if count == 0 {
 		return ""
 	}
 	if pointer == nil {
-		panic(bindingFailure{newBindingError(ErrNative, "null native message arena")})
+		panic(bindingFailure{newBindingError(StatusNativeError, "null native message arena")})
 	}
 	return bindingString(unsafe.Add(pointer, bindingLength(offset)), count)
 }
 
 type bindingState struct {
-	mu             sync.Mutex
-	typeName       string
-	raw            uint64
-	issued         uint64
-	readers        int
-	closing        bool
-	dispose        func(uint64)
-	deciding       bool
-	completed      bool
-	completing     bool
-	pendingRelease uint64
+	typeName string
+	raw      uint64
+	released atomic.Bool
+	reads    *sync.RWMutex
+	dispose  func(uint64)
 }
 
 type bindingOwner struct {
@@ -241,108 +228,21 @@ type bindingOwner struct {
 	roots   map[cgo.Handle]*bindingCallbackTicket
 }
 
-func (owner *bindingOwner) bindingAcquire(read bool) (uint64, func()) {
-	if owner == nil || owner.state == nil {
-		panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
+// bindingAdopt keeps cleanup state separate from the owner so that callback
+// cycles and children remain collectible.
+func bindingAdopt(raw uint64, parent any, typeName string, guarded bool, dispose func(uint64)) *bindingOwner {
+	state := &bindingState{typeName: typeName, raw: raw, dispose: dispose}
+	if guarded {
+		state.reads = &sync.RWMutex{}
 	}
-	state := owner.state
-	state.mu.Lock()
-	if err := state.unavailable(); err != nil {
-		state.mu.Unlock()
-		panic(bindingFailure{err})
-	}
-	raw := state.raw
-	if read {
-		state.readers++
-	}
-	state.mu.Unlock()
-	return raw, func() {
-		if read {
-			state.mu.Lock()
-			state.readers--
-			state.mu.Unlock()
-		}
-		runtime.KeepAlive(owner)
-	}
-}
-
-func (owner *bindingOwner) IsClosed() bool {
-	if owner == nil || owner.state == nil {
-		return true
-	}
-	owner.state.mu.Lock()
-	defer owner.state.mu.Unlock()
-	return owner.state.raw == 0
-}
-
-// unavailable returns the lifecycle error for a closed or closing handle, or
-// nil for a live one. The caller holds state.mu.
-func (state *bindingState) unavailable() *Error {
-	switch {
-	case state.closing:
-		return newBindingError(ErrInvalidState, state.typeName+" is closing")
-	case state.raw == 0:
-		return newBindingError(ErrInvalidState, state.typeName+" is closed")
-	}
-	return nil
-}
-
-// bindingAdopt wraps a handle that native transferred. Closing it explicitly is
-// the contract, so the collector's cleanup of a handle that is still open
-// disposes it and logs the leak through the default slog logger. A handle the
-// binding releases itself, such as a resource request it passes through, is
-// already closed when the cleanup runs, and logs nothing.
-func bindingAdopt(raw uint64, parent any, typeName string, dispose func(uint64)) *bindingOwner {
-	if raw == 0 {
-		panic(bindingFailure{newBindingError(ErrNative, "native returned a null "+typeName)})
-	}
-	state := &bindingState{typeName: typeName, raw: raw, issued: raw, dispose: dispose}
 	owner := &bindingOwner{state: state, parent: parent, roots: make(map[cgo.Handle]*bindingCallbackTicket)}
 	runtime.AddCleanup(owner, func(state *bindingState) {
-		state.mu.Lock()
-		raw := state.raw
-		state.raw = 0
-		state.mu.Unlock()
-		if raw != 0 {
-			state.dispose(raw)
-			slog.Warn("maplibre: leaked handle; close it explicitly", "type", state.typeName, "handle", raw)
+		if !state.released.Load() {
+			state.dispose(state.raw)
+			slog.Warn("maplibre: leaked handle; close it explicitly", "type", state.typeName, "handle", state.raw)
 		}
 	}, state)
 	return owner
-}
-
-type bindingClose struct {
-	state     *bindingState
-	raw       uint64
-	committed bool
-}
-
-func (state *bindingState) reserveClose() (uint64, *bindingClose) {
-	if state == nil {
-		panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-	}
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	if state.closing {
-		panic(bindingFailure{newBindingError(ErrInvalidState, state.typeName+" is closing")})
-	}
-	if state.readers != 0 {
-		panic(bindingFailure{newBindingError(ErrInvalidState, state.typeName+" is in use")})
-	}
-	transaction := &bindingClose{state: state, raw: state.raw}
-	state.closing = true
-	return state.raw, transaction
-}
-func (transaction *bindingClose) commit() { transaction.committed = true }
-func (transaction *bindingClose) finish() {
-	state := transaction.state
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	if transaction.committed {
-		state.raw = 0
-	}
-	state.closing = false
-	runtime.KeepAlive(state)
 }
 
 // Callback roots belong to their Go owner. Native stores a weak ticket so that
@@ -377,7 +277,7 @@ func bindingHandleCell(handle cgo.Handle) unsafe.Pointer {
 	cell := C.binding_handle_cell(C.uintptr_t(handle))
 	if cell == nil {
 		handle.Delete()
-		panic(bindingFailure{newBindingError(ErrNative, "native handle cell allocation failed")})
+		panic(bindingFailure{newBindingError(StatusNativeError, "native handle cell allocation failed")})
 	}
 	return cell
 }
@@ -429,14 +329,10 @@ func bindingCallbackValue[T any](pointer unsafe.Pointer) (T, bool) {
 // bindingReportCallbackPanic reports a panic that the trampoline of the C
 // callback type named callback recovered, through the default slog logger,
 // which a host replaces with slog.SetDefault. Native receives the callback's
-// declared failure value instead. The trampoline holds its thread, and the
-// handler runs on the native callback's stack, so the binding refuses every
-// native call the handler makes, whatever the callback itself may call.
+// failure value instead.
 func bindingReportCallbackPanic(callback string, failure any) {
 	// A panicking handler must not escape the trampoline either.
 	defer func() { _ = recover() }()
-	C.binding_report_enter()
-	defer C.binding_report_leave()
 	slog.Error("maplibre: callback panicked", "callback", callback, "panic", failure, "stack", string(debug.Stack()))
 }
 
@@ -459,15 +355,6 @@ func mlnGoCallbackRelease(pointer unsafe.Pointer) {
 	}
 }
 
-// bindingAdmission needs no thread pin: a goroutine inside a cgo callback is
-// already locked to the callback's thread, and every other goroutine sees an
-// empty policy stack on whichever thread it runs.
-func bindingAdmission(operation uint32, owner uint64) {
-	if !bool(C.binding_policy_check(C.uint32_t(operation), C.uint64_t(owner))) {
-		panic(bindingFailure{newBindingError(ErrInvalidState, "operation is unavailable in this native callback")})
-	}
-}
-
 type bindingScope struct {
 	alive  atomic.Bool
 	thread uintptr
@@ -481,78 +368,7 @@ func bindingNewScope() *bindingScope {
 
 func (scope *bindingScope) check() {
 	if scope == nil || !scope.alive.Load() || scope.thread != uintptr(C.binding_thread()) {
-		panic(bindingFailure{newBindingError(ErrInvalidState, "callback response is expired or used from another thread")})
-	}
-}
-
-func (state *bindingState) beginDecision() { state.mu.Lock(); state.deciding = true; state.mu.Unlock() }
-
-func (state *bindingState) finishDecision(decision, accept, pass uint32) uint32 {
-	state.mu.Lock()
-	state.deciding = false
-	var release uint64
-	if state.completed || state.completing || state.pendingRelease != 0 || decision == accept {
-		decision = accept
-		if !state.completing {
-			release = state.pendingRelease
-			state.pendingRelease = 0
-		}
-	} else {
-		state.raw = 0
-		state.pendingRelease = 0
-		decision = pass
-	}
-	state.mu.Unlock()
-	if release != 0 {
-		state.dispose(release)
-	}
-	return decision
-}
-
-func (state *bindingState) reserveCompletion() (uint64, func(bool)) {
-	state.mu.Lock()
-	if err := state.unavailable(); err != nil {
-		state.mu.Unlock()
-		panic(bindingFailure{err})
-	}
-	if state.completed || state.completing {
-		state.mu.Unlock()
-		panic(bindingFailure{newBindingError(ErrInvalidState, state.typeName+" completion is already accepted or in progress")})
-	}
-	state.completing = true
-	raw := state.raw
-	state.mu.Unlock()
-	return raw, func(accepted bool) {
-		state.mu.Lock()
-		state.completing = false
-		state.completed = state.completed || accepted
-		var release uint64
-		if !state.deciding {
-			release = state.pendingRelease
-			state.pendingRelease = 0
-		}
-		state.mu.Unlock()
-		if release != 0 {
-			state.dispose(release)
-		}
-	}
-}
-
-func (state *bindingState) closeDecision() {
-	state.mu.Lock()
-	raw := state.raw
-	if raw == 0 {
-		state.mu.Unlock()
-		return
-	}
-	state.raw = 0
-	if state.deciding || state.completing {
-		state.pendingRelease = raw
-		raw = 0
-	}
-	state.mu.Unlock()
-	if raw != 0 {
-		state.dispose(raw)
+		panic(bindingFailure{newBindingError(StatusInvalidState, "callback response is expired or used from another thread")})
 	}
 }
 
@@ -563,5 +379,5 @@ func (owner *bindingOwner) Id() uint64 {
 	if owner == nil || owner.state == nil {
 		return 0
 	}
-	return owner.state.issued
+	return owner.state.raw
 }

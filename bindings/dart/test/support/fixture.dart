@@ -96,7 +96,7 @@ final class RuntimeFixture {
       runtime.createMap(options ?? mapOptionsDefault()),
       'map creation',
     );
-    addTearDown(map.close);
+    addTearDown(() => closeIfLive(map.close));
     return map;
   }
 
@@ -122,7 +122,7 @@ Future<RuntimeFixture> openRuntime({
       cachePath: defaults.cachePath,
     ),
   );
-  addTearDown(runtime.close);
+  addTearDown(() => closeIfLive(runtime.close));
   final pending = <RuntimeEvent>[];
   await runtime.setEventHandler(
     RuntimeEventHandler(
@@ -160,3 +160,12 @@ ResourceResponse get emptyStyleResponse => ResourceResponse(
   status: ResourceResponseStatus.ok,
   bytes: jsonBytes(emptyStyleJson),
 );
+
+/// Closes a fixture owner that a test may already have released.
+Future<void> closeIfLive(Future<void> Function() close) async {
+  try {
+    await close();
+  } on MaplibreException catch (error) {
+    if (error.status != Status.invalidState) rethrow;
+  }
+}

@@ -7,13 +7,11 @@
 "ERR-01" = "bindings/zig/src/status.zig::statuses map both ways, keep an unknown code, and carry the diagnostic"
 "ERR-02" = "bindings/zig/src/status.zig::ABI version validation reports mismatch diagnostics"
 "ERR-03" = "bindings/zig/tests/rendering.zig::a drain before any demand returns no batch"
-"LIFE-01" = "bindings/zig/tests/lifecycle.zig::copied handles share one close and close twice safely"
+"LIFE-01" = "bindings/zig/tests/lifecycle.zig::copied handles report native invalid state after release"
 "LIFE-02" = "bindings/zig/tests/lifecycle.zig::a refused close leaves the handle usable and a later close succeeds"
-"LIFE-03" = "bindings/zig/src/owner.zig::a borrow on another thread holds off disposal until it ends"
-# Zig has no garbage collector, so `deinit` is an explicit abandonment rather
-# than a leak, and the binding has no leak to report. The test covers the
-# disposal off the callback stack.
-"LIFE-04" = "bindings/zig/src/owner.zig::an owner abandoned inside a callback scope disposes off the callback stack"
+"LIFE-03" = "bindings/zig/tests/rendering.zig::a scoped frame view holds its frame until the scope returns"
+# Zig owners are disposed explicitly; the provider disposes its request in its callback.
+"LIFE-04" = "bindings/zig/tests/generated_workflows.zig::a provider can deinit its request inside its callback"
 "LIFE-05" = "bindings/zig/tests/lifecycle.zig::a child map keeps its disposed runtime's callbacks alive"
 "LIFE-06" = "bindings/zig/tests/lifecycle.zig::a handle's raw value names its events and outlives close"
 # A Zig conversion runs in the completion callback and disposes what it built,
@@ -27,7 +25,7 @@
 "COMP-06" = "bindings/zig/tests/generated_workflows.zig::discarded commands are fenced and synchronous rejection returns an error"
 "CB-01" = "bindings/zig/tests/callbacks.zig::a callback registration is rooted until native releases it"
 "CB-02" = { na = "Zig has no garbage collector: a callback's context is a caller-owned pointer that the binding never retains, so no registration can keep a receiver alive" }
-"CB-03" = "bindings/zig/tests/generated_workflows.zig::generated provider inline completion and close retain decision ownership"
+"CB-03" = { na = "Native enforces callback reentry safety; tests/native covers the boundary" }
 "CB-04" = "bindings/zig/tests/callbacks.zig::an error returned by a resource provider is contained and reported"
 "CB-05" = "bindings/zig/tests/callbacks.zig::a decision handle answers its request later from another thread"
 "CB-06" = "bindings/zig/tests/callbacks.zig::a scoped response rejects use after its callback and from another thread"

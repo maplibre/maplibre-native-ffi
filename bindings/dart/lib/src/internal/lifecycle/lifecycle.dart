@@ -6,6 +6,7 @@ import '../c/maplibre_native_c.dart';
 import '../c/maplibre_native_c.g.dart' as raw;
 import '../status/status.dart';
 import '../../error/maplibre_exception.dart';
+import '../../values.dart';
 import 'native_handles.dart';
 
 final NativeFinalizer _ownerFinalizer = NativeFinalizer(
@@ -47,84 +48,36 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   }
 
   bool _closed = false;
-  bool _closing = false;
-  int _readers = 0;
-  Future<void>? _closeFuture;
   final Object _finalizerDetachToken = Object();
   Pointer<Void>? _ownerToken;
 
   final String typeName;
 
-  bool get isClosed => _closed;
-
   int get handleId => _handle.raw;
 
-  H get handle {
-    if (_closing) {
-      throwInvalidState('$typeName is closing');
-    }
-    if (_closed) {
-      throwInvalidState('$typeName is closed');
-    }
-    return _handle;
-  }
+  H get handle => _handle;
 
-  /// Runs [body] with the live handle and holds off a close until it returns.
-  T read<T>(T Function(H handle) body) {
-    final live = handle;
-    _readers++;
-    try {
-      return body(live);
-    } finally {
-      _readers--;
-    }
-  }
-
-  /// Releases the native handle with [destroy] exactly once after success.
-  ///
-  /// [destroy] returns the status of a call that wrote [nativeDiagnostic].
+  /// Releases the native handle once native accepts [destroy].
   void close(int Function(H) destroy) {
-    if (!_beginClose()) return;
-    try {
-      checkNativeCall(destroy(_handle));
-    } finally {
-      _closing = false;
-    }
+    if (_closed) return;
+    checkNativeCall(destroy(_handle));
     _closed = true;
     _detachOwnerFinalizer();
   }
 
-  /// Releases the native handle asynchronously exactly once after success.
-  ///
-  /// Rejected admission throws and preserves the owner. Accepted admission
-  /// consumes it immediately; the returned future reports native quiescence.
+  /// Submits a release and detaches cleanup once native accepts it.
   Future<void> closeAsync(Future<void> Function(H) close) {
-    if (_closed) return _closeFuture ?? Future.value();
-    _beginClose();
-    final Future<void> completion;
-    try {
-      completion = close(_handle);
-    } finally {
-      _closing = false;
-    }
+    final completion = close(_handle);
     _closed = true;
     _detachOwnerFinalizer();
-    return _closeFuture = completion;
-  }
-
-  bool _beginClose() {
-    if (_closed) return false;
-    if (_closing) throwInvalidState('$typeName is closing');
-    if (_readers != 0) throwInvalidState('$typeName is in use');
-    _closing = true;
-    return true;
+    return completion;
   }
 
   void _attachOwnerFinalizer(NativeHandle handle) {
     final token = _createOwnerToken(handle.raw);
     if (token == nullptr) {
-      throw MaplibreException.forNativeStatusCode(
-        nativeStatusNativeError,
+      throw MaplibreException(
+        Status.nativeError,
         'Could not allocate $typeName finalizer state',
       );
     }

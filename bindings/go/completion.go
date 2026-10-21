@@ -9,7 +9,6 @@ import "C"
 import (
 	"context"
 	"runtime/cgo"
-	"sync"
 	"unsafe"
 )
 
@@ -17,7 +16,7 @@ import (
 type CommandCompletion struct {
 	Disposition CommandDisposition
 	Generation  uint64
-	RawStatus   int32
+	Status      Status
 	Diagnostic  string
 }
 
@@ -27,10 +26,8 @@ type futureResult[T any] struct {
 }
 
 type futureState[T any] struct {
-	ready     chan struct{}
-	mu        sync.Mutex
-	result    futureResult[T]
-	completed bool
+	ready  chan struct{}
+	result futureResult[T]
 }
 
 // Future is a one-shot native result. Await may be called from any goroutine.
@@ -38,16 +35,7 @@ type Future[T any] struct {
 	state *futureState[T]
 }
 
-func completedFuture[T any](value T) *Future[T] {
-	state := &futureState[T]{ready: make(chan struct{}), completed: true}
-	state.result = futureResult[T]{value: value}
-	close(state.ready)
-	return &Future[T]{state: state}
-}
-
-// Done closes when native has delivered the terminal result. It lets a host
-// service another loop without blocking in Await. A nil Future reports done
-// immediately, and Await then reports ErrInvalidArgument rather than blocking.
+// Done closes when native has delivered the terminal result.
 func (future *Future[T]) Done() <-chan struct{} {
 	if future == nil || future.state == nil {
 		closed := make(chan struct{})
@@ -65,7 +53,7 @@ func (future *Future[T]) Done() <-chan struct{} {
 func (future *Future[T]) Await(ctx context.Context) (T, error) {
 	var zero T
 	if future == nil || future.state == nil {
-		return zero, newBindingError(ErrInvalidArgument, "Future is nil")
+		return zero, newBindingError(StatusInvalidArgument, "Future is nil")
 	}
 	// A context that has already ended wins over a result that has arrived,
 	// so its outcome does not depend on timing.
@@ -74,8 +62,6 @@ func (future *Future[T]) Await(ctx context.Context) (T, error) {
 	}
 	select {
 	case <-future.state.ready:
-		future.state.mu.Lock()
-		defer future.state.mu.Unlock()
 		return future.state.result.value, future.state.result.err
 	case <-ctx.Done():
 		return zero, ctx.Err()
@@ -99,21 +85,14 @@ func (bridge *completionBridge[T]) complete(raw *C.mln_completion_result) {
 			if failure, ok := failure.(bindingFailure); ok {
 				result.err = failure.error
 			} else {
-				result.err = newBindingError(ErrNative, "completion conversion panicked")
+				result.err = newBindingError(StatusNativeError, "completion conversion panicked")
 			}
 		}
-		bridge.state.mu.Lock()
-		if bridge.state.completed {
-			bridge.state.mu.Unlock()
-			return
-		}
 		bridge.state.result = result
-		bridge.state.completed = true
-		bridge.state.mu.Unlock()
 		close(bridge.state.ready)
 	}()
 	if raw == nil {
-		result.err = newBindingError(ErrInvalidState, "native completion returned nil")
+		result.err = newBindingError(StatusInvalidState, "native completion returned nil")
 	} else if raw.status != C.MLN_STATUS_OK && !bridge.deliversStatus {
 		result.err = newStatusError(int32(raw.status), bindingString(raw.diagnostic.data, uint64(raw.diagnostic.size)))
 	} else {
@@ -121,9 +100,8 @@ func (bridge *completionBridge[T]) complete(raw *C.mln_completion_result) {
 	}
 }
 
-func startCompletion[T any](start func(*C.mln_completion, *C.mln_diagnostic) int32, convert func(*C.mln_completion_result) (T, error)) (*Future[T], error) {
+func startCompletion[T any](start func(*C.mln_completion, *C.mln_diagnostic) int32, convert func(*C.mln_completion_result) (T, error), deliversStatus bool) (*Future[T], error) {
 	state := &futureState[T]{ready: make(chan struct{})}
-	_, deliversStatus := any(*new(T)).(CommandCompletion)
 	bridge := &completionBridge[T]{state: state, deliversStatus: deliversStatus, convert: convert}
 	handle := cgo.NewHandle(completionReceiver(bridge))
 	cell := bindingHandleCell(handle)
@@ -146,7 +124,7 @@ func startCompletion[T any](start func(*C.mln_completion, *C.mln_diagnostic) int
 
 func completionUnit(result *C.mln_completion_result) (struct{}, error) {
 	if result.value != nil || result.value_count != 0 {
-		return struct{}{}, newBindingError(ErrInvalidState, "unit completion returned a value")
+		return struct{}{}, newBindingError(StatusInvalidState, "unit completion returned a value")
 	}
 	return struct{}{}, nil
 }
@@ -158,7 +136,7 @@ func completionCommand(result *C.mln_completion_result) (CommandCompletion, erro
 	return CommandCompletion{
 		Disposition: CommandDisposition(result.disposition),
 		Generation:  uint64(result.generation),
-		RawStatus:   int32(result.status),
+		Status:      Status(result.status),
 		Diagnostic:  completionDiagnostic(result),
 	}, nil
 }
@@ -173,7 +151,7 @@ func completionDiagnostic(result *C.mln_completion_result) string {
 func completionValue[T any](result *C.mln_completion_result) (T, error) {
 	var zero T
 	if result.value == nil || result.value_count != 1 {
-		return zero, newBindingError(ErrInvalidState, "native completion returned no value")
+		return zero, newBindingError(StatusInvalidState, "native completion returned no value")
 	}
 	return *(*T)(result.value), nil
 }

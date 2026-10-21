@@ -2,7 +2,7 @@
 
 import unittest
 
-from support import parse, protocol_groups
+from support import parse, protocol_groups, real_api
 
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters import (
@@ -39,6 +39,13 @@ PROTOCOL_GAPS = {
 
 
 class GenerationTests(unittest.TestCase):
+    def test_go_guards_only_owner_outputs_copied_after_native_returns(self):
+        from tools.bindgen.emitters.go_operations import needs_read
+
+        api = compile_api(real_api())
+        guarded = {plan.name for plan in api.operations if needs_read(plan)}
+        self.assertEqual(guarded, {"mln_render_frame_batch_get"})
+
     def parse(self, source, *, owned_map=False):
         api = parse(
             source,

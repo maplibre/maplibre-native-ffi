@@ -2,7 +2,7 @@
 
 A generated operation names its native function, its receiver access, and the
 binding value for each remaining native parameter. bindings/zig/src/call.zig
-admits the call, holds the receiver and handle arguments, encodes inputs,
+passes native ids, encodes inputs,
 retains callback roots, and decodes outputs and completion results.
 """
 
@@ -55,34 +55,18 @@ def validate_input(function, name, value):
             validate_input(function, name + "." + field.name, field.value)
 
 
-def access(plan, values, decision):
+def access(plan):
     if plan.scoped_receiver:
         return "scoped"
     if not plan.receiver:
         return "none"
-    if plan.consumes:
-        return "close"
-    if decision:
-        return "complete"
-    borrowed = any(
-        dynamic(element(p.value)) and element(p.value).kind != "handle"
-        for p in plan.outputs
-    )
-    return "borrow" if borrowed else "lease"
+    return "handle"
 
 
 def owned(values, value):
     """The public type of a value, wrapped in OwnedValue when it copies storage."""
     public = values.public(value)
     return f"OwnedValue({public})" if dynamic(value) else public
-
-
-def parent_of(plan, owner):
-    """The call.Parent that an adopted handle retains."""
-    parent = owner.parent_parameter
-    if parent is None:
-        return ".none"
-    return ".receiver"
 
 
 def copier(plan, values):
@@ -95,8 +79,7 @@ def copier(plan, values):
     values.add(result)
     if plan.completion.result_owner:
         handle = values.public(result)
-        where = parent_of(plan, plan.completion.result_owner)
-        return f"call.handle({handle}, c.{result.native}, {where})", handle
+        return f"call.handle({handle}, c.{result.native})", handle
     if result.nullable and result.optional == "empty":
         raise failure(plan.function, "result is both nullable and optional")
     content = replace(result, nullable=False, optional=None)
@@ -115,7 +98,7 @@ def copier(plan, values):
     if result.nullable:
         return f"call.orNull({copy})", "?" + public
     if result.optional == "empty":
-        return f"call.orEmpty({copy}, {values.native_type(content)})", "?" + public
+        raise failure(plan.function, "empty completion requires a copier")
     return copy, public
 
 
@@ -126,14 +109,6 @@ def operation(plan, values, *, discard=False):
             function,
             "status-returning unconditional consumption requires a commit-on-error adapter",
         )
-    decision = next(
-        (
-            cb.decision
-            for cb in values.bound.callbacks.values()
-            if cb.decision and plan.name in (cb.decision.complete, cb.decision.resume)
-        ),
-        None,
-    )
     if plan.view:
         return view_operation(plan, values)
     inputs = {p.name: p.value for p in plan.inputs}
@@ -174,8 +149,7 @@ def operation(plan, values, *, discard=False):
             label = identifier(output_member(name))
             if name in owned_outputs:
                 results.append((label, values.public(value)))
-                where = parent_of(plan, owned_outputs[name])
-                arguments.append(f"call.adopt({values.public(value)}, {where})")
+                arguments.append(f"call.adopt({values.public(value)})")
                 continue
             if completion:
                 raise failure(function, "completion immediate output needs ownership")
@@ -217,7 +191,7 @@ def operation(plan, values, *, discard=False):
             )
             continue
         arguments.append(local)
-    mode = access(plan, values, decision)
+    mode = access(plan)
     receiver = names[receiver_name] if receiver_name else "{}"
     diagnostic = "diagnostic" if function.diagnostic else "null"
     args = ".{ " + ", ".join(arguments) + " }" if arguments else ".{}"

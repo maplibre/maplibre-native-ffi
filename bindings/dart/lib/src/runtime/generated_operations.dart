@@ -2373,7 +2373,6 @@ _NativeRegistration<raw.mln_resource_request_cancel_handler>
 _prepareResourceRequestCancelHandler(
   ResourceRequestCancelHandler value,
   _CallbackRoots roots,
-  bool Function() receiverClosed,
 ) {
   final arena = Arena();
   DeliveryRegistration? registration;
@@ -2381,16 +2380,13 @@ _prepareResourceRequestCancelHandler(
     final result = arena<raw.mln_resource_request_cancel_handler>();
     result.ref.size = sizeOf<raw.mln_resource_request_cancel_handler>();
     final registered = registration = roots.registerQueued({
-      raw.MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL: (batch, index, delivery) {
-        if (!receiverClosed()) {
+      raw.MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL: (batch, index, delivery) =>
           _deliverResourceRequestCancelCallback(
             value.callback,
             batch,
             index,
             delivery,
-          );
-        }
-      },
+          ),
     });
     result.ref.queue = isolateDeliveryQueue.handle;
     result.ref.user_data = Pointer.fromAddress(registered.token);
@@ -3619,9 +3615,6 @@ final class AcquiredFrameHandle implements Finalizable {
   final NativeHandleState<NativeAcquiredFrame> _state;
   NativeAcquiredFrame get _handle => _state.handle;
 
-  /// Whether this binding object has released its native handle.
-  bool get isClosed => _state.isClosed;
-
   /// The native handle id, which runtime events report as their source.
   ///
   /// It stays readable after close, so events drained later still match
@@ -3779,9 +3772,6 @@ final class GeojsonSourceDataHandle implements Finalizable {
     : _state = NativeHandleState(handle, 'GeojsonSourceDataHandle');
   final NativeHandleState<NativeGeojsonSourceData> _state;
   NativeGeojsonSourceData get _handle => _state.handle;
-
-  /// Whether this binding object has released its native handle.
-  bool get isClosed => _state.isClosed;
 
   /// The native handle id, which runtime events report as their source.
   ///
@@ -4360,9 +4350,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   final NativeHandleState<NativeMap> _state;
   NativeMap get _handle => _state.handle;
   MapHandleDiscarding get discarding => MapHandleDiscarding._(this);
-
-  /// Whether this binding object has released its native handle.
-  bool get isClosed => _state.isClosed;
 
   /// The native handle id, which runtime events report as their source.
   ///
@@ -5972,9 +5959,6 @@ final class MapProjectionHandle implements Finalizable {
   final NativeHandleState<NativeMapProjection> _state;
   NativeMapProjection get _handle => _state.handle;
 
-  /// Whether this binding object has released its native handle.
-  bool get isClosed => _state.isClosed;
-
   /// The native handle id, which runtime events report as their source.
   ///
   /// It stays readable after close, so events drained later still match
@@ -6105,9 +6089,6 @@ final class RenderFrameBatchHandle implements Finalizable {
   final NativeHandleState<NativeRenderFrameBatch> _state;
   NativeRenderFrameBatch get _handle => _state.handle;
 
-  /// Whether this binding object has released its native handle.
-  bool get isClosed => _state.isClosed;
-
   /// The native handle id, which runtime events report as their source.
   ///
   /// It stays readable after close, so events drained later still match
@@ -6168,9 +6149,6 @@ final class RenderSessionHandle implements Finalizable {
   NativeRenderSession get _handle => _state.handle;
   RenderSessionHandleDiscarding get discarding =>
       RenderSessionHandleDiscarding._(this);
-
-  /// Whether this binding object has released its native handle.
-  bool get isClosed => _state.isClosed;
 
   /// The native handle id, which runtime events report as their source.
   ///
@@ -6661,9 +6639,6 @@ final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
   final NativeHandleState<NativeResourceRequest> _state;
   NativeResourceRequest get _handle => _state.handle;
 
-  /// Whether this binding object has released its native handle.
-  bool get isClosed => _state.isClosed;
-
   /// The native handle id, which runtime events report as their source.
   ///
   /// It stays readable after close, so events drained later still match
@@ -6734,7 +6709,6 @@ final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
                 _prepareResourceRequestCancelHandler(
                   handler,
                   registrations.roots,
-                  () => isClosed,
                 ),
               ),
               outCancelled,
@@ -6762,9 +6736,6 @@ final class ResourceTransformRequestHandle implements Finalizable {
     : _state = NativeHandleState(handle, 'ResourceTransformRequestHandle');
   final NativeHandleState<NativeResourceTransformRequest> _state;
   NativeResourceTransformRequest get _handle => _state.handle;
-
-  /// Whether this binding object has released its native handle.
-  bool get isClosed => _state.isClosed;
 
   /// The native handle id, which runtime events report as their source.
   ///
@@ -6813,9 +6784,6 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   final _callbackRoots = _CallbackRoots();
   final NativeHandleState<NativeRuntime> _state;
   NativeRuntime get _handle => _state.handle;
-
-  /// Whether this binding object has released its native handle.
-  bool get isClosed => _state.isClosed;
 
   /// The native handle id, which runtime events report as their source.
   ///

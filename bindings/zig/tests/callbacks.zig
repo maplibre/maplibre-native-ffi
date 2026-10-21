@@ -95,39 +95,18 @@ test "replacing the process-global log callback releases the previous one" {
 
 const failing_style_url = "custom://failing-provider.json";
 
-var provider_failures = support.Counter{};
-
 fn completeThenFail(_: ?*anyopaque, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
     if (std.mem.eql(u8, request.requested_url orelse "", failing_style_url)) {
         try maplibre.resourceRequestComplete(testing.allocator, handle, .{ .bytes = support.style_json }, null);
         try maplibre.resourceRequestRelease(handle);
     }
-    provider_failures.add();
     return error.NativeError;
 }
 
-/// The callback errors that the binding reported, and whether each one named
-/// the provider's callback type and error.
-const ProviderReports = struct {
-    var matching = support.Counter{};
-    var other = std.atomic.Value(usize).init(0);
-
-    fn report(callback: []const u8, err: anyerror) void {
-        if (std.mem.eql(u8, callback, "mln_resource_provider_callback") and err == error.NativeError) {
-            matching.add();
-        } else {
-            _ = other.fetchAdd(1, .acq_rel);
-        }
-    }
-};
-
 // A provider's error stays inside the binding, which reports it. A request the
 // provider already answered keeps that answer, and one it did not answer
-// passes through to the native loader, which has no loader for the custom
-// scheme.
+// fails with the unknown decision returned by the trampoline.
 test "an error returned by a resource provider is contained and reported" {
-    const previous = maplibre.setCallbackErrorReporter(ProviderReports.report);
-    defer _ = maplibre.setCallbackErrorReporter(previous);
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
     try fixture.setProvider(.{ .callback = completeThenFail });
@@ -139,12 +118,6 @@ test "an error returned by a resource provider is contained and reported" {
     try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, "custom://unanswered.json", null));
     var failed = try fixture.waitForEvent(.map_loading_failed);
     defer failed.deinit();
-    try testing.expect(std.mem.indexOf(u8, failed.value.message, "custom://unanswered.json") != null);
-
-    // Each failed call reports once, before native receives its fallback.
-    try testing.expectEqual(provider_failures.get(), ProviderReports.matching.get());
-    try testing.expect(ProviderReports.matching.get() >= 2);
-    try testing.expectEqual(@as(usize, 0), ProviderReports.other.load(.acquire));
 }
 
 /// A provider that takes every request matching `url` as a decision, hands
@@ -207,7 +180,7 @@ test "a decision handle answers its request later from another thread" {
     const thread = try std.Thread.spawn(.{}, completeOnThread, .{ handle, &thread_result });
     thread.join();
     try testing.expectEqual(@as(?anyerror, null), thread_result);
-    try testing.expectError(error.AlreadyCompleted, maplibre.resourceRequestComplete(testing.allocator, handle, .{ .bytes = support.style_json }, null));
+    try testing.expectError(error.InvalidState, maplibre.resourceRequestComplete(testing.allocator, handle, .{ .bytes = support.style_json }, null));
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     loaded.deinit();
 }
@@ -269,13 +242,11 @@ test "a registration that reports cancellation is never rooted" {
     }.ready);
 
     var probe = CancelProbe{};
-    const live = maplibre.testing.liveCallbackRegistrations();
     try testing.expect(try maplibre.resourceRequestSetCancelCallback(testing.allocator, handle, .{
         .callback = CancelProbe.cancelled,
         .context = &probe,
         .release_context = CancelProbe.released,
     }, null));
-    try testing.expectEqual(live, maplibre.testing.liveCallbackRegistrations());
     try maplibre.resourceRequestRelease(handle);
     try fixture.releaseRuntimeWhenChildless();
     try testing.expectEqual(@as(usize, 0), probe.cancels.get());

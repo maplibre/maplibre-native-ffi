@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	stdruntime "runtime"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 	"weak"
@@ -91,8 +90,8 @@ func TestCallbackRootsFollowTheNativeRegistration(t *testing.T) {
 		id      string
 		options CustomGeometrySourceOptions
 	}{{"", options}, {"rejected", CustomGeometrySourceOptions{}}} {
-		if _, err := f.m.AddCustomGeometrySource(rejected.id, rejected.options); !errors.Is(err, ErrInvalidArgument) {
-			t.Fatalf("add %q = %v, want ErrInvalidArgument", rejected.id, err)
+		if _, err := f.m.AddCustomGeometrySource(rejected.id, rejected.options); !errors.Is(err, StatusInvalidArgument) {
+			t.Fatalf("add %q = %v, want StatusInvalidArgument", rejected.id, err)
 		}
 		if roots := rootCount(f.m.bindingOwner); roots != 0 {
 			t.Fatalf("roots after a rejected add of %q = %d, want 0", rejected.id, roots)
@@ -151,8 +150,8 @@ func TestCameraEndHandlerIsRootedUntilItRuns(t *testing.T) {
 	delta := DefaultCameraDelta()
 	delta.Scale = &scale
 	delta.Animation.EndHandler = update.Animation.EndHandler
-	if _, err := f.m.ApplyCameraDelta(delta); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("apply delta = %v, want ErrInvalidArgument", err)
+	if _, err := f.m.ApplyCameraDelta(delta); !errors.Is(err, StatusInvalidArgument) {
+		t.Fatalf("apply delta = %v, want StatusInvalidArgument", err)
 	}
 	if roots := rootCount(f.m.bindingOwner); roots != 0 {
 		t.Fatalf("roots after a rejected delta = %d, want 0", roots)
@@ -183,85 +182,9 @@ func TestCallbackDoesNotKeepItsReceiverAlive(t *testing.T) {
 	awaitUnreachable(t, discardProviderCycle(t), "the runtime in a cycle with its provider")
 }
 
-// Inside a callback, the calls its declaration allows succeed, and any other
-// call on the binding fails before it reaches native.
-func TestCallbackAdmissionPolicy(t *testing.T) {
-	f := newFixture(t)
-	failures := newFailureLog()
-	invoked := make(chan struct{}, 1)
-	await(t, submitted(f.runtime.SetHttpHeaderTransform(HttpHeaderTransform{Callback: func(_ ResourceKind, _ string, response *HttpHeaderTransformResponseScope) Status {
-		offer(invoked, struct{}{})
-		_, err := f.runtime.ClearResourceTransform()
-		var native *Error
-		if !errors.As(err, &native) || !strings.Contains(native.Diagnostic(), "unavailable in this native callback") {
-			failures.add("ClearResourceTransform inside the header transform = %v, want the admission error", err)
-		}
-		if _, ok := native.RawStatus(); ok {
-			failures.add("the admission error came from native")
-		}
-		if err := response.SetHeader("X-Test", "1"); err != nil {
-			failures.add("SetHeader inside the header transform: %v", err)
-		}
-		return StatusOk
-	}})))
-	base := f.serveLoopback(t, map[string]string{"/style.json": emptyStyle})
-	if _, err := f.m.SetStyleUrl(base + "/style.json"); err != nil {
-		t.Fatal(err)
-	}
-	f.awaitEvent(t, "the style load", isStyleLoaded)
-	receive(t, invoked, "the header transform's invocation")
-	failures.check(t)
-}
-
-// Admission is per OS thread. A goroutine that a callback starts runs on
-// another thread, so a call the callback may not make succeeds there while the
-// callback still runs. The callback waits only for the submission's acceptance,
-// which needs nothing from the callback's thread.
-func TestGoroutineFromCallbackIsNotRestricted(t *testing.T) {
-	f := newFixture(t)
-	failures := newFailureLog()
-	type submission struct {
-		future *Future[struct{}]
-		err    error
-	}
-	submissions := make(chan submission, 1)
-	var spawn sync.Once
-	await(t, submitted(f.runtime.SetHttpHeaderTransform(HttpHeaderTransform{Callback: func(ResourceKind, string, *HttpHeaderTransformResponseScope) Status {
-		spawn.Do(func() {
-			if _, err := f.runtime.ClearResourceTransform(); !errors.Is(err, ErrInvalidState) {
-				failures.add("ClearResourceTransform inside the header transform = %v, want ErrInvalidState", err)
-			}
-			accepted := make(chan submission, 1)
-			go func() {
-				future, err := f.runtime.ClearResourceTransform()
-				accepted <- submission{future, err}
-			}()
-			select {
-			case result := <-accepted:
-				submissions <- result
-			case <-time.After(testTimeout()):
-				failures.add("the goroutine's ClearResourceTransform did not return while the header transform ran")
-			}
-		})
-		return StatusOk
-	}})))
-	base := f.serveLoopback(t, map[string]string{"/style.json": emptyStyle})
-	if _, err := f.m.SetStyleUrl(base + "/style.json"); err != nil {
-		t.Fatal(err)
-	}
-	f.awaitEvent(t, "the style load", isStyleLoaded)
-	failures.check(t)
-	result := receive(t, submissions, "the goroutine's submission")
-	if result.err != nil {
-		t.Fatalf("ClearResourceTransform from the goroutine: %v", result.err)
-	}
-	await(t, result.future)
-}
-
 // A panic in a callback stays in the binding, which settles what native waits
-// for: a transform's request keeps its URL, and a provider's request passes
-// through to the built-in sources. The binding logs each panic through the
-// default slog logger.
+// for: a transform's request keeps its URL, and a provider's request fails.
+// The binding logs each panic through the default slog logger.
 func TestCallbackPanicIsContained(t *testing.T) {
 	panics := capturePanicLogs(t)
 	f := newFixture(t)
@@ -276,7 +199,7 @@ func TestCallbackPanicIsContained(t *testing.T) {
 	}
 	f.awaitEvent(t, "the style load from the original URL", isStyleLoaded)
 	receive(t, panicked, "the transform's panic")
-	if got := receive(t, panics, "the transform's panic log"); got != (callbackPanic{"mln_resource_transform_callback", "transform failed", true}) {
+	if got := receive(t, panics, "the transform's panic log"); got != (callbackPanic{"mln_resource_transform_callback", "transform failed"}) {
 		t.Fatalf("logged %+v", got)
 	}
 
@@ -287,8 +210,10 @@ func TestCallbackPanicIsContained(t *testing.T) {
 	if _, err := f.m.SetStyleUrl("custom://unserved.json"); err != nil {
 		t.Fatal(err)
 	}
-	f.awaitEvent(t, "the pass-through's loading failure", isLoadingFailure("custom://unserved.json"))
-	if got := receive(t, panics, "the provider's panic log"); got != (callbackPanic{"mln_resource_provider_callback", "provider failed", true}) {
+	f.awaitEvent(t, "the provider's loading failure", func(event RuntimeEvent) bool {
+		return event.Type == RuntimeEventTypeMapLoadingFailed
+	})
+	if got := receive(t, panics, "the provider's panic log"); got != (callbackPanic{"mln_resource_provider_callback", "provider failed"}) {
 		t.Fatalf("logged %+v", got)
 	}
 	select {
@@ -298,25 +223,28 @@ func TestCallbackPanicIsContained(t *testing.T) {
 	}
 }
 
-// A panic log reaches its handler on the callback's stack, so the handler may
-// not reenter native, even from a callback such as the wake callback that
-// admits every native call.
-func TestCallbackPanicHandlerCannotCallNative(t *testing.T) {
-	panics := capturePanicLogs(t)
-	// A trampoline holds its thread while it reports, as this test does.
-	stdruntime.LockOSThread()
-	defer stdruntime.UnlockOSThread()
+// A panic report contains a failure in the platform logger.
+func TestCallbackPanicReportIsContained(t *testing.T) {
+	previous := slog.Default()
+	slog.SetDefault(slog.New(failingPanicLogHandler{previous.Handler()}))
+	defer slog.SetDefault(previous)
 	bindingReportCallbackPanic("mln_wake_callback", "wake failed")
-	if got := receive(t, panics, "the wake's panic log"); got != (callbackPanic{"mln_wake_callback", "wake failed", true}) {
-		t.Fatalf("logged %+v", got)
-	}
 }
 
-// callbackPanic is one panic that the binding logged, and whether the binding
-// refused a native call from the log's handler.
+type failingPanicLogHandler struct{ slog.Handler }
+
+func (failingPanicLogHandler) Enabled(context.Context, slog.Level) bool { return true }
+
+func (failingPanicLogHandler) Handle(_ context.Context, record slog.Record) error {
+	if record.Message == "maplibre: callback panicked" {
+		panic("logger failed")
+	}
+	return nil
+}
+
+// callbackPanic is one panic that the binding logged.
 type callbackPanic struct {
 	callback, panic string
-	refused         bool
 }
 
 // capturePanicLogs routes the default slog logger's callback panics to the
@@ -349,8 +277,6 @@ func (handler panicLogHandler) Handle(_ context.Context, record slog.Record) err
 		}
 		return true
 	})
-	_, err := NetworkGetStatus()
-	logged.refused = errors.Is(err, ErrInvalidState)
 	offer(handler, logged)
 	return nil
 }
@@ -374,36 +300,6 @@ func TestProviderAnswersADeferredRequest(t *testing.T) {
 		t.Fatalf("Close: %v", err)
 	}
 	f.awaitEvent(t, "the deferred style load", isStyleLoaded)
-}
-
-// Inside the decision, the request handle decides the outcome: a completion
-// claims the request even when the callback returns pass-through, and a close
-// without one fails the request. Closing twice is safe.
-func TestProviderDecisionFollowsTheRequestHandle(t *testing.T) {
-	f := newFixture(t)
-	failures := newFailureLog()
-	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) ResourceProviderDecision {
-		if *request.RequestedUrl == "custom://answered.json" {
-			if err := handle.Complete(ResourceResponse{Status: ResourceResponseStatusOk, Bytes: []byte(emptyStyle)}); err != nil {
-				failures.add("Complete: %v", err)
-			}
-		}
-		for range 2 {
-			if err := handle.Close(); err != nil {
-				failures.add("Close: %v", err)
-			}
-		}
-		return ResourceProviderDecisionPassThrough
-	}})))
-	if _, err := f.m.SetStyleUrl("custom://answered.json"); err != nil {
-		t.Fatal(err)
-	}
-	f.awaitEvent(t, "the answered style load", isStyleLoaded)
-	if _, err := f.m.SetStyleUrl("custom://closed.json"); err != nil {
-		t.Fatal(err)
-	}
-	f.awaitEventType(t, RuntimeEventTypeMapLoadingFailed)
-	failures.check(t)
 }
 
 // Native copies a provider's routes, so the caller may reuse the slice once the
@@ -475,8 +371,8 @@ func TestScopedResponseRejectsLateAndForeignUse(t *testing.T) {
 	await(t, submitted(f.runtime.SetHttpHeaderTransform(HttpHeaderTransform{Callback: func(_ ResourceKind, _ string, response *HttpHeaderTransformResponseScope) Status {
 		foreign := make(chan error, 1)
 		go func() { foreign <- response.SetHeader("X-Test", "1") }()
-		if err := <-foreign; !errors.Is(err, ErrInvalidState) {
-			failures.add("SetHeader from another goroutine = %v, want ErrInvalidState", err)
+		if err := <-foreign; !errors.Is(err, StatusInvalidState) {
+			failures.add("SetHeader from another goroutine = %v, want StatusInvalidState", err)
 		}
 		offer(responses, response)
 		return StatusOk
@@ -488,8 +384,8 @@ func TestScopedResponseRejectsLateAndForeignUse(t *testing.T) {
 	f.awaitEvent(t, "the style load", isStyleLoaded)
 	failures.check(t)
 	response := receive(t, responses, "the header transform's response")
-	if err := response.SetHeader("X-Test", "late"); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("SetHeader after the callback returned = %v, want ErrInvalidState", err)
+	if err := response.SetHeader("X-Test", "late"); !errors.Is(err, StatusInvalidState) {
+		t.Fatalf("SetHeader after the callback returned = %v, want StatusInvalidState", err)
 	}
 }
 
@@ -567,8 +463,8 @@ func TestCancelCallbackIsRootedOnlyWhenStored(t *testing.T) {
 	if cancelled, err := held.SetCancelCallback(ResourceRequestCancelHandler{Callback: func() { close(ran) }}); cancelled || err != nil {
 		t.Fatalf("SetCancelCallback on a live request = (%v, %v), want (false, nil)", cancelled, err)
 	}
-	if _, err := held.SetCancelCallback(ResourceRequestCancelHandler{Callback: func() {}}); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("a second SetCancelCallback = %v, want ErrInvalidState", err)
+	if _, err := held.SetCancelCallback(ResourceRequestCancelHandler{Callback: func() {}}); !errors.Is(err, StatusInvalidState) {
+		t.Fatalf("a second SetCancelCallback = %v, want StatusInvalidState", err)
 	}
 	if roots := rootCount(held.bindingOwner); roots != 1 {
 		t.Fatalf("roots on the live request = %d, want 1", roots)
@@ -599,8 +495,8 @@ func TestCancelCallbackIsRootedOnlyWhenStored(t *testing.T) {
 	if err := discarded.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := discarded.SetCancelCallback(ResourceRequestCancelHandler{Callback: func() {}}); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("SetCancelCallback after Close = %v, want ErrInvalidState", err)
+	if _, err := discarded.SetCancelCallback(ResourceRequestCancelHandler{Callback: func() {}}); !errors.Is(err, StatusInvalidState) {
+		t.Fatalf("SetCancelCallback after Close = %v, want StatusInvalidState", err)
 	}
 	if err := held.Close(); err != nil {
 		t.Fatal(err)

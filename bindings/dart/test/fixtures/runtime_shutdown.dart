@@ -17,7 +17,8 @@ Future<void> closeRuntimes() async {
         try {
           await runtime.close();
           throw StateError('runtime closed with a live map');
-        } on InvalidStateException {
+        } on MaplibreException catch (error) {
+          if (error.status != Status.invalidState) rethrow;
           // A rejected close leaves the runtime available for later work.
         }
         await runtime.clearResourceTransform();

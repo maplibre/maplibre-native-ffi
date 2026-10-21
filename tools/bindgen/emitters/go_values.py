@@ -351,6 +351,20 @@ class Values:
                 doc(self.api, native, typename)
                 + f"type {typename} {scalar(value.enum_underlying or value.ctype, value.scalar_carrier)}\nconst (\n{constants}\n)\n"
             )
+            if value.enum_kind != "bitmask":
+                cases = "\n".join(
+                    f'case {number}: return "{typename}{name(key.removeprefix(prefix).lower())}"'
+                    for number, key in {
+                        number: key for key, number in value.enum_values
+                    }.items()
+                )
+                chunks.append(
+                    f'func (value {typename}) String() string {{ switch value {{ {cases} }}; return fmt.Sprintf("{typename}(%d)", value) }}'
+                )
+                if native == "mln_status":
+                    chunks.append(
+                        "func (value Status) Error() string { return value.String() }"
+                    )
             if value.enum_kind == "bitmask":
                 chunks.append(
                     f"func (value {typename}) Has(flags {typename}) bool {{ return value & flags == flags }}"
@@ -372,7 +386,7 @@ class Values:
             if value.response:
                 chunks.append(
                     f"type {typename}Scope struct {{ native *C.{native}; scope *bindingScope }}\n"
-                    f"func (response *{typename}Scope) target(operation uint32) bindingTarget {{ if response == nil {{ return bindingScoped(nil, 0, operation) }}; return bindingScoped(response.scope, uint64(uintptr(unsafe.Pointer(response.native))), operation) }}"
+                    f"func (response *{typename}Scope) target() bindingTarget {{ if response == nil {{ return bindingScoped(nil) }}; return bindingScoped(response.scope) }}"
                 )
                 continue
             from .go_callbacks import plain, registration_input, signature

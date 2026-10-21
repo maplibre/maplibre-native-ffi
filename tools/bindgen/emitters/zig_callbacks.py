@@ -1,5 +1,7 @@
 """Generate retained callback descriptors from their resolved registration plans."""
 
+import re
+
 from .zig import camel, identifier
 from .zig_dynamic_values import decode
 
@@ -81,7 +83,7 @@ def parts(values, value):
                 transfer = "ownership_transferred = true; "
                 release = camel(parameter.value.handle.release.removeprefix("mln_"))
                 owned.append(
-                    f"const {adopted} = try {values.public(parameter.value)}.adopt({raw}, null); "
+                    f"const {adopted} = {values.public(parameter.value)}.adopt({raw}); "
                     f"defer if (!ownership_transferred) {{ {release}({adopted}) catch {{}}; }}; "
                 )
                 converted.append(adopted)
@@ -94,25 +96,12 @@ def parts(values, value):
                 for name, source in names.items():
                     expression = expression.replace("raw." + identifier(name), source)
                 converted.append(expression)
-        policy = plan.reentry_policy
-        owner = "0"
-        if policy and policy.owner_parameter is None:
-            owner = "state.owner"
-        elif policy:
-            parameter = next(
-                p for p in plan.parameters if p.name == policy.owner_parameter
-            )
-            owner = (
-                names[parameter.name]
-                if parameter.value.kind == "handle"
-                else f"@intFromPtr({names[parameter.name]})"
-            )
-        operations = (
-            ", ".join('"' + name + '"' for name in policy.operations) if policy else ""
+        response = next(
+            (names[p.name] for p in parameters if p.value.unwrapped.response), None
         )
         scope = (
-            f"var scope: callback.Scope = .{{}}; scope.enter(&.{{ {operations} }}, {owner}); defer scope.leave();"
-            if plan.reentry != "allow"
+            f"var scope: callback.Scope = .{{}}; scope.enter(@intFromPtr({response})); defer scope.leave();"
+            if response
             else ""
         )
         call = f"host(state.value.context{''.join(', ' + expression for expression in converted)})"
@@ -130,12 +119,23 @@ def parts(values, value):
             request_type = values.public(
                 next(p.value for p in plan.parameters if p.name == decision.parameter)
             )
-            decision_setup = f"const request = try {request_type}.beginDecision({raw_request}); errdefer _ = request.finishDecision(false); "
-            action = f"const result = {call} catch |err| {{ {report} return if (request.finishDecision(false)) c.{decision.accept} else c.{decision.pass_through}; }}; {transfer}return if (request.finishDecision(result.toNative() == c.{decision.accept})) c.{decision.accept} else c.{decision.pass_through};"
+            decision_setup = f"const request = {request_type}.adopt({raw_request}); "
+            action = f"const result = {call} catch |err| {{ {report} return std.math.maxInt(u32); }}; {transfer}return result.toNative();"
         ownership_setup = "var ownership_transferred = false; " if owned else ""
         body = f"fn invoke({', '.join(names[p.name] + ': marshal.CallbackArg(c.' + plan.native + ', ' + str(i) + ')' for i, p in enumerate(plan.parameters))}) status.Error!marshal.CallbackResult(c.{plan.native}) {{ const state = {root_type}.get({names[plan.context]}); const host = state.value.{local} orelse {{ {fallback} }}; {scope} {decision_setup} {ownership_setup}{''.join(owned)}"
         if any("allocator" in expression for expression in converted):
             body += "var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator); defer arena.deinit(); const allocator = arena.allocator(); "
+        used = set(
+            re.findall(
+                r"\bnative_arg_\d+\b",
+                " ".join([names[plan.context], scope, decision_setup, *owned, action]),
+            )
+        )
+        body += "".join(
+            f"_ = {names[p.name]}; "
+            for p in plan.parameters
+            if names[p.name] not in used
+        )
         body += action + " }"
         body = body.replace("native_arg_", "callback_arg_")
         args = ", ".join(names[p.name] for p in plan.parameters)

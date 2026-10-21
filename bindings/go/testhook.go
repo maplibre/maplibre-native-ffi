@@ -181,7 +181,7 @@ func rejectedSubmissionForTest() (cgo.Handle, error) {
 	_, err := startCompletion(func(completion *C.mln_completion, _ *C.mln_diagnostic) int32 {
 		submitted = bindingHandleOf(completion.user_data)
 		return int32(C.MLN_STATUS_INVALID_STATE)
-	}, completionUnit)
+	}, completionUnit, false)
 	return submitted, err
 }
 
@@ -232,8 +232,7 @@ func createMapFailingAfterAdoptionForTest(receiver *RuntimeHandle) (*Future[*Map
 	return bindingCall(func() *Future[*MapHandle] {
 		arena := &bindingArena{}
 		defer arena.close()
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
+		raw := arena.lease(receiver.owner())
 		options := (*C.mln_map_options)(arena.allocate(unsafe.Sizeof(C.mln_map_options{})))
 		*options = nativeMapOptions(DefaultMapOptions(), arena)
 		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
@@ -245,7 +244,7 @@ func createMapFailingAfterAdoptionForTest(receiver *RuntimeHandle) (*Future[*Map
 			}
 			adoptMapHandle(uint64(value), receiver)
 			panic("conversion failed after adopting the map")
-		})
+		}, false)
 		if err != nil {
 			panic(bindingFailure{err})
 		}

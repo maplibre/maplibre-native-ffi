@@ -33,7 +33,13 @@ void main() {
           'refused',
           _geometrySource(tileSize: -1),
         ),
-        throwsA(isA<InvalidArgumentException>()),
+        throwsA(
+          isA<MaplibreException>().having(
+            (error) => error.status,
+            'status',
+            Status.invalidArgument,
+          ),
+        ),
       );
       expect(singleRegistrationProbeForTesting(map), isNull);
 
@@ -86,7 +92,13 @@ void main() {
             ),
           ),
         ),
-        throwsA(isA<InvalidArgumentException>()),
+        throwsA(
+          isA<MaplibreException>().having(
+            (error) => error.status,
+            'status',
+            Status.invalidArgument,
+          ),
+        ),
       );
       expect(singleRegistrationProbeForTesting(map), isNull);
     },

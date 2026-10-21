@@ -6,7 +6,6 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-import '../error/maplibre_exception.dart';
 import '../internal/callback/delivery_queue.dart';
 import '../internal/c/maplibre_native_c.dart'
     show checkNativeCall, ensureAbiVersion, nativeDiagnostic;
@@ -129,7 +128,7 @@ Future<CommandCompletion> _startCommand(
   decode: (result) => CommandCompletion(
     disposition: CommandDisposition.fromRawValue(result.disposition),
     generation: uint64FromNative(result.generation),
-    status: MaplibreStatus.fromNativeStatusCode(result.status),
+    status: Status.fromRawValue(result.status),
     diagnostic: copyCompletionDiagnostic(result.diagnostic),
   ),
 );
@@ -144,7 +143,7 @@ final class CommandCompletion {
 
   final CommandDisposition disposition;
   final BigInt generation;
-  final MaplibreStatus status;
+  final Status status;
   final String diagnostic;
 }
 

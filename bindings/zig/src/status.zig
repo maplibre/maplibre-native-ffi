@@ -5,19 +5,8 @@ const diagnostics = @import("diagnostics.zig");
 
 pub const expected_c_abi_version: u32 = 0;
 
-pub const NativeStatusError = error{
-    InvalidArgument,
-    InvalidState,
-    WrongThread,
-    Unsupported,
-    Cancelled,
-    Busy,
-    TargetLost,
-    NotReady,
-    NotFound,
-    NativeError,
-    UnknownStatus,
-};
+const generated = @import("generated_status.zig");
+pub const NativeStatusError = generated.NativeStatusError;
 
 pub const BindingError = NativeStatusError || error{
     InvalidString,
@@ -104,7 +93,7 @@ pub fn validateAbiVersion(diagnostic: ?*diagnostics.Diagnostic) Error!void {
     return validateAbiVersionValue(c.mln_c_version(), expected_c_abi_version, diagnostic);
 }
 
-pub fn validateAbiVersionValue(
+fn validateAbiVersionValue(
     actual: u32,
     expected: u32,
     diagnostic: ?*diagnostics.Diagnostic,
@@ -140,37 +129,10 @@ pub fn errorFromRawStatus(raw_status: i32) NativeStatusError!void {
     return nativeStatusError(raw_status);
 }
 
-fn nativeStatusError(raw_status: i32) NativeStatusError {
-    return switch (raw_status) {
-        c.MLN_STATUS_INVALID_ARGUMENT => error.InvalidArgument,
-        c.MLN_STATUS_INVALID_STATE => error.InvalidState,
-        c.MLN_STATUS_WRONG_THREAD => error.WrongThread,
-        c.MLN_STATUS_UNSUPPORTED => error.Unsupported,
-        c.MLN_STATUS_BUSY => error.Busy,
-        c.MLN_STATUS_TARGET_LOST => error.TargetLost,
-        c.MLN_STATUS_NOT_READY => error.NotReady,
-        c.MLN_STATUS_NOT_FOUND => error.NotFound,
-        c.MLN_STATUS_NATIVE_ERROR => error.NativeError,
-        c.MLN_STATUS_CANCELLED => error.Cancelled,
-        else => error.UnknownStatus,
-    };
-}
+const nativeStatusError = generated.fromRaw;
 
 /// The status that reports `err` to native code.
-pub fn rawStatus(err: Error) c.mln_status {
-    return switch (err) {
-        error.InvalidArgument => c.MLN_STATUS_INVALID_ARGUMENT,
-        error.InvalidState => c.MLN_STATUS_INVALID_STATE,
-        error.WrongThread => c.MLN_STATUS_WRONG_THREAD,
-        error.Unsupported => c.MLN_STATUS_UNSUPPORTED,
-        error.Cancelled => c.MLN_STATUS_CANCELLED,
-        error.Busy => c.MLN_STATUS_BUSY,
-        error.TargetLost => c.MLN_STATUS_TARGET_LOST,
-        error.NotReady => c.MLN_STATUS_NOT_READY,
-        error.NotFound => c.MLN_STATUS_NOT_FOUND,
-        else => c.MLN_STATUS_NATIVE_ERROR,
-    };
-}
+pub const rawStatus = generated.toRaw;
 
 test "statuses map both ways, keep an unknown code, and carry the diagnostic" {
     const table = .{

@@ -17,11 +17,11 @@ import (
 func TestNativeStatusMapsToTypedErrors(t *testing.T) {
 	err := NetworkSetStatus(NetworkStatus(999_999))
 	var native *Error
-	if !errors.As(err, &native) || !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("NetworkSetStatus(invalid) = %v, want an *Error wrapping ErrInvalidArgument", err)
+	if !errors.As(err, &native) || !errors.Is(err, StatusInvalidArgument) {
+		t.Fatalf("NetworkSetStatus(invalid) = %v, want an *Error wrapping StatusInvalidArgument", err)
 	}
-	if status, ok := native.RawStatus(); !ok || status != -1 {
-		t.Fatalf("RawStatus() = %d, %v; want -1, true", status, ok)
+	if native.Status != StatusInvalidArgument {
+		t.Fatalf("status = %v", native.Status)
 	}
 	if native.Diagnostic() == "" || !strings.Contains(native.Error(), native.Diagnostic()) {
 		t.Fatalf("diagnostic %q missing from %q", native.Diagnostic(), native.Error())
@@ -36,11 +36,11 @@ func TestNativeStatusMapsToTypedErrors(t *testing.T) {
 	}
 
 	err = failWithoutDiagnosticForTest(-12345)
-	if !errors.As(err, &native) || !errors.Is(err, ErrUnknownStatus) {
-		t.Fatalf("unknown status = %v, want an *Error wrapping ErrUnknownStatus", err)
+	if !errors.As(err, &native) || !errors.Is(err, Status(-12345)) {
+		t.Fatalf("unknown status = %v, want an *Error wrapping Status(-12345)", err)
 	}
-	if status, _ := native.RawStatus(); status != -12345 {
-		t.Fatalf("RawStatus() = %d, want the unknown code", status)
+	if native.Status != Status(-12345) {
+		t.Fatalf("status = %v", native.Status)
 	}
 	if native.Diagnostic() != "" {
 		t.Fatalf("Diagnostic() = %q, want the earlier call's message cleared", native.Diagnostic())
@@ -51,7 +51,7 @@ func TestNativeStatusMapsToTypedErrors(t *testing.T) {
 // mismatch, so no call reaches a library with another C ABI version.
 func TestMismatchedCABIVersionIsRejected(t *testing.T) {
 	err := checkCABIVersion(bindingCABIVersion + 1)
-	if !errors.Is(err, ErrUnsupported) || !strings.Contains(err.Error(), "C ABI version") {
-		t.Fatalf("checkCABIVersion(other) = %v, want ErrUnsupported naming the version", err)
+	if !errors.Is(err, StatusUnsupported) || !strings.Contains(err.Error(), "C ABI version") {
+		t.Fatalf("checkCABIVersion(other) = %v, want StatusUnsupported naming the version", err)
 	}
 }

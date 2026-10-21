@@ -6,35 +6,6 @@ import "unsafe"
 // touching C declarations, so a generator probe can compile them with its own
 // stand-in arena.
 
-// bindingNullableBytes borrows optional text or bytes by address, keeping
-// present empty text distinct from absent text with a non-null address.
-func bindingNullableBytes[T ~string | ~[]byte](value *T, arena *bindingArena) unsafe.Pointer {
-	if value == nil {
-		return nil
-	}
-	pointer := arena.bytes([]byte(*value))
-	if pointer == nil {
-		pointer = arena.allocate(1)
-	}
-	return pointer
-}
-
-// bindingOptionalBytes borrows optional text or bytes by address, which native
-// reads as absent when empty.
-func bindingOptionalBytes[T ~string | ~[]byte](value *T, arena *bindingArena) unsafe.Pointer {
-	if value == nil {
-		return nil
-	}
-	return arena.bytes([]byte(*value))
-}
-
-func bindingLen[T ~string | ~[]byte](value *T) int {
-	if value == nil {
-		return 0
-	}
-	return len(*value)
-}
-
 func bindingStore[T any](value T, arena *bindingArena) *T {
 	pointer := (*T)(arena.allocate(unsafe.Sizeof(value)))
 	*pointer = value
@@ -54,16 +25,6 @@ func bindingArray[In, Out any](items []In, arena *bindingArena, convert func(In,
 	converted := unsafe.Slice(pointer, len(items))
 	for i, item := range items {
 		converted[i] = convert(item, arena)
-	}
-	return pointer
-}
-
-// bindingNullableArray converts items like bindingArray, keeping a present
-// empty array distinct from an absent one with a non-null address.
-func bindingNullableArray[In, Out any](items []In, arena *bindingArena, convert func(In, *bindingArena) Out) *Out {
-	pointer := bindingArray(items, arena, convert)
-	if items != nil && pointer == nil {
-		pointer = (*Out)(arena.allocate(1))
 	}
 	return pointer
 }

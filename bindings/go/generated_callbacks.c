@@ -2,12 +2,6 @@
 #include "generated_callbacks.h"
 extern void mlnGoCallbackRelease(void*);
 void binding_release(void* p) { mlnGoCallbackRelease(p); }
-void binding_release_forbid(void* p) {
-  binding_policy policy = {0};
-  binding_policy_enter(&policy);
-  mlnGoCallbackRelease(p);
-  binding_policy_leave(&policy);
-}
 extern uint32_t mlnGo_mln_log_handler_callback(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   char* message
@@ -16,14 +10,9 @@ uint32_t binding_mln_log_handler_callback(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   const char* message
 ) {
-  static const uint32_t operations[] = {0};
-  binding_policy policy = {NULL, operations, 0, 0};
-  binding_policy_enter(&policy);
-  uint32_t result = mlnGo_mln_log_handler_callback(
+  return mlnGo_mln_log_handler_callback(
     (void*)user_data, severity, event, code, (char*)message
   );
-  binding_policy_leave(&policy);
-  return result;
 }
 extern void mlnGo_mln_custom_geometry_source_options_fetch_tile(
   void* user_data, mln_canonical_tile_id tile_id
@@ -81,19 +70,11 @@ void binding_mln_wake_callback(void* user_data) {
 }
 extern void mlnGo_mln_queue_lock_lock(void* user_data);
 void binding_mln_queue_lock_lock(void* user_data) {
-  static const uint32_t operations[] = {0};
-  binding_policy policy = {NULL, operations, 0, 0};
-  binding_policy_enter(&policy);
   mlnGo_mln_queue_lock_lock((void*)user_data);
-  binding_policy_leave(&policy);
 }
 extern void mlnGo_mln_queue_lock_unlock(void* user_data);
 void binding_mln_queue_lock_unlock(void* user_data) {
-  static const uint32_t operations[] = {0};
-  binding_policy policy = {NULL, operations, 0, 0};
-  binding_policy_enter(&policy);
   mlnGo_mln_queue_lock_unlock((void*)user_data);
-  binding_policy_leave(&policy);
 }
 extern void mlnGo_mln_resource_request_cancel_handler_callback(
   void* user_data, mln_resource_request handle
@@ -101,17 +82,7 @@ extern void mlnGo_mln_resource_request_cancel_handler_callback(
 void binding_mln_resource_request_cancel_handler_callback(
   void* user_data, mln_resource_request handle
 ) {
-  static const uint32_t operations[] = {
-    binding_operation_mln_resource_request_complete,
-    binding_operation_mln_resource_request_pass_through,
-    binding_operation_mln_resource_request_is_cancelled,
-    binding_operation_mln_resource_request_set_cancel_callback,
-    binding_operation_mln_resource_request_release
-  };
-  binding_policy policy = {NULL, operations, 5, (uint64_t)(uintptr_t)handle};
-  binding_policy_enter(&policy);
   mlnGo_mln_resource_request_cancel_handler_callback((void*)user_data, handle);
-  binding_policy_leave(&policy);
 }
 extern void mlnGo_mln_runtime_event_handler_callback(
   void* user_data, mln_event_batch_view* events
@@ -131,19 +102,10 @@ mln_status binding_mln_http_header_transform_callback(
   void* user_data, uint32_t kind, const char* url,
   mln_http_header_transform_response* out_response
 ) {
-  static const uint32_t operations[] = {
-    binding_operation_mln_http_header_transform_response_set_header
-  };
-  binding_policy policy = {
-    NULL, operations, 1, (uint64_t)(uintptr_t)out_response
-  };
-  binding_policy_enter(&policy);
-  mln_status result = mlnGo_mln_http_header_transform_callback(
+  return mlnGo_mln_http_header_transform_callback(
     (void*)user_data, kind, (char*)url,
     (mln_http_header_transform_response*)out_response
   );
-  binding_policy_leave(&policy);
-  return result;
 }
 extern uint32_t mlnGo_mln_resource_provider_callback(
   void* user_data, mln_resource_request_info* request,
@@ -153,20 +115,9 @@ uint32_t binding_mln_resource_provider_callback(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
-  static const uint32_t operations[] = {
-    binding_operation_mln_resource_request_complete,
-    binding_operation_mln_resource_request_pass_through,
-    binding_operation_mln_resource_request_is_cancelled,
-    binding_operation_mln_resource_request_set_cancel_callback,
-    binding_operation_mln_resource_request_release
-  };
-  binding_policy policy = {NULL, operations, 5, (uint64_t)(uintptr_t)handle};
-  binding_policy_enter(&policy);
-  uint32_t result = mlnGo_mln_resource_provider_callback(
+  return mlnGo_mln_resource_provider_callback(
     (void*)user_data, (mln_resource_request_info*)request, handle
   );
-  binding_policy_leave(&policy);
-  return result;
 }
 extern void mlnGo_mln_resource_transform_callback(
   void* user_data, uint32_t kind, char* url,

@@ -22,16 +22,11 @@ const ProviderProbe = struct {
         const self: *@This() = @ptrCast(@alignCast(context.?));
         _ = self.calls.fetchAdd(1, .seq_cst);
         if (request.kind != .style) return .pass_through;
-        if (maplibre.runtimeClearResourceTransform(self.runtime, null)) |unexpected| {
-            var future = unexpected;
-            future.deinit();
-            return error.NativeError;
-        } else |err| {
-            if (err != error.InvalidState) return err;
-        }
+        var cleared = try maplibre.runtimeClearResourceTransform(self.runtime, null);
+        cleared.deinit();
         try maplibre.resourceRequestComplete(std.heap.smp_allocator, handle, .{ .bytes = support.style_json }, null);
-        try maplibre.resourceRequestRelease(handle);
-        try maplibre.resourceRequestRelease(handle);
+        var owned = handle;
+        owned.deinit();
         return .pass_through;
     }
     fn release(context: ?*anyopaque) void {
@@ -40,7 +35,7 @@ const ProviderProbe = struct {
     }
 };
 
-test "generated provider inline completion and close retain decision ownership" {
+test "a provider can deinit its request inside its callback" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
     var probe = ProviderProbe{ .runtime = fixture.runtime };

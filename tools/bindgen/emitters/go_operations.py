@@ -16,7 +16,7 @@ def method_name(plan, receiver, handle):
     method = name(plan.member)
     if handle and handle.handle and plan.name == handle.handle.release:
         return "Close"
-    if receiver and method in {"Close", "IsClosed", "ID"}:
+    if receiver and method in {"Close", "Id"}:
         raise ModelError([f"{plan.name}: {method} is reserved for owner state"])
     return method
 
@@ -38,27 +38,30 @@ def argument(values, value, expr):
     if value.kind == "buffer":
         if value.length == "nul":
             return (
-                f"bindingOptionalCString({expr}, arena)"
+                f"func() *C.char {{ if {expr} == nil {{ return nil }}; return arena.cstring(*{expr}) }}()"
                 if absent(value)
                 else f"arena.cstring({expr})"
             )
         if value.ctype.pointee:
             if value.nullable:
-                return f"({values.c_type(value)})(bindingNullableBytes({expr}, arena))"
+                return f"({values.c_type(value)})(func() unsafe.Pointer {{ if {expr} == nil {{ return nil }}; p := arena.bytes([]byte(*{expr})); if p == nil {{ p = arena.allocate(1) }}; return p }}())"
             if value.optional == "empty":
-                return f"({values.c_type(value)})(bindingOptionalBytes({expr}, arena))"
+                return f"({values.c_type(value)})(func() unsafe.Pointer {{ if {expr} == nil {{ return nil }}; return arena.bytes([]byte(*{expr})) }}())"
             data = f"[]byte({expr})" if value.encoding == "utf8" else expr
             return f"({values.c_type(value)})(arena.bytes({data}))"
         if value.nullable:
-            return f"bindingNullableView({expr}, arena)"
+            return f"func() C.mln_buffer_view {{ if {expr} == nil {{ return C.mln_buffer_view{{}} }}; v := bindingView(*{expr}, arena); if v.data == nil {{ v.data = arena.allocate(1) }}; return v }}()"
         if value.optional == "empty":
             return f"bindingOptionalView({expr}, arena)"
         return f"bindingView({expr}, arena)"
     if value.kind == "array":
         if value.ctype.kind == "array":
             values.fail(value, "fixed array parameters need a conversion")
-        helper = "bindingNullableArray" if value.nullable else "bindingArray"
-        return f"{helper}({expr}, arena, {converter(values, value.element)})"
+        converted = f"bindingArray({expr}, arena, {converter(values, value.element)})"
+        if value.nullable:
+            native = values.c_type(value.element)
+            return f"func() *{native} {{ p := {converted}; if {expr} != nil && p == nil {{ p = (*{native})(arena.allocate(1)) }}; return p }}()"
+        return converted
     values.fail(value, "missing native input conversion")
 
 
@@ -88,10 +91,30 @@ def copier(values, value):
     if value.kind == "buffer" and not value.ctype.pointee and value.length != "nul":
         text = "Text" if value.encoding == "utf8" else "Bytes"
         if value.optional == "empty" and not value.nullable:
-            return f"copyOptionalView{text}"
+            values.fail(value, "empty completion buffer requires a copier")
         if not absent(value):
             return f"copyView{text}"
     return f"func(raw C.{value.native}) {values.type(value)} {{ return {values.copy(value, 'raw')} }}"
+
+
+def copies_borrowed(value):
+    if value.kind in {"array", "buffer", "reference"}:
+        return True
+    return any(copies_borrowed(field.value) for field in value.fields)
+
+
+def needs_read(plan):
+    return bool(
+        plan.receiver
+        and not plan.completion
+        and not plan.consumes
+        and not plan.owned_outputs
+        and not plan.view
+        and any(
+            copies_borrowed(element(p.value)) and element(p.value).kind != "handle"
+            for p in plan.outputs
+        )
+    )
 
 
 def operation(plan, values, *, discard=False):
@@ -102,11 +125,7 @@ def operation(plan, values, *, discard=False):
     receiver_name = plan.receiver or plan.scoped_receiver
     receiver = next((p for p in plan.inputs if p.name == receiver_name), None)
     handle = element(receiver.value) if receiver else None
-    decision = values.api.decisions.get(handle.native) if handle else None
     method = method_name(plan, receiver, handle)
-    operation_id = f"C.binding_operation_{plan.name}"
-    if decision and plan.name == decision.handle.release:
-        return f"func (receiver *{values.owner(handle.native)}) Close() error {{ return bindingCloseDecision(receiver.owner(), {operation_id}) }}\n"
     if plan.view:
         method = "With" + name(plan.view.stem)
     internal = {
@@ -148,7 +167,7 @@ def operation(plan, values, *, discard=False):
         if p.name in counts:
             counted = counts[p.name]
             length = (
-                f"bindingLen({labels[counted.name]})"
+                f"func() int {{ if {labels[counted.name]} == nil {{ return 0 }}; return len(*{labels[counted.name]}) }}()"
                 if counted.value.kind == "buffer" and absent(counted.value)
                 else f"len({labels[counted.name]})"
             )
@@ -221,21 +240,16 @@ def operation(plan, values, *, discard=False):
         access = "Consuming"
     elif plan.consumes:
         access = "Closing"
-    elif decision and plan.name in (decision.complete, decision.resume):
-        access = "Completing"
-    elif plan.view or any(
-        o.value.lifetime == "owner" or element(o.value).lifetime == "owner"
-        for o in plan.outputs
-    ):
+    elif needs_read(plan):
         access = "Read"
     else:
         access = "Live"
     if plan.scoped_receiver:
-        target = f"receiver.target({operation_id})"
+        target = "receiver.target()"
     elif receiver:
-        target = f"binding{access}(receiver.owner(), {operation_id})"
+        target = f"binding{access}(receiver.owner())"
     else:
-        target = f"bindingGlobal({operation_id})"
+        target = "bindingGlobal()"
     result_type = None
     if plan.completion:
         arguments[plan.completion.parameter] = "completion"
@@ -253,12 +267,10 @@ def operation(plan, values, *, discard=False):
             elif result.kind == "array":
                 if result.item_buffer:
                     values.fail(result, "array result needs a copy adapter")
-                helper = (
-                    "completionNullableListOf"
-                    if result.nullable
-                    else "completionListOf"
-                )
+                helper = "completionListOf"
                 convert = f"{helper}({copier(values, result.element)})"
+                if result.nullable:
+                    convert = f"func(result *C.mln_completion_result) ({completion_type}, error) {{ if result.value == nil {{ return nil, nil }}; return {convert}(result) }}"
             else:
                 content = replace(result, nullable=False)
                 convert = f"completionOf({copier(values, content)})"
@@ -332,9 +344,9 @@ def operation(plan, values, *, discard=False):
                 + "".join(line + "\n" for line in adoptions)
                 + f"return {converted}\n}}"
             )
-            invocation = f"return bindingStartWith({target}, {start}, {convert}, {result_closure})"
+            invocation = f"return bindingStartWith({target}, {start}, {convert}, {result_closure}, {str(plan.execution == 'command').lower()})"
         else:
-            invocation = f"return bindingStart({target}, {start}, {convert})"
+            invocation = f"return bindingStart({target}, {start}, {convert}, {str(plan.execution == 'command').lower()})"
     elif plan.function.return_type.canonical == "void" or result_type:
         if outputs:
             values.fail(

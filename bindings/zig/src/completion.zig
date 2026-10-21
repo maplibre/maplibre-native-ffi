@@ -39,9 +39,7 @@ fn disposeOwned(comptime Value: type, owned: *Value) void {
             if (owned.*) |*inner| disposeOwned(optional.child, inner);
         },
         .@"struct", .@"enum" => {
-            if (@hasDecl(Value, "disposeAbandoned")) {
-                owned.disposeAbandoned();
-            } else if (@hasDecl(Value, "deinit")) owned.deinit();
+            if (@hasDecl(Value, "deinit")) owned.deinit();
         },
         else => {},
     }
@@ -132,7 +130,7 @@ pub fn Future(comptime T: type) type {
         /// Otherwise it runs on the thread that delivers the completion, where
         /// it should only schedule work, such as waking a loop that then calls
         /// `wait`, which returns at once. An error that the wake returns goes
-        /// to the callback error reporter, as a native wake's does.
+        /// to std.log, as a native wake's does.
         ///
         /// A future dropped by `deinit` before its completion arrives releases
         /// the context without running the callback. A future accepts one

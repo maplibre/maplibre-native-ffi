@@ -82,7 +82,13 @@ void main() {
           errorMessage: 'bad\u0000message',
         ),
       ),
-      throwsA(isA<InvalidArgumentException>()),
+      throwsA(
+        isA<MaplibreException>().having(
+          (error) => error.status,
+          'status',
+          Status.invalidArgument,
+        ),
+      ),
     );
     handle.complete(emptyStyleResponse);
     await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded);
@@ -92,14 +98,35 @@ void main() {
       () => handle.complete(
         ResourceResponse(status: ResourceResponseStatus.noContent),
       ),
-      throwsA(isA<InvalidStateException>()),
+      throwsA(
+        isA<MaplibreException>().having(
+          (error) => error.status,
+          'status',
+          Status.invalidState,
+        ),
+      ),
     );
     handle.close();
     handle.close();
-    expect(handle.isCancelled, throwsA(isA<InvalidStateException>()));
+    expect(
+      handle.isCancelled,
+      throwsA(
+        isA<MaplibreException>().having(
+          (error) => error.status,
+          'status',
+          Status.invalidState,
+        ),
+      ),
+    );
     expect(
       () => handle.complete(emptyStyleResponse),
-      throwsA(isA<InvalidStateException>()),
+      throwsA(
+        isA<MaplibreException>().having(
+          (error) => error.status,
+          'status',
+          Status.invalidState,
+        ),
+      ),
     );
   });
 

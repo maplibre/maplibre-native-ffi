@@ -20,26 +20,22 @@ void main() {
         () => validateCAbiVersion(expectedCAbiVersion + 1),
         throwsA(
           isA<AbiVersionMismatchException>()
+              .having((error) => error.status, 'status', Status.unsupported)
               .having(
-                (error) => error.status,
-                'status',
-                MaplibreStatus.abiVersionMismatch,
-              )
-              .having(
-                (error) => error.diagnostic,
-                'diagnostic',
-                contains('expected $expectedCAbiVersion'),
+                (error) => error.expected,
+                'expected version',
+                expectedCAbiVersion,
               ),
         ),
       );
     });
 
     test('native statuses map to their exceptions and keep unknown codes', () {
-      final cases = <(int, Type)>[
-        (nativeStatusInvalidArgument, InvalidArgumentException),
-        (nativeStatusInvalidState, InvalidStateException),
-        (nativeStatusUnsupported, UnsupportedFeatureException),
-        (nativeStatusNativeError, NativeErrorException),
+      final cases = <(int, Status)>[
+        (nativeStatusInvalidArgument, Status.invalidArgument),
+        (nativeStatusInvalidState, Status.invalidState),
+        (nativeStatusUnsupported, Status.unsupported),
+        (nativeStatusNativeError, Status.nativeError),
       ];
 
       for (final (status, type) in cases) {
@@ -47,8 +43,8 @@ void main() {
           checkNativeStatus(status, () => 'diagnostic $status');
           fail('status $status unexpectedly succeeded');
         } on MaplibreException catch (error) {
-          expect(error.runtimeType, type);
-          expect(error.nativeStatusCode, status);
+          expect(error.status, type);
+          expect(error.status.rawValue, status);
           expect(error.diagnostic, 'diagnostic $status');
         }
       }
@@ -64,9 +60,8 @@ void main() {
       }
       nativeDiagnostic = 'later diagnostic';
 
-      expect(error, isA<UnknownMaplibreException>());
-      expect(error.status.name, 'unknown');
-      expect(error.nativeStatusCode, -999);
+      expect(error.status, const Status.fromRawValue(-999));
+      expect(error.toString(), contains('Status(-999)'));
       expect(error.diagnostic, 'first diagnostic');
     });
   });
@@ -109,7 +104,13 @@ void main() {
       result.ref.value_size = sizeOf<raw.mln_lat_lng>() - 1;
       expect(
         () => decodeLatLngListForTesting(result.ref),
-        throwsA(isA<InvalidStateException>()),
+        throwsA(
+          isA<MaplibreException>().having(
+            (error) => error.status,
+            'status',
+            Status.invalidState,
+          ),
+        ),
       );
     } finally {
       calloc.free(result);

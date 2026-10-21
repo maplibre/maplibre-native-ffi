@@ -15,7 +15,13 @@ void main() {
     // Native rejects a NUL in a path view before a C-string consumer reads it.
     expect(
       () => runtimeCreate(RuntimeOptions(cachePath: 'cache\u0000tail')),
-      throwsA(isA<InvalidArgumentException>()),
+      throwsA(
+        isA<MaplibreException>().having(
+          (error) => error.status,
+          'status',
+          Status.invalidArgument,
+        ),
+      ),
     );
 
     // A layer ID crosses as a view with an explicit length, so an ID with an
@@ -72,7 +78,13 @@ void main() {
     expect(uint64FromNative(-1), maximum);
     expect(
       () => uint64ToNative(maximum + BigInt.one, 'value'),
-      throwsA(isA<InvalidArgumentException>()),
+      throwsA(
+        isA<MaplibreException>().having(
+          (error) => error.status,
+          'status',
+          Status.invalidArgument,
+        ),
+      ),
     );
 
     // A value outside a 32-bit field's range is rejected before it crosses,
@@ -82,7 +94,13 @@ void main() {
         jsonBytes(_featureCollection),
         options: GeojsonSourceOptions(buffer: 4294967296),
       ),
-      throwsA(isA<InvalidArgumentException>()),
+      throwsA(
+        isA<MaplibreException>().having(
+          (error) => error.status,
+          'status',
+          Status.invalidArgument,
+        ),
+      ),
     );
     final fixture = await openRuntime();
 

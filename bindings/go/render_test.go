@@ -254,25 +254,25 @@ func TestFrameViewIsScopedToItsCallback(t *testing.T) {
 			foreign <- [2]error{viewErr, frame.Close(GpuSync{Kind: GpuSyncKindCpuComplete})}
 		}()
 		result := <-foreign
-		if !errors.Is(result[0], ErrInvalidState) {
-			t.Errorf("view read from another thread = %v, want ErrInvalidState", result[0])
+		if !errors.Is(result[0], StatusInvalidState) {
+			t.Errorf("view read from another thread = %v, want StatusInvalidState", result[0])
 		}
-		if !errors.Is(result[1], ErrInvalidState) || result[1].Error() != "AcquiredFrameHandle is in use" {
-			t.Errorf("frame close during the view = %v, want ErrInvalidState for a frame in use", result[1])
+		if !errors.Is(result[1], StatusBusy) {
+			t.Errorf("frame close during the view = %v, want StatusBusy for a frame in use", result[1])
 		}
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("frame view: %v", err)
 	}
-	if _, err := expired.Width(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("expired view read = %v, want ErrInvalidState", err)
+	if _, err := expired.Width(); !errors.Is(err, StatusInvalidState) {
+		t.Fatalf("expired view read = %v, want StatusInvalidState", err)
 	}
 	if err := frame.Close(GpuSync{Kind: GpuSyncKindCpuComplete}); err != nil {
 		t.Fatalf("frame close after the view: %v", err)
 	}
-	if err := withFrameView(frame, func(frameView) error { return nil }); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("view of a closed frame = %v, want ErrInvalidState", err)
+	if err := withFrameView(frame, func(frameView) error { return nil }); !errors.Is(err, StatusInvalidState) {
+		t.Fatalf("view of a closed frame = %v, want StatusInvalidState", err)
 	}
 }
 

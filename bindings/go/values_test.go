@@ -10,8 +10,8 @@ import (
 // native-lent strings decode from terminated storage.
 func TestHostStringsUseViewsAndNativeLentStringsDecode(t *testing.T) {
 	f := newFixture(t)
-	if _, err := f.m.SetStyleUrl("custom://style\x00.json"); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("SetStyleUrl with a NUL = %v, want ErrInvalidArgument", err)
+	if _, err := f.m.SetStyleUrl("custom://style\x00.json"); !errors.Is(err, StatusInvalidArgument) {
+		t.Fatalf("SetStyleUrl with a NUL = %v, want StatusInvalidArgument", err)
 	}
 	const url = "custom://named-style.json"
 	f.serveStyle(t, url)
