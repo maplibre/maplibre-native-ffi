@@ -132,7 +132,10 @@ paths = [
   ".mise/tasks/package-xcframework",
   "bindings/kotlin/src/iosTest/*",
   "bindings/kotlin/src/tvosTest/*",
-  "examples/swift-map/*",
+  "examples/swift-map/Package.swift",
+  "examples/swift-map/mise.toml",
+  "examples/swift-map/.mise/*",
+  "examples/swift-map/Sources/SwiftMapIOS/*",
 ]
 targets = ["ios-*", "tvos-*"]
 jobs = ["apple-xcframework"]
