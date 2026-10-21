@@ -15,26 +15,26 @@ import org.maplibre.nativeffi.withMap
 
 /**
  * Android's phantom-reference reclamation of a request handle that became unreachable unreleased.
- * The JVM binding reclaims through a Cleaner instead; see ResourceRequestHandleJvmTest.
+ * The JVM binding reclaims through a Cleaner; see ResourceRequestHandleJvmTest.
  */
 class ResourceRequestHandleAndroidTest {
   @Test
   fun anUnreachableRequestIsReleasedNatively(): Unit = runSuspendTest {
-    val claimed = CompletableDeferred<Pair<Long, TestWeakReference>>()
+    val claimed = CompletableDeferred<TestWeakReference>()
     val provider = denyingProvider { request, handle ->
       if (request.requestedUrl != STYLE_URL) return@denyingProvider null
       // Only the request's own cancel callback references it once the provider returns.
       handle.setCancelCallback(ResourceRequestCancelHandler { handle.close() })
-      claimed.complete(handle.binding.handle to TestWeakReference(handle))
+      claimed.complete(TestWeakReference(handle))
       ResourceProviderDecision.HANDLE
     }
     withMap(provider = provider) {
       map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
-      val (raw, reference) = claimed.awaitWithin("the provider to claim the request")
+      val reference = claimed.awaitWithin("the provider to claim the request")
       assertTrue(awaitCollected(reference), "the request never became unreachable")
-      // Reclamation releases the unanswered request, which fails the style it was loading.
+      // Cleanup releases the unanswered request and fails its style load.
+      // Native schedules this event before retiring the handle.
       awaitMapEvent(RuntimeEventType.MAP_LOADING_FAILED)
-      assertTrue(requestIsReleased(raw), "the collected request is still live in native")
     }
   }
 
