@@ -522,7 +522,7 @@ static bool take(mln_ts_call* call, size_t index) {
 
 /**
  * completionValue(index, decoder, take) converts a drained completion's value
- * through the decoder that the TypeScript half names, after taking its owned
+ * through the decoder that the TypeScript half names, then takes its owned
  * handle from the batch when take is set.
  */
 static napi_value completion_value(napi_env env, napi_callback_info info) {
@@ -544,9 +544,14 @@ static napi_value completion_value(napi_env env, napi_callback_info info) {
   ) {
     if (delivery->type != MLN_DELIVERY_TYPE_COMPLETION) {
       napi_throw_error(env, NULL, "the delivery is not a completion");
-    } else if (!taken || take(&call, index)) {
-      call.result =
+    } else {
+      // Decode before taking, so a value that fails to convert stays in the
+      // batch, and batchRelease disposes it.
+      napi_value value =
         mln_ts_decoders[decoder](env, &delivery->payload.completion);
+      if (value != NULL && (!taken || take(&call, index))) {
+        call.result = value;
+      }
     }
   }
   return mln_ts_end(&call);
