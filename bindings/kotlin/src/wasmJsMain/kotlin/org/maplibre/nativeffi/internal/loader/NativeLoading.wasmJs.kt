@@ -60,7 +60,8 @@ internal object ModuleLoader {
       HostDelivery.install()
       loaded = true
     } catch (failure: Throwable) {
-      // A failed load leaves nothing behind, so a later call can load again.
+      // A failed load drops the module's global, so a later call can load again. A module that
+      // instantiated keeps its heap and workers until the page unloads.
       uninstall()
       throw failure
     }
