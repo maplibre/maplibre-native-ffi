@@ -1394,8 +1394,12 @@ auto run_driver_result(
         },
         abandon_driver_result(operation), std::move(pending->ready)
       };
+      auto wakes = DeferredWakes{};
       const auto lock = std::scoped_lock{live->control_mutex};
       live->driver_work.push_front(std::move(rest));
+      // The result may have become ready before it was queued, when its
+      // resume_driver_work() found nothing to wake.
+      publish_driver_work_locked(*live, wakes);
       return;
     }
     operation->complete(
