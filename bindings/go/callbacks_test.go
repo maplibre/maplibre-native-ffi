@@ -366,7 +366,7 @@ func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {
 // on the thread native called it on.
 func TestScopedResponseRejectsLateAndForeignUse(t *testing.T) {
 	if !headerTransformSupported {
-		t.Skip("HTTP header transforms are unsupported on OpenHarmony and Emscripten")
+		t.Skip("HTTP header transforms are unsupported on OpenHarmony")
 	}
 	f := newFixture(t)
 	failures := newFailureLog()

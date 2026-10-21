@@ -13,12 +13,6 @@ package maplibre
 #include "binding_callback.h"
 #include "maplibre_native_c.h"
 
-#if defined(__EMSCRIPTEN__) || defined(__OHOS__)
-#define MLN_GO_TEST_HEADER_TRANSFORM_SUPPORTED 0
-#else
-#define MLN_GO_TEST_HEADER_TRANSFORM_SUPPORTED 1
-#endif
-
 // Receives an image the way a native call does, so that cgo checks the Go
 // pointers inside it.
 static void mln_go_test_receive_image(const mln_premultiplied_rgba8_image* image) { (void)image; }
@@ -30,8 +24,6 @@ import (
 	"runtime/cgo"
 	"unsafe"
 )
-
-const headerTransformSupported = C.MLN_GO_TEST_HEADER_TRANSFORM_SUPPORTED != 0
 
 // runtimeEventForTest is one synthesized event and its message, which the batch
 // builder copies into a message arena.
