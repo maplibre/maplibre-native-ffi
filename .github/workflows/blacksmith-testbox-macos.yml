@@ -23,6 +23,20 @@ jobs:
       - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
+      - name: Diagnose macOS Testbox metadata
+        shell: bash
+        run: |
+          echo "Login shell: $SHELL"
+          ps -p $$
+          metadata_addr="${BLACKSMITH_AGENT_ADDR}:${METADATA_PORT}"
+          for endpoint in installationModelID backendURL stickyDiskToken; do
+            response="$RUNNER_TEMP/testbox-metadata-$endpoint"
+            code=$(curl -sS --connect-timeout 2 --max-time 5 -o "$response" -w '%{http_code}' "http://$metadata_addr/$endpoint")
+            echo "$endpoint HTTP $code; bytes $(wc -c < "$response")"
+            # Report only JSON errors; metadata credentials stay private.
+            jq -r 'if type == "object" then .error // empty else empty end' "$response" 2>/dev/null || true
+            rm -f "$response"
+          done
       # Untagged main discovers the macOS agent through environment variables.
       - uses: useblacksmith/begin-testbox@cb1bda5e33f1eb981b92debdc126fb87b1cee19e # main
         with:
