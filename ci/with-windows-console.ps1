@@ -37,7 +37,9 @@ if (-not $environment.ContainsKey("GRADLE_USER_HOME")) {
   $environment["GRADLE_USER_HOME"] = Join-Path $env:USERPROFILE ".gradle"
 }
 # A daemon from the runner's service session cannot launch windowed apps here.
-$environment["GRADLE_OPTS"] = "$($environment['GRADLE_OPTS']) -Dorg.gradle.daemon=false"
+# The JVM reads JAVA_TOOL_OPTIONS directly. The Gradle shell wrapper parses
+# GRADLE_OPTS through xargs, which rejects the large Windows CI environment.
+$environment["JAVA_TOOL_OPTIONS"] = "$($environment['JAVA_TOOL_OPTIONS']) -Dorg.gradle.daemon=false"
 $payload = Join-Path $env:RUNNER_TEMP "console-$([Guid]::NewGuid()).json"
 $launcher = Join-Path $env:RUNNER_TEMP "console-$([Guid]::NewGuid()).ps1"
 $completion = Join-Path $env:RUNNER_TEMP "console-$([Guid]::NewGuid()).exit"
