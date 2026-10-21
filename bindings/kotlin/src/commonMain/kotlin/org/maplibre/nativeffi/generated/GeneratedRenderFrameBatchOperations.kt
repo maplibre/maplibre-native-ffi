@@ -7,7 +7,7 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 public abstract class GeneratedRenderFrameBatchOperations internal constructor() {
-  internal abstract val binding: HandleState
+  internal abstract val binding: ReadHandleState
 
   /**
    * Borrows the result view stored by an owned frame-result batch.

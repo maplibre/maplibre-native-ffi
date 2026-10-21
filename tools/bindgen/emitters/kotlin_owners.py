@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from .kotlin_operations import method_name, receiver_value
+from .kotlin_operations import method_name, needs_read, receiver_value
 from .kotlin_values import doc, generated_owners, name, owner_name
 
 ASYNC_RELEASABLE = "org.maplibre.nativeffi.runtime.AsyncReleasable"
@@ -23,6 +23,14 @@ class Release:
 
 def receives(plan, native):
     return bool(plan.receiver) and receiver_value(plan).native == native
+
+
+def state_type(native, plans):
+    return (
+        "ReadHandleState"
+        if any(receives(plan, native) and needs_read(plan) for plan in plans)
+        else "HandleState"
+    )
 
 
 def release(bound, native, plans):
@@ -79,7 +87,7 @@ def owner(bound, native, plans):
         )
     dispose = family[0].lower() + family[1:]
     body = [
-        f'  internal override val binding = HandleState("{owner_class}", handle, GeneratedOwnerDisposal::{dispose})',
+        f'  internal override val binding = {state_type(native, plans)}("{owner_class}", handle, GeneratedOwnerDisposal::{dispose})',
         '  @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)',
         (
             "  /**\n"

@@ -23,7 +23,7 @@ import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.runtime.awaitCommitted
 import org.maplibre.nativeffi.smallMapOptions
 
-/** How the generated owners close, refuse, and keep their parents. */
+/** How the generated owners close and keep their parents. */
 @OptIn(ExperimentalAtomicApi::class)
 class HandleLifecycleTest {
   @Test
@@ -46,8 +46,8 @@ class HandleLifecycleTest {
     val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
     val map = runtime.createMap(smallMapOptions()).awaitWithin("the map")
 
-    // Native refuses to release a runtime with a live map, so the call throws and the handle rolls
-    // back to live.
+    // Native refuses to release a runtime with a live map, so the call throws and the runtime
+    // stays usable.
     assertFailsWithStatus(Status.INVALID_STATE) { runtime.release() }
     assertFalse(runtime.isClosed)
     runtime.clearResourceTransform().awaitWithin("a command on the refused runtime")

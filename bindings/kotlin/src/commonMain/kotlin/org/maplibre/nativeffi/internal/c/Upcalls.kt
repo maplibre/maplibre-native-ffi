@@ -121,15 +121,15 @@ internal object Upcalls {
   @JvmStatic
   fun resourceProviderCallback(userData: Long, request: Long, handle: Long): Int =
     upcall<ResourceProvider, Int>("mln_resource_provider_callback", userData, -1) { value ->
-      val decisionOwner = ResourceRequestHandle(handle)
+      val requestOwner = ResourceRequestHandle(handle)
       val decision =
         try {
-          value.callback(readResourceRequestInfo(request), decisionOwner).rawValue.toInt()
+          value.callback(readResourceRequestInfo(request), requestOwner).rawValue.toInt()
         } catch (failure: Throwable) {
-          decisionOwner.binding.handOff()
+          requestOwner.binding.handOff()
           throw failure
         }
-      if (decision != 1) decisionOwner.binding.handOff()
+      if (decision != 1) requestOwner.binding.handOff()
       decision
     }
 

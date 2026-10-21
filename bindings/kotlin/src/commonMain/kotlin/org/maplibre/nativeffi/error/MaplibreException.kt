@@ -4,5 +4,5 @@ import org.maplibre.nativeffi.generated.Status
 
 /** Error for a status that the native MapLibre C ABI reported, or that the binding raised. */
 public open class MaplibreException
-internal constructor(public val status: Status, public val diagnostic: String = "") :
+internal constructor(public val status: Status, public val diagnostic: String) :
   RuntimeException("$status: ${diagnostic.ifBlank { "No native diagnostic available." }}")

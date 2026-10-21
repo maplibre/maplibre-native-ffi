@@ -14,7 +14,7 @@ internal constructor(
   handle: Long,
 ) : GeneratedRenderFrameBatchOperations(), AutoCloseable {
   internal override val binding =
-    HandleState("RenderFrameBatchHandle", handle, GeneratedOwnerDisposal::renderFrameBatch)
+    ReadHandleState("RenderFrameBatchHandle", handle, GeneratedOwnerDisposal::renderFrameBatch)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
   /**
    * The native handle value, which runtime events report as their source. It stays readable after

@@ -104,7 +104,9 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         if receiver:
             family = value_name(receiver)
             class_name = f"Generated{family}Operations"
-            members = ["  internal abstract val binding: HandleState\n"]
+            members = [
+                f"  internal abstract val binding: {kotlin_owners.state_type(receiver, plans)}\n"
+            ]
             if callback_owner(bound, receiver):
                 members.append(
                     "  internal val bindingCallbacks: CallbackOwner = CallbackOwner()\n"

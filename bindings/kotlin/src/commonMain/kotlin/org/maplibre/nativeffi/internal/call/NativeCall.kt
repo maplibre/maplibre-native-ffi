@@ -8,6 +8,7 @@ import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.internal.callback.CallbackRegistrationScope
 import org.maplibre.nativeffi.internal.callback.CallbackScope
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
+import org.maplibre.nativeffi.internal.lifecycle.ReadHandleState
 import org.maplibre.nativeffi.internal.lifecycle.ViewScope
 import org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive
 import org.maplibre.nativeffi.internal.lifecycle.endGraphicsAtExit
@@ -160,7 +161,7 @@ internal fun <T> nativeCall(owner: Any?, state: HandleState?, body: NativeCall.(
  * Runs a call like [nativeCall] that copies outputs native lends until [state]'s release, which
  * fails until the copy ends.
  */
-internal fun <T> nativeRead(owner: Any, state: HandleState, body: NativeCall.() -> T): T =
+internal fun <T> nativeRead(owner: Any, state: ReadHandleState, body: NativeCall.() -> T): T =
   receive(owner, state) { handle -> state.read { NativeCall(handle).use { it.body() } } }
 
 internal fun <T> nativeSubmit(

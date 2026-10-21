@@ -261,9 +261,9 @@ def callback_site(site_name, callback_value, member, root_type, values):
     for parameter in callback.arguments:
         if decision and parameter.name == decision.parameter:
             lines.append(
-                f"val decisionOwner = {owner_class(decision.handle)}({identifier(parameter.name)})"
+                f"val requestOwner = {owner_class(decision.handle)}({identifier(parameter.name)})"
             )
-            arguments.append("decisionOwner")
+            arguments.append("requestOwner")
         elif parameter.value.kind == "handle" and parameter.value.ownership == "owned":
             # The callback owns the handle; a callback that throws releases it.
             local = identifier(parameter.name) + "Owner"
@@ -290,9 +290,9 @@ def callback_site(site_name, callback_value, member, root_type, values):
         accept = number_literal(values.bound.enum_number(decision.accept), result)
         lines.append(
             f"val decision = try {{ {callback_result(callback.result, invocation, values)} }} "
-            "catch (failure: Throwable) { decisionOwner.binding.handOff(); throw failure }"
+            "catch (failure: Throwable) { requestOwner.binding.handOff(); throw failure }"
         )
-        lines.append(f"if (decision != {accept}) decisionOwner.binding.handOff()")
+        lines.append(f"if (decision != {accept}) requestOwner.binding.handOff()")
         lines.append("decision")
     elif callback.result.native == "void":
         lines.append(invocation)
