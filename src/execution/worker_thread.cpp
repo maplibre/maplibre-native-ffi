@@ -221,6 +221,7 @@ void repro_on_terminate() {
 }
 
 const bool repro_installed = [] {
+  std::fprintf(stderr, "repro: abort hook installed\n");
   std::signal(SIGABRT, repro_on_abort);
   std::set_terminate(repro_on_terminate);
   return true;
