@@ -7,6 +7,7 @@ import difflib
 import io
 import pathlib
 import re
+import shlex
 import sys
 
 from ruamel.yaml import YAML
@@ -476,6 +477,13 @@ def retry_workflow() -> dict:
 
 def windows_probe_workflow(source: dict, presets: dict) -> dict:
     """Temporarily run only Windows x64 while investigating Blacksmith."""
+
+    def console_command(command: str) -> str:
+        arguments = ", ".join(
+            "'" + argument.replace("'", "''") + "'" for argument in shlex.split(command)
+        )
+        return f"./ci/with-windows-console.ps1 -Command @({arguments})"
+
     workflow = ci_workflow(source, presets)
     selected = {"target-windows-x64-wgl", "target-windows-x64-vulkan"}
     jobs = workflow["jobs"]
@@ -497,11 +505,25 @@ def windows_probe_workflow(source: dict, presets: dict) -> dict:
                 shell="pwsh",
             ),
         )
+        job["steps"].insert(
+            2,
+            run(
+                console_command("pwsh -NoProfile -File ./ci/windows-desktop-probe.ps1"),
+                name="Inspect Windows console desktop",
+                shell="pwsh",
+                **{"timeout-minutes": 3},
+            ),
+        )
         for step in job["steps"]:
             if step.get("id", "").startswith("suite-"):
                 step["timeout-minutes"] = 15
+                step["shell"] = "pwsh"
+                step["run"] = console_command(step["run"])
+        native_index = next(
+            i for i, step in enumerate(job["steps"]) if step.get("id") == "suite-1"
+        )
         job["steps"].insert(
-            -1,
+            native_index + 1,
             action(
                 "actions/upload-artifact",
                 {

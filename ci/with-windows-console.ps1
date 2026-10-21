@@ -1,0 +1,68 @@
+param(
+  [Parameter(Mandatory, ValueFromRemainingArguments)]
+  [string[]] $Command
+)
+
+$ErrorActionPreference = "Stop"
+$tools = Join-Path $env:RUNNER_TEMP "windows-console-pstools"
+$psexec = Join-Path $tools "PsExec64.exe"
+if (-not (Test-Path $psexec)) {
+  $archive = Join-Path $env:RUNNER_TEMP "windows-console-pstools.zip"
+  Invoke-WebRequest "https://download.sysinternals.com/files/PSTools.zip" -OutFile $archive
+  $expected = "C26C6BA44997E650A733DF257C8FEB83898D3FAEF2D2E391869D107E40863553"
+  if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne $expected) {
+    throw "PSTools archive hash mismatch"
+  }
+  Expand-Archive $archive -DestinationPath $tools -Force
+}
+
+Add-Type @'
+using System.Runtime.InteropServices;
+public static class ConsoleSession {
+    [DllImport("kernel32.dll")]
+    public static extern uint WTSGetActiveConsoleSessionId();
+}
+'@
+$session = [ConsoleSession]::WTSGetActiveConsoleSessionId()
+if ($session -eq [uint32]::MaxValue) {
+  throw "No console session is attached"
+}
+Write-Output "Run in console session $session`: $($Command -join ' ')"
+
+# The console process uses SYSTEM's token. Restore the runner's environment so
+# mise, compiler tools, package caches, and job inputs keep their original paths.
+$environment = @{}
+Get-ChildItem Env: | ForEach-Object { $environment[$_.Name] = $_.Value }
+if (-not $environment.ContainsKey("GRADLE_USER_HOME")) {
+  $environment["GRADLE_USER_HOME"] = Join-Path $env:USERPROFILE ".gradle"
+}
+$payload = Join-Path $env:RUNNER_TEMP "console-$([Guid]::NewGuid()).json"
+$launcher = Join-Path $env:RUNNER_TEMP "console-$([Guid]::NewGuid()).ps1"
+@{
+  environment = $environment
+  directory = (Get-Location).Path
+  command = $Command
+} | ConvertTo-Json -Depth 4 | Set-Content $payload
+@'
+param([string] $Payload)
+$ErrorActionPreference = "Stop"
+$data = Get-Content -Raw $Payload | ConvertFrom-Json -AsHashtable
+foreach ($entry in $data.environment.GetEnumerator()) {
+  [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, "Process")
+}
+Set-Location $data.directory
+Write-Output "Console command process session: $((Get-Process -Id $PID).SessionId)"
+$executable, $arguments = $data.command
+& $executable @arguments
+exit $LASTEXITCODE
+'@ | Set-Content $launcher
+
+try {
+  $powershell = (Get-Process -Id $PID).Path
+  & $psexec -accepteula -nobanner -s -i $session -w (Get-Location).Path `
+    $powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $launcher $payload
+  $result = $LASTEXITCODE
+} finally {
+  Remove-Item $payload, $launcher -Force
+}
+exit $result
