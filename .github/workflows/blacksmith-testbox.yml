@@ -20,7 +20,8 @@ jobs:
       - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
-      - uses: useblacksmith/begin-testbox@233448af4bfdc6fca509a7f0974411ac6d8a8043 # v2
+      # Untagged main discovers the macOS agent through environment variables.
+      - uses: useblacksmith/begin-testbox@cb1bda5e33f1eb981b92debdc126fb87b1cee19e # main
         with:
           testbox_id: ${{ inputs.testbox_id }}
       # Matches the broad Linux target job, including source/submodule sync.
@@ -56,4 +57,5 @@ jobs:
             export -p
           ) > ~/.testbox-env
           sed -i '1i [ -f ~/.testbox-env ] && . ~/.testbox-env' ~/.bashrc
-      - uses: useblacksmith/run-testbox@5ca05834db1d3813554d1dd109e5f2087a8d7cbc # v2
+      # Untagged main pairs with the macOS-aware begin-testbox handshake.
+      - uses: useblacksmith/run-testbox@3f60ff9ceb2c10c3feefa87dc0c6490cffae059d # main
