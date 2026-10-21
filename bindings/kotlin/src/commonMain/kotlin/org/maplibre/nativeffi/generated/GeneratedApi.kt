@@ -3,7 +3,6 @@ package org.maplibre.nativeffi.generated
 
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
-import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 import org.maplibre.nativeffi.render.NativePointer
@@ -256,18 +255,6 @@ public object GeneratedApi {
   public fun logSetAsyncSeverityMask(mask: LogSeverityMask): Unit =
     nativeCall(null, null) {
       check(C.mln_log_set_async_severity_mask(mask.rawValue.toInt(), diagnostic))
-    }
-
-  /**
-   * Installs a process-global MapLibre Native log callback.
-   *
-   * See `mln_log_set_callback` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-   */
-  public fun logSetCallback(handler: LogHandler): Unit =
-    nativeCall(null, null) {
-      check(C.mln_log_set_callback(writeLogHandler(handler), diagnostic))
-      accept(CallbackOwner.global)
     }
 
   /**

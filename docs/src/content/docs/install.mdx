@@ -174,6 +174,15 @@ val descriptor =
   )
 ```
 
+The page cannot run Kotlin while MapLibre waits for a callback's answer, so
+three registrations take their own form on Kotlin/Wasm. `QueuedLogHandler` and
+`QueuedResourceProvider` receive each call after native has answered it: native
+consumes the log record, and keeps the request for the callback to serve or
+pass through. `HttpHeaderTransformRules` holds only header rules, which the
+browser module refuses. The JVM, Android, and Kotlin/Native take `LogHandler`,
+`ResourceProvider`, and `HttpHeaderTransform`, whose callbacks answer native on
+its thread.
+
 ### .NET
 
 <SnapshotOnly />

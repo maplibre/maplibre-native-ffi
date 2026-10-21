@@ -13,10 +13,10 @@ a uniform list of declarations:
   module writes into the browser module, in the pattern of the JNI glue.
 
 `UpcallStubs` holds the C function pointer behind each `Upcalls` method, and on
-a threaded target each `DirectUpcalls` method. A native thread cannot call
+a threaded target each `ThreadedUpcalls` method. A native thread cannot call
 Kotlin on wasm, so the browser module serves only the wake sites, through its
-wake shim, and `Deliveries` runs the queue-form sites for each delivery that
-the page drains.
+wake shim, and `Deliveries` runs the queue-form sites of `Upcalls` and
+`WasmUpcalls` for each delivery that the page drains.
 """
 
 from __future__ import annotations
@@ -238,7 +238,12 @@ class NativeShims:
     def __init__(self, bound, functions: dict[str, Function], sites):
         self.bound = bound
         self.abi = Abi(bound.source)
-        self.sites = list(sites)
+        sites = list(sites)
+        # The sites that native calls as function pointers, and those that the
+        # page runs for a drained delivery. Only Kotlin/Wasm takes the async
+        # forms, which name its queue, and only threaded targets the others.
+        self.sites = [site for site in sites if site.split != "async"]
+        self.delivered = [site for site in sites if site.split != "threaded"]
         self.signatures = [self.signature(f) for _, f in sorted(functions.items())]
         self.critical = {
             plan.name
@@ -811,7 +816,7 @@ class NativeShims:
         for site in self.sites:
             if site.name == "releaseRoot":
                 getter = "HostDelivery.wakeRelease"
-            elif site.form == "wake" and not site.direct:
+            elif site.form == "wake" and not site.split:
                 getter = "HostDelivery.wake"
             else:
                 getter = (
@@ -895,8 +900,8 @@ class NativeShims:
         )
         retired = self.delivery_constant("empty_variant", DELIVERY)
         by_type, wakes = {}, []
-        for site in self.sites:
-            if site.direct or site.root is None:
+        for site in self.delivered:
+            if site.root is None:
                 continue
             if site.form == "wake":
                 wakes.append(site)
@@ -928,7 +933,7 @@ class NativeShims:
                 + "\n          else -> Unit\n        }"
             )
         wake_arms = "\n".join(
-            f"      is {site.root} -> Upcalls.{site.name}(token)" for site in wakes
+            f"      is {site.root} -> {site.owner}.{site.name}(token)" for site in wakes
         )
         return (
             HEADER
@@ -976,7 +981,7 @@ class NativeShims:
                 raise LayoutError(f"{record.name}: an array has no site carrier")
             else:
                 arguments.append(WASM_READ[kind.name].format(address))
-        call = f"Upcalls.{site.name}({', '.join(arguments)})"
+        call = f"{site.owner}.{site.name}({', '.join(arguments)})"
         owned = any(
             field.value.ownership == "owned"
             for field in self.bound.values[record.name].fields

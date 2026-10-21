@@ -7,13 +7,19 @@
 # exercise them over every native-call shim: FFM on the JVM, JNI in the Android
 # device suite, cinterop on Kotlin/Native, and the browser module on wasm. The
 # threadedTest files run on the first three and hold the cases whose subject is
-# a second Kotlin thread or a direct callback form, which answers native on a
-# MapLibre thread: LIFE-03 and CB-06.
+# a second Kotlin thread or a callback that answers native on a MapLibre thread:
+# LIFE-03 and CB-06.
+#
+# The log handler and the resource provider have a form per target: the
+# threaded targets take LogHandler and ResourceProvider, whose callbacks answer
+# native, and wasm takes QueuedLogHandler and QueuedResourceProvider. The
+# commonTest fixtures install each one through a test helper that each target
+# implements in its own form.
 #
 # The commonTest files also run on the wasm target, on the page of headless
 # Chromium, against a WebGL and a WebGPU browser module. There every
 # registration names the page's delivery queue, and the page drains each
-# callback into the same upcall sites. On WebGL, REND-01 reads back from a core
+# callback into its upcall site. On WebGL, REND-01 reads back from a core
 # worker over a transferred canvas and REND-02 is serviced from the page. On
 # WebGPU the render cases drive a device that the page created, and REND-01's
 # readback finishes on a later driver service on the page. REND-02's refusal of
@@ -32,9 +38,9 @@
 #   the request).
 # CB-04's report goes to the thread's uncaught exception handler on the JVM, to
 # the unhandled exception hook on Kotlin/Native, and to the page's reportError
-# on wasm, which its commonTest test intercepts. Android writes the report to the log, since its default handler
-# ends the process, and a test cannot read the log back, so the Android run
-# checks the containment alone.
+# on wasm, which its commonTest test intercepts. Android writes the report to
+# the log, since its default handler ends the process, and a test cannot read
+# the log back, so the Android run checks the containment alone.
 # The strided event batch with an unknown payload arm needs a batch laid out the
 # way the C compiler does, which cinterop provides, so it runs in nativeTest
 # RuntimeEventNativeTest. It also covers the checked narrowing of a native count
@@ -67,7 +73,7 @@
 "CB-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/CallbackLifetimeTest.kt::aCallbackCapturingItsReceiverDoesNotKeepItReachable"
 "CB-04" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aProviderThatThrowsFailsItsRequestAndLeavesTheRuntimeWorking"
 "CB-05" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aClaimedRequestCanBeAnsweredAfterTheProviderReturns"
-"CB-06" = "bindings/kotlin/src/threadedTest/kotlin/org/maplibre/nativeffi/callback/DirectCallbackTest.kt::aHeaderResponseRefusesUseAfterItsCallbackAndFromAnotherThread"
+"CB-06" = "bindings/kotlin/src/threadedTest/kotlin/org/maplibre/nativeffi/callback/ThreadedCallbackTest.kt::aHeaderResponseRefusesUseAfterItsCallbackAndFromAnotherThread"
 "CB-07" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/LogCallbackTest.kt::replacingTheLogCallbackReleasesThePreviousRegistration"
 "CB-08" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aCancelRegistrationNativeDoesNotStoreIsNotRooted"
 "CB-09" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/CameraEndHandlerTest.kt::anEndHandlerIsRootedUntilItRuns"

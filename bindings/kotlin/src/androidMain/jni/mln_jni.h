@@ -27,8 +27,8 @@
 #define MLN_JNI_ADDRESS(value) ((jlong)(uintptr_t)(value))
 
 // One static method of org.maplibre.nativeffi.internal.c.Upcalls or
-// DirectUpcalls, which an upcall stub calls. JNI_OnLoad resolves its class and
-// method ID.
+// ThreadedUpcalls, which an upcall stub calls. JNI_OnLoad resolves its class
+// and method ID.
 typedef struct mln_jni_upcall {
   const char* owner;
   const char* name;

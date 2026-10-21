@@ -12,6 +12,13 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import org.maplibre.nativeffi.error.CallbackException
+import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.LogEvent
+import org.maplibre.nativeffi.generated.QueuedLogHandler
+import org.maplibre.nativeffi.generated.QueuedResourceProvider
+import org.maplibre.nativeffi.generated.RuntimeHandle
+import org.maplibre.nativeffi.generated.logSetCallback
+import org.maplibre.nativeffi.generated.setResourceProvider
 import org.maplibre.nativeffi.internal.delivery.HostDelivery
 
 /**
@@ -75,6 +82,15 @@ internal actual suspend fun requestCollection() {
 internal actual fun interceptCallbackFailures(sink: (CallbackException) -> Unit): (() -> Unit)? {
   val previous = replaceReportError { failure -> sink(failure.get()) }
   return { restoreReportError(previous) }
+}
+
+// Native keeps each routed request and queues it, and the page runs the callback as it drains.
+internal actual fun RuntimeHandle.setTestProvider(provider: TestProvider): Deferred<Unit> =
+  setResourceProvider(QueuedResourceProvider(provider.callback, provider.routes))
+
+// Native consumes each record and queues it, and the page runs the callback as it drains.
+internal actual fun setTestLogCallback(callback: (LogEvent) -> Unit) {
+  GeneratedApi.logSetCallback(QueuedLogHandler { _, event, _, _ -> callback(event) })
 }
 
 // The page drains what native has queued so far, then waits for a marker wake that the shim posts

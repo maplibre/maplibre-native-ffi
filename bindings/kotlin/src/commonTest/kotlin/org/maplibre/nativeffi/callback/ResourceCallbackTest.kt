@@ -11,6 +11,7 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.NETWORK_URLS
+import org.maplibre.nativeffi.TestProvider
 import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitDeliveries
 import org.maplibre.nativeffi.awaitWithin
@@ -19,7 +20,6 @@ import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.error.CallbackException
 import org.maplibre.nativeffi.generated.ResourceKind
 import org.maplibre.nativeffi.generated.ResourceKindMask
-import org.maplibre.nativeffi.generated.ResourceProvider
 import org.maplibre.nativeffi.generated.ResourceRequestCancelHandler
 import org.maplibre.nativeffi.generated.ResourceRequestHandle
 import org.maplibre.nativeffi.generated.ResourceResponse
@@ -33,6 +33,7 @@ import org.maplibre.nativeffi.generated.UrlMatchFlags
 import org.maplibre.nativeffi.interceptCallbackFailures
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.serve
+import org.maplibre.nativeffi.setTestProvider
 import org.maplibre.nativeffi.withMap
 
 /** The resource provider and transform callbacks: what they root and what they hand out. */
@@ -175,19 +176,16 @@ class ResourceCallbackTest {
         ResourceRoute(flags = UrlMatchFlags.GLOB, url = "custom://routed/**"),
       )
     val provider =
-      ResourceProvider(
-        callback = { request, handle ->
-          seen.update { it + (request.kind to request.requestedUrl) }
-          when (request.requestedUrl) {
-            ROUTED_STYLE_URL -> handle.serve(ROUTED_STYLE_JSON)
-            ROUTED_SOURCE_URL -> handle.serve(TILEJSON).also { sourceRequested.complete(Unit) }
-            else -> handle.deny()
-          }
-        },
-        routes = routes,
-      )
+      TestProvider(routes) { request, handle ->
+        seen.update { it + (request.kind to request.requestedUrl) }
+        when (request.requestedUrl) {
+          ROUTED_STYLE_URL -> handle.serve(ROUTED_STYLE_JSON)
+          ROUTED_SOURCE_URL -> handle.serve(TILEJSON).also { sourceRequested.complete(Unit) }
+          else -> handle.deny()
+        }
+      }
     withMap {
-      val installing = runtime.setResourceProvider(provider)
+      val installing = runtime.setTestProvider(provider)
       routes.clear()
       installing.awaitWithin("the routed provider")
 

@@ -16,6 +16,7 @@ import org.maplibre.nativeffi.examples.composemap.map.MapLibreNativeSurfaceAdapt
 import org.maplibre.nativeffi.examples.composemap.map.MapLibreSurfaceRenderer
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LogHandler
+import org.maplibre.nativeffi.generated.logSetCallback
 
 internal object Main {
   @JvmStatic
@@ -32,6 +33,7 @@ internal object Main {
     GeneratedApi.logSetCallback(
       LogHandler { severity, event, code, message ->
         System.err.printf("MapLibre %s %s %d: %s%n", severity, event, code, message)
+        1u
       },
     )
     System.getProperty("org.maplibre.nativeffi.library.path")?.let {

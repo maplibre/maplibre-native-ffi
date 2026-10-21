@@ -24,26 +24,6 @@ internal object Upcalls {
     contain("release_user_data", Unit) { CallbackRoots.release(userData) }
 
   @JvmStatic
-  fun logHandlerCallback(
-    userData: Long,
-    severity: Int,
-    event: Int,
-    code: Long,
-    message: Long,
-  ): Int = run {
-    upcall<LogHandler, Boolean>("mln_log_callback", userData, false) { value ->
-      value.callback(
-        LogSeverity(severity.toUInt()),
-        LogEvent(event.toUInt()),
-        code,
-        readCString(message),
-      )
-      true
-    }
-    1
-  }
-
-  @JvmStatic
   fun customGeometrySourceOptionsFetchTile(userData: Long, tileId: Long): Unit = run {
     upcall<CustomGeometrySourceOptions, Boolean>(
       "mln_custom_source_fetch_tile_callback",
@@ -123,21 +103,6 @@ internal object Upcalls {
   }
 
   @JvmStatic
-  fun resourceProviderCallback(userData: Long, request: Long, handle: Long): Int = run {
-    val handleOwner = ResourceRequestHandle(handle)
-    if (
-      !upcall<ResourceProvider, Boolean>("mln_resource_provider_callback", userData, false) { value
-        ->
-        value.callback(readResourceRequestInfo(request), handleOwner)
-        true
-      }
-    ) {
-      handleOwner.close()
-    }
-    1
-  }
-
-  @JvmStatic
   fun resourceTransformCallback(userData: Long, kind: Int, url: Long, request: Long): Unit = run {
     val requestOwner = ResourceTransformRequestHandle(request)
     if (
@@ -190,26 +155,24 @@ internal object Upcalls {
 
 /**
  * The C function pointer that calls each [Upcalls] method, and on a threaded target each
- * `DirectUpcalls` method.
+ * `ThreadedUpcalls` method.
  */
 internal expect object UpcallStubs {
   val completion: Long
   val completionRelease: Long
   val releaseRoot: Long
   val logHandlerCallback: Long
+  val httpHeaderTransformCallback: Long
+  val resourceProviderCallback: Long
   val customGeometrySourceOptionsFetchTile: Long
   val customGeometrySourceOptionsCancelTile: Long
   val customMvtVectorSourceOptionsFetchTile: Long
   val customMvtVectorSourceOptionsCancelTile: Long
   val resourceRequestCancelHandlerCallback: Long
   val runtimeEventHandlerCallback: Long
-  val resourceProviderCallback: Long
   val resourceTransformCallback: Long
   val wakeCallback: Long
   val queueLockLock: Long
   val queueLockUnlock: Long
   val cameraTransitionHandlerCallback: Long
-  val directLogHandlerCallback: Long
-  val directHttpHeaderTransformCallback: Long
-  val directResourceProviderCallback: Long
 }

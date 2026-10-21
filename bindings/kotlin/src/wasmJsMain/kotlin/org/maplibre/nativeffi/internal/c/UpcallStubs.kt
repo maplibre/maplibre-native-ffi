@@ -35,6 +35,20 @@ internal actual object UpcallStubs {
         "logHandlerCallback needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
       )
 
+  actual val httpHeaderTransformCallback: Long
+    get() =
+      throw MaplibreException(
+        Status.UNSUPPORTED,
+        "httpHeaderTransformCallback needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
+      )
+
+  actual val resourceProviderCallback: Long
+    get() =
+      throw MaplibreException(
+        Status.UNSUPPORTED,
+        "resourceProviderCallback needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
+      )
+
   actual val customGeometrySourceOptionsFetchTile: Long
     get() =
       throw MaplibreException(
@@ -77,13 +91,6 @@ internal actual object UpcallStubs {
         "runtimeEventHandlerCallback needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
       )
 
-  actual val resourceProviderCallback: Long
-    get() =
-      throw MaplibreException(
-        Status.UNSUPPORTED,
-        "resourceProviderCallback needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
-      )
-
   actual val resourceTransformCallback: Long
     get() =
       throw MaplibreException(
@@ -113,26 +120,5 @@ internal actual object UpcallStubs {
       throw MaplibreException(
         Status.UNSUPPORTED,
         "cameraTransitionHandlerCallback needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
-      )
-
-  actual val directLogHandlerCallback: Long
-    get() =
-      throw MaplibreException(
-        Status.UNSUPPORTED,
-        "directLogHandlerCallback needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
-      )
-
-  actual val directHttpHeaderTransformCallback: Long
-    get() =
-      throw MaplibreException(
-        Status.UNSUPPORTED,
-        "directHttpHeaderTransformCallback needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
-      )
-
-  actual val directResourceProviderCallback: Long
-    get() =
-      throw MaplibreException(
-        Status.UNSUPPORTED,
-        "directResourceProviderCallback needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
       )
 }

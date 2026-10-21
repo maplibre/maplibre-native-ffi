@@ -10,6 +10,7 @@ import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.maplibre.nativeffi.MapFixture
+import org.maplibre.nativeffi.TestProvider
 import org.maplibre.nativeffi.WAIT_TIMEOUT
 import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.generated.FrameDemand
@@ -23,7 +24,6 @@ import org.maplibre.nativeffi.generated.RenderSessionAttachment
 import org.maplibre.nativeffi.generated.RenderSessionCapabilityFlag
 import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.RenderSessionState
-import org.maplibre.nativeffi.generated.ResourceProvider
 import org.maplibre.nativeffi.generated.RuntimeOptions
 import org.maplibre.nativeffi.generated.Wake
 import org.maplibre.nativeffi.runtime.assertCommitted
@@ -167,7 +167,7 @@ internal suspend fun <T> withOwnedTexture(
   mapMode: MapMode = MapMode.STATIC,
   driver: RenderDriverKind = RenderDriverKind.CALLER_GRAPHICS_THREAD,
   textureRingDepth: UInt = 1u,
-  provider: ResourceProvider = denyingProvider(),
+  provider: TestProvider = denyingProvider(),
   runtimeOptions: RuntimeOptions = GeneratedApi.runtimeOptionsDefault(),
   onFrameWake: () -> Unit = {},
   block: suspend RenderSessionFixture.() -> T,

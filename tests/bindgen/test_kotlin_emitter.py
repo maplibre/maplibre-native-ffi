@@ -153,33 +153,43 @@ class KotlinLayoutTests(unittest.TestCase):
                 ROOT,
             )
 
-    def test_common_registrations_take_forms_that_every_target_serves(self):
-        _functions, _unsupported, _bodies, threaded, values, _native = kotlin.lowered(
+    def test_split_registrations_take_a_form_per_target(self):
+        _functions, _unsupported, bodies, split, values, _native = kotlin.lowered(
             real_api()
         )
+        for lowering in split:
+            values.split_codecs(lowering)
         values.codecs()
-        values.direct_codecs()
-        sites = kotlin_callbacks.sites(values)
-        # Every common site that a queue-form registration hands native has a
-        # delivery that the page drains into it.
-        for site in sites.values():
-            if site.form == "queue":
-                with self.subTest(site=site.name):
-                    self.assertIsNotNone(values.bound.callbacks[site.callback].delivery)
-                    self.assertFalse(site.direct)
-        # The registrations whose callback-mode answer a callback computes, or a
-        # rule replaces, have direct forms, which only threadedMain declares.
-        direct = {
-            native
-            for native, value in values.direct_used.items()
-            if value.registration and kotlin_callbacks.has_direct(value, values)
-        }
+        # The registrations whose answer a callback computes, or a rule
+        # replaces, differ by target, so common code takes none of them.
         self.assertEqual(
-            direct,
+            {
+                value.native
+                for value in values.bound.public_values.values()
+                if kotlin_callbacks.splits(value, values)
+            },
             {"mln_log_handler", "mln_resource_provider", "mln_http_header_transform"},
         )
-        self.assertIn("mln_log_set_callback", threaded)
-        self.assertIn("mln_http_header_transform_response_set_header", threaded)
+        registrations = {
+            "mln_log_set_callback",
+            "mln_runtime_set_resource_provider",
+            "mln_runtime_set_http_header_transform",
+        }
+        response = "mln_http_header_transform_response_set_header"
+        self.assertEqual(set(split[kotlin_callbacks.ASYNC]), registrations)
+        self.assertEqual(
+            set(split[kotlin_callbacks.THREADED]), registrations | {response}
+        )
+        self.assertFalse((registrations | {response}) & set(bodies))
+        # Only the threaded forms answer native from their callbacks, and every
+        # other queue-form site has a delivery that the page drains into it.
+        for site in kotlin_callbacks.sites(values).values():
+            with self.subTest(site=site.name):
+                if site.split == kotlin_callbacks.THREADED:
+                    self.assertEqual(site.form, "direct")
+                elif site.form == "queue":
+                    callback = values.bound.callbacks[site.callback]
+                    self.assertIsNotNone(callback.delivery)
 
     def test_failed_jni_upcall_releases_owned_arguments(self):
         java = Path(require_tool(self, "java", ROOT / "bindings/kotlin").executable)

@@ -165,12 +165,13 @@ class Values:
         self.writers = {}
         self.readers = {}
         self.sites = None
-        # Whether lowering takes the direct forms that only threadedMain
-        # declares, the callback values that a direct lowering used, and the
-        # direct registrations' writers.
-        self.direct = False
-        self.direct_used = {}
-        self.direct_writers = {}
+        # The split lowering in progress, if any: THREADED for the forms that
+        # threadedMain declares, or ASYNC for those that wasmJsMain declares.
+        # Each split lowering keeps the callback values that it used and the
+        # writers of its split registrations.
+        self.split = None
+        self.split_used = {"threaded": {}, "async": {}}
+        self.split_writers = {"threaded": {}, "async": {}}
 
     def needs_registration(self, value):
         return bool(
@@ -537,9 +538,9 @@ class Values:
         """Name the in-place writer of [record], emitting it once."""
         from . import kotlin_callbacks
 
-        if kotlin_callbacks.direct(record, self):
-            self.direct_writers.setdefault(record.native, record)
-            return "putDirect" + name(record.native)
+        if kotlin_callbacks.split(record, self):
+            self.split_writers[self.split].setdefault(record.native, record)
+            return "put" + kotlin_callbacks.public_name(record, self)
         self.writers.setdefault(record.native, record)
         return "put" + name(record.native)
 
@@ -919,14 +920,17 @@ class Values:
             + " } }"
         )
 
-    def direct_codecs(self):
-        """The writers of the direct registrations, which threadedMain declares."""
-        previous = self.direct
-        self.direct = True
+    def split_codecs(self, lowering):
+        """The writers of a split lowering's registrations, which its source set declares."""
+        previous = self.split
+        self.split = lowering
         try:
-            return [self.put_function(value) for value in self.direct_writers.values()]
+            return [
+                self.put_function(value)
+                for value in self.split_writers[lowering].values()
+            ]
         finally:
-            self.direct = previous
+            self.split = previous
 
     def codecs(self):
         """The common read and write functions for every record a binding uses."""

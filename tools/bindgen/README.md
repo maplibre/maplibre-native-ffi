@@ -215,8 +215,8 @@ These keys state what a C shape cannot:
   that native answers in queue mode, as `1`, which consumes a record, does for
   `mln_log_callback`. A decision callback answers its `decision_accept` instead,
   and the schema requires the key of every other delivered callback with a
-  result. Kotlin's common form of such a callback returns nothing, and a
-  threaded target's site returns this result to native.
+  result. A queue-form callback of Kotlin/Wasm returns nothing, and its
+  documentation names this result.
 - `blocks=thread_start` on a function says that the call returns only after a
   native thread that it starts is running, as `mln_runtime_create` does. A
   thread that a browser page starts runs only after the page yields, so the page

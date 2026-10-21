@@ -3,11 +3,11 @@ package org.maplibre.nativeffi.callback
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
+import org.maplibre.nativeffi.TestProvider
 import org.maplibre.nativeffi.TestWeakReference
 import org.maplibre.nativeffi.awaitCollected
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.denyingProvider
-import org.maplibre.nativeffi.generated.ResourceProvider
 import org.maplibre.nativeffi.generated.ResourceRequestCancelHandler
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
@@ -31,7 +31,7 @@ class CallbackLifetimeTest {
 
   private fun selfCapturingProvider(
     claimed: CompletableDeferred<TestWeakReference>,
-  ): ResourceProvider = denyingProvider { request, handle ->
+  ): TestProvider = denyingProvider { request, handle ->
     if (request.requestedUrl != STYLE_URL) return@denyingProvider false
     handle.setCancelCallback(ResourceRequestCancelHandler { handle.close() })
     claimed.complete(TestWeakReference(handle))

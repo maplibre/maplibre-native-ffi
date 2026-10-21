@@ -4652,27 +4652,6 @@ public data class CustomMvtVectorSourceOptions(
 )
 
 /**
- * Process-global log callback or queue state.
- *
- * See `mln_log_handler` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
- */
-public data class LogHandler(
-  /** Receives each record. */
-  public val callback: LogCallback,
-)
-
-/**
- * Receives a MapLibre Native log record. This form returns nothing: native answers `1`, as it does
- * for a queue, and a threaded target's direct form computes the answer instead.
- *
- * See `mln_log_callback` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
- */
-public typealias LogCallback =
-  (severity: LogSeverity, event: LogEvent, code: Long, message: String) -> Unit
-
-/**
  * Receiver wake callback copied by a successful owning call. The callback schedules service by the
  * receiver and returns without waiting for another thread.
  *
@@ -4748,41 +4727,6 @@ public data class RuntimeEventHandler(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public typealias RuntimeEventCallback = (events: EventBatchView) -> Unit
-
-/**
- * HTTP header transform state: a callback, or native header rules.
- *
- * See `mln_http_header_transform` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class HttpHeaderTransform(
-  /** Header rules for a transform without a callback; empty with one. */
-  public val rules: List<HttpHeaderRule> = emptyList(),
-)
-
-/**
- * Resource provider state.
- *
- * See `mln_resource_provider` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class ResourceProvider(
-  /** Decides each request that the routes leave to the provider. */
-  public val callback: ResourceProviderCallback,
-  /** The requests that reach the provider; empty to claim every request. */
-  public val routes: List<ResourceRoute> = emptyList(),
-)
-
-/**
- * Intercepts a network resource request. This form returns nothing: native answers
- * `MLN_RESOURCE_PROVIDER_DECISION_HANDLE`, as it does for a queue, and a threaded target's direct
- * form computes the answer instead.
- *
- * See `mln_resource_provider_callback` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public typealias ResourceProviderCallback =
-  (request: ResourceRequestInfo, handle: ResourceRequestHandle) -> Unit
 
 /**
  * Resource transform state.

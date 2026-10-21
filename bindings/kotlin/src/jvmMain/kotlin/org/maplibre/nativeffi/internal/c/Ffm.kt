@@ -36,7 +36,7 @@ internal object Ffm {
     linker.downcallHandle(symbols.findOrThrow(name), descriptor(result, arguments))
 
   /**
-   * An upcall stub that calls the static method [name] of [owner], `Upcalls` or `DirectUpcalls`,
+   * An upcall stub that calls the static method [name] of [owner], `Upcalls` or `ThreadedUpcalls`,
    * and lives for the process.
    *
    * The method takes each record argument as the address of the caller's copy.

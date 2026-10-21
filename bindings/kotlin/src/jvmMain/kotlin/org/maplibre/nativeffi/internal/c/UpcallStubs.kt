@@ -11,12 +11,31 @@ internal actual object UpcallStubs {
   actual val releaseRoot: Long = Ffm.upcall(Upcalls::class.java, "releaseRoot", null, JAVA_LONG)
   actual val logHandlerCallback: Long =
     Ffm.upcall(
-      Upcalls::class.java,
+      ThreadedUpcalls::class.java,
       "logHandlerCallback",
       JAVA_INT,
       JAVA_LONG,
       JAVA_INT,
       JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  actual val httpHeaderTransformCallback: Long =
+    Ffm.upcall(
+      ThreadedUpcalls::class.java,
+      "httpHeaderTransformCallback",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  actual val resourceProviderCallback: Long =
+    Ffm.upcall(
+      ThreadedUpcalls::class.java,
+      "resourceProviderCallback",
+      JAVA_INT,
+      JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
     )
@@ -62,15 +81,6 @@ internal actual object UpcallStubs {
     )
   actual val runtimeEventHandlerCallback: Long =
     Ffm.upcall(Upcalls::class.java, "runtimeEventHandlerCallback", null, JAVA_LONG, JAVA_LONG)
-  actual val resourceProviderCallback: Long =
-    Ffm.upcall(
-      Upcalls::class.java,
-      "resourceProviderCallback",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   actual val resourceTransformCallback: Long =
     Ffm.upcall(
       Upcalls::class.java,
@@ -87,34 +97,4 @@ internal actual object UpcallStubs {
     Ffm.upcall(Upcalls::class.java, "queueLockUnlock", null, JAVA_LONG)
   actual val cameraTransitionHandlerCallback: Long =
     Ffm.upcall(Upcalls::class.java, "cameraTransitionHandlerCallback", null, JAVA_LONG, JAVA_LONG)
-  actual val directLogHandlerCallback: Long =
-    Ffm.upcall(
-      DirectUpcalls::class.java,
-      "directLogHandlerCallback",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_INT,
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  actual val directHttpHeaderTransformCallback: Long =
-    Ffm.upcall(
-      DirectUpcalls::class.java,
-      "directHttpHeaderTransformCallback",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  actual val directResourceProviderCallback: Long =
-    Ffm.upcall(
-      DirectUpcalls::class.java,
-      "directResourceProviderCallback",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
 }

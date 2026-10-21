@@ -24,8 +24,8 @@ internal object Deliveries {
       4u -> Upcalls.releaseRoot(token)
       2u ->
         when (CallbackRoots.get(token)?.value) {
-          is LogHandler -> {
-            Upcalls.logHandlerCallback(
+          is QueuedLogHandler -> {
+            WasmUpcalls.queuedLogHandlerCallback(
               token,
               readI32(payload),
               readI32(payload + 4),
@@ -37,9 +37,13 @@ internal object Deliveries {
         }
       3u ->
         when (CallbackRoots.get(token)?.value) {
-          is ResourceProvider -> {
+          is QueuedResourceProvider -> {
             take()
-            Upcalls.resourceProviderCallback(token, readAddress(payload), readI64(payload + 8))
+            WasmUpcalls.queuedResourceProviderCallback(
+              token,
+              readAddress(payload),
+              readI64(payload + 8),
+            )
           }
           else -> Unit
         }

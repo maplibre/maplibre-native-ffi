@@ -7,12 +7,12 @@ import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.deny
 import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.generated.DirectHttpHeaderTransform
-import org.maplibre.nativeffi.generated.DirectLogHandler
-import org.maplibre.nativeffi.generated.DirectResourceProvider
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.HttpHeaderTransform
 import org.maplibre.nativeffi.generated.HttpHeaderTransformResponse
 import org.maplibre.nativeffi.generated.LogEvent
+import org.maplibre.nativeffi.generated.LogHandler
+import org.maplibre.nativeffi.generated.ResourceProvider
 import org.maplibre.nativeffi.generated.ResourceProviderDecision
 import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.generated.httpHeaderTransformResponseSetHeader
@@ -25,18 +25,18 @@ import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
 
 /**
- * The direct callback forms, which compute native's answer on the MapLibre thread that calls them,
- * and which only a threaded target serves.
+ * The callbacks that compute native's answer on the MapLibre thread that calls them, which only a
+ * threaded target serves.
  */
-class DirectCallbackTest {
+class ThreadedCallbackTest {
   @Test
-  fun aDirectLogCallbackDecidesWhetherItConsumesARecord() = runSuspendTest {
+  fun aLogCallbackAnswersWhetherItConsumesARecord() = runSuspendTest {
     val roots = CallbackOwner.global
     val base = roots.rootCountForTesting()
     val parsed = CompletableDeferred<LogEvent>()
     try {
       GeneratedApi.logSetCallback(
-        DirectLogHandler { _, event, _, _ ->
+        LogHandler { _, event, _, _ ->
           if (event == LogEvent.PARSE_STYLE) parsed.complete(event)
           // Leave the record to MapLibre's own logger as well.
           0u
@@ -50,7 +50,7 @@ class DirectCallbackTest {
             """{"version":8,"center":false,"sources":{},"layers":[]}""".encodeToByteArray(),
           )
           .awaitWithin("the style command")
-        assertEquals(LogEvent.PARSE_STYLE, parsed.awaitWithin("the direct callback's record"))
+        assertEquals(LogEvent.PARSE_STYLE, parsed.awaitWithin("the log callback's record"))
       }
     } finally {
       GeneratedApi.logClearCallback()
@@ -63,9 +63,9 @@ class DirectCallbackTest {
     val outcome = CompletableDeferred<Pair<Throwable?, Throwable?>>()
     var escaped: HttpHeaderTransformResponse? = null
     val transform =
-      DirectHttpHeaderTransform(
+      HttpHeaderTransform(
         callback = { _, url, response ->
-          if (url != HTTP_STYLE_URL || outcome.isCompleted) return@DirectHttpHeaderTransform
+          if (url != HTTP_STYLE_URL || outcome.isCompleted) return@HttpHeaderTransform
           escaped = response
           var fromAnotherThread: Throwable? = null
           runOnBackgroundThread {
@@ -83,8 +83,8 @@ class DirectCallbackTest {
         },
       )
     withMap {
-      // The direct provider passes the style through to the HTTP client, which runs the header
-      // transform before it tries a port that nothing serves.
+      // The provider passes the style through to the HTTP client, which runs the header transform
+      // before it tries a port that nothing serves.
       runtime.setResourceProvider(passingThrough(HTTP_STYLE_URL)).awaitWithin("the provider")
       runtime.setHttpHeaderTransform(transform).awaitWithin("the header transform")
       map.setStyleUrl(HTTP_STYLE_URL).awaitWithin("the style command")
@@ -104,7 +104,7 @@ class DirectCallbackTest {
 
   /** Passes [url] through to native loading, and denies every other request. */
   private fun passingThrough(url: String) =
-    DirectResourceProvider(
+    ResourceProvider(
       callback = { request, handle ->
         if (request.requestedUrl == url) ResourceProviderDecision.PASS_THROUGH
         else {

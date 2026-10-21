@@ -8,19 +8,19 @@ import org.maplibre.nativeffi.internal.callback.withCallbackScope
 import org.maplibre.nativeffi.internal.memory.*
 
 /**
- * The Kotlin side of each direct form's C function pointer, which computes native's answer on the
+ * The Kotlin side of each threaded form's C function pointer, which computes native's answer on the
  * calling thread.
  */
-internal object DirectUpcalls {
+internal object ThreadedUpcalls {
   @JvmStatic
-  fun directLogHandlerCallback(
+  fun logHandlerCallback(
     userData: Long,
     severity: Int,
     event: Int,
     code: Long,
     message: Long,
   ): Int =
-    upcall<DirectLogHandler, Int>("mln_log_callback", userData, 0) { value ->
+    upcall<LogHandler, Int>("mln_log_callback", userData, 0) { value ->
       value
         .callback(
           LogSeverity(severity.toUInt()),
@@ -32,14 +32,8 @@ internal object DirectUpcalls {
     }
 
   @JvmStatic
-  fun directHttpHeaderTransformCallback(
-    userData: Long,
-    kind: Int,
-    url: Long,
-    outResponse: Long,
-  ): Int =
-    upcall<DirectHttpHeaderTransform, Int>("mln_http_header_transform_callback", userData, -5) {
-      value ->
+  fun httpHeaderTransformCallback(userData: Long, kind: Int, url: Long, outResponse: Long): Int =
+    upcall<HttpHeaderTransform, Int>("mln_http_header_transform_callback", userData, -5) { value ->
       val invoke = value.callback ?: return@upcall -5
       withCallbackScope { scope ->
         invoke(
@@ -52,8 +46,8 @@ internal object DirectUpcalls {
     }
 
   @JvmStatic
-  fun directResourceProviderCallback(userData: Long, request: Long, handle: Long): Int =
-    upcall<DirectResourceProvider, Int>("mln_resource_provider_callback", userData, -1) { value ->
+  fun resourceProviderCallback(userData: Long, request: Long, handle: Long): Int =
+    upcall<ResourceProvider, Int>("mln_resource_provider_callback", userData, -1) { value ->
       val requestOwner = ResourceRequestHandle(handle)
       val decision =
         try {

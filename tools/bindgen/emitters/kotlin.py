@@ -1,12 +1,13 @@
 """Generate the Kotlin binding: one common API over a primitive native-call shim per platform.
 
 The common source set holds every generated value, codec, owner, and operation
-that every target can serve. The threadedMain source set holds the direct
-callback forms that answer native on a MapLibre thread, with their scoped
-responses and the operations that take them, as extensions beside the common
-ones (see kotlin_callbacks). The JVM, Kotlin/Native, Android, and wasm source
-sets hold only the declarations of the C functions and upcall stubs that the
-shared code uses (see kotlin_native).
+that behaves the same on every target. A split callback registration has a form
+per target instead (see kotlin_callbacks): the threadedMain source set holds the
+forms that answer native on a MapLibre thread, with their scoped responses, and
+wasmJsMain holds the forms that the page serves. Each declares the operations
+that take its forms as extensions. The JVM, Kotlin/Native, Android, and wasm
+source sets also hold the declarations of the C functions and upcall stubs that
+the shared code uses (see kotlin_native).
 """
 
 import dataclasses
@@ -28,7 +29,17 @@ from .kotlin_values import Unsupported, Values, generated_owners
 from .kotlin_values import name as value_name
 
 COMMON = "src/commonMain/kotlin/org/maplibre/nativeffi"
-THREADED = "src/threadedMain/kotlin/org/maplibre/nativeffi"
+# The source set and file names of each split lowering's forms.
+SPLIT = {
+    kotlin_callbacks.THREADED: (
+        "src/threadedMain/kotlin/org/maplibre/nativeffi",
+        "GeneratedThreadedCallbacks",
+    ),
+    kotlin_callbacks.ASYNC: (
+        "src/wasmJsMain/kotlin/org/maplibre/nativeffi",
+        "GeneratedWasmCallbacks",
+    ),
+}
 PLATFORMS = {
     "jvmMain": "jvm",
     "nativeMain": "native",
@@ -78,13 +89,18 @@ def lower(api: Api | BoundApi):
 
 
 def lowered(api: Api | BoundApi):
-    """Lowers every operation in its common form, then in its direct form where
-    it takes a registration that has one or answers through a scoped response."""
+    """Lowers every operation in its common form, or in each split lowering's form
+    when it takes a split registration. A scoped response exists only in the
+    threaded lowering.
+
+    The split operations of each lowering are in `split[lowering]`.
+    """
     unsupported = {}
     bound = compile_api(api)
     values = Values(bound)
     native = Native(bound)
-    bodies, threaded = {}, {}
+    bodies = {}
+    split = {lowering: {} for lowering in SPLIT}
     for value in bound.public_values.values():
         if value.kind == "enum":
             values.check(value)
@@ -97,26 +113,30 @@ def lowered(api: Api | BoundApi):
         groups.setdefault(receiver, []).append(plan)
     for plan in (plan for plans in groups.values() for plan in plans):
         function = plan.function
+        if plan.scoped_receiver:
+            lowerings = [kotlin_callbacks.THREADED]
+        elif kotlin_callbacks.split_registration(plan, values):
+            lowerings = list(SPLIT)
+        else:
+            lowerings = [None]
         try:
-            if not plan.scoped_receiver:
-                bodies[function.name] = operation(plan, values, native)
-            if plan.scoped_receiver or kotlin_callbacks.direct_registration(
-                plan, values
-            ):
-                values.direct = True
-                try:
-                    threaded[function.name] = operation(plan, values, native)
-                finally:
-                    values.direct = False
+            for lowering in lowerings:
+                values.split = lowering
+                source = operation(plan, values, native)
+                (split[lowering] if lowering else bodies)[function.name] = source
         except Unsupported as error:
             bodies.pop(function.name, None)
+            for lowered_split in split.values():
+                lowered_split.pop(function.name, None)
             unsupported[function.name] = f"{function.location}: {error}"
+        finally:
+            values.split = None
     functions = [
         plan.function
         for plan in bound.operations
-        if plan.name in bodies or plan.name in threaded
+        if plan.name in bodies or any(plan.name in s for s in split.values())
     ]
-    return functions, unsupported, bodies, threaded, values, native
+    return functions, unsupported, bodies, split, values, native
 
 
 def callback_owner(bound, receiver):
@@ -134,7 +154,7 @@ def callback_owner(bound, receiver):
 
 
 def extension(source: str, receiver: str) -> str:
-    """A member method's source as an extension of [receiver], which threadedMain declares."""
+    """A member method's source as an extension of [receiver], which a split source set declares."""
     for head in ("public suspend fun ", "public fun "):
         if source.startswith("  " + head):
             return head + receiver + "." + source[len(head) + 2 :]
@@ -152,7 +172,7 @@ def delivery_functions(bound):
 
 def generate(api: Api | BoundApi) -> dict[str, str]:
     bound = compile_api(api)
-    functions, _, rendered, threaded, values, native = lowered(bound)
+    functions, _, rendered, split, values, native = lowered(bound)
     groups = {}
     for function in functions:
         if function.name not in rendered:
@@ -211,18 +231,37 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                 header + "public object GeneratedApi {\n" + "\n".join(bodies) + "}\n"
             )
         outputs[f"{COMMON}/generated/{class_name}.kt"] = source
-    extensions = []
-    for function in functions:
-        if function.name not in threaded:
-            continue
-        plan = bound.operations_by_name[function.name]
-        receiver = (
-            f"Generated{value_name(receiver_value(plan).native)}Operations"
-            if plan.receiver
-            else "GeneratedApi"
+    # The split forms come first: their writers can name records whose common
+    # codecs and values are emitted below.
+    for lowering, (directory, file) in SPLIT.items():
+        extensions = []
+        for function in functions:
+            if function.name not in split[lowering]:
+                continue
+            plan = bound.operations_by_name[function.name]
+            receiver = (
+                f"Generated{value_name(receiver_value(plan).native)}Operations"
+                if plan.receiver
+                else "GeneratedApi"
+            )
+            extensions.append(
+                operation_doc(bound, plan)
+                + extension(split[lowering][function.name], receiver)
+            )
+        declarations = kotlin_callbacks.split_declarations(values, lowering)
+        codecs = values.split_codecs(lowering)
+        outputs[f"{directory}/generated/{file}.kt"] = (
+            "// Generated from the C headers by tools/bindgen. Do not edit.\n"
+            "package org.maplibre.nativeffi.generated\n\n"
+            + OPERATION_IMPORTS
+            + "import org.maplibre.nativeffi.internal.delivery.HostDelivery\n\n"
+            + "\n\n".join([*declarations, *codecs])
+            + "\n\n"
+            + "\n".join(extensions)
         )
-        extensions.append(
-            operation_doc(bound, plan) + extension(threaded[function.name], receiver)
+        upcalls = kotlin_callbacks.SPLIT_UPCALLS[lowering][0]
+        outputs[f"{directory}/internal/c/{upcalls}.kt"] = (
+            kotlin_callbacks.split_upcalls(values, lowering)
         )
     outputs.update(
         kotlin_owners.generate_owners(
@@ -237,23 +276,8 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         + owner_disposal(bound, native)
     )
     outputs[f"{COMMON}/generated/GeneratedCodecs.kt"] = values.codecs()
-    direct_codecs = values.direct_codecs()
     outputs[f"{COMMON}/generated/GeneratedValues.kt"] = values.common()
-    outputs[f"{THREADED}/generated/GeneratedDirectCallbacks.kt"] = (
-        "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-        "package org.maplibre.nativeffi.generated\n\n"
-        + OPERATION_IMPORTS
-        + "\n"
-        + "\n\n".join(kotlin_callbacks.threaded_declarations(values))
-        + "\n\n"
-        + "\n\n".join(direct_codecs)
-        + "\n\n"
-        + "\n".join(extensions)
-    )
     outputs[f"{COMMON}/internal/c/Upcalls.kt"] = kotlin_callbacks.upcalls(values)
-    outputs[f"{THREADED}/internal/c/DirectUpcalls.kt"] = (
-        kotlin_callbacks.direct_upcalls(values)
-    )
     shims = NativeShims(
         bound,
         {**native.functions, **delivery_functions(bound)},
