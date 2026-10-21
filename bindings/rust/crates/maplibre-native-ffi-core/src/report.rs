@@ -15,8 +15,8 @@ pub enum Report {
     /// Explicit `close` reports the same failure through the normal error
     /// path.
     LeakedHandle(NativeHandleLeak),
-    /// An error that a callback returned or failed to decode. Native received
-    /// the callback's failure value instead.
+    /// An error or panic that a callback contained. A caught panic carries
+    /// the native-error status.
     CallbackError {
         /// The C callback type that failed, such as
         /// `mln_http_header_transform_callback`.
@@ -39,8 +39,7 @@ static REPORTER: Mutex<Option<SharedReporter>> = Mutex::new(None);
 ///
 /// The reporter may run on any thread, including a native callback thread, so
 /// it should return quickly. A callback error reaches it on that callback's
-/// stack, where the binding refuses every native call. A panic it raises is
-/// discarded.
+/// stack. A panic it raises is discarded.
 pub fn set_reporter(reporter: Option<Reporter>) -> bool {
     let mut slot = REPORTER
         .lock()
@@ -68,7 +67,7 @@ pub fn report(report: Report) {
                     leak.type_name, leak.id
                 ),
                 Report::CallbackError { callback, error } => {
-                    format!("{callback} failed and native received its fallback: {error}")
+                    format!("{callback} failed: {error}")
                 }
             };
             let _ = writeln!(std::io::stderr(), "maplibre-native-ffi: {line}");

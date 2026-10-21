@@ -46,9 +46,17 @@ fn report_error(callback: &'static str, error: Error) {
     report(Report::CallbackError { callback, error });
 }
 
+pub(crate) fn report_panic(callback: &'static str, payload: Box<dyn std::any::Any + Send>) {
+    // A panic payload can itself panic when dropped across this C boundary.
+    std::mem::forget(payload);
+    report_error(
+        callback,
+        Error::new(crate::Status::NativeError, "callback panicked"),
+    );
+}
+
 /// Runs host code for the `callback` trampoline, returning `fallback` when it
-/// fails or panics. An error is reported; a panic has already reached the
-/// panic hook.
+/// fails or panics. Both failures reach the reporter.
 pub(crate) fn invoke<R>(
     callback: &'static str,
     fallback: R,
@@ -60,7 +68,10 @@ pub(crate) fn invoke<R>(
             report_error(callback, error);
             fallback
         }
-        Err(_) => fallback,
+        Err(payload) => {
+            report_panic(callback, payload);
+            fallback
+        }
     }
 }
 
@@ -80,7 +91,10 @@ pub(crate) fn invoke_status(
             report_error(callback, error);
             status
         }
-        Err(_) => failure,
+        Err(payload) => {
+            report_panic(callback, payload);
+            failure
+        }
     }
 }
 
@@ -92,8 +106,10 @@ pub(crate) fn invoke_status(
 /// `user_data` must be a boxed `S` that native releases exactly once.
 pub(crate) unsafe extern "C" fn release<S>(user_data: *mut c_void) {
     let _scope = CallbackScope::enter();
-    let _ = catch_unwind(AssertUnwindSafe(|| {
+    if let Err(payload) = catch_unwind(AssertUnwindSafe(|| {
         // SAFETY: native releases the registration exactly once.
         drop(unsafe { Box::from_raw(user_data.cast::<S>()) })
-    }));
+    })) {
+        report_panic("mln_user_data_release", payload);
+    }
 }

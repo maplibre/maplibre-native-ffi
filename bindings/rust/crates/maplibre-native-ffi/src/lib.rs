@@ -12,9 +12,9 @@
 //!
 //! Native cannot receive a Rust error or panic from a callback, so the binding
 //! contains both and returns a failure value to native.
-//! A panic reaches the standard panic hook as usual. An error goes to the
-//! reporter that [`set_reporter`] installs, as [`Report::CallbackError`], or to
-//! standard error when none is installed.
+//! Errors and caught panics go to the reporter that [`set_reporter`] installs,
+//! as [`Report::CallbackError`], or to standard error when none is installed.
+//! A panic also reaches the standard panic hook as usual.
 
 #![deny(unsafe_op_in_unsafe_fn)]
 

@@ -270,8 +270,8 @@ macro_rules! generated_owner {
 }
 
 /// Runs the Python side of a native callback with the interpreter attached.
-/// An exception is reported as unraisable and, like a panic or a finalized
-/// interpreter, answers native with `failure`.
+/// An exception or panic is reported as unraisable and answers native with
+/// `failure`. A finalized interpreter also answers with `failure`.
 fn generated_invoke<R>(failure: impl Fn() -> R, body: impl FnOnce(Python<'_>) -> PyResult<R>) -> R {
     let _scope = maplibre_core::callback::CallbackScope::enter();
     let result = catch_unwind(AssertUnwindSafe(|| Python::try_attach(body)));
@@ -281,8 +281,23 @@ fn generated_invoke<R>(failure: impl Fn() -> R, body: impl FnOnce(Python<'_>) ->
             Python::try_attach(|py| generated_report_unraisable(py, error));
             failure()
         }
-        _ => failure(),
+        Err(payload) => {
+            generated_report_panic(payload);
+            failure()
+        }
+        Ok(None) => failure(),
     }
+}
+
+fn generated_report_panic(payload: Box<dyn std::any::Any + Send>) {
+    // A panic payload can itself panic when dropped across this C boundary.
+    std::mem::forget(payload);
+    Python::try_attach(|py| {
+        generated_report_unraisable(
+            py,
+            pyo3::panic::PanicException::new_err("Rust callback panicked"),
+        );
+    });
 }
 
 /// Reports an exception that a native callback raised to `sys.unraisablehook`.

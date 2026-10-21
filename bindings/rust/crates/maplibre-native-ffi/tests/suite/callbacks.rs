@@ -126,6 +126,41 @@ fn a_registered_callback_does_not_keep_its_runtime_alive() {
 }
 
 #[test]
+fn a_panicking_void_callback_is_contained_and_reported() {
+    let _global = global_state();
+    let reports = capture_reports();
+    let fixture = Fixture::new();
+    let update = CameraUpdate {
+        mode: CameraUpdateMode::Ease,
+        camera: CameraOptions {
+            zoom: Some(4.0),
+            ..Default::default()
+        },
+        animation: AnimationOptions {
+            duration_ms: Some(60_000.0),
+            transition_id: Some(u64::MAX),
+            end_handler: CameraTransitionHandler::new(|_| {
+                std::panic::resume_unwind(Box::new("the camera end handler panicked"));
+            }),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    wait_for(fixture.map().update_camera(&update));
+    wait_for(fixture.map().cancel_camera_transition(u64::MAX));
+    let report = reports.recv_timeout(timeout()).unwrap();
+    set_reporter(None);
+    match report {
+        Report::CallbackError { callback, error } => {
+            assert_eq!(callback, "mln_camera_transition_end_callback");
+            assert_eq!(error.status(), Status::NativeError);
+            assert_eq!(error.diagnostic(), "callback panicked");
+        }
+        other => panic!("unexpected report: {other:?}"),
+    }
+}
+
+#[test]
 fn a_failing_callback_is_contained_and_its_error_is_reported() {
     let _global = global_state();
     let reports = capture_reports();
@@ -177,9 +212,8 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
     fixture.await_event_type(RuntimeEventType::MapLoadingFailed);
     wait_for(fixture.runtime().clear_resource_transform());
 
-    // OpenHarmony has no HTTP header transforms, the one callback that
-    // returns an error for the reporter.
-    #[cfg(not(target_env = "ohos"))]
+    // OpenHarmony and Emscripten have no HTTP header transforms.
+    #[cfg(not(any(target_env = "ohos", target_os = "emscripten")))]
     {
         // A header transform's error drops its headers, and the reporter receives
         // it, since native keeps only a status.
@@ -213,7 +247,7 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
         // The runtime keeps working.
         wait_for(fixture.runtime().clear_http_header_transform());
     }
-    #[cfg(target_env = "ohos")]
+    #[cfg(any(target_env = "ohos", target_os = "emscripten"))]
     {
         drop(reports);
         set_reporter(None);

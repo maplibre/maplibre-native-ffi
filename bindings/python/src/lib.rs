@@ -379,7 +379,7 @@ unsafe extern "C" fn complete_python_future(
     if user_data.is_null() || result.is_null() {
         return;
     }
-    let _ = catch_unwind(AssertUnwindSafe(|| {
+    if let Err(payload) = catch_unwind(AssertUnwindSafe(|| {
         // SAFETY: native owns the bridge from accepted submission through its
         // release callback. The result is borrowed for this callback.
         let bridge = unsafe { &*user_data.cast::<PyCompletionBridge>() };
@@ -437,7 +437,9 @@ unsafe extern "C" fn complete_python_future(
         {
             unsafe { discard(result) };
         }
-    }));
+    })) {
+        generated_report_panic(payload);
+    }
 }
 
 unsafe extern "C" fn release_python_future(user_data: *mut c_void) {

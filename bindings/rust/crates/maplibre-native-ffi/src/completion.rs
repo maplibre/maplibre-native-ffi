@@ -113,7 +113,7 @@ unsafe extern "C" fn complete<T>(
             Some(convert) => match catch_unwind(AssertUnwindSafe(|| convert(raw))) {
                 Ok(result) => result,
                 Err(payload) => {
-                    std::mem::forget(payload);
+                    crate::callback::report_panic("mln_completion_callback", payload);
                     Err(Error::new(
                         crate::Status::NativeError,
                         "completion conversion panicked",
@@ -137,7 +137,7 @@ unsafe extern "C" fn complete<T>(
     if let Some(waker) = waker
         && let Err(payload) = catch_unwind(AssertUnwindSafe(|| waker.wake()))
     {
-        std::mem::forget(payload);
+        crate::callback::report_panic("mln_completion_callback", payload);
     }
 }
 
@@ -147,7 +147,7 @@ unsafe extern "C" fn release<T>(user_data: *mut c_void) {
         // SAFETY: native calls release once after accepted completion delivery.
         let bridge = unsafe { Box::from_raw(user_data.cast::<Bridge<T>>()) };
         if let Err(payload) = catch_unwind(AssertUnwindSafe(|| drop(bridge))) {
-            std::mem::forget(payload);
+            crate::callback::report_panic("mln_user_data_release", payload);
         }
     }
 }
