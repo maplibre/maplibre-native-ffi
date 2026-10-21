@@ -55,7 +55,7 @@ what it changes.
 ## Issue and PR organization
 
 [Rubberstamp](https://github.com/apps/rubberstamp-bot) labels each new issue and
-pull request from `.github/rubberstamp.yml`: one kind, at least one `area:*`
+pull request from `.config/rubberstamp.yml`: one kind, at least one `area:*`
 label, and `binding:`, `platform:`, `renderer:`, `upstream`, and `dependencies`
 labels when they apply. Don't label by hand; correct a wrong label instead.
 Leave GitHub's native issue type unset.
