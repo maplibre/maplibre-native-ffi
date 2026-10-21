@@ -1,0 +1,27 @@
+diff --git a/src/mln/map/map_projection.cpp b/src/mln/map/map_projection.cpp
+--- a/src/mln/map/map_projection.cpp
++++ b/src/mln/map/map_projection.cpp
+@@ -3,6 +3,8 @@
+ #include <mln/map/transform.hpp>
+ #include <mln/math/angles.hpp>
+ 
++#include <cmath>
++
+ namespace mln {
+ 
+ MapProjection::MapProjection(const Map& map)
+@@ -14,9 +16,11 @@
+ MapProjection::~MapProjection() = default;
+ 
+ ScreenCoordinate MapProjection::pixelForLatLng(const LatLng& latLng) const {
+-    // The implementation is just a copy from map.cpp
+-    LatLng unwrappedLatLng = latLng.wrapped();
+-    unwrappedLatLng.unwrapForShortestPath(transform->getLatLng());
++    const LatLng wrappedLatLng = latLng.wrapped();
++    const double longitude = wrappedLatLng.longitude();
++    const double center = transform->getLatLng(LatLng::Unwrapped).longitude();
++    const LatLng unwrappedLatLng{wrappedLatLng.latitude(),
++                                longitude + util::DEGREES_MAX * std::round((center - longitude) / util::DEGREES_MAX)};
+     return transform->latLngToScreenCoordinate(unwrappedLatLng);
+ }
+ 

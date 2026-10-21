@@ -111,11 +111,8 @@ MLN_API mln_status mln_map_projection_set_camera(
  *
  * The output uses logical map pixels with an origin at the top-left of the
  * projection viewport. The coordinate converts in the world copy nearest the
- * camera center's longitude wrapped to -180 to 180, so for a camera centered
- * in another world copy, convert pixels to coordinates with
- * mln_map_projection_lat_lng_for_pixel_unwrapped() instead. The result
- * observes every earlier projection setter. This function may be called from
- * any thread.
+ * camera center's unwrapped longitude. The result observes every earlier
+ * projection setter. This function may be called from any thread.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

@@ -210,6 +210,13 @@ explicit duration that overrides velocity. The C regression in
 `tests/native/abi/map/camera.c` checks the completion status and diagnostic.
 Upstream: not yet proposed.
 
+`0045-projection-world-copy.patch` converts a coordinate in the world copy
+nearest the projection's unwrapped camera center. The longitude offset handles
+any number of world copies in either direction. The public C regression in
+`tests/native/abi/render/frame_view.c` compares projected coordinates with drawn
+pixels and checks that inverse conversion preserves the visible world copy.
+Upstream: not yet proposed.
+
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
 query-filter patch preserves the preceding camera-zoom fix. Tests reuse includes
