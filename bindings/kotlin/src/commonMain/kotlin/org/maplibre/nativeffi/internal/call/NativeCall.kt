@@ -1,9 +1,13 @@
 package org.maplibre.nativeffi.internal.call
 
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.async.adoptOwned
+import org.maplibre.nativeffi.internal.c.DiagnosticLayout
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.internal.callback.CallbackRegistrationScope
 import org.maplibre.nativeffi.internal.callback.CallbackScope
@@ -39,6 +43,16 @@ internal class NativeCall(val handle: Long, var completion: Long = 0L) : NativeA
 
   fun check(status: Int) {
     checkStatus(status) { NativeDiagnostics.message(NativeDiagnostics.buffer()) }
+  }
+
+  /**
+   * Runs [call], a C call that returns once a native thread that it starts is running, and checks
+   * its status like [check]. The call writes a diagnostic of its own, because other calls run while
+   * Kotlin/Wasm waits for it.
+   */
+  suspend fun threadStart(call: (diagnostic: Long) -> Int) {
+    val diagnostic = sized(DiagnosticLayout.SIZEOF, DiagnosticLayout.ALIGNOF)
+    checkStatus(ThreadStart.run { call(diagnostic) }) { NativeDiagnostics.message(diagnostic) }
   }
 
   /**
@@ -156,6 +170,27 @@ private inline fun <T> receive(owner: Any?, state: HandleState?, body: (Long) ->
 
 internal fun <T> nativeCall(owner: Any?, state: HandleState?, body: NativeCall.() -> T): T =
   receive(owner, state) { handle -> NativeCall(handle).use { it.body() } }
+
+/**
+ * Runs a call that suspends until a native thread that it starts is running. The wait does not
+ * cancel, so a caller cancelled meanwhile releases the owner that the call created through [drop],
+ * and receives the cancellation.
+ */
+internal suspend fun <T> nativeThreadStart(drop: (T) -> Unit, body: suspend NativeCall.() -> T): T {
+  ensureNativeLibrary()
+  val result = NativeCall(0L).use { it.body() }
+  try {
+    currentCoroutineContext().ensureActive()
+  } catch (cancelled: CancellationException) {
+    try {
+      drop(result)
+    } catch (cleanup: Throwable) {
+      cancelled.addSuppressed(cleanup)
+    }
+    throw cancelled
+  }
+  return result
+}
 
 /**
  * Runs a call like [nativeCall] that copies outputs native lends until [state]'s release, which

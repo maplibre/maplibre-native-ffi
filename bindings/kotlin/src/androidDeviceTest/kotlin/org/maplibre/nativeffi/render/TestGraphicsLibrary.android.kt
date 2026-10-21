@@ -24,7 +24,7 @@ internal object TestGraphicsJni {
 
 /** tests/graphics over JNI. */
 internal actual object TestGraphicsLibrary {
-  actual fun create(backend: UInt): Long {
+  actual suspend fun create(backend: UInt): Long {
     val graphics = TestGraphicsJni.create(backend.toInt())
     check(graphics != 0L) { "tests/graphics has no context: ${TestGraphicsJni.lastError()}" }
     return graphics
@@ -55,4 +55,7 @@ internal actual object TestGraphicsLibrary {
       "tests/graphics could not make its context current: ${TestGraphicsJni.lastError()}"
     }
   }
+
+  actual fun transferredCanvas(width: Int, height: Int): TestCanvas =
+    throw UnsupportedOperationException("tests/graphics transfers no canvas; only WebGL does")
 }

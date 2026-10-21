@@ -201,6 +201,48 @@ static void mln_custom_mvt_vector_source_options_default_jni(
   mln_custom_mvt_vector_source_options_default_critical(returned);
 }
 
+static void mln_delivery_batch_release_jni(
+  JNIEnv* env, jclass type, jlong batch
+) {
+  mln_delivery_batch_release((mln_delivery_batch)batch);
+}
+
+static jint mln_delivery_batch_take_jni(
+  JNIEnv* env, jclass type, jlong batch, jlong index, jlong out_diagnostic
+) {
+  return (jint)mln_delivery_batch_take(
+    (mln_delivery_batch)batch, (size_t)index,
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_delivery_queue_create_jni(
+  JNIEnv* env, jclass type, jlong options, jlong out_queue, jlong out_diagnostic
+) {
+  return (jint)mln_delivery_queue_create(
+    MLN_JNI_POINTER(const mln_delivery_queue_options*, options),
+    MLN_JNI_POINTER(mln_delivery_queue*, out_queue),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_delivery_queue_drain_jni(
+  JNIEnv* env, jclass type, jlong queue, jlong out_batch, jlong out_view,
+  jlong out_diagnostic
+) {
+  return (jint)mln_delivery_queue_drain(
+    (mln_delivery_queue)queue, MLN_JNI_POINTER(mln_delivery_batch*, out_batch),
+    MLN_JNI_POINTER(mln_delivery_batch_view*, out_view),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static void mln_delivery_queue_release_jni(
+  JNIEnv* env, jclass type, jlong queue
+) {
+  mln_delivery_queue_release((mln_delivery_queue)queue);
+}
+
 static void mln_frame_demand_default_critical(jlong returned) {
   *MLN_JNI_POINTER(mln_frame_demand*, returned) = mln_frame_demand_default();
 }
@@ -2481,6 +2523,11 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_custom_geometry_source_options_default_jni},
   {"mln_custom_mvt_vector_source_options_default", "(J)V",
    (void*)mln_custom_mvt_vector_source_options_default_jni},
+  {"mln_delivery_batch_release", "(J)V", (void*)mln_delivery_batch_release_jni},
+  {"mln_delivery_batch_take", "(JJJ)I", (void*)mln_delivery_batch_take_jni},
+  {"mln_delivery_queue_create", "(JJJ)I", (void*)mln_delivery_queue_create_jni},
+  {"mln_delivery_queue_drain", "(JJJJ)I", (void*)mln_delivery_queue_drain_jni},
+  {"mln_delivery_queue_release", "(J)V", (void*)mln_delivery_queue_release_jni},
   {"mln_frame_demand_default", "(J)V", (void*)mln_frame_demand_default_jni},
   {"mln_free_camera_options_default", "(J)V",
    (void*)mln_free_camera_options_default_jni},
@@ -2891,6 +2938,11 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_custom_geometry_source_options_default_critical},
   {"mln_custom_mvt_vector_source_options_default", "(J)V",
    (void*)mln_custom_mvt_vector_source_options_default_critical},
+  {"mln_delivery_batch_release", "(J)V", (void*)mln_delivery_batch_release_jni},
+  {"mln_delivery_batch_take", "(JJJ)I", (void*)mln_delivery_batch_take_jni},
+  {"mln_delivery_queue_create", "(JJJ)I", (void*)mln_delivery_queue_create_jni},
+  {"mln_delivery_queue_drain", "(JJJJ)I", (void*)mln_delivery_queue_drain_jni},
+  {"mln_delivery_queue_release", "(J)V", (void*)mln_delivery_queue_release_jni},
   {"mln_frame_demand_default", "(J)V",
    (void*)mln_frame_demand_default_critical},
   {"mln_free_camera_options_default", "(J)V",
@@ -3264,23 +3316,40 @@ const JNINativeMethod mln_jni_critical_methods[] = {
 };
 
 mln_jni_upcall mln_jni_upcalls[] = {
-  {"completion", "(JJ)V", NULL},
-  {"completionRelease", "(J)V", NULL},
-  {"releaseRoot", "(J)V", NULL},
-  {"logHandlerCallback", "(JIIJJ)I", NULL},
-  {"customGeometrySourceOptionsFetchTile", "(JJ)V", NULL},
-  {"customGeometrySourceOptionsCancelTile", "(JJ)V", NULL},
-  {"customMvtVectorSourceOptionsFetchTile", "(JJ)V", NULL},
-  {"customMvtVectorSourceOptionsCancelTile", "(JJ)V", NULL},
-  {"resourceRequestCancelHandlerCallback", "(JJ)V", NULL},
-  {"runtimeEventHandlerCallback", "(JJ)V", NULL},
-  {"httpHeaderTransformCallback", "(JIJJ)I", NULL},
-  {"resourceProviderCallback", "(JJJ)I", NULL},
-  {"resourceTransformCallback", "(JIJJ)V", NULL},
-  {"wakeCallback", "(J)V", NULL},
-  {"queueLockLock", "(J)V", NULL},
-  {"queueLockUnlock", "(J)V", NULL},
-  {"cameraTransitionHandlerCallback", "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "completion", "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "completionRelease", "(J)V",
+   NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "releaseRoot", "(J)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "logHandlerCallback",
+   "(JIIJJ)I", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls",
+   "customGeometrySourceOptionsFetchTile", "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls",
+   "customGeometrySourceOptionsCancelTile", "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls",
+   "customMvtVectorSourceOptionsFetchTile", "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls",
+   "customMvtVectorSourceOptionsCancelTile", "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls",
+   "resourceRequestCancelHandlerCallback", "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "runtimeEventHandlerCallback",
+   "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "resourceProviderCallback",
+   "(JJJ)I", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "resourceTransformCallback",
+   "(JIJJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "wakeCallback", "(J)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "queueLockLock", "(J)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "queueLockUnlock", "(J)V",
+   NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls",
+   "cameraTransitionHandlerCallback", "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/DirectUpcalls",
+   "directLogHandlerCallback", "(JIIJJ)I", NULL},
+  {"org/maplibre/nativeffi/internal/c/DirectUpcalls",
+   "directHttpHeaderTransformCallback", "(JIJJ)I", NULL},
+  {"org/maplibre/nativeffi/internal/c/DirectUpcalls",
+   "directResourceProviderCallback", "(JJJ)I", NULL},
 };
 
 static void mln_jni_completion(
@@ -3313,7 +3382,7 @@ static uint32_t mln_jni_logHandlerCallback(
     {.j = (jlong)code},
     {.j = MLN_JNI_ADDRESS(message)}
   };
-  jint result = 0;
+  jint result = 1;
   mln_jni_upcall_int(&mln_jni_upcalls[3], arguments, &result);
   return (uint32_t)result;
 }
@@ -3370,21 +3439,6 @@ static void mln_jni_runtimeEventHandlerCallback(
   mln_jni_upcall_void(&mln_jni_upcalls[9], arguments);
 }
 
-static mln_status mln_jni_httpHeaderTransformCallback(
-  void* userData, uint32_t kind, const char* url,
-  mln_http_header_transform_response* outResponse
-) {
-  jvalue arguments[] = {
-    {.j = MLN_JNI_ADDRESS(userData)},
-    {.i = (jint)kind},
-    {.j = MLN_JNI_ADDRESS(url)},
-    {.j = MLN_JNI_ADDRESS(outResponse)}
-  };
-  jint result = -5;
-  mln_jni_upcall_int(&mln_jni_upcalls[10], arguments, &result);
-  return (mln_status)result;
-}
-
 static uint32_t mln_jni_resourceProviderCallback(
   void* userData, const mln_resource_request_info* request,
   mln_resource_request handle
@@ -3394,8 +3448,8 @@ static uint32_t mln_jni_resourceProviderCallback(
     {.j = MLN_JNI_ADDRESS(request)},
     {.j = (jlong)handle}
   };
-  jint result = -1;
-  mln_jni_upcall_int(&mln_jni_upcalls[11], arguments, &result);
+  jint result = 1;
+  mln_jni_upcall_int(&mln_jni_upcalls[10], arguments, &result);
   return (uint32_t)result;
 }
 
@@ -3409,24 +3463,24 @@ static void mln_jni_resourceTransformCallback(
     {.j = MLN_JNI_ADDRESS(url)},
     {.j = (jlong)request}
   };
-  if (!mln_jni_upcall_void(&mln_jni_upcalls[12], arguments)) {
+  if (!mln_jni_upcall_void(&mln_jni_upcalls[11], arguments)) {
     mln_resource_transform_request_release(request);
   }
 }
 
 static void mln_jni_wakeCallback(void* userData) {
   jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
-  mln_jni_upcall_void(&mln_jni_upcalls[13], arguments);
+  mln_jni_upcall_void(&mln_jni_upcalls[12], arguments);
 }
 
 static void mln_jni_queueLockLock(void* userData) {
   jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
-  mln_jni_upcall_void(&mln_jni_upcalls[14], arguments);
+  mln_jni_upcall_void(&mln_jni_upcalls[13], arguments);
 }
 
 static void mln_jni_queueLockUnlock(void* userData) {
   jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
-  mln_jni_upcall_void(&mln_jni_upcalls[15], arguments);
+  mln_jni_upcall_void(&mln_jni_upcalls[14], arguments);
 }
 
 static void mln_jni_cameraTransitionHandlerCallback(
@@ -3435,7 +3489,52 @@ static void mln_jni_cameraTransitionHandlerCallback(
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(end)}
   };
-  mln_jni_upcall_void(&mln_jni_upcalls[16], arguments);
+  mln_jni_upcall_void(&mln_jni_upcalls[15], arguments);
+}
+
+static uint32_t mln_jni_directLogHandlerCallback(
+  void* userData, uint32_t severity, uint32_t event, int64_t code,
+  const char* message
+) {
+  jvalue arguments[] = {
+    {.j = MLN_JNI_ADDRESS(userData)},
+    {.i = (jint)severity},
+    {.i = (jint)event},
+    {.j = (jlong)code},
+    {.j = MLN_JNI_ADDRESS(message)}
+  };
+  jint result = 0;
+  mln_jni_upcall_int(&mln_jni_upcalls[16], arguments, &result);
+  return (uint32_t)result;
+}
+
+static mln_status mln_jni_directHttpHeaderTransformCallback(
+  void* userData, uint32_t kind, const char* url,
+  mln_http_header_transform_response* outResponse
+) {
+  jvalue arguments[] = {
+    {.j = MLN_JNI_ADDRESS(userData)},
+    {.i = (jint)kind},
+    {.j = MLN_JNI_ADDRESS(url)},
+    {.j = MLN_JNI_ADDRESS(outResponse)}
+  };
+  jint result = -5;
+  mln_jni_upcall_int(&mln_jni_upcalls[17], arguments, &result);
+  return (mln_status)result;
+}
+
+static uint32_t mln_jni_directResourceProviderCallback(
+  void* userData, const mln_resource_request_info* request,
+  mln_resource_request handle
+) {
+  jvalue arguments[] = {
+    {.j = MLN_JNI_ADDRESS(userData)},
+    {.j = MLN_JNI_ADDRESS(request)},
+    {.j = (jlong)handle}
+  };
+  jint result = -1;
+  mln_jni_upcall_int(&mln_jni_upcalls[18], arguments, &result);
+  return (uint32_t)result;
 }
 
 void* const mln_jni_upcall_stubs[] = {
@@ -3449,13 +3548,15 @@ void* const mln_jni_upcall_stubs[] = {
   (void*)mln_jni_customMvtVectorSourceOptionsCancelTile,
   (void*)mln_jni_resourceRequestCancelHandlerCallback,
   (void*)mln_jni_runtimeEventHandlerCallback,
-  (void*)mln_jni_httpHeaderTransformCallback,
   (void*)mln_jni_resourceProviderCallback,
   (void*)mln_jni_resourceTransformCallback,
   (void*)mln_jni_wakeCallback,
   (void*)mln_jni_queueLockLock,
   (void*)mln_jni_queueLockUnlock,
   (void*)mln_jni_cameraTransitionHandlerCallback,
+  (void*)mln_jni_directLogHandlerCallback,
+  (void*)mln_jni_directHttpHeaderTransformCallback,
+  (void*)mln_jni_directResourceProviderCallback,
 };
 const size_t mln_jni_upcall_count =
   sizeof mln_jni_upcall_stubs / sizeof mln_jni_upcall_stubs[0];

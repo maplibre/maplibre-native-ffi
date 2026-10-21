@@ -1110,6 +1110,7 @@ MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_WRONG_THREAD when called on the browser main thread.
  * - MLN_STATUS_NATIVE_ERROR when runtime initialization fails.
  */
+MLN_BINDING("blocks=thread_start")
 MLN_API mln_status mln_runtime_create(
   const mln_runtime_options* options,
   mln_runtime* out_runtime MLN_BINDING("direction=out"),

@@ -8,7 +8,6 @@ import org.maplibre.nativeffi.awaitCollected
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.generated.ResourceProvider
-import org.maplibre.nativeffi.generated.ResourceProviderDecision
 import org.maplibre.nativeffi.generated.ResourceRequestCancelHandler
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
@@ -16,7 +15,7 @@ import org.maplibre.nativeffi.withMap
 /** Whether a registered callback keeps the handle it is registered on reachable. */
 class CallbackLifetimeTest {
   @Test
-  fun aCallbackCapturingItsReceiverDoesNotKeepItReachable(): Unit = runSuspendTest {
+  fun aCallbackCapturingItsReceiverDoesNotKeepItReachable() = runSuspendTest {
     val claimed = CompletableDeferred<TestWeakReference>()
     withMap(provider = selfCapturingProvider(claimed)) {
       map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
@@ -33,10 +32,10 @@ class CallbackLifetimeTest {
   private fun selfCapturingProvider(
     claimed: CompletableDeferred<TestWeakReference>,
   ): ResourceProvider = denyingProvider { request, handle ->
-    if (request.requestedUrl != STYLE_URL) return@denyingProvider null
+    if (request.requestedUrl != STYLE_URL) return@denyingProvider false
     handle.setCancelCallback(ResourceRequestCancelHandler { handle.close() })
     claimed.complete(TestWeakReference(handle))
-    ResourceProviderDecision.HANDLE
+    true
   }
 
   private companion object {

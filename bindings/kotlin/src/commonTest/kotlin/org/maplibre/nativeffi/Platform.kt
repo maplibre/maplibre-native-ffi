@@ -1,17 +1,7 @@
 package org.maplibre.nativeffi
 
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.error.CallbackException
-
-/** A native thread that starts running [block] at construction. */
-internal expect class TestThread(block: () -> Unit) {
-  /** Waits for the block to return, and rethrows what it threw. */
-  fun join()
-}
-
-/** Runs [block] on a second native thread and waits for it to finish. */
-internal fun runOnBackgroundThread(block: () -> Unit) {
-  TestThread(block).join()
-}
 
 /** A weak reference that the garbage collector clears once nothing else reaches its value. */
 internal expect class TestWeakReference(value: Any) {
@@ -25,15 +15,16 @@ internal expect class TestWeakReference(value: Any) {
  * Collects garbage until [reference] clears, and returns whether it did before the wait timeout.
  *
  * Each round blocks on the collector itself: a reference queue on the JVM and Android, or a
- * synchronous collection on Kotlin/Native.
+ * synchronous collection on Kotlin/Native. The browser clears a weak reference only after the task
+ * that last read it, so on wasm each round yields to the page.
  */
-internal expect fun awaitCollected(reference: TestWeakReference): Boolean
+internal expect suspend fun awaitCollected(reference: TestWeakReference): Boolean
 
 /**
  * Asks the collector for a full collection, which queues the cleaners of unreachable handles. The
  * cleaners run on their own worker, so a caller still waits for what they do.
  */
-internal expect fun requestCollection()
+internal expect suspend fun requestCollection()
 
 /**
  * Routes each callback failure that the binding hands to the platform's handler to [sink], and
@@ -41,3 +32,17 @@ internal expect fun requestCollection()
  * failure goes to the log, which a test cannot read back.
  */
 internal expect fun interceptCallbackFailures(sink: (CallbackException) -> Unit): (() -> Unit)?
+
+/**
+ * Waits until native's releases and deliveries so far have reached Kotlin. A threaded target runs
+ * each one inside native's call, so this returns at once. On wasm, native queues each one, and the
+ * page drains them in order on later tasks.
+ */
+internal expect suspend fun awaitDeliveries()
+
+/**
+ * Holds the native thread that runs a completion handler until [release] completes, so the work
+ * that native queues behind the handler waits for the test. The page runs a handler as it drains
+ * the handler's completion, after the test yields, so on wasm the work already waits.
+ */
+internal expect fun holdThreadUntil(release: Deferred<Unit>)

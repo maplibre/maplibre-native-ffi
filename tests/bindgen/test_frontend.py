@@ -169,6 +169,33 @@ mln_status mln_read(const double *value BIND("direction=out"), mln_diagnostic *o
         self.assertIn("unknown metadata key 'ownershp'", str(raised.exception))
         self.assertIn("output direction contradicts const", str(raised.exception))
 
+    def test_a_thread_start_wait_belongs_to_an_immediate_status_call(self):
+        source = """
+BIND("blocks=thread_start")
+mln_status mln_start(mln_map *out_map BIND("direction=out"), mln_diagnostic *out_diagnostic);
+"""
+        validate(self.parse(source))
+        for before, after in (
+            (
+                "mln_status mln_start(",
+                'BIND("execution=snapshot") mln_status mln_start(',
+            ),
+            (
+                'mln_status mln_start(mln_map *out_map BIND("direction=out"), mln_diagnostic *out_diagnostic);',
+                "unsigned mln_start(void);",
+            ),
+        ):
+            with (
+                self.subTest(after=after),
+                self.assertRaisesRegex(
+                    ModelError,
+                    "blocks requires an immediate function that returns a status",
+                ),
+            ):
+                validate(self.parse(source.replace(before, after, 1)))
+        with self.assertRaisesRegex(ModelError, "unsupported blocks='lock'"):
+            self.parse(source.replace("thread_start", "lock"))
+
     def test_duplicate_metadata_is_rejected_at_the_declaration(self):
         with self.assertRaisesRegex(
             ModelError, "duplicate binding metadata 'execution'"

@@ -55,6 +55,7 @@ ANNOTATION_VALUES = {
     "lifetime": frozenset({"call", "owner", "process"}),
     "synchronous": frozenset({"true"}),
     "capture": frozenset({"manual"}),
+    "blocks": frozenset({"thread_start"}),
 }
 
 # The same semantic vocabulary applies to all target languages. A field's
@@ -71,6 +72,7 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "absent_on",
         "view_owner",
         "enum",
+        "blocks",
     }
 )
 PARAMETER_KEYS = COMMON_KEYS | frozenset({"direction", "length", "enum", "kind"})
@@ -106,6 +108,7 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "decision_handle",
         "decision_accept",
         "delivery",
+        "queue_result",
         "synchronous",
     }
 )
@@ -652,6 +655,12 @@ def validate(api: Api) -> None:
                         f"{context}: a function without a return value takes no "
                         f"value metadata ({', '.join(extra)})"
                     )
+        if "blocks" in metadata and (
+            execution not in {None, "immediate"} or not returns_status
+        ):
+            errors.append(
+                f"{context}: blocks requires an immediate function that returns a status"
+            )
         if "absent_on" in metadata:
             errors.extend(absence_errors(api, function, context))
         if function.variadic:
@@ -932,6 +941,7 @@ def validate(api: Api) -> None:
             errors.append(f"{context}: failure requires a callback")
         if "delivery" in typedef.metadata:
             errors.extend(delivery_errors(api, typedef, enum_constants, context))
+        errors.extend(queue_result_errors(typedef, enum_constants, context))
         if "synchronous" in typedef.metadata and (
             signature is None or signature.kind != "function"
         ):
@@ -1324,6 +1334,42 @@ def delivery_queue_errors(api: Api, typedef, record, context: str) -> list[str]:
             f"{context}: a queue registration's callback {field.name} requires delivery="
         )
     return errors
+
+
+def queue_result_errors(typedef, enum_constants, context: str) -> list[str]:
+    """Check the result that native answers for a callback in queue mode.
+
+    A queue-mode registration answers each call without its callback. A
+    decision callback answers its accepted outcome; any other delivered
+    callback with a result names the answer in `queue_result=`, which a host
+    that serves the queue form through a callback returns.
+    """
+    metadata = typedef.metadata
+    signature = typedef.type.pointee
+    returns = (
+        signature is not None
+        and signature.kind == "function"
+        and signature.result is not None
+        and signature.result.kind != "void"
+        and not is_status(signature.result)
+    )
+    needed = returns and "delivery" in metadata and "decision_accept" not in metadata
+    if "queue_result" not in metadata:
+        return (
+            [f"{context}: a delivered callback with a result declares its queue_result"]
+            if needed
+            else []
+        )
+    if not needed:
+        return [
+            (
+                f"{context}: queue_result requires a delivered callback with a "
+                "result and no decision"
+            )
+        ]
+    return callback_result_errors(
+        typedef, metadata["queue_result"], "queue_result", enum_constants, context
+    )
 
 
 def delivery_errors(api: Api, typedef, enum_constants, context: str) -> list[str]:

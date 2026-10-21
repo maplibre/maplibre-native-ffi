@@ -19,7 +19,7 @@ import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_make_current
 
 /** tests/graphics over cinterop, linked into the test executable from graphics.c. */
 internal actual object TestGraphicsLibrary {
-  actual fun create(backend: UInt): Long {
+  actual suspend fun create(backend: UInt): Long {
     val graphics =
       checkNotNull(mln_test_graphics_create(backend)) {
         "tests/graphics has no context: ${lastError()}"
@@ -54,6 +54,9 @@ internal actual object TestGraphicsLibrary {
       "tests/graphics could not make its context current: ${lastError()}"
     }
   }
+
+  actual fun transferredCanvas(width: Int, height: Int): TestCanvas =
+    throw UnsupportedOperationException("tests/graphics transfers no canvas; only WebGL does")
 
   private fun handle(graphics: Long): CPointer<mln_test_graphics> =
     checkNotNull(graphics.toCPointer())

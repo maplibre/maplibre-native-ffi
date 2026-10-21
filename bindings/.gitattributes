@@ -249,6 +249,13 @@
 /kotlin/src/jvmMain/kotlin/org/maplibre/nativeffi/internal/c/UpcallStubs.kt linguist-generated=true
 /kotlin/src/nativeMain/kotlin/org/maplibre/nativeffi/internal/c/C.kt linguist-generated=true
 /kotlin/src/nativeMain/kotlin/org/maplibre/nativeffi/internal/c/UpcallStubs.kt linguist-generated=true
+/kotlin/src/threadedMain/kotlin/org/maplibre/nativeffi/generated/GeneratedDirectCallbacks.kt linguist-generated=true
+/kotlin/src/threadedMain/kotlin/org/maplibre/nativeffi/internal/c/DirectUpcalls.kt linguist-generated=true
+/kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/C.kt linguist-generated=true
+/kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/Deliveries.kt linguist-generated=true
+/kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/UpcallStubs.kt linguist-generated=true
+/kotlin/wasm/mln_kw_exports.txt linguist-generated=true
+/kotlin/wasm/mln_kw_generated.c linguist-generated=true
 /python/python/maplibre_native_ffi/_generated_operations.py linguist-generated=true
 /python/python/maplibre_native_ffi/_generated_owners.py linguist-generated=true
 /python/python/maplibre_native_ffi/_generated_values.py linguist-generated=true

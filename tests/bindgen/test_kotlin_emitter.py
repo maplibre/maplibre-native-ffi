@@ -15,7 +15,7 @@ from support import (
     run,
 )
 
-from tools.bindgen.emitters import kotlin
+from tools.bindgen.emitters import kotlin, kotlin_callbacks
 from tools.bindgen.emitters.kotlin_abi import Abi, LayoutError
 
 # One target per data model a Kotlin target uses: Android ARM32 is ILP32, and
@@ -124,6 +124,62 @@ class KotlinLayoutTests(unittest.TestCase):
                     home / "include",
                     machine,
                 )
+
+    def test_the_wasm_glue_compiles_against_the_headers_for_wasm32(self):
+        # Each wrapper casts its wasm32 carriers to the C parameter types, and a
+        # thread-start wrapper asserts that its arguments fit the thread start,
+        # so compiling the glue against the real prototypes checks both.
+        clang = require_tool(self, "clang").executable
+        source = kotlin.generate(real_api())[kotlin.WASM_GLUE]
+        with TemporaryDirectory() as directory:
+            check = Path(directory) / "glue.c"
+            check.write_text(source)
+            run(
+                self,
+                [
+                    clang,
+                    "--target=wasm32-unknown-unknown",
+                    "-ffreestanding",
+                    "-std=c2x",
+                    "-fsyntax-only",
+                    "-Wall",
+                    "-Werror",
+                    "-DMLN_STATIC",
+                    f"-I{ROOT / 'include'}",
+                    f"-I{NATIVE_INCLUDE}",
+                    f"-I{ROOT / 'bindings/kotlin/wasm'}",
+                    str(check),
+                ],
+                ROOT,
+            )
+
+    def test_common_registrations_take_forms_that_every_target_serves(self):
+        _functions, _unsupported, _bodies, threaded, values, _native = kotlin.lowered(
+            real_api()
+        )
+        values.codecs()
+        values.direct_codecs()
+        sites = kotlin_callbacks.sites(values)
+        # Every common site that a queue-form registration hands native has a
+        # delivery that the page drains into it.
+        for site in sites.values():
+            if site.form == "queue":
+                with self.subTest(site=site.name):
+                    self.assertIsNotNone(values.bound.callbacks[site.callback].delivery)
+                    self.assertFalse(site.direct)
+        # The registrations whose callback-mode answer a callback computes, or a
+        # rule replaces, have direct forms, which only threadedMain declares.
+        direct = {
+            native
+            for native, value in values.direct_used.items()
+            if value.registration and kotlin_callbacks.has_direct(value, values)
+        }
+        self.assertEqual(
+            direct,
+            {"mln_log_handler", "mln_resource_provider", "mln_http_header_transform"},
+        )
+        self.assertIn("mln_log_set_callback", threaded)
+        self.assertIn("mln_http_header_transform_response_set_header", threaded)
 
     def test_failed_jni_upcall_releases_owned_arguments(self):
         java = Path(require_tool(self, "java", ROOT / "bindings/kotlin").executable)

@@ -9,6 +9,7 @@ import org.maplibre.nativeffi.internal.c.CompletionLayout
 import org.maplibre.nativeffi.internal.c.CompletionResultLayout
 import org.maplibre.nativeffi.internal.c.UpcallStubs
 import org.maplibre.nativeffi.internal.callback.NativeRoots
+import org.maplibre.nativeffi.internal.delivery.HostDelivery
 import org.maplibre.nativeffi.internal.memory.NativeArena
 import org.maplibre.nativeffi.internal.memory.readAddress
 import org.maplibre.nativeffi.internal.memory.readI32
@@ -17,6 +18,7 @@ import org.maplibre.nativeffi.internal.memory.readU32
 import org.maplibre.nativeffi.internal.memory.readU64
 import org.maplibre.nativeffi.internal.memory.readViewString
 import org.maplibre.nativeffi.internal.memory.writeAddress
+import org.maplibre.nativeffi.internal.memory.writeI64
 import org.maplibre.nativeffi.internal.memory.writeU32
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
@@ -24,9 +26,10 @@ import org.maplibre.nativeffi.runtime.CommandCompletion
  * Bridges one native completion into an eager Kotlin [Deferred].
  *
  * Each submission builds an `mln_completion` whose `user_data` roots its state until native
- * releases it. A conversion reads the `mln_completion_result` at the address it receives, which
- * stays valid only while the conversion runs. Each submission call throws the mapped status error
- * when native rejects it synchronously.
+ * releases it, or on a target with a [HostDelivery] queue, until the page delivers the result. A
+ * conversion reads the `mln_completion_result` at the address it receives, which stays valid only
+ * while the conversion runs. Each submission call throws the mapped status error when native
+ * rejects it synchronously.
  */
 internal object CompletionBridge {
   private class State<T>(
@@ -90,9 +93,15 @@ internal object CompletionBridge {
     try {
       val completion = arena.allocate(CompletionLayout.SIZEOF)
       writeU32(completion + CompletionLayout.SIZE, CompletionLayout.SIZEOF.toUInt())
-      writeAddress(completion + CompletionLayout.CALLBACK, UpcallStubs.completion)
       writeAddress(completion + CompletionLayout.USER_DATA, token)
-      writeAddress(completion + CompletionLayout.RELEASE_USER_DATA, UpcallStubs.completionRelease)
+      val queue = HostDelivery.queue
+      if (queue != 0L) {
+        // The page drains the result into [complete] and then [release].
+        writeI64(completion + CompletionLayout.QUEUE, queue)
+      } else {
+        writeAddress(completion + CompletionLayout.CALLBACK, UpcallStubs.completion)
+        writeAddress(completion + CompletionLayout.RELEASE_USER_DATA, UpcallStubs.completionRelease)
+      }
       call(completion)
     } catch (failure: Throwable) {
       // A throw from [call] means native rejected the submission, which then never takes the

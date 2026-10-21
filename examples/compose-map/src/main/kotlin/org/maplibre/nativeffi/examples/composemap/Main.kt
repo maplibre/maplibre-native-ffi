@@ -32,7 +32,6 @@ internal object Main {
     GeneratedApi.logSetCallback(
       LogHandler { severity, event, code, message ->
         System.err.printf("MapLibre %s %s %d: %s%n", severity, event, code, message)
-        1u
       },
     )
     System.getProperty("org.maplibre.nativeffi.library.path")?.let {

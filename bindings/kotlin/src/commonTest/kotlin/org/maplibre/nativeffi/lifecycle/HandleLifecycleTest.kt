@@ -7,7 +7,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.RuntimeFixture
 import org.maplibre.nativeffi.TestWeakReference
@@ -19,6 +18,7 @@ import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.generated.Status
+import org.maplibre.nativeffi.holdThreadUntil
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.runtime.awaitCommitted
 import org.maplibre.nativeffi.smallMapOptions
@@ -27,7 +27,7 @@ import org.maplibre.nativeffi.smallMapOptions
 @OptIn(ExperimentalAtomicApi::class)
 class HandleLifecycleTest {
   @Test
-  fun closingAHandleTwiceIsSafeAndLaterUseIsRefused(): Unit = runSuspendTest {
+  fun closingAHandleTwiceIsSafeAndLaterUseIsRefused() = runSuspendTest {
     val data = GeneratedApi.geojsonSourceDataCreate(POINT_JSON.encodeToByteArray())
     data.close()
     data.close()
@@ -41,7 +41,7 @@ class HandleLifecycleTest {
   }
 
   @Test
-  fun aRefusedReleaseLeavesTheRuntimeUsableAndALaterReleaseSucceeds(): Unit = runSuspendTest {
+  fun aRefusedReleaseLeavesTheRuntimeUsableAndALaterReleaseSucceeds() = runSuspendTest {
     val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
     val map = runtime.createMap(smallMapOptions()).awaitWithin("the map")
 
@@ -57,7 +57,7 @@ class HandleLifecycleTest {
   }
 
   @Test
-  fun aHandleIdNamesItsEventsAndOutlivesRelease(): Unit = runSuspendTest {
+  fun aHandleIdNamesItsEventsAndOutlivesRelease() = runSuspendTest {
     RuntimeFixture.use {
       val map = runtime.createMap(smallMapOptions()).awaitWithin("the map")
       map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray()).awaitCommitted()
@@ -70,7 +70,7 @@ class HandleLifecycleTest {
   }
 
   @Test
-  fun aMapKeepsItsRuntimeReachable(): Unit = runSuspendTest {
+  fun aMapKeepsItsRuntimeReachable() = runSuspendTest {
     val (map, runtime) = mapWithUnreferencedRuntime()
     try {
       // Once the collector has reclaimed an unrelated object, it has run a full cycle, and the
@@ -85,7 +85,7 @@ class HandleLifecycleTest {
   }
 
   @Test
-  fun droppingAMapCreationRetiresTheMapItCreates(): Unit = runSuspendTest {
+  fun droppingAMapCreationRetiresTheMapItCreates() = runSuspendTest {
     val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
     val map = runtime.createMap(smallMapOptions()).awaitWithin("the first map")
     // Parking the runtime's worker holds the creation behind it, so the creation is still pending
@@ -121,7 +121,7 @@ class HandleLifecycleTest {
           parked.complete(false)
         } else {
           parked.complete(true)
-          runBlocking { resume.await() }
+          holdThreadUntil(resume)
         }
       }
       registered.store(1)

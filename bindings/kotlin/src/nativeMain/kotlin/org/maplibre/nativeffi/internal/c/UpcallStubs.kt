@@ -79,20 +79,6 @@ internal actual object UpcallStubs {
       Upcalls.runtimeEventHandlerCallback(userData.toLong(), events.toLong())
     }
     .toLong()
-  actual val httpHeaderTransformCallback: Long =
-    staticCFunction {
-      userData: COpaquePointer?,
-      kind: UInt,
-      url: CPointer<ByteVar>?,
-      outResponse: CPointer<mln_http_header_transform_response>? ->
-      Upcalls.httpHeaderTransformCallback(
-        userData.toLong(),
-        kind.toInt(),
-        url.toLong(),
-        outResponse.toLong(),
-      )
-    }
-    .toLong()
   actual val resourceProviderCallback: Long =
     staticCFunction {
       userData: COpaquePointer?,
@@ -128,6 +114,50 @@ internal actual object UpcallStubs {
   actual val cameraTransitionHandlerCallback: Long =
     staticCFunction { userData: COpaquePointer?, end: CPointer<mln_camera_transition_end>? ->
       Upcalls.cameraTransitionHandlerCallback(userData.toLong(), end.toLong())
+    }
+    .toLong()
+  actual val directLogHandlerCallback: Long =
+    staticCFunction {
+      userData: COpaquePointer?,
+      severity: UInt,
+      event: UInt,
+      code: Long,
+      message: CPointer<ByteVar>? ->
+      DirectUpcalls.directLogHandlerCallback(
+          userData.toLong(),
+          severity.toInt(),
+          event.toInt(),
+          code,
+          message.toLong(),
+        )
+        .toUInt()
+    }
+    .toLong()
+  actual val directHttpHeaderTransformCallback: Long =
+    staticCFunction {
+      userData: COpaquePointer?,
+      kind: UInt,
+      url: CPointer<ByteVar>?,
+      outResponse: CPointer<mln_http_header_transform_response>? ->
+      DirectUpcalls.directHttpHeaderTransformCallback(
+        userData.toLong(),
+        kind.toInt(),
+        url.toLong(),
+        outResponse.toLong(),
+      )
+    }
+    .toLong()
+  actual val directResourceProviderCallback: Long =
+    staticCFunction {
+      userData: COpaquePointer?,
+      request: CPointer<mln_resource_request_info>?,
+      handle: ULong ->
+      DirectUpcalls.directResourceProviderCallback(
+          userData.toLong(),
+          request.toLong(),
+          handle.toLong(),
+        )
+        .toUInt()
     }
     .toLong()
 }

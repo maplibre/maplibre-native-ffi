@@ -1,15 +1,36 @@
-"""Lower retained callbacks and scoped responses to common Kotlin.
+"""Lower retained callbacks and scoped responses to Kotlin.
 
-Each callback a registration hands to native gets one upcall site: a common
-`Upcalls` method that finds the registration's root and runs the host
-callback, and a platform stub that native calls. The platform stub converts
-only primitives, so the C side of every site has the same shape.
+Each callback a registration hands to native gets one upcall site: an `Upcalls`
+method that finds the registration's root and runs the host callback, and a
+platform stub that native calls. The platform stub converts only primitives, so
+the C side of every site has the same shape.
+
+Common code takes each registration in the form that `async_hosts` gives a host
+that cannot run code on a native thread, so that every target can serve it:
+
+- A `queue` registration's callbacks receive what a queue delivery carries and
+  return nothing. Native answers each call itself in queue mode, so a threaded
+  target's site runs the callback and returns that answer: the decision's
+  accepted outcome or the callback's `queue_result`. The site owns each handle
+  that the call passes with ownership, and releases it when the callback
+  throws or the registration is gone. Kotlin/Wasm sets the registration's
+  queue and runs the same site when it drains the delivery.
+- A `wake`, `disabled`, or callback-less registration keeps its callbacks, and
+  a `rules` registration leaves out the callbacks that native rules replace.
+
+A registration whose callback-mode answer the common form cannot give, because
+a callback decides it or a rule replaces it, also has a direct form, named with
+a `Direct` prefix, whose callbacks compute native's answer on the calling
+thread. Only the threaded targets can run a direct form, so the direct forms,
+their scoped responses, and the operations that take them live in the
+`threadedMain` source set (see `Values.direct`).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .. import async_hosts, docs
 from ..model import CType
 from ..protocol import COMPLETION
 from ..semantic import public_stem
@@ -18,7 +39,7 @@ from .kotlin_values import Unsupported, doc, identifier, name, owner_class
 
 @dataclass(frozen=True)
 class Site:
-    """A C function pointer that calls one `Upcalls` method."""
+    """A C function pointer that calls one `Upcalls` or `DirectUpcalls` method."""
 
     name: str
     parameters: tuple[tuple[str, CType, str], ...]
@@ -27,25 +48,112 @@ class Site:
     body: str
     failure: str = "0"
     callback: str | None = None
+    # Whether the site serves a direct form, so DirectUpcalls holds it.
+    direct: bool = False
+    # The `async_hosts` form of the registration that the site serves, which
+    # tells a target without native-thread upcalls how to reach it.
+    form: str | None = None
+    # The Kotlin type of the registration whose root the site looks up.
+    root: str | None = None
+
+    @property
+    def owner(self) -> str:
+        return "DirectUpcalls" if self.direct else "Upcalls"
 
 
 def status_callback(callback):
     return callback.status
 
 
+def answered(callback):
+    """Whether a callback's queue mode answers in its place: it has a queue
+    delivery and returns a value that its host callback would compute."""
+    return (
+        callback.delivery is not None
+        and callback.result.native != "void"
+        and not status_callback(callback)
+    )
+
+
+def form(value, values):
+    """The `async_hosts` form of a registration, or None."""
+    return async_hosts.form(values.bound, value)
+
+
+def has_direct(value, values):
+    """Whether a registration has a direct form beside its common one."""
+    if not value.registration:
+        return False
+    registration_form = form(value, values)
+    if registration_form == "rules":
+        return True
+    return registration_form == "queue" and any(
+        answered(values.bound.callbacks[field.value.native])
+        for field in async_hosts.callback_fields(value)
+    )
+
+
+def direct(value, values):
+    """Whether [value] takes a direct form in the current lowering."""
+    if not values.direct:
+        return False
+    if value.registration:
+        return has_direct(value, values)
+    if value.kind == "callback":
+        return answered(values.bound.callbacks[value.native])
+    return False
+
+
+def public_name(value, values):
+    """The Kotlin name of a callback, registration, or response in the current lowering."""
+    return ("Direct" if direct(value, values) else "") + name(value.native)
+
+
+def queued(value, values):
+    """Whether a callback takes its queue shape: it returns nothing, and native answers."""
+    return answered(values.bound.callbacks[value.native]) and not direct(value, values)
+
+
+def direct_registration(plan, values):
+    """Whether [plan] takes a registration that has a direct form, so threadedMain overloads it."""
+    for parameter in plan.inputs:
+        value = parameter.value
+        if value.kind == "reference" and value.element:
+            value = value.element
+        if value.registration and has_direct(value, values):
+            return True
+    return False
+
+
+def omitted_fields(value, values):
+    """The callback fields that a registration's common form leaves out."""
+    if values.direct or form(value, values) != "rules":
+        return set()
+    return {
+        field.name
+        for field in async_hosts.callback_fields(value)
+        if async_hosts.omitted(values.bound, field)
+    }
+
+
 def check(value, values):
     if not (value.kind == "callback" or value.registration or value.response):
         return False
-    if value.native in values.used:
+    used = values.direct_used if values.direct else values.used
+    if value.native in used:
         return True
-    values.used[value.native] = value
+    used[value.native] = value
     if value.kind == "callback":
         callback = values.bound.callbacks[value.native]
         if not callback.context:
             raise Unsupported("callback needs its context parameter")
         for parameter in callback.arguments:
             values.check(parameter.value)
-        if callback.result.native != "void" and not status_callback(callback):
+        if (
+            callback.result.native != "void"
+            and not status_callback(callback)
+            and not queued(value, values)
+        ):
             values.check(callback.result)
     elif value.registration:
         for field in values.fields(value):
@@ -56,46 +164,103 @@ def check(value, values):
 def public(value, values):
     if not check(value, values):
         return None
-    return name(value.native) + ("?" if value.nullable or value.optional else "")
+    return public_name(value, values) + (
+        "?" if value.nullable or value.optional else ""
+    )
+
+
+DIRECT_NOTE = (
+    "This direct form computes native's answer on the MapLibre thread that calls "
+    "it, which only a threaded target can run Kotlin on."
+)
+
+
+def declaration_doc(value, values):
+    """The KDoc of a declaration, which says how a queue-shaped or direct form answers native."""
+    found = values.bound.doc(value.native)
+    if direct(value, values):
+        note = DIRECT_NOTE
+    elif value.kind == "callback" and queued(value, values):
+        answer = values.bound.callbacks[value.native].queue_result
+        note = (
+            "This form returns nothing: native answers `"
+            + answer
+            + "`, as it does for a queue, and a threaded target's direct form computes "
+            "the answer instead."
+        )
+    else:
+        return doc(values.bound, value.native)
+    summary = f"{found.summary} {note}" if found else note
+    return docs.block_comment(
+        docs.Doc(value.native, summary, found.url if found else "")
+    )
+
+
+def declaration(value, values):
+    """The Kotlin declaration of one callback, registration, or response."""
+    public = public_name(value, values)
+    if value.kind == "callback":
+        callback = values.bound.callbacks[value.native]
+        parameters = ", ".join(
+            f"{identifier(p.name)}: {values.public(p.value)}"
+            for p in callback.arguments
+        )
+        returns = (
+            "Unit"
+            if callback.result.native == "void"
+            or status_callback(callback)
+            or queued(value, values)
+            else values.public(callback.result)
+        )
+        return f"{declaration_doc(value, values)}public typealias {public} = ({parameters}) -> {returns}"
+    if value.response:
+        return (
+            f"{doc(values.bound, value.native)}public class {public} internal constructor("
+            "internal val bindingAddress: Long, "
+            "internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope)"
+        )
+    parameters = []
+    for member, typ, field in values.members(value):
+        default = "null" if typ.endswith("?") else values.field_default(field)
+        parameters.append(
+            doc(values.bound, f"{value.native}.{field.name}", "  ")
+            + f"  public val {member}: {typ}"
+            + (f" = {default}" if default else "")
+        )
+    return (
+        f"{declaration_doc(value, values)}public data class {public}(\n"
+        + ",\n".join(parameters)
+        + "\n)"
+    )
 
 
 def common(values):
-    result = []
-    for value in list(values.used.values()):
-        public_name = name(value.native)
-        if value.kind == "callback":
-            callback = values.bound.callbacks[value.native]
-            parameters = ", ".join(
-                f"{identifier(p.name)}: {values.public(p.value)}"
-                for p in callback.arguments
-            )
-            returns = (
-                "Unit"
-                if callback.result.native == "void" or status_callback(callback)
-                else values.public(callback.result)
-            )
-            result.append(
-                f"{doc(values.bound, value.native)}public typealias {public_name} = ({parameters}) -> {returns}"
-            )
-        elif value.response:
-            result.append(
-                f"{doc(values.bound, value.native)}public class {public_name} internal constructor(internal val bindingAddress: Long, internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope)"
-            )
-        elif value.registration:
-            parameters = []
-            for member, typ, field in values.members(value):
-                default = "null" if typ.endswith("?") else values.field_default(field)
-                parameters.append(
-                    doc(values.bound, f"{value.native}.{field.name}", "  ")
-                    + f"  public val {member}: {typ}"
-                    + (f" = {default}" if default else "")
-                )
-            result.append(
-                f"{doc(values.bound, value.native)}public data class {public_name}(\n"
-                + ",\n".join(parameters)
-                + "\n)"
-            )
+    """The callback, registration, and response types that common code declares."""
+    result = [
+        declaration(value, values)
+        for value in list(values.used.values())
+        if is_callback_value(value)
+    ]
     return "\n".join(result) + "\n"
+
+
+def is_callback_value(value):
+    return value.kind == "callback" or bool(value.registration or value.response)
+
+
+def threaded_declarations(values):
+    """The direct forms, and the types that only they use, which threadedMain declares."""
+    previous = values.direct
+    values.direct = True
+    try:
+        return [
+            declaration(value, values)
+            for value in list(values.direct_used.values())
+            if is_callback_value(value)
+            and (value.native not in values.used or direct(value, values))
+        ]
+    finally:
+        values.direct = previous
 
 
 def argument(value, expression):
@@ -171,6 +336,7 @@ def sites(values):
                 VOID,
                 "Unit",
                 'contain("release_user_data", Unit) { CallbackRoots.release(userData) }',
+                form="wake",
             ),
         ):
             values.sites[site.name] = site
@@ -193,19 +359,26 @@ def carrier(value, values):
     return kind.carrier
 
 
-def failure_literal(callback, values):
-    if callback.result.native == "void":
-        return "Unit"
-    symbol = callback.failure
+def constant_number(symbol, values, what):
+    """The number of a callback result constant: an enum constant or an integer literal."""
     number = values.bound.enum_numbers.get(symbol)
     if number is None:
         try:
             number = int(symbol, 0) if symbol else 0
         except ValueError as error:
             raise Unsupported(
-                f"callback failure {symbol} needs a numeric constant"
+                f"callback {what} {symbol} needs a numeric constant"
             ) from error
-    return number_literal(number, carrier(callback.result, values))
+    return number
+
+
+def failure_literal(callback, values):
+    if callback.result.native == "void":
+        return "Unit"
+    return number_literal(
+        constant_number(callback.failure, values, "failure"),
+        carrier(callback.result, values),
+    )
 
 
 def callback_argument(parameter, values):
@@ -216,7 +389,7 @@ def callback_argument(parameter, values):
     local = identifier(parameter.name)
     if value.kind == "reference":
         if value.element.response:
-            return f"{name(value.element.native)}({local}, scope)"
+            return f"{public_name(value.element, values)}({local}, scope)"
         decoded = values.decode(value.element, local)
         return f"if ({local} == 0L) null else {decoded}" if value.nullable else decoded
     if value.kind == "buffer" and value.length == "nul":
@@ -235,21 +408,27 @@ def callback_argument(parameter, values):
     raise Unsupported("callback argument requires another Kotlin rule")
 
 
-def callback_site(site_name, callback_value, member, root_type, values):
+def owns(callback, parameter):
+    """Whether the callback receives [parameter] as a handle that it owns."""
+    if callback.decision and parameter.name == callback.decision.parameter:
+        return True
+    return parameter.value.kind == "handle" and parameter.value.ownership == "owned"
+
+
+def callback_site(site_name, callback_value, member, root_type, values, site_form):
     """Register the upcall site that runs [member] of the root's [root_type] value."""
     callback = values.bound.callbacks[callback_value.native]
-    decision = callback.decision
-    failure = failure_literal(callback, values)
     result = carrier(callback.result, values)
-    parameters = []
-    for parameter in callback.parameters:
-        parameters.append(
-            (
-                identifier(parameter.name),
-                parameter.value.ctype,
-                carrier(parameter.value, values),
-            )
+    parameters = tuple(
+        (identifier(p.name), p.value.ctype, carrier(p.value, values))
+        for p in callback.parameters
+    )
+    if site_form == "queue":
+        return queued_site(
+            site_name, callback, callback_value, member, root_type, values, parameters
         )
+    failure = failure_literal(callback, values)
+    decision = callback.decision
     arguments = []
     lines = []
     owned = []
@@ -259,7 +438,7 @@ def callback_site(site_name, callback_value, member, root_type, values):
                 f"val requestOwner = {owner_class(decision.handle)}({identifier(parameter.name)})"
             )
             arguments.append("requestOwner")
-        elif parameter.value.kind == "handle" and parameter.value.ownership == "owned":
+        elif owns(callback, parameter):
             # The callback owns the handle; a callback that throws releases it.
             local = identifier(parameter.name) + "Owner"
             lines.append(
@@ -303,12 +482,84 @@ def callback_site(site_name, callback_value, member, root_type, values):
     )
     sites(values)[site_name] = Site(
         site_name,
-        tuple(parameters),
+        parameters,
         callback.result.ctype,
         result,
         body,
         failure,
         callback.native,
+        values.direct,
+        site_form,
+        root_type,
+    )
+    return site_name
+
+
+def queued_site(
+    site_name, callback, callback_value, member, root_type, values, parameters
+):
+    """Register the site of a queue-shaped callback.
+
+    The site answers native as queue mode does, whatever the callback does. It
+    owns each handle that the call passes with ownership before it looks up the
+    registration, and releases the handle when the callback throws or the
+    registration is gone, so a delivery that a queue carries reaches the same
+    site.
+    """
+    result = carrier(callback.result, values)
+    answer = (
+        "Unit"
+        if callback.result.native == "void"
+        else number_literal(
+            constant_number(callback.queue_result, values, "queue result"), result
+        )
+    )
+    adopted, owners, arguments = [], [], []
+    for parameter in callback.arguments:
+        if owns(callback, parameter):
+            handle = (
+                callback.decision.handle
+                if callback.decision and parameter.name == callback.decision.parameter
+                else parameter.value.handle
+            )
+            local = identifier(parameter.name) + "Owner"
+            adopted.append(
+                f"val {local} = {owner_class(handle)}({identifier(parameter.name)})"
+            )
+            owners.append(local)
+            arguments.append(local)
+        else:
+            arguments.append(callback_argument(parameter, values))
+    released = "; ".join(f"{local}.close()" for local in owners)
+    invoke = f"value.{member}"
+    lines = []
+    if callback_value.nullable:
+        lines.append(f"val invoke = {invoke} ?: return@upcall false")
+        invoke = "invoke"
+    lines.append(f"{invoke}({', '.join(arguments)})")
+    lines.append("true")
+    context = identifier(callback.context)
+    call = (
+        f'upcall<{root_type}, Boolean>("{callback.native}", {context}, false) '
+        f"{{ value -> {'; '.join(lines)} }}"
+    )
+    if adopted:
+        statements = [*adopted, f"if (!{call}) {{ {released} }}"]
+    else:
+        statements = [call]
+    statements.append(answer)
+    body = "run { " + "; ".join(statements) + " }"
+    sites(values)[site_name] = Site(
+        site_name,
+        parameters,
+        callback.result.ctype,
+        result,
+        body,
+        answer,
+        callback.native,
+        False,
+        "queue",
+        root_type,
     )
     return site_name
 
@@ -336,40 +587,83 @@ def callback_result(value, expression, values):
     raise Unsupported("callback result requires a scalar")
 
 
-def upcalls(values):
-    """The common `Upcalls` methods and the `UpcallStubs` they back."""
-    entries = []
-    for site in sites(values).values():
+UPCALL_IMPORTS = (
+    "import kotlin.jvm.JvmStatic\n"
+    "import org.maplibre.nativeffi.generated.*\n"
+    "import org.maplibre.nativeffi.internal.async.CompletionBridge\n"
+    "import org.maplibre.nativeffi.internal.callback.CallbackRoots\n"
+    "import org.maplibre.nativeffi.internal.callback.contain\n"
+    "import org.maplibre.nativeffi.internal.callback.upcall\n"
+    "import org.maplibre.nativeffi.internal.callback.withCallbackScope\n"
+    "import org.maplibre.nativeffi.internal.memory.*\n"
+    "import org.maplibre.nativeffi.render.NativePointer\n\n"
+)
+
+
+def upcall_object(entries, owner, doc_line):
+    methods = []
+    for site in entries:
         parameters = ", ".join(f"{local}: {typ}" for local, _c, typ in site.parameters)
-        entries.append(
+        methods.append(
             f"  @JvmStatic fun {site.name}({parameters}): {site.result_carrier} = {site.body}"
         )
-    stubs = [f"  val {site.name}: Long" for site in sites(values).values()]
+    return (
+        f"/** {doc_line} */\ninternal object {owner} {{\n"
+        + "\n".join(methods)
+        + "\n}\n"
+    )
+
+
+def upcalls(values):
+    """The common `Upcalls` methods and the `UpcallStubs` behind every site."""
+    every = list(sites(values).values())
+    common_sites = [site for site in every if not site.direct]
     return (
         "// Generated by tools/bindgen. Do not edit.\n"
         "package org.maplibre.nativeffi.internal.c\n\n"
-        "import kotlin.jvm.JvmStatic\n"
-        "import org.maplibre.nativeffi.generated.*\n"
-        "import org.maplibre.nativeffi.internal.async.CompletionBridge\n"
-        "import org.maplibre.nativeffi.internal.callback.CallbackRoots\n"
-        "import org.maplibre.nativeffi.internal.callback.contain\n"
-        "import org.maplibre.nativeffi.internal.callback.upcall\n"
-        "import org.maplibre.nativeffi.internal.callback.withCallbackScope\n"
-        "import org.maplibre.nativeffi.internal.memory.*\n"
-        "import org.maplibre.nativeffi.render.NativePointer\n\n"
-        "/** The Kotlin side of each C function pointer the binding hands to native. */\n"
-        "internal object Upcalls {\n" + "\n".join(entries) + "\n}\n\n"
-        "/** The C function pointer that calls each [Upcalls] method. */\n"
-        "internal expect object UpcallStubs {\n" + "\n".join(stubs) + "\n}\n"
+        + UPCALL_IMPORTS
+        + upcall_object(
+            common_sites,
+            "Upcalls",
+            "The Kotlin side of each C function pointer the binding hands to native.",
+        )
+        + "\n/**\n"
+        " * The C function pointer that calls each [Upcalls] method, and on a threaded target each\n"
+        " * `DirectUpcalls` method.\n"
+        " */\n"
+        "internal expect object UpcallStubs {\n"
+        + "\n".join(f"  val {site.name}: Long" for site in every)
+        + "\n}\n"
+    )
+
+
+def direct_upcalls(values):
+    """The `DirectUpcalls` of the direct forms, which only threaded targets declare."""
+    return (
+        "// Generated by tools/bindgen. Do not edit.\n"
+        "package org.maplibre.nativeffi.internal.c\n\n"
+        + UPCALL_IMPORTS
+        + upcall_object(
+            [site for site in sites(values).values() if site.direct],
+            "DirectUpcalls",
+            "The Kotlin side of each direct form's C function pointer, which computes "
+            "native's answer on the calling thread.",
+        )
     )
 
 
 def put_function(value, values):
     """Write a callback registration descriptor, rooting its value until native releases it."""
-    public_name = name(value.native)
-    callbacks = [f for f in value.fields if f.name in value.registration.callbacks]
+    public = public_name(value, values)
+    registration_form = "direct" if direct(value, values) else form(value, values)
+    omitted = omitted_fields(value, values)
+    callbacks = [
+        f
+        for f in value.fields
+        if f.name in value.registration.callbacks and f.name not in omitted
+    ]
     lines = [
-        f"internal fun NativeCall.{values.put(value)}(target: Long, value: {public_name}) {{"
+        f"internal fun NativeCall.{values.put(value)}(target: Long, value: {public}) {{"
     ]
     for field in value.fields:
         if field.role == "presence_mask":
@@ -409,6 +703,11 @@ def put_function(value, values):
                     identifier(field.name),
                 )
             )
+    if not callbacks:
+        # Native rules answer in place of every callback, so nothing is rooted.
+        lines.append("}")
+        lines.append(writer(value, values, public))
+        return "\n".join(lines)
     # With every callback nullable, the descriptor stays unregistered when all
     # are absent. A lone callback is then known present past that return.
     all_nullable = all(f.value.nullable for f in callbacks)
@@ -421,34 +720,50 @@ def put_function(value, values):
     lines.append(
         f"  writeAddress({values.at('target', value, value.registration.user_data)}, registrations.register(value))"
     )
+    writes = []
     for field in callbacks:
         site = callback_site(
-            name(value.native)[0].lower() + name(value.native)[1:] + name(field.name),
+            public[0].lower() + public[1:] + name(field.name),
             field.value,
             identifier(field.name),
-            public_name,
+            public,
             values,
+            registration_form,
         )
         stub = f"UpcallStubs.{site}"
         if field.value.nullable and not (all_nullable and len(callbacks) == 1):
             stub = f"if (value.{identifier(field.name)} == null) 0L else {stub}"
-        lines.append(
-            f"  writeAddress({values.at('target', value, field.name)}, {stub})"
-        )
-    lines.append(
-        f"  writeAddress({values.at('target', value, value.registration.release)}, UpcallStubs.releaseRoot)"
+        writes.append(f"writeAddress({values.at('target', value, field.name)}, {stub})")
+    writes.append(
+        f"writeAddress({values.at('target', value, value.registration.release)}, UpcallStubs.releaseRoot)"
     )
+    if registration_form == "queue":
+        # A target that delivers callbacks to its host thread names its queue
+        # in place of the callbacks, and drains each call to the same site.
+        queue = values.at("target", value, value.registration.queue)
+        lines.append("  val queue = HostDelivery.queue")
+        lines.append(f"  if (queue != 0L) writeI64({queue}, queue)")
+        lines.append("  else {")
+        lines += ["    " + line for line in writes]
+        lines.append("  }")
+    else:
+        lines += ["  " + line for line in writes]
     lines.append("}")
-    lines.append(
-        f"internal fun NativeCall.{values.write(value)}(value: {public_name}): Long = "
+    lines.append(writer(value, values, public))
+    return "\n".join(lines)
+
+
+def writer(value, values, public):
+    return (
+        f"internal fun NativeCall.{values.write(value)}(value: {public}): Long = "
         f"allocate({values.size(value.native)}, {values.align(value.native)}).also {{ {values.put(value)}(it, value) }}"
     )
-    return "\n".join(lines)
 
 
 def read_function(value, values):
     """Copy a registration's native default, whose callbacks are unset."""
     public_name = name(value.native)
+    omitted = omitted_fields(value, values)
     callbacks = [f for f in value.fields if f.name in value.registration.callbacks]
     locals = []
     for field in value.fields:
@@ -459,6 +774,8 @@ def read_function(value, values):
             )
     arguments = []
     for member, _typ, field in values.members(value):
+        if field.name in omitted:
+            continue
         if field in callbacks:
             arguments.append(f"{member} = null")
             continue
@@ -485,6 +802,8 @@ def operation(plan, values, native):
     )
 
     if plan.scoped_receiver:
+        if not values.direct:
+            raise Unsupported("a callback response exists only inside a direct form")
         lengths = {p.value.length for p in plan.inputs if p.value.kind == "buffer"}
         inputs = [
             p for p in plan.inputs if p.name != plan.receiver and p.name not in lengths

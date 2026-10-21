@@ -22,7 +22,7 @@ import org.maplibre.nativeffi.withMap
 /** Camera end handlers, which a command carries two records deep in its input. */
 class CameraEndHandlerTest {
   @Test
-  fun anEndHandlerIsRootedUntilItRuns(): Unit = runSuspendTest {
+  fun anEndHandlerIsRootedUntilItRuns() = runSuspendTest {
     withMap {
       val roots = map.bindingCallbacks
       val base = roots.rootCountForTesting()

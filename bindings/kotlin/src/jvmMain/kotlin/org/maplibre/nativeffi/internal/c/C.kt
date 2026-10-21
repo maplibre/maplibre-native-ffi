@@ -48,6 +48,16 @@ internal actual object C {
       "mln_custom_mvt_vector_source_options_default",
       mln_custom_mvt_vector_source_options,
     )
+  private val mln_delivery_batch_release =
+    Ffm.downcall("mln_delivery_batch_release", null, JAVA_LONG)
+  private val mln_delivery_batch_take =
+    Ffm.downcall("mln_delivery_batch_take", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_delivery_queue_create =
+    Ffm.downcall("mln_delivery_queue_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_delivery_queue_drain =
+    Ffm.downcall("mln_delivery_queue_drain", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_delivery_queue_release =
+    Ffm.downcall("mln_delivery_queue_release", null, JAVA_LONG)
   private val mln_frame_demand_default = Ffm.downcall("mln_frame_demand_default", mln_frame_demand)
   private val mln_free_camera_options_default =
     Ffm.downcall("mln_free_camera_options_default", mln_free_camera_options)
@@ -1346,6 +1356,27 @@ internal actual object C {
     mln_custom_mvt_vector_source_options_default.invokeExact(
       Ffm.into(returned, mln_custom_mvt_vector_source_options),
     ) as MemorySegment
+  }
+
+  actual fun mln_delivery_batch_release(batch: Long) {
+    mln_delivery_batch_release.invoke(batch)
+  }
+
+  actual fun mln_delivery_batch_take(batch: Long, index: Long, outDiagnostic: Long): Int =
+    mln_delivery_batch_take.invokeExact(batch, index, outDiagnostic) as Int
+
+  actual fun mln_delivery_queue_create(options: Long, outQueue: Long, outDiagnostic: Long): Int =
+    mln_delivery_queue_create.invokeExact(options, outQueue, outDiagnostic) as Int
+
+  actual fun mln_delivery_queue_drain(
+    queue: Long,
+    outBatch: Long,
+    outView: Long,
+    outDiagnostic: Long,
+  ): Int = mln_delivery_queue_drain.invokeExact(queue, outBatch, outView, outDiagnostic) as Int
+
+  actual fun mln_delivery_queue_release(queue: Long) {
+    mln_delivery_queue_release.invoke(queue)
   }
 
   actual fun mln_frame_demand_default(returned: Long) {

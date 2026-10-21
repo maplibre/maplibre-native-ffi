@@ -62,13 +62,17 @@ kotlin {
   linuxX64()
   macosArm64()
 
-  // jvmAndroidMain holds the code the JVM and Android share through java.lang.ref and
-  // java.util.concurrent.
+  // threadedMain holds the code of the targets whose threads may block and whose native threads
+  // may call Kotlin directly: the JVM, Android, and Kotlin/Native. jvmAndroidMain holds the code
+  // the JVM and Android share through java.lang.ref and java.util.concurrent.
   applyDefaultHierarchyTemplate {
     common {
-      group("jvmAndroid") {
-        withJvm()
-        withCompilations { it.target.platformType == KotlinPlatformType.androidJvm }
+      group("threaded") {
+        group("jvmAndroid") {
+          withJvm()
+          withCompilations { it.target.platformType == KotlinPlatformType.androidJvm }
+        }
+        group("native")
       }
     }
   }
@@ -246,7 +250,11 @@ kotlin {
       }
     }
 
-    commonTest.dependencies { implementation(kotlin("test")) }
+    // TestResult lets one test body return to a framework that cannot block for it.
+    commonTest.dependencies {
+      implementation(kotlin("test"))
+      implementation(libs.coroutines.test)
+    }
 
     configureEach {
       if (

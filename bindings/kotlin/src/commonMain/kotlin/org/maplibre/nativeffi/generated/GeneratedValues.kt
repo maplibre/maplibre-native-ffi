@@ -4651,12 +4651,6 @@ public data class CustomMvtVectorSourceOptions(
   public val maxZoom: Double? = null,
 )
 
-public class HttpHeaderTransformResponse
-internal constructor(
-  internal val bindingAddress: Long,
-  internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope,
-)
-
 /**
  * Process-global log callback or queue state.
  *
@@ -4669,13 +4663,14 @@ public data class LogHandler(
 )
 
 /**
- * Receives a MapLibre Native log record.
+ * Receives a MapLibre Native log record. This form returns nothing: native answers `1`, as it does
+ * for a queue, and a threaded target's direct form computes the answer instead.
  *
  * See `mln_log_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
 public typealias LogCallback =
-  (severity: LogSeverity, event: LogEvent, code: Long, message: String) -> UInt
+  (severity: LogSeverity, event: LogEvent, code: Long, message: String) -> Unit
 
 /**
  * Receiver wake callback copied by a successful owning call. The callback schedules service by the
@@ -4761,20 +4756,9 @@ public typealias RuntimeEventCallback = (events: EventBatchView) -> Unit
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class HttpHeaderTransform(
-  /** The callback, or null to apply rules. */
-  public val callback: HttpHeaderTransformCallback? = null,
   /** Header rules for a transform without a callback; empty with one. */
   public val rules: List<HttpHeaderRule> = emptyList(),
 )
-
-/**
- * Adds end-to-end headers to one outgoing HTTP request attempt.
- *
- * See `mln_http_header_transform_callback` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public typealias HttpHeaderTransformCallback =
-  (kind: ResourceKind, url: String, outResponse: HttpHeaderTransformResponse) -> Unit
 
 /**
  * Resource provider state.
@@ -4790,13 +4774,15 @@ public data class ResourceProvider(
 )
 
 /**
- * Intercepts a network resource request.
+ * Intercepts a network resource request. This form returns nothing: native answers
+ * `MLN_RESOURCE_PROVIDER_DECISION_HANDLE`, as it does for a queue, and a threaded target's direct
+ * form computes the answer instead.
  *
  * See `mln_resource_provider_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public typealias ResourceProviderCallback =
-  (request: ResourceRequestInfo, handle: ResourceRequestHandle) -> ResourceProviderDecision
+  (request: ResourceRequestInfo, handle: ResourceRequestHandle) -> Unit
 
 /**
  * Resource transform state.

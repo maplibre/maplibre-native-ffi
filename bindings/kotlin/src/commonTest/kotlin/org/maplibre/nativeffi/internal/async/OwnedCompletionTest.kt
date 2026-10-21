@@ -27,7 +27,7 @@ private fun <T> ownedCompletion(
 
 class OwnedCompletionTest {
   @Test
-  fun conversionFailureReleasesTheRawOwnerAndCompletesExceptionally(): Unit = runSuspendTest {
+  fun conversionFailureReleasesTheRawOwnerAndCompletesExceptionally() = runSuspendTest {
     val failure = IllegalStateException("conversion")
     var disposed = 0uL
     val completion =
@@ -46,7 +46,7 @@ class OwnedCompletionTest {
   }
 
   @Test
-  fun cancellationReleasesTheAdoptedWrapperExactlyOnce(): Unit = runSuspendTest {
+  fun cancellationReleasesTheAdoptedWrapperExactlyOnce() = runSuspendTest {
     var disposed = 0
     var closed = 0
     val completion =

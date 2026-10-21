@@ -91,10 +91,12 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
      * Creates the runtime and map, loading [styleJson] when given and the default URL otherwise.
      */
     fun create(viewport: Viewport, styleJson: String? = null): MapState {
-      val runtime =
+      // Creation waits for the runtime's thread to start.
+      val runtime = runBlocking {
         GeneratedApi.runtimeCreate(
           GeneratedApi.runtimeOptionsDefault().copy(cachePath = ":memory:"),
         )
+      }
       val initialCamera =
         CameraOptions(
           center = LatLng(37.7749, -122.4194),

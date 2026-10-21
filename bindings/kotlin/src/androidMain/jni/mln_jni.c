@@ -14,7 +14,6 @@
   __android_log_print(ANDROID_LOG_ERROR, "maplibre-native-ffi", __VA_ARGS__)
 
 static JavaVM* mln_jni_vm;
-static jclass mln_jni_upcalls_class;
 static pthread_key_t mln_jni_detach_key;
 
 // Detaches a thread that an upcall attached, when the thread exits.
@@ -48,7 +47,8 @@ static bool mln_jni_upcall_returned(JNIEnv* env, const mln_jni_upcall* upcall) {
     return true;
   }
   MLN_JNI_LOG(
-    "Upcalls.%s threw; native receives its failure result", upcall->name
+    "%s.%s threw; native receives its failure result", upcall->owner,
+    upcall->name
   );
   (*env)->ExceptionDescribe(env);
   (*env)->ExceptionClear(env);
@@ -60,9 +60,7 @@ bool mln_jni_upcall_void(mln_jni_upcall* upcall, const jvalue* arguments) {
   if (env == NULL) {
     return false;
   }
-  (*env)->CallStaticVoidMethodA(
-    env, mln_jni_upcalls_class, upcall->method, arguments
-  );
+  (*env)->CallStaticVoidMethodA(env, upcall->type, upcall->method, arguments);
   return mln_jni_upcall_returned(env, upcall);
 }
 
@@ -73,9 +71,8 @@ bool mln_jni_upcall_int(
   if (env == NULL) {
     return false;
   }
-  jint value = (*env)->CallStaticIntMethodA(
-    env, mln_jni_upcalls_class, upcall->method, arguments
-  );
+  jint value =
+    (*env)->CallStaticIntMethodA(env, upcall->type, upcall->method, arguments);
   if (!mln_jni_upcall_returned(env, upcall)) {
     return false;
   }
@@ -90,9 +87,8 @@ bool mln_jni_upcall_long(
   if (env == NULL) {
     return false;
   }
-  jlong value = (*env)->CallStaticLongMethodA(
-    env, mln_jni_upcalls_class, upcall->method, arguments
-  );
+  jlong value =
+    (*env)->CallStaticLongMethodA(env, upcall->type, upcall->method, arguments);
   if (!mln_jni_upcall_returned(env, upcall)) {
     return false;
   }
@@ -370,20 +366,30 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
   }
   // FindClass here resolves through the class loader that loaded this
   // library; an attached native thread would see only the system classes.
-  jclass upcalls = (*env)->FindClass(env, MLN_JNI_PACKAGE "c/Upcalls");
-  if (upcalls == NULL) {
-    MLN_JNI_LOG("cannot find the Upcalls class");
-    return JNI_ERR;
-  }
-  mln_jni_upcalls_class = (*env)->NewGlobalRef(env, upcalls);
-  (*env)->DeleteLocalRef(env, upcalls);
   for (size_t index = 0; index < mln_jni_upcall_count; ++index) {
     mln_jni_upcall* upcall = &mln_jni_upcalls[index];
+    for (size_t earlier = 0; earlier < index && upcall->type == NULL;
+         ++earlier) {
+      if (strcmp(mln_jni_upcalls[earlier].owner, upcall->owner) == 0) {
+        upcall->type = mln_jni_upcalls[earlier].type;
+      }
+    }
+    if (upcall->type == NULL) {
+      jclass type = (*env)->FindClass(env, upcall->owner);
+      if (type == NULL) {
+        MLN_JNI_LOG("cannot find the class %s", upcall->owner);
+        return JNI_ERR;
+      }
+      upcall->type = (*env)->NewGlobalRef(env, type);
+      (*env)->DeleteLocalRef(env, type);
+    }
     upcall->method = (*env)->GetStaticMethodID(
-      env, mln_jni_upcalls_class, upcall->name, upcall->signature
+      env, upcall->type, upcall->name, upcall->signature
     );
     if (upcall->method == NULL) {
-      MLN_JNI_LOG("cannot find Upcalls.%s%s", upcall->name, upcall->signature);
+      MLN_JNI_LOG(
+        "cannot find %s.%s%s", upcall->owner, upcall->name, upcall->signature
+      );
       return JNI_ERR;
     }
   }

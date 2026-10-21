@@ -165,6 +165,12 @@ class Values:
         self.writers = {}
         self.readers = {}
         self.sites = None
+        # Whether lowering takes the direct forms that only threadedMain
+        # declares, the callback values that a direct lowering used, and the
+        # direct registrations' writers.
+        self.direct = False
+        self.direct_used = {}
+        self.direct_writers = {}
 
     def needs_registration(self, value):
         return bool(
@@ -204,6 +210,10 @@ class Values:
         controls |= {
             f.presence.mask for f in value.fields if f.presence and f.presence.mask
         }
+        if value.registration:
+            from . import kotlin_callbacks
+
+            controls |= kotlin_callbacks.omitted_fields(value, self)
         return tuple(f for f in value.fields if f.name not in controls)
 
     def check(self, value):
@@ -525,13 +535,17 @@ class Values:
 
     def put(self, record):
         """Name the in-place writer of [record], emitting it once."""
+        from . import kotlin_callbacks
+
+        if kotlin_callbacks.direct(record, self):
+            self.direct_writers.setdefault(record.native, record)
+            return "putDirect" + name(record.native)
         self.writers.setdefault(record.native, record)
         return "put" + name(record.native)
 
     def write(self, record):
         """Name the allocating writer of [record], emitting it once."""
-        self.put(record)
-        return "write" + name(record.native)
+        return "write" + self.put(record).removeprefix("put")
 
     def argument(self, value, expression):
         """An expression for [value] as a native-call carrier, in a NativeArena receiver."""
@@ -905,6 +919,15 @@ class Values:
             + " } }"
         )
 
+    def direct_codecs(self):
+        """The writers of the direct registrations, which threadedMain declares."""
+        previous = self.direct
+        self.direct = True
+        try:
+            return [self.put_function(value) for value in self.direct_writers.values()]
+        finally:
+            self.direct = previous
+
     def codecs(self):
         """The common read and write functions for every record a binding uses."""
         functions = []
@@ -934,6 +957,7 @@ class Values:
             "import org.maplibre.nativeffi.internal.c.C\n"
             "import org.maplibre.nativeffi.internal.c.UpcallStubs\n"
             "import org.maplibre.nativeffi.internal.call.NativeCall\n"
+            "import org.maplibre.nativeffi.internal.delivery.HostDelivery\n"
             "import org.maplibre.nativeffi.internal.status.invalidArgument\n"
             "import org.maplibre.nativeffi.render.NativePointer\n"
             + (

@@ -115,7 +115,7 @@ class CompletionBridgeTest {
   }
 
   @Test
-  fun aFailedStatusBecomesItsExceptionWithTheDiagnostic(): Unit = runSuspendTest {
+  fun aFailedStatusBecomesItsExceptionWithTheDiagnostic() = runSuspendTest {
     val completion = handDeliveredGeneration()
     completion.deliver(Status.INVALID_ARGUMENT.rawValue, 0u, "the zoom is out of range")
     completion.release()

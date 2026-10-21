@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.generated
 
 import org.maplibre.nativeffi.internal.c.UpcallStubs
 import org.maplibre.nativeffi.internal.call.NativeCall
+import org.maplibre.nativeffi.internal.delivery.HostDelivery
 import org.maplibre.nativeffi.internal.lifecycle.ViewScope
 import org.maplibre.nativeffi.internal.memory.*
 import org.maplibre.nativeffi.internal.status.invalidArgument
@@ -81,8 +82,12 @@ internal fun NativeArena.writeProjectedMeters(value: ProjectedMeters): Long =
 internal fun NativeCall.putLogHandler(target: Long, value: LogHandler) {
   writeU32(target, w(24, 40).toUInt())
   writeAddress(target + w(8, 16), registrations.register(value))
-  writeAddress(target + w(4, 8), UpcallStubs.logHandlerCallback)
-  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  val queue = HostDelivery.queue
+  if (queue != 0L) writeI64(target + w(16, 32), queue)
+  else {
+    writeAddress(target + w(4, 8), UpcallStubs.logHandlerCallback)
+    writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  }
 }
 
 internal fun NativeCall.writeLogHandler(value: LogHandler): Long =
@@ -162,15 +167,19 @@ internal fun NativeCall.putCustomGeometrySourceOptions(
   writeU32(target + 4, fields)
   if (value.fetchTile == null && value.cancelTile == null) return
   writeAddress(target + w(16, 24), registrations.register(value))
-  writeAddress(
-    target + 8,
-    if (value.fetchTile == null) 0L else UpcallStubs.customGeometrySourceOptionsFetchTile,
-  )
-  writeAddress(
-    target + w(12, 16),
-    if (value.cancelTile == null) 0L else UpcallStubs.customGeometrySourceOptionsCancelTile,
-  )
-  writeAddress(target + w(60, 72), UpcallStubs.releaseRoot)
+  val queue = HostDelivery.queue
+  if (queue != 0L) writeI64(target + w(64, 80), queue)
+  else {
+    writeAddress(
+      target + 8,
+      if (value.fetchTile == null) 0L else UpcallStubs.customGeometrySourceOptionsFetchTile,
+    )
+    writeAddress(
+      target + w(12, 16),
+      if (value.cancelTile == null) 0L else UpcallStubs.customGeometrySourceOptionsCancelTile,
+    )
+    writeAddress(target + w(60, 72), UpcallStubs.releaseRoot)
+  }
 }
 
 internal fun NativeCall.writeCustomGeometrySourceOptions(value: CustomGeometrySourceOptions): Long =
@@ -193,15 +202,19 @@ internal fun NativeCall.putCustomMvtVectorSourceOptions(
   writeU32(target + 4, fields)
   if (value.fetchTile == null && value.cancelTile == null) return
   writeAddress(target + w(16, 24), registrations.register(value))
-  writeAddress(
-    target + 8,
-    if (value.fetchTile == null) 0L else UpcallStubs.customMvtVectorSourceOptionsFetchTile,
-  )
-  writeAddress(
-    target + w(12, 16),
-    if (value.cancelTile == null) 0L else UpcallStubs.customMvtVectorSourceOptionsCancelTile,
-  )
-  writeAddress(target + w(40, 48), UpcallStubs.releaseRoot)
+  val queue = HostDelivery.queue
+  if (queue != 0L) writeI64(target + w(48, 56), queue)
+  else {
+    writeAddress(
+      target + 8,
+      if (value.fetchTile == null) 0L else UpcallStubs.customMvtVectorSourceOptionsFetchTile,
+    )
+    writeAddress(
+      target + w(12, 16),
+      if (value.cancelTile == null) 0L else UpcallStubs.customMvtVectorSourceOptionsCancelTile,
+    )
+    writeAddress(target + w(40, 48), UpcallStubs.releaseRoot)
+  }
 }
 
 internal fun NativeCall.writeCustomMvtVectorSourceOptions(
@@ -873,8 +886,12 @@ internal fun NativeCall.putResourceRequestCancelHandler(
 ) {
   writeU32(target, w(24, 40).toUInt())
   writeAddress(target + w(8, 16), registrations.register(value))
-  writeAddress(target + w(4, 8), UpcallStubs.resourceRequestCancelHandlerCallback)
-  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  val queue = HostDelivery.queue
+  if (queue != 0L) writeI64(target + w(16, 32), queue)
+  else {
+    writeAddress(target + w(4, 8), UpcallStubs.resourceRequestCancelHandlerCallback)
+    writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  }
 }
 
 internal fun NativeCall.writeResourceRequestCancelHandler(
@@ -915,8 +932,12 @@ internal fun NativeCall.putRuntimeEventHandler(target: Long, value: RuntimeEvent
   writeU32(target, w(24, 40).toUInt())
   if (value.callback == null) return
   writeAddress(target + w(8, 16), registrations.register(value))
-  writeAddress(target + w(4, 8), UpcallStubs.runtimeEventHandlerCallback)
-  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  val queue = HostDelivery.queue
+  if (queue != 0L) writeI64(target + w(16, 32), queue)
+  else {
+    writeAddress(target + w(4, 8), UpcallStubs.runtimeEventHandlerCallback)
+    writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  }
 }
 
 internal fun NativeCall.writeRuntimeEventHandler(value: RuntimeEventHandler): Long =
@@ -929,10 +950,6 @@ internal fun NativeCall.putHttpHeaderTransform(target: Long, value: HttpHeaderTr
     array(value.rules, w(24, 40), w(4, 8)) { at, item -> putHttpHeaderRule(at, item) },
   )
   writeSize(target + w(20, 40), value.rules.size.toULong())
-  if (value.callback == null) return
-  writeAddress(target + w(8, 16), registrations.register(value))
-  writeAddress(target + w(4, 8), UpcallStubs.httpHeaderTransformCallback)
-  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
 }
 
 internal fun NativeCall.writeHttpHeaderTransform(value: HttpHeaderTransform): Long =
@@ -946,8 +963,12 @@ internal fun NativeCall.putResourceProvider(target: Long, value: ResourceProvide
   )
   writeSize(target + w(28, 48), value.routes.size.toULong())
   writeAddress(target + w(8, 16), registrations.register(value))
-  writeAddress(target + w(4, 8), UpcallStubs.resourceProviderCallback)
-  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  val queue = HostDelivery.queue
+  if (queue != 0L) writeI64(target + w(16, 32), queue)
+  else {
+    writeAddress(target + w(4, 8), UpcallStubs.resourceProviderCallback)
+    writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  }
 }
 
 internal fun NativeCall.writeResourceProvider(value: ResourceProvider): Long =
@@ -956,8 +977,12 @@ internal fun NativeCall.writeResourceProvider(value: ResourceProvider): Long =
 internal fun NativeCall.putResourceTransform(target: Long, value: ResourceTransform) {
   writeU32(target, w(24, 40).toUInt())
   writeAddress(target + w(8, 16), registrations.register(value))
-  writeAddress(target + w(4, 8), UpcallStubs.resourceTransformCallback)
-  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  val queue = HostDelivery.queue
+  if (queue != 0L) writeI64(target + w(16, 32), queue)
+  else {
+    writeAddress(target + w(4, 8), UpcallStubs.resourceTransformCallback)
+    writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  }
 }
 
 internal fun NativeCall.writeResourceTransform(value: ResourceTransform): Long =
@@ -2038,8 +2063,12 @@ internal fun NativeArena.writeUnitBezier(value: UnitBezier): Long =
 internal fun NativeCall.putCameraTransitionHandler(target: Long, value: CameraTransitionHandler) {
   if (value.callback == null) return
   writeAddress(target + w(4, 8), registrations.register(value))
-  writeAddress(target, UpcallStubs.cameraTransitionHandlerCallback)
-  writeAddress(target + w(8, 16), UpcallStubs.releaseRoot)
+  val queue = HostDelivery.queue
+  if (queue != 0L) writeI64(target + w(16, 24), queue)
+  else {
+    writeAddress(target, UpcallStubs.cameraTransitionHandlerCallback)
+    writeAddress(target + w(8, 16), UpcallStubs.releaseRoot)
+  }
 }
 
 internal fun NativeCall.writeCameraTransitionHandler(value: CameraTransitionHandler): Long =

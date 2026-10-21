@@ -4,11 +4,11 @@ import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import org.maplibre.nativeffi.NETWORK_URLS
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.MapMode
-import org.maplibre.nativeffi.generated.ResourceProviderDecision
 import org.maplibre.nativeffi.generated.RuntimeEventSourceType
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeOptions
@@ -129,13 +129,8 @@ class AndroidAssetStyleTest {
     GeneratedApi.runtimeOptionsDefault().copy(assetPath = assetPath)
 }
 
-/** Passes asset and file URLs through to the platform file sources, and denies the rest. */
-private fun localFilesProvider() = denyingProvider { request, _ ->
-  val url = request.requestedUrl.orEmpty()
-  if (url.startsWith("asset://") || url.startsWith("file://") || url.startsWith("pmtiles://")) {
-    ResourceProviderDecision.PASS_THROUGH
-  } else null
-}
+/** Denies network requests, and leaves asset and file URLs to the platform file sources. */
+private fun localFilesProvider() = denyingProvider(routes = NETWORK_URLS)
 
 private const val CUSTOM_ROOT_STYLE =
   """{"version":8,"sources":{},"layers":[{"id":"custom-root","type":"background"}]}"""

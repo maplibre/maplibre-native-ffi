@@ -36,7 +36,7 @@ internal actual class TestWeakReference actual constructor(value: Any) {
     get() = reference.get() == null
 }
 
-internal actual fun awaitCollected(reference: TestWeakReference): Boolean {
+internal actual suspend fun awaitCollected(reference: TestWeakReference): Boolean {
   val deadline = System.nanoTime() + GC_WAIT_NANOS
   while (System.nanoTime() < deadline) {
     if (reference.isCleared) return true
@@ -46,7 +46,7 @@ internal actual fun awaitCollected(reference: TestWeakReference): Boolean {
   return reference.isCleared
 }
 
-internal actual fun requestCollection() {
+internal actual suspend fun requestCollection() {
   System.gc()
 }
 

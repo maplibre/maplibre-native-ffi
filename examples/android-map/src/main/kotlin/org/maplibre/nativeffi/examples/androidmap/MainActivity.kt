@@ -44,7 +44,6 @@ class MainActivity : Activity() {
     GeneratedApi.logSetCallback(
       LogHandler { severity, event, code, message ->
         Log.i("MapLibre", "severity=${severity} event=${event} code=${code}: ${message}")
-        1u
       },
     )
   }

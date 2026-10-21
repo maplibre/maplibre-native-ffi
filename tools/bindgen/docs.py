@@ -86,6 +86,8 @@ class Doc:
     symbol: str
     summary: str
     url: str = ""
+    # Paragraphs that a binding adds after the summary, about its own behavior.
+    notes: tuple[str, ...] = ()
 
 
 def index(api: Api) -> dict[str, Doc]:
@@ -174,6 +176,8 @@ def markdown_lines(doc: Doc | None, width: int, escape=_escape_markdown) -> list
     if doc is None:
         return []
     lines = _wrap(_render(doc.summary, escape, lambda c: f"`{c}`"), width)
+    for note in doc.notes:
+        lines += ["", *_wrap(_render(note, escape, lambda c: f"`{c}`"), width)]
     if doc.url:
         lines += [
             "",

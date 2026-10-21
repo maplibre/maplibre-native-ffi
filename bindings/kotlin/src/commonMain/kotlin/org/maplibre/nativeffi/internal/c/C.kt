@@ -47,6 +47,16 @@ internal expect object C {
 
   fun mln_custom_mvt_vector_source_options_default(returned: Long): Unit
 
+  fun mln_delivery_batch_release(batch: Long): Unit
+
+  fun mln_delivery_batch_take(batch: Long, index: Long, outDiagnostic: Long): Int
+
+  fun mln_delivery_queue_create(options: Long, outQueue: Long, outDiagnostic: Long): Int
+
+  fun mln_delivery_queue_drain(queue: Long, outBatch: Long, outView: Long, outDiagnostic: Long): Int
+
+  fun mln_delivery_queue_release(queue: Long): Unit
+
   fun mln_frame_demand_default(returned: Long): Unit
 
   fun mln_free_camera_options_default(returned: Long): Unit

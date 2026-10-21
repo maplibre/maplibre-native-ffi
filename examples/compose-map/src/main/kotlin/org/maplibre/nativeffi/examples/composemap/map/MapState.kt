@@ -26,10 +26,12 @@ internal class MapState(initialExtent: SurfaceExtent, styleJson: String? = null)
   private val initialCamera =
     CameraOptions(center = LatLng(37.7749, -122.4194), zoom = 13.0, bearing = 12.0, pitch = 30.0)
 
-  private val runtime =
+  // Creation waits for the runtime's thread to start.
+  private val runtime = runBlocking {
     GeneratedApi.runtimeCreate(
       GeneratedApi.runtimeOptionsDefault().copy(cachePath = ":memory:"),
     )
+  }
   private lateinit var ownedMap: MapHandle
   val map: MapHandle
     get() = ownedMap

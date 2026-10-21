@@ -17,6 +17,7 @@ androidx-test-runner = "1.7.0"
 [libraries]
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
 coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 lwjgl-bom = { module = "org.lwjgl:lwjgl-bom", version.ref = "lwjgl" }
 lwjgl = { module = "org.lwjgl:lwjgl" }
 lwjgl-egl = { module = "org.lwjgl:lwjgl-egl" }

@@ -63,7 +63,7 @@ typedef enum mln_log_event : uint32_t {
  * A handler in queue mode consumes each record without a callback and queues
  * a copy as an mln_log_delivery.
  */
-MLN_BINDING("failure=0;delivery=MLN_DELIVERY_TYPE_LOG_RECORD")
+MLN_BINDING("failure=0;delivery=MLN_DELIVERY_TYPE_LOG_RECORD;queue_result=1")
 typedef uint32_t (*mln_log_callback)(
   void* user_data, uint32_t severity MLN_BINDING("enum=mln_log_severity"),
   uint32_t event MLN_BINDING("enum=mln_log_event"), int64_t code,
