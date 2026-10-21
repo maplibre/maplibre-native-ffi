@@ -12,12 +12,14 @@ import org.gradle.api.publish.tasks.GenerateModuleMetadata
  * Replaces fallback coordinates for targets disabled on the current host.
  *
  * Kotlin assigns those variants the Gradle project name and `unspecified`, but split-host cinterop
- * publishing needs one canonical root that references every target publication.
+ * publishing needs one canonical root that references every target publication. The root leaves out
+ * the variants of [unpublishedTargets], whose publications never run.
  */
 fun Project.canonicalizeKmpRootMetadata(
   group: String,
   version: String,
   targetModules: Map<String, String>,
+  unpublishedTargets: Set<String> = emptySet(),
 ) {
   tasks
     .withType(GenerateModuleMetadata::class.java)
@@ -26,7 +28,8 @@ fun Project.canonicalizeKmpRootMetadata(
       inputs.property("canonicalRootGroup", group)
       inputs.property("canonicalRootVersion", version)
       inputs.properties(targetModules.mapKeys { (target, _) -> "canonicalTargetModule.$target" })
-      doLast(CanonicalizeKmpRootMetadata(group, version, targetModules))
+      inputs.property("canonicalUnpublishedTargets", unpublishedTargets.sorted())
+      doLast(CanonicalizeKmpRootMetadata(group, version, targetModules, unpublishedTargets))
     }
 }
 
@@ -34,8 +37,10 @@ private class CanonicalizeKmpRootMetadata(
   private val group: String,
   private val version: String,
   targetModules: Map<String, String>,
+  unpublishedTargets: Set<String>,
 ) : Action<Task>, Serializable {
   private val targetModules = targetModules.toMap()
+  private val unpublishedTargets = unpublishedTargets.toSet()
 
   override fun execute(task: Task) {
     require(task is GenerateModuleMetadata) {
@@ -46,7 +51,11 @@ private class CanonicalizeKmpRootMetadata(
     val metadata = JsonSlurper().parse(metadataFile) as MutableMap<String, Any?>
 
     @Suppress("UNCHECKED_CAST")
-    val variants = metadata["variants"] as List<MutableMap<String, Any?>>
+    val variants =
+      (metadata["variants"] as List<MutableMap<String, Any?>>).filterNot { variant ->
+        unpublishedTargets.any((variant["name"] as String)::startsWith)
+      }
+    metadata["variants"] = variants
     variants.forEach { variant ->
       @Suppress("UNCHECKED_CAST")
       val availableAt = variant["available-at"] as? MutableMap<String, Any?> ?: return@forEach
