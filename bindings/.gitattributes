@@ -318,5 +318,11 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedSurfaceValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedTextureValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedWakeValues.swift linguist-generated=true
+/typescript/native/generated_addon.c linguist-generated=true
+/typescript/native/generated_addon.h linguist-generated=true
+/typescript/native/generated_values.c linguist-generated=true
+/typescript/src/generated_native.ts linguist-generated=true
+/typescript/src/generated_operations.ts linguist-generated=true
+/typescript/src/generated_values.ts linguist-generated=true
 /zig/src/generated_status.zig linguist-generated=true
 /zig/src/maplibre_native_ffi.zig linguist-generated=true

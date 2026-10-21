@@ -14,11 +14,12 @@ from tools.bindgen.emitters import (
     python,
     rust,
     swift,
+    typescript,
     zig,
 )
 from tools.bindgen.schema import validate
 
-EMITTERS = (dart, dotnet, go, kotlin, python, rust, swift, zig)
+EMITTERS = (dart, dotnet, go, kotlin, python, rust, swift, typescript, zig)
 
 # Protocol shapes an emitter's runtime cannot represent yet. Each emitter
 # reports these declarations as unsupported with its reason.

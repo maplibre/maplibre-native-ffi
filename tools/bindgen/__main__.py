@@ -31,6 +31,7 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
         python,
         rust,
         swift,
+        typescript,
         zig,
     )
 
@@ -59,6 +60,7 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
     )
     outputs["bindings/dart/lib/src/generated_values.dart"] = dart.generate_values(bound)
     outputs[dart_native.PATH] = dart_native.generate(bound)
+    outputs.update(typescript.generate(bound))
     reports = {
         language: emitter.coverage(bound)
         for language, emitter in {
@@ -67,6 +69,7 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
             "rust": rust,
             "python": python,
             "swift": swift,
+            "typescript": typescript,
             "dart": dart,
             "kotlin": kotlin,
             "zig": zig,
@@ -138,7 +141,7 @@ def format_outputs(outputs: dict[str, str], staging: Path) -> dict[str, str]:
         return [str(staging / path) for path in outputs if path.endswith(suffixes)]
 
     for path in outputs:
-        if not path.endswith((".h", ".inc", ".c", ".go", ".cs", ".kt")):
+        if not path.endswith((".h", ".inc", ".c", ".go", ".cs", ".kt", ".ts")):
             continue
         target = staging / path
         extension = "cpp" if target.suffix == ".inc" else target.suffix[1:]

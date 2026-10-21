@@ -208,9 +208,9 @@ These keys state what a C shape cannot:
 - `synchronous=true` on a callback typedef says that native code relies on the
   callback's work being done when it returns, as with the queue lock's
   callbacks. A binding runs the callback on the calling thread and never
-  delivers it later through a queue or a wake. Dart can only deliver later, so a
-  record with a native default keeps such a registration at its disabled
-  default.
+  delivers it later through a queue or a wake. Dart and TypeScript can only
+  deliver later, so a record with a native default keeps such a registration at
+  its disabled default.
 - `absent_on=` on a function names a failure status of `mln_status` that reports
   its one output as absent rather than failed, as `MLN_STATUS_NOT_READY` does
   for `mln_render_session_acquire_frame` when no frame has rendered. A drain is
@@ -221,8 +221,8 @@ These keys state what a C shape cannot:
   status, takes no completion, and has exactly one output. The semantic plan
   also rejects it on a borrowed view, a consuming operation, and a call that
   passes a callback registration, because an absent call publishes nothing.
-  Dart, Go, Rust, Swift, and Zig return any output as absent; .NET, Kotlin, and
-  Python return only an owned handle as absent.
+  Dart, Go, Rust, Swift, TypeScript, and Zig return any output as absent; .NET,
+  Kotlin, and Python return only an owned handle as absent.
 - `accepted_unless=` on a function names a boolean output that, when set on
   success, reports that native kept nothing from the function's one callback
   registration, as `out_cancelled` does for
@@ -241,9 +241,10 @@ member marked `kind=delivery_queue`, which a binding runtime sets in place of
 its callbacks; it is a control role, so no binding exposes it. Each of the
 registration's callbacks must be the protocol completion callback or declare
 `delivery=`, and one `MLN_DELIVERY_TYPE_RETIRED` delivery follows the last of
-them. Dart, whose host code runs only on its isolate, uses the queue for every
-such registration, and a wake for a registration whose one callback takes
-nothing but its context.
+them. Dart and TypeScript, whose host code runs only on an isolate or a realm,
+use the queue for every such registration, and a wake for a registration whose
+one callback takes nothing but its context. `async_hosts.py` makes that choice
+for both emitters.
 
 No annotation names a callback's thread. Every generated binding treats a
 callback as able to run on any native thread, and each callback's header comment

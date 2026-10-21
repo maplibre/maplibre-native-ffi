@@ -13,6 +13,9 @@ export default defineConfig({
       "**/dist/**",
       "third_party/**",
       "docs/public/reference/**",
+      // Probe sources import the bindings that a generator test assembles
+      // beside them at run time.
+      "tests/bindgen/fixtures/probes/**",
     ],
   },
 });
