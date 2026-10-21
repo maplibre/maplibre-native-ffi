@@ -1,4 +1,4 @@
-"""Coverage units and the CI jobs that run them."""
+"""Coverage units and the CI jobs that they run."""
 
 from __future__ import annotations
 
@@ -54,59 +54,46 @@ def dependencies(source: dict, presets: dict) -> dict[str, list[str]]:
     }
 
 
-def unit_jobs(config: dict, source: dict, presets: dict) -> dict[str, list[str]]:
-    """Map each unit, and hygiene, to the jobs it owns."""
+def unit_jobs(source: dict, presets: dict) -> dict[str, list[str]]:
+    """Map each coverage unit to the jobs it owns."""
     targets = [f"target-{row['preset']}" for row in target_rows(source, presets)]
-    owned = {HYGIENE: [HYGIENE]}
-    for unit in config["units"]:
-        owned[unit["id"]] = [
+    owned = {
+        unit: [
             *(
                 job
                 for job in targets
                 if any(
                     fnmatch.fnmatchcase(job.removeprefix("target-"), pattern)
-                    for pattern in unit.get("targets", ())
+                    for pattern in jobs.get("targets", ())
                 )
             ),
-            *unit.get("jobs", ()),
+            *jobs.get("jobs", ()),
         ]
-    jobs = [job for owned_jobs in owned.values() for job in owned_jobs]
-    expected = [HYGIENE, *NAMES.keys() - {HYGIENE}, *targets]
-    if sorted(jobs) != sorted(expected):
+        for unit, jobs in source["units"].items()
+    }
+    found = [job for owned_jobs in owned.values() for job in owned_jobs]
+    expected = [*NAMES.keys() - {HYGIENE}, *targets]
+    if sorted(found) != sorted(expected):
         raise ValueError(
-            "Every CI job must belong to exactly one coverage unit: "
-            f"unowned={sorted(set(expected) - set(jobs))}, "
-            f"repeated={sorted({job for job in jobs if jobs.count(job) > 1})}, "
-            f"unknown={sorted(set(jobs) - set(expected))}"
+            "Every CI job except hygiene must belong to exactly one coverage unit: "
+            f"unowned={sorted(set(expected) - set(found))}, "
+            f"repeated={sorted({job for job in found if found.count(job) > 1})}, "
+            f"unknown={sorted(set(found) - set(expected))}"
         )
     return owned
 
 
-def selected_jobs(
-    owned: dict[str, list[str]], needs: dict[str, list[str]], units
-) -> list[str]:
-    """Return the jobs of the selected units and every job they consume."""
-    jobs = {job for unit in units for job in owned[unit]}
-    for job in list(jobs):
-        jobs.update(needs.get(job, ()))
-    return sorted(jobs)
+def job_units(source: dict, presets: dict) -> dict[str, list[str]]:
+    """Map each gated job to the units that run it.
 
-
-def unit_outcome(jobs: list[str], conclusions: dict[str, str]) -> str | None:
-    """Return whether a unit passed or failed in one run, or None if neither."""
-    outcomes = []
-    for job in jobs:
-        name = job_name(job)
-        # A reusable workflow reports its jobs as `<caller> / <job>`, and some of
-        # them, such as Kotlin Maven publishing, skip in pull request CI.
-        nested = [c for r, c in conclusions.items() if r.startswith(f"{name} / ")]
-        found = nested or [conclusions.get(name)]
-        if any(conclusion in {"failure", "timed_out"} for conclusion in found):
-            outcomes.append("failed")
-        elif "success" in found and set(found) <= {"success", "skipped"}:
-            outcomes.append("passed")
-        else:
-            outcomes.append(None)
-    if "failed" in outcomes:
-        return "failed"
-    return "passed" if all(outcomes) else None
+    A unit runs the jobs it owns and every job that those consume.
+    """
+    needs = dependencies(source, presets)
+    running: dict[str, list[str]] = {}
+    for unit, jobs in unit_jobs(source, presets).items():
+        for job in jobs:
+            for runs in (job, *needs.get(job, ())):
+                units = running.setdefault(runs, [])
+                if unit not in units:
+                    units.append(unit)
+    return running

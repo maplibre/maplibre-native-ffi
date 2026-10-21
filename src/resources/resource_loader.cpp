@@ -258,11 +258,23 @@ class AbiNetworkFileSource final : public mln::FileSource {
 
   [[nodiscard]] auto canRequest(const mln::Resource& resource) const
     -> bool override {
-    const auto provider = acquire_resource_provider_for_platform_context(
-      resource_options_snapshot().platformContext()
-    );
-    return (can_request_network(resource) && provider.has_value()) ||
-           native_->canRequest(resource);
+    const auto options = resource_options_snapshot();
+    // A provider claims only the requests its routes match, as request() does,
+    // so a request outside those routes stays available to another file source.
+    if (can_request_network(resource)) {
+      const auto provider = acquire_resource_provider_for_platform_context(
+        options.platformContext()
+      );
+      if (
+        provider.has_value() && provider->matches(
+                                  resource_kind_to_abi(resource.kind),
+                                  resolve_resource_url(options, resource)
+                                )
+      ) {
+        return true;
+      }
+    }
+    return native_->canRequest(resource);
   }
 
   void forward(

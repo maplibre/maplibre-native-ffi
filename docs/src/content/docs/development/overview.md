@@ -138,8 +138,12 @@ write to it, and pull request runs read it through the public endpoint.
 
 ## CI coverage
 
-Applicable CI jobs are selected automatically. If the selection looks wrong,
-trigger a manual run (`gh workflow run CI --ref <branch>`).
+Rubberstamp plans which coverage units each pull request runs from the units in
+`.config/rubberstamp.yml`, and `ci/workflow.toml` maps each unit to its jobs.
+The plan job's summary links to the Rubberstamp dashboard with the reason for
+each unit. Hygiene always runs, and pushes to `main` and manual runs run every
+unit. If the plan looks wrong, trigger a manual run
+(`gh workflow run CI --ref <branch>`).
 
 Each target job runs every suite even after one fails, and a final step fails
 the job. CI retries a failed run once when every failed job failed in an
