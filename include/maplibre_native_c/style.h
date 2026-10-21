@@ -1009,9 +1009,9 @@ MLN_API mln_status mln_map_set_geojson_source_synchronous_tiling(
  * fetch_tile and cancel_tile may run on arbitrary native worker threads, may be
  * concurrent with runtime and map calls. The style command functions in this
  * header may be called directly from these callbacks. Callbacks must not block
- * waiting for command execution.
- * Callbacks must not throw, panic, longjmp, or otherwise unwind through the C
- * ABI. cancel_tile is best-effort and may be repeated or race with fetch_tile.
+ * waiting for command execution. Every callback returns normally; see
+ * mln_user_data_release. cancel_tile is best-effort and may be repeated or
+ * race with fetch_tile.
  *
  * Custom geometry sources belong to the current style. Replacing the style
  * drops sources that were added to the previous style.
@@ -1124,9 +1124,8 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
  * concurrent with runtime and map calls. The style command functions in this
  * header, including the tile-delivery commands below, may be called directly
  * from these callbacks. Callbacks must not block waiting for command
- * execution, and must not throw, panic, longjmp, or otherwise unwind through
- * the C ABI. cancel_tile is best-effort and may be repeated or race with
- * fetch_tile.
+ * execution. Every callback returns normally; see mln_user_data_release.
+ * cancel_tile is best-effort and may be repeated or race with fetch_tile.
  *
  * Custom MVT vector sources belong to the current style. Replacing the style
  * drops sources that were added to the previous style. A layer that draws this
