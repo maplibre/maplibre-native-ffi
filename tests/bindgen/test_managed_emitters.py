@@ -74,7 +74,7 @@ mln_status mln_measurement_change(mln_measurement measurement, const mln_complet
     def test_dart_generates_callback_registrations_only_with_queue_delivery(
         self,
     ):
-        text = protocol_header(groups=("delivery",))
+        text = protocol_header(groups=("delivery", "decision"))
         api = parse_sources({"api.h": text})
         generated = dart.coverage(api)["generated"]
         self.assertIn("mln_notice_set_callback", generated)

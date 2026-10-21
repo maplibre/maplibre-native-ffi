@@ -21,17 +21,9 @@ from tools.bindgen.schema import validate
 EMITTERS = (dart, dotnet, go, kotlin, python, rust, swift, zig)
 
 # Protocol shapes an emitter's runtime cannot represent yet. Each emitter
-# reports these declarations as unsupported with its reason. Dart runs host code
-# only on its isolate, so it serves a notification that carries arguments only
-# through a delivery queue, which these fixtures leave out.
+# reports these declarations as unsupported with its reason.
 PROTOCOL_GAPS = {
-    ("retained_registration", "dart"): {"mln_map_observe_sample"},
-    ("record_notification", "dart"): {"mln_map_request_reading"},
-    ("owned_argument", "dart"): {"mln_map_set_query_handler"},
-    ("declinable_registration", "dart"): {"mln_ticket_on_cancel"},
-    ("delivery", "dart"): {"mln_ticket_on_cancel"},
     ("values", "rust"): {"mln_probe_roundtrip"},
-    ("decision", "dart"): {"mln_host_set_provider", "mln_ticket_on_cancel"},
     ("absent_value", "dotnet"): {"mln_probe_read_level"},
     ("absent_value", "kotlin"): {"mln_probe_read_level"},
     ("absent_value", "python"): {"mln_probe_read_level"},

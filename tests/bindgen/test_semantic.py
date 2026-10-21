@@ -605,7 +605,7 @@ typedef struct signals { notify signal; void *state BIND("kind=context"); releas
             bind(self.parse(source), require_complete=True)
 
     def test_delivered_callbacks_name_the_payload_that_copies_them(self):
-        text = protocol_header(groups=("delivery",))
+        text = protocol_header(groups=("delivery", "decision"))
         model = bind(parse_sources({"api.h": text}), require_complete=True)
         self.assertEqual(
             model.callbacks["mln_notice_callback"].delivery,
