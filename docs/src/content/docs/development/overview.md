@@ -133,20 +133,24 @@ Authenticate with `blacksmith auth login`; your account needs access to the
 MapLibre organization in Blacksmith.
 
 Warm the Linux job from your branch, then use the returned ID to sync local
-changes over rsync and run a command:
+changes over rsync and run a command from the repository root:
 
 ```bash
 blacksmith testbox warmup .github/workflows/blacksmith-testbox.yml --job linux --ref <branch>
+cd "$(git rev-parse --show-toplevel)"
 blacksmith testbox run --id <id> "mise run test linux-gnu-x64-egl"
 ```
 
 Replace the test command with `mise run //bindings/<lang>:test <preset>` to test
 a binding. The Linux job prepares x64 GNU and musl presets with EGL or Vulkan.
 Android/OHOS emulators, Emscripten, and Linux ARM64 need separate target setup
-or runners. The `macos` job mirrors CI's Apple setup, but the pinned Testbox
-actions use Linux-specific commands; confirm upstream macOS support before using
-that job. Warmup prepares dependencies and waits for commands; it runs no tests
-itself.
+or runners. macOS needs upstream support for the Linux-specific commands in the
+pinned Testbox actions. Warmup prepares dependencies and waits for commands; it
+runs no tests itself.
+
+Run `blacksmith testbox run` from the repository root: rsync mirrors the current
+directory with `--delete`, which removes remote files absent from that
+directory.
 
 ## Tests and examples
 
