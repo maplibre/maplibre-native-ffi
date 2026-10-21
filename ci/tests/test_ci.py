@@ -168,9 +168,8 @@ class PlanTest(unittest.TestCase):
         self.assertTrue(all(decisions.values()))
 
     def test_planner_parses_with_the_runner_system_python(self):
-        # The plan and label jobs run the ubuntu-slim system Python, not the
-        # project's.
-        for name in ("plan", "select", "coverage", "workflow", "label"):
+        # The plan job runs the ubuntu-slim system Python, not the project's.
+        for name in ("plan", "select", "coverage", "workflow"):
             path = ROOT / "ci" / f"{name}.py"
             with self.subTest(module=name):
                 ast.parse(path.read_text(), str(path), feature_version=(3, 12))

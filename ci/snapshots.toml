@@ -88,6 +88,7 @@ shared = [
   "!.github/actionlint.yaml",
   "!.github/dependabot.yml",
   "!.github/FUNDING.yml",
+  "!.github/rubberstamp.yml",
   "!.coderabbit.yaml",
   "!.agents/**",
   "!.claude/**",
