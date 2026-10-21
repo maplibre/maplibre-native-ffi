@@ -1,6 +1,8 @@
 const std = @import("std");
 const status = @import("status.zig");
 
+const log = std.log.scoped(.maplibre_native_ffi);
+
 /// A native generational id. Synchronize release with calls that copy borrowed
 /// batch storage, and release each owned id once.
 pub fn Handle(comptime name: []const u8, comptime dispose: *const fn (u64) status.Error!void) type {
@@ -21,7 +23,7 @@ pub fn Handle(comptime name: []const u8, comptime dispose: *const fn (u64) statu
         /// restrictions apply to disposals that return a status.
         pub fn deinit(self: *Self) void {
             dispose(self.raw) catch |err| {
-                std.log.warn("native owner disposal failed: {s}", .{@errorName(err)});
+                log.warn("native owner disposal failed: {s}", .{@errorName(err)});
             };
         }
     };

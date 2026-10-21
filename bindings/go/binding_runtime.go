@@ -69,12 +69,17 @@ type bindingArena struct {
 	owners      []*bindingOwner
 }
 
-func (arena *bindingArena) lease(owner *bindingOwner) uint64 {
+func bindingHandleState(owner *bindingOwner) *bindingState {
 	if owner == nil || owner.state == nil {
-		arena.fail("nil input handle")
+		panic(bindingFailure{newBindingError(StatusInvalidArgument, "nil handle")})
 	}
+	return owner.state
+}
+
+func (arena *bindingArena) lease(owner *bindingOwner) uint64 {
+	state := bindingHandleState(owner)
 	arena.owners = append(arena.owners, owner)
-	return owner.state.raw
+	return state.raw
 }
 
 func (arena *bindingArena) fail(message string) {

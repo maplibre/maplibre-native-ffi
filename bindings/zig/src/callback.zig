@@ -33,9 +33,9 @@ pub const Roots = struct {
         context: *anyopaque,
         accept: *const fn (*anyopaque) void,
         release: *const fn (*anyopaque) void,
-        native_release: ?*const fn (*anyopaque) void = null,
+        native_release: *const fn (*anyopaque) void,
         pub fn releaseNative(self: Entry) void {
-            (self.native_release orelse self.release)(self.context);
+            self.native_release(self.context);
         }
     };
     pub fn retain(self: *Roots, comptime T: type, value: T) status.Error!*Registration(T) {

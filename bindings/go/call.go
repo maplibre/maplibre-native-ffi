@@ -18,7 +18,7 @@ type bindingAccess uint8
 
 const (
 	bindingGlobalAccess bindingAccess = iota
-	bindingLiveAccess
+	bindingOwnerAccess
 	// The call leases the receiver and holds off its close, because the
 	// results borrow from it until they are copied.
 	bindingReadAccess
@@ -38,8 +38,8 @@ type bindingTarget struct {
 }
 
 func bindingGlobal() bindingTarget { return bindingTarget{} }
-func bindingLive(owner *bindingOwner) bindingTarget {
-	return bindingTarget{owner: owner, access: bindingLiveAccess}
+func bindingOwned(owner *bindingOwner) bindingTarget {
+	return bindingTarget{owner: owner, access: bindingOwnerAccess}
 }
 
 func bindingRead(owner *bindingOwner) bindingTarget {
@@ -72,11 +72,8 @@ func bindingRun[T any](target bindingTarget, call func(arena *bindingArena, raw 
 		return value
 	}
 	owner := target.owner
-	if owner == nil || owner.state == nil {
-		panic(bindingFailure{newBindingError(StatusInvalidState, "nil handle")})
-	}
+	state := bindingHandleState(owner)
 	defer runtime.KeepAlive(owner)
-	state := owner.state
 	if target.access == bindingCloseAccess || target.access == bindingConsumeAccess {
 		if synchronous && state.released.Load() {
 			var zero T

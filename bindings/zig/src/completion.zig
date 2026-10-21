@@ -386,7 +386,7 @@ test "a completion delivers once, and a value that fails to convert reports the 
     var diagnostic: diagnostics.Diagnostic = .{};
     try std.testing.expectError(error.NativeError, failed.wait(&diagnostic));
     try std.testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
-    try std.testing.expectEqualStrings("native returned a value that the binding cannot read", diagnostic.message());
+    try std.testing.expectEqualStrings(@errorName(error.NativeError), diagnostic.message());
     try std.testing.expectError(error.AlreadyCompleted, failed.wait(null));
 }
 

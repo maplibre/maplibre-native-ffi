@@ -40,11 +40,13 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   }
 
   final H _handle;
-  Object? callbackStorage;
+  // Roots remain reachable through the owner until native retires them.
+  // ignore: unused_field
+  Object? _callbackRoots;
 
   /// Keeps callback registrations reachable through this owner's lifetime.
   void retain(Object value) {
-    callbackStorage = value;
+    _callbackRoots = value;
   }
 
   bool _closed = false;

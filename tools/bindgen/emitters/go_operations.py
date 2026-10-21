@@ -243,7 +243,7 @@ def operation(plan, values, *, discard=False):
     elif needs_read(plan):
         access = "Read"
     else:
-        access = "Live"
+        access = "Owned"
     if plan.scoped_receiver:
         target = "receiver.target()"
     elif receiver:

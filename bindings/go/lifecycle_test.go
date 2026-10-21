@@ -68,8 +68,8 @@ func TestHandleIdNamesItsEventsAndOutlivesClose(t *testing.T) {
 // and native reports a closed input handle stale.
 func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 	for _, session := range []*RenderSessionHandle{nil, {}} {
-		if _, err := session.GetCapabilities(); !errors.Is(err, StatusInvalidState) {
-			t.Fatalf("receiver %#v: %v, want StatusInvalidState", session, err)
+		if _, err := session.GetCapabilities(); !errors.Is(err, StatusInvalidArgument) {
+			t.Fatalf("receiver %#v: %v, want StatusInvalidArgument", session, err)
 		}
 	}
 	for _, frame := range []*AcquiredFrameHandle{nil, {}} {
@@ -77,8 +77,8 @@ func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 			t.Fatal("a view callback ran for an invalid frame")
 			return nil
 		})
-		if !errors.Is(err, StatusInvalidState) {
-			t.Fatalf("frame %#v: %v, want StatusInvalidState", frame, err)
+		if !errors.Is(err, StatusInvalidArgument) {
+			t.Fatalf("frame %#v: %v, want StatusInvalidArgument", frame, err)
 		}
 	}
 

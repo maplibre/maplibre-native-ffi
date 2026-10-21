@@ -96,51 +96,23 @@ fn Native(comptime function: anytype, comptime count: usize) type {
     return @Tuple(&types);
 }
 
-fn Receiver(comptime access: Access, comptime T: type) type {
-    return struct {
-        state: T,
-        fn acquire(receiver: T) Error!@This() {
-            if (access == .scoped) try callback.checkScoped(@intFromPtr(receiver.native));
-            return .{ .state = receiver };
-        }
-        fn native(self: *@This()) switch (access) {
-            .none => void,
-            .scoped => @FieldType(T, "native"),
-            else => u64,
-        } {
-            return switch (access) {
-                .none => {},
-                .scoped => self.state.native,
-                else => self.state.raw,
-            };
-        }
-        fn succeed(_: @This(), roots: *callback.Roots) void {
-            roots.accept();
-        }
-    };
-}
-
 fn Operation(comptime name: []const u8, comptime access: Access, comptime ReceiverType: type, comptime Allocator: type, comptime Args: type) type {
     const function = @field(c, name);
     const offset: usize = if (access == .none) 0 else 1;
     const fields = argumentTypes(Args);
     return struct {
         const Self = @This();
-        const Hold = Receiver(access, ReceiverType);
         const NativeArgs = Native(function, offset + fields.len);
 
-        receiver: Hold,
-        diagnostic: ?*Diagnostic,
+        receiver: ReceiverType,
         arena: if (Allocator == std.mem.Allocator) std.heap.ArenaAllocator else void,
         roots: callback.Roots = .{},
         held: Held(function, offset, Args) = undefined,
 
-        fn begin(receiver: ReceiverType, allocator: Allocator, diagnostic: ?*Diagnostic) Error!Self {
-            const hold = try Hold.acquire(receiver);
+        fn begin(receiver: ReceiverType, allocator: Allocator) Error!Self {
+            if (access == .scoped) try callback.checkScoped(@intFromPtr(receiver.native));
             return .{
-                .receiver = hold,
-                .roots = .{},
-                .diagnostic = diagnostic,
+                .receiver = receiver,
                 .arena = if (Allocator == std.mem.Allocator) std.heap.ArenaAllocator.init(allocator) else {},
             };
         }
@@ -159,7 +131,7 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
         fn arguments(self: *Self, args: Args) Error!NativeArgs {
             var native: NativeArgs = undefined;
             if (offset == 1) {
-                native[0] = self.receiver.native();
+                native[0] = if (access == .scoped) self.receiver.native else self.receiver.raw;
             }
             inline for (fields, 0..) |Field, index| {
                 const Parameter = Param(function, offset + index);
@@ -274,11 +246,11 @@ fn invokeInner(
     args: anytype,
 ) Error!Outputs(@TypeOf(args)) {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
-    var op = try Op.begin(receiver, allocator, diagnostic);
+    var op = try Op.begin(receiver, allocator);
     defer op.end();
     const native = try op.arguments(args);
     try status.call(@field(c, name), native, diagnostic);
-    op.receiver.succeed(&op.roots);
+    op.roots.accept();
     return op.outputs(allocator);
 }
 
@@ -307,11 +279,11 @@ fn invokeUnlessInner(
     args: anytype,
 ) Error!?Outputs(@TypeOf(args)) {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
-    var op = try Op.begin(receiver, allocator, diagnostic);
+    var op = try Op.begin(receiver, allocator);
     defer op.end();
     const native = try op.arguments(args);
     const present = try status.callUnless(@field(c, name), native, diagnostic, absent);
-    op.receiver.succeed(&op.roots);
+    op.roots.accept();
     if (!present) return null;
     return try op.outputs(allocator);
 }
@@ -342,13 +314,12 @@ fn invokeDeclinableInner(
 ) Error!bool {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
     if (Outputs(@TypeOf(args)) != bool) @compileError(name ++ ": a declinable call has one boolean output");
-    var op = try Op.begin(receiver, allocator, diagnostic);
+    var op = try Op.begin(receiver, allocator);
     defer op.end();
     const native = try op.arguments(args);
     try status.call(@field(c, name), native, diagnostic);
     const declined = try op.outputs(allocator);
-    var kept: callback.Roots = .{};
-    op.receiver.succeed(if (declined) &kept else &op.roots);
+    if (!declined) op.roots.accept();
     return declined;
 }
 
@@ -361,16 +332,16 @@ pub fn direct(
     args: anytype,
 ) Error!T {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
-    var op = try Op.begin(receiver, allocator, null);
+    var op = try Op.begin(receiver, allocator);
     defer op.end();
     const native = try op.arguments(args);
     if (T == void) {
         @call(.auto, @field(c, name), native);
-        op.receiver.succeed(&op.roots);
+        op.roots.accept();
         return;
     }
     const raw = @call(.auto, @field(c, name), native);
-    op.receiver.succeed(&op.roots);
+    op.roots.accept();
     if (comptime marshal.decodeAllocates(T) and @TypeOf(allocator) != std.mem.Allocator) @compileError(name ++ ": the result needs an allocator parameter");
     return marshal.decode(T, raw, .{ .allocator = if (@TypeOf(allocator) == std.mem.Allocator) allocator else null });
 }
@@ -412,7 +383,7 @@ fn submitInner(
 ) Error!Submitted(Copy, @TypeOf(args)) {
     const Allocator = @TypeOf(allocator);
     const Op = Operation(name, access, @TypeOf(receiver), Allocator, @TypeOf(args));
-    var op = try Op.begin(receiver, allocator, diagnostic);
+    var op = try Op.begin(receiver, allocator);
     defer op.end();
     const native = try op.arguments(args);
     const function = @field(c, name);
@@ -429,7 +400,7 @@ fn submitInner(
             return Copy.copy(result, .{});
         }
     }.copy, function, native);
-    op.receiver.succeed(&op.roots);
+    op.roots.accept();
     if (Outputs(@TypeOf(args)) == void) return ready;
     errdefer ready.deinit();
     return .{ .outputs = try op.outputs(allocator), .ready = ready };
@@ -456,11 +427,11 @@ fn discardInner(
     args: anytype,
 ) Error!void {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
-    var op = try Op.begin(receiver, allocator, diagnostic);
+    var op = try Op.begin(receiver, allocator);
     defer op.end();
     const native = try op.arguments(args);
     try status.call(@field(c, name), native ++ .{@as(?*const c.mln_completion, null)}, diagnostic);
-    op.receiver.succeed(&op.roots);
+    op.roots.accept();
 }
 
 pub fn scopedView(

@@ -115,9 +115,6 @@ fn bindingMessage(err: anyerror) []const u8 {
         error.InvalidString => "the string contains a NUL byte",
         error.AlreadyCompleted => "the operation already completed",
         error.OutOfMemory => "out of memory",
-        error.InvalidState => "the handle is not in a state that permits the call",
-        error.WrongThread => "the call is not permitted on this thread",
-        error.NativeError => "native returned a value that the binding cannot read",
         else => @errorName(err),
     };
 }
