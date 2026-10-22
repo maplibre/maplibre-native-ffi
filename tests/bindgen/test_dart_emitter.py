@@ -28,6 +28,7 @@ class DartEmitterTests(unittest.TestCase):
         clang = require_tool(self, "clang")
         header = protocol_header(
             groups=(
+                "caller_sized_output",
                 "values",
                 "keywords",
                 "defaults",
@@ -41,6 +42,8 @@ class DartEmitterTests(unittest.TestCase):
             set(dart.coverage(api)["generated"]),
             {
                 "mln_keyword_combine",
+                "mln_probe_batch_points",
+                "mln_probe_batch_scores",
                 "mln_probe_hooks_default",
                 "mln_probe_read_level",
                 "mln_probe_roundtrip",

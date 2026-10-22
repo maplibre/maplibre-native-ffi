@@ -11,7 +11,8 @@
 #define MLN_BINDGEN_PROTOCOLS_H
 
 // Groups that declare fixed-width types include the standard headers.
-#if defined(MLN_PROTOCOL_CONVENTIONS) || defined(MLN_PROTOCOL_PLAN_NAMES)
+#if defined(MLN_PROTOCOL_CONVENTIONS) || defined(MLN_PROTOCOL_PLAN_NAMES) || \
+  defined(MLN_PROTOCOL_CALLER_SIZED_OUTPUT)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
 #if defined(MLN_PROTOCOL_VALUES) || defined(MLN_PROTOCOL_KEYWORDS) ||    \
@@ -256,6 +257,27 @@ typedef struct mln_keyword_entry {
 mln_status mln_keyword_combine(
   double defer, double self, double raw, double bindingArg0,
   mln_keyword_entry* out_entry BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
+);
+#endif
+
+#ifdef MLN_PROTOCOL_CALLER_SIZED_OUTPUT
+// Output arrays that the caller sizes from an input array's count, with record
+// and scalar elements.
+typedef struct mln_probe_batch_point {
+  double x;
+  double y;
+} mln_probe_batch_point;
+mln_status mln_probe_batch_points(
+  const mln_probe_batch_point* points BIND("length=point_count"),
+  uint32_t point_count,
+  mln_probe_batch_point* out_points BIND("direction=out;length=point_count"),
+  mln_diagnostic* out_diagnostic
+);
+mln_status mln_probe_batch_scores(
+  const mln_probe_batch_point* points BIND("length=point_count"),
+  uint32_t point_count,
+  double* out_scores BIND("direction=out;length=point_count"),
   mln_diagnostic* out_diagnostic
 );
 #endif

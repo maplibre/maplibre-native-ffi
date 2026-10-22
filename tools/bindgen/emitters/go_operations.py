@@ -113,6 +113,7 @@ def needs_read(plan):
         and any(
             copies_borrowed(element(p.value)) and element(p.value).kind != "handle"
             for p in plan.outputs
+            if not p.sized_by
         )
     )
 
@@ -193,6 +194,20 @@ def operation(plan, values, *, discard=False):
         value = element(p.value)
         values.require(value)
         local = labels[p.name]
+        if p.sized_by:
+            # Native writes one element per input element into Go memory that
+            # holds no Go pointers, which cgo lets a call borrow.
+            count = f"len({labels[p.sized_by]})"
+            raw_type = values.c_type(value.element)
+            setup.append(f"{local} := make([]{raw_type}, {count})")
+            for member in value.element.fields:
+                if member.role == "size":
+                    setup.append(
+                        f"for index := range {local} {{ {local}[index].{member.name} = {values.c_type(member.value)}(unsafe.Sizeof({local}[index])) }}"
+                    )
+            arguments[p.name] = f"unsafe.SliceData({local})"
+            outputs.append((p, value, local))
+            continue
         setup.append(
             f"{local} := C.{value.default}()"
             if value.default
@@ -215,7 +230,12 @@ def operation(plan, values, *, discard=False):
     output_types, conversions, adoptions = [], [], []
     for p, value, local in outputs:
         output_types.append(values.type(value))
-        if value.kind == "handle":
+        if p.sized_by:
+            copied = values.copy(value.element, "item")
+            conversions.append(
+                f"func() {values.type(value)} {{ result := make({values.type(value)}, len({local})); for index, item := range {local} {{ result[index] = {copied} }}; return result }}()"
+            )
+        elif value.kind == "handle":
             adopted = f"adopted{len(adoptions)}" if len(outputs) > 1 else "adopted"
             adoptions.append(
                 f"{adopted} := adopt{values.owner(value.native)}(uint64({local}), {parent_of(owned.get(p.name))})"

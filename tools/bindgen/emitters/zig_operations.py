@@ -147,6 +147,14 @@ def operation(plan, values, *, discard=False):
             public = owned(values, value)
             needs_allocator |= dynamic(value)
             results.append((label, public))
+            sized_by = next(p.sized_by for p in plan.outputs if p.name == name)
+            if sized_by:
+                # The call allocates the native elements from its input arena.
+                needs_allocator = True
+                arguments.append(
+                    f"call.outArray({values.public(value.element)}, call.len({names[sized_by]}))"
+                )
+                continue
             sized = value.kind == "record" and any(
                 field.role == "size" for field in value.fields
             )

@@ -151,6 +151,28 @@ def lower_function(
         if parameter.name in outputs:
             output_plan = outputs[parameter.name]
             output = output_plan.value
+            if output_plan.sized_by:
+                values.check(output)
+                source = camel(output_plan.sized_by)
+                count = f"{source}.length"
+                element = output.element
+                setup.append(
+                    f"final {local} = arena<{values.ffi(element)}>({source}.isEmpty ? 1 : {count});"
+                )
+                if element.kind == "record":
+                    if element.default:
+                        setup.append(
+                            f"for (var index = 0; index < {count}; index++) {{ {local}[index] = raw.{element.default}(); }}"
+                        )
+                    elif any(f.role == "size" for f in element.fields):
+                        setup.append(
+                            f"for (var index = 0; index < {count}; index++) {{ {local}[index].size = sizeOf<{values.ffi(element)}>(); }}"
+                        )
+                args.append(local)
+                returns.append(
+                    (values.public(output), values.copy(output, local, count))
+                )
+                continue
             if output.kind != "reference" or not output.element:
                 raise Unsupported("output needs one initialized native storage value")
             output = output.element

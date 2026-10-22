@@ -106,3 +106,31 @@ try ledger.close()
 
 try check(Maplibre.probeReadLevel() == nil, "absent level")
 try check(Maplibre.probeReadLevel() == 0.5, "published level")
+
+/// A caller-sized output array holds one element per input element, in input
+/// order.
+let batchPoints = [
+  ProbeBatchPoint(x: 2, y: 5),
+  ProbeBatchPoint(x: 7, y: 11),
+  ProbeBatchPoint(x: -3, y: 17),
+]
+try check(
+  Maplibre.probeBatchPoints(points: batchPoints) == [
+    ProbeBatchPoint(x: 5, y: 3),
+    ProbeBatchPoint(x: 11, y: 8),
+    ProbeBatchPoint(x: 17, y: -2),
+  ],
+  "caller-sized points"
+)
+try check(
+  Maplibre.probeBatchScores(points: batchPoints) == [7, 18, 14],
+  "caller-sized scalars"
+)
+try check(
+  Maplibre.probeBatchPoints(points: []).isEmpty,
+  "empty caller-sized points"
+)
+try check(
+  Maplibre.probeBatchScores(points: []).isEmpty,
+  "empty caller-sized scalars"
+)

@@ -386,6 +386,29 @@ def operation(
         capture, storage, types = [], [], []
         for index, output in enumerate(outputs):
             value = output_plans[output.name]
+            output_plan = next(p for p in plan.outputs if p.name == output.name)
+            if output_plan.sized_by:
+                value_types.add(value)
+                element = value.element
+                raw = SCALARS.get(
+                    native(output.type.pointee), native(output.type.pointee)
+                )
+                initial = f"{element.default}()" if element.default else f"{raw}()"
+                count = lengths[value.length]
+                storage.append(
+                    f"  var value{index}: [{raw}] = Array(repeating: {initial}, count: {count})"
+                )
+                for field in element.fields:
+                    if field.role == "size":
+                        storage.append(
+                            f"  for item in value{index}.indices {{ value{index}[item].size = UInt32(MemoryLayout<{raw}>.size) }}"
+                        )
+                types.append(value_types.public(value))
+                copied = value_types.copy(element, "item")
+                capture.append(
+                    f"{'try ' if 'try ' in copied else ''}value{index}.map {{ item in {copied} }}"
+                )
+                continue
             if value.kind == "reference":
                 value = value.element
             value_types.add(value)

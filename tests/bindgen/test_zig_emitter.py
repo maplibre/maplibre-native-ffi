@@ -24,6 +24,7 @@ class ZigEmitterTests(unittest.TestCase):
         zig_tool = require_tool(self, "zig", BINDING)
         header = protocol_header(
             groups=(
+                "caller_sized_output",
                 "values",
                 "keywords",
                 "defaults",

@@ -6,6 +6,8 @@ import assert from "node:assert/strict";
 import {
   MaplibreError,
   keywordCombine,
+  probeBatchPoints,
+  probeBatchScores,
   probeHooksDefault,
   probeReadLevel,
   probeRoundtrip,
@@ -34,6 +36,22 @@ assert.deepEqual(probeRoundtrip({ left: [], right: [] }), {
   right: [],
 });
 assert.deepEqual(probeRoundtrip({ right: [] }), { right: [] });
+
+// A caller-sized output array holds one element per input element, in input
+// order.
+const batch = [
+  { x: 2, y: 5 },
+  { x: 7, y: 11 },
+  { x: -3, y: 17 },
+];
+assert.deepEqual(probeBatchPoints(batch), [
+  { x: 5, y: 3 },
+  { x: 11, y: 8 },
+  { x: 17, y: -2 },
+]);
+assert.deepEqual(probeBatchScores(batch), [7, 18, 14]);
+assert.deepEqual(probeBatchPoints([]), []);
+assert.deepEqual(probeBatchScores([]), []);
 
 // Parameters that are TypeScript keywords keep their order.
 assert.deepEqual(keywordCombine(5, 2, 7, 11), { type: 3, defer: 7, raw: 11 });

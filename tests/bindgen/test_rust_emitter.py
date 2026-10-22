@@ -62,6 +62,7 @@ class RustEmitterTests(unittest.TestCase):
         api = parse(
             COLLISIONS,
             groups=(
+                "caller_sized_output",
                 "keywords",
                 "default_registration",
                 "absent_handle",
@@ -74,6 +75,8 @@ class RustEmitterTests(unittest.TestCase):
             set(rust.coverage(api)["generated"]),
             {
                 "mln_c_version",
+                "mln_probe_batch_points",
+                "mln_probe_batch_scores",
                 "mln_keyword_combine",
                 "mln_map_match",
                 "mln_map_move",

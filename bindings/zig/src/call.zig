@@ -38,6 +38,20 @@ pub fn sizedOut(comptime T: type) Output(T, true) {
     return .{};
 }
 
+/// Receives `count` output elements, one for each element of an input array.
+pub fn outArray(comptime T: type, count: usize) OutputArray(T) {
+    return .{ .count = count };
+}
+
+fn OutputArray(comptime T: type) type {
+    return struct {
+        pub const Value = marshal.OwnedValue([]const T);
+        pub const array_element = T;
+        pub const output = true;
+        count: usize,
+    };
+}
+
 /// Receives a native handle and adopts it as `T`.
 pub fn adopt(comptime T: type) Output(T, false) {
     return .{};
@@ -83,7 +97,10 @@ fn Held(comptime function: anytype, comptime offset: usize, comptime Args: type)
     var types: [fields.len]type = undefined;
     for (fields, 0..) |Field, index| {
         types[index] = if (isOutput(Field))
-            @typeInfo(Param(function, offset + index)).pointer.child
+            if (@hasDecl(Field, "array_element"))
+                []@typeInfo(Param(function, offset + index)).pointer.child
+            else
+                @typeInfo(Param(function, offset + index)).pointer.child
         else
             void;
     }
@@ -139,9 +156,19 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
                 if (comptime isHandle(Field)) {
                     native[offset + index] = input.raw;
                 } else if (comptime isOutput(Field)) {
-                    self.held[index] = std.mem.zeroes(@TypeOf(self.held[index]));
-                    if (Field.sets_size) self.held[index].size = @sizeOf(@TypeOf(self.held[index]));
-                    native[offset + index] = &self.held[index];
+                    if (comptime @hasDecl(Field, "array_element")) {
+                        const Element = @typeInfo(Parameter).pointer.child;
+                        self.held[index] = try self.inputAllocator().alloc(Element, input.count);
+                        for (self.held[index]) |*item| {
+                            item.* = std.mem.zeroes(Element);
+                            if (comptime @typeInfo(Element) == .@"struct" and @hasField(Element, "size")) item.size = @sizeOf(Element);
+                        }
+                        native[offset + index] = self.held[index].ptr;
+                    } else {
+                        self.held[index] = std.mem.zeroes(@TypeOf(self.held[index]));
+                        if (Field.sets_size) self.held[index].size = @sizeOf(@TypeOf(self.held[index]));
+                        native[offset + index] = &self.held[index];
+                    }
                 } else {
                     native[offset + index] = try self.encode(Parameter, input);
                 }
@@ -210,6 +237,15 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
         fn output(self: *Self, comptime index: usize, allocator: Allocator) Error!fields[index].Value {
             const Step = fields[index];
             if (comptime marshal.decodeAllocates(Step.Value) and Allocator != std.mem.Allocator) @compileError(name ++ ": an output needs an allocator parameter");
+            if (comptime @hasDecl(Step, "array_element")) {
+                var arena = std.heap.ArenaAllocator.init(allocator);
+                errdefer arena.deinit();
+                const values = try arena.allocator().alloc(Step.array_element, self.held[index].len);
+                for (values, self.held[index]) |*decoded, native_value| {
+                    decoded.* = try marshal.decode(Step.array_element, native_value, .{ .allocator = arena.allocator() });
+                }
+                return .{ .arena = arena, .value = values };
+            }
             return marshal.decode(Step.Value, self.held[index], .{
                 .allocator = if (Allocator == std.mem.Allocator) allocator else null,
             });

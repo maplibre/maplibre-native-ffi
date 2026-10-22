@@ -111,7 +111,11 @@ def needs_read(plan):
         and not plan.consumes
         and not plan.owned_outputs
         and not plan.view
-        and any(copies_borrowed(output.value.unwrapped) for output in plan.outputs)
+        and any(
+            copies_borrowed(output.value.unwrapped)
+            for output in plan.outputs
+            if not output.sized_by
+        )
     )
 
 
@@ -252,8 +256,29 @@ def call_arguments(plan, values):
     return result
 
 
-def output_storage(value, values):
-    """Allocate one output and decode it after the call: (allocation, decoded)."""
+def output_storage(value, values, count=None):
+    """Allocate one output and decode it after the call: (allocation, decoded).
+
+    A caller-sized output array takes [count] elements.
+    """
+    if value.kind == "array" and count is not None:
+        element = value.element
+        size = values.element_size(element)
+        align = values.element_align(element)
+        allocation = f"allocate({count}.toLong() * {size}, {align})"
+        size_field = next((f for f in element.fields if f.role == "size"), None)
+        if size_field:
+            write = values.write_scalar(
+                size_field.value,
+                values.at("item", element, size_field.name),
+                f"{size}.toUInt()",
+            )
+            allocation += f".also {{ base -> repeat({count}) {{ index -> val item = base + index.toLong() * {size}; {write} }} }}"
+        item = values.decode_item(element, "item")
+        return (
+            allocation,
+            f"readArray({{out}}, {count}.toULong(), {size}.toLong()) {{ item -> {item} }}",
+        )
     if value.kind == "record" or (
         value.kind == "buffer" and value.buffer_form == "view"
     ):
@@ -284,6 +309,12 @@ def output_storage(value, values):
     if value.kind in {"scalar", "enum"}:
         return values.storage(value.ctype), values.decode(value, "{out}")
     raise Unsupported("immediate output requires scalar or copied record storage")
+
+
+def output_count(plan, index):
+    """The element count of [plan]'s output at [index] when the caller sizes it."""
+    sized_by = plan.outputs[index].sized_by
+    return f"{parameter_name(sized_by)}.size" if sized_by else None
 
 
 def result_value(value, values):
@@ -386,7 +417,7 @@ def immediate(plan, values, native):
     arguments = call_arguments(plan, values)
     setup, decoded = [], None
     if plan.outputs:
-        allocation, decoded = output_storage(result, values)
+        allocation, decoded = output_storage(result, values, output_count(plan, 0))
         setup.append(f"val out = {allocation}")
         arguments.append("out")
         decoded = decoded.replace("{out}", "out")
@@ -415,7 +446,7 @@ def multiple_outputs(plan, values, native):
     arguments = call_arguments(plan, values)
     setup, copied = [], []
     for index, (field, value) in enumerate(values.multiple[result_type]):
-        allocation, decoded = output_storage(value, values)
+        allocation, decoded = output_storage(value, values, output_count(plan, index))
         setup.append(f"val out{index} = {allocation}")
         arguments.append(f"out{index}")
         copied.append(f"{field} = " + decoded.replace("{out}", f"out{index}"))

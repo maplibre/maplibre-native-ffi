@@ -182,6 +182,8 @@ class ParameterPlan:
     name: str
     value: ValuePlan
     direction: str
+    # The input array whose length sizes this caller-allocated output array.
+    sized_by: str | None = None
 
 
 @dataclass(frozen=True)
@@ -644,6 +646,14 @@ class Binder:
             }
             child_name = type_name(pointee)
             if metadata.get("direction") == "out":
+                if pointee.kind != "pointer" and metadata.get("length") not in {
+                    None,
+                    "1",
+                }:
+                    element = self.value(
+                        pointee, child_metadata, context + " output element"
+                    )
+                    return ValuePlan(kind="array", element=element, **common)
                 if pointee.kind == "pointer" and "length" in metadata:
                     child_metadata["length"] = metadata["length"]
                 element = self.value(pointee, child_metadata, context + " output")
@@ -870,6 +880,18 @@ class Binder:
                 parameter.name,
                 value,
                 direction,
+                next(
+                    (
+                        input_.name
+                        for input_ in function.parameters
+                        if input_.metadata.get("direction", "in") == "in"
+                        and input_.metadata.get("length") == value.length
+                        and input_.type.kind == "pointer"
+                    ),
+                    None,
+                )
+                if direction == "out" and value.kind == "array"
+                else None,
             )
 
             def validate_input_lifetime(item, parameter_name=parameter.name):

@@ -79,6 +79,14 @@ internal sealed unsafe partial class NativeCallScope : IDisposable
     internal T* Out<T>()
         where T : unmanaged => Value(default(T));
 
+    internal T* OutputArray<T>(int count)
+        where T : unmanaged
+    {
+        var pointer = Allocate<T>(count);
+        new Span<T>(pointer, Math.Max(count, 1)).Clear();
+        return pointer;
+    }
+
     internal T* Value<T>(T value)
         where T : unmanaged
     {

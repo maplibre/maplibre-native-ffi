@@ -437,7 +437,32 @@ class NativeValues:
             return (
                 f"{self.reader(value)}(env, &({source}), {size or f'sizeof({source})'})"
             )
+        if value.kind == "array" and size is not None:
+            return f"{self.items_reader(value.element)}(env, {source}, {size})"
         raise Unsupported(f"{value.native}: no C to JavaScript conversion")
+
+    def items_reader(self, element: ValuePlan) -> str:
+        """Converts `count` contiguous C elements to a JavaScript array."""
+        ctype = element.native
+        name = f"mln_ts_read_items_{stem(ctype)}"
+        if name in self.functions:
+            return name
+        prototype = (
+            f"napi_value {name}(napi_env env, const {ctype}* items, size_t count)"
+        )
+        self.functions[name] = (prototype, "")
+        lines = [
+            "  napi_value result = mln_ts_array(env, count);",
+            "  if (result == NULL) return NULL;",
+            "  for (size_t index = 0; index < count; index++) {",
+            f"    napi_value element = {self.to_js(element, 'items[index]')};",
+            "    if (element == NULL) return NULL;",
+            "    if (!mln_ts_set_index(env, result, (uint32_t)index, element)) return NULL;",
+            "  }",
+            "  return result;",
+        ]
+        self.functions[name] = (prototype, "\n".join(lines))
+        return name
 
     def reader(self, value: ValuePlan) -> str:
         name = f"mln_ts_read_{stem(value.native)}"

@@ -548,6 +548,19 @@ void release_request(request value);
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):
                 bind(self.parse(source.replace(before, after)), require_complete=True)
 
+    def test_counted_output_preserves_array_storage(self):
+        model = bind(
+            self.parse("""
+mln_status copy_values(
+  const double *values BIND("length=count"),
+  double *out BIND("direction=out;length=count"), unsigned count, mln_diagnostic *out_diagnostic);
+"""),
+            require_complete=True,
+        )
+        output = model.operations[0].outputs[0]
+        self.assertEqual((output.value.kind, output.value.length), ("array", "count"))
+        self.assertEqual(output.sized_by, "values")
+
     def test_an_absence_status_names_the_one_output_it_reports_absent(self):
         model = bind(
             parse(groups=("absent_handle", "absent_value")), require_complete=True

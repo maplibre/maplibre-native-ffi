@@ -27,6 +27,7 @@ PROBE = FIXTURES / "probes/typescript"
 # the addon runtime compiles against, and the groups that the probe's own
 # results_stub.c implements.
 GROUPS = (
+    "caller_sized_output",
     "values",
     "keywords",
     "defaults",

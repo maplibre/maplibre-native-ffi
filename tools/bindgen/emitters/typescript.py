@@ -165,6 +165,11 @@ def lower_function(
             lowered.arguments.append("token")
             index += 1
     returned: list[tuple[str, object]] = []
+
+    def output_count(name):
+        sized_by = outputs[name].sized_by
+        return f"count_{sized_by}" if sized_by else None
+
     for parameter in function.parameters[1 if receiver else 0 :]:
         local = f"arg_{parameter.name}"
         public_name_ = parameter_name(parameter.name)
@@ -190,6 +195,26 @@ def lower_function(
             if value.kind == "native_pointer":
                 locals_.append(f"void* {local} = NULL;")
                 args.append(f"&{local}")
+                returned.append((parameter.name, value))
+                continue
+            sized_by = outputs[parameter.name].sized_by
+            if sized_by:
+                # One output element per element of the input array, in call
+                # memory that the input list's count bounds.
+                element = value.element
+                values.check(element, "out")
+                count = f"count_{sized_by}"
+                locals_.append(f"{element.native}* {local} = NULL;")
+                body.append(
+                    f"{local} = mln_ts_allocate(call, sizeof *{local} * {count});"
+                )
+                body.append(f"if ({local} == NULL) goto done;")
+                init = natives.init(element, f"{local}[index]")
+                if init[1:] or not init[0].startswith("memset("):
+                    body.append(f"for (size_t index = 0; index < {count}; index++) {{")
+                    body += [f"  {line}" for line in init]
+                    body.append("}")
+                args.append(local)
                 returned.append((parameter.name, value))
                 continue
             if value.kind != "reference" or value.element is None:
@@ -479,13 +504,15 @@ def lower_function(
         for name, value in returned:
             key = identifier(output_member(name))
             body.append(
-                f'if (!mln_ts_set(env, call->result, "{key}", {natives.to_js(value, f"arg_{name}")})) goto done;'
+                f'if (!mln_ts_set(env, call->result, "{key}", {natives.to_js(value, f"arg_{name}", output_count(name))})) goto done;'
             )
             members.append(f"readonly {key}: {values.ts(value)}")
         lowered.native_result = lowered.returns = "{ " + "; ".join(members) + " }"
     elif returned:
         name, value = returned[0]
-        body.append(f"call->result = {natives.to_js(value, f'arg_{name}')};")
+        body.append(
+            f"call->result = {natives.to_js(value, f'arg_{name}', output_count(name))};"
+        )
         lowered.native_result = lowered.returns = values.ts(value)
         if plan.view:
             if value.kind != "record":
