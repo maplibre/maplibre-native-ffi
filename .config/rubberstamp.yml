@@ -129,8 +129,9 @@ labels:
       readback.
     "binding:typescript": >-
       A TypeScript binding, or an example built with it.
-    "binding:vala": >-
-      A Vala binding, or an example built with it.
+    "binding:gobject": >-
+      The GObject binding, its introspection data, or its Vala API, or an
+      example built with it such as a GTK app.
     "binding:arkts": >-
       An ArkTS binding for OpenHarmony, or an example built with it.
     "platform:linux": >-
