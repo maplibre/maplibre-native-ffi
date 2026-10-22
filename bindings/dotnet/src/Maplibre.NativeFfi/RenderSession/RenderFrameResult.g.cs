@@ -16,8 +16,8 @@ namespace Maplibre.NativeFfi;
 /// <param name="MapUpdateGeneration">
 /// Generation of the map render update the demand evaluated. When disposition
 /// is <c>MLN_RENDER_RESULT_RENDERED</c>, the frame drew that update; compare it
-/// with <c>mln_map_snapshot.latest_render_update_generation</c> to find the
-/// first frame that includes a command.
+/// with <c>mln_completion_result.render_update_generation</c> to find the first
+/// frame that includes a command.
 /// </param>
 /// <param name="Generation">
 /// The session's target generation when the demand reached its result. See

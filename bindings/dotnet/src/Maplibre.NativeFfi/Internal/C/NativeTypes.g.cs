@@ -145,6 +145,7 @@ internal unsafe struct mln_completion_result
     public uint disposition;
     public uint value_size;
     public ulong generation;
+    public ulong render_update_generation;
     public mln_buffer_view diagnostic;
     public void* value;
     public nuint value_count;

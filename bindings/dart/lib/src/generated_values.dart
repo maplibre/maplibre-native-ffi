@@ -1951,7 +1951,7 @@ final class RenderFrameResult extends _Value {
 
   /// Generation of the map render update the demand evaluated. When disposition
   /// is `MLN_RENDER_RESULT_RENDERED`, the frame drew that update; compare it
-  /// with `mln_map_snapshot.latest_render_update_generation` to find the first
+  /// with `mln_completion_result.render_update_generation` to find the first
   /// frame that includes a command.
   final BigInt mapUpdateGeneration;
 

@@ -14,16 +14,17 @@ internal object CompletionLayout {
 }
 
 internal object CompletionResultLayout {
-  val SIZEOF: Int = w(40, 56)
+  val SIZEOF: Int = w(48, 64)
   val ALIGNOF: Int = 8
   val SIZE: Int = 0
   val STATUS: Int = 4
   val DISPOSITION: Int = 8
   val VALUE_SIZE: Int = 12
   val GENERATION: Int = 16
-  val DIAGNOSTIC: Int = 24
-  val VALUE: Int = w(32, 40)
-  val VALUE_COUNT: Int = w(36, 48)
+  val RENDER_UPDATE_GENERATION: Int = 24
+  val DIAGNOSTIC: Int = 32
+  val VALUE: Int = w(40, 48)
+  val VALUE_COUNT: Int = w(44, 56)
 }
 
 internal object DiagnosticLayout {
@@ -43,7 +44,7 @@ internal object RenderAbandonResultLayout {
 }
 
 internal object DeliveryLayout {
-  val SIZEOF: Int = w(56, 72)
+  val SIZEOF: Int = w(64, 80)
   val ALIGNOF: Int = 8
   val TYPE: Int = 0
   val RESERVED: Int = 4

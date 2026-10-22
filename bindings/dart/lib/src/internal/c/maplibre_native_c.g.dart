@@ -258,6 +258,8 @@ final class mln_completion_result extends Struct {
   external int value_size;
   @Uint64()
   external int generation;
+  @Uint64()
+  external int render_update_generation;
   external mln_buffer_view diagnostic;
   external Pointer<Void> value;
   @Size()

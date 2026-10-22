@@ -557,6 +557,7 @@ pub struct mln_completion_result {
     pub disposition: u32,
     pub value_size: u32,
     pub generation: u64,
+    pub render_update_generation: u64,
     pub diagnostic: mln_buffer_view,
     pub value: *const std::ffi::c_void,
     pub value_count: usize,

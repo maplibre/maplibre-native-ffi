@@ -2785,8 +2785,8 @@ pub const RenderFrameResult = struct {
     token: u64 = std.mem.zeroes(u64),
     /// Generation of the map render update the demand evaluated. When
     /// disposition is `MLN_RENDER_RESULT_RENDERED`, the frame drew that update;
-    /// compare it with `mln_map_snapshot.latest_render_update_generation` to
-    /// find the first frame that includes a command.
+    /// compare it with `mln_completion_result.render_update_generation` to find
+    /// the first frame that includes a command.
     map_update_generation: u64 = std.mem.zeroes(u64),
     /// The session's target generation when the demand reached its result. See
     /// `mln_render_session_snapshot.generation`.
