@@ -30,7 +30,7 @@ OpenglTextureFrame _readOpenglTextureFrame(
   type: source.type,
 );
 
-Pointer<raw.mln_gpu_sync> _writeGpuSync(GpuSync value, Arena arena) {
+Pointer<raw.mln_gpu_sync> _writeGpuSync(GpuSync value, Allocator arena) {
   final result = arena<raw.mln_gpu_sync>();
   result.ref = raw.mln_gpu_sync_default();
   result.ref.kind = value.kind.rawValue;
@@ -43,7 +43,7 @@ GpuSync _readGpuSync(raw.mln_gpu_sync source) => GpuSync(
   object: uint64FromNative(source.object),
 );
 
-Pointer<raw.mln_lat_lng> _writeLatLng(LatLng value, Arena arena) {
+Pointer<raw.mln_lat_lng> _writeLatLng(LatLng value, Allocator arena) {
   final result = arena<raw.mln_lat_lng>();
   result.ref.latitude = value.latitude;
   result.ref.longitude = value.longitude;
@@ -53,7 +53,10 @@ Pointer<raw.mln_lat_lng> _writeLatLng(LatLng value, Arena arena) {
 LatLng _readLatLng(raw.mln_lat_lng source) =>
     LatLng(latitude: source.latitude, longitude: source.longitude);
 
-Pointer<raw.mln_edge_insets> _writeEdgeInsets(EdgeInsets value, Arena arena) {
+Pointer<raw.mln_edge_insets> _writeEdgeInsets(
+  EdgeInsets value,
+  Allocator arena,
+) {
   final result = arena<raw.mln_edge_insets>();
   result.ref.top = value.top;
   result.ref.left = value.left;
@@ -71,7 +74,7 @@ EdgeInsets _readEdgeInsets(raw.mln_edge_insets source) => EdgeInsets(
 
 Pointer<raw.mln_screen_point> _writeScreenPoint(
   ScreenPoint value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_screen_point>();
   result.ref.x = value.x;
@@ -84,7 +87,7 @@ ScreenPoint _readScreenPoint(raw.mln_screen_point source) =>
 
 Pointer<raw.mln_camera_options> _writeCameraOptions(
   CameraOptions value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_camera_options>();
   result.ref = raw.mln_camera_options_default();
@@ -157,7 +160,7 @@ CameraOptions _readCameraOptions(
 
 Pointer<raw.mln_logical_extent> _writeLogicalExtent(
   LogicalExtent value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_logical_extent>();
   result.ref = raw.mln_logical_extent_default();
@@ -176,7 +179,7 @@ LogicalExtent _readLogicalExtent(raw.mln_logical_extent source) =>
 
 Pointer<raw.mln_projection_mode> _writeProjectionMode(
   ProjectionMode value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_projection_mode>();
   result.ref = raw.mln_projection_mode_default();
@@ -210,7 +213,7 @@ ProjectionMode _readProjectionMode(raw.mln_projection_mode source) =>
 
 Pointer<raw.mln_map_viewport_options> _writeMapViewportOptions(
   MapViewportOptions value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_map_viewport_options>();
   result.ref = raw.mln_map_viewport_options_default();
@@ -256,7 +259,7 @@ MapViewportOptions _readMapViewportOptions(
       : null,
 );
 
-Pointer<raw.mln_map_view> _writeMapView(MapView value, Arena arena) {
+Pointer<raw.mln_map_view> _writeMapView(MapView value, Allocator arena) {
   final result = arena<raw.mln_map_view>();
   result.ref.size = sizeOf<raw.mln_map_view>();
   result.ref.camera = _writeCameraOptions(value.camera, arena).ref;
@@ -318,7 +321,10 @@ WebgpuTextureFrame _readWebgpuTextureFrame(
   format: source.format,
 );
 
-Pointer<raw.mln_unit_bezier> _writeUnitBezier(UnitBezier value, Arena arena) {
+Pointer<raw.mln_unit_bezier> _writeUnitBezier(
+  UnitBezier value,
+  Allocator arena,
+) {
   final result = arena<raw.mln_unit_bezier>();
   result.ref.x1 = value.x1;
   result.ref.y1 = value.y1;
@@ -380,7 +386,7 @@ _prepareCameraTransitionHandler(
 
 Pointer<raw.mln_animation_options> _writeAnimationOptions(
   AnimationOptions value,
-  Arena arena,
+  Allocator arena,
   _NativeRegistrations registrations,
 ) {
   final result = arena<raw.mln_animation_options>();
@@ -436,7 +442,7 @@ AnimationOptions _readAnimationOptions(raw.mln_animation_options source) =>
 
 Pointer<raw.mln_lat_lng_bounds> _writeLatLngBounds(
   LatLngBounds value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_lat_lng_bounds>();
   result.ref.southwest = _writeLatLng(value.southwest, arena).ref;
@@ -451,7 +457,7 @@ LatLngBounds _readLatLngBounds(raw.mln_lat_lng_bounds source) => LatLngBounds(
 
 Pointer<raw.mln_bound_options> _writeBoundOptions(
   BoundOptions value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_bound_options>();
   result.ref = raw.mln_bound_options_default();
@@ -502,7 +508,7 @@ BoundOptions _readBoundOptions(raw.mln_bound_options source) => BoundOptions(
 
 Pointer<raw.mln_camera_delta> _writeCameraDelta(
   CameraDelta value,
-  Arena arena,
+  Allocator arena,
   _NativeRegistrations registrations,
 ) {
   final result = arena<raw.mln_camera_delta>();
@@ -558,7 +564,7 @@ CameraDelta _readCameraDelta(raw.mln_camera_delta source) => CameraDelta(
 
 Pointer<raw.mln_camera_fit_options> _writeCameraFitOptions(
   CameraFitOptions value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_camera_fit_options>();
   result.ref = raw.mln_camera_fit_options_default();
@@ -592,7 +598,7 @@ CameraFitOptions _readCameraFitOptions(raw.mln_camera_fit_options source) =>
 
 Pointer<raw.mln_camera_update> _writeCameraUpdate(
   CameraUpdate value,
-  Arena arena,
+  Allocator arena,
   _NativeRegistrations registrations,
 ) {
   final result = arena<raw.mln_camera_update>();
@@ -617,7 +623,7 @@ CameraUpdate _readCameraUpdate(raw.mln_camera_update source) => CameraUpdate(
 
 Pointer<raw.mln_canonical_tile_id> _writeCanonicalTileId(
   CanonicalTileId value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_canonical_tile_id>();
   result.ref.z = _nativeInteger(value.z, 0, 4294967295);
@@ -786,7 +792,7 @@ CustomMvtVectorSourceOptions _readCustomMvtVectorSourceOptions(
 
 Pointer<raw.mln_frame_demand> _writeFrameDemand(
   FrameDemand value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_frame_demand>();
   result.ref = raw.mln_frame_demand_default();
@@ -800,7 +806,7 @@ FrameDemand _readFrameDemand(raw.mln_frame_demand source) => FrameDemand(
   token: uint64FromNative(source.token),
 );
 
-Pointer<raw.mln_vec3> _writeVec3(Vec3 value, Arena arena) {
+Pointer<raw.mln_vec3> _writeVec3(Vec3 value, Allocator arena) {
   final result = arena<raw.mln_vec3>();
   result.ref.x = value.x;
   result.ref.y = value.y;
@@ -811,7 +817,10 @@ Pointer<raw.mln_vec3> _writeVec3(Vec3 value, Arena arena) {
 Vec3 _readVec3(raw.mln_vec3 source) =>
     Vec3(x: source.x, y: source.y, z: source.z);
 
-Pointer<raw.mln_quaternion> _writeQuaternion(Quaternion value, Arena arena) {
+Pointer<raw.mln_quaternion> _writeQuaternion(
+  Quaternion value,
+  Allocator arena,
+) {
   final result = arena<raw.mln_quaternion>();
   result.ref.x = value.x;
   result.ref.y = value.y;
@@ -825,7 +834,7 @@ Quaternion _readQuaternion(raw.mln_quaternion source) =>
 
 Pointer<raw.mln_free_camera_options> _writeFreeCameraOptions(
   FreeCameraOptions value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_free_camera_options>();
   result.ref = raw.mln_free_camera_options_default();
@@ -852,7 +861,7 @@ FreeCameraOptions _readFreeCameraOptions(raw.mln_free_camera_options source) =>
 
 Pointer<raw.mln_geojson_source_options> _writeGeojsonSourceOptions(
   GeojsonSourceOptions value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_geojson_source_options>();
   result.ref = raw.mln_geojson_source_options_default();
@@ -957,7 +966,10 @@ GeojsonSourceOptions _readGeojsonSourceOptions(
       : null,
 );
 
-Pointer<raw.mln_http_header> _writeHttpHeader(HttpHeader value, Arena arena) {
+Pointer<raw.mln_http_header> _writeHttpHeader(
+  HttpHeader value,
+  Allocator arena,
+) {
   final result = arena<raw.mln_http_header>();
   result.ref.name = nativeStringView(value.name, arena).value;
   result.ref.value = nativeStringView(value.value, arena).value;
@@ -971,7 +983,7 @@ HttpHeader _readHttpHeader(raw.mln_http_header source) => HttpHeader(
 
 Pointer<raw.mln_http_header_rule> _writeHttpHeaderRule(
   HttpHeaderRule value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_http_header_rule>();
   result.ref = raw.mln_http_header_rule_default();
@@ -1006,7 +1018,7 @@ HttpHeaderRule _readHttpHeaderRule(raw.mln_http_header_rule source) =>
 
 Pointer<raw.mln_projected_meters> _writeProjectedMeters(
   ProjectedMeters value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_projected_meters>();
   result.ref.northing = value.northing;
@@ -1057,7 +1069,7 @@ _NativeRegistration<raw.mln_log_handler> _prepareLogHandler(
 
 Pointer<raw.mln_premultiplied_rgba8_image> _writePremultipliedRgba8Image(
   PremultipliedRgba8Image value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_premultiplied_rgba8_image>();
   result.ref = raw.mln_premultiplied_rgba8_image_default();
@@ -1083,7 +1095,7 @@ PremultipliedRgba8Image _readPremultipliedRgba8Image(
 
 Pointer<raw.mln_metal_borrowed_texture> _writeMetalBorrowedTexture(
   MetalBorrowedTexture value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_metal_borrowed_texture>();
   result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
@@ -1097,7 +1109,7 @@ MetalBorrowedTexture _readMetalBorrowedTexture(
 Pointer<raw.mln_metal_borrowed_texture_descriptor>
 _writeMetalBorrowedTextureDescriptor(
   MetalBorrowedTextureDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_metal_borrowed_texture_descriptor>();
   result.ref = raw.mln_metal_borrowed_texture_descriptor_default();
@@ -1141,7 +1153,7 @@ MetalBorrowedTextureDescriptor _readMetalBorrowedTextureDescriptor(
 
 Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
   RenderSessionAttachOptions value,
-  Arena arena,
+  Allocator arena,
   _NativeRegistrations registrations,
 ) {
   final result = arena<raw.mln_render_session_attach_options>();
@@ -1174,7 +1186,7 @@ RenderSessionAttachOptions _readRenderSessionAttachOptions(
 
 Pointer<raw.mln_metal_context_descriptor> _writeMetalContextDescriptor(
   MetalContextDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_metal_context_descriptor>();
   result.ref.device = Pointer<Void>.fromAddress(value.device.address).cast();
@@ -1188,7 +1200,7 @@ MetalContextDescriptor _readMetalContextDescriptor(
 Pointer<raw.mln_metal_owned_texture_descriptor>
 _writeMetalOwnedTextureDescriptor(
   MetalOwnedTextureDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_metal_owned_texture_descriptor>();
   result.ref = raw.mln_metal_owned_texture_descriptor_default();
@@ -1208,7 +1220,7 @@ MetalOwnedTextureDescriptor _readMetalOwnedTextureDescriptor(
 
 Pointer<raw.mln_metal_surface_descriptor> _writeMetalSurfaceDescriptor(
   MetalSurfaceDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_metal_surface_descriptor>();
   result.ref = raw.mln_metal_surface_descriptor_default();
@@ -1228,7 +1240,7 @@ MetalSurfaceDescriptor _readMetalSurfaceDescriptor(
 
 Pointer<raw.mln_wgl_context_descriptor> _writeWglContextDescriptor(
   WglContextDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_wgl_context_descriptor>();
   result.ref.device_context = Pointer<Void>.fromAddress(
@@ -1253,7 +1265,7 @@ WglContextDescriptor _readWglContextDescriptor(
 
 Pointer<raw.mln_egl_context_descriptor> _writeEglContextDescriptor(
   EglContextDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_egl_context_descriptor>();
   result.ref.display = Pointer<Void>.fromAddress(value.display.address).cast();
@@ -1280,7 +1292,7 @@ EglContextDescriptor _readEglContextDescriptor(
 
 Pointer<raw.mln_webgl_context_descriptor> _writeWebglContextDescriptor(
   WebglContextDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_webgl_context_descriptor>();
   result.ref.kind = value.kind.rawValue;
@@ -1302,7 +1314,7 @@ WebglContextDescriptor _readWebglContextDescriptor(
 
 Pointer<raw.mln_opengl_context_descriptor> _writeOpenglContextDescriptor(
   OpenglContextDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_opengl_context_descriptor>();
 
@@ -1356,7 +1368,7 @@ OpenglContextDescriptor _readOpenglContextDescriptor(
 
 Pointer<raw.mln_opengl_borrowed_texture> _writeOpenglBorrowedTexture(
   OpenglBorrowedTexture value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_opengl_borrowed_texture>();
   result.ref.texture = _nativeInteger(value.texture, 0, 4294967295);
@@ -1370,7 +1382,7 @@ OpenglBorrowedTexture _readOpenglBorrowedTexture(
 Pointer<raw.mln_opengl_borrowed_texture_descriptor>
 _writeOpenglBorrowedTextureDescriptor(
   OpenglBorrowedTextureDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_opengl_borrowed_texture_descriptor>();
   result.ref = raw.mln_opengl_borrowed_texture_descriptor_default();
@@ -1419,7 +1431,7 @@ OpenglBorrowedTextureDescriptor _readOpenglBorrowedTextureDescriptor(
 Pointer<raw.mln_opengl_owned_texture_descriptor>
 _writeOpenglOwnedTextureDescriptor(
   OpenglOwnedTextureDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_opengl_owned_texture_descriptor>();
   result.ref = raw.mln_opengl_owned_texture_descriptor_default();
@@ -1437,7 +1449,7 @@ OpenglOwnedTextureDescriptor _readOpenglOwnedTextureDescriptor(
 
 Pointer<raw.mln_opengl_surface_descriptor> _writeOpenglSurfaceDescriptor(
   OpenglSurfaceDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_opengl_surface_descriptor>();
   result.ref = raw.mln_opengl_surface_descriptor_default();
@@ -1457,7 +1469,7 @@ OpenglSurfaceDescriptor _readOpenglSurfaceDescriptor(
 
 Pointer<raw.mln_vulkan_context_descriptor> _writeVulkanContextDescriptor(
   VulkanContextDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_vulkan_context_descriptor>();
   result.ref.instance = Pointer<Void>.fromAddress(
@@ -1498,7 +1510,7 @@ VulkanContextDescriptor _readVulkanContextDescriptor(
 
 Pointer<raw.mln_vulkan_borrowed_texture> _writeVulkanBorrowedTexture(
   VulkanBorrowedTexture value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_vulkan_borrowed_texture>();
   result.ref.image = uint64ToNative(
@@ -1522,7 +1534,7 @@ VulkanBorrowedTexture _readVulkanBorrowedTexture(
 Pointer<raw.mln_vulkan_borrowed_texture_descriptor>
 _writeVulkanBorrowedTextureDescriptor(
   VulkanBorrowedTextureDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_vulkan_borrowed_texture_descriptor>();
   result.ref = raw.mln_vulkan_borrowed_texture_descriptor_default();
@@ -1579,7 +1591,7 @@ VulkanBorrowedTextureDescriptor _readVulkanBorrowedTextureDescriptor(
 Pointer<raw.mln_vulkan_owned_texture_descriptor>
 _writeVulkanOwnedTextureDescriptor(
   VulkanOwnedTextureDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_vulkan_owned_texture_descriptor>();
   result.ref = raw.mln_vulkan_owned_texture_descriptor_default();
@@ -1597,7 +1609,7 @@ VulkanOwnedTextureDescriptor _readVulkanOwnedTextureDescriptor(
 
 Pointer<raw.mln_vulkan_surface_descriptor> _writeVulkanSurfaceDescriptor(
   VulkanSurfaceDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_vulkan_surface_descriptor>();
   result.ref = raw.mln_vulkan_surface_descriptor_default();
@@ -1620,7 +1632,7 @@ VulkanSurfaceDescriptor _readVulkanSurfaceDescriptor(
 
 Pointer<raw.mln_webgpu_context_descriptor> _writeWebgpuContextDescriptor(
   WebgpuContextDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_webgpu_context_descriptor>();
   result.ref.instance = Pointer<Void>.fromAddress(
@@ -1641,7 +1653,7 @@ WebgpuContextDescriptor _readWebgpuContextDescriptor(
 
 Pointer<raw.mln_webgpu_borrowed_texture> _writeWebgpuBorrowedTexture(
   WebgpuBorrowedTexture value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_webgpu_borrowed_texture>();
   result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
@@ -1661,7 +1673,7 @@ WebgpuBorrowedTexture _readWebgpuBorrowedTexture(
 Pointer<raw.mln_webgpu_borrowed_texture_descriptor>
 _writeWebgpuBorrowedTextureDescriptor(
   WebgpuBorrowedTextureDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_webgpu_borrowed_texture_descriptor>();
   result.ref = raw.mln_webgpu_borrowed_texture_descriptor_default();
@@ -1710,7 +1722,7 @@ WebgpuBorrowedTextureDescriptor _readWebgpuBorrowedTextureDescriptor(
 Pointer<raw.mln_webgpu_owned_texture_descriptor>
 _writeWebgpuOwnedTextureDescriptor(
   WebgpuOwnedTextureDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_webgpu_owned_texture_descriptor>();
   result.ref = raw.mln_webgpu_owned_texture_descriptor_default();
@@ -1728,7 +1740,7 @@ WebgpuOwnedTextureDescriptor _readWebgpuOwnedTextureDescriptor(
 
 Pointer<raw.mln_webgpu_surface_descriptor> _writeWebgpuSurfaceDescriptor(
   WebgpuSurfaceDescriptor value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_webgpu_surface_descriptor>();
   result.ref = raw.mln_webgpu_surface_descriptor_default();
@@ -1756,7 +1768,7 @@ CameraQueryResult _readCameraQueryResult(raw.mln_camera_query_result source) =>
 
 Pointer<raw.mln_feature_state_selector> _writeFeatureStateSelector(
   FeatureStateSelector value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_feature_state_selector>();
   result.ref.size = sizeOf<raw.mln_feature_state_selector>();
@@ -1781,7 +1793,7 @@ Pointer<raw.mln_feature_state_selector> _writeFeatureStateSelector(
 
 Pointer<raw.mln_map_tile_options> _writeMapTileOptions(
   MapTileOptions value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_map_tile_options>();
   result.ref = raw.mln_map_tile_options_default();
@@ -1859,7 +1871,7 @@ MapSnapshot _readMapSnapshot(raw.mln_map_snapshot source) => MapSnapshot(
 
 Pointer<raw.mln_image_stretch> _writeImageStretch(
   ImageStretch value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_image_stretch>();
   result.ref.from = value.from;
@@ -1872,7 +1884,7 @@ ImageStretch _readImageStretch(raw.mln_image_stretch source) =>
 
 Pointer<raw.mln_image_content> _writeImageContent(
   ImageContent value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_image_content>();
   result.ref.left = value.left;
@@ -1981,7 +1993,7 @@ StyleSourceInfo _readStyleSourceInfo(raw.mln_style_source_info source) =>
 
 Pointer<raw.mln_style_transition_options> _writeStyleTransitionOptions(
   StyleTransitionOptions value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_style_transition_options>();
   result.ref = raw.mln_style_transition_options_default();
@@ -2018,7 +2030,10 @@ StyleTransitionOptions _readStyleTransitionOptions(
       : null,
 );
 
-Pointer<raw.mln_map_options> _writeMapOptions(MapOptions value, Arena arena) {
+Pointer<raw.mln_map_options> _writeMapOptions(
+  MapOptions value,
+  Allocator arena,
+) {
   final result = arena<raw.mln_map_options>();
   result.ref = raw.mln_map_options_default();
   result.ref.initial_extent = _writeLogicalExtent(
@@ -2040,7 +2055,7 @@ MapOptions _readMapOptions(raw.mln_map_options source) => MapOptions(
 
 Pointer<raw.mln_style_image_options> _writeStyleImageOptions(
   StyleImageOptions value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_style_image_options>();
   result.ref = raw.mln_style_image_options_default();
@@ -2178,7 +2193,7 @@ RenderSessionSnapshot _readRenderSessionSnapshot(
   pendingChanges: source.pending_changes,
 );
 
-Pointer<raw.mln_screen_box> _writeScreenBox(ScreenBox value, Arena arena) {
+Pointer<raw.mln_screen_box> _writeScreenBox(ScreenBox value, Allocator arena) {
   final result = arena<raw.mln_screen_box>();
   result.ref.min = _writeScreenPoint(value.min, arena).ref;
   result.ref.max = _writeScreenPoint(value.max, arena).ref;
@@ -2187,7 +2202,7 @@ Pointer<raw.mln_screen_box> _writeScreenBox(ScreenBox value, Arena arena) {
 
 Pointer<raw.mln_screen_line_string> _writeScreenLineString(
   ScreenLineString value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_screen_line_string>();
   result.ref.points = arena<raw.mln_screen_point>(
@@ -2205,7 +2220,7 @@ Pointer<raw.mln_screen_line_string> _writeScreenLineString(
 
 Pointer<raw.mln_rendered_query_geometry> _writeRenderedQueryGeometry(
   RenderedQueryGeometry value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_rendered_query_geometry>();
   result.ref.size = sizeOf<raw.mln_rendered_query_geometry>();
@@ -2229,7 +2244,7 @@ Pointer<raw.mln_rendered_query_geometry> _writeRenderedQueryGeometry(
 Pointer<raw.mln_rendered_feature_query_options>
 _writeRenderedFeatureQueryOptions(
   RenderedFeatureQueryOptions value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_rendered_feature_query_options>();
   result.ref = raw.mln_rendered_feature_query_options_default();
@@ -2287,7 +2302,7 @@ QueriedFeature _readQueriedFeature(raw.mln_queried_feature source) =>
 
 Pointer<raw.mln_source_feature_query_options> _writeSourceFeatureQueryOptions(
   SourceFeatureQueryOptions value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_source_feature_query_options>();
   result.ref = raw.mln_source_feature_query_options_default();
@@ -2347,7 +2362,7 @@ TextureReadbackResult _readTextureReadbackResult(
 
 Pointer<raw.mln_resource_response> _writeResourceResponse(
   ResourceResponse value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_resource_response>();
   result.ref.size = sizeOf<raw.mln_resource_response>();
@@ -2417,7 +2432,7 @@ _prepareResourceRequestCancelHandler(
 
 Pointer<raw.mln_resource_route> _writeResourceRoute(
   ResourceRoute value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_resource_route>();
   result.ref = raw.mln_resource_route_default();
@@ -2436,7 +2451,7 @@ ResourceRoute _readResourceRoute(raw.mln_resource_route source) =>
 
 Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
   RuntimeOptions value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_runtime_options>();
   result.ref = raw.mln_runtime_options_default();
@@ -2464,7 +2479,7 @@ RuntimeOptions _readRuntimeOptions(raw.mln_runtime_options source) =>
 Pointer<raw.mln_offline_tile_pyramid_region_definition>
 _writeOfflineTilePyramidRegionDefinition(
   OfflineTilePyramidRegionDefinition value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_offline_tile_pyramid_region_definition>();
   result.ref.style_url = nativeStringView(value.styleUrl, arena).value;
@@ -2490,7 +2505,7 @@ OfflineTilePyramidRegionDefinition _readOfflineTilePyramidRegionDefinition(
 Pointer<raw.mln_offline_geometry_region_definition>
 _writeOfflineGeometryRegionDefinition(
   OfflineGeometryRegionDefinition value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_offline_geometry_region_definition>();
   result.ref.style_url = nativeStringView(value.styleUrl, arena).value;
@@ -2515,7 +2530,7 @@ OfflineGeometryRegionDefinition _readOfflineGeometryRegionDefinition(
 
 Pointer<raw.mln_offline_region_definition> _writeOfflineRegionDefinition(
   OfflineRegionDefinition value,
-  Arena arena,
+  Allocator arena,
 ) {
   final result = arena<raw.mln_offline_region_definition>();
   result.ref.size = sizeOf<raw.mln_offline_region_definition>();

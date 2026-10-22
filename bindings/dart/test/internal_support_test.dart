@@ -74,6 +74,58 @@ void main() {
     });
   });
 
+  group('call arena', () {
+    test('reuses zeroed memory across calls, including after a throw', () {
+      final first = withNativeArena((arena) {
+        final bytes = arena<Uint8>(64);
+        bytes.asTypedList(64).fillRange(0, 64, 0xff);
+        return bytes.address;
+      });
+      expect(
+        () => withNativeArena((arena) {
+          arena<Uint8>(64).asTypedList(64).fillRange(0, 64, 0xff);
+          throw StateError('body failed');
+        }),
+        throwsStateError,
+      );
+      withNativeArena((arena) {
+        final bytes = arena<Uint8>(64);
+        expect(bytes.address, first);
+        expect(bytes.asTypedList(64), everyElement(0));
+      });
+    });
+
+    test('gives a nested call memory apart from the outer call', () {
+      withNativeArena((outer) {
+        final value = outer<Uint64>()..value = 1;
+        withNativeArena((inner) {
+          final nested = inner<Uint64>();
+          expect(nested.address, isNot(value.address));
+          expect(nested.value, 0);
+          nested.value = 2;
+        });
+        expect(value.value, 1);
+      });
+    });
+
+    test('keeps every allocation of a call distinct, aligned, and zeroed', () {
+      withNativeArena((arena) {
+        final allocations = [
+          for (var index = 0; index < 100; index++)
+            (arena<Uint8>(index % 3 == 0 ? 4096 : 24), index),
+        ];
+        for (final (pointer, index) in allocations) {
+          expect(pointer.address % 16, 0);
+          expect(pointer.cast<Uint64>().value, 0);
+          pointer.cast<Uint64>().value = index;
+        }
+        for (final (pointer, index) in allocations) {
+          expect(pointer.cast<Uint64>().value, index);
+        }
+      });
+    });
+  });
+
   // A native build whose element grew reports a value_size wider than this
   // binding's element, so the reader steps by it. A stride narrower than the
   // element cannot hold one.

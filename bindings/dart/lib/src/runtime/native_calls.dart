@@ -4,7 +4,7 @@ part of 'runtime.dart';
 // remain rooted until the native call accepts or rejects them.
 
 typedef _NativeStart =
-    int Function(Arena arena, Pointer<raw.mln_completion> completion);
+    int Function(Allocator arena, Pointer<raw.mln_completion> completion);
 
 NativeCompletionStart _withArena(_NativeStart start) =>
     (completion) => withNativeArena((arena) => start(arena, completion));
@@ -87,7 +87,7 @@ Future<T> _queryOwned<T>(_NativeStart start, T Function(int handle) adopt) =>
 /// owner reachable until it completes.
 A _attach<T extends Object, A>(
   int Function(
-    Arena arena,
+    Allocator arena,
     Pointer<raw.mln_completion> completion,
     Pointer<Uint64> output,
   )

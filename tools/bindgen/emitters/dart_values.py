@@ -757,7 +757,7 @@ class Values:
             else ""
         )
         conversion = (
-            f"Pointer<raw.{value.native}> _write{public}({public} value, Arena arena) {{\n  final result = arena<raw.{value.native}>();\n{initialize}\n  switch(value) {{\n"
+            f"Pointer<raw.{value.native}> _write{public}({public} value, Allocator arena) {{\n  final result = arena<raw.{value.native}>();\n{initialize}\n  switch(value) {{\n"
             + "\n".join(writes)
             + f"\n  }}\n  return result;\n}}\n{public} _read{public}(raw.{value.native} source) => switch(source.{union.presence.tag}) {{\n"
             + "\n".join(reads)
@@ -844,7 +844,7 @@ class Values:
             else ""
         )
         conversion = (
-            f"Pointer<raw.{value.native}> _write{public}({public} value, Arena arena) {{\n  final result = arena<raw.{value.native}>();\n{initialize}\n"
+            f"Pointer<raw.{value.native}> _write{public}({public} value, Allocator arena) {{\n  final result = arena<raw.{value.native}>();\n{initialize}\n"
             + "\n".join(writes)
             + f"\n  switch(value.{identifier(union.name)}) {{\n"
             + "\n".join(cases)
@@ -980,7 +980,7 @@ class Values:
                 f"final class {public} extends _Value {{\n  {'const ' if not initializers and not value.default else ''}{public}({signature}){' : ' + ', '.join(initializers) if initializers else ''};\n{fields}\n  @override List<Object?> get _members => [{compared}];\n}}\n"
             )
             write = [
-                f"Pointer<raw.{value.native}> _write{public}({public} value, Arena arena"
+                f"Pointer<raw.{value.native}> _write{public}({public} value, Allocator arena"
                 + (
                     ", _NativeRegistrations registrations"
                     if self.has_registrations(value)
