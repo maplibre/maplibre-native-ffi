@@ -66,8 +66,9 @@ final class _Library {
 final _library = _Library(DynamicLibrary.open(_libraryPath()));
 
 String _libraryPath() {
-  // The install prefix that `mise run //bindings/dart:test` links.
-  const prefix = '.dart_tool/native';
+  // The install prefix that `mise run //bindings/dart:test` links. A hardened
+  // Dart VM refuses to load a library by relative path.
+  final prefix = Directory('.dart_tool/native').absolute.path;
   if (Platform.isWindows) return '$prefix/bin/mln_test_graphics.dll';
   if (Platform.isMacOS) return '$prefix/lib/libmln_test_graphics.dylib';
   return '$prefix/lib/libmln_test_graphics.so';

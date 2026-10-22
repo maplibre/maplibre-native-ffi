@@ -7,7 +7,12 @@ run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig:$sdl_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
-cmake -S . -B "$MISE_MONOREPO_ROOT/build/$usage_preset/c-map" -G Ninja \
+# Without a sysroot, clang takes the default SDK, which can be a Command Line
+# Tools SDK newer than the selected Xcode's linker reads. The presets pin the
+# selected Xcode's SDK the same way.
+sysroot=""
+if [ "$(uname -s)" = Darwin ]; then sysroot="-DCMAKE_OSX_SYSROOT=macosx"; fi
+cmake -S . -B "$MISE_MONOREPO_ROOT/build/$usage_preset/c-map" -G Ninja $sysroot \
   -DMLN_NATIVE_INSTALL_DIR="$native_install_dir" \
   -DMLN_DEPENDENCY_INCLUDE_DIR="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 cmake --build "$MISE_MONOREPO_ROOT/build/$usage_preset/c-map"
