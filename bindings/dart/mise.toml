@@ -163,3 +163,32 @@ run_windows = '''
 export PATH="$(cygpath -u "$MISE_MONOREPO_ROOT/build/$usage_preset/install/bin")${PATH:+:${PATH}}"
 dart test
 '''
+
+[tasks."test:ios"]
+description = "Run portable Dart binding suites in a Flutter iOS simulator host."
+usage = 'arg "[preset]" default="ios-simulator-arm64-metal" { choices "ios-simulator-arm64-metal" }'
+depends = [
+  { task = "//:build", args = [
+    "{{usage.preset}}",
+  ] },
+  { task = ":_native-prefix", args = [
+    "{{usage.preset}}",
+  ] },
+]
+run = '''
+mise run //:ios-simulator:boot
+device=$("$MISE_MONOREPO_ROOT/scripts/apple-simulator.sh" find-booted iOS)
+app=.dart_tool/flutter_ios_test
+flutter create --empty --no-pub --org org.maplibre.native_ffi \
+  --platforms ios --project-name maplibre_native_ffi_ios_test "$app"
+cp tool/flutter_ios_test/pubspec.yaml "$app/pubspec.yaml"
+mkdir -p "$app/integration_test" "$app/hook"
+cp tool/flutter_ios_test/hook/build.dart "$app/hook/build.dart"
+cp tool/flutter_ios_test/integration_test/binding_test.dart "$app/integration_test/binding_test.dart"
+cd "$app"
+if ! grep -q '^ARCHS = arm64$' ios/Flutter/Debug.xcconfig; then
+  printf '\nARCHS = arm64\n' >>ios/Flutter/Debug.xcconfig
+fi
+flutter pub get
+flutter test integration_test/binding_test.dart --device-id "$device" --timeout 10m
+'''

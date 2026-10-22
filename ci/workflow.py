@@ -262,7 +262,7 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
                 f"mise run //bindings/kotlin:test {preset}",
                 f"mise run //bindings/swift:test {preset}",
                 "mise run //examples/swift-map:build:ios-simulator",
-                f"mise run //bindings/dart:build:mobile {preset}",
+                f"mise run //bindings/dart:test:ios {preset}",
             ]
         )
     elif target_platform == "ios-maccatalyst":

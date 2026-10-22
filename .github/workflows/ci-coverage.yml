@@ -1498,7 +1498,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/dart:build:mobile ios-simulator-arm64-metal
+        run: mise run //bindings/dart:test:ios ios-simulator-arm64-metal
       - name: Upload native artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

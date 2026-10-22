@@ -1,0 +1,29 @@
+name: maplibre_native_ffi_ios_test
+description: iOS simulator host for the portable Dart binding suites.
+publish_to: none
+version: 0.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  code_assets: ^2.1.0
+  hooks: ^2.2.0
+  flutter:
+    sdk: flutter
+  maplibre_native_ffi:
+    path: ../..
+
+dev_dependencies:
+  ffi: ^2.1.4
+  integration_test:
+    sdk: flutter
+  test: ^1.31.1
+
+hooks:
+  user_defines:
+    maplibre_native_ffi:
+      local_build: ../native
+
+flutter:
+  uses-material-design: false
