@@ -46,7 +46,7 @@ static void fence_driver(const mln_test_render_fixture* fixture) {
 static mln_render_frame_result take_one_result(
   const mln_test_render_fixture* fixture
 ) {
-  mln_render_frame_batch batch = mln_test_render_wait_for_results(fixture, 1);
+  mln_render_frame_batch batch = mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   return result;
@@ -102,7 +102,7 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
     &fixture, frame_woke, &wake, mln_test_deadline_default(), "a frame wake"
   ));
   const unsigned int woke = atomic_load(&fixture.frame_wakes);
-  mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture, 1);
+  mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture);
   TEST_ASSERT_EQUAL_UINT32(woke, atomic_load(&fixture.frame_wakes));
 
   const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
@@ -200,20 +200,19 @@ static void sustained_demands_past_the_ring_depth_keep_the_newest_frames(void) {
   for (uint64_t token = 1; token <= demand_count; token += 1) {
     mln_test_render_request_forced(&fixture, token);
   }
-  mln_render_frame_batch batch =
-    mln_test_render_wait_for_results(&fixture, demand_count);
+  mln_render_frame_result results[demand_count];
+  mln_test_render_wait_for_result_list(&fixture, demand_count, results);
   uint64_t previous_generation = 0;
   for (size_t index = 0; index < demand_count; index += 1) {
-    const mln_render_frame_result result =
-      mln_test_render_batch_result(batch, index);
-    TEST_ASSERT_EQUAL_UINT64(index + 1, result.token);
-    TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
-    TEST_ASSERT_GREATER_THAN_UINT64(
-      previous_generation, result.frame_generation
+    TEST_ASSERT_EQUAL_UINT64(index + 1, results[index].token);
+    TEST_ASSERT_EQUAL_UINT32(
+      MLN_RENDER_RESULT_RENDERED, results[index].disposition
     );
-    previous_generation = result.frame_generation;
+    TEST_ASSERT_GREATER_THAN_UINT64(
+      previous_generation, results[index].frame_generation
+    );
+    previous_generation = results[index].frame_generation;
   }
-  mln_render_frame_batch_release(batch);
 
   mln_acquired_frame frames[2] = {MLN_HANDLE_NULL, MLN_HANDLE_NULL};
   for (size_t index = 0; index < 2; index += 1) {
@@ -234,6 +233,47 @@ static void sustained_demands_past_the_ring_depth_keep_the_newest_frames(void) {
   mln_test_render_release_frame(&frames[1]);
   detach(runtime, map, &fixture);
 }
+
+#if defined(__EMSCRIPTEN__) && defined(MLN_FFI_TEST_BACKEND_WEBGPU)
+// A WebGPU render returns before the GPU finishes its frame, and the queue
+// reports it done once this thread returns to its event loop. With as many
+// frames unfinished as the ring has slots the driver runs nothing more, so
+// demands past the ring depth wait rather than pile more frames onto the GPU.
+static void webgpu_demands_past_the_ring_depth_wait_for_the_gpu(void) {
+  mln_runtime runtime;
+  mln_map map;
+  mln_test_render_fixture fixture = {0};
+  attach(&runtime, &map, &fixture);
+  mln_render_session_capabilities capabilities = {
+    .size = sizeof(mln_render_session_capabilities)
+  };
+  MLN_TEST_OK(
+    mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
+  );
+  const uint64_t depth = capabilities.texture_ring_depth;
+  for (uint64_t token = 1; token <= depth + 1; token += 1) {
+    mln_test_render_request_forced(&fixture, token);
+  }
+
+  // One service runs every queued demand without returning to the event loop.
+  MLN_TEST_OK(mln_test_render_fixture_service(&fixture));
+  mln_render_frame_batch batch = MLN_HANDLE_NULL;
+  MLN_TEST_OK(
+    mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
+  );
+  TEST_ASSERT_EQUAL_size_t(
+    depth, mln_test_render_batch_view(batch).result_count
+  );
+  mln_render_frame_batch_release(batch);
+
+  batch = mln_test_render_wait_for_results(&fixture);
+  const mln_render_frame_result last = mln_test_render_batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(depth + 1, last.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, last.disposition);
+  detach(runtime, map, &fixture);
+}
+#endif
 
 // Resizes apply in order, preserve the scale factor, and publish target
 // generations.
@@ -629,11 +669,10 @@ static void a_waiting_demand_ends_by_supersession_barrier_or_detach(void) {
     MLN_STATUS_OK, &fixture,
     mln_render_session_barrier(fixture.session, &completion.descriptor, NULL)
   );
-  mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture, 2);
-  const mln_render_frame_result superseded =
-    mln_test_render_batch_result(batch, 0);
-  const mln_render_frame_result ended = mln_test_render_batch_result(batch, 1);
-  mln_render_frame_batch_release(batch);
+  mln_render_frame_result results[2];
+  mln_test_render_wait_for_result_list(&fixture, 2, results);
+  const mln_render_frame_result superseded = results[0];
+  const mln_render_frame_result ended = results[1];
   TEST_ASSERT_EQUAL_UINT64(611, superseded.token);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_SUPERSEDED, superseded.disposition
@@ -659,6 +698,9 @@ MLN_TEST_GROUP {
   RUN_TEST(frame_results_wake_the_host_and_drain_into_an_owned_batch);
   RUN_TEST(a_barrier_ends_a_demand_while_the_ring_stays_acquired);
   RUN_TEST(sustained_demands_past_the_ring_depth_keep_the_newest_frames);
+#if defined(__EMSCRIPTEN__) && defined(MLN_FFI_TEST_BACKEND_WEBGPU)
+  RUN_TEST(webgpu_demands_past_the_ring_depth_wait_for_the_gpu);
+#endif
   RUN_TEST(resizes_apply_in_order_and_publish_generations);
   RUN_TEST(a_session_resizes_at_its_own_scale_factor_over_a_different_map);
   RUN_TEST(attaching_sizes_the_map_to_the_target);

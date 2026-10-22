@@ -282,8 +282,7 @@ static void an_unobserved_animation_publishes_its_final_snapshot(void) {
     MLN_TEST_OK(
       mln_render_session_request_frame(fixture.session, &demand, NULL)
     );
-    mln_render_frame_batch batch =
-      mln_test_render_wait_for_results(&fixture, 1);
+    mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture);
     result = mln_test_render_batch_result(batch, 0);
     mln_render_frame_batch_release(batch);
     TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);

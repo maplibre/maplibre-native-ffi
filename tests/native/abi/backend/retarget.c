@@ -129,7 +129,7 @@ static uint32_t render_frame(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
   );
   const mln_render_frame_batch batch =
-    mln_test_render_wait_for_results(fixture, 1);
+    mln_test_render_wait_for_results(fixture);
   const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
   uint32_t disposition = UINT32_MAX;
   for (size_t index = 0; index < view.result_count; index += 1) {
@@ -422,7 +422,7 @@ static void frames_published_before_a_retarget_cannot_be_acquired(void) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_NOT_READY, acquire(fixture, &frame));
 
   const mln_render_frame_batch batch =
-    mln_test_render_wait_for_results(fixture, 1);
+    mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT64(demand.token, result.token);
@@ -488,7 +488,7 @@ static void a_borrowed_retarget_renders_a_waiting_demand(void) {
     mln_test_last_error()
   );
   finish(fixture, &completion, MLN_STATUS_OK, "the texture replacement");
-  batch = mln_test_render_wait_for_results(fixture, 1);
+  batch = mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT64(3000, result.token);

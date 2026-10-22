@@ -37,7 +37,7 @@ static mln_render_frame_result render_frame(
 ) {
   mln_test_render_request_forced(fixture, token);
   const mln_render_frame_batch batch =
-    mln_test_render_wait_for_results(fixture, 1);
+    mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
@@ -57,7 +57,7 @@ static mln_render_frame_result render_update(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
   );
   const mln_render_frame_batch batch =
-    mln_test_render_wait_for_results(fixture, 1);
+    mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
@@ -314,7 +314,7 @@ static void a_frame_view_places_coordinates_where_the_frame_drew_them(void) {
   mln_frame_demand demand = mln_frame_demand_default();
   MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
   const mln_render_frame_batch batch =
-    mln_test_render_wait_for_results(&fixture, 1);
+    mln_test_render_wait_for_results(&fixture);
   const mln_render_frame_result unchanged =
     mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);

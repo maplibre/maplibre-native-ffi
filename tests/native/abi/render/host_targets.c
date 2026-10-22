@@ -24,7 +24,7 @@ static uint32_t render_frame(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
   );
   const mln_render_frame_batch batch =
-    mln_test_render_wait_for_results(fixture, 1);
+    mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT64(token, result.token);
@@ -193,7 +193,7 @@ static void a_borrowed_ring_hands_each_frame_to_the_host(void) {
     mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
   );
   mln_test_render_release_frame(&first);
-  batch = mln_test_render_wait_for_results(&fixture, 1);
+  batch = mln_test_render_wait_for_results(&fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT64(3, result.token);

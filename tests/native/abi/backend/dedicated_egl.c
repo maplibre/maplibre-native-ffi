@@ -22,7 +22,7 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   demand.flags = MLN_FRAME_DEMAND_PRESENT;
   MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
   const mln_render_frame_batch batch =
-    mln_test_render_wait_for_results(&fixture, 1);
+    mln_test_render_wait_for_results(&fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
   mln_render_frame_batch_release(batch);
@@ -75,7 +75,7 @@ static void dedicated_egl_texture_uses_a_readback_only_core_worker(void) {
   demand.token = 41;
   MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
   const mln_render_frame_batch batch =
-    mln_test_render_wait_for_results(&fixture, 1);
+    mln_test_render_wait_for_results(&fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   TEST_ASSERT_EQUAL_UINT64(demand.token, result.token);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);

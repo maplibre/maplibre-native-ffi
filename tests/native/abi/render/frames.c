@@ -547,7 +547,7 @@ static void disposing_a_frame_quarantines_only_its_slot(void) {
   expect_parked_demand(&fixture);
   mln_test_render_release_frame(&held);
   const mln_render_frame_batch batch =
-    mln_test_render_wait_for_results(&fixture, 1);
+    mln_test_render_wait_for_results(&fixture);
   result = mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT64(4, result.token);
@@ -572,17 +572,14 @@ static void a_fully_quarantined_ring_takes_no_more_demands(void) {
 
   MLN_TEST_OK(mln_acquired_frame_dispose(first, NULL));
   MLN_TEST_OK(mln_acquired_frame_dispose(second, NULL));
-  const mln_render_frame_batch batch =
-    mln_test_render_wait_for_results(&fixture, 2);
+  mln_render_frame_result results[2];
+  mln_test_render_wait_for_result_list(&fixture, 2, results);
   for (size_t index = 0; index < 2; index += 1) {
-    const mln_render_frame_result result =
-      mln_test_render_batch_result(batch, index);
-    TEST_ASSERT_EQUAL_UINT64(3 + index, result.token);
+    TEST_ASSERT_EQUAL_UINT64(3 + index, results[index].token);
     TEST_ASSERT_EQUAL_UINT32(
-      MLN_RENDER_RESULT_TARGET_NOT_READY, result.disposition
+      MLN_RENDER_RESULT_TARGET_NOT_READY, results[index].disposition
     );
   }
-  mln_render_frame_batch_release(batch);
 
   mln_frame_demand demand = mln_frame_demand_default();
   demand.token = 5;
@@ -683,7 +680,7 @@ static mln_render_frame_result render_one(
 ) {
   mln_test_render_request_forced(fixture, token);
   const mln_render_frame_batch batch =
-    mln_test_render_wait_for_results(fixture, 1);
+    mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   mln_acquired_frame frame = MLN_HANDLE_NULL;

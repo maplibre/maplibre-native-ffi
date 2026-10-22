@@ -1089,6 +1089,13 @@ auto driver_work_runnable_locked(
   const mln_render_session_object& session
 ) noexcept -> bool {
   if (session.driver_work.empty()) return false;
+  // Frames in flight bound the GPU work queued ahead of the host's reads.
+  const auto& texture = session.texture;
+  if (
+    !texture.slots.empty() &&
+    texture.gpu_frames_in_flight >= texture.slots.size()
+  )
+    return false;
   const auto& ready = session.driver_work.front().ready;
   return !ready || ready();
 }
@@ -1144,6 +1151,20 @@ auto queue_frame_demand_work_locked(
   }
   publish_driver_work_locked(session, wakes);
   return true;
+}
+
+// Runs the front demand again once a released frame frees a slot of the full
+// ring that parked it.
+auto resume_parked_demand_locked(
+  mln_render_session_object& session, DeferredWakes& wakes
+) noexcept -> void {
+  if (
+    session.demands.empty() ||
+    (session.state != MLN_RENDER_SESSION_STATE_ATTACHED &&
+     session.state != MLN_RENDER_SESSION_STATE_DETACHING)
+  )
+    return;
+  static_cast<void>(queue_frame_demand_work_locked(session, wakes));
 }
 
 // Moves every demand that waits for a map update back to the front of the
@@ -1250,15 +1271,6 @@ auto run_core_worker(
     }
     resubmit_parked_retirements(parked);
   }
-}
-
-auto enqueue_work(
-  const std::shared_ptr<mln_render_session_object>& session,
-  RenderDriverWork work
-) -> void {
-  auto wakes = DeferredWakes{};
-  const auto lock = std::scoped_lock{session->control_mutex};
-  push_driver_work_locked(*session, std::move(work), wakes);
 }
 
 auto service_scheduler_work(
@@ -1414,6 +1426,15 @@ auto run_driver_result(
 }
 
 }  // namespace
+
+void GpuFrameDone::run() const noexcept {
+  const auto live = session.lock();
+  if (live == nullptr) return;
+  auto wakes = DeferredWakes{};
+  const auto lock = std::scoped_lock{live->control_mutex};
+  --live->texture.gpu_frames_in_flight;
+  publish_driver_work_locked(*live, wakes);
+}
 
 auto lease_render_session(mln_render_session session)
   -> std::shared_ptr<mln_render_session_object> {
@@ -3014,17 +3035,23 @@ auto run_frame_demand(
         producer_sync = session->texture.backend->producer_sync();
       }
       scope.reset();
-      const auto lock = std::scoped_lock{session->control_mutex};
       if (selected_slot) {
-        auto& slot = session->texture.slots[*selected_slot];
-        slot.result = result;
-        slot.producer_sync = producer_sync;
-        // A frame without its metadata cannot be acquired, so its slot stays
-        // unavailable rather than hold back the newer frames behind it, and the
-        // next demand renders into it first.
-        slot.available = !acquirable || metadata.has_value();
-        slot.backend_metadata = std::move(metadata);
-        slot.rendering = false;
+        {
+          const auto lock = std::scoped_lock{session->control_mutex};
+          auto& slot = session->texture.slots[*selected_slot];
+          slot.result = result;
+          slot.producer_sync = producer_sync;
+          // A frame without its metadata cannot be acquired, so its slot stays
+          // unavailable rather than hold back the newer frames behind it, and
+          // the next demand renders into it first.
+          slot.available = !acquirable || metadata.has_value();
+          slot.backend_metadata = std::move(metadata);
+          slot.rendering = false;
+          if (session->texture.backend) ++session->texture.gpu_frames_in_flight;
+        }
+        // Registered without the lock, since a backend may report at once.
+        if (session->texture.backend)
+          session->texture.backend->when_gpu_done(GpuFrameDone{session});
       }
     }
     scope.reset();
@@ -3554,12 +3581,7 @@ auto acquired_frame_release(
       if (live->slot < session.texture.slots.size())
         session.texture.slots[live->slot].acquired = false;
       if (session.acquired_frame_count) --session.acquired_frame_count;
-      if (
-        !session.demands.empty() &&
-        (session.state == MLN_RENDER_SESSION_STATE_ATTACHED ||
-         session.state == MLN_RENDER_SESSION_STATE_DETACHING)
-      )
-        static_cast<void>(queue_frame_demand_work_locked(session, wakes));
+      resume_parked_demand_locked(session, wakes);
     }
   }
   const auto consumed = handle_table<mln_acquired_frame_object>().remove(frame);
@@ -3583,8 +3605,8 @@ auto acquired_frame_release(
     }
     if (status == MLN_STATUS_OK && backend != nullptr)
       status = backend->release_consumer_sync(copied);
-    auto resume_demand = std::shared_ptr<const mln_frame_demand>{};
     {
+      auto wakes = DeferredWakes{};
       const auto lock = std::scoped_lock{consumed->session->control_mutex};
       auto& slots = consumed->session->texture.slots;
       if (consumed->slot < slots.size()) {
@@ -3603,27 +3625,12 @@ auto acquired_frame_release(
           slot.quarantined = true;
         }
       }
-      if (
-        !consumed->session->demands.empty() &&
-        (consumed->session->state == MLN_RENDER_SESSION_STATE_ATTACHED ||
-         consumed->session->state == MLN_RENDER_SESSION_STATE_DETACHING)
-      )
-        resume_demand = consumed->session->demands.front();
+      resume_parked_demand_locked(*consumed->session, wakes);
     }
     if (status != MLN_STATUS_OK && status != MLN_STATUS_TARGET_LOST) {
       mln::Log::Error(
         mln::Event::Render,
         "failed to retire an acquired frame; its texture slot is quarantined"
-      );
-    }
-    if (resume_demand) {
-      enqueue_work(
-        consumed->session, RenderDriverWork{
-                             [session = consumed->session, resume_demand]() {
-                               run_frame_demand(session, resume_demand);
-                             },
-                             {}
-                           }
       );
     }
   };

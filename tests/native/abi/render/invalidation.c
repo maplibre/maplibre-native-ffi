@@ -252,7 +252,7 @@ static void a_frame_shows_a_command_group_whole_or_not_at_all(void) {
   );
   set_property(map, "background-color", "\"#0000ff\"");
   mln_test_render_request_forced(&fixture, 1);
-  mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture, 1);
+  mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture);
   mln_render_frame_batch_release(batch);
   expect_center_pixel(&fixture, red, "inside the group");
 
@@ -296,7 +296,7 @@ static void feature_state_stays_with_the_update_held_by_a_command_group(void) {
   set_selected(map, "{\"selected\":true}");
   mln_test_render_request_forced(&fixture, 9001);
   const mln_render_frame_batch batch =
-    mln_test_render_wait_for_results(&fixture, 1);
+    mln_test_render_wait_for_results(&fixture);
   const mln_render_frame_result held = mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   uint8_t inside[4];
@@ -517,7 +517,7 @@ static bool frame_matches(void* context) {
     mln_render_session_request_frame(seek->fixture->session, &demand, NULL)
   );
   const mln_render_frame_batch batch =
-    mln_test_render_wait_for_results(seek->fixture, 1);
+    mln_test_render_wait_for_results(seek->fixture);
   const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
   bool matched = false;
   for (size_t index = 0; index < view.result_count; index += 1) {

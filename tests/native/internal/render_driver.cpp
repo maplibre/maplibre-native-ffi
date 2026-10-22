@@ -1,6 +1,7 @@
 // A render session's driver while it is busy: queued demands, waits for map
 // updates, barriers, and abandon.
 
+#include <array>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -89,14 +90,33 @@ void a_resize_queued_before_detach_completes_as_failed() {
   destroy_fixture(fixture);
 }
 
-auto wait_for_results(const Fixture& fixture, std::size_t minimum)
-  -> mln_render_frame_batch {
-  return mln_test_render_wait_for_results(&fixture.render, minimum);
+auto wait_for_results(const Fixture& fixture) -> mln_render_frame_batch {
+  return mln_test_render_wait_for_results(&fixture.render);
+}
+
+// The first `count` results, however many drains they arrive over.
+template <std::size_t count>
+auto wait_for_result_list(const Fixture& fixture)
+  -> std::array<mln_render_frame_result, count> {
+  auto results = std::array<mln_render_frame_result, count>{};
+  mln_test_render_wait_for_result_list(&fixture.render, count, results.data());
+  return results;
 }
 
 auto batch_result(mln_render_frame_batch batch, std::size_t index)
   -> mln_render_frame_result {
   return mln_test_render_batch_result(batch, index);
+}
+
+// Services a caller driver on the case's thread until another thread sets
+// `done`, returning to the event loop between services, where a WebGPU frame's
+// completion arrives. A held driver call runs inside one of these services.
+void service_until(const Fixture& fixture, std::atomic_bool& done) {
+  MLN_TEST_OK(mln_test_render_step_until(
+    &fixture.render,
+    [](void* flag) { return static_cast<std::atomic_bool*>(flag)->load(); },
+    &done, mln_test_deadline_default(), "the thread that holds the driver"
+  ));
 }
 
 auto request_frame(const Fixture& fixture, const mln_frame_demand& demand)
@@ -232,7 +252,7 @@ void graphics_failures_finish_demands_and_lose_the_target() {
     MLN_TEST_OK(blocker.finish(fixture.render));
     auto results = std::vector<mln_render_frame_result>{};
     while (results.size() < 2) {
-      const auto batch = wait_for_results(fixture, 1);
+      const auto batch = wait_for_results(fixture);
       const auto view = mln_test_render_batch_view(batch);
       for (auto index = std::size_t{0}; index < view.result_count; ++index)
         results.push_back(batch_result(batch, index));
@@ -277,7 +297,7 @@ void an_unavailable_drawable_releases_its_slot_for_a_retry() {
   ));
   install_frame_failure(fixture, FrameFailure::Drawable);
   mln_test_render_request_forced(&fixture.render, 9102);
-  auto batch = wait_for_results(fixture, 1);
+  auto batch = wait_for_results(fixture);
   const auto unavailable = batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   auto snapshot =
@@ -289,7 +309,7 @@ void an_unavailable_drawable_releases_its_slot_for_a_retry() {
   demand.flags = MLN_FRAME_DEMAND_IF_NEEDED;
   demand.token = 9103;
   MLN_TEST_OK(request_frame(fixture, demand));
-  batch = wait_for_results(fixture, 1);
+  batch = wait_for_results(fixture);
   const auto retried = batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   destroy_fixture(fixture);
@@ -311,7 +331,7 @@ void an_idle_demand_reports_a_failed_backend_activation() {
   demand.flags = MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = 9104;
   MLN_TEST_OK(request_frame(fixture, demand));
-  const auto batch = wait_for_results(fixture, 1);
+  const auto batch = wait_for_results(fixture);
   const auto result = batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   auto snapshot =
@@ -353,12 +373,12 @@ void a_same_size_resize_redraws_after_an_earlier_queued_frame() {
     mln_test_render_fixture_finish_operation(&fixture.render, &resize)
   );
   mln_test_completion_destroy(&resize);
-  mln_render_frame_batch_release(wait_for_results(fixture, 1));
+  mln_render_frame_batch_release(wait_for_results(fixture));
   auto demand = mln_frame_demand_default();
   demand.flags = MLN_FRAME_DEMAND_IF_NEEDED;
   demand.token = 9003;
   MLN_TEST_OK(request_frame(fixture, demand));
-  const auto batch = wait_for_results(fixture, 1);
+  const auto batch = wait_for_results(fixture);
   const auto result = batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   destroy_fixture(fixture);
@@ -439,7 +459,7 @@ void a_barrier_waits_for_an_ordered_operation_after_a_running_demand() {
   TEST_ASSERT_TRUE(order.demand_held);
   MLN_TEST_OK(order.maintenance_submission);
   MLN_TEST_OK(order.barrier_submission);
-  const auto batch = wait_for_results(fixture, 1);
+  const auto batch = wait_for_results(fixture);
   TEST_ASSERT_EQUAL_UINT64(160, batch_result(batch, 0).token);
   mln_render_frame_batch_release(batch);
   // A later barrier also fences the maintenance callback before teardown.
@@ -477,11 +497,8 @@ void if_needed_demands_supersede_and_forced_demands_render() {
   MLN_TEST_OK(request_frame(fixture, newest));
   MLN_TEST_OK(request_frame(fixture, another_forced));
   MLN_TEST_OK(blocker.finish(fixture.render));
-  const auto batch = wait_for_results(fixture, 4);
-  const auto superseded = batch_result(batch, 0);
-  const auto rendered = batch_result(batch, 1);
-  const auto if_needed = batch_result(batch, 2);
-  const auto repeated = batch_result(batch, 3);
+  const auto [superseded, rendered, if_needed, repeated] =
+    wait_for_result_list<4>(fixture);
   TEST_ASSERT_EQUAL_UINT64(101, superseded.token);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_SUPERSEDED, superseded.disposition
@@ -499,7 +516,6 @@ void if_needed_demands_supersede_and_forced_demands_render() {
   TEST_ASSERT_GREATER_THAN_UINT64(
     rendered.frame_generation, repeated.frame_generation
   );
-  mln_render_frame_batch_release(batch);
   destroy_fixture(fixture);
 }
 
@@ -535,9 +551,7 @@ void supersession_preserves_a_forced_demand_after_a_resize() {
     mln_test_render_fixture_finish_operation(&fixture.render, &resize)
   );
   mln_test_completion_destroy(&resize);
-  const auto batch = wait_for_results(fixture, 3);
-  const auto superseded = batch_result(batch, 0);
-  const auto forced = batch_result(batch, 1);
+  const auto [superseded, forced, later] = wait_for_result_list<3>(fixture);
   TEST_ASSERT_EQUAL_UINT64(101, superseded.token);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_SUPERSEDED, superseded.disposition
@@ -545,8 +559,7 @@ void supersession_preserves_a_forced_demand_after_a_resize() {
   TEST_ASSERT_EQUAL_UINT64(102, forced.token);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, forced.disposition);
   TEST_ASSERT_EQUAL_UINT64(before.generation + 1, forced.generation);
-  TEST_ASSERT_EQUAL_UINT64(103, batch_result(batch, 2).token);
-  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(103, later.token);
   destroy_fixture(fixture);
 }
 
@@ -574,7 +587,7 @@ void scheduler_service_preserves_a_forced_demand_after_a_resize() {
     mln_test_render_fixture_finish_operation(&fixture.render, &resize)
   );
   mln_test_completion_destroy(&resize);
-  const auto batch = wait_for_results(fixture, 1);
+  const auto batch = wait_for_results(fixture);
   TEST_ASSERT_EQUAL_UINT64(201, batch_result(batch, 0).token);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_RENDERED, batch_result(batch, 0).disposition
@@ -638,7 +651,7 @@ void concurrent_resizes_publish_matching_map_and_driver_extents() {
   TEST_ASSERT_EQUAL_UINT32(map.view.extent.width, session.extent.width);
   TEST_ASSERT_EQUAL_UINT32(map.view.extent.height, session.extent.height);
   mln_test_render_request_forced(&fixture.render, 202);
-  const auto batch = wait_for_results(fixture, 1);
+  const auto batch = wait_for_results(fixture);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_RENDERED, batch_result(batch, 0).disposition
   );
@@ -1122,6 +1135,7 @@ struct ParkedDisposal {
   bool parked = false;
   mln_status first_status = MLN_STATUS_NATIVE_ERROR;
   mln_status second_status = MLN_STATUS_NATIVE_ERROR;
+  std::atomic_bool done{false};
 };
 
 // Disposes both frames while the driver is held just after parking a demand,
@@ -1133,6 +1147,7 @@ void dispose_when_parked(void* argument) {
   disposal.first_status = mln_acquired_frame_dispose(disposal.first, nullptr);
   disposal.second_status = mln_acquired_frame_dispose(disposal.second, nullptr);
   disposal.points->release(SyncPoint::RenderFrameDemandParked);
+  disposal.done = true;
 }
 
 // A demand that finds the ring full parks in the same locked section, so a
@@ -1151,20 +1166,15 @@ void a_demand_parked_as_disposal_quarantines_the_ring_gets_a_result() {
   points.hold(SyncPoint::RenderFrameDemandParked);
   auto* disposing = mln_test_thread_start(dispose_when_parked, &disposal);
   mln_test_render_request_forced(&fixture.render, 133);
-  if (fixture.render.driver != MLN_RENDER_DRIVER_CORE_WORKER) {
-    // The case's own thread runs the demand, so it parks inside this call
-    // until the disposal lets it go.
-
-    MLN_TEST_OK(
-      mln_render_session_service_driver_work(fixture.render.session, nullptr)
-    );
-  }
+  // A caller driver parks the demand inside a service of the case's thread
+  // until the disposal lets it go.
+  service_until(fixture, disposal.done);
   mln_test_thread_join(disposing);
   TEST_ASSERT_TRUE(disposal.parked);
   MLN_TEST_OK(disposal.first_status);
   MLN_TEST_OK(disposal.second_status);
 
-  const auto batch = wait_for_results(fixture, 1);
+  const auto batch = wait_for_results(fixture);
   const auto result = batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT64(133, result.token);
@@ -1226,6 +1236,7 @@ struct HeldCameraMove {
   bool held = false;
   mln_status status = MLN_STATUS_NATIVE_ERROR;
   bool published = false;
+  std::atomic_bool done{false};
 };
 
 // Publishes a map update while the driver is held after a waiting demand
@@ -1246,6 +1257,7 @@ void move_camera_while_the_demand_looks(void* argument) {
     "the camera update to be published"
   );
   move.points->release(SyncPoint::RenderDemandWaits);
+  move.done = true;
 }
 
 struct HeldBarrier {
@@ -1255,6 +1267,7 @@ struct HeldBarrier {
   bool held = false;
   mln_status status = MLN_STATUS_NATIVE_ERROR;
   mln_status next_status = MLN_STATUS_NATIVE_ERROR;
+  std::atomic_bool done{false};
 };
 
 void end_the_running_demand(void* context) {
@@ -1265,6 +1278,7 @@ void end_the_running_demand(void* context) {
   );
   barrier.next_status = request_waiting(*barrier.fixture, 158);
   barrier.points->release(SyncPoint::RenderDemandWaits);
+  barrier.done = true;
 }
 
 // A barrier accepted as a running demand starts waiting ends that demand.
@@ -1280,14 +1294,14 @@ void a_barrier_ends_a_running_wait_without_ending_a_later_demand() {
   auto barrier = HeldBarrier{&fixture, &points, &done};
   auto* submitting = mln_test_thread_start(end_the_running_demand, &barrier);
   MLN_TEST_OK(request_waiting(fixture, 157));
-  MLN_TEST_OK(mln_test_render_fixture_service(&fixture.render));
+  service_until(fixture, barrier.done);
   mln_test_thread_join(submitting);
   TEST_ASSERT_TRUE(barrier.held);
   MLN_TEST_OK(barrier.status);
   MLN_TEST_OK(barrier.next_status);
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture.render, &done));
   mln_test_completion_destroy(&done);
-  auto batch = wait_for_results(fixture, 1);
+  auto batch = wait_for_results(fixture);
   const auto ended = batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT64(157, ended.token);
@@ -1296,7 +1310,7 @@ void a_barrier_ends_a_running_wait_without_ending_a_later_demand() {
   MLN_TEST_OK(submit_camera_zoom(fixture.map, 3.0, move));
   TEST_ASSERT_TRUE(mln_test_completion_wait(&move, -1));
   mln_test_completion_destroy(&move);
-  batch = wait_for_results(fixture, 1);
+  batch = wait_for_results(fixture);
   const auto rendered = batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT64(158, rendered.token);
@@ -1325,20 +1339,15 @@ void a_waiting_demand_renders_an_update_that_lands_as_it_looks() {
   auto* moving =
     mln_test_thread_start(move_camera_while_the_demand_looks, &move);
   MLN_TEST_OK(request_waiting(fixture, 151));
-  if (fixture.render.driver != MLN_RENDER_DRIVER_CORE_WORKER) {
-    // The case's own thread runs the demand, so it is held inside this call
-    // until the camera update lands.
-
-    MLN_TEST_OK(
-      mln_render_session_service_driver_work(fixture.render.session, nullptr)
-    );
-  }
+  // A caller driver holds the demand inside a service of the case's thread
+  // until the camera update lands.
+  service_until(fixture, move.done);
   mln_test_thread_join(moving);
   TEST_ASSERT_TRUE(move.held);
   MLN_TEST_OK(move.status);
   TEST_ASSERT_TRUE(move.published);
 
-  const auto batch = wait_for_results(fixture, 1);
+  const auto batch = wait_for_results(fixture);
   const auto result = batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT64(151, result.token);
@@ -1377,7 +1386,7 @@ void a_waiting_demand_waits_for_an_update_the_session_has_yet_to_learn_of() {
   forced.flags = 0;
   forced.token = 155;
   MLN_TEST_OK(request_frame(fixture, forced));
-  auto batch = wait_for_results(fixture, 1);
+  auto batch = wait_for_results(fixture);
   const auto rendered = batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT64(155, rendered.token);
@@ -1405,7 +1414,7 @@ void a_waiting_demand_waits_for_an_update_the_session_has_yet_to_learn_of() {
   MLN_TEST_OK(submit_camera_zoom(fixture.map, 4.0, next_move));
   TEST_ASSERT_TRUE(mln_test_completion_wait(&next_move, -1));
   mln_test_completion_destroy(&next_move);
-  batch = wait_for_results(fixture, 1);
+  batch = wait_for_results(fixture);
   const auto waited = batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT64(156, waited.token);

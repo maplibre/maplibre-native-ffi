@@ -32,10 +32,17 @@ void mln_test_render_request_forced(
   const mln_test_render_fixture* fixture, uint64_t token
 );
 
-// Services the fixture until one drain yields at least `minimum` results
-// and returns that batch. The caller releases it.
+// Services the fixture until a drain yields results and returns that batch.
+// The caller releases it.
 mln_render_frame_batch mln_test_render_wait_for_results(
-  const mln_test_render_fixture* fixture, size_t minimum
+  const mln_test_render_fixture* fixture
+);
+
+// Services the fixture until `count` results have arrived, over as many drains
+// as they take, and copies them to `out` in order.
+void mln_test_render_wait_for_result_list(
+  const mln_test_render_fixture* fixture, size_t count,
+  mln_render_frame_result* out
 );
 
 // Reads the borrowed view of `batch`, which stays valid until its release.

@@ -130,7 +130,7 @@ static void an_attached_session_holds_its_map_and_refuses_destroy(void) {
     MLN_RENDER_SESSION_STATE_ATTACHED, read_snapshot(fixture.session).state
   );
   mln_test_render_request_forced(&fixture, 1);
-  mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture, 1);
+  mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_RENDERED,
     mln_test_render_batch_result(batch, 0).disposition
@@ -420,7 +420,7 @@ static void abandon_at_exit_keeps_every_graphics_object(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   mln_test_render_request_forced(&fixture, 1);
-  mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture, 1));
+  mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
 
   mln_render_abandon_result abandoned = {
     .size = sizeof(mln_render_abandon_result)
@@ -498,7 +498,7 @@ static void abandon_from_a_driver_completion_is_busy(void) {
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   // A rendered frame gives the maintenance command a renderer to act on.
   mln_test_render_request_forced(&fixture, 1);
-  mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture, 1));
+  mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
 
   for (size_t row = 0;
        row < sizeof(driver_run_commands) / sizeof(driver_run_commands[0]);
@@ -694,7 +694,7 @@ static void a_disposed_attached_session_releases_its_wakes_before_the_device(
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &attach));
   mln_test_completion_destroy(&attach);
   mln_test_render_request_forced(&fixture, 1);
-  mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture, 1));
+  mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
 
   mln_test_completion queued = mln_test_completion_default(0);
   MLN_TEST_OK(mln_render_session_reduce_memory_use(

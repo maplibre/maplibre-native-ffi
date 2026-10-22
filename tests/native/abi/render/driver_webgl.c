@@ -20,7 +20,7 @@ static void transferred_offscreen_canvas_runs_on_core_worker(void) {
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_SESSION_STATE_ATTACHED, snapshot.state);
 
   mln_test_render_request_forced(&fixture, 901);
-  mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture, 1);
+  mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
   TEST_ASSERT_EQUAL_UINT64(901, result.token);

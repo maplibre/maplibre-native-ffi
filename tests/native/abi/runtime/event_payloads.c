@@ -478,7 +478,7 @@ static void render_one_frame(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
   );
   const mln_render_frame_batch frames =
-    mln_test_render_wait_for_results(fixture, 1);
+    mln_test_render_wait_for_results(fixture);
   mln_render_frame_batch_release(frames);
   if (log != NULL) {
     log_drain(runtime, log);

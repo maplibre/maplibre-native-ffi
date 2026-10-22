@@ -29,65 +29,73 @@ void mln_test_render_request_forced(
 
 typedef struct results_wait {
   const mln_test_render_fixture* fixture;
-  size_t minimum;
   mln_render_frame_batch batch;
   bool failed;
 } results_wait;
 
-// Holds once one drain yields at least `minimum` results.
+// Holds once a drain yields results.
 static bool results_ready(void* context) {
   results_wait* wait = context;
+  const mln_status status = mln_render_session_drain_frame_results(
+    wait->fixture->session, &wait->batch, NULL
+  );
+  wait->failed = status != MLN_STATUS_OK && status != MLN_STATUS_NOT_READY;
+  return status != MLN_STATUS_NOT_READY;
+}
+
+typedef struct result_list_wait {
+  const mln_test_render_fixture* fixture;
+  size_t count;
+  size_t received;
+  mln_render_frame_result* out;
+  bool failed;
+} result_list_wait;
+
+// Holds once `count` results have arrived, copying each drain's in order.
+static bool result_list_ready(void* context) {
+  result_list_wait* wait = context;
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   const mln_status status = mln_render_session_drain_frame_results(
     wait->fixture->session, &batch, NULL
   );
-  if (status == MLN_STATUS_OK) {
-    mln_render_frame_batch_view view = {
-      .size = sizeof(mln_render_frame_batch_view)
-    };
-    if (
-      mln_render_frame_batch_get(batch, &view, NULL) == MLN_STATUS_OK &&
-      view.result_count >= wait->minimum
-    ) {
-      wait->batch = batch;
-      return true;
-    }
-    mln_render_frame_batch_release(batch);
-  } else if (status != MLN_STATUS_NOT_READY) {
+  if (status == MLN_STATUS_NOT_READY) return false;
+  if (status != MLN_STATUS_OK) {
     wait->failed = true;
     return true;
   }
-  return false;
+  const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
+  for (size_t index = 0; index < view.result_count; index += 1) {
+    if (wait->received < wait->count) {
+      wait->out[wait->received] = *mln_test_render_view_result(&view, index);
+    }
+    wait->received += 1;
+  }
+  mln_render_frame_batch_release(batch);
+  return wait->received >= wait->count;
 }
 
 mln_render_frame_batch mln_test_render_wait_for_results(
-  const mln_test_render_fixture* fixture, size_t minimum
+  const mln_test_render_fixture* fixture
 ) {
-  if (minimum > 1) {
-    mln_test_completion fence = mln_test_completion_default(0);
-    const mln_status status = mln_render_session_dump_debug_logs(
-      fixture->session, &fence.descriptor, NULL
-    );
-    if (status == MLN_STATUS_OK) {
-      const mln_status settled =
-        mln_test_render_fixture_finish_operation(fixture, &fence);
-      TEST_ASSERT_TRUE(
-        settled == MLN_STATUS_OK || settled == MLN_STATUS_TARGET_LOST
-      );
-    } else {
-      MLN_TEST_STATUS(MLN_STATUS_INVALID_STATE, status);
-      mln_test_completion_reject(&fence);
-    }
-    mln_test_completion_destroy(&fence);
-  }
-  results_wait wait = {
-    .fixture = fixture, .minimum = minimum, .batch = MLN_HANDLE_NULL
-  };
+  results_wait wait = {.fixture = fixture, .batch = MLN_HANDLE_NULL};
   MLN_TEST_OK(mln_test_render_step_until(
     fixture, results_ready, &wait, mln_test_deadline_default(), "frame results"
   ));
   TEST_ASSERT_FALSE(wait.failed);
   return wait.batch;
+}
+
+void mln_test_render_wait_for_result_list(
+  const mln_test_render_fixture* fixture, size_t count,
+  mln_render_frame_result* out
+) {
+  result_list_wait wait = {.fixture = fixture, .count = count, .out = out};
+  MLN_TEST_OK(mln_test_render_step_until(
+    fixture, result_list_ready, &wait, mln_test_deadline_default(),
+    "frame results"
+  ));
+  TEST_ASSERT_FALSE(wait.failed);
+  TEST_ASSERT_EQUAL_size_t(count, wait.received);
 }
 
 mln_render_frame_batch_view mln_test_render_batch_view(
@@ -174,9 +182,7 @@ bool mln_test_render_until_idle(
     MLN_TEST_OK(
       mln_render_session_request_frame(fixture->session, &demand, NULL)
     );
-    mln_render_frame_batch_release(
-      mln_test_render_wait_for_results(fixture, 1)
-    );
+    mln_render_frame_batch_release(mln_test_render_wait_for_results(fixture));
     drain_idle_events(&wait);
     TEST_ASSERT_FALSE_MESSAGE(
       mln_test_deadline_passed(deadline), "the map never reported idle"
@@ -189,7 +195,7 @@ mln_acquired_frame mln_test_render_and_acquire(
 ) {
   mln_test_render_request_forced(fixture, token);
   const mln_render_frame_batch batch =
-    mln_test_render_wait_for_results(fixture, 1);
+    mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT64(token, result.token);

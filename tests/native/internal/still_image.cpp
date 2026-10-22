@@ -48,7 +48,7 @@ void read_center_pixel(
 // and releases it so the texture ring never fills.
 void render_forced_frame(const mln_test_render_fixture& fixture) {
   mln_test_render_request_forced(&fixture, 1);
-  const auto batch = mln_test_render_wait_for_results(&fixture, 1);
+  const auto batch = mln_test_render_wait_for_results(&fixture);
   const auto result = mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);

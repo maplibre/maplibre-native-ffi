@@ -207,6 +207,13 @@ class TextureReadback {
   virtual auto take() -> mln::PremultipliedImage = 0;
 };
 
+// Reports that the GPU finished one of the session's frames. run() may run on
+// any thread.
+struct GpuFrameDone {
+  std::weak_ptr<mln_render_session_object> session;
+  void run() const noexcept;
+};
+
 class TextureSessionBackend {
  public:
   TextureSessionBackend() = default;
@@ -319,6 +326,14 @@ class TextureSessionBackend {
   virtual auto producer_sync() const -> mln_gpu_sync {
     return mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0};
   }
+  // Runs `done` once the GPU has finished the work submitted so far. While the
+  // GPU has as many unfinished frames as the ring has slots, the driver runs
+  // nothing, as a render that waits for its own GPU work would block it. Most
+  // renders do wait, so the default runs `done` at once; a backend whose render
+  // returns first runs it later, on whatever thread its graphics API reports
+  // completion, or at once when it cannot register. Runs on the driver thread,
+  // after the frame is published.
+  virtual void when_gpu_done(GpuFrameDone done) noexcept { done.run(); }
   // Records the backend metadata a host reads back from an acquired frame.
   // Runs on the driver thread, right after the render, for the slot the
   // backend still has selected, so it may touch graphics state; acquisition
@@ -686,6 +701,8 @@ struct RenderTextureState {
   // them, because every frame published before one runs names a texture that
   // it replaces.
   std::uint32_t pending_retargets = 0;
+  // Rendered frames whose GPU work the backend has yet to report finished.
+  std::size_t gpu_frames_in_flight = 0;
 };
 
 struct RenderDriverWork {

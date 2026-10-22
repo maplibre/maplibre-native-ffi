@@ -594,6 +594,10 @@ MLN_API mln_status mln_render_session_dump_debug_logs(
  * thread to its event loop between service calls, or waits for the wake in a
  * way that runs that loop.
  *
+ * A WebGPU texture render likewise returns before the GPU finishes its frame.
+ * Once the GPU has as many unfinished frames as the texture ring has slots, a
+ * service runs no driver work until the event loop reports one finished.
+ *
  * Returns:
  * - MLN_STATUS_OK once queued driver work has been serviced.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle.

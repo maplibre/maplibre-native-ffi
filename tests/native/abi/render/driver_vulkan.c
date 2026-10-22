@@ -241,7 +241,7 @@ static void render_one_frame(
 ) {
   mln_test_render_request_forced(fixture, token);
   const mln_render_frame_batch batch =
-    mln_test_render_wait_for_results(fixture, 1);
+    mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT64(token, result.token);
