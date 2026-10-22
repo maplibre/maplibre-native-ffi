@@ -99,11 +99,11 @@ export MISE_ENV=android,ohos
 
 Android native builds install the pinned NDK, platform, and build tools into the
 selected SDK when they are missing. The build compiles the TLS verifier's Kotlin
-helper into a dex that the library embeds, with the JDK and the Kotlin compiler
-version that Gradle pins. To prepare the SDK before you run Gradle or CMake
-directly, run `mise run android-sdk-packages`. Pass `--native-only` for native
-compilation alone, or `--sdk-root <path>` to provision a specific SDK. The
-package versions are variables in `mise.toml`, and a Git-ignored
+helper into a dex that the library embeds, with a JDK and a Kotlin compiler that
+mise installs for Android builds alone. To prepare the SDK before you run Gradle
+or CMake directly, run `mise run android-sdk-packages`. Pass `--native-only` for
+native compilation alone, or `--sdk-root <path>` to provision a specific SDK.
+The package versions are variables in `mise.toml`, and a Git-ignored
 `mise.local.toml` overrides them. After an NDK change, run
 `mise run clean <preset>` for each Android preset that you built, because CMake
 caches the compiler path.

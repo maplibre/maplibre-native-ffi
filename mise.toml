@@ -81,6 +81,9 @@ flutter_version = "3.47.7"
 hk_version = "2.7.0"
 java_version = "zulu-25.36.205.0"
 jvl_version = "2026.05.03"
+# The Kotlin compiler that builds the Android TLS helper, which needs no match
+# with the Kotlin that Gradle builds the binding with.
+kotlin_version = "2.4.21"
 libxml2_version = "2.13.9"
 node_version = "26.12.0"
 ninja_version = "1.13.2"
@@ -274,15 +277,11 @@ run = [
   { task = "//:check-cross-sdk", args = [
     "{{usage.preset}}",
   ] },
-  # Android builds compile the TLS helper with the Kotlin compiler that Gradle
-  # pins, then shrink it with R8, both on the pinned JDK.
   '''
-  launcher=()
-  if [[ "$usage_preset" == android-* ]]; then
-    kotlin_version="$(sed -n 's/^kotlin = "\(.*\)"$/\1/p' gradle/libs.versions.toml)"
-    launcher=(mise exec --no-deps "core:java@{{vars.java_version}}" "kotlin@$kotlin_version" --)
-  fi
-  ${launcher[@]+"${launcher[@]}"} .mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"
+  case "$usage_preset" in
+    android-*) mise run //:_android-workflow "$usage_preset" ;;
+    *) .mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset" ;;
+  esac
   ''',
   'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component loader',
   'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component test-graphics',
@@ -443,6 +442,14 @@ run = 'python3 scripts/check-exports.py "$usage_preset"'
 [tasks.check-export-calls]
 description = "Check that the C tests call every exported function by name."
 run = 'python3 scripts/check-export-calls.py "$@"'
+
+# Android builds compile the TLS helper with the Kotlin compiler, then shrink it
+# with R8, both on the JDK, so only their workflow installs the two.
+[tasks._android-workflow]
+hide = true
+usage = 'arg "<preset>"'
+tools = { "core:java" = "{{vars.java_version}}", kotlin = "{{vars.kotlin_version}}" }
+run = '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"'
 
 [tasks."android-sdk-packages"]
 description = "Install the pinned packages into the selected Android SDK."
