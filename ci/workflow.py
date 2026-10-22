@@ -162,6 +162,7 @@ def android_commands(preset: str, abi: str) -> list[str]:
         commands = [
             f"mise run //bindings/kotlin:build {preset}",
             f"mise run //bindings/kotlin:test {preset}",
+            f"mise run //bindings/kotlin:test:native {preset}",
             f"mise run //bindings/go:test {preset}",
             f"mise run //bindings/rust:test {preset}",
             f"mise run //bindings/zig:test {preset}",

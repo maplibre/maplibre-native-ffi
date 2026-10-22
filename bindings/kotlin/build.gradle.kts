@@ -170,9 +170,24 @@ kotlin {
       }
     }
 
-    // Every native test compiles against tests/graphics through cinterop. A target whose tests
-    // run links graphics.c, compiled here for that target; Android Kotlin/Native tests only
-    // compile, so their binaries never link it.
+    // Every native test compiles against tests/graphics through cinterop. Android
+    // loads the installed fixture beside the native library; other targets link its object.
+    if (name.startsWith("androidNative")) {
+      val toolchain = providers.gradleProperty("maplibre.android.nativeTestToolchain")
+      binaries.withType<TestExecutable>().configureEach {
+        // Kotlin's API 21 sysroot cannot resolve the API 26 library's transitive
+        // libc symbols. Android resolves them from the device's libc at load time.
+        linkerOpts("-lmln_test_graphics", "-Wl,--allow-shlib-undefined")
+        toolchain.orNull?.let { directory ->
+          val host =
+            if (hostPlatform.isMac) {
+              if (hostPlatform.isArm64) "macos_arm64" else "macos_x64"
+            } else "linux_x64"
+          val target = konanTarget.name.lowercase()
+          freeCompilerArgs += "-Xoverride-konan-properties=targetToolchain.$host-$target=$directory"
+        }
+      }
+    }
     val fixture = rootProject.file("tests/graphics")
     compilations.getByName("test") {
       cinterops.create("testGraphics") {

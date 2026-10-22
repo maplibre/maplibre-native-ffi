@@ -112,6 +112,8 @@ def command_support(command: str) -> list[tuple[str, str]]:
     kind, name, action = match.groups()
 
     if kind == "bindings" and name == "kotlin":
+        if action == "test:native":
+            return [("bindings-kotlin-native", "tested")]
         if action == "android-build":
             return [("bindings-kotlin-android", "build-only")]
         if action == "ios-build":

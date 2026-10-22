@@ -131,8 +131,7 @@ case "$usage_preset" in
   linux-gnu-x64-*) kotlin_target=linuxX64 ;;
   macos-arm64-*) kotlin_target=macosArm64 ;;
   android-*)
-    echo "The Kotlin/Native Android targets are build-only; use //bindings/kotlin:build with $usage_preset." >&2
-    exit 2
+    exec "$MISE_MONOREPO_ROOT/scripts/test-kotlin-native-android.sh" "$usage_preset"
     ;;
   ios-simulator-arm64-metal)
     kotlin_target=iosSimulatorArm64
