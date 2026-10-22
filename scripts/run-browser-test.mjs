@@ -12,18 +12,14 @@
 // the native suite stretches its waits by: MLN_TEST_TIMEOUT_SCALE, or 3.
 
 import { spawn } from "node:child_process";
-import {
-  createReadStream,
-  existsSync,
-  readdirSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+import { createReadStream, existsSync, statSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import process from "node:process";
+
+import { findChromium } from "./find-chromium.mjs";
 
 const CONTENT_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -62,49 +58,6 @@ const BACKEND_BROWSER_ARGS = {
 function fail(message) {
   console.error(`error: ${message}`);
   process.exit(2);
-}
-
-// Chromium comes from the environment where CI provides one, and otherwise from
-// whatever is on PATH or in a local Playwright cache.
-function findBrowser() {
-  const explicit = process.env.MLN_FFI_TEST_BROWSER ?? process.env.CHROME_PATH;
-  if (explicit) {
-    if (!existsSync(explicit))
-      fail(`MLN_FFI_TEST_BROWSER is not a file: ${explicit}`);
-    return explicit;
-  }
-  const names = [
-    "/usr/bin/google-chrome",
-    "/usr/bin/google-chrome-stable",
-    "/usr/bin/chromium",
-    "/usr/bin/chromium-browser",
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-  ];
-  for (const name of names) if (existsSync(name)) return name;
-
-  const cache = path.join(
-    process.env.HOME ?? "",
-    process.platform === "darwin"
-      ? "Library/Caches/ms-playwright"
-      : ".cache/ms-playwright",
-  );
-  if (existsSync(cache)) {
-    for (const entry of readdirSync(cache).sort().reverse()) {
-      if (!entry.startsWith("chromium-")) continue;
-      // Playwright has shipped both layouts; newer builds carry the arch.
-      for (const relative of [
-        "chrome-linux64/chrome",
-        "chrome-linux/chrome",
-        "chrome-mac/Chromium.app/Contents/MacOS/Chromium",
-      ]) {
-        const candidate = path.join(cache, entry, relative);
-        if (existsSync(candidate)) return candidate;
-      }
-    }
-  }
-  fail(
-    "no Chromium found; set MLN_FFI_TEST_BROWSER to a Chrome or Chromium binary",
-  );
 }
 
 const [targetPath, ...rest] = process.argv.slice(2);
@@ -287,7 +240,12 @@ const server = createServer((request, response) => {
   createReadStream(requested).pipe(response);
 });
 
-const browser = findBrowser();
+let browser;
+try {
+  browser = findChromium();
+} catch (error) {
+  fail(error.message);
+}
 const profile = await mkdtemp(path.join(tmpdir(), "mln-browser-test-"));
 
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));

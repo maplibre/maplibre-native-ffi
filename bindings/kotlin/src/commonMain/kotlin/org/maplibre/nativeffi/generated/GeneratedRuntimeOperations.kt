@@ -285,24 +285,6 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     }
 
   /**
-   * Registers or replaces the runtime-scoped outgoing HTTP header transform.
-   *
-   * See `mln_runtime_set_http_header_transform` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  public fun setHttpHeaderTransform(transform: HttpHeaderTransform): Deferred<Unit> =
-    nativeUnit(this, binding, bindingCallbacks) {
-      check(
-        C.mln_runtime_set_http_header_transform(
-          handle,
-          writeHttpHeaderTransform(transform),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
    * Starts a change to this runtime's maximum ambient cache size.
    *
    * See `mln_runtime_set_maximum_ambient_cache_size` in the
@@ -350,24 +332,6 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
           handle,
           regionId,
           observed,
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
-   * Registers or replaces a runtime-scoped network resource provider.
-   *
-   * See `mln_runtime_set_resource_provider` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  public fun setResourceProvider(provider: ResourceProvider): Deferred<Unit> =
-    nativeUnit(this, binding, bindingCallbacks) {
-      check(
-        C.mln_runtime_set_resource_provider(
-          handle,
-          writeResourceProvider(provider),
           completion,
           diagnostic,
         ),

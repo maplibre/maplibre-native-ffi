@@ -1083,9 +1083,22 @@ auto close_wakes(
   if (driver != nullptr) driver->close();
 }
 
+// Whether the driver can take the item at the front of its queue now. A
+// pending driver result holds the queue until it is ready.
+auto driver_work_runnable_locked(
+  const mln_render_session_object& session
+) noexcept -> bool {
+  if (session.driver_work.empty()) return false;
+  const auto& ready = session.driver_work.front().ready;
+  return !ready || ready();
+}
+
+// Wakes the driver when it can take work. Work queued behind a pending driver
+// result wakes nothing until resume_driver_work() reports the result ready.
 auto publish_driver_work_locked(
   mln_render_session_object& session, DeferredWakes& wakes
 ) noexcept -> void {
+  if (!driver_work_runnable_locked(session)) return;
   if (session.capabilities.driver == MLN_RENDER_DRIVER_CORE_WORKER) {
     session.worker_condition.notify_one();
   } else if (session.driver_wake != nullptr && !session.driver_wake_pending) {
@@ -1200,7 +1213,7 @@ auto run_core_worker(
       session->worker_condition.wait(lock, [&]() noexcept {
         return session->abandon_waiters == 0 &&
                (session->stop_worker || session->disposal_detach ||
-                !session->driver_work.empty());
+                driver_work_runnable_locked(*session));
       });
       if (session->disposal_detach) {
         lock.unlock();
@@ -1209,7 +1222,7 @@ auto run_core_worker(
       }
       if (
         session->views_invalidated || session->disposal_requested ||
-        (session->stop_worker && session->driver_work.empty())
+        !driver_work_runnable_locked(*session)
       )
         return;
       work = std::move(session->driver_work.front());
@@ -1350,6 +1363,56 @@ auto valueless_driver_work(
   };
 }
 
+auto abandon_driver_result(const std::shared_ptr<OperationObject>& operation)
+  -> std::function<void()> {
+  return [operation]() {
+    operation->complete(
+      MLN_STATUS_TARGET_LOST, "render target was abandoned", std::any{}
+    );
+  };
+}
+
+// Runs a driver result's work and completes its operation with what the work
+// reports. Work that leaves a PendingDriverResult puts the rest of the result
+// at the front of the driver's queue instead, where it holds the work behind
+// it until it is ready. The driver popped the running work from that front,
+// so the result keeps its place in the accepted order. No abandon can empty
+// the queue first: abandon waits out or refuses a driver call in flight.
+auto run_driver_result(
+  const std::shared_ptr<mln_render_session_object>& live,
+  const std::shared_ptr<OperationObject>& operation,
+  const std::function<mln_status(std::any&)>& work
+) -> void {
+  try {
+    auto result = std::any{};
+    const auto status = work(result);
+    auto* pending = std::any_cast<PendingDriverResult>(&result);
+    if (status == MLN_STATUS_OK && pending != nullptr) {
+      auto rest = RenderDriverWork{
+        [live, operation, finish = std::move(pending->finish)]() {
+          run_driver_result(live, operation, finish);
+        },
+        abandon_driver_result(operation), std::move(pending->ready)
+      };
+      auto wakes = DeferredWakes{};
+      const auto lock = std::scoped_lock{live->control_mutex};
+      live->driver_work.push_front(std::move(rest));
+      // The result may have become ready before it was queued, when its
+      // resume_driver_work() found nothing to wake.
+      publish_driver_work_locked(*live, wakes);
+      return;
+    }
+    operation->complete(
+      status,
+      status == MLN_STATUS_OK ? std::string{}
+                              : std::string{thread_last_error_message()},
+      std::move(result)
+    );
+  } catch (const std::exception& exception) {
+    operation->complete(MLN_STATUS_NATIVE_ERROR, exception.what(), std::any{});
+  }
+}
+
 }  // namespace
 
 auto lease_render_session(mln_render_session session)
@@ -1384,30 +1447,24 @@ auto enqueue_driver_result_operation(
     ) {
       return RenderDriverWork{
         [live, operation, work]() {
-          try {
-            auto result = std::any{};
-            const auto work_status = work(*live, result);
-            operation->complete(
-              work_status,
-              work_status == MLN_STATUS_OK
-                ? std::string{}
-                : std::string{thread_last_error_message()},
-              std::move(result)
-            );
-          } catch (const std::exception& exception) {
-            operation->complete(
-              MLN_STATUS_NATIVE_ERROR, exception.what(), std::any{}
-            );
-          }
+          run_driver_result(live, operation, [&](std::any& result) {
+            return work(*live, result);
+          });
         },
-        [operation]() {
-          operation->complete(
-            MLN_STATUS_TARGET_LOST, "render target was abandoned", std::any{}
-          );
-        }
+        abandon_driver_result(operation)
       };
     }
   );
+}
+
+auto resume_driver_work(
+  const std::weak_ptr<mln_render_session_object>& session
+) noexcept -> void {
+  const auto live = session.lock();
+  if (live == nullptr) return;
+  auto wakes = DeferredWakes{};
+  const auto lock = std::scoped_lock{live->control_mutex};
+  publish_driver_work_locked(*live, wakes);
 }
 
 auto validate_render_session_attach_request(
@@ -3182,7 +3239,7 @@ auto render_session_service_driver_work(mln_render_session session)
         session->driver_call_thread.reset();
         parked = take_parked_retirements_locked(*session);
         session->worker_condition.notify_all();
-        session->driver_wake_pending = !session->driver_work.empty();
+        session->driver_wake_pending = driver_work_runnable_locked(*session);
         if (session->driver_wake_pending) wakes.driver(session->driver_wake);
       }
       resubmit_parked_retirements(parked);
@@ -3192,7 +3249,7 @@ auto render_session_service_driver_work(mln_render_session session)
     auto item = RenderDriverWork{};
     {
       const auto lock = std::scoped_lock{live->control_mutex};
-      if (live->driver_work.empty()) break;
+      if (!driver_work_runnable_locked(*live)) break;
       item = std::move(live->driver_work.front());
       live->driver_work.pop_front();
     }

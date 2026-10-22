@@ -26,15 +26,18 @@
 // A pointer as its Kotlin Long carrier.
 #define MLN_JNI_ADDRESS(value) ((jlong)(uintptr_t)(value))
 
-// One static method of org.maplibre.nativeffi.internal.c.Upcalls, which an
-// upcall stub calls. JNI_OnLoad resolves its method ID.
+// One static method of org.maplibre.nativeffi.internal.c.Upcalls or
+// ThreadedUpcalls, which an upcall stub calls. JNI_OnLoad resolves its class
+// and method ID.
 typedef struct mln_jni_upcall {
+  const char* owner;
   const char* name;
   const char* signature;
+  jclass type;
   jmethodID method;
 } mln_jni_upcall;
 
-// Calls an Upcalls method from any thread, attaching a native thread for its
+// Calls an upcall method from any thread, attaching a native thread for its
 // lifetime. Each returns false, leaving *result untouched, when the thread
 // cannot attach or the method throws; the Kotlin methods catch everything, so
 // that happens only on a JVM error such as running out of memory.
@@ -47,7 +50,7 @@ bool mln_jni_upcall_long(
 );
 
 // Defined by the generated shim: the natives of
-// org.maplibre.nativeffi.internal.c.C, the Upcalls methods, and one C function
+// org.maplibre.nativeffi.internal.c.C, the upcall methods, and one C function
 // per upcall, in the order UpcallStubs indexes them.
 extern const JNINativeMethod mln_jni_methods[];
 extern const JNINativeMethod mln_jni_critical_methods[];

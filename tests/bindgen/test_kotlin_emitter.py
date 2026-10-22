@@ -15,7 +15,7 @@ from support import (
     run,
 )
 
-from tools.bindgen.emitters import kotlin
+from tools.bindgen.emitters import kotlin, kotlin_callbacks
 from tools.bindgen.emitters.kotlin_abi import Abi, LayoutError
 
 # One target per data model a Kotlin target uses: Android ARM32 is ILP32, and
@@ -124,6 +124,72 @@ class KotlinLayoutTests(unittest.TestCase):
                     home / "include",
                     machine,
                 )
+
+    def test_the_wasm_glue_compiles_against_the_headers_for_wasm32(self):
+        # Each wrapper casts its wasm32 carriers to the C parameter types, and a
+        # thread-start wrapper asserts that its arguments fit the thread start,
+        # so compiling the glue against the real prototypes checks both.
+        clang = require_tool(self, "clang").executable
+        source = kotlin.generate(real_api())[kotlin.WASM_GLUE]
+        with TemporaryDirectory() as directory:
+            check = Path(directory) / "glue.c"
+            check.write_text(source)
+            run(
+                self,
+                [
+                    clang,
+                    "--target=wasm32-unknown-unknown",
+                    "-ffreestanding",
+                    "-std=c2x",
+                    "-fsyntax-only",
+                    "-Wall",
+                    "-Werror",
+                    "-DMLN_STATIC",
+                    f"-I{ROOT / 'include'}",
+                    f"-I{NATIVE_INCLUDE}",
+                    f"-I{ROOT / 'bindings/kotlin/wasm'}",
+                    str(check),
+                ],
+                ROOT,
+            )
+
+    def test_split_registrations_take_a_form_per_target(self):
+        _functions, _unsupported, bodies, split, values, _native = kotlin.lowered(
+            real_api()
+        )
+        for lowering in split:
+            values.split_codecs(lowering)
+        values.codecs()
+        # The registrations whose answer a callback computes, or a rule
+        # replaces, differ by target, so common code takes none of them.
+        self.assertEqual(
+            {
+                value.native
+                for value in values.bound.public_values.values()
+                if kotlin_callbacks.splits(value, values)
+            },
+            {"mln_log_handler", "mln_resource_provider", "mln_http_header_transform"},
+        )
+        registrations = {
+            "mln_log_set_callback",
+            "mln_runtime_set_resource_provider",
+            "mln_runtime_set_http_header_transform",
+        }
+        response = "mln_http_header_transform_response_set_header"
+        self.assertEqual(set(split[kotlin_callbacks.ASYNC]), registrations)
+        self.assertEqual(
+            set(split[kotlin_callbacks.THREADED]), registrations | {response}
+        )
+        self.assertFalse((registrations | {response}) & set(bodies))
+        # Only the threaded forms answer native from their callbacks, and every
+        # other queue-form site has a delivery that the page drains into it.
+        for site in kotlin_callbacks.sites(values).values():
+            with self.subTest(site=site.name):
+                if site.split == kotlin_callbacks.THREADED:
+                    self.assertEqual(site.form, "direct")
+                elif site.form == "queue":
+                    callback = values.bound.callbacks[site.callback]
+                    self.assertIsNotNone(callback.delivery)
 
     def test_failed_jni_upcall_releases_owned_arguments(self):
         java = Path(require_tool(self, "java", ROOT / "bindings/kotlin").executable)

@@ -7,7 +7,6 @@ import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.callback.CallbackRoots
 import org.maplibre.nativeffi.internal.callback.contain
 import org.maplibre.nativeffi.internal.callback.upcall
-import org.maplibre.nativeffi.internal.callback.withCallbackScope
 import org.maplibre.nativeffi.internal.memory.*
 
 /** The Kotlin side of each C function pointer the binding hands to native. */
@@ -25,125 +24,98 @@ internal object Upcalls {
     contain("release_user_data", Unit) { CallbackRoots.release(userData) }
 
   @JvmStatic
-  fun logHandlerCallback(
-    userData: Long,
-    severity: Int,
-    event: Int,
-    code: Long,
-    message: Long,
-  ): Int =
-    upcall<LogHandler, Int>("mln_log_callback", userData, 0) { value ->
-      value
-        .callback(
-          LogSeverity(severity.toUInt()),
-          LogEvent(event.toUInt()),
-          code,
-          readCString(message),
-        )
-        .toInt()
-    }
-
-  @JvmStatic
-  fun customGeometrySourceOptionsFetchTile(userData: Long, tileId: Long): Unit =
-    upcall<CustomGeometrySourceOptions, Unit>(
+  fun customGeometrySourceOptionsFetchTile(userData: Long, tileId: Long): Unit = run {
+    upcall<CustomGeometrySourceOptions, Boolean>(
       "mln_custom_source_fetch_tile_callback",
       userData,
-      Unit,
+      false,
     ) { value ->
-      val invoke = value.fetchTile ?: return@upcall Unit
+      val invoke = value.fetchTile ?: return@upcall false
       invoke(readCanonicalTileId(tileId))
+      true
     }
+    Unit
+  }
 
   @JvmStatic
-  fun customGeometrySourceOptionsCancelTile(userData: Long, tileId: Long): Unit =
-    upcall<CustomGeometrySourceOptions, Unit>(
+  fun customGeometrySourceOptionsCancelTile(userData: Long, tileId: Long): Unit = run {
+    upcall<CustomGeometrySourceOptions, Boolean>(
       "mln_custom_source_cancel_tile_callback",
       userData,
-      Unit,
+      false,
     ) { value ->
-      val invoke = value.cancelTile ?: return@upcall Unit
+      val invoke = value.cancelTile ?: return@upcall false
       invoke(readCanonicalTileId(tileId))
+      true
     }
+    Unit
+  }
 
   @JvmStatic
-  fun customMvtVectorSourceOptionsFetchTile(userData: Long, tileId: Long): Unit =
-    upcall<CustomMvtVectorSourceOptions, Unit>(
+  fun customMvtVectorSourceOptionsFetchTile(userData: Long, tileId: Long): Unit = run {
+    upcall<CustomMvtVectorSourceOptions, Boolean>(
       "mln_custom_source_fetch_tile_callback",
       userData,
-      Unit,
+      false,
     ) { value ->
-      val invoke = value.fetchTile ?: return@upcall Unit
+      val invoke = value.fetchTile ?: return@upcall false
       invoke(readCanonicalTileId(tileId))
+      true
     }
+    Unit
+  }
 
   @JvmStatic
-  fun customMvtVectorSourceOptionsCancelTile(userData: Long, tileId: Long): Unit =
-    upcall<CustomMvtVectorSourceOptions, Unit>(
+  fun customMvtVectorSourceOptionsCancelTile(userData: Long, tileId: Long): Unit = run {
+    upcall<CustomMvtVectorSourceOptions, Boolean>(
       "mln_custom_source_cancel_tile_callback",
       userData,
-      Unit,
+      false,
     ) { value ->
-      val invoke = value.cancelTile ?: return@upcall Unit
+      val invoke = value.cancelTile ?: return@upcall false
       invoke(readCanonicalTileId(tileId))
+      true
     }
+    Unit
+  }
 
   @JvmStatic
-  fun resourceRequestCancelHandlerCallback(userData: Long, handle: Long): Unit =
-    upcall<ResourceRequestCancelHandler, Unit>(
+  fun resourceRequestCancelHandlerCallback(userData: Long, handle: Long): Unit = run {
+    upcall<ResourceRequestCancelHandler, Boolean>(
       "mln_resource_request_cancel_callback",
       userData,
-      Unit,
+      false,
     ) { value ->
       value.callback()
+      true
     }
+    Unit
+  }
 
   @JvmStatic
-  fun runtimeEventHandlerCallback(userData: Long, events: Long): Unit =
-    upcall<RuntimeEventHandler, Unit>("mln_runtime_event_callback", userData, Unit) { value ->
-      val invoke = value.callback ?: return@upcall Unit
+  fun runtimeEventHandlerCallback(userData: Long, events: Long): Unit = run {
+    upcall<RuntimeEventHandler, Boolean>("mln_runtime_event_callback", userData, false) { value ->
+      val invoke = value.callback ?: return@upcall false
       invoke(readEventBatchView(events))
+      true
     }
+    Unit
+  }
 
   @JvmStatic
-  fun httpHeaderTransformCallback(userData: Long, kind: Int, url: Long, outResponse: Long): Int =
-    upcall<HttpHeaderTransform, Int>("mln_http_header_transform_callback", userData, -5) { value ->
-      val invoke = value.callback ?: return@upcall -5
-      withCallbackScope { scope ->
-        invoke(
-          ResourceKind(kind.toUInt()),
-          readCString(url),
-          HttpHeaderTransformResponse(outResponse, scope),
-        )
-      }
-      0
-    }
-
-  @JvmStatic
-  fun resourceProviderCallback(userData: Long, request: Long, handle: Long): Int =
-    upcall<ResourceProvider, Int>("mln_resource_provider_callback", userData, -1) { value ->
-      val requestOwner = ResourceRequestHandle(handle)
-      val decision =
-        try {
-          value.callback(readResourceRequestInfo(request), requestOwner).rawValue.toInt()
-        } catch (failure: Throwable) {
-          requestOwner.binding.handOff()
-          throw failure
-        }
-      if (decision != 1) requestOwner.binding.handOff()
-      decision
-    }
-
-  @JvmStatic
-  fun resourceTransformCallback(userData: Long, kind: Int, url: Long, request: Long): Unit =
-    upcall<ResourceTransform, Unit>("mln_resource_transform_callback", userData, Unit) { value ->
-      val requestOwner = ResourceTransformRequestHandle(request)
-      try {
+  fun resourceTransformCallback(userData: Long, kind: Int, url: Long, request: Long): Unit = run {
+    val requestOwner = ResourceTransformRequestHandle(request)
+    if (
+      !upcall<ResourceTransform, Boolean>("mln_resource_transform_callback", userData, false) {
+        value ->
         value.callback(ResourceKind(kind.toUInt()), readCString(url), requestOwner)
-      } catch (failure: Throwable) {
-        requestOwner.close()
-        throw failure
+        true
       }
+    ) {
+      requestOwner.close()
     }
+    Unit
+  }
 
   @JvmStatic
   fun wakeCallback(userData: Long): Unit =
@@ -167,28 +139,37 @@ internal object Upcalls {
     }
 
   @JvmStatic
-  fun cameraTransitionHandlerCallback(userData: Long, end: Long): Unit =
-    upcall<CameraTransitionHandler, Unit>("mln_camera_transition_end_callback", userData, Unit) {
-      value ->
-      val invoke = value.callback ?: return@upcall Unit
+  fun cameraTransitionHandlerCallback(userData: Long, end: Long): Unit = run {
+    upcall<CameraTransitionHandler, Boolean>(
+      "mln_camera_transition_end_callback",
+      userData,
+      false,
+    ) { value ->
+      val invoke = value.callback ?: return@upcall false
       invoke(readCameraTransitionEnd(end))
+      true
     }
+    Unit
+  }
 }
 
-/** The C function pointer that calls each [Upcalls] method. */
+/**
+ * The C function pointer that calls each [Upcalls] method, and on a threaded target each
+ * `ThreadedUpcalls` method.
+ */
 internal expect object UpcallStubs {
   val completion: Long
   val completionRelease: Long
   val releaseRoot: Long
   val logHandlerCallback: Long
+  val httpHeaderTransformCallback: Long
+  val resourceProviderCallback: Long
   val customGeometrySourceOptionsFetchTile: Long
   val customGeometrySourceOptionsCancelTile: Long
   val customMvtVectorSourceOptionsFetchTile: Long
   val customMvtVectorSourceOptionsCancelTile: Long
   val resourceRequestCancelHandlerCallback: Long
   val runtimeEventHandlerCallback: Long
-  val httpHeaderTransformCallback: Long
-  val resourceProviderCallback: Long
   val resourceTransformCallback: Long
   val wakeCallback: Long
   val queueLockLock: Long

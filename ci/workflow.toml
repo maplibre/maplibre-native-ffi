@@ -122,10 +122,19 @@ commands = [{ task = "//bindings/dart:test" }]
 platforms = ["linux-gnu", "macos"]
 commands = [{ task = "//bindings/typescript:test" }]
 
-# Run Rust browser tests against the Emscripten build.
+# The browser suites run against the Emscripten build in headless Chromium. The
+# Kotlin/Wasm suite runs on the page and links its own module from the package.
+# The canary passes only when a test that fails on purpose fails the Kotlin/Wasm
+# run, and one backend is enough to show that.
 [[suites]]
 platforms = ["emscripten"]
-commands = [{ task = "//bindings/rust:test" }]
+commands = [
+  { task = "//bindings/rust:test" },
+  { task = "//bindings/kotlin:test" },
+  { task = "//bindings/kotlin:test:wasm-canary", include = [
+    "emscripten-wasm32-webgl",
+  ] },
+]
 
 # The jobs that each coverage unit in `.config/rubberstamp.yml` owns. Rubberstamp
 # plans which units a pull request runs. `targets` matches native target

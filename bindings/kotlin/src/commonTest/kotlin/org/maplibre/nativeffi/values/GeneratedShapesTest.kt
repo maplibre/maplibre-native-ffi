@@ -48,7 +48,7 @@ class GeneratedShapesTest {
   }
 
   @Test
-  fun hostStringsUseViewsAndNativeLentStringsDecode(): Unit = runSuspendTest {
+  fun hostStringsUseViewsAndNativeLentStringsDecode() = runSuspendTest {
     NativeArena().use { arena ->
       assertEquals("native-lent é", readCString(arena.cString("native-lent é")))
     }
@@ -74,7 +74,7 @@ class GeneratedShapesTest {
   }
 
   @Test
-  fun presenceFieldsRoundTripSetAndAbsentValues(): Unit = runSuspendTest {
+  fun presenceFieldsRoundTripSetAndAbsentValues() = runSuspendTest {
     withMap {
       val camera = CameraOptions(center = LatLng(12.0, 34.0), zoom = 4.0, bearing = 25.0)
       map.updateCamera(CameraUpdate(camera = camera)).awaitCommitted()
@@ -105,7 +105,7 @@ class GeneratedShapesTest {
   }
 
   @Test
-  fun aStridedImageCopiesItsRowsAndReadsBackUnpadded(): Unit = runSuspendTest {
+  fun aStridedImageCopiesItsRowsAndReadsBackUnpadded() = runSuspendTest {
     withMap(mapMode = MapMode.STATIC) {
       loadStyle()
       val width = 2
@@ -133,7 +133,7 @@ class GeneratedShapesTest {
   }
 
   @Test
-  fun openEnumsKeepUnknownValuesAnd64BitCarriersKeepTheirHighBits(): Unit = runSuspendTest {
+  fun openEnumsKeepUnknownValuesAnd64BitCarriersKeepTheirHighBits() = runSuspendTest {
     withMap {
       // The binding passes an unknown enum value through unchanged, and native rejects it.
       assertFailsWithStatus(Status.INVALID_ARGUMENT) {
@@ -167,7 +167,7 @@ class GeneratedShapesTest {
   }
 
   @Test
-  fun arrayInputsAreCopiedAtSubmission(): Unit = runSuspendTest {
+  fun arrayInputsAreCopiedAtSubmission() = runSuspendTest {
     withMap {
       map
         .updateCamera(CameraUpdate(camera = CameraOptions(center = LatLng(10.0, 20.0), zoom = 3.0)))

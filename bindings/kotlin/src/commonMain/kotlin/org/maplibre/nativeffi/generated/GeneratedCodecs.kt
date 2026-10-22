@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.generated
 
 import org.maplibre.nativeffi.internal.c.UpcallStubs
 import org.maplibre.nativeffi.internal.call.NativeCall
+import org.maplibre.nativeffi.internal.delivery.HostDelivery
 import org.maplibre.nativeffi.internal.lifecycle.ViewScope
 import org.maplibre.nativeffi.internal.memory.*
 import org.maplibre.nativeffi.internal.status.invalidArgument
@@ -78,16 +79,6 @@ internal fun NativeArena.putProjectedMeters(target: Long, value: ProjectedMeters
 internal fun NativeArena.writeProjectedMeters(value: ProjectedMeters): Long =
   allocate(16, 8).also { putProjectedMeters(it, value) }
 
-internal fun NativeCall.putLogHandler(target: Long, value: LogHandler) {
-  writeU32(target, w(24, 40).toUInt())
-  writeAddress(target + w(8, 16), registrations.register(value))
-  writeAddress(target + w(4, 8), UpcallStubs.logHandlerCallback)
-  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
-}
-
-internal fun NativeCall.writeLogHandler(value: LogHandler): Long =
-  allocate(w(24, 40), 8).also { putLogHandler(it, value) }
-
 internal fun NativeArena.putLogicalExtent(target: Long, value: LogicalExtent) {
   writeU32(target, value.width)
   writeU32(target + 4, value.height)
@@ -162,15 +153,19 @@ internal fun NativeCall.putCustomGeometrySourceOptions(
   writeU32(target + 4, fields)
   if (value.fetchTile == null && value.cancelTile == null) return
   writeAddress(target + w(16, 24), registrations.register(value))
-  writeAddress(
-    target + 8,
-    if (value.fetchTile == null) 0L else UpcallStubs.customGeometrySourceOptionsFetchTile,
-  )
-  writeAddress(
-    target + w(12, 16),
-    if (value.cancelTile == null) 0L else UpcallStubs.customGeometrySourceOptionsCancelTile,
-  )
-  writeAddress(target + w(60, 72), UpcallStubs.releaseRoot)
+  val queue = HostDelivery.queue
+  if (queue != 0L) writeI64(target + w(64, 80), queue)
+  else {
+    writeAddress(
+      target + 8,
+      if (value.fetchTile == null) 0L else UpcallStubs.customGeometrySourceOptionsFetchTile,
+    )
+    writeAddress(
+      target + w(12, 16),
+      if (value.cancelTile == null) 0L else UpcallStubs.customGeometrySourceOptionsCancelTile,
+    )
+    writeAddress(target + w(60, 72), UpcallStubs.releaseRoot)
+  }
 }
 
 internal fun NativeCall.writeCustomGeometrySourceOptions(value: CustomGeometrySourceOptions): Long =
@@ -193,15 +188,19 @@ internal fun NativeCall.putCustomMvtVectorSourceOptions(
   writeU32(target + 4, fields)
   if (value.fetchTile == null && value.cancelTile == null) return
   writeAddress(target + w(16, 24), registrations.register(value))
-  writeAddress(
-    target + 8,
-    if (value.fetchTile == null) 0L else UpcallStubs.customMvtVectorSourceOptionsFetchTile,
-  )
-  writeAddress(
-    target + w(12, 16),
-    if (value.cancelTile == null) 0L else UpcallStubs.customMvtVectorSourceOptionsCancelTile,
-  )
-  writeAddress(target + w(40, 48), UpcallStubs.releaseRoot)
+  val queue = HostDelivery.queue
+  if (queue != 0L) writeI64(target + w(48, 56), queue)
+  else {
+    writeAddress(
+      target + 8,
+      if (value.fetchTile == null) 0L else UpcallStubs.customMvtVectorSourceOptionsFetchTile,
+    )
+    writeAddress(
+      target + w(12, 16),
+      if (value.cancelTile == null) 0L else UpcallStubs.customMvtVectorSourceOptionsCancelTile,
+    )
+    writeAddress(target + w(40, 48), UpcallStubs.releaseRoot)
+  }
 }
 
 internal fun NativeCall.writeCustomMvtVectorSourceOptions(
@@ -873,8 +872,12 @@ internal fun NativeCall.putResourceRequestCancelHandler(
 ) {
   writeU32(target, w(24, 40).toUInt())
   writeAddress(target + w(8, 16), registrations.register(value))
-  writeAddress(target + w(4, 8), UpcallStubs.resourceRequestCancelHandlerCallback)
-  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  val queue = HostDelivery.queue
+  if (queue != 0L) writeI64(target + w(16, 32), queue)
+  else {
+    writeAddress(target + w(4, 8), UpcallStubs.resourceRequestCancelHandlerCallback)
+    writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  }
 }
 
 internal fun NativeCall.writeResourceRequestCancelHandler(
@@ -915,53 +918,53 @@ internal fun NativeCall.putRuntimeEventHandler(target: Long, value: RuntimeEvent
   writeU32(target, w(24, 40).toUInt())
   if (value.callback == null) return
   writeAddress(target + w(8, 16), registrations.register(value))
-  writeAddress(target + w(4, 8), UpcallStubs.runtimeEventHandlerCallback)
-  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  val queue = HostDelivery.queue
+  if (queue != 0L) writeI64(target + w(16, 32), queue)
+  else {
+    writeAddress(target + w(4, 8), UpcallStubs.runtimeEventHandlerCallback)
+    writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  }
 }
 
 internal fun NativeCall.writeRuntimeEventHandler(value: RuntimeEventHandler): Long =
   allocate(w(24, 40), 8).also { putRuntimeEventHandler(it, value) }
 
-internal fun NativeCall.putHttpHeaderTransform(target: Long, value: HttpHeaderTransform) {
-  writeU32(target, w(24, 48).toUInt())
-  writeAddress(
-    target + w(16, 32),
-    array(value.rules, w(24, 40), w(4, 8)) { at, item -> putHttpHeaderRule(at, item) },
-  )
-  writeSize(target + w(20, 40), value.rules.size.toULong())
-  if (value.callback == null) return
-  writeAddress(target + w(8, 16), registrations.register(value))
-  writeAddress(target + w(4, 8), UpcallStubs.httpHeaderTransformCallback)
-  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
-}
-
-internal fun NativeCall.writeHttpHeaderTransform(value: HttpHeaderTransform): Long =
-  allocate(w(24, 48), w(4, 8)).also { putHttpHeaderTransform(it, value) }
-
-internal fun NativeCall.putResourceProvider(target: Long, value: ResourceProvider) {
-  writeU32(target, w(32, 56).toUInt())
-  writeAddress(
-    target + w(24, 40),
-    array(value.routes, w(16, 24), w(4, 8)) { at, item -> putResourceRoute(at, item) },
-  )
-  writeSize(target + w(28, 48), value.routes.size.toULong())
-  writeAddress(target + w(8, 16), registrations.register(value))
-  writeAddress(target + w(4, 8), UpcallStubs.resourceProviderCallback)
-  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
-}
-
-internal fun NativeCall.writeResourceProvider(value: ResourceProvider): Long =
-  allocate(w(32, 56), 8).also { putResourceProvider(it, value) }
-
 internal fun NativeCall.putResourceTransform(target: Long, value: ResourceTransform) {
   writeU32(target, w(24, 40).toUInt())
   writeAddress(target + w(8, 16), registrations.register(value))
-  writeAddress(target + w(4, 8), UpcallStubs.resourceTransformCallback)
-  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  val queue = HostDelivery.queue
+  if (queue != 0L) writeI64(target + w(16, 32), queue)
+  else {
+    writeAddress(target + w(4, 8), UpcallStubs.resourceTransformCallback)
+    writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  }
 }
 
 internal fun NativeCall.writeResourceTransform(value: ResourceTransform): Long =
   allocate(w(24, 40), 8).also { putResourceTransform(it, value) }
+
+internal fun NativeArena.putHttpHeaderRule(target: Long, value: HttpHeaderRule) {
+  writeU32(target, value.kinds.rawValue)
+  writeU32(target + 4, value.flags.rawValue)
+  putView(target + 8, value.url)
+  writeAddress(
+    target + w(16, 24),
+    array(value.headers, w(16, 32), w(4, 8)) { at, item -> putHttpHeader(at, item) },
+  )
+  writeSize(target + w(20, 32), value.headers.size.toULong())
+}
+
+internal fun NativeArena.writeHttpHeaderRule(value: HttpHeaderRule): Long =
+  allocate(w(24, 40), w(4, 8)).also { putHttpHeaderRule(it, value) }
+
+internal fun NativeArena.putResourceRoute(target: Long, value: ResourceRoute) {
+  writeU32(target, value.kinds.rawValue)
+  writeU32(target + 4, value.flags.rawValue)
+  putView(target + 8, value.url)
+}
+
+internal fun NativeArena.writeResourceRoute(value: ResourceRoute): Long =
+  allocate(w(16, 24), w(4, 8)).also { putResourceRoute(it, value) }
 
 internal fun readMetalTextureFrame(source: Long, scope: ViewScope? = null): MetalTextureFrame =
   MetalTextureFrame(
@@ -1602,6 +1605,24 @@ internal fun readOfflineRegionStatus(source: Long): OfflineRegionStatus =
     complete = readBool(source + 57),
   )
 
+internal fun readResourceRequestInfo(source: Long): ResourceRequestInfo {
+  val fields = readU32(source + 4)
+  return ResourceRequestInfo(
+    requestedUrl = readCStringOrNull(readAddress(source + 8)),
+    resolvedUrl = readCStringOrNull(readAddress(source + w(12, 16))),
+    kind = ResourceKind(readU32(source + w(16, 24))),
+    loadingMethod = ResourceLoadingMethod(readU32(source + w(20, 28))),
+    priority = ResourcePriority(readU32(source + w(24, 32))),
+    usage = ResourceUsage(readU32(source + w(28, 36))),
+    storagePolicy = ResourceStoragePolicy(readU32(source + w(32, 40))),
+    range = if ((fields and 1u) != 0u) readResourceRange(source + w(40, 48)) else null,
+    priorModifiedUnixMs = if ((fields and 2u) != 0u) readI64(source + w(56, 64)) else null,
+    priorExpiresUnixMs = if ((fields and 4u) != 0u) readI64(source + w(64, 72)) else null,
+    priorEtag = readCStringOrNull(readAddress(source + w(72, 80))),
+    priorData = readBytes(readAddress(source + w(76, 88)), readSize(source + w(80, 96))),
+  )
+}
+
 internal fun NativeCall.putAnimationOptions(target: Long, value: AnimationOptions) {
   var fields = 0u
   value.durationMs?.let {
@@ -1828,28 +1849,13 @@ internal fun NativeArena.writeOfflineGeometryRegionDefinition(
   value: OfflineGeometryRegionDefinition,
 ): Long = allocate(w(40, 56), 8).also { putOfflineGeometryRegionDefinition(it, value) }
 
-internal fun NativeArena.putHttpHeaderRule(target: Long, value: HttpHeaderRule) {
-  writeU32(target, value.kinds.rawValue)
-  writeU32(target + 4, value.flags.rawValue)
-  putView(target + 8, value.url)
-  writeAddress(
-    target + w(16, 24),
-    array(value.headers, w(16, 32), w(4, 8)) { at, item -> putHttpHeader(at, item) },
-  )
-  writeSize(target + w(20, 32), value.headers.size.toULong())
+internal fun NativeArena.putHttpHeader(target: Long, value: HttpHeader) {
+  putView(target, value.name)
+  putView(target + w(8, 16), value.value)
 }
 
-internal fun NativeArena.writeHttpHeaderRule(value: HttpHeaderRule): Long =
-  allocate(w(24, 40), w(4, 8)).also { putHttpHeaderRule(it, value) }
-
-internal fun NativeArena.putResourceRoute(target: Long, value: ResourceRoute) {
-  writeU32(target, value.kinds.rawValue)
-  writeU32(target + 4, value.flags.rawValue)
-  putView(target + 8, value.url)
-}
-
-internal fun NativeArena.writeResourceRoute(value: ResourceRoute): Long =
-  allocate(w(16, 24), w(4, 8)).also { putResourceRoute(it, value) }
+internal fun NativeArena.writeHttpHeader(value: HttpHeader): Long =
+  allocate(w(16, 32), w(4, 8)).also { putHttpHeader(it, value) }
 
 internal fun readCanonicalTileId(source: Long): CanonicalTileId =
   CanonicalTileId(z = readU32(source), x = readU32(source + 4), y = readU32(source + 8))
@@ -1866,24 +1872,6 @@ internal fun readEventBatchView(source: Long): EventBatchView =
         readRuntimeEvent(item)
       },
   )
-
-internal fun readResourceRequestInfo(source: Long): ResourceRequestInfo {
-  val fields = readU32(source + 4)
-  return ResourceRequestInfo(
-    requestedUrl = readCStringOrNull(readAddress(source + 8)),
-    resolvedUrl = readCStringOrNull(readAddress(source + w(12, 16))),
-    kind = ResourceKind(readU32(source + w(16, 24))),
-    loadingMethod = ResourceLoadingMethod(readU32(source + w(20, 28))),
-    priority = ResourcePriority(readU32(source + w(24, 32))),
-    usage = ResourceUsage(readU32(source + w(28, 36))),
-    storagePolicy = ResourceStoragePolicy(readU32(source + w(32, 40))),
-    range = if ((fields and 1u) != 0u) readResourceRange(source + w(40, 48)) else null,
-    priorModifiedUnixMs = if ((fields and 2u) != 0u) readI64(source + w(56, 64)) else null,
-    priorExpiresUnixMs = if ((fields and 4u) != 0u) readI64(source + w(64, 72)) else null,
-    priorEtag = readCStringOrNull(readAddress(source + w(72, 80))),
-    priorData = readBytes(readAddress(source + w(76, 88)), readSize(source + w(80, 96))),
-  )
-}
 
 internal fun readMapView(source: Long): MapView =
   MapView(
@@ -2025,6 +2013,9 @@ internal fun readOfflineRegionDefinition(source: Long): OfflineRegionDefinition 
       },
   )
 
+internal fun readResourceRange(source: Long): ResourceRange =
+  ResourceRange(start = readU64(source), end = readU64(source + 8))
+
 internal fun NativeArena.putUnitBezier(target: Long, value: UnitBezier) {
   writeF64(target, value.x1)
   writeF64(target + 8, value.y1)
@@ -2038,8 +2029,12 @@ internal fun NativeArena.writeUnitBezier(value: UnitBezier): Long =
 internal fun NativeCall.putCameraTransitionHandler(target: Long, value: CameraTransitionHandler) {
   if (value.callback == null) return
   writeAddress(target + w(4, 8), registrations.register(value))
-  writeAddress(target, UpcallStubs.cameraTransitionHandlerCallback)
-  writeAddress(target + w(8, 16), UpcallStubs.releaseRoot)
+  val queue = HostDelivery.queue
+  if (queue != 0L) writeI64(target + w(16, 24), queue)
+  else {
+    writeAddress(target, UpcallStubs.cameraTransitionHandlerCallback)
+    writeAddress(target + w(8, 16), UpcallStubs.releaseRoot)
+  }
 }
 
 internal fun NativeCall.writeCameraTransitionHandler(value: CameraTransitionHandler): Long =
@@ -2074,14 +2069,6 @@ internal fun NativeArena.putWebglContextDescriptor(target: Long, value: WebglCon
 internal fun NativeArena.writeWebglContextDescriptor(value: WebglContextDescriptor): Long =
   allocate(w(16, 24), w(4, 8)).also { putWebglContextDescriptor(it, value) }
 
-internal fun NativeArena.putHttpHeader(target: Long, value: HttpHeader) {
-  putView(target, value.name)
-  putView(target + w(8, 16), value.value)
-}
-
-internal fun NativeArena.writeHttpHeader(value: HttpHeader): Long =
-  allocate(w(16, 32), w(4, 8)).also { putHttpHeader(it, value) }
-
 internal fun readRuntimeEvent(source: Long): RuntimeEvent =
   RuntimeEvent(
     type = RuntimeEventType(readU32(source)),
@@ -2113,9 +2100,6 @@ internal fun readRuntimeEvent(source: Long): RuntimeEvent =
         }
       },
   )
-
-internal fun readResourceRange(source: Long): ResourceRange =
-  ResourceRange(start = readU64(source), end = readU64(source + 8))
 
 internal fun readWglContextDescriptor(source: Long): WglContextDescriptor =
   WglContextDescriptor(

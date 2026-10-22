@@ -29,7 +29,7 @@ internal actual object TestGraphicsLibrary {
   private val makeCurrent =
     function("mln_test_graphics_make_current", FunctionDescriptor.of(JAVA_BOOLEAN, ADDRESS))
 
-  actual fun create(backend: UInt): Long {
+  actual suspend fun create(backend: UInt): Long {
     val graphics = create.invokeWithArguments(backend.toInt()) as MemorySegment
     check(graphics.address() != 0L) { "tests/graphics has no context: ${lastError()}" }
     return graphics.address()
@@ -66,6 +66,9 @@ internal actual object TestGraphicsLibrary {
       "tests/graphics could not make its context current: ${lastError()}"
     }
   }
+
+  actual fun transferredCanvas(width: Int, height: Int): TestCanvas =
+    throw UnsupportedOperationException("tests/graphics transfers no canvas; only WebGL does")
 
   private fun lastError(): String =
     (lastErrorFunction.invokeWithArguments() as MemorySegment)

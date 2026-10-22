@@ -9,21 +9,21 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.LogEvent
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.MapOptions
 import org.maplibre.nativeffi.generated.ResourceErrorReason
-import org.maplibre.nativeffi.generated.ResourceProvider
-import org.maplibre.nativeffi.generated.ResourceProviderDecision
 import org.maplibre.nativeffi.generated.ResourceRequestHandle
 import org.maplibre.nativeffi.generated.ResourceRequestInfo
 import org.maplibre.nativeffi.generated.ResourceResponse
 import org.maplibre.nativeffi.generated.ResourceResponseStatus
+import org.maplibre.nativeffi.generated.ResourceRoute
 import org.maplibre.nativeffi.generated.RuntimeEvent
 import org.maplibre.nativeffi.generated.RuntimeEventHandler
 import org.maplibre.nativeffi.generated.RuntimeEventSourceType
@@ -31,6 +31,7 @@ import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.generated.RuntimeOptions
 import org.maplibre.nativeffi.generated.Status
+import org.maplibre.nativeffi.generated.UrlMatchFlags
 import org.maplibre.nativeffi.runtime.AsyncReleasable
 
 /** How long one test may run before it fails instead of hanging the suite. */
@@ -42,10 +43,12 @@ internal val WAIT_TIMEOUT: Duration = 10.seconds
 /** Smallest style a map can load: valid, empty, and free of resource requests. */
 internal const val EMPTY_STYLE_JSON: String = """{"version":8,"sources":{},"layers":[]}"""
 
-/** Runs a suspending test body on the calling thread, failing it after [TEST_TIMEOUT]. */
-internal fun <T> runSuspendTest(block: suspend CoroutineScope.() -> T): T = runBlocking {
-  withTimeout(TEST_TIMEOUT) { block() }
-}
+/**
+ * Runs a suspending test body, failing it after [TEST_TIMEOUT]. A threaded target blocks the
+ * calling thread until the body returns; a browser page, which cannot block, returns the body's
+ * pending result to the test framework instead.
+ */
+internal expect fun runSuspendTest(block: suspend CoroutineScope.() -> Unit): TestResult
 
 /** Whether a release of this owner has ended its handle. */
 private val AsyncReleasable.isReleased: Boolean
@@ -76,19 +79,52 @@ internal suspend fun <T> Deferred<T>.awaitWithin(what: String): T =
   }
 
 /**
- * Answers every request that [serve] leaves to it with a NOT_FOUND error, so no test reaches the
- * network or the file system. [serve] returns a decision for the requests it handles itself, and
- * null for the rest.
+ * Routes that claim every HTTP and HTTPS request, so a provider over them keeps the network out of
+ * a test and leaves every other scheme to native loading. A route's defaults come from native, so
+ * the list is built on first use, once the module that a browser test loads is there.
+ */
+internal val NETWORK_URLS: List<ResourceRoute> by lazy {
+  listOf("http://**", "https://**").map { ResourceRoute(flags = UrlMatchFlags.GLOB, url = it) }
+}
+
+/**
+ * A resource provider that claims the requests that [routes] match, every request when [routes] is
+ * empty, and keeps each request that reaches [callback]. Each target installs it in the form that
+ * it takes, through [setTestProvider].
+ */
+internal class TestProvider(
+  val routes: List<ResourceRoute>,
+  val callback: (ResourceRequestInfo, ResourceRequestHandle) -> Unit,
+)
+
+/**
+ * Installs [provider]: as a `ResourceProvider` whose callback keeps each request on a threaded
+ * target, and as a `QueuedResourceProvider` on wasm.
+ */
+internal expect fun RuntimeHandle.setTestProvider(provider: TestProvider): Deferred<Unit>
+
+/**
+ * Installs [callback] as the process-global log callback, in the form that the target takes. The
+ * callback consumes each record.
+ */
+internal expect fun setTestLogCallback(callback: (LogEvent) -> Unit)
+
+/**
+ * Claims the requests that [routes] match, every request by default, and answers each one that
+ * [serve] leaves to it with a NOT_FOUND error, so no test reaches the network or the file system.
+ * [serve] returns true for the requests it handles itself. Native matches the routes, so a request
+ * that no route claims reaches native loading without a callback.
  */
 internal fun denyingProvider(
-  serve: (ResourceRequestInfo, ResourceRequestHandle) -> ResourceProviderDecision? = { _, _ ->
-    null
-  },
-): ResourceProvider =
-  ResourceProvider(callback = { request, handle -> serve(request, handle) ?: handle.deny() })
+  routes: List<ResourceRoute> = emptyList(),
+  serve: (ResourceRequestInfo, ResourceRequestHandle) -> Boolean = { _, _ -> false },
+): TestProvider =
+  TestProvider(routes) { request, handle ->
+    if (!serve(request, handle)) handle.deny()
+  }
 
 /** Completes this request with the fixture's NOT_FOUND error and releases it. */
-internal fun ResourceRequestHandle.deny(): ResourceProviderDecision {
+internal fun ResourceRequestHandle.deny() {
   complete(
     ResourceResponse(
       status = ResourceResponseStatus.ERROR,
@@ -97,14 +133,12 @@ internal fun ResourceRequestHandle.deny(): ResourceProviderDecision {
     ),
   )
   close()
-  return ResourceProviderDecision.HANDLE
 }
 
 /** Completes this request with [body] and releases it. */
-internal fun ResourceRequestHandle.serve(body: String): ResourceProviderDecision {
+internal fun ResourceRequestHandle.serve(body: String) {
   complete(ResourceResponse(status = ResourceResponseStatus.OK, bytes = body.encodeToByteArray()))
   close()
-  return ResourceProviderDecision.HANDLE
 }
 
 /** Options for the fixture's small map, [width] x [height] logical pixels. */
@@ -153,7 +187,7 @@ private constructor(val runtime: RuntimeHandle, private val events: Channel<Runt
      * releases the runtime afterwards even when [block] fails. The fixture owns the event receiver.
      */
     suspend fun <T> use(
-      provider: ResourceProvider = denyingProvider(),
+      provider: TestProvider = denyingProvider(),
       options: RuntimeOptions = GeneratedApi.runtimeOptionsDefault(),
       block: suspend RuntimeFixture.() -> T,
     ): T {
@@ -166,7 +200,7 @@ private constructor(val runtime: RuntimeHandle, private val events: Channel<Runt
             RuntimeEventHandler { batch -> batch.events.forEach { events.trySend(it) } },
           )
           .awaitWithin("the event handler")
-        runtime.setResourceProvider(provider).awaitWithin("the resource provider")
+        runtime.setTestProvider(provider).awaitWithin("the resource provider")
         fixture.block()
       }
     }
@@ -194,7 +228,7 @@ internal class MapFixture(val runtimeFixture: RuntimeFixture, val map: MapHandle
  */
 internal suspend fun <T> withMap(
   mapMode: MapMode = MapMode.CONTINUOUS,
-  provider: ResourceProvider = denyingProvider(),
+  provider: TestProvider = denyingProvider(),
   options: MapOptions = smallMapOptions(mapMode),
   runtimeOptions: RuntimeOptions = GeneratedApi.runtimeOptionsDefault(),
   block: suspend MapFixture.() -> T,

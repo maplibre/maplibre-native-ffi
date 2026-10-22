@@ -116,6 +116,35 @@ dependencies {
 }
 ```
 
+#### Kotlin/Wasm in the browser
+
+<Aside type="caution" title="Repository only">
+  The `wasmJs` target publishes no library and no browser module yet, so only
+  Gradle builds inside this repository, such as its test suite, can use it.
+</Aside>
+
+Build the browser module for your backend's preset, then serve
+`maplibre-native-kotlin.mjs` and `maplibre-native-kotlin.wasm` from
+`bindings/kotlin/wasm/build/<preset>/install` side by side, from a cross-origin
+isolated page as [Web](#web) describes.
+
+```bash frame="terminal"
+mise -E emscripten run //bindings/kotlin:wasm-module emscripten-wasm32-webgl
+```
+
+Load the module by its URL before any other call:
+
+```kotlin title="Main.kt"
+import org.maplibre.nativeffi.Maplibre
+
+suspend fun main() {
+  Maplibre.loadModule("/maplibre-native-kotlin.mjs")
+}
+```
+
+`BrowserGraphics` imports the page's `GPUDevice`, canvas context, or
+`WebGL2RenderingContext` as the handles that render target descriptors take.
+
 ### .NET
 
 <SnapshotOnly />
@@ -382,3 +411,8 @@ provider.
 
 Emscripten runs the WebGPU and OpenGL backends, with WebGL as the OpenGL context
 provider.
+
+A page that loads a browser module must be cross-origin isolated: serve it with
+the `Cross-Origin-Opener-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp` headers. The module reserves a
+fixed 512 MB heap.

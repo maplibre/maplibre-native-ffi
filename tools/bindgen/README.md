@@ -211,6 +211,17 @@ These keys state what a C shape cannot:
   delivers it later through a queue or a wake. Dart and TypeScript can only
   deliver later, so a record with a native default keeps such a registration at
   its disabled default.
+- `queue_result=` on a delivered callback that returns a value names the result
+  that native answers in queue mode, as `1`, which consumes a record, does for
+  `mln_log_callback`. A decision callback answers its `decision_accept` instead,
+  and the schema requires the key of every other delivered callback with a
+  result. A queue-form callback of Kotlin/Wasm returns nothing, and its
+  documentation names this result.
+- `blocks=thread_start` on a function says that the call returns only after a
+  native thread that it starts is running, as `mln_runtime_create` does. A
+  thread that a browser page starts runs only after the page yields, so the page
+  cannot wait for the call. Kotlin generates a `suspend` function for it. The
+  schema accepts the key only on an immediate function that returns a status.
 - `absent_on=` on a function names a failure status of `mln_status` that reports
   its one output as absent rather than failed, as `MLN_STATUS_NOT_READY` does
   for `mln_render_session_acquire_frame` when no frame has rendered. A drain is

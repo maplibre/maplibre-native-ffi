@@ -4,32 +4,97 @@ package org.maplibre.nativeffi.internal.c
 import java.lang.foreign.ValueLayout.*
 
 internal actual object UpcallStubs {
-  actual val completion: Long = Ffm.upcall("completion", null, JAVA_LONG, JAVA_LONG)
-  actual val completionRelease: Long = Ffm.upcall("completionRelease", null, JAVA_LONG)
-  actual val releaseRoot: Long = Ffm.upcall("releaseRoot", null, JAVA_LONG)
+  actual val completion: Long =
+    Ffm.upcall(Upcalls::class.java, "completion", null, JAVA_LONG, JAVA_LONG)
+  actual val completionRelease: Long =
+    Ffm.upcall(Upcalls::class.java, "completionRelease", null, JAVA_LONG)
+  actual val releaseRoot: Long = Ffm.upcall(Upcalls::class.java, "releaseRoot", null, JAVA_LONG)
   actual val logHandlerCallback: Long =
-    Ffm.upcall("logHandlerCallback", JAVA_INT, JAVA_LONG, JAVA_INT, JAVA_INT, JAVA_LONG, JAVA_LONG)
-  actual val customGeometrySourceOptionsFetchTile: Long =
-    Ffm.upcall("customGeometrySourceOptionsFetchTile", null, JAVA_LONG, mln_canonical_tile_id)
-  actual val customGeometrySourceOptionsCancelTile: Long =
-    Ffm.upcall("customGeometrySourceOptionsCancelTile", null, JAVA_LONG, mln_canonical_tile_id)
-  actual val customMvtVectorSourceOptionsFetchTile: Long =
-    Ffm.upcall("customMvtVectorSourceOptionsFetchTile", null, JAVA_LONG, mln_canonical_tile_id)
-  actual val customMvtVectorSourceOptionsCancelTile: Long =
-    Ffm.upcall("customMvtVectorSourceOptionsCancelTile", null, JAVA_LONG, mln_canonical_tile_id)
-  actual val resourceRequestCancelHandlerCallback: Long =
-    Ffm.upcall("resourceRequestCancelHandlerCallback", null, JAVA_LONG, JAVA_LONG)
-  actual val runtimeEventHandlerCallback: Long =
-    Ffm.upcall("runtimeEventHandlerCallback", null, JAVA_LONG, JAVA_LONG)
+    Ffm.upcall(
+      ThreadedUpcalls::class.java,
+      "logHandlerCallback",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_INT,
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   actual val httpHeaderTransformCallback: Long =
-    Ffm.upcall("httpHeaderTransformCallback", JAVA_INT, JAVA_LONG, JAVA_INT, JAVA_LONG, JAVA_LONG)
+    Ffm.upcall(
+      ThreadedUpcalls::class.java,
+      "httpHeaderTransformCallback",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   actual val resourceProviderCallback: Long =
-    Ffm.upcall("resourceProviderCallback", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+    Ffm.upcall(
+      ThreadedUpcalls::class.java,
+      "resourceProviderCallback",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  actual val customGeometrySourceOptionsFetchTile: Long =
+    Ffm.upcall(
+      Upcalls::class.java,
+      "customGeometrySourceOptionsFetchTile",
+      null,
+      JAVA_LONG,
+      mln_canonical_tile_id,
+    )
+  actual val customGeometrySourceOptionsCancelTile: Long =
+    Ffm.upcall(
+      Upcalls::class.java,
+      "customGeometrySourceOptionsCancelTile",
+      null,
+      JAVA_LONG,
+      mln_canonical_tile_id,
+    )
+  actual val customMvtVectorSourceOptionsFetchTile: Long =
+    Ffm.upcall(
+      Upcalls::class.java,
+      "customMvtVectorSourceOptionsFetchTile",
+      null,
+      JAVA_LONG,
+      mln_canonical_tile_id,
+    )
+  actual val customMvtVectorSourceOptionsCancelTile: Long =
+    Ffm.upcall(
+      Upcalls::class.java,
+      "customMvtVectorSourceOptionsCancelTile",
+      null,
+      JAVA_LONG,
+      mln_canonical_tile_id,
+    )
+  actual val resourceRequestCancelHandlerCallback: Long =
+    Ffm.upcall(
+      Upcalls::class.java,
+      "resourceRequestCancelHandlerCallback",
+      null,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  actual val runtimeEventHandlerCallback: Long =
+    Ffm.upcall(Upcalls::class.java, "runtimeEventHandlerCallback", null, JAVA_LONG, JAVA_LONG)
   actual val resourceTransformCallback: Long =
-    Ffm.upcall("resourceTransformCallback", null, JAVA_LONG, JAVA_INT, JAVA_LONG, JAVA_LONG)
-  actual val wakeCallback: Long = Ffm.upcall("wakeCallback", null, JAVA_LONG)
-  actual val queueLockLock: Long = Ffm.upcall("queueLockLock", null, JAVA_LONG)
-  actual val queueLockUnlock: Long = Ffm.upcall("queueLockUnlock", null, JAVA_LONG)
+    Ffm.upcall(
+      Upcalls::class.java,
+      "resourceTransformCallback",
+      null,
+      JAVA_LONG,
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  actual val wakeCallback: Long = Ffm.upcall(Upcalls::class.java, "wakeCallback", null, JAVA_LONG)
+  actual val queueLockLock: Long = Ffm.upcall(Upcalls::class.java, "queueLockLock", null, JAVA_LONG)
+  actual val queueLockUnlock: Long =
+    Ffm.upcall(Upcalls::class.java, "queueLockUnlock", null, JAVA_LONG)
   actual val cameraTransitionHandlerCallback: Long =
-    Ffm.upcall("cameraTransitionHandlerCallback", null, JAVA_LONG, JAVA_LONG)
+    Ffm.upcall(Upcalls::class.java, "cameraTransitionHandlerCallback", null, JAVA_LONG, JAVA_LONG)
 }

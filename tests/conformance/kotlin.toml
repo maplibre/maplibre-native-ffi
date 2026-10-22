@@ -5,18 +5,42 @@
 #
 # The generated API and its runtime are common code, so the commonTest files
 # exercise them over every native-call shim: FFM on the JVM, JNI in the Android
-# device suite, and cinterop on Kotlin/Native. Cases that depend on a platform
-# name one test here and keep a copy per platform:
+# device suite, cinterop on Kotlin/Native, and the browser module on wasm. The
+# threadedTest files run on the first three and hold the cases whose subject is
+# a second Kotlin thread or a callback that answers native on a MapLibre thread:
+# LIFE-03 and CB-06.
+#
+# The log handler and the resource provider have a form per target: the
+# threaded targets take LogHandler and ResourceProvider, whose callbacks answer
+# native, and wasm takes QueuedLogHandler and QueuedResourceProvider. The
+# commonTest fixtures install each one through a test helper that each target
+# implements in its own form.
+#
+# The commonTest files also run on the wasm target, on the page of headless
+# Chromium, against a WebGL and a WebGPU browser module. There every
+# registration names the page's delivery queue, and the page drains each
+# callback into its upcall site. On WebGL, REND-01 reads back from a core
+# worker over a transferred canvas and REND-02 is serviced from the page. On
+# WebGPU the render cases drive a device that the page created, and REND-01's
+# readback finishes on a later driver service on the page. REND-02's refusal of
+# a second graphics thread needs a second Kotlin thread, so it runs in
+# threadedTest CallerDriverThreadTest.
+#
+# Cases that depend on a platform name one test here and keep a copy per
+# platform:
 # - The leak report of an abandoned handle, read from standard output
-#   (AbandonedHandleJvmTest in a child JVM, AbandonedHandleAndroidTest). The
-#   disposal half runs on every platform in commonTest AbandonedHandleTest.
+#   (AbandonedHandleJvmTest in a child JVM, AbandonedHandleAndroidTest) or
+#   from console.log (AbandonedHandleWasmTest). The disposal half runs on
+#   every platform in commonTest AbandonedHandleTest.
 # - Unreachable-request reclamation, which each garbage collector drives
-#   (ResourceRequestHandleJvmTest, ResourceRequestHandleAndroidTest).
-# CB-04's report goes to the thread's uncaught exception handler on the JVM and
-# to the unhandled exception hook on Kotlin/Native, which its commonTest test
-# intercepts. Android writes the report to the log, since its default handler
-# ends the process, and a test cannot read the log back, so the Android run
-# checks the containment alone.
+#   (ResourceRequestHandleJvmTest, ResourceRequestHandleAndroidTest, and
+#   ResourceRequestHandleWasmTest, where a FinalizationRegistry task releases
+#   the request).
+# CB-04's report goes to the thread's uncaught exception handler on the JVM, to
+# the unhandled exception hook on Kotlin/Native, and to the page's reportError
+# on wasm, which its commonTest test intercepts. Android writes the report to
+# the log, since its default handler ends the process, and a test cannot read
+# the log back, so the Android run checks the containment alone.
 # The strided event batch with an unknown payload arm needs a batch laid out the
 # way the C compiler does, which cinterop provides, so it runs in nativeTest
 # RuntimeEventNativeTest. It also covers the checked narrowing of a native count
@@ -35,7 +59,7 @@
 "ERR-03" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aDrainBeforeAnyDemandReturnsNull"
 "LIFE-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::closingAHandleTwiceIsSafeAndLaterUseIsRefused"
 "LIFE-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::aRefusedReleaseLeavesTheRuntimeUsableAndALaterReleaseSucceeds"
-"LIFE-03" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aBorrowOnAnotherThreadHoldsOffTheFramesReleaseUntilItEnds"
+"LIFE-03" = "bindings/kotlin/src/threadedTest/kotlin/org/maplibre/nativeffi/render/FrameBorrowThreadTest.kt::aBorrowOnAnotherThreadHoldsOffTheFramesReleaseUntilItEnds"
 "LIFE-04" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/lifecycle/AbandonedHandleJvmTest.kt::anAbandonedMapIsReportedOnTheLeakReportWorker"
 "LIFE-05" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::aMapKeepsItsRuntimeReachable"
 "LIFE-06" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::aHandleIdNamesItsEventsAndOutlivesRelease"
@@ -49,12 +73,12 @@
 "CB-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/CallbackLifetimeTest.kt::aCallbackCapturingItsReceiverDoesNotKeepItReachable"
 "CB-04" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aProviderThatThrowsFailsItsRequestAndLeavesTheRuntimeWorking"
 "CB-05" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aClaimedRequestCanBeAnsweredAfterTheProviderReturns"
-"CB-06" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aHeaderResponseRefusesUseAfterItsCallbackAndFromAnotherThread"
+"CB-06" = "bindings/kotlin/src/threadedTest/kotlin/org/maplibre/nativeffi/callback/ThreadedCallbackTest.kt::aHeaderResponseRefusesUseAfterItsCallbackAndFromAnotherThread"
 "CB-07" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/LogCallbackTest.kt::replacingTheLogCallbackReleasesThePreviousRegistration"
 "CB-08" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aCancelRegistrationNativeDoesNotStoreIsNotRooted"
 "CB-09" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/CameraEndHandlerTest.kt::anEndHandlerIsRootedUntilItRuns"
 "CB-10" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::routesDecideWhichRequestsReachTheProviderAndAUrlOnlyRouteMatchesEveryKind"
-"CB-11" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aTransformRequestIsAnsweredFromAnotherThreadAfterItsCallbackReturns"
+"CB-11" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aTransformRequestIsAnsweredAfterItsCallbackReturns"
 "VAL-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::hostStringsUseViewsAndNativeLentStringsDecode"
 "VAL-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::presenceFieldsRoundTripSetAndAbsentValues"
 "VAL-03" = "bindings/kotlin/src/nativeTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeEventNativeTest.kt::aStridedBatchWithAnUnknownPayloadArmDecodesWithoutLoss"
@@ -64,7 +88,7 @@
 "VAL-07" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/internal/async/CompletionBridgeTest.kt::anArrayResultIsReadAtItsValueSize"
 "VIEW-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aBorrowedFrameViewExpiresWithItsBlockAndHoldsOffItsRelease"
 "REND-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::anOwnedTextureFrameReadsBackAsPixels"
-"REND-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aCallerDrivenSessionStaysOnTheGraphicsThreadItWasServicedFrom"
+"REND-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aCallerDrivenSessionIsServicedFromTheGraphicsThread"
 "PLAT-01" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/internal/loader/NativeLibraryTest.kt::theLibraryLoadsFromTheConfiguredPath"
 "PLAT-02" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/log/LogProcessExitTest.kt::jvmExitsWithLiveHandlesAndCallbacks"
 "PLAT-03" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/resource/ResourceRequestHandleJvmTest.kt::anUnreachableRequestIsReleasedNatively"

@@ -23,7 +23,8 @@ endif()
 # without waiting for a Worker. A host that runs more raises the size.
 #
 # The thread that calls into the library, such as main() under
-# -sPROXY_TO_PTHREAD.
+# -sPROXY_TO_PTHREAD, or the thread on which a binding that calls from the
+# main thread creates each runtime, as the Kotlin/Wasm binding does.
 set(_mln_pool_host 1)
 # MapLibre's background ThreadPool, a ParallelScheduler(3) of four threads that
 # every map shares.

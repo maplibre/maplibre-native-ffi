@@ -201,6 +201,48 @@ static void mln_custom_mvt_vector_source_options_default_jni(
   mln_custom_mvt_vector_source_options_default_critical(returned);
 }
 
+static void mln_delivery_batch_release_jni(
+  JNIEnv* env, jclass type, jlong batch
+) {
+  mln_delivery_batch_release((mln_delivery_batch)batch);
+}
+
+static jint mln_delivery_batch_take_jni(
+  JNIEnv* env, jclass type, jlong batch, jlong index, jlong out_diagnostic
+) {
+  return (jint)mln_delivery_batch_take(
+    (mln_delivery_batch)batch, (size_t)index,
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_delivery_queue_create_jni(
+  JNIEnv* env, jclass type, jlong options, jlong out_queue, jlong out_diagnostic
+) {
+  return (jint)mln_delivery_queue_create(
+    MLN_JNI_POINTER(const mln_delivery_queue_options*, options),
+    MLN_JNI_POINTER(mln_delivery_queue*, out_queue),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_delivery_queue_drain_jni(
+  JNIEnv* env, jclass type, jlong queue, jlong out_batch, jlong out_view,
+  jlong out_diagnostic
+) {
+  return (jint)mln_delivery_queue_drain(
+    (mln_delivery_queue)queue, MLN_JNI_POINTER(mln_delivery_batch*, out_batch),
+    MLN_JNI_POINTER(mln_delivery_batch_view*, out_view),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static void mln_delivery_queue_release_jni(
+  JNIEnv* env, jclass type, jlong queue
+) {
+  mln_delivery_queue_release((mln_delivery_queue)queue);
+}
+
 static void mln_frame_demand_default_critical(jlong returned) {
   *MLN_JNI_POINTER(mln_frame_demand*, returned) = mln_frame_demand_default();
 }
@@ -2481,6 +2523,11 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_custom_geometry_source_options_default_jni},
   {"mln_custom_mvt_vector_source_options_default", "(J)V",
    (void*)mln_custom_mvt_vector_source_options_default_jni},
+  {"mln_delivery_batch_release", "(J)V", (void*)mln_delivery_batch_release_jni},
+  {"mln_delivery_batch_take", "(JJJ)I", (void*)mln_delivery_batch_take_jni},
+  {"mln_delivery_queue_create", "(JJJ)I", (void*)mln_delivery_queue_create_jni},
+  {"mln_delivery_queue_drain", "(JJJJ)I", (void*)mln_delivery_queue_drain_jni},
+  {"mln_delivery_queue_release", "(J)V", (void*)mln_delivery_queue_release_jni},
   {"mln_frame_demand_default", "(J)V", (void*)mln_frame_demand_default_jni},
   {"mln_free_camera_options_default", "(J)V",
    (void*)mln_free_camera_options_default_jni},
@@ -2891,6 +2938,11 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_custom_geometry_source_options_default_critical},
   {"mln_custom_mvt_vector_source_options_default", "(J)V",
    (void*)mln_custom_mvt_vector_source_options_default_critical},
+  {"mln_delivery_batch_release", "(J)V", (void*)mln_delivery_batch_release_jni},
+  {"mln_delivery_batch_take", "(JJJ)I", (void*)mln_delivery_batch_take_jni},
+  {"mln_delivery_queue_create", "(JJJ)I", (void*)mln_delivery_queue_create_jni},
+  {"mln_delivery_queue_drain", "(JJJJ)I", (void*)mln_delivery_queue_drain_jni},
+  {"mln_delivery_queue_release", "(J)V", (void*)mln_delivery_queue_release_jni},
   {"mln_frame_demand_default", "(J)V",
    (void*)mln_frame_demand_default_critical},
   {"mln_free_camera_options_default", "(J)V",
@@ -3264,23 +3316,36 @@ const JNINativeMethod mln_jni_critical_methods[] = {
 };
 
 mln_jni_upcall mln_jni_upcalls[] = {
-  {"completion", "(JJ)V", NULL},
-  {"completionRelease", "(J)V", NULL},
-  {"releaseRoot", "(J)V", NULL},
-  {"logHandlerCallback", "(JIIJJ)I", NULL},
-  {"customGeometrySourceOptionsFetchTile", "(JJ)V", NULL},
-  {"customGeometrySourceOptionsCancelTile", "(JJ)V", NULL},
-  {"customMvtVectorSourceOptionsFetchTile", "(JJ)V", NULL},
-  {"customMvtVectorSourceOptionsCancelTile", "(JJ)V", NULL},
-  {"resourceRequestCancelHandlerCallback", "(JJ)V", NULL},
-  {"runtimeEventHandlerCallback", "(JJ)V", NULL},
-  {"httpHeaderTransformCallback", "(JIJJ)I", NULL},
-  {"resourceProviderCallback", "(JJJ)I", NULL},
-  {"resourceTransformCallback", "(JIJJ)V", NULL},
-  {"wakeCallback", "(J)V", NULL},
-  {"queueLockLock", "(J)V", NULL},
-  {"queueLockUnlock", "(J)V", NULL},
-  {"cameraTransitionHandlerCallback", "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "completion", "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "completionRelease", "(J)V",
+   NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "releaseRoot", "(J)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/ThreadedUpcalls", "logHandlerCallback",
+   "(JIIJJ)I", NULL},
+  {"org/maplibre/nativeffi/internal/c/ThreadedUpcalls",
+   "httpHeaderTransformCallback", "(JIJJ)I", NULL},
+  {"org/maplibre/nativeffi/internal/c/ThreadedUpcalls",
+   "resourceProviderCallback", "(JJJ)I", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls",
+   "customGeometrySourceOptionsFetchTile", "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls",
+   "customGeometrySourceOptionsCancelTile", "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls",
+   "customMvtVectorSourceOptionsFetchTile", "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls",
+   "customMvtVectorSourceOptionsCancelTile", "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls",
+   "resourceRequestCancelHandlerCallback", "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "runtimeEventHandlerCallback",
+   "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "resourceTransformCallback",
+   "(JIJJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "wakeCallback", "(J)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "queueLockLock", "(J)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "queueLockUnlock", "(J)V",
+   NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls",
+   "cameraTransitionHandlerCallback", "(JJ)V", NULL},
 };
 
 static void mln_jni_completion(
@@ -3318,58 +3383,6 @@ static uint32_t mln_jni_logHandlerCallback(
   return (uint32_t)result;
 }
 
-static void mln_jni_customGeometrySourceOptionsFetchTile(
-  void* userData, mln_canonical_tile_id tileId
-) {
-  jvalue arguments[] = {
-    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
-  };
-  mln_jni_upcall_void(&mln_jni_upcalls[4], arguments);
-}
-
-static void mln_jni_customGeometrySourceOptionsCancelTile(
-  void* userData, mln_canonical_tile_id tileId
-) {
-  jvalue arguments[] = {
-    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
-  };
-  mln_jni_upcall_void(&mln_jni_upcalls[5], arguments);
-}
-
-static void mln_jni_customMvtVectorSourceOptionsFetchTile(
-  void* userData, mln_canonical_tile_id tileId
-) {
-  jvalue arguments[] = {
-    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
-  };
-  mln_jni_upcall_void(&mln_jni_upcalls[6], arguments);
-}
-
-static void mln_jni_customMvtVectorSourceOptionsCancelTile(
-  void* userData, mln_canonical_tile_id tileId
-) {
-  jvalue arguments[] = {
-    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
-  };
-  mln_jni_upcall_void(&mln_jni_upcalls[7], arguments);
-}
-
-static void mln_jni_resourceRequestCancelHandlerCallback(
-  void* userData, mln_resource_request handle
-) {
-  jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}, {.j = (jlong)handle}};
-  mln_jni_upcall_void(&mln_jni_upcalls[8], arguments);
-}
-
-static void mln_jni_runtimeEventHandlerCallback(
-  void* userData, const mln_event_batch_view* events
-) {
-  jvalue arguments[] = {
-    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(events)}
-  };
-  mln_jni_upcall_void(&mln_jni_upcalls[9], arguments);
-}
-
 static mln_status mln_jni_httpHeaderTransformCallback(
   void* userData, uint32_t kind, const char* url,
   mln_http_header_transform_response* outResponse
@@ -3381,7 +3394,7 @@ static mln_status mln_jni_httpHeaderTransformCallback(
     {.j = MLN_JNI_ADDRESS(outResponse)}
   };
   jint result = -5;
-  mln_jni_upcall_int(&mln_jni_upcalls[10], arguments, &result);
+  mln_jni_upcall_int(&mln_jni_upcalls[4], arguments, &result);
   return (mln_status)result;
 }
 
@@ -3395,8 +3408,60 @@ static uint32_t mln_jni_resourceProviderCallback(
     {.j = (jlong)handle}
   };
   jint result = -1;
-  mln_jni_upcall_int(&mln_jni_upcalls[11], arguments, &result);
+  mln_jni_upcall_int(&mln_jni_upcalls[5], arguments, &result);
   return (uint32_t)result;
+}
+
+static void mln_jni_customGeometrySourceOptionsFetchTile(
+  void* userData, mln_canonical_tile_id tileId
+) {
+  jvalue arguments[] = {
+    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
+  };
+  mln_jni_upcall_void(&mln_jni_upcalls[6], arguments);
+}
+
+static void mln_jni_customGeometrySourceOptionsCancelTile(
+  void* userData, mln_canonical_tile_id tileId
+) {
+  jvalue arguments[] = {
+    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
+  };
+  mln_jni_upcall_void(&mln_jni_upcalls[7], arguments);
+}
+
+static void mln_jni_customMvtVectorSourceOptionsFetchTile(
+  void* userData, mln_canonical_tile_id tileId
+) {
+  jvalue arguments[] = {
+    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
+  };
+  mln_jni_upcall_void(&mln_jni_upcalls[8], arguments);
+}
+
+static void mln_jni_customMvtVectorSourceOptionsCancelTile(
+  void* userData, mln_canonical_tile_id tileId
+) {
+  jvalue arguments[] = {
+    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
+  };
+  mln_jni_upcall_void(&mln_jni_upcalls[9], arguments);
+}
+
+static void mln_jni_resourceRequestCancelHandlerCallback(
+  void* userData, mln_resource_request handle
+) {
+  jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}, {.j = (jlong)handle}};
+  mln_jni_upcall_void(&mln_jni_upcalls[10], arguments);
+}
+
+static void mln_jni_runtimeEventHandlerCallback(
+  void* userData, const mln_event_batch_view* events
+) {
+  jvalue arguments[] = {
+    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(events)}
+  };
+  mln_jni_upcall_void(&mln_jni_upcalls[11], arguments);
 }
 
 static void mln_jni_resourceTransformCallback(
@@ -3443,14 +3508,14 @@ void* const mln_jni_upcall_stubs[] = {
   (void*)mln_jni_completionRelease,
   (void*)mln_jni_releaseRoot,
   (void*)mln_jni_logHandlerCallback,
+  (void*)mln_jni_httpHeaderTransformCallback,
+  (void*)mln_jni_resourceProviderCallback,
   (void*)mln_jni_customGeometrySourceOptionsFetchTile,
   (void*)mln_jni_customGeometrySourceOptionsCancelTile,
   (void*)mln_jni_customMvtVectorSourceOptionsFetchTile,
   (void*)mln_jni_customMvtVectorSourceOptionsCancelTile,
   (void*)mln_jni_resourceRequestCancelHandlerCallback,
   (void*)mln_jni_runtimeEventHandlerCallback,
-  (void*)mln_jni_httpHeaderTransformCallback,
-  (void*)mln_jni_resourceProviderCallback,
   (void*)mln_jni_resourceTransformCallback,
   (void*)mln_jni_wakeCallback,
   (void*)mln_jni_queueLockLock,

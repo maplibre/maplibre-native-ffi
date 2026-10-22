@@ -12,7 +12,6 @@ import org.maplibre.nativeffi.WAIT_TIMEOUT
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.generated.MapHandle
-import org.maplibre.nativeffi.generated.ResourceProviderDecision
 import org.maplibre.nativeffi.generated.ResourceRequestCancelHandler
 import org.maplibre.nativeffi.generated.ResourceRequestHandle
 import org.maplibre.nativeffi.generated.RuntimeHandle
@@ -23,7 +22,7 @@ import org.maplibre.nativeffi.smallMapOptions
 /** What happens to a handle that its owner drops without closing. */
 class AbandonedHandleTest {
   @Test
-  fun anAbandonedMapIsDisposedAndDropsItsPendingRequest(): Unit = runSuspendTest {
+  fun anAbandonedMapIsDisposedAndDropsItsPendingRequest() = runSuspendTest {
     abandonAMapAndAwaitItsDisposal()
   }
 }
@@ -36,9 +35,9 @@ class AbandonedHandleTest {
 internal suspend fun abandonAMapAndAwaitItsDisposal() {
   val claimed = CompletableDeferred<ResourceRequestHandle>()
   val provider = denyingProvider { request, handle ->
-    if (request.requestedUrl != ABANDONED_STYLE_URL) return@denyingProvider null
+    if (request.requestedUrl != ABANDONED_STYLE_URL) return@denyingProvider false
     claimed.complete(handle)
-    ResourceProviderDecision.HANDLE
+    true
   }
   RuntimeFixture.use(provider) {
     val holder = MapHolder()

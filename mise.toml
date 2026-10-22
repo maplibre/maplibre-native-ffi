@@ -145,6 +145,10 @@ sccache = "{{vars.sccache_version}}"
 # because the tool's post-install step takes them as arguments.
 MLN_FFI_ANDROID_CMAKE_VERSION = "{{vars.android_cmake_version}}"
 MLN_FFI_ANDROID_NDK_VERSION = "{{vars.android_ndk_version}}"
+# Kotlin Gradle installs the wasm target's npm packages with its own Yarn 1,
+# which refuses to run under this repository's package.json because that names
+# pnpm as the package manager.
+SKIP_YARN_COREPACK_CHECK = "1"
 
 # sccache keeps compiled objects in its own disk cache, which every checkout on
 # the machine shares; .mise/bin/with-sccache-basedirs lines the cache keys up

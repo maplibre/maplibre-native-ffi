@@ -83,7 +83,7 @@ mln_status mln_measurement_change(mln_measurement measurement, const mln_complet
         synchronous = parse_sources(
             {
                 "api.h": text.replace(
-                    ' BIND("failure=0;delivery=MLN_DELIVERY_TYPE_NOTICE")',
+                    ' BIND("failure=0;delivery=MLN_DELIVERY_TYPE_NOTICE;queue_result=1")',
                     ' BIND("failure=0")',
                 ).replace(
                     '  mln_delivery_queue queue BIND("kind=delivery_queue");\n} mln_notice_handler',

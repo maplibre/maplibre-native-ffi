@@ -25,6 +25,10 @@ typedef struct mln_test_render_fixture {
   uint32_t driver;
   bool observed_attaching;
   bool observed_driver_ready;
+  // Set in the browser to service the session on the browser main thread
+  // instead of the calling thread, which returns to the main thread's event
+  // loop after each service.
+  bool serviced_on_main_thread;
   // Counted by the fixture's frame and driver-work wakes, which also pulse.
   atomic_uint frame_wakes;
   atomic_uint driver_wakes;
@@ -53,9 +57,11 @@ mln_status mln_test_render_fixture_service(
   const mln_test_render_fixture* fixture
 );
 
-// Services the fixture's driver work until `ready(context)` holds, blocking on
-// the fixture's wakes in between. Returns MLN_STATUS_OK once it holds, the
-// service status when service fails, or MLN_STATUS_NOT_READY at the deadline.
+// Services the fixture's driver work until `ready(context)` holds, waiting for
+// the fixture's wakes in between with mln_test_await_on_event_loop(), so a
+// WebGPU readback's map reaches the thread that services. Returns
+// MLN_STATUS_OK once it holds, the service status when service fails, or
+// MLN_STATUS_NOT_READY at the deadline.
 mln_status mln_test_render_step_until(
   const mln_test_render_fixture* fixture, bool (*ready)(void* context),
   void* context, mln_test_deadline deadline, const char* what
@@ -113,6 +119,34 @@ bool mln_test_webgpu_borrowed_ring_create(
 // The WGPUTexture at `index` of a borrowed ring fixture, or null past its end.
 void* mln_test_webgpu_ring_texture(
   const mln_test_render_fixture* fixture, size_t index
+);
+
+// A WebGPU device that the browser main thread creates and owns, for a
+// session that the main thread services while the suite's thread waits.
+typedef struct mln_test_webgpu_main_thread_device {
+  mln_webgpu_context_descriptor context;
+  atomic_bool created;
+  atomic_bool lost;
+} mln_test_webgpu_main_thread_device;
+
+// Creates the device on the browser main thread. Returns false, holding
+// nothing, when the main thread gets no device.
+bool mln_test_webgpu_main_thread_device_create(
+  mln_test_webgpu_main_thread_device* device
+);
+
+// Destroys the device on the browser main thread and waits until the main
+// thread reports it lost, which settles the runtime keepalive the device held
+// there. Every session on the device must be gone first.
+void mln_test_webgpu_main_thread_device_destroy(
+  mln_test_webgpu_main_thread_device* device
+);
+
+// Attaches a 64x64 owned texture on `device`, serviced on the browser main
+// thread.
+bool mln_test_webgpu_main_thread_fixture_create(
+  mln_map map, const mln_test_webgpu_main_thread_device* device,
+  mln_test_render_fixture* fixture
 );
 
 // Copies the ring texture at `index` into a buffer on the device's queue, maps

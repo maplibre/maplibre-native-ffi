@@ -3,11 +3,13 @@ import org.gradle.api.tasks.testing.AbstractTestTask
 import org.gradle.api.tasks.testing.Test
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
 import org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable
+import org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.maplibre.nativeffi.gradle.AndroidTarget
@@ -62,13 +64,23 @@ kotlin {
   linuxX64()
   macosArm64()
 
-  // jvmAndroidMain holds the code the JVM and Android share through java.lang.ref and
-  // java.util.concurrent.
+  // The browser target runs on the page, which never blocks, and calls the Emscripten module that
+  // bindings/kotlin/wasm links. Karma serves that module; see karma.config.d.
+  @OptIn(ExperimentalWasmDsl::class)
+  wasmJs { browser { testTask { useKarma { useChromeHeadless() } } } }
+
+  // threadedMain holds the code of the targets whose threads may block and whose native threads
+  // may call Kotlin directly: the JVM, Android, and Kotlin/Native. jvmAndroidMain holds the code
+  // the JVM and Android share through java.lang.ref and java.util.concurrent. The wasm target
+  // joins only common.
   applyDefaultHierarchyTemplate {
     common {
-      group("jvmAndroid") {
-        withJvm()
-        withCompilations { it.target.platformType == KotlinPlatformType.androidJvm }
+      group("threaded") {
+        group("jvmAndroid") {
+          withJvm()
+          withCompilations { it.target.platformType == KotlinPlatformType.androidJvm }
+        }
+        group("native")
       }
     }
   }
@@ -246,7 +258,11 @@ kotlin {
       }
     }
 
-    commonTest.dependencies { implementation(kotlin("test")) }
+    // TestResult lets one test body return to a framework that cannot block for it.
+    commonTest.dependencies {
+      implementation(kotlin("test"))
+      implementation(libs.coroutines.test)
+    }
 
     configureEach {
       if (
@@ -296,7 +312,11 @@ canonicalizeKmpRootMetadata(
       "linuxX64" to "$mavenArtifact-linuxx64",
       "macosArm64" to "$mavenArtifact-macosarm64",
     ),
+  // The wasm KLIB needs a browser module that ships per backend, which no package carries yet.
+  unpublishedTargets = setOf("wasmJs"),
 )
+
+tasks.configureEach { if (name.startsWith("publishWasmJsPublication")) enabled = false }
 
 extensions.extraProperties["maplibreAndroidSdkDirectory"] =
   androidComponents.sdkComponents.sdkDirectory
@@ -363,6 +383,50 @@ tasks.named<Test>("jvmTest") {
     inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
   }
   testLogging { exceptionFormat = TestExceptionFormat.FULL }
+}
+
+// The wasm suite runs in headless Chromium against the browser module that bindings/kotlin/wasm
+// links. The mise test:wasm task passes that module's directory, its render backend, and the
+// Chromium to run. The canary run selects only HarnessCanaryTest, which fails on purpose; every
+// other run leaves it out. On WebGPU, headless Chromium loses every WebGPU device of a page once a
+// WebGPU canvas renders, and later adapter requests resolve to null. CanvasSurfaceTest therefore
+// runs on a page of its own there: the canvas run selects only it, and the main run leaves it out.
+val wasmModuleDir = providers.gradleProperty("maplibre.wasm.moduleDir")
+val wasmRenderBackend = providers.gradleProperty("maplibre.wasm.renderBackend")
+val wasmChromium = providers.gradleProperty("maplibre.wasm.chromium")
+val wasmCanary =
+  providers.gradleProperty("maplibre.wasm.canary").map(String::toBoolean).getOrElse(false)
+val wasmCanvasRun =
+  providers.gradleProperty("maplibre.wasm.canvasRun").map(String::toBoolean).getOrElse(false)
+
+tasks.named<KotlinJsTest>("wasmJsBrowserTest") {
+  val moduleDir = wasmModuleDir.orNull?.let(rootProject::file)
+  if (moduleDir != null) {
+    environment("MLN_KOTLIN_WASM_MODULE_DIR", moduleDir.absolutePath)
+    inputs.dir(moduleDir).withPropertyName("maplibreWasmModule")
+  }
+  val renderBackend = wasmRenderBackend.orNull
+  renderBackend?.let { environment("MLN_KOTLIN_WASM_RENDER_BACKEND", it) }
+  wasmChromium.orNull?.let { environment("CHROME_BIN", it) }
+  val configured = moduleDir != null && renderBackend != null && wasmChromium.isPresent
+  doFirst {
+    if (!configured) {
+      throw GradleException(
+        "wasmJsBrowserTest needs -Pmaplibre.wasm.moduleDir, -Pmaplibre.wasm.renderBackend, and " +
+          "-Pmaplibre.wasm.chromium; run it through mise run //bindings/kotlin:test:wasm",
+      )
+    }
+  }
+  filter.apply {
+    if (wasmCanary) includeTestsMatching("org.maplibre.nativeffi.browser.HarnessCanaryTest")
+    else excludeTestsMatching("org.maplibre.nativeffi.browser.HarnessCanaryTest")
+    if (renderBackend == "webgpu" && !wasmCanary) {
+      val canvasTest = "org.maplibre.nativeffi.render.CanvasSurfaceTest"
+      if (wasmCanvasRun) includeTestsMatching(canvasTest) else excludeTestsMatching(canvasTest)
+      // A --tests filter may select tests of only one of the two runs.
+      isFailOnNoMatchingTests = false
+    }
+  }
 }
 
 // A coverage run needs the tests to execute, because Gradle does not track the

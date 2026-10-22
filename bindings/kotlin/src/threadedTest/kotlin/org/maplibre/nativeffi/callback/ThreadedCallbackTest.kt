@@ -1,0 +1,121 @@
+package org.maplibre.nativeffi.callback
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlinx.coroutines.CompletableDeferred
+import org.maplibre.nativeffi.assertFailsWithStatus
+import org.maplibre.nativeffi.awaitWithin
+import org.maplibre.nativeffi.deny
+import org.maplibre.nativeffi.error.MaplibreException
+import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.HttpHeaderTransform
+import org.maplibre.nativeffi.generated.HttpHeaderTransformResponse
+import org.maplibre.nativeffi.generated.LogEvent
+import org.maplibre.nativeffi.generated.LogHandler
+import org.maplibre.nativeffi.generated.ResourceProvider
+import org.maplibre.nativeffi.generated.ResourceProviderDecision
+import org.maplibre.nativeffi.generated.Status
+import org.maplibre.nativeffi.generated.httpHeaderTransformResponseSetHeader
+import org.maplibre.nativeffi.generated.logSetCallback
+import org.maplibre.nativeffi.generated.setHttpHeaderTransform
+import org.maplibre.nativeffi.generated.setResourceProvider
+import org.maplibre.nativeffi.internal.callback.CallbackOwner
+import org.maplibre.nativeffi.runOnBackgroundThread
+import org.maplibre.nativeffi.runSuspendTest
+import org.maplibre.nativeffi.withMap
+
+/**
+ * The callbacks that compute native's answer on the MapLibre thread that calls them, which only a
+ * threaded target serves.
+ */
+class ThreadedCallbackTest {
+  @Test
+  fun aLogCallbackAnswersWhetherItConsumesARecord() = runSuspendTest {
+    val roots = CallbackOwner.global
+    val base = roots.rootCountForTesting()
+    val parsed = CompletableDeferred<LogEvent>()
+    try {
+      GeneratedApi.logSetCallback(
+        LogHandler { _, event, _, _ ->
+          if (event == LogEvent.PARSE_STYLE) parsed.complete(event)
+          // Leave the record to MapLibre's own logger as well.
+          0u
+        },
+      )
+      assertEquals(base + 1, roots.rootCountForTesting())
+      withMap {
+        // A style whose center has the wrong JSON type logs a parser warning.
+        map
+          .setStyleJson(
+            """{"version":8,"center":false,"sources":{},"layers":[]}""".encodeToByteArray(),
+          )
+          .awaitWithin("the style command")
+        assertEquals(LogEvent.PARSE_STYLE, parsed.awaitWithin("the log callback's record"))
+      }
+    } finally {
+      GeneratedApi.logClearCallback()
+    }
+    assertEquals(base, roots.rootCountForTesting())
+  }
+
+  @Test
+  fun aHeaderResponseRefusesUseAfterItsCallbackAndFromAnotherThread() = runSuspendTest {
+    val outcome = CompletableDeferred<Pair<Throwable?, Throwable?>>()
+    var escaped: HttpHeaderTransformResponse? = null
+    val transform =
+      HttpHeaderTransform(
+        callback = { _, url, response ->
+          if (url != HTTP_STYLE_URL || outcome.isCompleted) return@HttpHeaderTransform
+          escaped = response
+          var fromAnotherThread: Throwable? = null
+          runOnBackgroundThread {
+            fromAnotherThread =
+              runCatching {
+                GeneratedApi.httpHeaderTransformResponseSetHeader(response, "X-Test", "1")
+              }
+                .exceptionOrNull()
+          }
+          val inside = runCatching {
+            GeneratedApi.httpHeaderTransformResponseSetHeader(response, "X-Test", "1")
+          }
+            .exceptionOrNull()
+          outcome.complete(inside to fromAnotherThread)
+        },
+      )
+    withMap {
+      // The provider passes the style through to the HTTP client, which runs the header transform
+      // before it tries a port that nothing serves.
+      runtime.setResourceProvider(passingThrough(HTTP_STYLE_URL)).awaitWithin("the provider")
+      runtime.setHttpHeaderTransform(transform).awaitWithin("the header transform")
+      map.setStyleUrl(HTTP_STYLE_URL).awaitWithin("the style command")
+      val (inside, fromAnotherThread) = outcome.awaitWithin("the header transform callback")
+      assertEquals(null, inside, "setting a header inside the callback is allowed")
+      assertEquals(
+        Status.INVALID_STATE,
+        (fromAnotherThread as? MaplibreException)?.status,
+        "the response from another thread: $fromAnotherThread",
+      )
+      assertFailsWithStatus(Status.INVALID_STATE) {
+        GeneratedApi.httpHeaderTransformResponseSetHeader(escaped!!, "X-Test", "1")
+      }
+      runtime.clearHttpHeaderTransform().awaitWithin("the header transform clear")
+    }
+  }
+
+  /** Passes [url] through to native loading, and denies every other request. */
+  private fun passingThrough(url: String) =
+    ResourceProvider(
+      callback = { request, handle ->
+        if (request.requestedUrl == url) ResourceProviderDecision.PASS_THROUGH
+        else {
+          handle.deny()
+          ResourceProviderDecision.HANDLE
+        }
+      },
+    )
+
+  private companion object {
+    // A loopback port that nothing serves, so the request fails without leaving the machine.
+    const val HTTP_STYLE_URL = "http://127.0.0.1:1/style.json"
+  }
+}

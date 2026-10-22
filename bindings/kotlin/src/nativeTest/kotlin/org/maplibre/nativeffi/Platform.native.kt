@@ -70,7 +70,7 @@ internal actual class TestWeakReference actual constructor(value: Any) {
     get() = reference.value == null
 }
 
-internal actual fun awaitCollected(reference: TestWeakReference): Boolean {
+internal actual suspend fun awaitCollected(reference: TestWeakReference): Boolean {
   // GC.collect() runs a full collection before it returns, so each round is a real result.
   val deadline = TimeSource.Monotonic.markNow() + 10.seconds
   while (deadline.hasNotPassedNow()) {
@@ -80,7 +80,7 @@ internal actual fun awaitCollected(reference: TestWeakReference): Boolean {
   return reference.isCleared
 }
 
-internal actual fun requestCollection() {
+internal actual suspend fun requestCollection() {
   GC.collect()
 }
 

@@ -596,7 +596,7 @@ typedef struct mln_ticket_delivery {
 typedef void (*mln_notice_release)(void* context);
 typedef unsigned (*mln_notice_callback)(
   void* context, int code, const char* text
-) BIND("failure=0;delivery=MLN_DELIVERY_TYPE_NOTICE");
+) BIND("failure=0;delivery=MLN_DELIVERY_TYPE_NOTICE;queue_result=1");
 // Its release must not call back into the API.
 typedef struct mln_notice_handler {
   unsigned int size;

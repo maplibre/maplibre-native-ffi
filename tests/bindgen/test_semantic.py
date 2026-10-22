@@ -615,6 +615,13 @@ typedef struct signals { notify signal; void *state BIND("kind=context"); releas
             model.callbacks["mln_ticket_provider_callback"].delivery.record,
             "mln_ticket_delivery",
         )
+        # What queue mode answers in place of each callback with a result: its
+        # queue_result, or a decision's accepted outcome.
+        self.assertEqual(model.callbacks["mln_notice_callback"].queue_result, "1")
+        self.assertEqual(
+            model.callbacks["mln_ticket_provider_callback"].queue_result,
+            "MLN_DECISION_CLAIM",
+        )
         registration = model.operations_by_name[
             "mln_notice_set_callback"
         ].registrations[0]
@@ -646,6 +653,16 @@ typedef struct signals { notify signal; void *state BIND("kind=context"); releas
                 "delivery=MLN_DELIVERY_TYPE_NOTICE",
                 "delivery=MLN_DELIVERY_TYPE_UNKNOWN",
                 "unknown constant",
+            ),
+            (
+                ";queue_result=1",
+                "",
+                "declares its queue_result",
+            ),
+            (
+                "queue_result=1",
+                "queue_result=4294967296",
+                "queue_result must be an integer",
             ),
             (
                 "  int code;\n  const char* text",

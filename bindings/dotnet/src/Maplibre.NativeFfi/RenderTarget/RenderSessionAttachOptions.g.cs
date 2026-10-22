@@ -29,7 +29,8 @@ namespace Maplibre.NativeFfi;
 /// Wakes the receiver when the frame-result queue becomes nonempty.
 /// </param>
 /// <param name="DriverWorkWake">
-/// Wakes the graphics receiver when caller-driver work is available.
+/// Wakes the graphics receiver when caller-driver work is available, including
+/// work that a finished driver result releases.
 /// </param>
 /// <param name="QueueLock">
 /// Host lock on the graphics queue, disabled by default. Only Vulkan targets

@@ -29,7 +29,7 @@ import org.maplibre.nativeffi.withMap
 /** How a native completion reaches Kotlin as a Deferred. */
 class CompletionTest {
   @Test
-  fun aDiscardedCommandIsFencedAndSynchronousRejectionThrows(): Unit = runSuspendTest {
+  fun aDiscardedCommandIsFencedAndSynchronousRejectionThrows() = runSuspendTest {
     withMap {
       map.discarding.setDebugOptions(MapDebugOption.TILE_BORDERS)
       // A later command on the same map completes after the discarded one.
@@ -42,7 +42,7 @@ class CompletionTest {
   }
 
   @Test
-  fun aSubmissionNativeRejectsLeavesNoCompletionBehind(): Unit = runSuspendTest {
+  fun aSubmissionNativeRejectsLeavesNoCompletionBehind() = runSuspendTest {
     withMap {
       var token = 0L
       // Native rejects the unknown state before it takes the completion, so the call itself throws
@@ -70,7 +70,7 @@ class CompletionTest {
   }
 
   @Test
-  fun aFailedCommandArrivesAsDataRatherThanAnException(): Unit = runSuspendTest {
+  fun aFailedCommandArrivesAsDataRatherThanAnException() = runSuspendTest {
     withMap {
       loadStyle()
       // awaitFailed returns the FAILED disposition with its status and diagnostic.
@@ -79,7 +79,7 @@ class CompletionTest {
   }
 
   @Test
-  fun waitingOnACompletionTimesOutOrIsCancelledWithoutEndingIt(): Unit = runSuspendTest {
+  fun waitingOnACompletionTimesOutOrIsCancelledWithoutEndingIt() = runSuspendTest {
     withMap(mapMode = MapMode.STATIC) {
       loadStyle()
       // A static map renders its still image only for a render session, and none is attached.

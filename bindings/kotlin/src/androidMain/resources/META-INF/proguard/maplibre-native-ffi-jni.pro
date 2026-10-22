@@ -5,3 +5,4 @@
 -keep class org.maplibre.nativeffi.internal.c.Jni { native <methods>; }
 -keep class org.maplibre.nativeffi.internal.memory.NativeMemory { native <methods>; }
 -keep class org.maplibre.nativeffi.internal.c.Upcalls { public static <methods>; }
+-keep class org.maplibre.nativeffi.internal.c.ThreadedUpcalls { public static <methods>; }

@@ -313,9 +313,9 @@ ci:
     web:
       covers: >-
         The browser, built with Emscripten for WebGL and WebGPU. Runs the C API
-        tests and the Rust binding tests in a browser. Catches Emscripten,
-        wasm32, and browser rendering problems. Platform-independent code that
-        Linux x64 already tests does not need it.
+        tests and the Rust and Kotlin/Wasm binding tests in a browser. Catches
+        Emscripten, wasm32, and browser rendering problems. Platform-independent
+        code that Linux x64 already tests does not need it.
       paths:
         - src/platform/emscripten/*
         - src/render/webgpu/*
@@ -323,6 +323,9 @@ ci:
         - cmake/toolchains/emscripten.cmake
         - cmake/mln_ffi_emscripten.cmake
         - mise.emscripten.*
+        - bindings/kotlin/src/wasmJs*
+        - bindings/kotlin/wasm/*
+        - bindings/kotlin/karma.config.d/*
     maven:
       covers: >-
         Assembles and verifies the Kotlin Maven repository from every native

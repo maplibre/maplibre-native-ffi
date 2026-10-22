@@ -10,6 +10,7 @@ import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.maplibre.nativeffi.MapFixture
+import org.maplibre.nativeffi.TestProvider
 import org.maplibre.nativeffi.WAIT_TIMEOUT
 import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.generated.FrameDemand
@@ -19,9 +20,10 @@ import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderFrameResult
 import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
+import org.maplibre.nativeffi.generated.RenderSessionAttachment
+import org.maplibre.nativeffi.generated.RenderSessionCapabilityFlag
 import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.RenderSessionState
-import org.maplibre.nativeffi.generated.ResourceProvider
 import org.maplibre.nativeffi.generated.RuntimeOptions
 import org.maplibre.nativeffi.generated.Wake
 import org.maplibre.nativeffi.runtime.assertCommitted
@@ -29,15 +31,20 @@ import org.maplibre.nativeffi.smallMapOptions
 import org.maplibre.nativeffi.withMap
 
 /**
- * A caller-driven owned-texture session on a [MapFixture]'s map, serviced on [TestGraphics.thread]
- * and woken by the session's frame and driver-work wakes.
+ * A render session on a [MapFixture]'s map, woken by the session's frame and driver-work wakes. A
+ * caller-driven session is serviced on [TestGraphics.thread]; a core worker drives its own.
  */
-internal class OwnedTextureFixture(
+internal class RenderSessionFixture(
   val mapFixture: MapFixture,
   val session: RenderSessionHandle,
   private val wakes: Channel<Unit>,
+  driver: RenderDriverKind,
 ) {
   private var nextToken = 1uL
+  private val callerDriven = driver == RenderDriverKind.CALLER_GRAPHICS_THREAD
+  // A private texture and a surface hand out no frames, so their rendered frames need no release.
+  private val acquiresFrames =
+    RenderSessionCapabilityFlag.FRAME_ACQUISITION in session.getCapabilities().flags
 
   /** Services the session's driver work on the graphics thread until [deferred] completes. */
   suspend fun <T> complete(deferred: Deferred<T>, what: String = "a driver-serviced operation"): T {
@@ -47,9 +54,9 @@ internal class OwnedTextureFixture(
 
   /**
    * Keeps one forced frame demand in flight until [done] holds, and returns the last frame result.
-   * A forced demand renders the latest map update whether or not it is new. Each rendered frame is
-   * acquired and released so the texture ring never fills, unless [keepLastFrame] leaves the final
-   * one for the test to acquire.
+   * A forced demand renders the latest map update whether or not it is new. Where the session hands
+   * out frames, each rendered frame is acquired and released so the texture ring never fills,
+   * unless [keepLastFrame] leaves the final one for the test to acquire.
    */
   suspend fun renderUntil(
     what: String,
@@ -64,7 +71,7 @@ internal class OwnedTextureFixture(
         if (result != null) {
           last = result
           pending = null
-          if (!(keepLastFrame && done(result))) releaseFrames()
+          if (acquiresFrames && !(keepLastFrame && done(result))) releaseFrames()
         }
       }
       when {
@@ -113,10 +120,10 @@ internal class OwnedTextureFixture(
   }
 
   /**
-   * Services driver work on the graphics thread and checks [ready] after each round, blocking on
-   * the session's wakes, or on [completion] when it completes off the driver, in between. A wake
-   * fires when a queue becomes nonempty, so work that arrives after a round leaves a wake behind
-   * for the next receive.
+   * Services driver work on the graphics thread, when the caller drives the session, and checks
+   * [ready] after each round, blocking on the session's wakes, or on [completion] when it completes
+   * off the driver, in between. A wake fires when a queue becomes nonempty, so work that arrives
+   * after a round leaves a wake behind for the next receive.
    */
   private suspend fun serviceUntil(
     what: String,
@@ -127,7 +134,7 @@ internal class OwnedTextureFixture(
       try {
         withTimeout(WAIT_TIMEOUT) {
           while (true) {
-            session.serviceDriverWork()
+            if (callerDriven) session.serviceDriverWork()
             if (ready()) break
             select {
               wakes.onReceive {}
@@ -149,45 +156,71 @@ internal class OwnedTextureFixture(
 }
 
 /**
- * Runs [block] against a map with an attached caller-driven owned-texture session of [width] x
- * [height] on the build's backend, and abandons and closes the session afterwards. The map's
- * runtime is created from [runtimeOptions], and [onFrameWake] runs on each frame wake.
+ * Runs [block] against a map with an attached owned-texture session of [width] x [height] on the
+ * build's backend, and abandons and closes the session afterwards. The caller drives the session on
+ * [TestGraphics.thread] unless [driver] names a core worker. The map's runtime is created from
+ * [runtimeOptions], and [onFrameWake] runs on each frame wake.
  */
 internal suspend fun <T> withOwnedTexture(
   width: Int = 32,
   height: Int = 16,
   mapMode: MapMode = MapMode.STATIC,
+  driver: RenderDriverKind = RenderDriverKind.CALLER_GRAPHICS_THREAD,
   textureRingDepth: UInt = 1u,
-  provider: ResourceProvider = denyingProvider(),
+  provider: TestProvider = denyingProvider(),
   runtimeOptions: RuntimeOptions = GeneratedApi.runtimeOptionsDefault(),
   onFrameWake: () -> Unit = {},
-  block: suspend OwnedTextureFixture.() -> T,
+  block: suspend RenderSessionFixture.() -> T,
 ): T =
   withMap(mapMode, provider, smallMapOptions(mapMode, width, height), runtimeOptions) {
-    val wakes = Channel<Unit>(Channel.CONFLATED)
-    val options =
-      RenderSessionAttachOptions(
-        driver = RenderDriverKind.CALLER_GRAPHICS_THREAD,
-        requestedTextureRingDepth = textureRingDepth,
-        frameWake =
-          Wake {
-            wakes.trySend(Unit)
-            onFrameWake()
-          },
-        driverWorkWake = Wake { wakes.trySend(Unit) },
-      )
-    val attachment =
-      withContext(TestGraphics.thread) {
-        TestGraphics.attachOwnedTexture(map, width, height, options)
-      }
-    val fixture = OwnedTextureFixture(this, attachment.session, wakes)
+    val canvas = TestGraphics.ownedTextureCanvas(width, height, driver)
     try {
-      fixture.complete(attachment.ready, "the attach")
-      fixture.block()
+      withRenderSession(
+        driver,
+        attach = { options ->
+          TestGraphics.attachOwnedTexture(map, width, height, options, canvas)
+        },
+        textureRingDepth = textureRingDepth,
+        onFrameWake = onFrameWake,
+        block = block,
+      )
     } finally {
-      withContext(NonCancellable + TestGraphics.thread) { attachment.session.abandonAndClose() }
+      canvas?.close()
     }
   }
+
+/**
+ * Runs [block] against a session of this map that [attach] submits on [TestGraphics.thread] with
+ * options for [driver], once the attach completes, and abandons and closes the session afterwards.
+ */
+internal suspend fun <T> MapFixture.withRenderSession(
+  driver: RenderDriverKind,
+  attach: suspend (RenderSessionAttachOptions) -> RenderSessionAttachment,
+  textureRingDepth: UInt = 1u,
+  onFrameWake: () -> Unit = {},
+  block: suspend RenderSessionFixture.() -> T,
+): T {
+  val wakes = Channel<Unit>(Channel.CONFLATED)
+  val options =
+    RenderSessionAttachOptions(
+      driver = driver,
+      requestedTextureRingDepth = textureRingDepth,
+      frameWake =
+        Wake {
+          wakes.trySend(Unit)
+          onFrameWake()
+        },
+      driverWorkWake = Wake { wakes.trySend(Unit) },
+    )
+  val attachment = withContext(TestGraphics.thread) { attach(options) }
+  try {
+    val fixture = RenderSessionFixture(this, attachment.session, wakes, driver)
+    fixture.complete(attachment.ready, "the attach")
+    return fixture.block()
+  } finally {
+    withContext(NonCancellable + TestGraphics.thread) { attachment.session.abandonAndClose() }
+  }
+}
 
 /** Leaves a session closed: an attached session is abandoned rather than leaked. */
 internal fun RenderSessionHandle.abandonAndClose() {

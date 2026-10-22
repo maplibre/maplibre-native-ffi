@@ -36,13 +36,19 @@ internal object Ffm {
     linker.downcallHandle(symbols.findOrThrow(name), descriptor(result, arguments))
 
   /**
-   * An upcall stub that calls the static method [name] of [Upcalls] and lives for the process.
+   * An upcall stub that calls the static method [name] of [owner], `Upcalls` or `ThreadedUpcalls`,
+   * and lives for the process.
    *
    * The method takes each record argument as the address of the caller's copy.
    */
-  fun upcall(name: String, result: MemoryLayout?, vararg arguments: MemoryLayout): Long {
+  fun upcall(
+    owner: Class<*>,
+    name: String,
+    result: MemoryLayout?,
+    vararg arguments: MemoryLayout,
+  ): Long {
     val type = MethodType.methodType(result?.let(::carrier) ?: Void.TYPE, arguments.map(::carrier))
-    var target = MethodHandles.lookup().findStatic(Upcalls::class.java, name, type)
+    var target = MethodHandles.lookup().findStatic(owner, name, type)
     arguments.forEachIndexed { index, layout ->
       if (layout is GroupLayout)
         target = MethodHandles.filterArguments(target, index, segmentAddress)

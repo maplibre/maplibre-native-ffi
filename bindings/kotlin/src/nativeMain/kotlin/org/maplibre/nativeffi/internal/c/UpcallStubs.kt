@@ -27,13 +27,36 @@ internal actual object UpcallStubs {
       event: UInt,
       code: Long,
       message: CPointer<ByteVar>? ->
-      Upcalls.logHandlerCallback(
+      ThreadedUpcalls.logHandlerCallback(
           userData.toLong(),
           severity.toInt(),
           event.toInt(),
           code,
           message.toLong(),
         )
+        .toUInt()
+    }
+    .toLong()
+  actual val httpHeaderTransformCallback: Long =
+    staticCFunction {
+      userData: COpaquePointer?,
+      kind: UInt,
+      url: CPointer<ByteVar>?,
+      outResponse: CPointer<mln_http_header_transform_response>? ->
+      ThreadedUpcalls.httpHeaderTransformCallback(
+        userData.toLong(),
+        kind.toInt(),
+        url.toLong(),
+        outResponse.toLong(),
+      )
+    }
+    .toLong()
+  actual val resourceProviderCallback: Long =
+    staticCFunction {
+      userData: COpaquePointer?,
+      request: CPointer<mln_resource_request_info>?,
+      handle: ULong ->
+      ThreadedUpcalls.resourceProviderCallback(userData.toLong(), request.toLong(), handle.toLong())
         .toUInt()
     }
     .toLong()
@@ -77,29 +100,6 @@ internal actual object UpcallStubs {
   actual val runtimeEventHandlerCallback: Long =
     staticCFunction { userData: COpaquePointer?, events: CPointer<mln_event_batch_view>? ->
       Upcalls.runtimeEventHandlerCallback(userData.toLong(), events.toLong())
-    }
-    .toLong()
-  actual val httpHeaderTransformCallback: Long =
-    staticCFunction {
-      userData: COpaquePointer?,
-      kind: UInt,
-      url: CPointer<ByteVar>?,
-      outResponse: CPointer<mln_http_header_transform_response>? ->
-      Upcalls.httpHeaderTransformCallback(
-        userData.toLong(),
-        kind.toInt(),
-        url.toLong(),
-        outResponse.toLong(),
-      )
-    }
-    .toLong()
-  actual val resourceProviderCallback: Long =
-    staticCFunction {
-      userData: COpaquePointer?,
-      request: CPointer<mln_resource_request_info>?,
-      handle: ULong ->
-      Upcalls.resourceProviderCallback(userData.toLong(), request.toLong(), handle.toLong())
-        .toUInt()
     }
     .toLong()
   actual val resourceTransformCallback: Long =

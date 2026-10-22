@@ -289,12 +289,14 @@ before it builds anything. Android presets build against `ANDROID_HOME`; to use
 the pinned SDK, run `mise -E android run //:kotlin:publish local <preset>...`.
 
 The repository holds only the targets that the named presets feed, although each
-root module still names every target. Later runs at the same version add
-Kotlin/Native targets and backends to the repository. Each publish rewrites a
-backend's JVM runtime module and Android AAR, and the binding's AAR, so they
-hold only the classifiers and ABIs from their latest publish. Both backends
-share the binding's AAR, which carries the JNI shim. Name every classifier of a
-backend, and every Android preset of both backends, in one run.
+root module still names every published target. The `wasmJs` target publishes
+nothing, and the root module leaves it out, until a package carries its browser
+module for each backend. Later runs at the same version add Kotlin/Native
+targets and backends to the repository. Each publish rewrites a backend's JVM
+runtime module and Android AAR, and the binding's AAR, so they hold only the
+classifiers and ABIs from their latest publish. Both backends share the
+binding's AAR, which carries the JNI shim. Name every classifier of a backend,
+and every Android preset of both backends, in one run.
 
 A pull request with complete coverage publishes its verified repository the same
 way. The version is `0.1.0-pr<number>.<run id>`, where the run id is the one

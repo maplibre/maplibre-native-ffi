@@ -10,19 +10,16 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
+import org.maplibre.nativeffi.NETWORK_URLS
+import org.maplibre.nativeffi.TestProvider
 import org.maplibre.nativeffi.assertFailsWithStatus
+import org.maplibre.nativeffi.awaitDeliveries
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.deny
 import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.error.CallbackException
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.generated.GeneratedApi
-import org.maplibre.nativeffi.generated.HttpHeaderTransform
-import org.maplibre.nativeffi.generated.HttpHeaderTransformResponse
 import org.maplibre.nativeffi.generated.ResourceKind
 import org.maplibre.nativeffi.generated.ResourceKindMask
-import org.maplibre.nativeffi.generated.ResourceProvider
-import org.maplibre.nativeffi.generated.ResourceProviderDecision
 import org.maplibre.nativeffi.generated.ResourceRequestCancelHandler
 import org.maplibre.nativeffi.generated.ResourceRequestHandle
 import org.maplibre.nativeffi.generated.ResourceResponse
@@ -34,9 +31,9 @@ import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.generated.UrlMatchFlags
 import org.maplibre.nativeffi.interceptCallbackFailures
-import org.maplibre.nativeffi.runOnBackgroundThread
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.serve
+import org.maplibre.nativeffi.setTestProvider
 import org.maplibre.nativeffi.withMap
 
 /** The resource provider and transform callbacks: what they root and what they hand out. */
@@ -44,7 +41,7 @@ import org.maplibre.nativeffi.withMap
 class ResourceCallbackTest {
 
   @Test
-  fun aCancelCallbackIsRootedUntilNativeReleasesIt(): Unit = runSuspendTest {
+  fun aCancelCallbackIsRootedUntilNativeReleasesIt() = runSuspendTest {
     val claimed = CompletableDeferred<ResourceRequestHandle>()
     withMap(provider = claimingProvider(STYLE_URL, claimed)) {
       map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
@@ -62,16 +59,17 @@ class ResourceCallbackTest {
       assertEquals(1, request.bindingCallbacks.rootCountForTesting())
 
       // Provider removal waits for the callback to return. Closing the unanswered request then
-      // releases its cancel registration before the root count is read.
+      // releases its cancel registration, which reaches Kotlin before the root count is read.
       runtime.clearResourceProvider().awaitWithin("provider removal")
       request.close()
+      awaitDeliveries()
       assertEquals(0, request.bindingCallbacks.rootCountForTesting())
       assertEquals(0, cancels.load())
     }
   }
 
   @Test
-  fun aCancelRegistrationNativeDoesNotStoreIsNotRooted(): Unit = runSuspendTest {
+  fun aCancelRegistrationNativeDoesNotStoreIsNotRooted() = runSuspendTest {
     val claimed = CompletableDeferred<ResourceRequestHandle>()
     val request =
       withMap(provider = claimingProvider(STYLE_URL, claimed)) {
@@ -88,11 +86,11 @@ class ResourceCallbackTest {
   }
 
   @Test
-  fun aProviderThatThrowsFailsItsRequestAndLeavesTheRuntimeWorking(): Unit = runSuspendTest {
+  fun aProviderThatThrowsFailsItsRequestAndLeavesTheRuntimeWorking() = runSuspendTest {
     val thrown = IllegalStateException("provider failure")
     val provider = denyingProvider { request, _ ->
       if (request.requestedUrl == STYLE_URL) throw thrown
-      null
+      false
     }
     val reports = AtomicReference(emptyList<CallbackException>())
     val restore = interceptCallbackFailures { failure ->
@@ -102,7 +100,7 @@ class ResourceCallbackTest {
     try {
       withMap(provider = provider) {
         map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
-        // The binding contains the exception and answers native with a failed decision, which
+        // The binding contains the exception and releases the request without a response, which
         // MapLibre reports as the style's loading failure.
         awaitMapEvent(RuntimeEventType.MAP_LOADING_FAILED)
         loadStyle()
@@ -110,14 +108,14 @@ class ResourceCallbackTest {
     } finally {
       restore?.invoke()
     }
-    // The report reaches the platform's handler before native receives the decision.
+    // The report reaches the platform's handler before the request fails.
     if (restore != null) {
       assertEquals(listOf("mln_resource_provider_callback"), reports.load().map { it.callback })
     }
   }
 
   @Test
-  fun aClaimedRequestCanBeAnsweredAfterTheProviderReturns(): Unit = runSuspendTest {
+  fun aClaimedRequestCanBeAnsweredAfterTheProviderReturns() = runSuspendTest {
     val claimed = CompletableDeferred<ResourceRequestHandle>()
     withMap(provider = claimingProvider(STYLE_URL, claimed)) {
       map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
@@ -142,56 +140,7 @@ class ResourceCallbackTest {
   }
 
   @Test
-  fun aHeaderResponseRefusesUseAfterItsCallbackAndFromAnotherThread(): Unit = runSuspendTest {
-    val outcome = CompletableDeferred<Pair<Throwable?, Throwable?>>()
-    var escaped: HttpHeaderTransformResponse? = null
-    val transform =
-      HttpHeaderTransform(
-        callback = { _, url, response ->
-          if (url != HTTP_STYLE_URL || outcome.isCompleted) return@HttpHeaderTransform
-          escaped = response
-          var fromAnotherThread: Throwable? = null
-          runOnBackgroundThread {
-            fromAnotherThread =
-              runCatching {
-                GeneratedApi.httpHeaderTransformResponseSetHeader(response, "X-Test", "1")
-              }
-                .exceptionOrNull()
-          }
-          val inside = runCatching {
-            GeneratedApi.httpHeaderTransformResponseSetHeader(response, "X-Test", "1")
-          }
-            .exceptionOrNull()
-          outcome.complete(inside to fromAnotherThread)
-        },
-      )
-    // The provider passes the style through to the HTTP client, which runs the header transform
-    // before it tries a port that nothing serves.
-    withMap(
-      provider =
-        denyingProvider { request, _ ->
-          if (request.requestedUrl == HTTP_STYLE_URL) ResourceProviderDecision.PASS_THROUGH
-          else null
-        },
-    ) {
-      runtime.setHttpHeaderTransform(transform).awaitWithin("the header transform")
-      map.setStyleUrl(HTTP_STYLE_URL).awaitWithin("the style command")
-      val (inside, fromAnotherThread) = outcome.awaitWithin("the header transform callback")
-      assertEquals(null, inside, "setting a header inside the callback is allowed")
-      assertEquals(
-        Status.INVALID_STATE,
-        (fromAnotherThread as? MaplibreException)?.status,
-        "the response from another thread: $fromAnotherThread",
-      )
-      assertFailsWithStatus(Status.INVALID_STATE) {
-        GeneratedApi.httpHeaderTransformResponseSetHeader(escaped!!, "X-Test", "1")
-      }
-      runtime.clearHttpHeaderTransform().awaitWithin("the header transform clear")
-    }
-  }
-
-  @Test
-  fun aTransformRequestIsAnsweredFromAnotherThreadAfterItsCallbackReturns(): Unit = runSuspendTest {
+  fun aTransformRequestIsAnsweredAfterItsCallbackReturns() = runSuspendTest {
     val received = CompletableDeferred<ResourceTransformRequestHandle>()
     val transform =
       ResourceTransform(
@@ -199,26 +148,15 @@ class ResourceCallbackTest {
           if (url == STYLE_URL) received.complete(request) else request.close()
         },
       )
-    // The provider passes the style through to the online source, which waits for the answer.
-    withMap(
-      provider =
-        denyingProvider { request, _ ->
-          if (request.requestedUrl == STYLE_URL) ResourceProviderDecision.PASS_THROUGH else null
-        },
-    ) {
+    // The provider claims only network requests, so the style reaches the online source, which
+    // waits for the transform's answer. The test answers on its own thread, after the callback
+    // returned on MapLibre's: another thread on a threaded target, and a later task on the page.
+    withMap(provider = denyingProvider(routes = NETWORK_URLS)) {
       runtime.setResourceTransform(transform).awaitWithin("the transform")
       map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
       val request = received.awaitWithin("the transform callback")
-      var answered: Throwable? = null
-      runOnBackgroundThread {
-        answered =
-          runCatching {
-            request.complete(REWRITTEN_URL)
-            request.close()
-          }
-            .exceptionOrNull()
-      }
-      assertEquals(null, answered, "answering after the callback returned")
+      request.complete(REWRITTEN_URL)
+      request.close()
       assertFailsWithStatus(Status.INVALID_STATE) { request.complete(REWRITTEN_URL) }
       // The online source cannot load the rewritten scheme.
       awaitMapEvent(RuntimeEventType.MAP_LOADING_FAILED)
@@ -227,69 +165,63 @@ class ResourceCallbackTest {
   }
 
   @Test
-  fun routesDecideWhichRequestsReachTheProviderAndAUrlOnlyRouteMatchesEveryKind(): Unit =
-    runSuspendTest {
-      val seen = AtomicReference(emptyList<Pair<ResourceKind, String?>>())
-      val sourceRequested = CompletableDeferred<Unit>()
-      val routes =
-        mutableListOf(
-          // Every URL, but only tiles, which this map never requests.
-          ResourceRoute(kinds = ResourceKindMask.TILE, flags = UrlMatchFlags.GLOB, url = "**"),
-          // Every kind under one prefix.
-          ResourceRoute(flags = UrlMatchFlags.GLOB, url = "custom://routed/**"),
-        )
-      val provider =
-        ResourceProvider(
-          callback = { request, handle ->
-            seen.update { it + (request.kind to request.requestedUrl) }
-            when (request.requestedUrl) {
-              ROUTED_STYLE_URL -> handle.serve(ROUTED_STYLE_JSON)
-              ROUTED_SOURCE_URL -> handle.serve(TILEJSON).also { sourceRequested.complete(Unit) }
-              else -> handle.deny()
-            }
-          },
-          routes = routes,
-        )
-      withMap {
-        val installing = runtime.setResourceProvider(provider)
-        routes.clear()
-        installing.awaitWithin("the routed provider")
-
-        // The style and the source it names are different kinds, and the URL-only route claims
-        // both.
-        map.setStyleUrl(ROUTED_STYLE_URL).awaitWithin("the routed style command")
-        awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
-        sourceRequested.awaitWithin("the routed source request")
-        assertEquals(
-          listOf(
-            ResourceKind.STYLE to ROUTED_STYLE_URL,
-            ResourceKind.SOURCE to ROUTED_SOURCE_URL,
-          ),
-          seen.load(),
-        )
-
-        // A style outside the prefix matches only the tile route's URL, so it passes through to
-        // native loading, which serves no custom scheme. The provider decides before the load
-        // fails, so the failure shows that the provider never saw the request.
-        map.setStyleUrl(UNROUTED_STYLE_URL).awaitWithin("the unrouted style command")
-        awaitMapEvent(RuntimeEventType.MAP_LOADING_FAILED)
-        assertEquals(2, seen.load().size, "requests the provider saw: ${seen.load()}")
+  fun routesDecideWhichRequestsReachTheProviderAndAUrlOnlyRouteMatchesEveryKind() = runSuspendTest {
+    val seen = AtomicReference(emptyList<Pair<ResourceKind, String?>>())
+    val sourceRequested = CompletableDeferred<Unit>()
+    val routes =
+      mutableListOf(
+        // Every URL, but only tiles, which this map never requests.
+        ResourceRoute(kinds = ResourceKindMask.TILE, flags = UrlMatchFlags.GLOB, url = "**"),
+        // Every kind under one prefix.
+        ResourceRoute(flags = UrlMatchFlags.GLOB, url = "custom://routed/**"),
+      )
+    val provider =
+      TestProvider(routes) { request, handle ->
+        seen.update { it + (request.kind to request.requestedUrl) }
+        when (request.requestedUrl) {
+          ROUTED_STYLE_URL -> handle.serve(ROUTED_STYLE_JSON)
+          ROUTED_SOURCE_URL -> handle.serve(TILEJSON).also { sourceRequested.complete(Unit) }
+          else -> handle.deny()
+        }
       }
+    withMap {
+      val installing = runtime.setTestProvider(provider)
+      routes.clear()
+      installing.awaitWithin("the routed provider")
+
+      // The style and the source it names are different kinds, and the URL-only route claims
+      // both.
+      map.setStyleUrl(ROUTED_STYLE_URL).awaitWithin("the routed style command")
+      awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
+      sourceRequested.awaitWithin("the routed source request")
+      assertEquals(
+        listOf(
+          ResourceKind.STYLE to ROUTED_STYLE_URL,
+          ResourceKind.SOURCE to ROUTED_SOURCE_URL,
+        ),
+        seen.load(),
+      )
+
+      // A style outside the prefix matches only the tile route's URL, so it passes through to
+      // native loading, which serves no custom scheme. The provider decides before the load
+      // fails, so the failure shows that the provider never saw the request.
+      map.setStyleUrl(UNROUTED_STYLE_URL).awaitWithin("the unrouted style command")
+      awaitMapEvent(RuntimeEventType.MAP_LOADING_FAILED)
+      assertEquals(2, seen.load().size, "requests the provider saw: ${seen.load()}")
     }
+  }
 
   /** Claims the request for [url] without answering it, and hands it to [claimed]. */
   private fun claimingProvider(url: String, claimed: CompletableDeferred<ResourceRequestHandle>) =
     denyingProvider { request, handle ->
-      if (request.requestedUrl != url) return@denyingProvider null
+      if (request.requestedUrl != url) return@denyingProvider false
       claimed.complete(handle)
-      ResourceProviderDecision.HANDLE
+      true
     }
 
   private companion object {
     const val STYLE_URL = "custom://style.json"
     const val REWRITTEN_URL = "unsupported://rewritten-style.json"
-    // A loopback port that nothing serves, so the request fails without leaving the machine.
-    const val HTTP_STYLE_URL = "http://127.0.0.1:1/style.json"
     const val ROUTED_STYLE_URL = "custom://routed/style.json"
     const val ROUTED_SOURCE_URL = "custom://routed/source.json"
     const val UNROUTED_STYLE_URL = "custom://unrouted/style.json"

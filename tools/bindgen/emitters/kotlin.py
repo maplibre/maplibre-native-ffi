@@ -1,13 +1,21 @@
 """Generate the Kotlin binding: one common API over a primitive native-call shim per platform.
 
-The common source set holds every generated value, codec, owner, and operation.
-The JVM, Kotlin/Native, and Android source sets hold only the declarations of
-the C functions and upcall stubs that common code uses (see kotlin_native).
+The common source set holds every generated value, codec, owner, and operation
+that behaves the same on every target. A split callback registration has a form
+per target instead (see kotlin_callbacks): the threadedMain source set holds the
+forms that answer native on a MapLibre thread, with their scoped responses, and
+wasmJsMain holds the forms that the page serves. Each declares the operations
+that take its forms as extensions. The JVM, Kotlin/Native, Android, and wasm
+source sets also hold the declarations of the C functions and upcall stubs that
+the shared code uses (see kotlin_native).
 """
 
+import dataclasses
+
+from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import Api
-from tools.bindgen.semantic import BoundApi
+from tools.bindgen.semantic import BoundApi, DeliverySupport
 
 from . import kotlin_callbacks, kotlin_owners
 from .kotlin_native import NativeShims
@@ -17,12 +25,30 @@ from .kotlin_operations import (
     owner_disposal,
     receiver_value,
 )
-from .kotlin_values import Unsupported, Values, doc, generated_owners
+from .kotlin_values import Unsupported, Values, generated_owners
 from .kotlin_values import name as value_name
 
 COMMON = "src/commonMain/kotlin/org/maplibre/nativeffi"
-PLATFORMS = {"jvmMain": "jvm", "nativeMain": "native", "androidMain": "android"}
+# The source set and file names of each split lowering's forms.
+SPLIT = {
+    kotlin_callbacks.THREADED: (
+        "src/threadedMain/kotlin/org/maplibre/nativeffi",
+        "GeneratedThreadedCallbacks",
+    ),
+    kotlin_callbacks.ASYNC: (
+        "src/wasmJsMain/kotlin/org/maplibre/nativeffi",
+        "GeneratedWasmCallbacks",
+    ),
+}
+PLATFORMS = {
+    "jvmMain": "jvm",
+    "nativeMain": "native",
+    "androidMain": "android",
+    "wasmJsMain": "wasm",
+}
 JNI = "src/androidMain/jni/mln_jni_generated.c"
+WASM_GLUE = "wasm/mln_kw_generated.c"
+WASM_EXPORTS = "wasm/mln_kw_exports.txt"
 
 OPERATION_IMPORTS = """\
 import kotlin.jvm.JvmInline
@@ -38,6 +64,24 @@ import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.runtime.CommandCompletion
 """
 
+# What a call that waits for a thread to start does on each target, which the C
+# reference cannot say.
+THREAD_START_NOTE = (
+    "Suspends until the call's thread starts. On the JVM, Android, and "
+    "Kotlin/Native the call waits on the calling thread, which it blocks until "
+    "then. On Kotlin/Wasm it runs on a thread of its own, so the page can call "
+    "it. Cancellation does not interrupt the wait: a caller cancelled meanwhile "
+    "receives the cancellation, and the binding disposes the result."
+)
+
+
+def operation_doc(bound, plan, indent: str = "") -> str:
+    """The KDoc of an operation, with what a thread-start call does in Kotlin."""
+    native = bound.doc(plan.name)
+    if native is not None and plan.blocks == "thread_start":
+        native = dataclasses.replace(native, notes=(THREAD_START_NOTE,))
+    return docs.block_comment(native, indent)
+
 
 def lower(api: Api | BoundApi):
     functions, unsupported, *_ = lowered(api)
@@ -45,11 +89,18 @@ def lower(api: Api | BoundApi):
 
 
 def lowered(api: Api | BoundApi):
-    functions, unsupported = [], {}
+    """Lowers every operation in its common form, or in each split lowering's form
+    when it takes a split registration. A scoped response exists only in the
+    threaded lowering.
+
+    The split operations of each lowering are in `split[lowering]`.
+    """
+    unsupported = {}
     bound = compile_api(api)
     values = Values(bound)
     native = Native(bound)
     bodies = {}
+    split = {lowering: {} for lowering in SPLIT}
     for value in bound.public_values.values():
         if value.kind == "enum":
             values.check(value)
@@ -62,12 +113,30 @@ def lowered(api: Api | BoundApi):
         groups.setdefault(receiver, []).append(plan)
     for plan in (plan for plans in groups.values() for plan in plans):
         function = plan.function
+        if plan.scoped_receiver:
+            lowerings = [kotlin_callbacks.THREADED]
+        elif kotlin_callbacks.split_registration(plan, values):
+            lowerings = list(SPLIT)
+        else:
+            lowerings = [None]
         try:
-            bodies[function.name] = operation(plan, values, native)
+            for lowering in lowerings:
+                values.split = lowering
+                source = operation(plan, values, native)
+                (split[lowering] if lowering else bodies)[function.name] = source
         except Unsupported as error:
+            bodies.pop(function.name, None)
+            for lowered_split in split.values():
+                lowered_split.pop(function.name, None)
             unsupported[function.name] = f"{function.location}: {error}"
-    functions = [plan.function for plan in bound.operations if plan.name in bodies]
-    return functions, unsupported, bodies, values, native
+        finally:
+            values.split = None
+    functions = [
+        plan.function
+        for plan in bound.operations
+        if plan.name in bodies or any(plan.name in s for s in split.values())
+    ]
+    return functions, unsupported, bodies, split, values, native
 
 
 def callback_owner(bound, receiver):
@@ -84,11 +153,30 @@ def callback_owner(bound, receiver):
     )
 
 
+def extension(source: str, receiver: str) -> str:
+    """A member method's source as an extension of [receiver], which a split source set declares."""
+    for head in ("public suspend fun ", "public fun "):
+        if source.startswith("  " + head):
+            return head + receiver + "." + source[len(head) + 2 :]
+    raise ValueError(f"not a member method: {source[:40]}")
+
+
+def delivery_functions(bound):
+    """The delivery queue functions that a host thread's runtime drains with."""
+    return {
+        plan.name: plan.function
+        for plan in bound.runtime_operations
+        if isinstance(plan.support, DeliverySupport)
+    }
+
+
 def generate(api: Api | BoundApi) -> dict[str, str]:
     bound = compile_api(api)
-    functions, _, rendered, values, native = lowered(bound)
+    functions, _, rendered, split, values, native = lowered(bound)
     groups = {}
     for function in functions:
+        if function.name not in rendered:
+            continue
         plan = bound.operations_by_name[function.name]
         receiver = receiver_value(plan).native if plan.receiver else None
         groups.setdefault(receiver, []).append(plan)
@@ -96,7 +184,9 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         groups.setdefault(owner, [])
     outputs = {}
     for receiver, plans in groups.items():
-        bodies = [doc(bound, plan.name, "  ") + rendered[plan.name] for plan in plans]
+        bodies = [
+            operation_doc(bound, plan, "  ") + rendered[plan.name] for plan in plans
+        ]
         header = (
             "// Generated from the C headers by tools/bindgen. Do not edit.\n"
             "package org.maplibre.nativeffi.generated\n\n" + OPERATION_IMPORTS + "\n"
@@ -141,6 +231,38 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                 header + "public object GeneratedApi {\n" + "\n".join(bodies) + "}\n"
             )
         outputs[f"{COMMON}/generated/{class_name}.kt"] = source
+    # The split forms come first: their writers can name records whose common
+    # codecs and values are emitted below.
+    for lowering, (directory, file) in SPLIT.items():
+        extensions = []
+        for function in functions:
+            if function.name not in split[lowering]:
+                continue
+            plan = bound.operations_by_name[function.name]
+            receiver = (
+                f"Generated{value_name(receiver_value(plan).native)}Operations"
+                if plan.receiver
+                else "GeneratedApi"
+            )
+            extensions.append(
+                operation_doc(bound, plan)
+                + extension(split[lowering][function.name], receiver)
+            )
+        declarations = kotlin_callbacks.split_declarations(values, lowering)
+        codecs = values.split_codecs(lowering)
+        outputs[f"{directory}/generated/{file}.kt"] = (
+            "// Generated from the C headers by tools/bindgen. Do not edit.\n"
+            "package org.maplibre.nativeffi.generated\n\n"
+            + OPERATION_IMPORTS
+            + "import org.maplibre.nativeffi.internal.delivery.HostDelivery\n\n"
+            + "\n\n".join([*declarations, *codecs])
+            + "\n\n"
+            + "\n".join(extensions)
+        )
+        upcalls = kotlin_callbacks.SPLIT_UPCALLS[lowering][0]
+        outputs[f"{directory}/internal/c/{upcalls}.kt"] = (
+            kotlin_callbacks.split_upcalls(values, lowering)
+        )
     outputs.update(
         kotlin_owners.generate_owners(
             bound, [bound.operations_by_name[f.name] for f in functions]
@@ -157,7 +279,9 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
     outputs[f"{COMMON}/generated/GeneratedValues.kt"] = values.common()
     outputs[f"{COMMON}/internal/c/Upcalls.kt"] = kotlin_callbacks.upcalls(values)
     shims = NativeShims(
-        bound, native.functions, kotlin_callbacks.sites(values).values()
+        bound,
+        {**native.functions, **delivery_functions(bound)},
+        kotlin_callbacks.sites(values).values(),
     )
     outputs[f"{COMMON}/internal/c/C.kt"] = shims.common()
     outputs[f"{COMMON}/internal/c/RuntimeLayouts.kt"] = shims.runtime_layouts()
@@ -166,6 +290,8 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         if platform == "android":
             files, jni = shims.android()
             outputs[JNI] = jni
+        elif platform == "wasm":
+            files, outputs[WASM_GLUE], outputs[WASM_EXPORTS] = shims.wasm()
         else:
             files = getattr(shims, platform)()
         for file, source in files.items():

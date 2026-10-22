@@ -40,6 +40,10 @@ service.
 
 <Code code={region(frameLoopSnippet, "service")} lang="c" title="frame-loop.c" />
 
+In a browser, the graphics thread also runs its event loop between service
+calls. A WebGPU readback finishes through that loop, and the session's later
+driver work waits for it.
+
 If the graphics thread cannot run again,
 [abandon the target](/maplibre-native-ffi/guides/attach-a-render-target/#resize-and-release).
 

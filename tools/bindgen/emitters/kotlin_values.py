@@ -165,6 +165,13 @@ class Values:
         self.writers = {}
         self.readers = {}
         self.sites = None
+        # The split lowering in progress, if any: THREADED for the forms that
+        # threadedMain declares, or ASYNC for those that wasmJsMain declares.
+        # Each split lowering keeps the callback values that it used and the
+        # writers of its split registrations.
+        self.split = None
+        self.split_used = {"threaded": {}, "async": {}}
+        self.split_writers = {"threaded": {}, "async": {}}
 
     def needs_registration(self, value):
         return bool(
@@ -204,6 +211,10 @@ class Values:
         controls |= {
             f.presence.mask for f in value.fields if f.presence and f.presence.mask
         }
+        if value.registration:
+            from . import kotlin_callbacks
+
+            controls |= kotlin_callbacks.omitted_fields(value, self)
         return tuple(f for f in value.fields if f.name not in controls)
 
     def check(self, value):
@@ -525,13 +536,17 @@ class Values:
 
     def put(self, record):
         """Name the in-place writer of [record], emitting it once."""
+        from . import kotlin_callbacks
+
+        if kotlin_callbacks.split(record, self):
+            self.split_writers[self.split].setdefault(record.native, record)
+            return "put" + kotlin_callbacks.public_name(record, self)
         self.writers.setdefault(record.native, record)
         return "put" + name(record.native)
 
     def write(self, record):
         """Name the allocating writer of [record], emitting it once."""
-        self.put(record)
-        return "write" + name(record.native)
+        return "write" + self.put(record).removeprefix("put")
 
     def argument(self, value, expression):
         """An expression for [value] as a native-call carrier, in a NativeArena receiver."""
@@ -905,6 +920,18 @@ class Values:
             + " } }"
         )
 
+    def split_codecs(self, lowering):
+        """The writers of a split lowering's registrations, which its source set declares."""
+        previous = self.split
+        self.split = lowering
+        try:
+            return [
+                self.put_function(value)
+                for value in self.split_writers[lowering].values()
+            ]
+        finally:
+            self.split = previous
+
     def codecs(self):
         """The common read and write functions for every record a binding uses."""
         functions = []
@@ -934,6 +961,7 @@ class Values:
             "import org.maplibre.nativeffi.internal.c.C\n"
             "import org.maplibre.nativeffi.internal.c.UpcallStubs\n"
             "import org.maplibre.nativeffi.internal.call.NativeCall\n"
+            "import org.maplibre.nativeffi.internal.delivery.HostDelivery\n"
             "import org.maplibre.nativeffi.internal.status.invalidArgument\n"
             "import org.maplibre.nativeffi.render.NativePointer\n"
             + (

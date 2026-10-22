@@ -3361,7 +3361,10 @@ public data class RenderSessionAttachOptions(
   public val producerSyncKind: GpuSyncKind = RenderSessionAttachOptions.default.producerSyncKind,
   /** Wakes the receiver when the frame-result queue becomes nonempty. */
   public val frameWake: Wake = RenderSessionAttachOptions.default.frameWake,
-  /** Wakes the graphics receiver when caller-driver work is available. */
+  /**
+   * Wakes the graphics receiver when caller-driver work is available, including work that a
+   * finished driver result releases.
+   */
   public val driverWorkWake: Wake = RenderSessionAttachOptions.default.driverWorkWake,
   /**
    * Host lock on the graphics queue, disabled by default. Only Vulkan targets accept an enabled
@@ -4648,32 +4651,6 @@ public data class CustomMvtVectorSourceOptions(
   public val maxZoom: Double? = null,
 )
 
-public class HttpHeaderTransformResponse
-internal constructor(
-  internal val bindingAddress: Long,
-  internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope,
-)
-
-/**
- * Process-global log callback or queue state.
- *
- * See `mln_log_handler` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
- */
-public data class LogHandler(
-  /** Receives each record. */
-  public val callback: LogCallback,
-)
-
-/**
- * Receives a MapLibre Native log record.
- *
- * See `mln_log_callback` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
- */
-public typealias LogCallback =
-  (severity: LogSeverity, event: LogEvent, code: Long, message: String) -> UInt
-
 /**
  * Receiver wake callback copied by a successful owning call. The callback schedules service by the
  * receiver and returns without waiting for another thread.
@@ -4750,50 +4727,6 @@ public data class RuntimeEventHandler(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public typealias RuntimeEventCallback = (events: EventBatchView) -> Unit
-
-/**
- * HTTP header transform state: a callback, or native header rules.
- *
- * See `mln_http_header_transform` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class HttpHeaderTransform(
-  /** The callback, or null to apply rules. */
-  public val callback: HttpHeaderTransformCallback? = null,
-  /** Header rules for a transform without a callback; empty with one. */
-  public val rules: List<HttpHeaderRule> = emptyList(),
-)
-
-/**
- * Adds end-to-end headers to one outgoing HTTP request attempt.
- *
- * See `mln_http_header_transform_callback` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public typealias HttpHeaderTransformCallback =
-  (kind: ResourceKind, url: String, outResponse: HttpHeaderTransformResponse) -> Unit
-
-/**
- * Resource provider state.
- *
- * See `mln_resource_provider` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class ResourceProvider(
-  /** Decides each request that the routes leave to the provider. */
-  public val callback: ResourceProviderCallback,
-  /** The requests that reach the provider; empty to claim every request. */
-  public val routes: List<ResourceRoute> = emptyList(),
-)
-
-/**
- * Intercepts a network resource request.
- *
- * See `mln_resource_provider_callback` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public typealias ResourceProviderCallback =
-  (request: ResourceRequestInfo, handle: ResourceRequestHandle) -> ResourceProviderDecision
 
 /**
  * Resource transform state.

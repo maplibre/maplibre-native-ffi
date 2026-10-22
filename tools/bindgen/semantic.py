@@ -205,6 +205,10 @@ class CallbackPlan:
     status: bool = False
     # How a delivery queue carries the call, for a registration in queue mode.
     delivery: DeliveryPlan | None = None
+    # The result that native code answers in queue mode: the decision's
+    # accepted outcome, or the `queue_result=` of another callback that
+    # returns a value.
+    queue_result: str | None = None
     # Whether native code relies on the callback's work being done when it
     # returns, so a binding must run it on the calling thread rather than
     # deliver it later, even when it returns nothing.
@@ -317,6 +321,9 @@ class OperationPlan:
     status: bool = False
     member: str = ""
     absence: AbsencePlan | None = None
+    # What an immediate call waits for before it returns, such as a native
+    # thread start, which some host threads cannot wait for.
+    blocks: str | None = None
 
     @property
     def name(self) -> str:
@@ -1146,6 +1153,7 @@ class Binder:
             is_status(function.return_type),
             member,
             absence,
+            metadata.get("blocks"),
         )
 
     def copied(
@@ -1273,6 +1281,13 @@ class Binder:
             is_status(function.result),
             synchronous=typedef.metadata.get("synchronous") == "true",
             delivery=self.delivery(typedef),
+            queue_result=(
+                typedef.metadata.get(
+                    "queue_result", typedef.metadata.get("decision_accept")
+                )
+                if "delivery" in typedef.metadata
+                else None
+            ),
         )
 
     def delivery(self, typedef) -> DeliveryPlan | None:

@@ -2809,7 +2809,8 @@ final class RenderSessionAttachOptions extends _Value {
   /// Wakes the receiver when the frame-result queue becomes nonempty.
   final Wake frameWake;
 
-  /// Wakes the graphics receiver when caller-driver work is available.
+  /// Wakes the graphics receiver when caller-driver work is available,
+  /// including work that a finished driver result releases.
   final Wake driverWorkWake;
 
   @override

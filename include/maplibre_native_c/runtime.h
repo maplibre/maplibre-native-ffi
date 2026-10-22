@@ -1110,6 +1110,7 @@ MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_WRONG_THREAD when called on the browser main thread.
  * - MLN_STATUS_NATIVE_ERROR when runtime initialization fails.
  */
+MLN_BINDING("blocks=thread_start")
 MLN_API mln_status mln_runtime_create(
   const mln_runtime_options* options,
   mln_runtime* out_runtime MLN_BINDING("direction=out"),
@@ -1588,7 +1589,10 @@ MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
  * A host that drives a session on its own graphics thread stops driver service
  * first. Abandon returns once the session's in-flight driver call has ended,
  * so an exit path can end a session that is mid-frame. A disposed session's
- * graphics calls have ended once its wake release callbacks have run.
+ * graphics calls have ended once its wake release callbacks have run. A browser
+ * WebGPU readback whose copy is still mapping is the one exception to both
+ * paths: the library releases its own staging buffer when the graphics
+ * thread's event loop delivers the map; see mln_render_session_abandon().
  *
  * Returns:
  * - MLN_STATUS_OK when the handle was consumed.

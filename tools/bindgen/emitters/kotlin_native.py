@@ -1,4 +1,4 @@
-"""Emit the C declarations of the Kotlin binding and their three platform shims.
+"""Emit the C declarations of the Kotlin binding and their four platform shims.
 
 Common code calls `C`, an expect object with one function per C function it
 uses. Every parameter is a primitive carrier (see kotlin_abi), so each shim is
@@ -9,8 +9,14 @@ a uniform list of declarations:
 - Kotlin/Native: one call into the cinterop import of the headers.
 - Android: one `external` function per C function, registered by the JNI glue
   this module writes, which casts each carrier to its C type.
+- Wasm: one `js()` extern per C function, which calls the C wrapper that this
+  module writes into the browser module, in the pattern of the JNI glue.
 
-`UpcallStubs` holds the C function pointer behind each `Upcalls` method.
+`UpcallStubs` holds the C function pointer behind each `Upcalls` method, and on
+a threaded target each `ThreadedUpcalls` method. A native thread cannot call
+Kotlin on wasm, so the browser module serves only the wake sites, through its
+wake shim, and `Deliveries` runs the queue-form sites of `Upcalls` and
+`WasmUpcalls` for each delivery that the page drains.
 """
 
 from __future__ import annotations
@@ -18,7 +24,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..model import CType, Function
-from ..protocol import COMPLETION, COMPLETION_RESULT, DIAGNOSTIC
+from ..protocol import (
+    COMPLETION,
+    COMPLETION_RESULT,
+    DELIVERY,
+    DELIVERY_BATCH_VIEW,
+    DELIVERY_PAYLOAD,
+    DIAGNOSTIC,
+)
 from ..semantic import DefaultSupport, DeliverySupport
 from .kotlin_abi import (
     POINTER,
@@ -118,6 +131,50 @@ FROM_CINTEROP = {
     "ptr": ".toLong()",
 }
 
+# The global through which a wasm extern reaches the loaded module.
+WASM_MODULE = "globalThis[Symbol.for('org.maplibre.nativeffi.c')]"
+
+# Each primitive as wasm32 passes it to JavaScript: the Kotlin type of the
+# extern's argument, the C type of the wrapper's parameter, and the Kotlin
+# expressions that convert a common carrier to it and back. Integers of 32 bits
+# or fewer cross as a Number, 64-bit ones as a BigInt, and pointers and sizes
+# as a 32-bit word that Carriers.kt narrows with a check.
+WASM = {
+    "bool": ("Int", "int32_t", "if ({}) 1 else 0", "{} != 0"),
+    "i8": ("Int", "int32_t", "{}.toInt()", "{}.toByte()"),
+    "u8": ("Int", "int32_t", "{}.toInt()", "{}.toByte()"),
+    "i16": ("Int", "int32_t", "{}.toInt()", "{}.toShort()"),
+    "u16": ("Int", "int32_t", "{}.toInt()", "{}.toShort()"),
+    "i32": ("Int", "int32_t", "{}", "{}"),
+    "u32": ("Int", "int32_t", "{}", "{}"),
+    "i64": ("Long", "int64_t", "{}", "{}"),
+    "u64": ("Long", "int64_t", "{}", "{}"),
+    "size": ("Int", "uint32_t", "word({})", "unsignedWord({})"),
+    "ssize": ("Int", "int32_t", "signedWord({})", "{}.toLong()"),
+    "f32": ("Float", "float", "{}", "{}"),
+    "f64": ("Double", "double", "{}", "{}"),
+    "ptr": ("Int", "uintptr_t", "word({})", "unsignedWord({})"),
+}
+
+# The reader of each primitive that a delivery's payload passes to its site,
+# which returns the site parameter's carrier.
+WASM_READ = {
+    "bool": "readBool({})",
+    "i8": "readI8({})",
+    "u8": "readI8({})",
+    "i16": "readI16({})",
+    "u16": "readI16({})",
+    "i32": "readI32({})",
+    "u32": "readI32({})",
+    "i64": "readI64({})",
+    "u64": "readI64({})",
+    "size": "readAddress({})",
+    "ssize": "readI32({}).toLong()",
+    "f32": "readF32({})",
+    "f64": "readF64({})",
+    "ptr": "readAddress({})",
+}
+
 CINTEROP_TYPE = {
     "bool": "Boolean",
     "i8": "Byte",
@@ -154,6 +211,13 @@ class Signature:
     parameters: tuple[Parameter, ...]
     result: object
     result_ctype: CType
+    # What the call waits for before it returns, from `blocks=`.
+    blocks: str | None = None
+
+    @property
+    def wrapper(self):
+        """The C wrapper that the wasm extern of this function calls."""
+        return f"mln_kw_{self.function}"
 
     @property
     def carrier(self):
@@ -174,7 +238,12 @@ class NativeShims:
     def __init__(self, bound, functions: dict[str, Function], sites):
         self.bound = bound
         self.abi = Abi(bound.source)
-        self.sites = list(sites)
+        sites = list(sites)
+        # The sites that native calls as function pointers, and those that the
+        # page runs for a drained delivery. Only Kotlin/Wasm takes the async
+        # forms, which name its queue, and only threaded targets the others.
+        self.sites = [site for site in sites if site.split != "async"]
+        self.delivered = [site for site in sites if site.split != "threaded"]
         self.signatures = [self.signature(f) for _, f in sorted(functions.items())]
         self.critical = {
             plan.name
@@ -238,7 +307,13 @@ class NativeShims:
         for parameter in parameters:
             if isinstance(parameter.kind, Array):
                 raise LayoutError(f"{function.name}: array parameters have no carrier")
-        return Signature(function.name, tuple(parameters), result, function.return_type)
+        return Signature(
+            function.name,
+            tuple(parameters),
+            result,
+            function.return_type,
+            function.metadata.get("blocks"),
+        )
 
     def kotlin_parameters(self, signature):
         return ", ".join(f"{p.name}: {p.carrier}" for p in signature.parameters)
@@ -269,6 +344,8 @@ class NativeShims:
             (COMPLETION_RESULT, "CompletionResultLayout"),
             (DIAGNOSTIC, "DiagnosticLayout"),
             ("mln_render_abandon_result", "RenderAbandonResultLayout"),
+            (DELIVERY, "DeliveryLayout"),
+            (DELIVERY_BATCH_VIEW, "DeliveryBatchViewLayout"),
         ):
             if record not in self.bound.source.records_by_name:
                 continue
@@ -367,7 +444,7 @@ class NativeShims:
                 arguments.append(self.ffm_argument(self.abi.classify(ctype)))
             result = self.classify(site.result)
             stubs.append(
-                f'  actual val {site.name}: Long = Ffm.upcall("{site.name}", '
+                f'  actual val {site.name}: Long = Ffm.upcall({site.owner}::class.java, "{site.name}", '
                 + ", ".join(
                     [
                         "null" if result is None else self.ffm_argument(result),
@@ -482,7 +559,7 @@ class NativeShims:
                     arguments.append(f"{local}Address")
                 else:
                     arguments.append(local + FROM_CINTEROP[kind.name])
-            call = f"Upcalls.{site.name}({', '.join(arguments)})"
+            call = f"{site.owner}.{site.name}({', '.join(arguments)})"
             result = self.classify(site.result)
             if result is not None:
                 call += TO_CINTEROP[result.name]
@@ -651,7 +728,8 @@ class NativeShims:
                 + ")"
                 + JNI_LETTER[site.result_carrier]
             )
-            entries.append(f'  {{"{site.name}", "{descriptor}", NULL}},')
+            owner = f"{PACKAGE.replace('.', '/')}/{site.owner}"
+            entries.append(f'  {{"{owner}", "{site.name}", "{descriptor}", NULL}},')
             stubs.append(f"  (void*)mln_jni_{site.name},")
         return (
             HEADER
@@ -677,6 +755,276 @@ class NativeShims:
             + "\n};\nconst size_t mln_jni_upcall_count =\n"
             + "  sizeof mln_jni_upcall_stubs / sizeof mln_jni_upcall_stubs[0];\n"
         )
+
+    def wasm_kind(self, kind):
+        """The primitive that carries [kind] across wasm32: a record crosses by address."""
+        return POINTER if isinstance(kind, Record) else kind
+
+    def wasm_cast(self, parameter, value):
+        """The C argument that a wasm wrapper passes for [parameter], from its carrier [value]."""
+        ctype = parameter.ctype
+        if isinstance(parameter.kind, Record):
+            return f"*(const {ctype.declaration or ctype.spelling}*)(uintptr_t){value}"
+        return f"({ctype.spelling}){value}"
+
+    def wasm(self):
+        """The wasm shim: the Kotlin externs, the C wrappers they call, the export
+        list, the upcall stubs that the browser module serves, and `Deliveries`.
+
+        A function whose header records `blocks=thread_start` cannot run on the
+        page, which cannot wait for a thread to start. Its wrapper copies the
+        arguments into the thread start that `ThreadStart` staged, starts the call
+        on a pthread, and returns at once; the page later receives the call's
+        status.
+        """
+        externs, functions, wrappers, exports = [], [], [], []
+        for s in self.signatures:
+            names = [f"p{index}" for index in range(len(s.parameters) + bool(s.blocks))]
+            carriers = [self.wasm_kind(p.kind) for p in s.parameters]
+            extern_types = [WASM[kind.name][0] for kind in carriers]
+            arguments = [
+                WASM[kind.name][2].format(p.name)
+                for p, kind in zip(s.parameters, carriers, strict=True)
+            ]
+            if s.blocks:
+                extern_types.insert(0, "Int")
+                arguments.insert(0, "ThreadStart.staged()")
+            result = (
+                None if s.result is None or isinstance(s.result, Record) else s.result
+            )
+            extern_result = "Unit" if result is None else WASM[result.name][0]
+            extern = f"_{s.wrapper}"
+            externs.append(
+                f"private fun {s.wrapper}("
+                + ", ".join(
+                    f"{n}: {t}" for n, t in zip(names, extern_types, strict=True)
+                )
+                + f"): {extern_result} =\n"
+                + f'  js("{WASM_MODULE}.{extern}({", ".join(names)})")'
+            )
+            call = f"{s.wrapper}({', '.join(arguments)})"
+            head = f"  actual fun {s.function}({self.kotlin_parameters(s)})"
+            if result is None:
+                functions.append(f"{head} {{ {call} }}")
+            else:
+                functions.append(
+                    f"{head}: {s.carrier} = {WASM[result.name][3].format(call)}"
+                )
+            wrappers.append(self.wasm_wrapper(s, carriers, result))
+            exports.append(extern)
+        stubs = []
+        for site in self.sites:
+            if site.name == "releaseRoot":
+                getter = "HostDelivery.wakeRelease"
+            elif site.form == "wake" and not site.split:
+                getter = "HostDelivery.wake"
+            else:
+                getter = (
+                    "throw MaplibreException(Status.UNSUPPORTED, "
+                    f'"{site.name} needs Kotlin on a native thread, which Kotlin/Wasm cannot run")'
+                )
+            stubs.append(f"  actual val {site.name}: Long\n    get() = {getter}")
+        kotlin = (
+            HEADER
+            + "@file:OptIn(ExperimentalWasmJsInterop::class)\n\n"
+            + f"package {PACKAGE}\n\n"
+            + "import org.maplibre.nativeffi.internal.call.ThreadStart\n\n"
+            + "/** The C wrapper behind each C function, in the module that `Maplibre.loadModule` loads. */\n"
+            + "internal actual object C {\n"
+            + "\n".join(functions)
+            + "\n}\n\n"
+            + "\n\n".join(externs)
+            + "\n"
+        )
+        upcall_stubs = (
+            HEADER
+            + f"package {PACKAGE}\n\n"
+            + "import org.maplibre.nativeffi.error.MaplibreException\n"
+            + "import org.maplibre.nativeffi.generated.Status\n"
+            + "import org.maplibre.nativeffi.internal.delivery.HostDelivery\n\n"
+            + "/**\n"
+            + " * The browser module serves a wake through its wake shim, which posts the wake to the page. Every\n"
+            + " * other registration names the page's delivery queue in place of its callbacks, so no other\n"
+            + " * site has a function pointer.\n"
+            + " */\n"
+            + "internal actual object UpcallStubs {\n"
+            + "\n".join(stubs)
+            + "\n}\n"
+        )
+        c = (
+            HEADER
+            + "// The C half of each wasm extern of the Kotlin binding. Every argument is a\n"
+            + "// primitive that wasm32 passes to JavaScript, and a record crosses by\n"
+            + "// address.\n"
+            + '#include "mln_kw_runtime.h"\n\n'
+            + "#include <maplibre_native_c.h>\n"
+            + "#include <maplibre_native_c/plugin.h>\n"
+            + "#include <stddef.h>\n\n"
+            + "\n\n".join(wrappers)
+            + "\n"
+        )
+        return (
+            {
+                "C.kt": kotlin,
+                "UpcallStubs.kt": upcall_stubs,
+                "Deliveries.kt": self.deliveries(),
+            },
+            c,
+            "\n".join(exports) + "\n",
+        )
+
+    def delivery_constant(self, metadata_key, record_name, field_type=None):
+        """The number of an mln_delivery_type constant that a delivery record's
+        metadata names, or None for an API without the delivery protocol."""
+        record = self.bound.source.records_by_name.get(record_name)
+        if record is None:
+            return None
+        for field in record.fields:
+            if field_type and (field.type.declaration or "") != field_type:
+                continue
+            if metadata_key in field.metadata:
+                return self.bound.enum_number(field.metadata[metadata_key])
+        raise LayoutError(f"{record_name}: no field names {metadata_key}")
+
+    def deliveries(self):
+        """`Deliveries`: the site that each drained delivery runs, by its type and token.
+
+        A queue-form site receives the delivery's payload, whose record mirrors
+        the callback's arguments by name, at the record's wasm32 offsets. The
+        page takes a delivery's owned handles from its batch just before the site
+        runs, and the site owns them from then. A completion's result is the
+        payload itself; a retired registration releases its root.
+        """
+        completion = self.delivery_constant(
+            "variant", DELIVERY_PAYLOAD, COMPLETION_RESULT
+        )
+        retired = self.delivery_constant("empty_variant", DELIVERY)
+        by_type, wakes = {}, []
+        for site in self.delivered:
+            if site.root is None:
+                continue
+            if site.form == "wake":
+                wakes.append(site)
+            elif site.form == "queue":
+                callback = self.bound.callbacks[site.callback]
+                number = self.bound.enum_number(callback.delivery.constant)
+                by_type.setdefault(number, []).append((site, callback))
+        branches = []
+        if completion is not None:
+            branches.append(
+                f"      {completion}u -> {{\n"
+                "        take()\n"
+                "        Upcalls.completion(token, payload)\n"
+                "        Upcalls.completionRelease(token)\n"
+                "      }"
+            )
+        if retired is not None:
+            branches.append(f"      {retired}u -> Upcalls.releaseRoot(token)")
+        for number, entries in sorted(by_type.items()):
+            arms = []
+            for site, callback in entries:
+                arms.append(
+                    f"        is {site.root} -> {self.delivery_call(site, callback)}"
+                )
+            branches.append(
+                f"      {number}u ->\n"
+                "        when (CallbackRoots.get(token)?.value) {\n"
+                + "\n".join("  " + arm for arm in arms)
+                + "\n          else -> Unit\n        }"
+            )
+        wake_arms = "\n".join(
+            f"      is {site.root} -> {site.owner}.{site.name}(token)" for site in wakes
+        )
+        return (
+            HEADER
+            + f"package {PACKAGE}\n\n"
+            + "import org.maplibre.nativeffi.generated.*\n"
+            + "import org.maplibre.nativeffi.internal.callback.CallbackRoots\n"
+            + "import org.maplibre.nativeffi.internal.memory.*\n\n"
+            + "/**\n"
+            + " * Runs the site of each delivery that the page drains from its queue, and of each wake that the\n"
+            + " * module's wake shim posts, by the registration that the token roots.\n"
+            + " */\n"
+            + "internal object Deliveries {\n"
+            + "  /**\n"
+            + "   * Runs the site of one delivery of [type] for [token], with the arguments in its [payload].\n"
+            + "   * [take] moves the delivery's owned handles from its batch to the site that runs.\n"
+            + "   */\n"
+            + "  fun dispatch(type: UInt, token: Long, payload: Long, take: () -> Unit) {\n"
+            + "    when (type) {\n"
+            + "\n".join(branches)
+            + "\n      else -> Unit\n    }\n  }\n\n"
+            + "  /** Runs the wake site of the registration that [token] roots. */\n"
+            + "  fun wake(token: Long) {\n"
+            + "    when (CallbackRoots.get(token)?.value) {\n"
+            + wake_arms
+            + "\n      else -> Unit\n    }\n  }\n}\n"
+        )
+
+    def delivery_call(self, site, callback):
+        """The call of a queue-form site with the arguments of a delivery's payload."""
+        record = self.bound.source.records_by_name[callback.delivery.record]
+        layout = self.abi.record_named(record.name, 32)
+        fields = {field.name: field for field in record.fields}
+        arguments = []
+        for parameter in callback.parameters:
+            if parameter.name == callback.context:
+                arguments.append("token")
+                continue
+            field = fields[parameter.name]
+            offset = layout.offsets[parameter.name]
+            address = f"payload + {offset}" if offset else "payload"
+            kind = self.abi.classify(field.type)
+            if isinstance(kind, Record):
+                arguments.append(address)
+            elif isinstance(kind, Array):
+                raise LayoutError(f"{record.name}: an array has no site carrier")
+            else:
+                arguments.append(WASM_READ[kind.name].format(address))
+        call = f"{site.owner}.{site.name}({', '.join(arguments)})"
+        owned = any(
+            field.value.ownership == "owned"
+            for field in self.bound.values[record.name].fields
+        )
+        return f"{{ take(); {call} }}" if owned else f"{{ {call} }}"
+
+    def wasm_wrapper(self, s, carriers, result):
+        parameters = [
+            f"{WASM[kind.name][1]} {p.c_name}"
+            for p, kind in zip(s.parameters, carriers, strict=True)
+        ]
+        c_result = "void" if result is None else WASM[result.name][1]
+        if s.blocks:
+            arguments = f"{s.wrapper}_arguments"
+            fields = "".join(f"  {parameter};\n" for parameter in parameters)
+            casts = [
+                self.wasm_cast(p, f"call->{p.c_name}")
+                for p in s.parameters
+                if not p.returned
+            ]
+            return (
+                f"typedef struct {arguments} {{\n{fields}}} {arguments};\n"
+                f"_Static_assert(sizeof({arguments}) <= MLN_KW_THREAD_START_ARGUMENTS_SIZE, "
+                f'"{s.function} arguments");\n\n'
+                f"static int32_t {s.wrapper}_run(const void* arguments) {{\n"
+                f"  const {arguments}* call = arguments;\n"
+                f"  return (int32_t){s.function}({', '.join(casts)});\n}}\n\n"
+                f"int32_t {s.wrapper}({', '.join(['uintptr_t start', *parameters])}) {{\n"
+                f"  {arguments} arguments = {{"
+                + ", ".join(p.c_name for p in s.parameters)
+                + "};\n"
+                f"  return mln_kw_start_thread((mln_kw_thread_start*)start, {s.wrapper}_run, "
+                "&arguments, sizeof arguments);\n}"
+            )
+        casts = [self.wasm_cast(p, p.c_name) for p in s.parameters if not p.returned]
+        call = f"{s.function}({', '.join(casts)})"
+        if isinstance(s.result, Record):
+            body = f"*({s.result_ctype.spelling}*)returned = {call};"
+        elif result is None:
+            body = f"{call};"
+        else:
+            body = f"return ({c_result}){call};"
+        return f"{c_result} {s.wrapper}({', '.join(parameters) or 'void'}) {{\n  {body}\n}}"
 
     def c_declaration(self, ctype, local):
         spelling = ctype.spelling
