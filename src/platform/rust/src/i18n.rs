@@ -17,6 +17,7 @@ use icu_experimental::dimension::provider::currency::fractions::CurrencyFraction
 use icu_experimental::dimension::provider::currency::symbols::CurrencySymbolsV1;
 use icu_locale::{LocaleCanonicalizer, LocaleExpander};
 use icu_locale_core::extensions::unicode::key;
+use icu_locale_core::subtags::script;
 use icu_locale_core::{Locale, locale};
 use icu_provider::prelude::*;
 use writeable::Writeable;
@@ -58,15 +59,27 @@ unsafe fn bytes<'a>(data: *const u8, length: usize) -> &'a [u8] {
 }
 
 /// The locale the environment names for a POSIX locale category, as the first
-/// nonempty of `LC_ALL`, the category, and `LANG`, such as `sv_SE.UTF-8`.
-/// `C`, `POSIX`, and an unset or unsupported locale mean `en-US`.
+/// nonempty of `LC_ALL`, the category, and `LANG`, such as `sv_SE.UTF-8` or
+/// `sr_RS.UTF-8@latin`. `C`, `POSIX`, and an unset or unsupported locale mean
+/// `en-US`.
 fn environment_locale(category: &str, variable: impl Fn(&str) -> Option<String>) -> Locale {
     let name = ["LC_ALL", category, "LANG"]
         .into_iter()
         .find_map(|name| variable(name).filter(|value| !value.is_empty()))
         .unwrap_or_default();
-    let tag = name.split(['.', '@']).next().unwrap_or_default();
-    supported_locale(&tag.replace('_', "-")).unwrap_or(locale!("en-US"))
+    let (name, modifier) = name.split_once('@').unwrap_or((&name, ""));
+    let tag = name.split('.').next().unwrap_or_default();
+    let Some(mut locale) = supported_locale(&tag.replace('_', "-")) else {
+        return locale!("en-US");
+    };
+    // glibc names a language's non-default script with a modifier.
+    locale.id.script = match modifier {
+        "cyrillic" => Some(script!("Cyrl")),
+        "devanagari" => Some(script!("Deva")),
+        "latin" => Some(script!("Latn")),
+        _ => locale.id.script,
+    };
+    locale
 }
 
 /// Parses and canonicalizes a language tag whose language CLDR knows. Data
@@ -394,5 +407,6 @@ mod tests {
         assert_eq!(locale(&[("LC_ALL", "POSIX")]), "en-US");
         assert_eq!(locale(&[("LC_ALL", "xx_ZZ"), ("LANG", "de_DE")]), "en-US");
         assert_eq!(locale(&[("LANG", "iw_IL")]), "he-IL");
+        assert_eq!(locale(&[("LANG", "sr_RS.UTF-8@latin")]), "sr-Latn-RS");
     }
 }
