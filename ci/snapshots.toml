@@ -187,4 +187,7 @@ paths = [
   "build.zig.zon",
   "docs/**",
   "*.md",
+  # The support matrix reads CI coverage.
+  "ci/workflow.py",
+  "ci/workflow.toml",
 ]

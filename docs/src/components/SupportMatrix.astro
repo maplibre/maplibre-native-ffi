@@ -1,179 +1,223 @@
 ---
-import { Badge } from "@astrojs/starlight/components";
-
 import supportMatrix from "../generated/support-matrix.json";
 
-type Status = "tested" | "build-only";
-type BadgeVariant = "default" | "note" | "success" | "caution";
+type Status = "tested" | "build-only" | "path-known" | "blocked" | "unknown";
 
-type Backend = {
-  backendLabel: string;
-  status: Status;
+type Cell = {
+  status: string;
+  detail?: string;
 };
 
-type EnvironmentSupport = {
-  environment: string;
-  environmentLabel: string;
-  backends: Backend[];
+const glyphs: Record<Status, string> = {
+  tested: "✓",
+  "build-only": "◐",
+  "path-known": "○",
+  blocked: "✕",
+  unknown: "?",
 };
 
-type SubprojectSupport = {
-  label: string;
-  sourceDirectory: string;
-  environments: EnvironmentSupport[];
-};
-
-type EnvironmentColumn = {
-  environment: string;
-  label: string;
-};
-
-type NativeEnvironment = {
-  environment: string;
-  environmentLabel: string;
-  backends: Backend[];
-};
-
-const environmentRows: (EnvironmentColumn & { backends: Backend[] })[] =
-  supportMatrix.native.map((row: NativeEnvironment) => ({
-    environment: row.environment,
-    label: row.environmentLabel,
-    backends: row.backends,
-  }));
-
-const statusBadges = supportMatrix.statuses.map((row) => ({
-  label: row.statusLabel,
-  status: row.status as Status,
-}));
+const statusLabels = new Map(
+  supportMatrix.statuses.map((row) => [row.status, row.label]),
+);
 
 const sourceRoot = "https://github.com/maplibre/maplibre-native-ffi/tree/main";
+const issueRoot = "https://github.com/maplibre/maplibre-native-ffi/issues";
 
-function sourceUrl(sourceDirectory: string): string {
-  return `${sourceRoot}/${sourceDirectory}`;
-}
-
-function badgeVariant(status: Status): BadgeVariant {
-  if (status === "tested") {
-    return "success";
-  }
-  if (status === "build-only") {
-    return "caution";
-  }
-  return "default";
-}
-
-function environmentSupport(
-  subproject: SubprojectSupport,
-  environment: string,
-): EnvironmentSupport | undefined {
-  return subproject.environments.find(
-    (entry) => entry.environment === environment,
+const rows = supportMatrix.platforms.flatMap((platform) => {
+  const platformRows = platform.architectures.reduce(
+    (count, arch) => count + arch.backends.length,
+    0,
   );
-}
+  return platform.architectures.flatMap((arch, archIndex) =>
+    arch.backends.map((backend, backendIndex) => ({
+      platform: platform.label,
+      arch: arch.label,
+      backend: backend.label,
+      cells: backend.cells as Cell[],
+      platformRows: archIndex === 0 && backendIndex === 0 ? platformRows : 0,
+      archRows: backendIndex === 0 ? arch.backends.length : 0,
+    })),
+  );
+});
 
-function supportStatus(support: EnvironmentSupport): Status {
-  if (support.backends.some((backend) => backend.status === "tested")) {
-    return "tested";
-  }
-  return "build-only";
-}
-
-function subprojectSupport(
-  subprojects: SubprojectSupport[],
-  environment: EnvironmentColumn,
-): { label: string; status: Status; url: string }[] {
-  return subprojects.flatMap((subproject) => {
-    const support = environmentSupport(subproject, environment.environment);
-    if (!support) {
-      return [];
-    }
-    return [
-      {
-        label: subproject.label,
-        status: supportStatus(support),
-        url: sourceUrl(subproject.sourceDirectory),
-      },
-    ];
-  });
+function cellLabel(language: string, row: (typeof rows)[number], cell: Cell) {
+  const label = `${language} on ${row.platform} ${row.arch} with ${row.backend}: ${statusLabels.get(cell.status)}`;
+  return cell.detail ? `${label}. ${cell.detail}` : label;
 }
 ---
 
-<p>
-  {statusBadges.map((status) => (
-    <span>
-      <Badge
-        text={status.label}
-        variant={badgeVariant(status.status)}
-        size="small"
-      />{" "}
-    </span>
-  ))}
-</p>
-
-<table>
-  <thead>
-    <tr>
-      <th scope="col">Environment</th>
-      <th scope="col">Backends</th>
-      <th scope="col">Bindings</th>
-      <th scope="col">Examples</th>
-    </tr>
-  </thead>
-  <tbody>
-    {environmentRows.map((environment) => {
-      const bindings = subprojectSupport(supportMatrix.bindings, environment);
-      const examples = subprojectSupport(supportMatrix.examples, environment);
-      return (
+<div class="not-content support-matrix">
+  <p class="legend">
+    {supportMatrix.statuses.map((row) => (
+      <span>
+        <span class={`cell ${row.status}`} aria-hidden="true">
+          {glyphs[row.status as Status]}
+        </span>
+        {row.label}
+      </span>
+    ))}
+  </p>
+  <div class="scroll">
+    <table>
+      <thead>
         <tr>
-          <th scope="row">{environment.label}</th>
-          <td>
-            {environment.backends.map((backend) => (
-              <span>
-                <Badge
-                  text={backend.backendLabel}
-                  variant={badgeVariant(backend.status)}
-                  size="small"
-                />{" "}
-              </span>
-            ))}
-          </td>
-          <td>
-            {bindings.length > 0 ? bindings.map((binding) => (
-              <span>
-                <a class="support-badge-link" href={binding.url}>
-                  <Badge
-                    text={binding.label}
-                    variant={badgeVariant(binding.status)}
-                    size="small"
-                  />
-                </a>{" "}
-              </span>
-            )) : "-"}
-          </td>
-          <td>
-            {examples.length > 0 ? examples.map((example) => (
-              <span>
-                <a class="support-badge-link" href={example.url}>
-                  <Badge
-                    text={example.label}
-                    variant={badgeVariant(example.status)}
-                    size="small"
-                  />
-                </a>{" "}
-              </span>
-            )) : "-"}
-          </td>
+          <th scope="col">Platform</th>
+          <th scope="col">Arch</th>
+          <th scope="col">Backend</th>
+          {supportMatrix.languages.map((language) => (
+            <th scope="col" class="language">
+              <a href={`${sourceRoot}/${language.sourceDirectory}`}>
+                {language.label}
+              </a>
+            </th>
+          ))}
         </tr>
-      );
-    })}
-  </tbody>
-</table>
-<p>
-  OpenGL uses WGL on Windows and EGL on other platforms. macOS EGL uses ANGLE.
-</p>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr class:list={{ "platform-start": row.platformRows > 0 }}>
+            {row.platformRows > 0 && (
+              <th scope="rowgroup" rowspan={row.platformRows}>
+                {row.platform}
+              </th>
+            )}
+            {row.archRows > 0 && (
+              <th scope="row" class="secondary" rowspan={row.archRows}>
+                {row.arch}
+              </th>
+            )}
+            <th scope="row" class="secondary">{row.backend}</th>
+            {row.cells.map((cell, index) => {
+              const label = cellLabel(supportMatrix.languages[index].label, row, cell);
+              return (
+                <td>
+                  <span
+                    class={`cell ${cell.status}`}
+                    title={label}
+                    aria-label={label}
+                    role="img"
+                  >
+                    {glyphs[cell.status as Status]}
+                  </span>
+                </td>
+              );
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+  <p class="note">
+    Hover a cell for details. OpenGL uses WGL on Windows and EGL on other
+    platforms. macOS EGL uses ANGLE.{" "}
+    <a href={`${issueRoot}/${supportMatrix.issue}`}>
+      Issue #{supportMatrix.issue}
+    </a>{" "}
+    tracks the gaps.
+  </p>
+</div>
 
 <style>
-.support-badge-link {
+.support-matrix {
+  margin-block: 1.5rem;
+  font-size: var(--sl-text-sm);
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  color: var(--sl-color-gray-3);
+}
+.legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.scroll {
+  overflow-x: auto;
+  margin-block: 0.75rem;
+}
+table {
+  border-collapse: separate;
+  border-spacing: 2px;
+}
+th {
+  font-weight: 600;
+  text-align: start;
+  white-space: nowrap;
+  padding: 0 0.5rem 0 0;
+  vertical-align: top;
+}
+th.secondary {
+  color: var(--sl-color-gray-3);
+  font-weight: 400;
+}
+thead th {
+  vertical-align: bottom;
+  color: var(--sl-color-gray-3);
+  font-weight: 400;
+}
+th.language {
+  padding: 0;
+  height: 6rem;
+}
+th.language a {
+  display: block;
+  margin-inline: auto;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  color: var(--sl-color-white);
+  font-weight: 600;
   text-decoration: none;
+}
+tr.platform-start > * {
+  border-top: 1px solid var(--sl-color-hairline);
+  padding-top: 0.25rem;
+}
+td {
+  padding: 0;
+  text-align: center;
+}
+.cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.25rem;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  font-size: var(--sl-text-xs);
+  font-weight: 700;
+  line-height: 1;
+}
+.tested {
+  background: var(--sl-color-green-low);
+  border-color: var(--sl-color-green);
+  color: var(--sl-color-green-high);
+}
+.build-only {
+  background: var(--sl-color-orange-low);
+  border-color: var(--sl-color-orange);
+  color: var(--sl-color-orange-high);
+}
+.blocked {
+  background: var(--sl-color-red-low);
+  border-color: var(--sl-color-red);
+  color: var(--sl-color-red-high);
+}
+.path-known {
+  border-color: var(--sl-color-gray-3);
+  color: var(--sl-color-white);
+}
+.unknown {
+  background: var(--sl-color-gray-6);
+  border-color: var(--sl-color-gray-5);
+  color: var(--sl-color-white);
+}
+.note {
+  color: var(--sl-color-gray-3);
+}
+.note a {
+  color: var(--sl-color-text-accent);
 }
 </style>

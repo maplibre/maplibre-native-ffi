@@ -3,13 +3,14 @@ import json
 import pathlib
 import re
 import sys
+import tomllib
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUTPUT_PATH = REPO_ROOT / "docs" / "src" / "generated" / "support-matrix.json"
-SUPPORT_SOURCE = "ci/workflow.toml"
+GAPS_PATH = REPO_ROOT / "docs" / "support-gaps.toml"
 sys.path.insert(0, str(REPO_ROOT))
 
 from ci.workflow import (
@@ -24,251 +25,274 @@ from ci.workflow import (
 )
 
 PLATFORM_LABELS = {
-    "android": "Android",
-    "emscripten": "Emscripten",
-    "ios": "iOS",
-    "ios-maccatalyst": "Mac Catalyst",
     "linux-gnu": "Linux GNU",
     "linux-musl": "Linux musl",
     "macos": "macOS",
-    "ohos": "OpenHarmony",
+    "windows": "Windows MSVC",
+    "windows-mingw": "Windows MinGW",
+    "freebsd": "FreeBSD",
+    "android": "Android",
+    "ios": "iOS",
+    "ios-maccatalyst": "Mac Catalyst",
     "tvos": "tvOS",
-    "windows": "Windows",
+    "visionos": "visionOS",
+    "ohos": "OpenHarmony",
+    "emscripten": "Emscripten",
 }
+PLATFORM_ORDER = list(PLATFORM_LABELS)
+# Apple mobile platforms list device and simulator rows separately.
+DEVICE_PLATFORMS = {"ios", "tvos", "visionos"}
+ARCH_ORDER = ["x64", "arm64", "arm", "riscv64", "loongarch64", "wasm32"]
 BACKEND_LABELS = {
-    "metal": "Metal",
-    "opengl": "OpenGL",
     "vulkan": "Vulkan",
+    "opengl": "OpenGL",
+    "metal": "Metal",
     "webgpu": "WebGPU",
 }
-BACKEND_ORDER = ["vulkan", "opengl", "metal", "webgpu"]
-ENVIRONMENT_ORDER = [
-    "linux-gnu-x64",
-    "linux-gnu-arm64",
-    "linux-musl-x64",
-    "linux-musl-arm64",
-    "macos-arm64",
-    "windows-x64",
-    "windows-arm64",
-    "emscripten-wasm32",
-    "android-arm",
-    "android-arm64",
-    "android-x64",
-    "ios-arm64",
-    "ios-simulator-arm64",
-    "ios-maccatalyst-arm64",
-    "tvos-arm64",
-    "tvos-simulator-arm64",
-    "ohos-arm64",
-    "ohos-x64",
-]
-STATUS_LABELS = {"tested": "Tested in CI", "build-only": "Built only"}
-PROJECT_LABELS = {
-    "bindings-dotnet": "C#",
-    "bindings-kotlin-android": "Kotlin/Android",
-    "bindings-kotlin-jvm": "Kotlin/JVM",
-    "bindings-kotlin-native": "Kotlin/Native",
-    "bindings-kotlin-wasm": "Kotlin/Wasm",
-    "bindings-typescript": "TypeScript",
+BACKEND_ORDER = list(BACKEND_LABELS)
+STATUS_LABELS = {
+    "tested": "Tested in CI",
+    "build-only": "Built only",
+    "path-known": "Not started, path known",
+    "blocked": "Blocked upstream",
+    "unknown": "Not investigated",
+}
+GAP_STATUSES = {"path-known", "blocked"}
+LANGUAGE_LABELS = {
+    "c": "C",
+    "dotnet": "C#",
+    "dart": "Dart",
+    "go": "Go",
+    "kotlin": "Kotlin",
+    "python": "Python",
+    "rust": "Rust",
+    "swift": "Swift",
+    "typescript": "TypeScript",
+    "zig": "Zig",
+}
+FLAVOR_LABELS = {
+    "kotlin-android": "Kotlin/Android",
+    "kotlin-jvm": "Kotlin/JVM",
+    "kotlin-native": "Kotlin/Native",
+    "kotlin-wasm": "Kotlin/Wasm",
 }
 
 
 @dataclass(frozen=True)
-class Coverage:
+class Target:
     platform: str
     arch: str
     backend: str
-    status: str
     simulator: bool = False
 
-    @property
-    def environment(self) -> str:
-        if self.simulator:
-            return f"{self.platform}-simulator-{self.arch}"
-        return f"{self.platform}-{self.arch}"
+    def sort_key(self) -> tuple[int, int, bool, int]:
+        return (
+            PLATFORM_ORDER.index(self.platform),
+            ARCH_ORDER.index(self.arch),
+            self.simulator,
+            BACKEND_ORDER.index(self.backend),
+        )
+
+    def arch_label(self) -> str:
+        if self.platform not in DEVICE_PLATFORMS:
+            return self.arch
+        kind = "simulator" if self.simulator else "device"
+        return f"{kind} {self.arch}"
 
 
-def coverage_from_preset(preset: str, status: str) -> Coverage:
+def target_from_preset(preset: str) -> Target:
     target_platform = platform(preset)
     simulator = target_platform.endswith("-simulator")
-    base_platform = (
-        target_platform.removesuffix("-simulator") if simulator else target_platform
-    )
-    return Coverage(
-        platform=base_platform,
+    return Target(
+        platform=target_platform.removesuffix("-simulator"),
         arch=architecture(preset),
         backend={"egl": "opengl", "wgl": "opengl", "webgl": "opengl"}.get(
             backend(preset), backend(preset)
         ),
-        status=status,
         simulator=simulator,
     )
 
 
 def command_support(command: str) -> list[tuple[str, str]]:
-    match = re.search(r"mise run //(bindings|examples)/([^: ]+):([^ ]+)", command)
+    """Returns the binding flavor and status that a CI command establishes."""
+    match = re.search(r"mise run //bindings/([^: ]+):([^ ]+)", command)
     if match is None:
         return []
-    kind, name, action = match.groups()
+    name, action = match.groups()
 
-    if kind == "bindings" and name == "kotlin":
+    if name == "kotlin":
         if action == "test:native":
-            return [("bindings-kotlin-native", "tested")]
+            return [("kotlin-native", "tested")]
         if action == "android-build":
-            return [("bindings-kotlin-android", "build-only")]
+            return [("kotlin-android", "build-only")]
         if action == "ios-build":
-            return [("bindings-kotlin-native", "build-only")]
+            return [("kotlin-native", "build-only")]
         if action == "test":
             preset = command.rsplit(" ", 1)[-1]
             if preset.startswith("android-"):
-                return [("bindings-kotlin-android", "tested")]
+                return [("kotlin-android", "tested")]
             if preset.startswith(("ios-simulator-", "tvos-simulator-")):
-                return [("bindings-kotlin-native", "tested")]
+                return [("kotlin-native", "tested")]
             if preset.startswith("emscripten-"):
-                return [("bindings-kotlin-wasm", "tested")]
+                return [("kotlin-wasm", "tested")]
             # The test task runs the JVM suite on every host preset and adds
             # the Kotlin/Native suite where the binding declares a target.
-            rows = [("bindings-kotlin-jvm", "tested")]
+            rows = [("kotlin-jvm", "tested")]
             if preset.startswith(("linux-gnu-x64-", "macos-arm64-")):
-                rows.append(("bindings-kotlin-native", "tested"))
+                rows.append(("kotlin-native", "tested"))
             return rows
         return []
-    project_id = f"{kind}-{name}"
 
     status = (
         "tested"
         if (action == "run" or action == "test" or action.startswith("test:"))
         else "build-only"
     )
-    return [(project_id, status)]
+    return [(name, status)]
 
 
-def project_label(project_id: str) -> str:
-    if project_id in PROJECT_LABELS:
-        return PROJECT_LABELS[project_id]
-    kind, name = project_id.split("-", 1)
-    return name if kind == "examples" else name.capitalize()
+def language(flavor: str) -> str:
+    return flavor.split("-", 1)[0]
 
 
-def source_directory(project_id: str) -> str:
-    if project_id.startswith("bindings-kotlin-"):
-        return "bindings/kotlin"
-    kind, name = project_id.split("-", 1)
-    return f"{kind}/{name}"
-
-
-def environment_sort_key(environment: str) -> tuple[int, str]:
-    try:
-        return (ENVIRONMENT_ORDER.index(environment), environment)
-    except ValueError:
-        return (len(ENVIRONMENT_ORDER), environment)
-
-
-def backend_sort_key(value: str) -> tuple[int, str]:
-    try:
-        return (BACKEND_ORDER.index(value), value)
-    except ValueError:
-        return (len(BACKEND_ORDER), value)
-
-
-def environment_label(entry: Coverage) -> str:
-    if entry.simulator:
-        return f"{PLATFORM_LABELS[entry.platform]} Simulator {entry.arch}"
-    if entry.platform in {"ios", "tvos"}:
-        return f"{PLATFORM_LABELS[entry.platform]} device {entry.arch}"
-    return f"{PLATFORM_LABELS[entry.platform]} {entry.arch}"
-
-
-def backend_rows(entries: list[Coverage]) -> list[dict[str, str]]:
-    statuses: dict[str, set[str]] = defaultdict(set)
-    for entry in entries:
-        statuses[entry.backend].add(entry.status)
-    return [
-        {
-            "backend": value,
-            "backendLabel": BACKEND_LABELS[value],
-            "status": "tested" if "tested" in statuses[value] else "build-only",
-        }
-        for value in sorted(statuses, key=backend_sort_key)
-    ]
-
-
-def environment_rows(entries: list[Coverage]) -> list[dict[str, Any]]:
-    grouped: dict[str, list[Coverage]] = defaultdict(list)
-    for entry in entries:
-        grouped[entry.environment].append(entry)
-    return [
-        {
-            "environment": environment,
-            "environmentLabel": environment_label(grouped[environment][0]),
-            "platform": grouped[environment][0].platform,
-            "platformLabel": PLATFORM_LABELS[grouped[environment][0].platform],
-            "arch": grouped[environment][0].arch,
-            "archLabel": grouped[environment][0].arch,
-            "backends": backend_rows(grouped[environment]),
-        }
-        for environment in sorted(grouped, key=environment_sort_key)
-    ]
-
-
-def project_rows(
-    projects: dict[str, list[Coverage]], kind: str
-) -> list[dict[str, Any]]:
-    matching = {
-        project_id: entries
-        for project_id, entries in projects.items()
-        if project_id.startswith(f"{kind}-")
-    }
-    return [
-        {
-            "id": project_id,
-            "kind": "binding" if kind == "bindings" else "example",
-            "label": project_label(project_id),
-            "source": SUPPORT_SOURCE,
-            "sourceDirectory": source_directory(project_id),
-            "environments": environment_rows(entries),
-        }
-        for project_id, entries in sorted(
-            matching.items(),
-            key=lambda item: (project_label(item[0]).casefold(), item[0]),
+def load_gaps() -> tuple[int, list[Target], dict[tuple[str, str], dict[str, str]]]:
+    document = tomllib.loads(GAPS_PATH.read_text(encoding="utf-8"))
+    planned = [
+        Target(
+            platform=entry["platform"],
+            arch=entry["arch"],
+            backend=value,
+            simulator=entry.get("simulator", False),
         )
+        for entry in document.get("planned", [])
+        for value in entry["backends"]
     ]
+    gaps: dict[tuple[str, str], dict[str, str]] = {}
+    for entry in document.get("gap", []):
+        key = (entry["language"], entry["platform"])
+        if entry["language"] not in LANGUAGE_LABELS:
+            raise SystemExit(f"error: unknown language in {GAPS_PATH}: {key}")
+        if entry["platform"] not in PLATFORM_LABELS:
+            raise SystemExit(f"error: unknown platform in {GAPS_PATH}: {key}")
+        if entry["status"] not in GAP_STATUSES:
+            raise SystemExit(f"error: unknown status in {GAPS_PATH}: {key}")
+        if key in gaps:
+            raise SystemExit(f"error: duplicate gap in {GAPS_PATH}: {key}")
+        gaps[key] = entry
+    return document["issue"], planned, gaps
 
 
 def support_matrix() -> dict[str, Any]:
     source, presets = load_configuration(REPO_ROOT)
     configured, _, tested, _ = preset_sets(presets)
-    native = environment_rows(
-        [
-            coverage_from_preset(
-                preset, "tested" if runtime_tested(preset, tested) else "build-only"
-            )
-            for preset in configured
-        ]
-    )
 
-    projects: dict[str, list[Coverage]] = defaultdict(list)
+    # coverage[(language, target)] holds the best status and the flavors that
+    # reached it.
+    coverage: dict[tuple[str, Target], tuple[str, set[str]]] = {}
+
+    def record(flavor: str, target: Target, status: str) -> None:
+        key = (language(flavor), target)
+        current, flavors = coverage.get(key, (status, set()))
+        if current == status:
+            coverage[key] = (status, flavors | {flavor})
+        elif status == "tested":
+            coverage[key] = (status, {flavor})
+
     for preset in configured:
+        target = target_from_preset(preset)
+        record(
+            "c", target, "tested" if runtime_tested(preset, tested) else "build-only"
+        )
         commands = native_commands(preset, tested) + consumer_commands(source, preset)
         for command in commands:
-            for project_id, status in command_support(command):
-                projects[project_id].append(coverage_from_preset(preset, status))
+            for flavor, status in command_support(command):
+                if language(flavor) not in LANGUAGE_LABELS:
+                    raise SystemExit(f"error: no language label for {flavor!r}")
+                record(flavor, target, status)
+
+    issue, planned, gaps = load_gaps()
+    built = {target for (name, target) in coverage if name == "c"}
+    for target in planned:
+        if target in built:
+            raise SystemExit(
+                f"error: CI builds planned target {target}; remove it from {GAPS_PATH}"
+            )
+    covered = {(name, target.platform) for (name, target) in coverage}
+    for key in gaps:
+        if key in covered:
+            raise SystemExit(f"error: CI covers gap {key}; remove it from {GAPS_PATH}")
+
+    def cell(name: str, target: Target) -> dict[str, str]:
+        if (name, target) in coverage:
+            status, flavors = coverage[(name, target)]
+            labels = sorted(FLAVOR_LABELS[f] for f in flavors if f in FLAVOR_LABELS)
+            row = {"status": status}
+            if labels:
+                row["detail"] = ", ".join(labels)
+            return row
+        gap = gaps.get((name, target.platform))
+        # A known path still waits on the C library when it does not build
+        # the target.
+        if gap and (gap["status"] == "blocked" or target in built):
+            # Tooltips show plain text, so code spans drop their backticks.
+            return {"status": gap["status"], "detail": gap["reason"].replace("`", "")}
+        return {"status": "unknown"}
+
+    platforms: dict[str, dict[tuple[str, str], dict[str, list[dict[str, Any]]]]] = (
+        defaultdict(lambda: defaultdict(dict))
+    )
+    for target in sorted(built | set(planned), key=Target.sort_key):
+        arch = (target.arch, target.arch_label())
+        platforms[target.platform][arch][target.backend] = [
+            cell(name, target) for name in LANGUAGE_LABELS
+        ]
 
     return {
+        "issue": issue,
         "statuses": [
-            {"status": status, "statusLabel": STATUS_LABELS[status]}
-            for status in ("tested", "build-only")
+            {"status": status, "label": label}
+            for status, label in STATUS_LABELS.items()
         ],
-        "environments": [
+        "languages": [
             {
-                "environment": row["environment"],
-                "environmentLabel": row["environmentLabel"],
+                "id": name,
+                "label": label,
+                "sourceDirectory": "include" if name == "c" else f"bindings/{name}",
             }
-            for row in native
+            for name, label in LANGUAGE_LABELS.items()
         ],
-        "native": native,
-        "bindings": project_rows(projects, "bindings"),
-        "examples": project_rows(projects, "examples"),
+        "platforms": [
+            {
+                "platform": name,
+                "label": PLATFORM_LABELS[name],
+                "architectures": [
+                    {
+                        "arch": arch,
+                        "label": label,
+                        "backends": [
+                            {
+                                "backend": value,
+                                "label": BACKEND_LABELS[value],
+                                "cells": cells,
+                            }
+                            for value, cells in backends.items()
+                        ],
+                    }
+                    for (arch, label), backends in architectures.items()
+                ],
+            }
+            for name, architectures in platforms.items()
+        ],
+        "gaps": [
+            {
+                **gaps[(name, platform_name)],
+                "language": LANGUAGE_LABELS[name],
+                "platform": PLATFORM_LABELS[platform_name],
+            }
+            for name in LANGUAGE_LABELS
+            for platform_name in PLATFORM_ORDER
+            if (name, platform_name) in gaps
+        ],
     }
 
 

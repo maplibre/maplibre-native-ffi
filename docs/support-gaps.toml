@@ -1,0 +1,200 @@
+# Support that ci/workflow.toml cannot record. The support matrix on the docs
+# home page merges these entries with CI coverage, and its generator fails when
+# CI covers an entry, so remove an entry once CI covers it. Each docs deploy
+# also rewrites the tracking issue's body from this file.
+
+issue = 936
+
+# Native targets that the C library does not build yet.
+
+[[planned]]
+platform = "linux-gnu"
+arch = "riscv64"
+backends = ["vulkan", "opengl"]
+
+[[planned]]
+platform = "linux-gnu"
+arch = "loongarch64"
+backends = ["vulkan", "opengl"]
+
+[[planned]]
+platform = "linux-musl"
+arch = "riscv64"
+backends = ["vulkan", "opengl"]
+
+[[planned]]
+platform = "linux-musl"
+arch = "loongarch64"
+backends = ["vulkan", "opengl"]
+
+[[planned]]
+platform = "windows-mingw"
+arch = "x64"
+backends = ["vulkan", "opengl"]
+
+[[planned]]
+platform = "windows-mingw"
+arch = "arm64"
+backends = ["vulkan", "opengl"]
+
+[[planned]]
+platform = "freebsd"
+arch = "x64"
+backends = ["vulkan", "opengl"]
+
+[[planned]]
+platform = "freebsd"
+arch = "arm64"
+backends = ["vulkan", "opengl"]
+
+[[planned]]
+platform = "visionos"
+arch = "arm64"
+backends = ["metal"]
+
+[[planned]]
+platform = "visionos"
+arch = "arm64"
+simulator = true
+backends = ["metal"]
+
+# Languages that cannot reach a platform until an upstream project changes.
+# The reason is Markdown and appears in the matrix and the issue; the link
+# points upstream.
+
+[[gap]]
+language = "dart"
+platform = "emscripten"
+status = "blocked"
+reason = "dart2wasm forbids user imports of `dart:ffi`, so the browser needs a separate JavaScript backend."
+link = "https://github.com/dart-lang/sdk/blob/3.13.5/CHANGELOG.md"
+
+[[gap]]
+language = "go"
+platform = "emscripten"
+status = "blocked"
+reason = "Go's `js/wasm` port has no cgo ABI."
+link = "https://github.com/golang/go/issues/55351"
+
+[[gap]]
+language = "kotlin"
+platform = "ios-maccatalyst"
+status = "blocked"
+reason = "Kotlin/Native has no Mac Catalyst target."
+link = "https://youtrack.jetbrains.com/issue/KT-40442"
+
+[[gap]]
+language = "kotlin"
+platform = "ohos"
+status = "blocked"
+reason = "Kotlin Multiplatform has no OpenHarmony target."
+link = "https://youtrack.jetbrains.com/issue/KT-63976"
+
+[[gap]]
+language = "python"
+platform = "emscripten"
+status = "blocked"
+reason = "PyEmscripten wheels forbid the pthreads that the C library needs."
+link = "https://peps.python.org/pep-0783/#the-pyemscripten-platform"
+
+[[gap]]
+language = "swift"
+platform = "emscripten"
+status = "blocked"
+reason = "The Swift WebAssembly SDK targets WASI, not Emscripten."
+
+[[gap]]
+language = "zig"
+platform = "ios"
+status = "blocked"
+reason = "Zig 0.17.0 references process spawning, which these targets lack. The fix is expected in Zig 0.17.1."
+link = "https://codeberg.org/ziglang/zig/pulls/37063"
+
+[[gap]]
+language = "zig"
+platform = "tvos"
+status = "blocked"
+reason = "Zig 0.17.0 references process spawning, which these targets lack. The fix is expected in Zig 0.17.1."
+link = "https://codeberg.org/ziglang/zig/pulls/37063"
+
+# Languages with a known path to a platform that no one has started.
+
+[[gap]]
+language = "dotnet"
+platform = "android"
+status = "path-known"
+reason = "Add a `net10.0-android` host, package the native assets, initialize Android services, and run an emulator test app."
+
+[[gap]]
+language = "dotnet"
+platform = "ios"
+status = "path-known"
+reason = "Add a `net10.0-ios` host, package or statically link the native assets, and run a simulator test app."
+
+[[gap]]
+language = "dotnet"
+platform = "emscripten"
+status = "path-known"
+reason = "Add a browser WebAssembly host that links the native archives through `NativeFileReference` with matching Emscripten flags, and run browser tests."
+
+[[gap]]
+language = "go"
+platform = "ios"
+status = "path-known"
+reason = "Add a cgo or gomobile build, package it in an app or framework, and run a simulator host."
+
+[[gap]]
+language = "kotlin"
+platform = "linux-musl"
+status = "path-known"
+reason = "Kotlin/JVM needs musl natives that the loader selects on musl hosts. Kotlin/Native binaries cannot run on musl."
+link = "https://youtrack.jetbrains.com/issue/KT-38876"
+
+[[gap]]
+language = "python"
+platform = "ios"
+status = "path-known"
+reason = "Cross-build the extension for embedded Python on iOS, package it in an app, and run it on the simulator."
+
+[[gap]]
+language = "rust"
+platform = "ios"
+status = "path-known"
+reason = "Add Apple target and device artifact selection to the build and test tasks, and a simulator runner."
+
+[[gap]]
+language = "swift"
+platform = "android"
+status = "path-known"
+reason = "The Swift Android SDK now ships the `Testing` module. Add SDK and NDK setup, cross-build tasks, and an x64 emulator runner."
+
+[[gap]]
+language = "typescript"
+platform = "android"
+status = "path-known"
+reason = "Add an app host with a Node-API runtime, package the addon, and run emulator tests."
+
+[[gap]]
+language = "typescript"
+platform = "ios"
+status = "path-known"
+reason = "Add an app host with a Node-API runtime, package the addon, and run simulator tests."
+
+[[gap]]
+language = "typescript"
+platform = "emscripten"
+status = "path-known"
+reason = "Load the addon through a browser Node-API bridge or a browser backend, and run WebGL and WebGPU tests."
+link = "https://github.com/toyobayashi/emnapi"
+
+[[gap]]
+language = "zig"
+platform = "emscripten"
+status = "path-known"
+reason = "Link the installed archives through an `emcc` final link, and add browser fixtures and tests."
+
+[[gap]]
+language = "zig"
+platform = "ios-maccatalyst"
+status = "path-known"
+reason = "Zig targets `aarch64-maccatalyst-none`, but `scripts/zig-cross-env.sh` rejects Catalyst presets. Add the SDK and link integration."

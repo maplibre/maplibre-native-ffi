@@ -173,6 +173,11 @@ run = "pnpm exec astro"
 [tasks.generate-support-matrix]
 run = "pnpm run generate-support-matrix"
 
+[tasks.support-issue]
+description = "Print the support tracking issue body from the generated matrix"
+depends = ["generate-support-matrix"]
+run = "python scripts/render-support-issue.py"
+
 [tasks.generate-versions]
 description = "Write the release versions the pages quote into src/generated"
 run = "pnpm run generate-versions"
