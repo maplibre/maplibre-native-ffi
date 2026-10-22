@@ -17,6 +17,7 @@ class AndroidPackagesTest(unittest.TestCase):
         self.capture = self.directory / "sdkmanager arguments"
         catalog = tomllib.loads((ROOT / "gradle/libs.versions.toml").read_text())
         for package in (
+            "build-tools/test-build-tools",
             "cmake/test-cmake",
             f"platforms/android-{catalog['versions']['android-compileSdk']}",
             "platform-tools",
@@ -37,6 +38,7 @@ class AndroidPackagesTest(unittest.TestCase):
                 str(self.sdk),
                 "test-java",
                 "test-ndk",
+                "test-build-tools",
                 "test-cmake",
             ],
             env=self.environment,

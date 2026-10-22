@@ -42,7 +42,7 @@ shared = [
   ".mise/**",
   # The CI definitions that shape every snapshot artifact.
   ".github/workflows/**",
-  "!.github/workflows/*-release.yml",
+  "!.github/workflows/release.yml",
   "!.github/workflows/_*.yml",
   ".github/actions/**",
   "ci/**",
@@ -122,7 +122,6 @@ description = "Kotlin Multiplatform modules on Maven Central snapshots."
 depends = ["native"]
 paths = [
   "bindings/kotlin/**",
-  "bindings/rustls-platform-verifier-android/**",
   "!.github/workflows/_native-package.yml",
   "!ci/native_package_release.py",
   ".github/workflows/_kotlin-maven.yml",

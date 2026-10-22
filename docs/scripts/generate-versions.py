@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes the release versions the docs quote into src/generated/versions.json."""
+"""Writes the release version the docs quote into src/generated/versions.json."""
 
 import json
 import pathlib
@@ -9,23 +9,26 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUTPUT_PATH = REPO_ROOT / "docs" / "src" / "generated" / "versions.json"
 sys.path.insert(0, str(REPO_ROOT))
 
-from ci.release_version import family, release_tags
-
-# Each key names a release family, and pages quote it as `{{key}}`.
-FAMILIES = ("kotlin",)
-
-
-def latest_release(name: str) -> str:
-    tags = release_tags(family(name), repository=REPO_ROOT)
-    if not tags:
-        raise SystemExit(
-            f"the checkout has no {name} release tags; fetch tags to build the docs"
-        )
-    return str(max(tags.values()))
+from ci.release_version import release_tags
 
 
 def main() -> int:
-    versions = {name: latest_release(name) for name in FAMILIES}
+    tags = release_tags(repository=REPO_ROOT)
+    # Pages quote the latest release as `{{version}}`. Before the first release
+    # under one tag, the latest Kotlin release is the version that the pages'
+    # Maven coordinates can name.
+    current = {tag: version for tag, version in tags.items() if tag.startswith("v")}
+    if not current:
+        current = {
+            tag: version
+            for tag, version in tags.items()
+            if tag.startswith("bindings/kotlin/v")
+        }
+    if not current:
+        raise SystemExit(
+            "the checkout has no release tags; fetch tags to build the docs"
+        )
+    versions = {"version": str(max(current.values()))}
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(json.dumps(versions, indent=2) + "\n", encoding="utf-8")
     return 0

@@ -1,5 +1,5 @@
 // Supplies the MapLibre Native C library as a code asset: from a local build
-// that the application names, or else from the core release that this package
+// that the application names, or else from the release that this package
 // was published against.
 
 import 'dart:convert';
@@ -13,11 +13,11 @@ import 'package:hooks/hooks.dart';
 import 'package:maplibre_native_ffi/src/internal/c/native_asset.dart';
 
 const String _defines = 'hooks.user_defines.maplibre_native_ffi';
-const String _releaseUrl =
+const String _defaultReleaseUrl =
     'https://github.com/maplibre/maplibre-native-ffi/releases/download';
 
-/// The core release that a published package downloads, with the SHA-256
-/// digest of each archive in it. The core release job writes this file, and
+/// The release that a published package downloads, with the SHA-256
+/// digest of each archive in it. The release workflow writes this file, and
 /// git ignores it.
 const String _pinPath = 'hook/native_release.json';
 
@@ -33,7 +33,7 @@ Future<void> main(List<String> arguments) async {
     final preset = '$platform-${_backendSuffix(backend, code.targetOS)}';
     final localBuild = input.userDefines.path('local_build');
     final prefix = localBuild == null
-        ? await _download(input, output, preset)
+        ? await _download(input, output, preset, _releaseUrl(input))
         : _localPrefix(
             Uri.directory(localBuild.toFilePath()),
             platform,
@@ -120,6 +120,18 @@ String _backendSuffix(String? selected, OS os) {
   return backend == 'opengl' ? (os == OS.windows ? 'wgl' : 'egl') : backend;
 }
 
+/// The base URL of the release downloads: the GitHub releases, or else a mirror
+/// that the application names, which serves each release tag as a directory.
+String _releaseUrl(BuildInput input) =>
+    switch (input.userDefines['release_url']) {
+      null => _defaultReleaseUrl,
+      final String url =>
+        url.endsWith('/') ? url.substring(0, url.length - 1) : url,
+      final other => throw FormatException(
+        '$_defines.release_url must be a URL; found $other',
+      ),
+    };
+
 /// Resolves a local build, which is either an install prefix or a CMake build
 /// root holding an install for each preset.
 Uri _localPrefix(
@@ -169,6 +181,7 @@ Future<Uri> _download(
   BuildInput input,
   BuildOutputBuilder output,
   String preset,
+  String releaseUrl,
 ) async {
   final pinFile = File.fromUri(input.packageRoot.resolve(_pinPath));
   if (!pinFile.existsSync()) {
@@ -196,7 +209,7 @@ Future<Uri> _download(
   }
 
   stderr.writeln('Downloading $archiveName from $tag.');
-  final archive = await _fetch('$_releaseUrl/$tag/$archiveName');
+  final archive = await _fetch('$releaseUrl/$tag/$archiveName');
   if (sha256.convert(archive).toString() != digest) {
     throw StateError('$archiveName does not match its digest pinned for $tag.');
   }

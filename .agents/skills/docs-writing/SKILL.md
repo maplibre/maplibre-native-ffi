@@ -90,10 +90,9 @@ import { region } from "../../../snippets";
 Show four to eight meaningful lines per block. Comment only what the reader
 cannot see, such as a thread rule or a trap. Never use line-numbered markers.
 
-Write a release version in code as a placeholder named for its release family,
-such as `{{kotlin}}`, which the docs build replaces with the family's latest
-release tag. Add a family to `docs/scripts/generate-versions.py` before a page
-quotes it; an unknown name fails the build.
+Write a release version in code as the placeholder `{{version}}`, which the docs
+build replaces with the latest release version. Any other placeholder name fails
+the build.
 
 ## Terminology
 

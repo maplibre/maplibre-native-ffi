@@ -8,8 +8,7 @@ on:
         required: true
         type: string
       previous_tag:
-        description:
-          Previous tag in the release family, linked from the release notes
+        description: Previous release tag, linked from the release notes
         default: ""
         required: false
         type: string
@@ -134,8 +133,8 @@ jobs:
           tag_name: ${{ inputs.tag }}
           target_commitish: ${{ inputs.sha }}
           name:
-            ${{ inputs.release && format('Native package {0}', inputs.version)
-            || format('Native package snapshot {0}',
+            ${{ inputs.release && format('MapLibre Native FFI {0}',
+            inputs.version) || format('Native package snapshot {0}',
             steps.publish.outputs.timestamp) }}
           body_path: build/packages/native/release/RELEASE_NOTES.md
           draft: ${{ inputs.release }}
@@ -215,9 +214,10 @@ jobs:
             echo "$PUBLISH_TAG points to $tag_sha; expected $PUBLISH_SHA" >&2
             exit 1
           fi
+          # The release checked its order when it started, and a newer tag
+          # waits for it in the release concurrency group.
           if [[ "$PUBLISH_CHANNEL" == release ]]; then
-            context="$(mise run --no-deps ci:release-version "$PUBLISH_TAG")"
-            if [[ "$(jq -r '.version' <<<"$context")" != "$PUBLISH_VERSION" ]]; then
+            if [[ "${PUBLISH_TAG#v}" != "$PUBLISH_VERSION" ]]; then
               echo "$PUBLISH_TAG no longer names version $PUBLISH_VERSION" >&2
               exit 1
             fi
@@ -233,7 +233,7 @@ jobs:
           release="$(gh release view "$PUBLISH_TAG" --json isDraft,isPrerelease,url)"
           jq -e '(.isDraft | not) and (.isPrerelease | not)' <<<"$release" >/dev/null
           {
-            echo "### Native package $PUBLISH_VERSION"
+            echo "### MapLibre Native FFI $PUBLISH_VERSION"
             echo
             echo "Published $(jq -r '.url' <<<"$release")."
           } >> "$GITHUB_STEP_SUMMARY"

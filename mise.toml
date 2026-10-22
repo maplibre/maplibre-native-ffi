@@ -58,6 +58,7 @@ actionlint_version = "1.7.12"
 # Gradle reads the package versions from the environment, which `[env]` sets from
 # these.
 android_cmdline_tools_version = "22.0"
+android_build_tools_version = "36.0.0"
 android_cmake_version = "4.1.2"
 # NDK r30 is the 2026 LTS. Update this pin through validated toolchain upgrades.
 android_ndk_version = "30.0.16248370"
@@ -80,6 +81,9 @@ flutter_version = "3.47.7"
 hk_version = "2.7.0"
 java_version = "zulu-25.36.205.0"
 jvl_version = "2026.05.03"
+# The Kotlin compiler that builds the Android TLS helper, which needs no match
+# with the Kotlin that Gradle builds the binding with.
+kotlin_version = "2.4.21"
 libxml2_version = "2.13.9"
 node_version = "26.12.0"
 ninja_version = "1.13.2"
@@ -143,6 +147,7 @@ sccache = "{{vars.sccache_version}}"
 # The Android SDK packages the CMake presets and the Gradle builds resolve. They are
 # environment variables because Gradle reads them, and they come from `[vars]`
 # because the tool's post-install step takes them as arguments.
+MLN_FFI_ANDROID_BUILD_TOOLS_VERSION = "{{vars.android_build_tools_version}}"
 MLN_FFI_ANDROID_CMAKE_VERSION = "{{vars.android_cmake_version}}"
 MLN_FFI_ANDROID_NDK_VERSION = "{{vars.android_ndk_version}}"
 # Kotlin Gradle installs the wasm target's npm packages with its own Yarn 1,
@@ -224,7 +229,7 @@ depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 description = "Configure, build, and install a native CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 run = [
-  'case "$usage_preset" in android-*) mise run //:android-sdk-packages --ndk-only ;; esac',
+  'case "$usage_preset" in android-*) mise run //:android-sdk-packages --native-only ;; esac',
   { task = "//:build-preset", args = [
     "{{usage.preset}}",
   ] },
@@ -249,6 +254,7 @@ sources = [
   "mise.toml",
   "build/dependencies/rustls-platform-verifier/android-release-support/Cargo.toml",
   "build/dependencies/rustls-platform-verifier/android-release-support/src/**/*.rs",
+  "build/dependencies/rustls-platform-verifier/android/rustls-platform-verifier/src/main/**/*.kt",
   "build/dependencies/rustls-platform-verifier/rustls-platform-verifier/Cargo.toml",
   "build/dependencies/rustls-platform-verifier/rustls-platform-verifier/src/**/*.rs",
   "build/*/.native-package-install",
@@ -271,7 +277,12 @@ run = [
   { task = "//:check-cross-sdk", args = [
     "{{usage.preset}}",
   ] },
-  '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"',
+  '''
+  case "$usage_preset" in
+    android-*) mise run //:_android-workflow "$usage_preset" ;;
+    *) .mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset" ;;
+  esac
+  ''',
   'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component loader',
   'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component test-graphics',
 ]
@@ -432,22 +443,30 @@ run = 'python3 scripts/check-exports.py "$usage_preset"'
 description = "Check that the C tests call every exported function by name."
 run = 'python3 scripts/check-export-calls.py "$@"'
 
+# Android builds compile the TLS helper with the Kotlin compiler, then shrink it
+# with R8, both on the JDK, so only their workflow installs the two.
+[tasks._android-workflow]
+hide = true
+usage = 'arg "<preset>"'
+tools = { "core:java" = "{{vars.java_version}}", kotlin = "{{vars.kotlin_version}}" }
+run = '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"'
+
 [tasks."android-sdk-packages"]
 description = "Install the pinned packages into the selected Android SDK."
 usage = '''
 flag "--sdk-root <path>" default="{{env.ANDROID_HOME | default(value='')}}" help="Android SDK directory; defaults to ANDROID_HOME"
-flag "--ndk-only" help="Install only the NDK for native compilation"
+flag "--native-only" help="Install only the packages for native compilation"
 '''
 run = '''
 args=()
-if [[ "$usage_ndk_only" == true ]]; then
-  args+=(--ndk-only)
+if [[ "$usage_native_only" == true ]]; then
+  args+=(--native-only)
 fi
 if [[ -z "$usage_sdk_root" ]]; then
   echo "Set ANDROID_HOME or pass --sdk-root; install the repository SDK with mise -E android install." >&2
   exit 1
 fi
-bash .mise/bin/sync-android-packages "$usage_sdk_root" "{{vars.java_version}}" "{{vars.android_ndk_version}}" "{{vars.android_cmake_version}}" "${args[@]}"
+bash .mise/bin/sync-android-packages "$usage_sdk_root" "{{vars.java_version}}" "{{vars.android_ndk_version}}" "{{vars.android_build_tools_version}}" "{{vars.android_cmake_version}}" "${args[@]}"
 '''
 
 [tasks."android-emulator:boot"]

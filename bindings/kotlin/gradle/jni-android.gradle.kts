@@ -127,8 +127,9 @@ androidTargets.forEach { target ->
       dependsOn(androidSdkPackages)
       doNotTrackState("CMake owns native incremental build state")
       workingDir(repositoryRoot)
-      executable("cmake")
-      args("--workflow", "--preset", cmakePreset)
+      // The task supplies the JDK and Kotlin compiler that build the TLS helper dex.
+      executable("mise")
+      args("run", "//:_android-workflow", cmakePreset)
       environment("ANDROID_HOME", androidSdkDirectory.get().asFile.absolutePath)
       enabled = !configuredInstallDir.isPresent
     }

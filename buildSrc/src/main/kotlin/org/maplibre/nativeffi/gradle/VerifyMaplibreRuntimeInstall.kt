@@ -58,6 +58,11 @@ abstract class VerifyMaplibreRuntimeInstall : DefaultTask() {
       ) {
         add("rust.md")
       }
+      if (expectedTargetPlatform.get().startsWith("android-")) {
+        addAll(
+          listOf("kotlin.txt", "kotlin-notice.txt", "rustls-platform-verifier-notice.txt"),
+        )
+      }
       if (
         expectedTargetPlatform.get().startsWith("linux-") ||
           expectedTargetPlatform.get().startsWith("windows-")

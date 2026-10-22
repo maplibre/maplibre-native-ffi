@@ -95,6 +95,10 @@ def native_licenses(backend: str, target: str) -> set[str]:
     licenses = set(COMMON_NATIVE_LICENSES)
     if target.startswith(("android-", "linux-", "windows-")):
         licenses.add("rust.md")
+    if target.startswith("android-"):
+        licenses.update(
+            {"kotlin.txt", "kotlin-notice.txt", "rustls-platform-verifier-notice.txt"}
+        )
     if target.startswith(("linux-", "windows-")):
         licenses.update({"libuv-extra.txt", "libuv.txt", "zlib.txt"})
     if backend == "vulkan":
@@ -267,9 +271,6 @@ def verify_javadoc(root: pathlib.Path) -> None:
                 )
 
 
-RUSTLS_VERIFIER_PACKAGE = "org.maplibre.nativeffi.internal.rustlsplatformverifier"
-
-
 def aar_keep_rules(aar: zipfile.ZipFile) -> str:
     names = [
         name
@@ -336,17 +337,6 @@ def verify_android(root: pathlib.Path) -> None:
                 raise SystemExit(
                     f"{runtime} is missing META-INF/licenses/android-ndk/NOTICE"
                 )
-            rustls_jar = "libs/rustls-platform-verifier-android.jar"
-            if rustls_jar not in names:
-                raise SystemExit(f"{runtime} is missing {rustls_jar}")
-            if RUSTLS_VERIFIER_PACKAGE not in aar_keep_rules(aar):
-                raise SystemExit(f"{runtime} is missing the Rustls consumer keep rule")
-            for license_name in ("LICENSE-APACHE", "LICENSE-MIT", "NOTICE"):
-                expected = (
-                    "META-INF/licenses/rustls-platform-verifier/" + license_name
-                )
-                if expected not in names:
-                    raise SystemExit(f"{runtime} is missing {expected}")
             prefab = "prefab/modules/maplibre-native-c"
             for expected in (
                 "prefab/prefab.json",

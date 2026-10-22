@@ -76,6 +76,8 @@ function(mln_ffi_link_rust_platform target)
   string(REPLACE "-" "_" rust_target_env "${rust_target_env}")
   string(TOLOWER "${rust_target_env}" rust_target_env_lower)
 
+  set(rust_extra_environment)
+  set(rust_extra_depends)
   set(rust_cc "${CMAKE_C_COMPILER}")
   set(rust_cxx "${CMAKE_CXX_COMPILER}")
   set(rust_linker "${CMAKE_CXX_COMPILER}")
@@ -107,6 +109,13 @@ function(mln_ffi_link_rust_platform target)
         FATAL_ERROR
           "Android Rust build requires target-prefixed NDK compilers: ${android_cc} and ${android_cxx}")
     endif()
+
+    # src/platform/rust/src/android.rs embeds the dex with include_bytes!.
+    include(mln_ffi_android_tls_helper)
+    mln_ffi_android_tls_helper_dex(tls_helper_dex)
+    list(APPEND rust_extra_environment
+         "MLN_FFI_ANDROID_TLS_HELPER_DEX=${tls_helper_dex}")
+    list(APPEND rust_extra_depends "${tls_helper_dex}")
   endif()
 
   set(rust_environment
@@ -118,7 +127,8 @@ function(mln_ffi_link_rust_platform target)
       "AR_${rust_target_env_lower}=${CMAKE_AR}"
       "CARGO_TARGET_${rust_target_env}_LINKER=${rust_linker}"
       "CARGO_TARGET_${rust_target_env}_AR=${CMAKE_AR}"
-      "CARGO_TARGET_DIR=${MLN_FFI_CARGO_TARGET_DIR}")
+      "CARGO_TARGET_DIR=${MLN_FFI_CARGO_TARGET_DIR}"
+      ${rust_extra_environment})
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     list(APPEND rust_environment
          "CARGO_TARGET_${rust_target_env}_RUSTFLAGS=-Ctarget-feature=+crt-static")
@@ -154,9 +164,13 @@ function(mln_ffi_link_rust_platform target)
       --release
       ${rust_extra_args}
     DEPENDS
-      "${rust_manifest}" ${rust_sources} ${rust_dependency_sources}
-      ${rust_dependency_manifests} "${PROJECT_SOURCE_DIR}/Cargo.toml"
+      "${rust_manifest}"
+      ${rust_sources}
+      ${rust_dependency_sources}
+      ${rust_dependency_manifests}
+      "${PROJECT_SOURCE_DIR}/Cargo.toml"
       "${PROJECT_SOURCE_DIR}/Cargo.lock"
+      ${rust_extra_depends}
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     VERBATIM)
 
@@ -203,6 +217,9 @@ function(mln_ffi_link_rust_platform target)
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     COMMAND_ERROR_IS_FATAL ANY)
   mln_ffi_add_license(mln_ffi_platform_rust "${rust_license_file}" "rust.md")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    mln_ffi_android_tls_helper_licenses(mln_ffi_platform_rust)
+  endif()
   add_dependencies(mln_ffi_platform_rust mln_ffi_platform_rust_build)
 
   target_link_libraries(${target} PRIVATE mln_ffi_platform_rust)

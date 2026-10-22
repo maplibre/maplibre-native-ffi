@@ -43,6 +43,34 @@ run = "dart format lib test tool"
 [tasks.analyze]
 run = "dart analyze"
 
+[tasks.prepare-release]
+description = "Pin a release's native archives in the package and stamp its version, before publishing."
+usage = 'arg "<tag>" help="The release tag, such as v0.202610.2"'
+run = '''
+checksums="$(mktemp)"
+trap 'rm -f "$checksums"' EXIT
+curl --fail --location --silent --show-error --retry 3 --output "$checksums" \
+  "https://github.com/maplibre/maplibre-native-ffi/releases/download/$usage_tag/SHA256SUMS"
+python3 "$MISE_MONOREPO_ROOT/ci/dart_release.py" . "$usage_tag" "$checksums"
+'''
+
+[tasks.check-publish]
+description = "Check that pub would publish the package as a release prepares it."
+# A copy outside Git stands in for the release checkout, whose prepared files
+# pub would otherwise report as modified.
+run = '''
+copy="$(mktemp -d)"
+trap 'rm -rf "$copy"' EXIT
+package="$copy/maplibre_native_ffi"
+mkdir "$package"
+# -h copies the file that the LICENSE link names.
+git ls-files -z --cached --others --exclude-standard | tar -c -h --null -T - | tar -x -C "$package"
+printf '%s  %s\n' "$(printf '0%.0s' {1..64})" maplibre-native-c-linux-gnu-x64-vulkan.tar.gz >"$copy/SHA256SUMS"
+python3 "$MISE_MONOREPO_ROOT/ci/dart_release.py" "$package" v0.202601.0 "$copy/SHA256SUMS"
+cd "$package"
+dart pub publish --dry-run
+'''
+
 [tasks.build]
 depends = [":analyze"]
 
@@ -127,6 +155,7 @@ depends = [
     "{{usage.preset}}",
   ] },
   ":analyze",
+  ":check-publish",
 ]
 run = "dart test"
 run_windows = '''
