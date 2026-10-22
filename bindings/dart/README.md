@@ -53,11 +53,11 @@ describes. This package's pubspec and the Flutter smoke host set `local_build`
 to `.dart_tool/native`, which the test tasks link to the selected preset's
 install prefix.
 
-A published package downloads the core release named in
-`hook/native_release.json`. The publish job writes that file with
-`mise run //bindings/dart:pin-native <core tag>`, which requires the core
-release to be tagged on the published commit. Git ignores the file and
-`.pubignore` keeps it in the package.
+The package belongs to the core release family, because it downloads the core
+release's archives rather than carrying its own. A published package downloads
+the archives named in `hook/native_release.json`, which the core release job
+writes from that release's `SHA256SUMS`. Git ignores the file and `.pubignore`
+keeps it in the package.
 
 ## Android host integration
 

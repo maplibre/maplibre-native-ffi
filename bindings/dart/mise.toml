@@ -134,8 +134,3 @@ run_windows = '''
 export PATH="$(cygpath -u "$MISE_MONOREPO_ROOT/build/$usage_preset/install/bin")${PATH:+:${PATH}}"
 dart test
 '''
-
-[tasks.pin-native]
-description = "Pin the core release that the published package downloads."
-usage = 'arg "<tag>" help="A core release tag on the checked-out commit"'
-run = 'python3 "$MISE_MONOREPO_ROOT/ci/dart_native_pin.py" "$usage_tag" hook/native_release.json'

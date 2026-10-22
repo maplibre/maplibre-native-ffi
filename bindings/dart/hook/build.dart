@@ -17,8 +17,8 @@ const String _releaseUrl =
     'https://github.com/maplibre/maplibre-native-ffi/releases/download';
 
 /// The core release that a published package downloads, with the SHA-256
-/// digest of each archive in it. The publish job writes this file, and git
-/// ignores it.
+/// digest of each archive in it. The core release job writes this file, and
+/// git ignores it.
 const String _pinPath = 'hook/native_release.json';
 
 Future<void> main(List<String> arguments) async {
