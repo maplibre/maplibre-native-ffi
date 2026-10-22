@@ -1159,8 +1159,9 @@ auto queue_frame_demand_work_locked(
   return true;
 }
 
-// Runs the front demand again once a released frame frees a slot of the full
-// ring that parked it.
+// Runs the front demand again. A full ring parks a demand without a work item,
+// so a released frame that frees a slot runs it, as does a quarantined ring
+// once the demand ahead of it ended.
 auto resume_parked_demand_locked(
   mln_render_session_object& session, DeferredWakes& wakes
 ) noexcept -> void {
@@ -1200,6 +1201,13 @@ auto resume_update_waiting_demands_locked(
   }
 }
 
+// Gives every demand that waits for a map update the terminal `disposition`,
+// in acceptance order.
+auto finish_waiting_demands_locked(
+  mln_render_session_object& session, mln_render_result disposition,
+  DeferredWakes& wakes
+) noexcept -> void;
+
 // Gives every demand that has yet to start the terminal `disposition`: those
 // that wait for a map update, then the queued ones, each in acceptance order.
 auto finish_demands_locked(
@@ -1208,18 +1216,24 @@ auto finish_demands_locked(
 ) noexcept -> void;
 
 // Quarantines a slot whose texture the host's GPU may still read, so the ring
-// never renders into it again. Once no slot can take a frame, no demand that
-// has yet to start can ever render, so each one ends now.
+// never renders into it again. Once no slot can take a frame, a demand that
+// waits for a map update could never render one and ends now. A queued demand
+// ends when the driver reaches it, behind the work accepted before it, so the
+// one a full ring parked runs again.
 auto quarantine_slot_locked(
   mln_render_session_object& session, RenderTextureSlot& slot,
   DeferredWakes& wakes
 ) noexcept -> void {
   slot.quarantined = true;
   if (
-    session.state == MLN_RENDER_SESSION_STATE_ATTACHED &&
-    every_slot_quarantined_locked(session)
+    session.state != MLN_RENDER_SESSION_STATE_ATTACHED ||
+    !every_slot_quarantined_locked(session)
   )
-    finish_demands_locked(session, MLN_RENDER_RESULT_TARGET_NOT_READY, wakes);
+    return;
+  finish_waiting_demands_locked(
+    session, MLN_RENDER_RESULT_TARGET_NOT_READY, wakes
+  );
+  resume_parked_demand_locked(session, wakes);
 }
 
 // Releases the core worker after stop_worker is set. A session destroyed from
@@ -2647,30 +2661,43 @@ auto publish_frame_result_locked(
   }
 }
 
+// Publishes `disposition` for a demand that ends without starting.
+auto finish_demand_locked(
+  mln_render_session_object& session, const mln_frame_demand& pending,
+  mln_render_result disposition, DeferredWakes& wakes
+) noexcept -> void {
+  publish_frame_result_locked(
+    session,
+    mln_render_frame_result{
+      sizeof(mln_render_frame_result),
+      disposition,
+      pending.token,
+      session.map_update_generation,
+      session.generation,
+      0,
+      false,
+      {}
+    },
+    wakes
+  );
+}
+
+auto finish_waiting_demands_locked(
+  mln_render_session_object& session, mln_render_result disposition,
+  DeferredWakes& wakes
+) noexcept -> void {
+  for (const auto& pending : session.update_waiting_demands)
+    finish_demand_locked(session, *pending, disposition, wakes);
+  session.update_waiting_demands.clear();
+}
+
 auto finish_demands_locked(
   mln_render_session_object& session, mln_render_result disposition,
   DeferredWakes& wakes
 ) noexcept -> void {
-  const auto finish =
-    [&](const std::shared_ptr<const mln_frame_demand>& pending) {
-      publish_frame_result_locked(
-        session,
-        mln_render_frame_result{
-          sizeof(mln_render_frame_result),
-          disposition,
-          pending->token,
-          session.map_update_generation,
-          session.generation,
-          0,
-          false,
-          {}
-        },
-        wakes
-      );
-    };
-  for (const auto& pending : session.update_waiting_demands) finish(pending);
-  session.update_waiting_demands.clear();
-  for (const auto& pending : session.demands) finish(pending);
+  finish_waiting_demands_locked(session, disposition, wakes);
+  for (const auto& pending : session.demands)
+    finish_demand_locked(session, *pending, disposition, wakes);
   session.demands.clear();
 }
 
@@ -2896,10 +2923,12 @@ auto run_frame_demand(
     auto& slots = session->texture.slots;
     ring_quarantined = every_slot_quarantined_locked(*session);
     if (ring_quarantined) {
-      // No slot can take a frame again. Quarantining the last one ended every
-      // other demand, and this one had already started.
+      // No slot can take a frame again, so the demand ends here, behind the
+      // driver work accepted before it. A demand that a full ring parked keeps
+      // no work item, so the next one runs to reach its own turn.
       result.disposition = MLN_RENDER_RESULT_TARGET_NOT_READY;
       publish_frame_result_locked(*session, result, wakes);
+      resume_parked_demand_locked(*session, wakes);
     } else if (!slots.empty()) {
       const auto busy = [](const RenderTextureSlot& value) {
         return value.acquired || value.rendering || value.quarantined;

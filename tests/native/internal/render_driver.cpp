@@ -1257,6 +1257,64 @@ void a_failed_release_of_the_last_slot_ends_a_waiting_demand() {
   destroy_fixture(fixture);
 }
 
+struct MaintenanceProbe {
+  mln_render_session session;
+  bool results_queued = false;
+  std::atomic_bool done{false};
+};
+
+// Records whether any frame result was queued when maintenance completed.
+void probe_results(void* context, const mln_completion_result*) {
+  auto& probe = *static_cast<MaintenanceProbe*>(context);
+  auto batch = mln_render_frame_batch{MLN_HANDLE_NULL};
+  probe.results_queued =
+    mln_render_session_drain_frame_results(probe.session, &batch, nullptr) ==
+    MLN_STATUS_OK;
+  if (probe.results_queued) mln_render_frame_batch_release(batch);
+  probe.done = true;
+  mln_test_pulse();
+}
+
+// Releases that quarantine the last slot leave a demand accepted after
+// maintenance to end in its own turn on the driver, after the maintenance.
+void a_quarantined_ring_ends_a_demand_in_driver_order() {
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  render_until_idle(fixture);
+  install_frame_failure(fixture, FrameFailure::Release);
+  auto first = mln_test_render_and_acquire(&fixture.render, 181);
+  auto second = mln_test_render_and_acquire(&fixture.render, 182);
+  const auto fenced = mln_gpu_sync{
+    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_OPENGL_FENCE, .object = 1
+  };
+  MLN_TEST_OK(mln_acquired_frame_release(first, &fenced, nullptr));
+  MLN_TEST_OK(mln_acquired_frame_release(second, &fenced, nullptr));
+  auto probe = MaintenanceProbe{.session = fixture.render.session};
+  const auto maintenance = mln_completion{
+    .size = sizeof(mln_completion),
+    .callback = probe_results,
+    .user_data = &probe,
+    .release_user_data = nullptr,
+  };
+  MLN_TEST_OK(mln_render_session_reduce_memory_use(
+    fixture.render.session, &maintenance, nullptr
+  ));
+  mln_test_render_request_forced(&fixture.render, 183);
+  service_until(fixture, probe.done);
+  TEST_ASSERT_FALSE(probe.results_queued);
+  const auto batch = wait_for_results(fixture);
+  const auto ended = batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(183, ended.token);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_TARGET_NOT_READY, ended.disposition
+  );
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  mln_test_render_fixture_keep_graphics_until_exit(&fixture.render);
+#endif
+  destroy_fixture(fixture);
+}
+
 auto latest_update_generation(mln_map map) -> uint64_t {
   auto snapshot = mln_map_snapshot{.size = sizeof(mln_map_snapshot)};
   if (mln_map_get_snapshot(map, &snapshot, nullptr) != MLN_STATUS_OK) return 0;
@@ -1485,6 +1543,7 @@ MLN_TEST_GROUP {
   RUN_TEST(abandon_keeps_a_ring_released_with_a_gpu_wait_as_it_abandons);
   RUN_TEST(a_demand_parked_as_disposal_quarantines_the_ring_gets_a_result);
   RUN_TEST(a_failed_release_of_the_last_slot_ends_a_waiting_demand);
+  RUN_TEST(a_quarantined_ring_ends_a_demand_in_driver_order);
   RUN_TEST(a_waiting_demand_renders_an_update_that_lands_as_it_looks);
   RUN_TEST(a_barrier_ends_a_running_wait_without_ending_a_later_demand);
   RUN_TEST(
