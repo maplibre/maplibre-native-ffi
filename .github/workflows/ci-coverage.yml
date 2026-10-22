@@ -393,7 +393,7 @@ jobs:
     if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-x64') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-linux-gnu-arm64-egl:
     name: target / linux-gnu-arm64-egl
-    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
+    runs-on: blacksmith-8vcpu-ubuntu-2404-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
@@ -548,7 +548,7 @@ jobs:
     if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-arm64') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-linux-gnu-arm64-vulkan:
     name: target / linux-gnu-arm64-vulkan
-    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
+    runs-on: blacksmith-8vcpu-ubuntu-2404-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
@@ -808,7 +808,7 @@ jobs:
     if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-musl')
   target-linux-musl-arm64-egl:
     name: target / linux-musl-arm64-egl
-    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
+    runs-on: blacksmith-8vcpu-ubuntu-2404-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
@@ -866,7 +866,7 @@ jobs:
     if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'linux-musl')
   target-linux-musl-arm64-vulkan:
     name: target / linux-musl-arm64-vulkan
-    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
+    runs-on: blacksmith-8vcpu-ubuntu-2404-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:

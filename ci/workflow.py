@@ -75,7 +75,7 @@ def backend(preset: str) -> str:
 # tests open windows, and Blacksmith's Windows runners have no interactive
 # desktop.
 LINUX_RUNNER = "blacksmith-4vcpu-ubuntu-2404"
-LINUX_ARM_RUNNER = "blacksmith-4vcpu-ubuntu-2404-arm"
+LINUX_ARM_RUNNER = "blacksmith-8vcpu-ubuntu-2404-arm"
 MACOS_RUNNER = "blacksmith-6vcpu-macos-26"
 SMALL_RUNNER = "blacksmith-2vcpu-ubuntu-2404"
 
