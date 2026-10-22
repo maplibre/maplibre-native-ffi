@@ -40,6 +40,46 @@ const rows = supportMatrix.platforms.flatMap((platform) => {
   );
 });
 
+// Gaps that share a language and reason collapse into one entry, as in the
+// tracking issue.
+function gapGroups(status: string) {
+  const groups = new Map<
+    string,
+    { language: string; platforms: string[]; reason: string; link?: string }
+  >();
+  for (const gap of supportMatrix.gaps as {
+    language: string;
+    platform: string;
+    status: string;
+    reason: string;
+    link?: string;
+  }[]) {
+    if (gap.status !== status) {
+      continue;
+    }
+    const key = [gap.language, gap.reason, gap.link].join("\n");
+    const group = groups.get(key);
+    if (group) {
+      group.platforms.push(gap.platform);
+    } else {
+      groups.set(key, { ...gap, platforms: [gap.platform] });
+    }
+  }
+  return [...groups.values()];
+}
+
+const gapSections = [
+  { title: "Blocked upstream", gaps: gapGroups("blocked") },
+  { title: "Not started, path known", gaps: gapGroups("path-known") },
+];
+
+// Reasons are Markdown whose only markup is code spans.
+function codeSpans(text: string) {
+  return text
+    .split("`")
+    .map((part, index) => ({ part, code: index % 2 === 1 }));
+}
+
 function cellLabel(language: string, row: (typeof rows)[number], cell: Cell) {
   const label = `${language} on ${row.platform} ${row.arch} with ${row.backend}: ${statusLabels.get(cell.status)}`;
   return cell.detail ? `${label}. ${cell.detail}` : label;
@@ -107,6 +147,32 @@ function cellLabel(language: string, row: (typeof rows)[number], cell: Cell) {
       </tbody>
     </table>
   </div>
+  <details class="gaps">
+    <summary>Gaps and their causes</summary>
+    {gapSections.map((section) => (
+      <>
+        <p class="gap-title">{section.title}</p>
+        <ul>
+          {section.gaps.map((gap) => (
+            <li>
+              <strong>
+                {gap.language} on {gap.platforms.join(", ")}:
+              </strong>{" "}
+              {codeSpans(gap.reason).map(({ part, code }) => (code ? (
+                <code>{part}</code>
+              ) : part))}
+              {gap.link && (
+                <>
+                  {" "}
+                  <a href={gap.link}>Upstream</a>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      </>
+    ))}
+  </details>
   <p class="note">
     Hover a cell for details. OpenGL uses WGL on Windows and EGL on other
     platforms. macOS EGL uses ANGLE.{" "}
@@ -217,6 +283,25 @@ td {
 .note {
   color: var(--sl-color-gray-3);
 }
+.gaps {
+  margin-block: 0.75rem;
+}
+.gaps summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.gap-title {
+  margin-block: 0.75rem 0.25rem;
+  font-weight: 600;
+}
+.gaps ul {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
+.gaps li {
+  margin-block: 0.25rem;
+}
+.gaps a,
 .note a {
   color: var(--sl-color-text-accent);
 }
