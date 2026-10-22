@@ -52,11 +52,12 @@ echo "$addon exports only napi_register_module_v1"
 '''
 
 [tasks.api]
-description = "Generate the TypeScript API reference HTML with TypeDoc."
+description = "Generate the TypeScript API reference HTML with deno doc."
 run = '''
 rm -rf build/typedoc
-pnpm exec typedoc --entryPoints src/index.ts --excludeInternal --out build/typedoc \
-  --name @maplibre/native-ffi --readme README.md
+# --no-npm skips resolving @types/node. deno doc still reads these sources, and
+# @internal members stay unlisted.
+deno doc --html --name=@maplibre/native-ffi --output=build/typedoc --no-npm src/index.ts
 '''
 
 [tasks.pack]

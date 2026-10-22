@@ -34,7 +34,7 @@ task runs the suite under Node, Bun, and Deno in turn, or under the one runtime
 that its second argument names. For an OpenHarmony preset, it builds, signs, and
 installs a test HAP on the emulator, which
 `mise -E ohos run //:ohos-emulator:boot` starts, and runs the suite on ArkTS.
-The `api` task writes the TypeDoc reference to `build/typedoc`.
+The `api` task writes the `deno doc` HTML reference to `build/typedoc`.
 
 Node 24 strips types, and Bun and Deno run TypeScript directly, so the suite
 runs the sources without a build. The pack task, with an optional `--version`,
