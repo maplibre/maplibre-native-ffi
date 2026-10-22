@@ -76,6 +76,13 @@ mln_status mln_probe_batch(const double *left BIND("length=count"), const double
   double *out_values BIND("direction=out;length=count"), mln_diagnostic *out_diagnostic);
 """)
 
+    def test_output_array_follows_its_count_and_input_array(self):
+        with self.assertRaisesRegex(ModelError, "output array length"):
+            self.parse("""
+mln_status mln_probe_batch(const double *values BIND("length=count"),
+  double *out_values BIND("direction=out;length=count"), unsigned count, mln_diagnostic *out_diagnostic);
+""")
+
     def test_output_array_cannot_take_its_count_from_a_byte_buffer(self):
         with self.assertRaisesRegex(ModelError, "output array length"):
             self.parse("""

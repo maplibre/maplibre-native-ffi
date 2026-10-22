@@ -552,8 +552,8 @@ void release_request(request value);
         model = bind(
             self.parse("""
 mln_status copy_values(
-  const double *values BIND("length=count"),
-  double *out BIND("direction=out;length=count"), unsigned count, mln_diagnostic *out_diagnostic);
+  const double *values BIND("length=count"), unsigned count,
+  double *out BIND("direction=out;length=count"), mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
         )
@@ -587,8 +587,8 @@ mln_status copy_values(
             source = f"""
 {declarations}
 mln_status copy_values(
-  const double *values BIND("length=count"),
-  {element} *out BIND("direction=out;length=count"), unsigned count, mln_diagnostic *out_diagnostic);
+  const double *values BIND("length=count"), unsigned count,
+  {element} *out BIND("direction=out;length=count"), mln_diagnostic *out_diagnostic);
 """
             with (
                 self.subTest(declarations=declarations),
