@@ -459,8 +459,43 @@ static void a_frame_at_a_commands_render_update_draws_the_command(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// A session resize reports the render update of the map's resize, and the
+// first frame at that update draws the new extent.
+static void a_session_resize_reports_the_render_update_of_its_extent(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  render_frame(&fixture, 1);
+
+  const mln_logical_extent resized = {
+    .width = 48,
+    .height = 32,
+    .scale_factor = 1.0,
+  };
+  mln_test_completion resize = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_render_session_resize(
+    fixture.session, resized, &resize.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &resize));
+  const uint64_t render_update =
+    mln_test_completion_render_update_generation(&resize);
+  mln_test_completion_destroy(&resize);
+
+  const mln_render_frame_result frame =
+    render_through_update(&fixture, render_update);
+  TEST_ASSERT_EQUAL_UINT32(48, frame.view.extent.width);
+  TEST_ASSERT_EQUAL_UINT32(32, frame.view.extent.height);
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(a_frame_view_places_coordinates_where_the_frame_drew_them);
   RUN_TEST(each_frame_of_a_transition_reports_its_own_view);
   RUN_TEST(a_frame_at_a_commands_render_update_draws_the_command);
+  RUN_TEST(a_session_resize_reports_the_render_update_of_its_extent);
 }

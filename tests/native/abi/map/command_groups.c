@@ -144,7 +144,9 @@ static void nested_groups_publish_at_the_outermost_end(void) {
   begin_group(map);
   begin_group(map);
   add_background_layer(map, "{\"id\":\"a\",\"type\":\"background\"}");
-  TEST_ASSERT_EQUAL_UINT64(before, end_group(map));
+  // The inner end publishes nothing yet, but already names the update that
+  // the outer end publishes.
+  TEST_ASSERT_EQUAL_UINT64(before + 1, end_group(map));
   TEST_ASSERT_EQUAL_UINT64(before, render_update_generation(map));
   add_background_layer(map, "{\"id\":\"b\",\"type\":\"background\"}");
   TEST_ASSERT_EQUAL_UINT64(before + 1, end_group(map));

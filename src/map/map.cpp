@@ -1133,6 +1133,14 @@ class HeadlessFrontend final : public mln::RendererFrontend {
     return latest_update_generation_;
   }
 
+  // The generation of the first update that includes the map's current state.
+  // While a command group holds an update, nothing else stores one, so the
+  // outermost group end stores it as the next generation.
+  [[nodiscard]] auto pending_update_generation() const -> uint64_t {
+    const std::scoped_lock lock(latest_update_mutex_);
+    return latest_update_generation_ + (held_update_ != nullptr ? 1 : 0);
+  }
+
   auto run_render_jobs() -> void { thread_pool_.runRenderJobs(); }
 
   // Drains queued and running worker jobs without closing the queue; later
@@ -2878,11 +2886,9 @@ auto run_map_transaction(std::shared_ptr<MapObject> map, Work&& work)
     // The snapshot reports the update that the work produced, unless a
     // command group still holds it.
     live.frontend->store_held_update();
-    // Only the runtime worker stores updates, so the latest one is the one
-    // that the snapshot reports.
     outcome.generations = {
       .snapshot = publish_map_snapshot(live),
-      .render_update = live.frontend->latest_update_generation(),
+      .render_update = live.frontend->pending_update_generation(),
     };
   } catch (...) {
     if (outcome.status == MLN_STATUS_OK) {

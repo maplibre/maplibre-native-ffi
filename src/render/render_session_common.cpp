@@ -3653,17 +3653,23 @@ struct DriverMapCompletion {
   unsigned remaining = 2;
   mln_status status = MLN_STATUS_OK;
   std::string diagnostic;
+  CommandGenerations generations;
 
-  auto complete(mln_status next_status, std::string next_diagnostic) -> void {
+  // The map's half passes the generations that its resize command reported.
+  auto complete(
+    mln_status next_status, std::string next_diagnostic,
+    std::optional<CommandGenerations> map_generations = std::nullopt
+  ) -> void {
     {
       const auto lock = std::scoped_lock{mutex};
+      if (map_generations) generations = *map_generations;
       if (next_status != MLN_STATUS_OK || status == MLN_STATUS_OK) {
         status = next_status;
         diagnostic = std::move(next_diagnostic);
       }
       if (--remaining != 0) return;
     }
-    operation->complete(status, std::move(diagnostic), {});
+    operation->complete(status, std::move(diagnostic), generations);
   }
 };
 
@@ -3774,14 +3780,17 @@ auto render_session_resize_start(
     completion,
     [](
       const std::shared_ptr<Completion>& state, mln_status status,
-      std::string diagnostic, std::any
+      std::string diagnostic, std::any value
     ) {
+      // Empty when the resize failed before the map ran it.
+      const auto* generations = std::any_cast<CommandGenerations>(&value);
       complete_command(
         state,
         status != MLN_STATUS_OK
           ? static_cast<std::uint32_t>(MLN_COMMAND_DISPOSITION_FAILED)
           : static_cast<std::uint32_t>(MLN_COMMAND_DISPOSITION_COMMITTED),
-        status, {}, std::move(diagnostic)
+        status, generations != nullptr ? *generations : CommandGenerations{},
+        std::move(diagnostic)
       );
     },
     async, true
@@ -3816,7 +3825,11 @@ auto render_session_resize_start(
           *static_cast<std::shared_ptr<DriverMapCompletion>*>(data);
         joined->complete(
           static_cast<mln_status>(result->status),
-          string_from_view(result->diagnostic)
+          string_from_view(result->diagnostic),
+          CommandGenerations{
+            .snapshot = result->generation,
+            .render_update = result->render_update_generation,
+          }
         );
       },
     .user_data = context.get(),

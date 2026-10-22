@@ -1048,12 +1048,13 @@ typedef struct mln_map_snapshot {
    * frames.
    *
    * A command publishes the render update for its change before it reports
-   * its completion, which reports this value from the command's own snapshot
-   * as mln_completion_result.render_update_generation. A frame result with
+   * its completion, and the completion reports that update's generation as
+   * mln_completion_result.render_update_generation. A frame result with
    * disposition MLN_RENDER_RESULT_RENDERED and a map_update_generation at or
    * past that value was rendered from map state that includes the command. A
    * command group holds its commands' update until the outermost group ends,
-   * so the command that ends it reports the update that includes the group.
+   * so this value stays behind the group's commands until then, while their
+   * completions already report the update that the group end publishes.
    * For a camera command with a duration, that state is the transition's first
    * step; the commanded camera appears in the update after the transition's
    * last frame. Resources a command starts loading, such as a style or source
