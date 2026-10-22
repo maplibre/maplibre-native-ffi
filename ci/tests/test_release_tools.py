@@ -31,6 +31,7 @@ def initialize_repository(repository: pathlib.Path) -> None:
     run_git(repository, "init", "--quiet")
     run_git(repository, "config", "user.name", "Release Test")
     run_git(repository, "config", "user.email", "release@example.com")
+    run_git(repository, "config", "commit.gpgSign", "false")
     run_git(repository, "config", "tag.gpgSign", "false")
     run_git(repository, "commit", "--quiet", "--allow-empty", "-m", "initial")
 
