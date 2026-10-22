@@ -316,9 +316,11 @@ jobs:
       - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ env.SNAPSHOT_SHA }}
-          # The pages quote the latest release versions from the release tags.
-          fetch-tags: true
           persist-credentials: false
+      # The pages quote the latest release version from the release tags. A
+      # checkout of a commit SHA skips tags even with `fetch-tags`.
+      - name: Fetch the release tags
+        run: git fetch --quiet --depth=1 origin 'refs/tags/*:refs/tags/*'
       - uses: ./.github/actions/setup-ci-deps
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
