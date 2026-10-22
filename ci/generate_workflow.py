@@ -295,6 +295,33 @@ def docs_job() -> dict:
     }
 
 
+def support_issue_job() -> dict:
+    # The tracking issue follows main, while the site it summarizes follows
+    # snapshot deploys. Only a push to main may write the issue.
+    return {
+        "name": "support issue",
+        "runs-on": SMALL_RUNNER,
+        "timeout-minutes": 10,
+        "if": "github.event_name == 'push'",
+        "permissions": {"contents": "read", "issues": "write"},
+        "concurrency": {"group": "support-issue", "cancel-in-progress": False},
+        "steps": [
+            checkout(SMALL_RUNNER),
+            action("jdx/mise-action", {"cache": False, "install_args": "python"}),
+            run(
+                "set -euo pipefail\n\n"
+                "mise exec -- python docs/scripts/generate-support-matrix.py\n"
+                "mise exec -- python docs/scripts/render-support-issue.py "
+                '> "$RUNNER_TEMP/support-issue.md"\n'
+                "issue=\"$(jq -r '.issue' docs/src/generated/support-matrix.json)\"\n"
+                'gh issue edit "$issue" --body-file "$RUNNER_TEMP/support-issue.md"\n',
+                name="Rewrite the support issue body",
+                env={"GH_TOKEN": "${{ github.token }}"},
+            ),
+        ],
+    }
+
+
 def android_multi_job(needs: list[str]) -> dict:
     return {
         "name": job_name("android-multi"),
@@ -446,7 +473,12 @@ def ci_workflow(source: dict, presets: dict) -> dict:
             "group": "${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}",
             "cancel-in-progress": "${{ github.event.action == 'synchronize' }}",
         },
-        "jobs": {"plan": plan_job(), **jobs, "required": required},
+        "jobs": {
+            "plan": plan_job(),
+            **jobs,
+            "required": required,
+            "support-issue": support_issue_job(),
+        },
     }
 
 

@@ -2853,3 +2853,33 @@ jobs:
         run: |
           test "$PLAN" = success &&
           jq -e -n --argjson results "$RESULTS" 'all($results[]; .result == "success" or .result == "skipped")'
+  support-issue:
+    name: support issue
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      issues: write
+    concurrency:
+      group: support-issue
+      cancel-in-progress: false
+    steps:
+      - name: Check out repository
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        with:
+          cache: false
+          install_args: python
+      - name: Rewrite the support issue body
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          mise exec -- python docs/scripts/generate-support-matrix.py
+          mise exec -- python docs/scripts/render-support-issue.py > "$RUNNER_TEMP/support-issue.md"
+          issue="$(jq -r '.issue' docs/src/generated/support-matrix.json)"
+          gh issue edit "$issue" --body-file "$RUNNER_TEMP/support-issue.md"
