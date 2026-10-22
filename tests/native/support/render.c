@@ -188,7 +188,6 @@ static bool create_fixture(
   fixture->serviced_on_main_thread = serviced_on_main_thread;
   mln_render_session_attach_options options =
     mln_render_session_attach_options_default();
-  options.requested_texture_ring_depth = 2;
   options.driver = fixture->driver;
   options.frame_wake = (mln_wake){
     .callback = mln_test_render_count_wake, .user_data = &fixture->frame_wakes

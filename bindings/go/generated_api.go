@@ -4218,7 +4218,8 @@ type RenderSessionAttachOptions struct {
 	// Requested slot count of a session-owned texture ring, from one to
 	// MLN_TEXTURE_RING_MAX_DEPTH. Private targets grant one slot regardless of this
 	// value. A borrowed texture ring's depth is its texture count, so borrowed and
-	// other targets ignore this value. Defaults to 1.
+	// other targets ignore this value. Defaults to 2, so the host can retain one
+	// frame while the session renders its replacement.
 	RequestedTextureRingDepth uint32
 	// Producer synchronization for acquired texture frames. Defaults to
 	// MLN_GPU_SYNC_CPU_COMPLETE. MLN_GPU_SYNC_OPENGL_FENCE requires a shared EGL or
