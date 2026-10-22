@@ -1,0 +1,87 @@
+name: "↳ Rust crates"
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        description: Source commit named by the release tag
+        required: true
+        type: string
+      tag:
+        description: Release tag, whose GitHub release the crates download from
+        required: true
+        type: string
+      version:
+        description: Crate version
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Cargo publish
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    # crates.io accepts an OIDC token from this repository when each crate's
+    # trusted publisher names this environment and release.yml, the workflow
+    # that calls this one: crates.io matches the run's top-level workflow.
+    environment:
+      name: crates.io
+      url: https://crates.io/crates/maplibre-native-ffi/${{ inputs.version }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      MISE_NO_HOOKS: "1"
+      PUBLISH_TAG: ${{ inputs.tag }}
+      PUBLISH_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          ref: ${{ inputs.sha }}
+          persist-credentials: false
+      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        with:
+          cache: false
+          install_args: core:rust python
+      # The workspace patches crates.io from the verifier checkout, so Cargo
+      # needs it to resolve; the native sources are not needed.
+      - name: Prepare the crates
+        run: |
+          set -euo pipefail
+
+          mise deps rustls-platform-verifier
+          mise run --no-deps //bindings/rust:prepare-release "$PUBLISH_TAG"
+      - uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
+        id: auth
+      # In dependency order, skipping a crate that crates.io already has, so a
+      # rerun after a partial publish resumes where it stopped. Verification
+      # builds each crate against the published GitHub release, through the
+      # download path that consumers take.
+      - name: Publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: |
+          set -euo pipefail
+
+          for crate in maplibre-native-ffi-sys maplibre-native-ffi-core maplibre-native-ffi; do
+            url="https://crates.io/api/v1/crates/$crate/$PUBLISH_VERSION"
+            # crates.io rejects API requests without a user agent.
+            status="$(
+              curl --silent --output /dev/null --write-out '%{http_code}' \
+                --user-agent "maplibre-native-ffi release ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY)" \
+                "$url"
+            )"
+            case "$status" in
+              200) continue ;;
+              404) ;;
+              *)
+                echo "crates.io returned HTTP $status for $url" >&2
+                exit 1
+                ;;
+            esac
+            mise exec --no-deps core:rust -- cargo publish --package "$crate" --allow-dirty
+            echo "### $crate $PUBLISH_VERSION" >> "$GITHUB_STEP_SUMMARY"
+          done

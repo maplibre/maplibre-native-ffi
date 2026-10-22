@@ -262,33 +262,41 @@ Take one distribution:
 
 ### Rust
 
-<SnapshotOnly />
+Add the crate from [crates.io](https://crates.io/crates/maplibre-native-ffi).
 
-Depend on the `maplibre-native-ffi` crate from Git.
+```bash frame="terminal"
+cargo add maplibre-native-ffi
+```
+
+The build script downloads the C library for the target. Releases include macOS
+for arm64 alone, and the published crates do not support Emscripten.
+
+Each target uses Metal on Apple platforms, OpenGL on Android and OpenHarmony,
+and Vulkan elsewhere. Enable one backend feature, `opengl`, `metal`, or
+`vulkan`, to choose another. A feature on a target-specific dependency applies
+to that target alone.
 
 ```toml title="Cargo.toml"
 [dependencies]
-maplibre-native-ffi = { git = "https://github.com/maplibre/maplibre-native-ffi" }
+maplibre-native-ffi = "{{version}}"
+
+[target.'cfg(target_os = "android")'.dependencies]
+maplibre-native-ffi = { version = "{{version}}", features = ["vulkan"] }
 ```
 
-Install the [C library](#build-against-a-prefix), then set
-`MAPLIBRE_NATIVE_FFI_LOCAL_BUILD` to its absolute path. Name an install prefix,
-or a build directory that holds `<preset>/install` for each target.
+To build against your own copy of the [C library](#build-against-a-prefix), set
+`MAPLIBRE_NATIVE_FFI_LOCAL_BUILD` to an absolute path. Name an install prefix,
+or a build directory that holds `<preset>/install` for each target. A Git or
+path dependency on the crate needs a local build.
 
 ```toml title=".cargo/config.toml"
 [env]
 MAPLIBRE_NATIVE_FFI_LOCAL_BUILD = { value = "../maplibre-native-ffi/build", relative = true }
 ```
 
-Each target uses Metal on Apple platforms, OpenGL on Android and OpenHarmony,
-WebGPU in the browser, and Vulkan elsewhere. Enable one backend feature,
-`opengl`, `metal`, `vulkan`, or `webgpu`, to choose another. A feature on a
-target-specific dependency applies to that target alone.
-
-```toml title="Cargo.toml"
-[target.'cfg(target_os = "android")'.dependencies]
-maplibre-native-ffi = { git = "https://github.com/maplibre/maplibre-native-ffi", features = ["vulkan"] }
-```
+To download through a mirror, set `MAPLIBRE_NATIVE_FFI_RELEASE_URL` to its base
+URL. The mirror serves each release tag as a directory that holds that
+release's archives.
 
 ### Swift
 

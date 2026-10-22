@@ -26,13 +26,19 @@ A release has one tag, `vAPI_EPOCH.YYYYMM.REVISION`, on a commit on `main` that
 has passed CI. Every artifact of the release builds from that commit. The
 release workflow rejects a tag out of order or from another month.
 
-pub.dev enables automated publishing only for a package that exists, so publish
-the Dart package's first version by hand: run
-`mise run //bindings/dart:prepare-release <tag>` for a published release tag,
-then `dart pub publish` from `bindings/dart`. On the package's admin page,
-enable publishing from GitHub Actions for `maplibre/maplibre-native-ffi`, with
-the tag pattern v{{version}}, as pub.dev writes it, and the `pub.dev`
-environment.
+pub.dev and crates.io enable automated publishing only for a package that
+exists, so publish the first version of each package by hand, from a clean
+checkout of a published release tag.
+
+- Dart: run `mise run //bindings/dart:prepare-release <tag>`, then
+  `dart pub publish` from `bindings/dart`. On the package's admin page, enable
+  publishing from GitHub Actions for `maplibre/maplibre-native-ffi`, with the
+  tag pattern v{{version}}, as pub.dev writes it, and the `pub.dev` environment.
+- Rust: run `mise run //bindings/rust:prepare-release <tag>`, then
+  `cargo publish --allow-dirty -p <crate>` for `maplibre-native-ffi-sys`,
+  `maplibre-native-ffi-core`, and `maplibre-native-ffi`, in that order. In each
+  crate's settings, add a trusted publisher for `maplibre/maplibre-native-ffi`,
+  with the workflow `release.yml` and the `crates.io` environment.
 
 ## Snapshots
 
@@ -42,6 +48,6 @@ successful CI run on `main`. A component publishes when its inputs in
 `snapshot-state/<component>` tag names, and a successful publish moves the tag.
 Dispatch the workflow manually and name a component to republish it now.
 
-The TypeScript binding has no snapshot channel. The other channels keep only the
-latest snapshot, and npm keeps every version that it publishes, so the binding
-publishes nothing until its first tagged release.
+pub.dev, crates.io, and npm keep every version that they publish, so the Dart,
+Rust, and TypeScript bindings have no snapshot channel. The other channels keep
+only the latest snapshot.
