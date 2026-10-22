@@ -18,6 +18,7 @@
 
 #include <pthread.h>
 #include <stdatomic.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -77,6 +78,7 @@ struct mln_ts_realm {
   napi_ref receive;
   napi_ref register_value;
   napi_ref make_error;
+  napi_ref take_native;
   bool referenced;
   bool cleaned;
   // The owners whose tokens this realm's teardown finalizes. The exit path
@@ -360,6 +362,84 @@ bool mln_ts_read_wake(
   }
   *out_user_data = context;
   return true;
+}
+
+/** The release that a call runs for a native registration it does not pass
+ * on. */
+typedef struct mln_ts_native_release {
+  mln_user_data_release release;
+  void* user_data;
+} mln_ts_native_release;
+
+static void native_release(void* data) {
+  mln_ts_native_release* entry = data;
+  entry->release(entry->user_data);
+}
+
+bool mln_ts_read_native_registration(
+  mln_ts_call* call, napi_value value, const char* kind, size_t callbacks,
+  uint64_t* out, const char* path
+) {
+  napi_env env = call->env;
+  napi_value target = reference_value(env, call->realm->take_native);
+  napi_value global;
+  napi_value fields;
+  napi_value argv[3] = {
+    value, mln_ts_text(env, kind, strlen(kind)),
+    mln_ts_text(env, path, strlen(path))
+  };
+  if (
+    target == NULL || argv[1] == NULL || argv[2] == NULL ||
+    napi_get_global(env, &global) != napi_ok ||
+    napi_call_function(env, global, target, 3, argv, &fields) != napi_ok
+  ) {
+    return false;
+  }
+  if (mln_ts_is_absent(call, fields)) {
+    char message[256];
+    snprintf(
+      message, sizeof message,
+      "%s: an earlier call already consumed this native registration", path
+    );
+    mln_ts_throw_status(env, MLN_STATUS_INVALID_STATE, message);
+    return false;
+  }
+  // The callbacks, then the context and its release.
+  size_t count = callbacks + 2;
+  uint32_t length = 0;
+  if (
+    napi_get_array_length(env, fields, &length) != napi_ok || length != count
+  ) {
+    napi_throw_type_error(
+      env, NULL, "a native registration has the wrong number of fields"
+    );
+    return false;
+  }
+  for (size_t index = 0; index < count; index++) {
+    napi_value field;
+    if (
+      !mln_ts_element(call, fields, index, &field) ||
+      !mln_ts_read_u64(call, field, &out[index], path)
+    ) {
+      return false;
+    }
+  }
+  if (out[callbacks + 1] == 0) {
+    return true;
+  }
+  mln_ts_native_release* entry = mln_ts_allocate(call, sizeof *entry);
+  if (entry == NULL) {
+    // This call took the registration, so it releases the context even
+    // though it fails before native code sees it.
+    ((mln_user_data_release)(uintptr_t)out[callbacks + 1])(
+      (void*)(uintptr_t)out[callbacks]
+    );
+    return false;
+  }
+  entry->release = (mln_user_data_release)(uintptr_t)out[callbacks + 1];
+  entry->user_data = (void*)(uintptr_t)out[callbacks];
+  // The call's rejections run before its allocations are freed.
+  return mln_ts_reject_later(call, native_release, entry);
 }
 
 bool mln_ts_read_completion(
@@ -782,7 +862,9 @@ static void realm_cleanup(void* data) {
   napi_delete_reference(realm->env, realm->receive);
   napi_delete_reference(realm->env, realm->register_value);
   napi_delete_reference(realm->env, realm->make_error);
+  napi_delete_reference(realm->env, realm->take_native);
   realm->receive = realm->register_value = realm->make_error = NULL;
+  realm->take_native = NULL;
 }
 
 static void realm_finalize(napi_env env, void* data, void* hint) {
@@ -820,10 +902,10 @@ static napi_value shutdown_at_exit(napi_env env, napi_callback_info info) {
 // ---------------------------------------------------------------------------
 // Runtime exports
 
-// install(receive, register, makeError)
+// install(receive, register, makeError, takeNative)
 static napi_value install(napi_env env, napi_callback_info info) {
   mln_ts_call call;
-  if (!mln_ts_begin(&call, env, info, 3)) {
+  if (!mln_ts_begin(&call, env, info, 4)) {
     return NULL;
   }
   // A second copy of the binding in this realm would number its tokens from
@@ -836,10 +918,11 @@ static napi_value install(napi_env env, napi_callback_info info) {
     );
     return mln_ts_end(&call);
   }
-  napi_ref* targets[3] = {
-    &call.realm->receive, &call.realm->register_value, &call.realm->make_error
+  napi_ref* targets[4] = {
+    &call.realm->receive, &call.realm->register_value, &call.realm->make_error,
+    &call.realm->take_native
   };
-  for (size_t index = 0; index < 3; index++) {
+  for (size_t index = 0; index < 4; index++) {
     napi_create_reference(env, call.argv[index], 1, targets[index]);
   }
   return mln_ts_end(&call);

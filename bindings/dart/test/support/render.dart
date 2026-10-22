@@ -64,7 +64,7 @@ final class WorkerSession {
       ),
     );
     worker = WorkerSession._(attachment.session);
-    addTearDown(() => _release(worker.session));
+    addTearDown(() => releaseSession(worker.session));
     await within(attachment.completed, 'attachment');
     return worker;
   }
@@ -85,7 +85,7 @@ final class WorkerSession {
 }
 
 /// Abandons [session] unless it already released its target, then closes it.
-void _release(RenderSessionHandle session) {
+void releaseSession(RenderSessionHandle session) {
   try {
     session.abandon();
   } on MaplibreException {

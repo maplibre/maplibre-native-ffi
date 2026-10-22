@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import textwrap
 from dataclasses import replace
 
 from .. import async_hosts, docs
@@ -118,10 +119,16 @@ class Values:
                 self.check(field.value)
             self.used[value.native] = value
             return
+        if value.registration and self.native_only(value):
+            # Native code in the host supplies every callback, so no callback
+            # type reaches Dart.
+            self.native_parameters(value)
+            self.used[value.native] = value
+            return
         if value.registration:
             raise Unsupported(
                 f"{value.native}: registration requires queue delivery, a wake, "
-                "or native rules"
+                "native rules, or a native registration"
             )
         if value.kind != "record":
             raise Unsupported(
@@ -163,6 +170,9 @@ class Values:
     def rules_only(self, value):
         return async_hosts.rules_only(self.bound, value)
 
+    def native_only(self, value):
+        return async_hosts.native_only(self.bound, value)
+
     def check_delivery(self, callback):
         """Accept a delivered callback whose copied arguments Dart can decode."""
         for parameter in callback.arguments:
@@ -200,12 +210,16 @@ class Values:
             controls |= {value.registration.user_data, value.registration.release}
             controls |= {f.name for f in value.fields if self.omitted(f)}
         controls |= {f.value.length for f in value.fields if f.value.kind == "array"}
-        if value.default:
-            controls |= {f.name for f in value.fields if self.left_disabled(f.value)}
-        return tuple(f for f in value.fields if f.name not in controls)
-
-    def left_disabled(self, value):
-        return async_hosts.left_disabled(self.bound, value)
+        # A registration that only native code supplies may be absent, which
+        # keeps the record's initial value: its native default, or zero. Both
+        # leave the registration disabled.
+        return tuple(
+            replace(f, value=replace(f.value, nullable=True))
+            if f.value.registration and self.native_only(f.value)
+            else f
+            for f in value.fields
+            if f.name not in controls
+        )
 
     def public(self, value):
         # An owned handle names its owner class, as a borrowed one does;
@@ -262,12 +276,11 @@ class Values:
 
     def prepared(self, value, expression):
         """A registration descriptor added to the call's transaction."""
-        if self.wake(value):
-            field = next(
-                f for f in value.fields if f.name in value.registration.callbacks
-            )
-            return f"registrations.add(registrations.roots.wake({expression}.{identifier(field.name)}))"
-        roots = ", registrations.roots" if self.queue_callbacks(value) else ""
+        roots = (
+            ", registrations.roots"
+            if self.wake(value) or self.queue_callbacks(value)
+            else ""
+        )
         return f"registrations.add(_prepare{public_name(value.native)}({expression}{roots}))"
 
     def native(self, value, expression):
@@ -695,13 +708,118 @@ class Values:
             conversion + reader,
         )
 
+    def native_parameters(self, value):
+        """The parameters of a native registration, each named for its C field:
+        one function pointer per callback field, then the context and its
+        release, which default to null."""
+        registration = value.registration
+        if any(f.name not in registration.callbacks for f in self.fields(value)):
+            raise Unsupported(
+                f"{value.native}: a native registration with other members needs a rule"
+            )
+        callbacks = [identifier(name) for name in registration.callbacks]
+        context = [identifier(registration.user_data), identifier(registration.release)]
+        return callbacks, context
+
+    def native_constructor(self, value, initializers=""):
+        """The constructor of a native registration, which records its pointers
+        for the first call that carries it."""
+        callbacks, (user_data, release) = self.native_parameters(value)
+        parameters = ", ".join(
+            [f"required NativePointer {name}" for name in callbacks]
+            + [
+                f"NativePointer {name} = NativePointer.nullPointer"
+                for name in (user_data, release)
+            ]
+        )
+        pointers = ", ".join(f"[{name}]" for name in [*callbacks, user_data])
+        comment = "\n".join(
+            textwrap.wrap(
+                f"Creates a native registration from {pointers}, and [{release}], "
+                "which native code in the host supplies. The binding copies them "
+                "unchanged.",
+                width=76,
+                initial_indent="  /// ",
+                subsequent_indent="  /// ",
+            )
+            + ["  ///"]
+            + textwrap.wrap(
+                "The first call that carries the registration consumes it, and a "
+                "later call throws an invalid-state error. Native code releases the "
+                f"context of a call that it accepts, and the binding calls [{release}] "
+                "for a call that native code does not accept.",
+                width=76,
+                initial_indent="  /// ",
+                subsequent_indent="  /// ",
+            )
+        )
+        return (
+            f"{comment}\n"
+            f"  {public_name(value.native)}.native({{{parameters}}}){initializers} {{\n"
+            f"    nativeRegistrations[this] = NativeRegistration([{', '.join(callbacks)}], {user_data}, {release});\n"
+            "  }"
+        )
+
+    def render_native_registration(self, value):
+        """Copy a native registration into its descriptor, unchanged. A wake
+        without one posts to this isolate through _CallbackRoots.wake."""
+        public = public_name(value.native)
+        registration = value.registration
+        if self.wake(value):
+            head = [
+                f"_NativeRegistration<raw.{value.native}> _prepare{public}({public} value, _CallbackRoots roots) {{",
+                "  final native = _takeNativeRegistration(value);",
+                f"  if (native == null) return roots.wake(value.{identifier(registration.callbacks[0])});",
+            ]
+        else:
+            head = [
+                f"_NativeRegistration<raw.{value.native}> _prepare{public}({public} value) {{",
+                "  final native = _takeNativeRegistration(value)!;",
+            ]
+        initialize = self.registration_initializer(value).strip()
+        return "\n".join(
+            [
+                *head,
+                "  final arena = Arena();",
+                f"  final result = arena<raw.{value.native}>();",
+                *([f"  {initialize}"] if initialize else []),
+                *(
+                    f"  result.ref.{name} = Pointer.fromAddress(native.callbacks[{index}].address);"
+                    for index, name in enumerate(registration.callbacks)
+                ),
+                f"  result.ref.{registration.user_data} = Pointer.fromAddress(native.userData.address);",
+                f"  result.ref.{registration.release} = Pointer.fromAddress(native.releaseUserData.address);",
+                "  return _NativeRegistration(result, native.release, arena.releaseAll);",
+                "}",
+                "",
+            ]
+        )
+
     def render_wake(self, value):
-        """The declaration of a wake, which _CallbackRoots.wake
-        materializes."""
+        """A wake: a closure that _CallbackRoots.wake posts to this isolate, or
+        a native registration."""
         members, args, initializers, _writes = self.registration_members(
             value, skip=set(value.registration.callbacks)
         )
-        return self.registration_class(value, members, args, initializers)
+        declaration, constructor, rest = self.registration_class(
+            value, members, args, initializers
+        ).split("\n", 2)
+        callback = identifier(value.registration.callbacks[0])
+        native = self.native_constructor(value, f" : {callback} = null")
+        return (
+            f"{declaration}\n{constructor}\n{native}\n{rest}",
+            self.render_native_registration(value),
+        )
+
+    def render_native_only(self, value):
+        """A registration whose synchronous callbacks only native code in the
+        host can supply."""
+        declaration = (
+            f"final class {public_name(value.native)} {{\n"
+            + self.native_constructor(value)
+            + "\n}"
+        )
+        return declaration, self.render_native_registration(value)
 
     def render_rules_registration(self, value):
         """A registration whose callbacks Dart leaves unset, so the native
@@ -894,7 +1012,14 @@ class Values:
                     conversions.append(self.render_delivery(callback))
                 continue
             if value.registration and self.wake(value):
-                declarations.append(self.render_wake(value))
+                declaration, conversion = self.render_wake(value)
+                declarations.append(declaration)
+                conversions.append(conversion)
+                continue
+            if value.registration and self.native_only(value):
+                declaration, conversion = self.render_native_only(value)
+                declarations.append(declaration)
+                conversions.append(conversion)
                 continue
             if value.registration and self.queue_callbacks(value):
                 declaration, conversion = self.render_queue_registration(value)
@@ -1040,6 +1165,11 @@ class Values:
                             "  }",
                         ]
                     write += lines
+                elif field.value.registration and field.value.nullable:
+                    # An absent registration keeps the record's initial value.
+                    write.append(
+                        f"  if ({expression} != null) {{ {native_field} = {self.native(field.value, expression + '!')}; }}"
+                    )
                 else:
                     write.append(
                         f"  {native_field} = {self.native(field.value, expression)};"

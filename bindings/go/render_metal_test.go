@@ -7,6 +7,8 @@ import "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/testsupport
 const (
 	buildBackend    = RenderBackendFlagMetal
 	graphicsBackend = testsupport.BackendMetal
+	// Only Vulkan sessions take a queue lock.
+	queueLockSupported = false
 )
 
 func attachOwnedTexture(

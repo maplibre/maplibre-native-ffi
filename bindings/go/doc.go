@@ -12,6 +12,14 @@
 // [HttpHeaderTransformResponseScope] works only during its callback, on the
 // callback's thread.
 //
+// Each call of a Go callback enters the Go runtime from a native thread. A host
+// whose wake or queue lock is already a C function passes it as a native
+// registration from [NewNativeWake] or [NewNativeQueueLock], with the C function
+// pointers and context as uintptr values. The first call that carries a native
+// registration consumes it, and a later call returns [StatusInvalidState].
+// Native code releases the context of a call that it accepts, and the binding
+// calls the release for any other call.
+//
 // The binding recovers a callback's panic, returns the callback's failure value
 // to native, and logs the panic with [log/slog.Error] on the default logger. Go
 // cleanup disposes an owner that the host abandoned and logs it with

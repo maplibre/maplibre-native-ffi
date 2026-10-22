@@ -11,12 +11,15 @@ namespace Maplibre.NativeFfi.Internal.Memory;
 /// when the call returns.
 /// </summary>
 /// <remarks>
-/// A registration becomes permanent only after <see cref="Accept"/>.
+/// A registration becomes permanent only after <see cref="Accept"/>. Without it, the
+/// scope releases the managed registrations, and the contexts of the native
+/// registrations that the call consumed.
 /// </remarks>
 internal sealed unsafe partial class NativeCallScope : IDisposable
 {
     private List<nint>? allocations;
     private List<NativeCallbackRoot>? registrations;
+    private List<NativeRegistration>? natives;
     private bool accepted;
 
     internal NativeCallScope() { }
@@ -34,6 +37,24 @@ internal sealed unsafe partial class NativeCallScope : IDisposable
             throw;
         }
         return root.Pointer;
+    }
+
+    /// <summary>
+    /// Consumes a native registration for this call. The scope releases its context
+    /// unless native code accepts the call.
+    /// </summary>
+    internal void Consume(NativeRegistration registration)
+    {
+        registration.Claim();
+        try
+        {
+            (natives ??= []).Add(registration);
+        }
+        catch
+        {
+            registration.Release();
+            throw;
+        }
     }
 
     internal void Accept() => accepted = true;
@@ -174,6 +195,10 @@ internal sealed unsafe partial class NativeCallScope : IDisposable
             foreach (var root in registrations)
                 root.Dispose();
         registrations = null;
+        if (!accepted && natives is not null)
+            foreach (var registration in natives)
+                registration.Release();
+        natives = null;
         if (allocations is not null)
             foreach (var pointer in allocations)
                 NativeMemory.Free((void*)pointer);

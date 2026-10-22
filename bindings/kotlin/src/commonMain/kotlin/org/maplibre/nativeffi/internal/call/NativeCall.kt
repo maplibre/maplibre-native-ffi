@@ -75,7 +75,8 @@ internal class NativeCall(val handle: Long, var completion: Long = 0L) : NativeA
 
   /**
    * Adopts the owned handle at [out] like [adopt], then roots this call's registrations in the
-   * [callbacks] of the new owner, releasing it through [drop] if that fails.
+   * [callbacks] of the new owner, releasing it through [drop] if that fails. Native code accepted
+   * the call, so it releases the call's native registrations whether or not the adoption succeeds.
    */
   fun <T> adoptRegistered(
     out: Long,
@@ -83,8 +84,12 @@ internal class NativeCall(val handle: Long, var completion: Long = 0L) : NativeA
     create: (Long) -> T,
     callbacks: (T) -> CallbackOwner,
     drop: (T) -> Unit,
-  ): T =
-    adopt(out, dispose, create).let { owner -> accept(owner, callbacks(owner)) { drop(owner) } }
+  ): T {
+    scope?.handOff()
+    return adopt(out, dispose, create).let { owner ->
+      accept(owner, callbacks(owner)) { drop(owner) }
+    }
+  }
 
   /**
    * Runs a render-session attach: [submit] receives an out slot and a completion, writes the new

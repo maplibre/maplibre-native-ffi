@@ -3,6 +3,7 @@
 import enum
 import sys
 import types
+import typing
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -98,6 +99,46 @@ mln_status mln_map_new_entries(mln_map map, const mln_completion *completion, ml
         second = values.ReadingRequest(level=4)
         self.assertIsNone(first.handler.callback)
         self.assertIsNot(first.handler, second.handler)
+
+    def test_wakes_and_synchronous_registrations_take_a_native_registration(self):
+        api = self.parse(
+            """
+BIND("synchronous=true")
+typedef void (*mln_probe_guard_callback)(void* user_data);
+typedef struct mln_probe_guard {
+  mln_probe_guard_callback enter BIND("nullable=true");
+  mln_probe_guard_callback leave BIND("nullable=true");
+  void* user_data BIND("kind=context");
+  mln_probe_notify_release release_user_data;
+} mln_probe_guard BIND("kind=callback_registration;release=release_user_data");
+mln_status mln_probe_hooks_install(
+  const mln_probe_hooks* hooks, const mln_probe_guard* guard,
+  mln_diagnostic* out_diagnostic
+);
+""",
+            groups=("default_registration", "record_notification"),
+        )
+        self.assertIn("mln_probe_hooks_install", python.coverage(api)["generated"])
+        native = types.SimpleNamespace(_NativeRegistration=lambda *parts: parts)
+        values = self.materialize(api, native).values
+        package = types.ModuleType("fixture")
+        package._native = native
+        with patch.dict(sys.modules, {"fixture": package, "fixture._native": native}):
+            wake = values.ProbeSignal.native(callback=5, user_data=6)
+            guard = values.ProbeGuard.native(enter=1, leave=2, release_user_data=3)
+        # Each address reaches the runtime unchanged, in field order.
+        self.assertIsInstance(wake, values.NativeProbeSignal)
+        self.assertEqual(wake._registration, ("mln_probe_signal", (5,), 6, 0))
+        self.assertEqual(guard._registration, ("mln_probe_guard", (1, 2), 0, 3))
+        # A record field takes either form.
+        self.assertEqual(
+            typing.get_type_hints(values.ProbeHooks, vars(values))["signal"],
+            values.ProbeSignal | values.NativeProbeSignal,
+        )
+        with self.assertRaises(TypeError):
+            values.NativeProbeSignal()
+        # A registration with a queue delivery takes only host callbacks.
+        self.assertFalse(hasattr(values.ReadingHandler, "native"))
 
     def test_input_identifiers_cannot_shadow_callback_runtime_locals(self):
         api = self.parse("""

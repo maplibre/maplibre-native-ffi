@@ -28,11 +28,14 @@ type frameView interface {
 
 type renderFixture struct {
 	*fixture
+	graphics *testsupport.Graphics
+	extent   LogicalExtent
 	session  *RenderSessionHandle
 	attached *Future[struct{}]
 	// frames and driverWork receive the session's frame and driver-work wakes.
 	frames, driverWork chan struct{}
 	token              uint64
+	closed             bool
 }
 
 // newRenderFixture starts attaching a session-owned 32x16 texture to a map,
@@ -41,6 +44,14 @@ type renderFixture struct {
 // the cleanups, which run on it last-first, so the session detaches there and
 // an EGL context is never left current on a thread that Go reuses.
 func newRenderFixture(t *testing.T) *renderFixture {
+	t.Helper()
+	r := newGraphicsFixture(t)
+	r.start(t, r.options())
+	return r
+}
+
+// newGraphicsFixture is newRenderFixture without the session.
+func newGraphicsFixture(t *testing.T) *renderFixture {
 	t.Helper()
 	stdruntime.LockOSThread()
 	t.Cleanup(stdruntime.UnlockOSThread)
@@ -60,21 +71,40 @@ func newRenderFixture(t *testing.T) *renderFixture {
 	mapOptions.InitialExtent = extent
 	r := &renderFixture{
 		fixture:    newFixtureWith(t, mapOptions),
+		graphics:   graphics,
+		extent:     extent,
 		frames:     make(chan struct{}, 1),
 		driverWork: make(chan struct{}, 1),
 	}
 	awaitCommitted(t, submitted(r.m.SetStyleJson([]byte(backgroundStyle))))
+	return r
+}
+
+// options returns the fixture's attach options, whose wakes notify frames and
+// driverWork.
+func (r *renderFixture) options() RenderSessionAttachOptions {
 	options := DefaultRenderSessionAttachOptions()
 	options.Driver = RenderDriverKindCallerGraphicsThread
 	options.RequestedTextureRingDepth = 2
 	options.FrameWake = Wake{Callback: func() { notify(r.frames) }}
 	options.DriverWorkWake = Wake{Callback: func() { notify(r.driverWork) }}
-	r.session, r.attached, err = attachOwnedTexture(r.m, graphics.Context, extent, options)
+	return options
+}
+
+// attachTexture starts attaching the fixture's texture with options.
+func (r *renderFixture) attachTexture(options RenderSessionAttachOptions) (*RenderSessionHandle, *Future[struct{}], error) {
+	return attachOwnedTexture(r.m, r.graphics.Context, r.extent, options)
+}
+
+// start starts attaching the session, which the test's cleanup tears down.
+func (r *renderFixture) start(t *testing.T, options RenderSessionAttachOptions) {
+	t.Helper()
+	var err error
+	r.session, r.attached, err = r.attachTexture(options)
 	if err != nil {
 		t.Fatalf("owned texture attach: %v", err)
 	}
 	t.Cleanup(func() { r.teardown(t) })
-	return r
 }
 
 // attach services the session until its attachment completes.
@@ -85,8 +115,12 @@ func (r *renderFixture) attach(t *testing.T) {
 }
 
 // teardown detaches the session on this thread, or abandons it when it cannot
-// detach, and destroys it.
+// detach, and destroys it. A later teardown does nothing.
 func (r *renderFixture) teardown(t *testing.T) {
+	if r.closed {
+		return
+	}
+	r.closed = true
 	if detach, err := r.session.Detach(); err == nil {
 		r.service(t, detach.Done(), "the detach")
 	} else if _, err := r.session.Abandon(); err != nil {

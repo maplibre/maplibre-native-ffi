@@ -7,7 +7,10 @@ unknown tag. Integers of 32 bits or fewer and floating-point values are
 `number`; 64-bit integers and native pointers are `bigint`. A callback
 registration takes the form that `async_hosts.py` chooses for a host that runs
 no code on native threads: its callback's function type, an object of its
-callbacks and members, or its members alone when native rules answer.
+callbacks and members, or its members alone when native rules answer. A
+registration that accepts a native registration also has a `native()` factory
+of the same name, which takes a native function pointer for each callback, a
+context, and a release.
 """
 
 from __future__ import annotations
@@ -26,12 +29,15 @@ class Unsupported(ValueError):
 @dataclass(frozen=True)
 class Registration:
     value: ValuePlan
-    # "queue", "wake", "rules", or "disabled"; see async_hosts.py.
+    # "queue", "wake", "rules", or "native"; see async_hosts.py.
     form: str
     # The callbacks that host code supplies.
     callbacks: tuple[FieldPlan, ...]
     # The registration's public fields beside its callbacks.
     members: tuple[FieldPlan, ...]
+    # The fields of a native registration in C order: each callback, then the
+    # context and its release. Empty when the registration accepts none.
+    native: tuple[FieldPlan, ...] = ()
 
     @property
     def function(self) -> bool:
@@ -63,7 +69,20 @@ def registration(bound: BoundApi, value: ValuePlan) -> Registration:
         and f.public
         and f.name not in masks
     )
-    return Registration(value, form, callbacks, members)
+    native = ()
+    if async_hosts.accepts_native(bound, value):
+        if members:
+            raise Unsupported(
+                f"{value.native}: a native registration has no members beside "
+                "its callbacks"
+            )
+        by_name = {f.name: f for f in value.fields}
+        native = (
+            *async_hosts.callback_fields(value),
+            by_name[plan.user_data],
+            by_name[plan.release],
+        )
+    return Registration(value, form, callbacks, members, native)
 
 
 # Words that a TypeScript identifier cannot be, as a binding or a parameter.
@@ -281,9 +300,6 @@ class Values:
     def registration(self, value: ValuePlan) -> Registration:
         return registration(self.bound, value)
 
-    def disabled(self, value: ValuePlan) -> bool:
-        return bool(value.registration) and self.registration(value).form == "disabled"
-
     def fields(self, value: ValuePlan) -> tuple[FieldPlan, ...]:
         """The public members of a record, without its control fields."""
         if value.registration:
@@ -300,11 +316,7 @@ class Values:
             for f in value.fields
             if f.value.kind == "array" or is_counted(f.value)
         }
-        return tuple(
-            f
-            for f in value.fields
-            if f.name not in controls and not self.disabled(f.value)
-        )
+        return tuple(f for f in value.fields if f.name not in controls)
 
     def check(self, value: ValuePlan, direction: str) -> None:
         """Accept a value that this binding can carry in `direction`."""
@@ -358,7 +370,7 @@ class Values:
             return
         if value.kind == "record" and value.registration:
             entry = self.registration(value)
-            if entry.form != "disabled":
+            if entry.form != "native":
                 for field in entry.callbacks:
                     self.check_callback(field.value)
                 for field in entry.members:
@@ -376,11 +388,6 @@ class Values:
                 if field.value.kind == "callback":
                     raise Unsupported(f"{value.native}: callback field")
                 self.check(field.value, direction)
-            for field in value.fields:
-                if self.disabled(field.value) and not value.default:
-                    raise Unsupported(
-                        f"{value.native}: a disabled registration needs a default"
-                    )
             (self.inputs if direction == "in" else self.outputs).add(value.native)
             self.used[value.native] = value
             return
@@ -469,7 +476,7 @@ class Values:
         """Whether a value may be absent, as `undefined`."""
         if value.kind == "record" and value.registration:
             entry = self.registration(value)
-            return entry.form in {"queue", "wake", "disabled"} and all(
+            return entry.form in {"queue", "wake", "native"} and all(
                 f.value.nullable for f in entry.callbacks
             )
         return bool(value.nullable or value.optional)
@@ -534,9 +541,17 @@ class Values:
         if self.owners:
             imports = (
                 f"import type {{ {', '.join(sorted(self.owners))} }} "
-                'from "./generated_operations.ts";\n\n'
+                'from "./generated_operations.ts";\n'
             )
-        return imports + "\n".join(chunks)
+        if any(
+            value.registration and self.registration(value).native
+            for value in self.used.values()
+        ):
+            imports += (
+                "import {\n  type NativeRegistration,\n  nativeRegistration,\n} "
+                'from "./internal/native_registrations.ts";\n'
+            )
+        return imports + ("\n" if imports else "") + "\n".join(chunks)
 
     def render_enum(self, value: ValuePlan) -> str:
         public = public_name(value.native)
@@ -587,8 +602,8 @@ class Values:
     def render_registration(self, value: ValuePlan) -> str:
         public = public_name(value.native)
         entry = self.registration(value)
-        if entry.form == "disabled":
-            return ""
+        if entry.native:
+            return self.render_native_registration(value, entry)
         if entry.function:
             callback = self.bound.callbacks[entry.callbacks[0].value.native]
             return (
@@ -608,6 +623,58 @@ class Values:
             doc(self.bound, value.native)
             + f"export interface {public} {{\n"
             + "".join(members)
+            + "}\n"
+        )
+
+    def render_native_registration(self, value: ValuePlan, entry: Registration) -> str:
+        """A registration type that admits a native registration, a value of
+        the same name whose `native()` creates one, and the fields that
+        `native()` takes."""
+        public = public_name(value.native)
+        fields = f"Native{public}Fields"
+        native = f'NativeRegistration<"{public}">'
+        if entry.form == "native":
+            alias = native
+        elif entry.function:
+            callback = self.bound.callbacks[entry.callbacks[0].value.native]
+            alias = f"({self.callback_type(callback)}) | {native}"
+        else:
+            raise Unsupported(f"{value.native}: no TypeScript form with a native one")
+        context = {value.registration.user_data, value.registration.release}
+        members = "".join(
+            doc(self.bound, f"{value.native}.{field.name}", "  ")
+            + f"  readonly {identifier(field.name)}"
+            + f"{'?' if field.name in context else ''}: bigint;\n"
+            for field in entry.native
+        )
+        arguments = "".join(
+            f"      {identifier(field.name)}: fields.{identifier(field.name)}"
+            + (" ?? 0n" if field.name in context else "")
+            + ",\n"
+            for field in entry.native
+        )
+        return (
+            doc(self.bound, value.native)
+            + f"export type {public} = {alias};\n"
+            + f"export const {public} = {{\n"
+            + "  /**\n"
+            + "   * Creates a native registration from a native function pointer for\n"
+            + "   * each callback, and an optional context and release. The binding\n"
+            + "   * copies them into the C descriptor unchanged. The first call that\n"
+            + "   * carries the registration consumes it: native code releases the\n"
+            + "   * context of a call that it accepts, and the binding releases it for\n"
+            + "   * any other call. A later call throws a `MaplibreError` with the\n"
+            + "   * invalid-state status.\n"
+            + "   */\n"
+            + f"  native(fields: {fields}): {native} {{\n"
+            + f'    return nativeRegistration("{public}", {{\n'
+            + arguments
+            + "    });\n"
+            + "  },\n"
+            + "};\n\n"
+            + f"/** The fields of a native {{@link {public}}}, as native addresses. */\n"
+            + f"export interface {fields} {{\n"
+            + members
             + "}\n"
         )
 

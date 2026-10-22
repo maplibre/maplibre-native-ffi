@@ -18,6 +18,7 @@ import {
   native,
 } from "./addon.ts";
 import { MaplibreError, reportError } from "./errors.ts";
+import { takeNativeRegistration } from "./native_registrations.ts";
 
 // The kinds of message that the addon's wake shim posts.
 const WAKE = 1;
@@ -287,11 +288,15 @@ function receive(kind: number, ...values: unknown[]): void {
   }
 }
 
-/** Gives the addon this realm's receiver, registration, and error factory. */
+/**
+ * Gives the addon this realm's receiver, registration, error factory, and
+ * native registration taker.
+ */
 export function installRealm(addon: Addon): void {
   addon.install(
     receive,
     register,
     (status, diagnostic) => new MaplibreError(status, diagnostic),
+    takeNativeRegistration,
   );
 }

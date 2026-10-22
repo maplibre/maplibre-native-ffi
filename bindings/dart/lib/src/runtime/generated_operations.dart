@@ -1139,6 +1139,35 @@ MetalBorrowedTextureDescriptor _readMetalBorrowedTextureDescriptor(
   ),
 );
 
+_NativeRegistration<raw.mln_wake> _prepareWake(
+  Wake value,
+  _CallbackRoots roots,
+) {
+  final native = _takeNativeRegistration(value);
+  if (native == null) return roots.wake(value.callback);
+  final arena = Arena();
+  final result = arena<raw.mln_wake>();
+  result.ref.callback = Pointer.fromAddress(native.callbacks[0].address);
+  result.ref.user_data = Pointer.fromAddress(native.userData.address);
+  result.ref.release_user_data = Pointer.fromAddress(
+    native.releaseUserData.address,
+  );
+  return _NativeRegistration(result, native.release, arena.releaseAll);
+}
+
+_NativeRegistration<raw.mln_queue_lock> _prepareQueueLock(QueueLock value) {
+  final native = _takeNativeRegistration(value)!;
+  final arena = Arena();
+  final result = arena<raw.mln_queue_lock>();
+  result.ref.lock = Pointer.fromAddress(native.callbacks[0].address);
+  result.ref.unlock = Pointer.fromAddress(native.callbacks[1].address);
+  result.ref.user_data = Pointer.fromAddress(native.userData.address);
+  result.ref.release_user_data = Pointer.fromAddress(
+    native.releaseUserData.address,
+  );
+  return _NativeRegistration(result, native.release, arena.releaseAll);
+}
+
 Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
   RenderSessionAttachOptions value,
   Arena arena,
@@ -1154,11 +1183,16 @@ Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
   );
   result.ref.producer_sync_kind = value.producerSyncKind.rawValue;
   result.ref.frame_wake = registrations
-      .add(registrations.roots.wake(value.frameWake.callback))
+      .add(_prepareWake(value.frameWake, registrations.roots))
       .ref;
   result.ref.driver_work_wake = registrations
-      .add(registrations.roots.wake(value.driverWorkWake.callback))
+      .add(_prepareWake(value.driverWorkWake, registrations.roots))
       .ref;
+  if (value.queueLock != null) {
+    result.ref.queue_lock = registrations
+        .add(_prepareQueueLock(value.queueLock!))
+        .ref;
+  }
   return result;
 }
 
@@ -1170,6 +1204,7 @@ RenderSessionAttachOptions _readRenderSessionAttachOptions(
   producerSyncKind: GpuSyncKind.fromRawValue(source.producer_sync_kind),
   frameWake: const Wake(),
   driverWorkWake: const Wake(),
+  queueLock: null,
 );
 
 Pointer<raw.mln_metal_context_descriptor> _writeMetalContextDescriptor(

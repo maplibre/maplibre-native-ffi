@@ -17,6 +17,7 @@ export * from "./generated_operations.ts";
 export * from "./generated_values.ts";
 export type { CommandCompletion } from "./internal/completions.ts";
 export { AbiVersionMismatchError, MaplibreError } from "./internal/errors.ts";
+export type { NativeRegistration } from "./internal/native_registrations.ts";
 export {
   AwaitableWake,
   type AwaitableWakeOptions,

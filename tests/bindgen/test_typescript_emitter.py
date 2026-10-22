@@ -81,6 +81,7 @@ class TypeScriptEmitterTests(unittest.TestCase):
                 "mln_custom_mvt_vector_source_options": "queue",
                 "mln_http_header_transform": "rules",
                 "mln_log_handler": "queue",
+                "mln_queue_lock": "native",
                 "mln_resource_provider": "queue",
                 "mln_resource_request_cancel_handler": "queue",
                 "mln_resource_transform": "queue",
@@ -88,6 +89,36 @@ class TypeScriptEmitterTests(unittest.TestCase):
                 "mln_wake": "wake",
             },
         )
+
+    def test_native_registrations_carry_each_callback_then_the_context(self):
+        # A wake and a registration that only native code can supply take a
+        # native registration, whose fields mirror the C descriptor. A record
+        # that holds one exposes it as an optional member.
+        native = {
+            value.native: [
+                field.name for field in self.values.registration(value).native
+            ]
+            for value in self.values.used.values()
+            if value.kind == "record"
+            and value.registration
+            and self.values.registration(value).native
+        }
+        self.assertEqual(
+            native,
+            {
+                "mln_queue_lock": [
+                    "lock",
+                    "unlock",
+                    "user_data",
+                    "release_user_data",
+                ],
+                "mln_wake": ["callback", "user_data", "release_user_data"],
+            },
+        )
+        options = self.bound.values["mln_render_session_attach_options"]
+        members = {f.name: f for f in self.values.fields(options)}
+        self.assertIn("queue_lock", members)
+        self.assertTrue(self.values.member_optional(options, members["queue_lock"]))
 
     def test_only_synchronous_categories_return_without_a_promise(self):
         # An operation that the headers complete later returns a Promise or an

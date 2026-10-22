@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 
 import '../internal/callback/delivery_queue.dart';
+import '../internal/callback/native_registration.dart';
 import '../internal/c/maplibre_native_c.dart'
     show checkNativeCall, ensureAbiVersion, nativeDiagnostic;
 import '../internal/c/maplibre_native_c.g.dart' as raw;

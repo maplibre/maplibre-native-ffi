@@ -51,7 +51,7 @@ internal sealed class RenderFixture : IDisposable
         }
     }
 
-    private RenderFixture(TestGraphicsBackend backend)
+    private RenderFixture(TestGraphicsBackend backend, Configure configure)
     {
         Backend = backend;
         Graphics = TestGraphics.Create(backend);
@@ -72,7 +72,18 @@ internal sealed class RenderFixture : IDisposable
                 )
             );
             Complete(Map.SetStyleJsonAsync(RedStyle));
-            Session = Attach();
+            Session = Attach(
+                configure(
+                    Signal,
+                    new RenderSessionAttachOptions
+                    {
+                        Driver = RenderDriverKind.CallerGraphicsThread,
+                        RequestedTextureRingDepth = 2,
+                        FrameWake = new Wake(Signal),
+                        DriverWorkWake = new Wake(Signal),
+                    }
+                )
+            );
         }
         catch
         {
@@ -92,15 +103,32 @@ internal sealed class RenderFixture : IDisposable
     /// <summary>The attached session. Its attachment completes once the fixture services it.</summary>
     internal RenderSessionHandle Session { get; } = null!;
 
+    /// <summary>
+    /// Changes the options that the session attaches with. It receives the fixture's wake, which
+    /// every wake of the session calls so that the fixture makes progress.
+    /// </summary>
+    internal delegate RenderSessionAttachOptions Configure(
+        Action wake,
+        RenderSessionAttachOptions options
+    );
+
     /// <summary>Runs a test on a new graphics thread that creates, drives, and disposes a fixture.</summary>
-    internal static void Run(TestGraphicsBackend backend, Action<RenderFixture> test)
+    internal static void Run(TestGraphicsBackend backend, Action<RenderFixture> test) =>
+        Run(backend, static (_, options) => options, test);
+
+    /// <summary>Runs a test on a fixture whose session attaches with the configured options.</summary>
+    internal static void Run(
+        TestGraphicsBackend backend,
+        Configure configure,
+        Action<RenderFixture> test
+    )
     {
         ExceptionDispatchInfo? failure = null;
         var thread = new Thread(() =>
         {
             try
             {
-                using var fixture = new RenderFixture(backend);
+                using var fixture = new RenderFixture(backend, configure);
                 test(fixture);
             }
             catch (Exception error)
@@ -228,16 +256,10 @@ internal sealed class RenderFixture : IDisposable
         return batch.Get().Results;
     }
 
-    private RenderSessionHandle Attach()
+    /// <summary>Attaches an owned texture target of the fixture's backend to its map.</summary>
+    internal RenderSessionHandle Attach(RenderSessionAttachOptions options)
     {
         var extent = new LogicalExtent(Width, Height, 1);
-        var options = new RenderSessionAttachOptions
-        {
-            Driver = RenderDriverKind.CallerGraphicsThread,
-            RequestedTextureRingDepth = 2,
-            FrameWake = new Wake(Signal),
-            DriverWorkWake = new Wake(Signal),
-        };
         var context = Graphics.Context;
         return Backend switch
         {

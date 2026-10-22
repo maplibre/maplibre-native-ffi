@@ -173,49 +173,9 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
         methods = "\n".join(
             values.encoder(plan) + values.decoder(plan) for plan in plans
         )
-        with TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / "Probe.csproj").write_text("""
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup>
-<TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType>
-<AllowUnsafeBlocks>true</AllowUnsafeBlocks><ImplicitUsings>enable</ImplicitUsings>
-<Nullable>enable</Nullable>
-</PropertyGroup></Project>
-""")
-            runtime = (
-                ROOT
-                / "bindings/dotnet/src/Maplibre.NativeFfi/Internal/Memory/NativeCallScope.cs"
-            )
-            (root / "NativeCallScope.cs").write_text(runtime.read_text())
-            (root / "NativeCallbackRoot.cs").write_text(
-                (runtime.parent.parent / "Callback/NativeCallbackRoot.cs").read_text()
-            )
-            (root / "ValueArray.cs").write_text(
-                (runtime.parent.parent / "ValueArray.cs").read_text()
-            )
-            (root / "NativeValues.cs").write_text(
-                (runtime.parent.parent / "Struct/NativeValues.cs").read_text()
-            )
-            # The probe compiles the generated raw types, and declares the
-            # diagnostic and handle interface that the runtime supplies.
-            (root / "NativeMethods.cs").write_text(
-                (runtime.parent.parent / "C/NativeMethods.cs").read_text()
-            )
-            (root / "NativeTypes.g.cs").write_text(
-                dotnet_native.generate(compile_api(api))["Internal/C/NativeTypes.g.cs"]
-            )
-            errors = runtime.parent.parent.parent / "Error"
-            (root / "MaplibreException.cs").write_text(
-                (errors / "MaplibreException.cs").read_text()
-            )
-            status = next(
-                source
-                for path, source in dotnet.emit(api).files.items()
-                if path.endswith("/Status.g.cs")
-            )
-            (root / "Status.g.cs").write_text(status)
-            (root / "Program.cs").write_text(
-                """
+        self.run_dotnet_probe(
+            api,
+            """
 using Maplibre.NativeFfi.Internal;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Memory;
@@ -230,10 +190,10 @@ namespace Maplibre.NativeFfi.Internal.C {
   }
 }
 """
-                + declarations
-                + "\nunsafe class Probe {\n"
-                + methods
-                + """
+            + declarations
+            + "\nunsafe class Probe {\n"
+            + methods
+            + """
   static void Check(bool test) { if (!test) throw new Exception("conversion contract failed"); }
   static void Main() {
     var absent = NativeCamera(new Camera());
@@ -270,8 +230,145 @@ namespace Maplibre.NativeFfi.Internal.C {
     Check(NativeMetric(new Metric(5)).@event == 5);
   }
 }
+""",
+        )
+
+    def test_dotnet_native_registrations_cross_unchanged_and_are_consumed_once(self):
+        # A wake and a registration with a synchronous callback accept a
+        # native registration; a registration whose callback takes an argument
+        # does not.
+        api = self.parse(
+            """
+typedef void (*mln_probe_release)(void *user_data);
+typedef void (*mln_ping_callback)(void *user_data);
+typedef struct mln_ping {
+  mln_ping_callback callback BIND("nullable=true");
+  void *user_data BIND("kind=context");
+  mln_probe_release release_user_data;
+} mln_ping BIND("kind=callback_registration;release=release_user_data");
+BIND("synchronous=true")
+typedef void (*mln_hold_callback)(void *user_data);
+typedef struct mln_hold {
+  mln_hold_callback lock BIND("nullable=true");
+  mln_hold_callback unlock BIND("nullable=true");
+  void *user_data BIND("kind=context");
+  mln_probe_release release_user_data;
+} mln_hold BIND("kind=callback_registration;release=release_user_data");
+typedef void (*mln_tally_callback)(void *user_data, double count);
+typedef struct mln_tally {
+  mln_tally_callback callback BIND("nullable=true");
+  void *user_data BIND("kind=context");
+  mln_probe_release release_user_data;
+} mln_tally BIND("kind=callback_registration;release=release_user_data");
+typedef struct mln_hooks { mln_ping ping; mln_hold hold; mln_tally tally; } mln_hooks;
+mln_status mln_map_set_hooks(mln_map map, const mln_hooks *hooks, mln_diagnostic *out_diagnostic);
+""",
+            # The runtime's array helpers take a size_t length.
+            groups=("standard_types",),
+        )
+        values = Values(api)
+        plans = [values.record(name) for name in ("mln_ping", "mln_hold", "mln_tally")]
+        declarations = "\n".join(values.declaration(plan) for plan in plans)
+        methods = "\n".join(
+            values.callback_methods(plan) + values.encoder(plan) for plan in plans
+        )
+        self.run_dotnet_probe(
+            api,
+            """
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using Maplibre.NativeFfi;
+using Maplibre.NativeFfi.Error;
+using Maplibre.NativeFfi.Internal.C;
+using Maplibre.NativeFfi.Internal.Callback;
+using Maplibre.NativeFfi.Internal.Memory;
+namespace Maplibre.NativeFfi.Internal.Callback {
+  static class NativeCallbackFailure { internal static void Report(string callback, Exception error) { } }
+}
 """
+            + declarations
+            + "\nunsafe class Probe {\n"
+            + methods
+            + """
+  static int releases;
+  static nint released;
+  [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+  static void Call(void* context) { }
+  [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+  static void Release(void* context) { releases++; released = (nint)context; }
+  static NativePointer Address(nint address) => NativePointer.FromBorrowedAddress(address);
+  static void Check(bool test) { if (!test) throw new Exception("native registration contract failed"); }
+  static void Main() {
+    var call = (nint)(delegate* unmanaged[Cdecl]<void*, void>)&Call;
+    var release = (nint)(delegate* unmanaged[Cdecl]<void*, void>)&Release;
+    // An accepted call copies every address unchanged, and native code owns the context.
+    var ping = Ping.Native(Address(call), Address(7), Address(release));
+    var copy = ping;
+    using (var scope = new NativeCallScope()) {
+      var native = NativePing(ping, scope);
+      Check((nint)native.callback == call && (nint)native.user_data == 7 && (nint)native.release_user_data == release);
+      scope.Accept();
+    }
+    Check(releases == 0);
+    // A copy shares the claim, so a second call fails before it encodes anything.
+    try {
+      using var scope = new NativeCallScope();
+      NativePing(copy, scope);
+      Check(false);
+    } catch (MaplibreException error) {
+      Check(error.Status == Status.InvalidState);
+    }
+    Check(releases == 0);
+    // The binding releases the context of a call that native code does not accept.
+    var hold = Hold.Native(Address(call), Address(release), Address(9), Address(release));
+    using (var scope = new NativeCallScope()) {
+      var native = NativeHold(hold, scope);
+      Check((nint)native.@lock == call && (nint)native.unlock == release && (nint)native.user_data == 9);
+    }
+    Check(releases == 1 && released == 9);
+    // A registration whose callback takes an argument keeps only its delegate form.
+    Check(typeof(Tally).GetMethod("Native") is null);
+  }
+}
+""",
+        )
+
+    def run_dotnet_probe(self, api, program: str) -> None:
+        """Compiles `program` with the generated raw types and the runtime that
+        generated values call, and runs it."""
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "Probe.csproj").write_text("""
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup>
+<TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType>
+<AllowUnsafeBlocks>true</AllowUnsafeBlocks><ImplicitUsings>enable</ImplicitUsings>
+<Nullable>enable</Nullable>
+</PropertyGroup></Project>
+""")
+            source = ROOT / "bindings/dotnet/src/Maplibre.NativeFfi"
+            for path in (
+                "Internal/Memory/NativeCallScope.cs",
+                "Internal/Callback/NativeCallbackRoot.cs",
+                "Internal/Callback/NativeRegistration.cs",
+                "Internal/ValueArray.cs",
+                "Internal/Struct/NativeValues.cs",
+                # The probe compiles the generated raw types, and declares the
+                # diagnostic and handle interface that the runtime supplies.
+                "Internal/C/NativeMethods.cs",
+                "Error/MaplibreException.cs",
+                "NativePointer.cs",
+            ):
+                (root / Path(path).name).write_text((source / path).read_text())
+            (root / "NativeTypes.g.cs").write_text(
+                dotnet_native.generate(compile_api(api))["Internal/C/NativeTypes.g.cs"]
             )
+            status = next(
+                source
+                for path, source in dotnet.emit(api).files.items()
+                if path.endswith("/Status.g.cs")
+            )
+            (root / "Status.g.cs").write_text(status)
+            (root / "Program.cs").write_text(program)
             # The repository's global.json selects the SDK.
             require_tool(self, "dotnet", ROOT / "bindings/dotnet").run(
                 self,

@@ -4103,11 +4103,31 @@ func copyQueriedFeature(raw C.mln_queried_feature) QueriedFeature {
 type QueueLock struct {
 	Lock   func()
 	Unlock func()
+	native *bindingNativeRegistration
+}
+
+// NewNativeQueueLock returns a QueueLock from C values that native code in the
+// host supplies: lock, unlock, userData, and releaseUserData are the members of
+// mln_queue_lock, which the binding copies unchanged. The first call that
+// carries the QueueLock consumes it. Native code releases userData if it
+// accepts the call, and otherwise the binding calls releaseUserData. A later
+// call returns StatusInvalidState.
+func NewNativeQueueLock(lock, unlock, userData, releaseUserData uintptr) QueueLock {
+	return QueueLock{native: bindingNewNativeRegistration(userData, releaseUserData, lock, unlock)}
 }
 
 func nativeQueueLock(input QueueLock, arena *bindingArena) C.mln_queue_lock {
 	raw := C.mln_queue_lock{}
-	if input.Lock != nil || input.Unlock != nil {
+	if input.native != nil {
+		registration := arena.native(input.native)
+		if input.Lock != nil || input.Unlock != nil {
+			arena.fail("QueueLock carries both a native registration and a func")
+		}
+		raw.lock = C.mln_queue_lock_callback(C.binding_address(C.uintptr_t(registration.callbacks[0])))
+		raw.unlock = C.mln_queue_lock_callback(C.binding_address(C.uintptr_t(registration.callbacks[1])))
+		raw.user_data = C.binding_address(C.uintptr_t(registration.userData))
+		raw.release_user_data = C.mln_user_data_release(C.binding_address(C.uintptr_t(registration.release)))
+	} else if input.Lock != nil || input.Unlock != nil {
 		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Lock != nil {
@@ -5722,11 +5742,32 @@ func copyVulkanTextureFrame(raw C.mln_vulkan_texture_frame) VulkanTextureFrame {
 //
 // See mln_wake in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html
-type Wake struct{ Callback func() }
+type Wake struct {
+	Callback func()
+	native   *bindingNativeRegistration
+}
+
+// NewNativeWake returns a Wake from C values that native code in the host
+// supplies: callback, userData, and releaseUserData are the members of
+// mln_wake, which the binding copies unchanged. The first call that carries the
+// Wake consumes it. Native code releases userData if it accepts the call, and
+// otherwise the binding calls releaseUserData. A later call returns
+// StatusInvalidState.
+func NewNativeWake(callback, userData, releaseUserData uintptr) Wake {
+	return Wake{native: bindingNewNativeRegistration(userData, releaseUserData, callback)}
+}
 
 func nativeWake(input Wake, arena *bindingArena) C.mln_wake {
 	raw := C.mln_wake{}
-	if input.Callback != nil {
+	if input.native != nil {
+		registration := arena.native(input.native)
+		if input.Callback != nil {
+			arena.fail("Wake carries both a native registration and a func")
+		}
+		raw.callback = C.mln_wake_callback(C.binding_address(C.uintptr_t(registration.callbacks[0])))
+		raw.user_data = C.binding_address(C.uintptr_t(registration.userData))
+		raw.release_user_data = C.mln_user_data_release(C.binding_address(C.uintptr_t(registration.release)))
+	} else if input.Callback != nil {
 		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {

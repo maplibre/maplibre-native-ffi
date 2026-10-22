@@ -6,6 +6,7 @@ library;
 
 import 'dart:typed_data';
 
+import 'internal/callback/native_registration.dart';
 import 'render/native_pointer.dart';
 import 'runtime/runtime.dart';
 

@@ -249,6 +249,7 @@
     "bindings/kotlin/src/jvmMain/kotlin/org/maplibre/nativeffi/internal/c/UpcallStubs.kt",
     "bindings/kotlin/src/nativeMain/kotlin/org/maplibre/nativeffi/internal/c/C.kt",
     "bindings/kotlin/src/nativeMain/kotlin/org/maplibre/nativeffi/internal/c/UpcallStubs.kt",
+    "bindings/kotlin/src/threadedMain/kotlin/org/maplibre/nativeffi/generated/GeneratedNativeRegistrations.kt",
     "bindings/kotlin/src/threadedMain/kotlin/org/maplibre/nativeffi/generated/GeneratedThreadedCallbacks.kt",
     "bindings/kotlin/src/threadedMain/kotlin/org/maplibre/nativeffi/internal/c/ThreadedUpcalls.kt",
     "bindings/kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/generated/GeneratedWasmCallbacks.kt",

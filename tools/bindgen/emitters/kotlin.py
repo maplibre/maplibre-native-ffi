@@ -4,7 +4,8 @@ The common source set holds every generated value, codec, owner, and operation
 that behaves the same on every target. A split callback registration has a form
 per target instead (see kotlin_callbacks): the threadedMain source set holds the
 forms that answer native on a MapLibre thread, with their scoped responses, and
-wasmJsMain holds the forms that the page serves. Each declares the operations
+wasmJsMain holds the forms that the page serves. The threadedMain source set
+also holds the factories of native registrations. Each declares the operations
 that take its forms as extensions. The JVM, Kotlin/Native, Android, and wasm
 source sets also hold the declarations of the C functions and upcall stubs that
 the shared code uses (see kotlin_native).
@@ -46,6 +47,12 @@ PLATFORMS = {
     "androidMain": "android",
     "wasmJsMain": "wasm",
 }
+# The factories of the native registrations, which only the threaded targets
+# can pass (see kotlin_callbacks).
+NATIVE_REGISTRATIONS = (
+    "src/threadedMain/kotlin/org/maplibre/nativeffi/generated/"
+    "GeneratedNativeRegistrations.kt"
+)
 JNI = "src/androidMain/jni/mln_jni_generated.c"
 WASM_GLUE = "wasm/mln_kw_generated.c"
 WASM_EXPORTS = "wasm/mln_kw_exports.txt"
@@ -277,6 +284,14 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
     )
     outputs[f"{COMMON}/generated/GeneratedCodecs.kt"] = values.codecs()
     outputs[f"{COMMON}/generated/GeneratedValues.kt"] = values.common()
+    outputs[NATIVE_REGISTRATIONS] = (
+        "// Generated from the C headers by tools/bindgen. Do not edit.\n"
+        "package org.maplibre.nativeffi.generated\n\n"
+        "import org.maplibre.nativeffi.internal.callback.NativeRegistration\n"
+        "import org.maplibre.nativeffi.render.NativePointer\n\n"
+        + "\n\n".join(kotlin_callbacks.native_factories(values))
+        + "\n"
+    )
     outputs[f"{COMMON}/internal/c/Upcalls.kt"] = kotlin_callbacks.upcalls(values)
     shims = NativeShims(
         bound,

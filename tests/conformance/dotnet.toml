@@ -29,6 +29,7 @@
 "CB-09" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CallbackLifetimeTests.cs::ACameraEndHandlerIsRootedUntilItRuns"
 "CB-10" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs::RoutesDecideWhichRequestsReachTheProvider"
 "CB-11" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceTransformTests.cs::ATransformRequestIsAnsweredFromAnotherThreadAfterItsCallback"
+"CB-12" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/NativeRegistrationTests.cs::NativeWakesFireAndNativeCodeReleasesTheirContexts"
 "VAL-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/GeneratedValueTests.cs::HostStringsUseViewsAndNativeLentStringsDecode"
 "VAL-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/GeneratedValueTests.cs::PresenceFieldsSendOnlyTheValuesTheCallerSet"
 "VAL-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RuntimeEventTests.cs::UnknownEventDomainsKeepRawValuesAndCopyThePayloadWindow"

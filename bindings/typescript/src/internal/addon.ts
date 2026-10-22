@@ -31,6 +31,11 @@ export interface Addon extends NativeOperations {
     receive: (kind: number, ...values: unknown[]) => void,
     register: (value: unknown) => number,
     makeError: (status: number, diagnostic: string) => Error,
+    takeNative: (
+      value: unknown,
+      kind: string,
+      path: string,
+    ) => readonly bigint[] | undefined,
   ): void;
   abiDigest(): string;
   setReferenced(referenced: boolean): void;

@@ -6,7 +6,9 @@
 // realm's delivery queue and a token, which the realm drains on its event loop
 // and dispatches in TypeScript. The wake shim in realm.c is the one path from a
 // native thread to a realm: the queue's wake and each wake registration post a
-// token to the realm's threadsafe function. The runtime also keeps the owner
+// token to the realm's threadsafe function. A native registration instead
+// carries function pointers from native code in the host, which the runtime
+// copies into the C descriptor unchanged. The runtime also keeps the owner
 // tokens that finalizers dispose through, and the realm's teardown.
 
 #ifndef MAPLIBRE_NATIVE_FFI_NODE_RUNTIME_H
@@ -111,6 +113,8 @@ bool mln_ts_reject_later(
 // JavaScript to C. Each reads one value and throws a TypeError or a RangeError
 // that names `path` when the value has the wrong shape.
 bool mln_ts_is_absent(mln_ts_call* call, napi_value value);
+/** Whether a value is an object, as a native registration is. */
+bool mln_ts_is_object(mln_ts_call* call, napi_value value);
 bool mln_ts_member(
   mln_ts_call* call, napi_value object, const char* key, napi_value* out
 );
@@ -184,6 +188,17 @@ bool mln_ts_read_registration(
  */
 bool mln_ts_read_wake(
   mln_ts_call* call, napi_value value, void** out_user_data, const char* path
+);
+/**
+ * Takes a native registration of kind, which the realm's TypeScript half
+ * consumes, into out: the function pointer of each of its callbacks, then its
+ * context and its release. Throws the invalid-state error for a registration
+ * that an earlier call consumed. The call releases the context unless native
+ * code accepts it.
+ */
+bool mln_ts_read_native_registration(
+  mln_ts_call* call, napi_value value, const char* kind, size_t callbacks,
+  uint64_t* out, const char* path
 );
 /** Posts the wake's token to its realm. */
 void mln_ts_wake(void* user_data);

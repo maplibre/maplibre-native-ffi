@@ -29,6 +29,7 @@
 "CB-09" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_camera_end_handler_inside_a_command_is_rooted_until_it_runs"
 "CB-10" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_provider_receives_only_the_requests_its_routes_match"
 "CB-11" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_transform_hands_its_request_to_another_thread_and_answers_later"
+"CB-12" = { na = "The binding's callbacks enter no language runtime, so a callback can call a native function directly at no extra cost" }
 "VAL-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::host_strings_use_views_and_native_lent_strings_decode"
 "VAL-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::presence_fields_keep_a_present_zero_apart_from_an_absent_value"
 "VAL-03" = "bindings/rust/crates/maplibre-native-ffi/src/convert.rs::a_strided_batch_and_an_unknown_union_arm_decode_without_losing_data"

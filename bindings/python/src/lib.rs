@@ -552,6 +552,7 @@ fn native_error(diagnostic: impl Into<String>) -> PyErr {
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     maplibre_core::validate_abi_version().map_err(map_error)?;
+    module.add_class::<GeneratedNativeRegistration>()?;
     register_generated_functions(module)?;
     Ok(())
 }

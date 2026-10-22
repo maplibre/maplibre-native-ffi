@@ -29,6 +29,7 @@
 "CB-09" = "bindings/python/tests/test_callbacks.py::test_a_camera_end_handler_is_rooted_until_it_runs"
 "CB-10" = "bindings/python/tests/test_callbacks.py::test_a_providers_routes_decide_which_requests_reach_it"
 "CB-11" = "bindings/python/tests/test_callbacks.py::test_a_transform_request_is_answered_from_another_thread_after_its_callback"
+"CB-12" = "bindings/python/tests/test_render.py::test_a_native_wake_reaches_native_and_the_first_call_consumes_it"
 "VAL-01" = "bindings/python/tests/test_values.py::test_host_strings_use_views_and_native_lent_strings_decode"
 "VAL-02" = "bindings/python/tests/test_values.py::test_absent_fields_stay_distinct_from_present_values"
 "VAL-03" = "bindings/python/tests/test_values.py::test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native"

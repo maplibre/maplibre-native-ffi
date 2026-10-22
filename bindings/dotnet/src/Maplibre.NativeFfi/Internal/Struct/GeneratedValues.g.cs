@@ -1636,7 +1636,21 @@ internal static unsafe class GeneratedValues
     internal static mln_queue_lock NativeQueueLock(QueueLock value, NativeCallScope scope)
     {
         var native = new mln_queue_lock();
-        if (value.Lock is not null || value.Unlock is not null)
+        if (value.NativeRegistration is { } registration)
+        {
+            scope.Consume(registration);
+            if (value.Lock is not null || value.Unlock is not null)
+                throw new ArgumentException(
+                    "A native registration carries no delegates.",
+                    nameof(value)
+                );
+            native.@lock = (delegate* unmanaged[Cdecl]<void*, void>)registration.Function(0);
+            native.unlock = (delegate* unmanaged[Cdecl]<void*, void>)registration.Function(1);
+            native.user_data = registration.UserData;
+            native.release_user_data = (delegate* unmanaged[Cdecl]<void*, void>)
+                registration.ReleaseUserData;
+        }
+        else if (value.Lock is not null || value.Unlock is not null)
         {
             native.user_data = scope.Register(value with { });
             native.release_user_data = &NativeCallbackRoot.Release;
@@ -2704,7 +2718,20 @@ internal static unsafe class GeneratedValues
     internal static mln_wake NativeWake(Wake value, NativeCallScope scope)
     {
         var native = new mln_wake();
-        if (value.Callback is not null)
+        if (value.NativeRegistration is { } registration)
+        {
+            scope.Consume(registration);
+            if (value.Callback is not null)
+                throw new ArgumentException(
+                    "A native registration carries no delegates.",
+                    nameof(value)
+                );
+            native.callback = (delegate* unmanaged[Cdecl]<void*, void>)registration.Function(0);
+            native.user_data = registration.UserData;
+            native.release_user_data = (delegate* unmanaged[Cdecl]<void*, void>)
+                registration.ReleaseUserData;
+        }
+        else if (value.Callback is not null)
         {
             native.user_data = scope.Register(value with { });
             native.release_user_data = &NativeCallbackRoot.Release;

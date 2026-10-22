@@ -1,5 +1,6 @@
-// Graphics objects from tests/graphics, through the test graphics addon, and
-// the render sessions that the suite attaches with them.
+// Graphics objects from tests/graphics, through the test graphics addon, the
+// render sessions that the suite attaches with them, and the native code that
+// fills a native registration.
 
 import {
   AwaitableWake,
@@ -18,7 +19,13 @@ import {
   type RenderSessionHandle,
   supportedRenderBackendMask,
 } from "../../src/index.ts";
-import { bounded, nextWake, teardown, turn } from "./harness.ts";
+import {
+  bounded,
+  callbackArrival,
+  nextWake,
+  teardown,
+  turn,
+} from "./harness.ts";
 import { capabilities } from "./host-capabilities.ts";
 
 interface GraphicsContext {
@@ -37,10 +44,19 @@ interface GraphicsContext {
   readonly vulkanGetDeviceProcAddr: bigint;
 }
 
+interface ProbeAddresses {
+  readonly wake: bigint;
+  readonly lock: bigint;
+  readonly unlock: bigint;
+  readonly release: bigint;
+  readonly userData: bigint;
+}
+
 interface GraphicsAddon {
   create(backend: number): GraphicsContext;
   makeCurrent(graphics: bigint): boolean;
   destroy(graphics: bigint): void;
+  nativeProbe(listener: (event: string) => void): ProbeAddresses;
 }
 
 const addon = capabilities.testGraphics() as GraphicsAddon;
@@ -147,6 +163,67 @@ function attachOwnedTexture(
     },
     options,
   );
+}
+
+/**
+ * Attaches an owned texture that a core worker drives, with `options` in place
+ * of the defaults, and releases the session in a teardown.
+ */
+export function attachSession(
+  map: MapHandle,
+  options: RenderSessionAttachOptions,
+): RenderSessionAttachment {
+  const attachment = attachOwnedTexture(openGraphics(), map, {
+    driver: RenderDriverKind.coreWorker,
+    requestedTextureRingDepth: 1,
+    ...options,
+  });
+  teardown(() => releaseSession(attachment.session));
+  return attachment;
+}
+
+/**
+ * Native code that a host brings, from the test graphics addon: the function
+ * pointers and the context of a native registration. Each call that native
+ * code makes through them reaches this realm's event loop as an event.
+ */
+export class NativeProbe implements ProbeAddresses {
+  readonly wake: bigint;
+  readonly lock: bigint;
+  readonly unlock: bigint;
+  readonly release: bigint;
+  readonly userData: bigint;
+  /** The names of the calls that have arrived, in order. */
+  readonly events: string[] = [];
+  readonly #waiters = new Set<{ event: string; resolve: () => void }>();
+
+  constructor() {
+    const addresses = addon.nativeProbe((event) => {
+      this.events.push(event);
+      for (const waiter of this.#waiters) {
+        if (waiter.event === event) {
+          this.#waiters.delete(waiter);
+          waiter.resolve();
+        }
+      }
+    });
+    this.wake = addresses.wake;
+    this.lock = addresses.lock;
+    this.unlock = addresses.unlock;
+    this.release = addresses.release;
+    this.userData = addresses.userData;
+  }
+
+  /** Resolves once native code has made a call named `event`. */
+  arrival(event: string): Promise<void> {
+    if (this.events.includes(event)) {
+      return Promise.resolve();
+    }
+    return callbackArrival(
+      new Promise<void>((resolve) => this.#waiters.add({ event, resolve })),
+      `the native ${event}`,
+    );
+  }
 }
 
 /**

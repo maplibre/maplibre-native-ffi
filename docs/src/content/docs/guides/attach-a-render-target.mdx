@@ -29,7 +29,12 @@ texture target and a transferred `OffscreenCanvas` use a core worker.
 ### Shared Vulkan queues
 
 Pass a queue lock when the host and the session submit to the same Vulkan queue.
-The [target reference](/maplibre-native-ffi/reference/c/render__target_8h.html)
+When the host's lock is native code, pass its lock and unlock functions as a
+native registration, so that the session calls them without entering the
+binding's language runtime. Dart and TypeScript accept only that form. Rust,
+Swift, and Zig have none, because their callbacks can call a native lock
+directly. The
+[target reference](/maplibre-native-ffi/reference/c/render__target_8h.html)
 states the rules for contexts and queue locks.
 
 ## Attach the target

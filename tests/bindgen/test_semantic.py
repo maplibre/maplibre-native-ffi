@@ -710,8 +710,8 @@ mln_status attach(const settings *options, mln_diagnostic *out_diagnostic);
         model = bind(api, require_complete=True)
         self.assertTrue(model.callbacks["gate"].synchronous)
         self.assertFalse(model.callbacks["notify"].synchronous)
-        # Dart keeps the synchronous registration at its disabled default and
-        # still lowers the call.
+        # Dart takes the synchronous registration only as a native
+        # registration, so it still lowers the call.
         self.assertIn("attach", dart.coverage(api)["generated"])
         for before, after, error in (
             (

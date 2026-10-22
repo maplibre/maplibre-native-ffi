@@ -425,16 +425,7 @@ def render_deliveries(bound, values: Values) -> str:
 
 
 def value_imports(values: Values, text: str) -> str:
-    names = sorted(
-        {
-            public_name(native)
-            for native, value in values.used.items()
-            if not (
-                value.registration
-                and registration(values.bound, value).form == "disabled"
-            )
-        }
-    )
+    names = sorted({public_name(native) for native in values.used})
     used = [name for name in names if re.search(rf"\b{name}\b", text)]
     if not used:
         return ""

@@ -8,7 +8,7 @@ from dataclasses import replace
 from keyword import iskeyword
 from textwrap import dedent
 
-from tools.bindgen import docs
+from tools.bindgen import async_hosts, docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters.rust import (
     RUST_KEYWORDS,
@@ -878,6 +878,14 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         )
     )
     files["python/maplibre_native_ffi/_native.pyi"] += "\n".join(stubs.get("", []))
+    if any(
+        value.registration and async_hosts.accepts_native(bound, value)
+        for value in values.records.values()
+    ):
+        files["python/maplibre_native_ffi/_native.pyi"] += (
+            "\nclass _NativeRegistration:\n"
+            "    def __init__(self, kind: str, callbacks: tuple[int, ...], user_data: int, release: int) -> None: ...\n"
+        )
     files["python/maplibre_native_ffi/_native.pyi"] += "\n" + "\n".join(
         f"def {name}() -> Any: ..." for name in default_names
     )

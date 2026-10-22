@@ -3095,6 +3095,45 @@ class QueueLock:
         assert callback is not None
         return callback()
 
+    @classmethod
+    def native(
+        cls, lock: int, unlock: int, user_data: int = 0, release_user_data: int = 0
+    ) -> NativeQueueLock:
+        """A native registration, whose function pointers, context, and release
+        the host's native code supplies as addresses. Zero is null. The
+        binding copies each address unchanged, and native code validates
+        them.
+        """
+        from . import _native
+
+        return NativeQueueLock._from_registration(
+            _native._NativeRegistration(
+                "mln_queue_lock", (lock, unlock), user_data, release_user_data
+            )
+        )
+
+
+class NativeQueueLock:
+    """A native `QueueLock` from `QueueLock.native`, accepted wherever a
+    `QueueLock` is.
+
+    The first call that carries it consumes it. Native code releases the
+    context of a call that it accepts, and the binding releases the context
+    of a call that native code does not accept. A second call raises an
+    invalid-state error.
+    """
+
+    __slots__ = ("_registration",)
+
+    def __init__(self):
+        raise TypeError("native registrations come from QueueLock.native")
+
+    @classmethod
+    def _from_registration(cls, registration):
+        value = cls.__new__(cls)
+        value._registration = registration
+        return value
+
 
 @dataclass(frozen=True, slots=True)
 class RenderAbandonResult:
@@ -3234,19 +3273,19 @@ class RenderSessionAttachOptions:
     request.
     """
 
-    frame_wake: Wake = field(
+    frame_wake: Wake | NativeWake = field(
         default_factory=lambda: RenderSessionAttachOptions.default().frame_wake
     )
     """Wakes the receiver when the frame-result queue becomes nonempty."""
 
-    driver_work_wake: Wake = field(
+    driver_work_wake: Wake | NativeWake = field(
         default_factory=lambda: RenderSessionAttachOptions.default().driver_work_wake
     )
     """Wakes the graphics receiver when caller-driver work is available,
     including work that a finished driver result releases.
     """
 
-    queue_lock: QueueLock = field(
+    queue_lock: QueueLock | NativeQueueLock = field(
         default_factory=lambda: RenderSessionAttachOptions.default().queue_lock
     )
     """Host lock on the graphics queue, disabled by default. Only Vulkan targets
@@ -4672,6 +4711,44 @@ class Wake:
         callback = self.callback
         assert callback is not None
         return callback()
+
+    @classmethod
+    def native(
+        cls, callback: int, user_data: int = 0, release_user_data: int = 0
+    ) -> NativeWake:
+        """A native registration, whose function pointers, context, and release
+        the host's native code supplies as addresses. Zero is null. The
+        binding copies each address unchanged, and native code validates
+        them.
+        """
+        from . import _native
+
+        return NativeWake._from_registration(
+            _native._NativeRegistration(
+                "mln_wake", (callback,), user_data, release_user_data
+            )
+        )
+
+
+class NativeWake:
+    """A native `Wake` from `Wake.native`, accepted wherever a `Wake` is.
+
+    The first call that carries it consumes it. Native code releases the
+    context of a call that it accepts, and the binding releases the context
+    of a call that native code does not accept. A second call raises an
+    invalid-state error.
+    """
+
+    __slots__ = ("_registration",)
+
+    def __init__(self):
+        raise TypeError("native registrations come from Wake.native")
+
+    @classmethod
+    def _from_registration(cls, registration):
+        value = cls.__new__(cls)
+        value._registration = registration
+        return value
 
 
 @dataclass(frozen=True, slots=True)

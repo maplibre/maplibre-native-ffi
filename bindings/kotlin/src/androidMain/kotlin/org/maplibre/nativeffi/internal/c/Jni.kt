@@ -36,4 +36,7 @@ internal object Jni {
 
   /** Calls `mln_android_init` with this thread's JNIEnv and [context]. */
   @JvmStatic external fun androidInit(context: Any, diagnostic: Long): Int
+
+  /** Calls [release], an `mln_user_data_release` function pointer, with [userData]. */
+  @JvmStatic external fun callUserDataRelease(release: Long, userData: Long)
 }

@@ -7,7 +7,7 @@ import re
 from dataclasses import replace
 from typing import NoReturn
 
-from .. import docs
+from .. import async_hosts, docs
 from ..model import ModelError
 from ..semantic import BoundApi, ValuePlan, enum_member_prefix
 
@@ -63,6 +63,11 @@ def field_name(name: str) -> str:
 
 def public_name(native: str) -> str:
     return "".join(x.capitalize() for x in native.removeprefix("mln_").split("_"))
+
+
+def native_name(plan: ValuePlan) -> str:
+    """The class of a registration's native form."""
+    return "Native" + public_name(plan.native)
 
 
 def rust_field(name: str) -> str:
@@ -166,6 +171,8 @@ class Values:
             )
         elif plan.kind in {"record", "enum"}:
             result = public_name(plan.native) + ("Scope" if plan.response else "")
+            if plan.registration and async_hosts.accepts_native(self.api, plan):
+                result += " | " + native_name(plan)
         elif plan.kind == "native_pointer":
             result = "int"
         elif plan.kind == "union":

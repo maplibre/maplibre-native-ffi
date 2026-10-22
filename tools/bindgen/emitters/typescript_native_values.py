@@ -10,7 +10,9 @@ the binding owns: the JavaScript type, the integer range, and NUL termination.
 
 A registration that a delivery queue carries names the realm's queue and a
 token in place of its callbacks; a wake posts its token to the realm through
-the addon's wake shim.
+the addon's wake shim. A native registration, which a wake takes as an object
+in place of its function, fills the descriptor with the function pointers,
+context, and release of native code in the host.
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from .typescript_values import (
     Values,
     identifier,
     is_counted,
+    public_name,
     union_kinds,
 )
 
@@ -106,13 +109,25 @@ class NativeValues:
         if value.kind == "record" and value.registration:
             entry = self.values.registration(value)
             plan = value.registration
+            if entry.form == "native":
+                return self.read_native(value, entry, js, target, path, fail)
             if entry.form == "wake":
                 field = entry.callbacks[0]
-                return [
+                lines = [
                     f"if (!mln_ts_read_wake(call, {js}, (void**)&{target}.{plan.user_data}, {path})) {fail};",
                     f"if ({target}.{plan.user_data} != NULL) {{",
                     f"  {target}.{field.name} = mln_ts_wake;",
                     f"  {target}.{plan.release} = mln_ts_wake_release;",
+                    "}",
+                ]
+                if not entry.native:
+                    return lines
+                native = self.read_native(value, entry, js, target, path, fail)
+                return [
+                    f"if (mln_ts_is_object(call, {js})) {{",
+                    *(f"  {line}" for line in native),
+                    "} else {",
+                    *(f"  {line}" for line in lines),
                     "}",
                 ]
             if entry.form == "queue" and entry.function:
@@ -126,6 +141,26 @@ class NativeValues:
                 f"if (!{self.writer(value)}(call, {js}, &{target}, {path})) {fail};",
             ]
         raise Unsupported(f"{value.native}: no C reader")
+
+    def read_native(
+        self, value: ValuePlan, entry, js: str, target: str, path: str, fail: str
+    ) -> list[str]:
+        """Statements that take a native registration into the descriptor
+        `target`: its callbacks, then its context and its release."""
+        if not entry.native:
+            raise Unsupported(f"{value.native}: no native registration")
+        kind = c_string(public_name(value.native))
+        count = len(entry.native)
+        return [
+            "{",
+            f"  uint64_t fields[{count}];",
+            f"  if (!mln_ts_read_native_registration(call, {js}, {kind}, {count - 2}, fields, {path})) {fail};",
+            *(
+                f"  {target}.{field.name} = ({field.value.ctype.spelling})(uintptr_t)fields[{index}];"
+                for index, field in enumerate(entry.native)
+            ),
+            "}",
+        ]
 
     def list_writer(self, element: ValuePlan) -> str:
         """Reads a JavaScript array into C storage that lives for the call."""

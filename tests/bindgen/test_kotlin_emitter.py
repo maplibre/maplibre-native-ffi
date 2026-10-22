@@ -191,6 +191,34 @@ class KotlinLayoutTests(unittest.TestCase):
                     callback = values.bound.callbacks[site.callback]
                     self.assertIsNotNone(callback.delivery)
 
+    def test_native_registrations_mirror_their_c_records(self):
+        _functions, _unsupported, _bodies, _split, values, _native = kotlin.lowered(
+            real_api()
+        )
+        values.codecs()
+        # A wake and the queue lock, whose callback native code waits for, take
+        # the host's native functions; each parameter names the field it fills.
+        self.assertEqual(
+            {
+                value.native: kotlin_callbacks.native_factory(value, values).parameters
+                for value in values.used.values()
+                if kotlin_callbacks.accepts_native(value, values)
+            },
+            {
+                "mln_wake": (
+                    ("callback", "callback"),
+                    ("userData", "user_data"),
+                    ("releaseUserData", "release_user_data"),
+                ),
+                "mln_queue_lock": (
+                    ("lock", "lock"),
+                    ("unlock", "unlock"),
+                    ("userData", "user_data"),
+                    ("releaseUserData", "release_user_data"),
+                ),
+            },
+        )
+
     def test_failed_jni_upcall_releases_owned_arguments(self):
         java = Path(require_tool(self, "java", ROOT / "bindings/kotlin").executable)
         home = java.resolve().parents[1]

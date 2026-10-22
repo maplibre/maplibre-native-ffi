@@ -33,6 +33,13 @@ internal object Ffm {
     linker.downcallHandle(symbols.findOrThrow(name), descriptor(result, arguments))
 
   /**
+   * The downcall for a C function pointer that the caller passes as a leading [MemorySegment],
+   * returning [result] or void when it is null.
+   */
+  fun downcall(result: MemoryLayout?, vararg arguments: MemoryLayout): MethodHandle =
+    linker.downcallHandle(descriptor(result, arguments))
+
+  /**
    * An upcall stub that calls the static method [name] of [owner], `Upcalls` or `ThreadedUpcalls`,
    * and lives for the process.
    *

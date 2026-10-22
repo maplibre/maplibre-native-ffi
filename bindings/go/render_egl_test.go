@@ -7,6 +7,8 @@ import "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/testsupport
 const (
 	buildBackend    = RenderBackendFlagOpengl
 	graphicsBackend = testsupport.BackendEGL
+	// Only Vulkan sessions take a queue lock.
+	queueLockSupported = false
 )
 
 // A shared EGL context takes the caller driver, which runs on the thread the

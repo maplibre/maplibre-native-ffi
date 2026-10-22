@@ -379,7 +379,13 @@ class Values:
                     f"func (response *{typename}Scope) target() bindingTarget {{ if response == nil {{ return bindingScoped(nil) }}; return bindingScoped(response.scope) }}"
                 )
                 continue
-            from .go_callbacks import plain, registration_input, signature
+            from .go_callbacks import (
+                accepts_native,
+                native_constructor,
+                plain,
+                registration_input,
+                signature,
+            )
 
             visible = plain(value) if value.registration else value
             members = list(self.members(visible))
@@ -401,6 +407,8 @@ class Values:
                         doc(self.api, f"{native}.{member}", None)
                         + f"{name(member)} {signature(self, callback)}"
                     )
+                if accepts_native(self, value):
+                    fields.append("native *bindingNativeRegistration")
             body = (
                 "\n" + "\n".join(fields) + "\n"
                 if any("//" in field for field in fields)
@@ -409,6 +417,8 @@ class Values:
             chunks.append(
                 doc(self.api, native, typename) + f"type {typename} struct {{{body}}}"
             )
+            if value.registration and accepts_native(self, value):
+                chunks.append(native_constructor(self, value))
             if native not in self.api.values:
                 continue
             if native in self.api.returned:

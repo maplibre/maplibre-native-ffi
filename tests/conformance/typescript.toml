@@ -50,6 +50,7 @@
 # too, and a request that it does not match passes through to the network.
 "CB-10" = "bindings/typescript/test/resource-provider.test.ts::a provider answers the requests its routes match after its callback returns"
 "CB-11" = "bindings/typescript/test/resource-provider.test.ts::a transform answers its request after its callback returns"
+"CB-12" = "bindings/typescript/test/render.test.ts::a native registration reaches native unchanged, a call consumes it, and a refused call releases it"
 "VAL-01" = "bindings/typescript/test/values.test.ts::host strings use views and native-lent strings decode"
 "VAL-02" = "bindings/typescript/test/values.test.ts::presence fields keep a present zero apart from an absent one"
 # The addon's generated C decoders read completions, batches, and unions. The

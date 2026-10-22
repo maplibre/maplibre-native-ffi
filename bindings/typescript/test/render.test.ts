@@ -1,18 +1,28 @@
 // Owned-texture sessions on a core worker and on the JavaScript thread, the
-// scope of a borrowed frame view, and a drain that finds nothing.
+// scope of a borrowed frame view, a drain that finds nothing, and the native
+// registrations that a session's attach options take.
 
 import assert from "node:assert/strict";
 
-import { type MapHandle, MaplibreError, Status } from "../src/index.ts";
+import {
+  type MapHandle,
+  MaplibreError,
+  QueueLock,
+  Status,
+  Wake,
+} from "../src/index.ts";
 import { expectCommitted, openRuntime } from "./support/fixture.ts";
 import {
+  attachSession,
   backend,
   centerPixel,
+  NativeProbe,
   renderExtent,
   renderSize,
+  requestFrame,
   TestSession,
 } from "./support/graphics.ts";
-import { test } from "./support/harness.ts";
+import { bounded, test } from "./support/harness.ts";
 import { backgroundStyle } from "./support/styles.ts";
 
 const red = [255, 0, 0, 255];
@@ -112,4 +122,94 @@ test("a frame view expires with its scope and holds off release inside it", asyn
     (error) =>
       error instanceof MaplibreError && error.status === Status.invalidState,
   );
+});
+
+function failsWith(status: Status) {
+  return (error: unknown) =>
+    error instanceof MaplibreError && error.status === status;
+}
+
+function nativeWake(probe: NativeProbe, callback = probe.wake) {
+  return Wake.native({
+    callback,
+    userData: probe.userData,
+    releaseUserData: probe.release,
+  });
+}
+
+test("a native registration reaches native unchanged, a call consumes it, and a refused call releases it", async () => {
+  const map = await openRenderMap();
+
+  // Native code calls the probe's wake with the probe's context directly.
+  const probe = new NativeProbe();
+  const frameWake = nativeWake(probe);
+  const { session, completed } = attachSession(map, { frameWake });
+  await bounded(completed, "the attachment");
+  requestFrame(session, 1n);
+  await probe.arrival("wake");
+
+  // The attach call consumed the registration, so another call throws before
+  // it reaches native code.
+  assert.throws(
+    () => attachSession(map, { frameWake }),
+    failsWith(Status.invalidState),
+  );
+
+  // Native code releases the context that it accepted once the session ends.
+  await bounded(session.detach(), "the detach");
+  session.close();
+  await probe.arrival("release");
+
+  // Native code refuses a disabled wake that carries a release, so the
+  // binding releases the context.
+  const refused = new NativeProbe();
+  assert.throws(
+    () => attachSession(map, { frameWake: nativeWake(refused, 0n) }),
+    failsWith(Status.invalidArgument),
+  );
+  await refused.arrival("release");
+
+  // A conversion error after the binding took the registration releases it
+  // too.
+  const unconverted = new NativeProbe();
+  assert.throws(
+    () =>
+      attachSession(map, {
+        frameWake: nativeWake(unconverted),
+        driverWorkWake: 1 as unknown as Wake,
+      }),
+    TypeError,
+  );
+  await unconverted.arrival("release");
+  assert.deepEqual(unconverted.events, ["release"]);
+});
+
+test("a native queue lock reaches a session whose target takes one", async () => {
+  const map = await openRenderMap();
+  const probe = new NativeProbe();
+  const queueLock = QueueLock.native({
+    lock: probe.lock,
+    unlock: probe.unlock,
+    userData: probe.userData,
+    releaseUserData: probe.release,
+  });
+  if (backend !== "vulkan") {
+    // Only a Vulkan target takes a queue lock, and the binding releases the
+    // context of the attach that native code refuses.
+    assert.throws(
+      () => attachSession(map, { queueLock }),
+      failsWith(Status.unsupported),
+    );
+    await probe.arrival("release");
+    assert.deepEqual(probe.events, ["release"]);
+    return;
+  }
+  const { session, completed } = attachSession(map, { queueLock });
+  await bounded(completed, "the attachment");
+  requestFrame(session, 1n);
+  await probe.arrival("unlock");
+  await bounded(session.detach(), "the detach");
+  session.close();
+  await probe.arrival("release");
+  assert.equal(probe.events.at(-1), "release");
 });

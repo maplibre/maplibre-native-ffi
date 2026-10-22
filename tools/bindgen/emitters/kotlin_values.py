@@ -353,6 +353,7 @@ class Values:
                 if self.views
                 else []
             ),
+            "import org.maplibre.nativeffi.internal.callback.NativeRegistration",
             "import org.maplibre.nativeffi.render.NativePointer",
             "",
         ]

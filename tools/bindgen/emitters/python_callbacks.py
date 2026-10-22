@@ -1,8 +1,15 @@
-"""Compile callback descriptors and their quiescent Python roots."""
+"""Compile callback descriptors and their quiescent Python roots.
+
+A registration that `async_hosts.accepts_native` admits also takes a native
+registration, whose function pointers and context the host's native code
+supplies. The record's `native` classmethod returns one as a distinct class:
+the record keeps its value semantics, and the native registration is affine.
+"""
 
 from dataclasses import replace
 
-from .python_values import public_name, rust_field, scalar_type
+from .. import async_hosts, docs
+from .python_values import field_name, native_name, public_name, rust_field, scalar_type
 
 
 def plain_fields(plan):
@@ -32,6 +39,14 @@ def ffi_type(value):
 def validate(values, plan):
     descriptor = plan.registration
     plain = plain_fields(plan)
+    if async_hosts.accepts_native(values.api, plan):
+        # A native registration carries only the C registration's own fields.
+        if any(f.public for f in plain.fields):
+            values.fail(plan, "a native registration has no place for other fields")
+        if {"cls", "native"} & set(descriptor.callbacks):
+            values.fail(plan, "a callback field collides with the native classmethod")
+        if any(public_name(n) == native_name(plan) for n in values.api.public_values):
+            values.fail(plan, "the native registration class collides with a record")
     for field in plain.fields:
         if field.public:
             values.supported(field.value, input=True)
@@ -51,9 +66,26 @@ def validate(values, plan):
             values.supported(callback.result, input=True)
 
 
+def native_input_lines(plan):
+    """Copies a native registration's addresses unchanged into the C record."""
+    descriptor = plan.registration
+    lines = [
+        f'if let Some(native) = storage.native_registration(value, "{plan.native}")? {{',
+        f"raw.{rust_field(descriptor.user_data)} = native.user_data as _;",
+        f"raw.{rust_field(descriptor.release)} = unsafe {{ std::mem::transmute::<usize, _>(native.release) }};",
+    ]
+    lines += [
+        f"raw.{rust_field(name)} = unsafe {{ std::mem::transmute::<usize, _>(native.callbacks[{index}]) }};"
+        for index, name in enumerate(descriptor.callbacks)
+    ]
+    return [*lines, "return Ok(raw);", "}"]
+
+
 def input_source(plan, values):
     descriptor = plan.registration
     lines = values.input_lines(plain_fields(plan))
+    if async_hosts.accepts_native(values.api, plan):
+        lines += native_input_lines(plan)
     for name in descriptor.callbacks:
         lines.append(f'let {name}_enabled = !value.getattr("{name}")?.is_none();')
     lines.append(
@@ -218,6 +250,10 @@ def sources(values, plan):
     outcome
 }}
 """)
+    native_class = ""
+    if async_hosts.accepts_native(values.api, plan):
+        native_method, native_class = native_sources(plan)
+        methods.append(native_method)
     record_rust, record_python = values.record_sources(
         plain_fields(plan),
         extra_fields=fields,
@@ -228,5 +264,62 @@ def sources(values, plan):
         registration=True,
     )
     rust.append(record_rust)
-    python.append(record_python)
+    python.append(record_python + native_class)
     return "\n".join(rust), "\n".join(python)
+
+
+def native_sources(plan):
+    """The record's `native` classmethod, and the class that it returns."""
+    descriptor = plan.registration
+    public, native = public_name(plan.native), native_name(plan)
+    callbacks = [field_name(name) for name in descriptor.callbacks]
+    context = [field_name(descriptor.user_data), field_name(descriptor.release)]
+    parameters = ", ".join(
+        ["cls", *(f"{name}: int" for name in callbacks)]
+        + [f"{name}: int = 0" for name in context]
+    )
+    addresses = ", ".join(callbacks) + ("," if len(callbacks) == 1 else "")
+    method = (
+        f"    @classmethod\n    def native({parameters}) -> {native}:\n"
+        + docs.docstring(
+            None,
+            "        ",
+            (
+                (
+                    "A native registration, whose function pointers, context, "
+                    "and release the host's native code supplies as addresses. "
+                    "Zero is null. The binding copies each address unchanged, "
+                    "and native code validates them."
+                ),
+            ),
+        )
+        + "        from . import _native\n\n"
+        + f"        return {native}._from_registration(\n"
+        + f'            _native._NativeRegistration("{plan.native}", ({addresses}), {", ".join(context)})\n'
+        + "        )\n"
+    )
+    cls = (
+        f"\n\nclass {native}:\n"
+        + docs.docstring(
+            None,
+            "    ",
+            (
+                f"A native `{public}` from `{public}.native`, accepted wherever a `{public}` is.",
+                (
+                    "The first call that carries it consumes it. Native code "
+                    "releases the context of a call that it accepts, and the "
+                    "binding releases the context of a call that native code "
+                    "does not accept. A second call raises an invalid-state "
+                    "error."
+                ),
+            ),
+        )
+        + '\n    __slots__ = ("_registration",)\n\n'
+        + "    def __init__(self):\n"
+        + f'        raise TypeError("native registrations come from {public}.native")\n\n'
+        + "    @classmethod\n    def _from_registration(cls, registration):\n"
+        + "        value = cls.__new__(cls)\n"
+        + "        value._registration = registration\n"
+        + "        return value\n"
+    )
+    return method, cls

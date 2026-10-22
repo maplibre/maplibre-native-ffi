@@ -1,7 +1,9 @@
 """Compile callback signatures, C entry points, and Go lifetime scopes."""
 
+import textwrap
 from dataclasses import replace
 
+from .. import async_hosts
 from ..model import ModelError
 from .go import native_identifier
 from .go_values import name, public
@@ -156,6 +158,74 @@ def sources(values, plan):
     return "\n\n".join(go), "\n".join(header), "\n".join(c)
 
 
+def accepts_native(values, plan):
+    """Whether a registration also takes a native registration, whose function
+    pointers, context, and release native code in the host supplies."""
+    return async_hosts.accepts_native(values.api, plan)
+
+
+def parameter(member):
+    word = name(member)
+    return native_identifier(word[:1].lower() + word[1:])
+
+
+def native_constructor(values, plan):
+    """The constructor of a registration's native form, which takes the C
+    members of the registration in declaration order."""
+    descriptor = plan.registration
+    typename = public(plan.native)
+    members = (*descriptor.callbacks, descriptor.user_data, descriptor.release)
+    params = [parameter(member) for member in members]
+    context, release = params[-2:]
+    article = "an" if typename[0] in "AEIOU" else "a"
+    listed = ", ".join(params[:-1]) + ", and " + params[-1]
+    text = (
+        f"NewNative{typename} returns {article} {typename} from C values that "
+        f"native code in the host supplies: {listed} are the members of "
+        f"{plan.native}, which the binding copies unchanged. The first call "
+        f"that carries the {typename} consumes it. Native code releases "
+        f"{context} if it accepts the call, and otherwise the binding calls "
+        f"{release}. A later call returns StatusInvalidState."
+    )
+    comment = "".join(f"// {line}\n" for line in textwrap.wrap(text, 77))
+    callbacks = ", ".join(params[:-2])
+    return (
+        comment
+        + f"func NewNative{typename}({', '.join(params)} uintptr) {typename} {{ "
+        + f"return {typename}{{native: bindingNewNativeRegistration({context}, {release}, {callbacks})}} }}"
+    )
+
+
+def native_input(values, plan):
+    """Copies a registration's native form into its C struct unchanged."""
+    descriptor = plan.registration
+    typename = public(plan.native)
+
+    def ctype(member):
+        return next(f.value.native for f in plan.fields if f.name == member)
+
+    def address(expr):
+        return f"C.binding_address(C.uintptr_t({expr}))"
+
+    funcs = " || ".join(
+        "input." + name(member) + " != nil" for member in descriptor.callbacks
+    )
+    lines = [
+        "registration := arena.native(input.native)",
+        f'if {funcs} {{ arena.fail("{typename} carries both a native registration and a func") }}',
+    ]
+    for index, member in enumerate(descriptor.callbacks):
+        callback = address(f"registration.callbacks[{index}]")
+        lines.append(
+            f"raw.{native_identifier(member)} = (C.{ctype(member)})({callback})"
+        )
+    lines += [
+        f"raw.{native_identifier(descriptor.user_data)} = {address('registration.userData')}",
+        f"raw.{native_identifier(descriptor.release)} = (C.{ctype(descriptor.release)})({address('registration.release')})",
+    ]
+    return "; ".join(lines)
+
+
 def registration_input(values, plan):
     descriptor = plan.registration
     enabled = " || ".join(
@@ -165,8 +235,14 @@ def registration_input(values, plan):
         f.value.native for f in plan.fields if f.name == descriptor.release
     )
     release = "binding_release"
+    # A native registration takes the place of the funcs.
+    native = (
+        f"if input.native != nil {{ {native_input(values, plan)} }} else "
+        if accepts_native(values, plan)
+        else ""
+    )
     lines = [
-        f"if {enabled} {{",
+        f"{native}if {enabled} {{",
         f"raw.{native_identifier(descriptor.user_data)} = arena.register(input)",
         f"raw.{native_identifier(descriptor.release)} = (C.{release_type})(C.{release})",
     ]

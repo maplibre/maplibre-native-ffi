@@ -67,6 +67,11 @@ class DartEmitterTests(unittest.TestCase):
             (root / "render").mkdir()
             shutil.copy(BINDING / "lib/src/render/native_pointer.dart", root / "render")
             shutil.copy(BINDING / "lib/src/values.dart", root)
+            (root / "internal/callback").mkdir(parents=True)
+            shutil.copy(
+                BINDING / "lib/src/internal/callback/native_registration.dart",
+                root / "internal/callback",
+            )
             # The probe groups name no handle owners, so an empty library
             # stands in for the runtime that the binding's values import.
             (root / "runtime").mkdir()

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import re
 
-from .. import docs
+from .. import async_hosts, docs
 from ..compiler import compile_api
 from ..managed_contracts import KEYWORDS
 from ..model import Api, ModelError
-from ..names import pascal
+from ..names import camel, pascal
 from ..semantic import BoundApi, FieldPlan, ValuePlan, enum_member_prefix
 
 SCALARS = {
@@ -637,7 +637,11 @@ class Values:
             condition = " || ".join(
                 f"value.{pascal(field.name)} is not null" for field in callbacks
             )
-            lines.append(f"        if ({condition})")
+            if self.native_callbacks(plan):
+                lines += self.native_registration_encoding(plan, condition)
+                lines.append(f"        else if ({condition})")
+            else:
+                lines.append(f"        if ({condition})")
             lines.append("        {")
             rooted = "value with { }"
             lines.append(
@@ -691,6 +695,96 @@ class Values:
                 f"        if (value.{self.flag_name(flag)}) native.{member(flag.mask)} |= {self.bit(plan, flag.mask, flag.name)};"
             )
         return "\n".join([*lines, "        return native;", "    }", ""])
+
+    def native_callbacks(self, plan: ValuePlan) -> tuple[FieldPlan, ...]:
+        """The callback fields of a registration that also accepts a native
+        registration, in registration order, or none."""
+        if not async_hosts.accepts_native(self.bound, plan):
+            return ()
+        return tuple(
+            next(field for field in plan.fields if field.name == name)
+            for name in plan.registration.callbacks
+        )
+
+    def function_pointer(self, native: str) -> str:
+        """The unmanaged function pointer type of a callback typedef."""
+        callback = self.bound.callbacks[native]
+        types = [self.raw_type(parameter.value) for parameter in callback.parameters]
+        void = callback.result.ctype.kind == "void"
+        types.append("void" if void else self.raw_type(callback.result))
+        return f"delegate* unmanaged[Cdecl]<{', '.join(types)}>"
+
+    def native_registration_encoding(
+        self, plan: ValuePlan, delegates: str
+    ) -> list[str]:
+        """The branch that consumes a native registration and copies it
+        unchanged into the C struct.
+
+        The scope releases a consumed context unless native code accepts the
+        call, so a value that also sets a delegate throws after the claim.
+        """
+        registration = plan.registration
+        release = next(f for f in plan.fields if f.name == registration.release)
+        lines = [
+            "        if (value.NativeRegistration is { } registration)",
+            "        {",
+            "            scope.Consume(registration);",
+            f"            if ({delegates})",
+            '                throw new ArgumentException("A native registration carries no delegates.", nameof(value));',
+        ]
+        lines += [
+            f"            native.{member(field.name)} = ({self.function_pointer(field.value.native)})registration.Function({index});"
+            for index, field in enumerate(self.native_callbacks(plan))
+        ]
+        lines += [
+            f"            native.{member(registration.user_data)} = registration.UserData;",
+            f"            native.{member(registration.release)} = ({self.function_pointer(release.value.native)})registration.ReleaseUserData;",
+            "        }",
+        ]
+        return lines
+
+    def native_members(self, plan: ValuePlan) -> str:
+        """The factory of a registration's native form, and the reference that
+        every copy of the record shares, so that one claim covers all copies."""
+        callbacks = self.native_callbacks(plan)
+        if not callbacks:
+            return ""
+        registration = plan.registration
+        name = public_name(plan.native)
+        functions = [member(camel(field.name)) for field in callbacks]
+        user_data = member(camel(registration.user_data))
+        release = member(camel(registration.release))
+        parameters = ", ".join(
+            f"NativePointer {item}" for item in [*functions, user_data, release]
+        )
+        addresses = ", ".join(f"{item}.Address" for item in functions)
+        lines = [
+            "<summary>",
+            "Creates a native registration from C functions and a context that the",
+            "host supplies. The binding copies them unchanged, so native code calls",
+            "each function without entering the .NET runtime.",
+            "</summary>",
+            "<remarks>",
+            "The first call that carries this value or a copy of it consumes the",
+            "registration. Native code releases the context of a call that it accepts,",
+            "and the binding calls the release for a call that native code does not",
+            "accept. A later call that carries the registration throws an",
+            'invalid-state <see cref="Error.MaplibreException"/> before it reaches',
+            "native code.",
+            "</remarks>",
+            *(
+                f'<param name="{item.removeprefix("@")}">The C function that native code calls as <c>{field.name}</c>.</param>'
+                for item, field in zip(functions, callbacks)
+            ),
+            f'<param name="{user_data}">The context that native code passes to each function.</param>',
+            f'<param name="{release}">The C function that releases <paramref name="{user_data}"/>, or <see cref="NativePointer.Null"/>.</param>',
+        ]
+        return (
+            "".join(f"    /// {line}\n" for line in lines)
+            + f"    public static {name} Native({parameters}) =>\n"
+            + f"        default({name}) with {{ NativeRegistration = new([{addresses}], {user_data}.Address, {release}.Address) }};\n\n"
+            + "    internal NativeRegistration? NativeRegistration { get; init; }\n"
+        )
 
     def field_encoding(
         self, plan: ValuePlan, name: str, field: FieldPlan, expression: str, indent: str
@@ -1119,9 +1213,5 @@ class Values:
             )
             + ")"
         )
-        constructor = self.parameterless(plan, primary=True)
-        return (
-            f"{declaration}\n{{\n{constructor}}}\n"
-            if constructor
-            else declaration + ";\n"
-        )
+        body = self.parameterless(plan, primary=True) + self.native_members(plan)
+        return f"{declaration}\n{{\n{body}}}\n" if body else declaration + ";\n"

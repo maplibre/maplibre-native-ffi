@@ -16,6 +16,15 @@ package maplibre
 // Receives an image the way a native call does, so that cgo checks the Go
 // pointers inside it.
 static void mln_go_test_receive_image(const mln_premultiplied_rgba8_image* image) { (void)image; }
+
+// The callbacks of a native registration, which stand in for host code in C.
+// Each reports to the recorder that user_data names; see testnative.go.
+extern void mlnGoTestNativeCall(void* user_data);
+extern void mlnGoTestNativeUnlock(void* user_data);
+extern void mlnGoTestNativeRelease(void* user_data);
+void mln_go_test_native_call(void* user_data) { mlnGoTestNativeCall(user_data); }
+void mln_go_test_native_unlock(void* user_data) { mlnGoTestNativeUnlock(user_data); }
+void mln_go_test_native_release(void* user_data) { mlnGoTestNativeRelease(user_data); }
 */
 import "C"
 
@@ -242,4 +251,24 @@ func createMapFailingAfterAdoptionForTest(receiver *RuntimeHandle) (*Future[*Map
 		}
 		return future
 	})
+}
+
+// wake returns a native wake whose callback and release are C functions.
+func (recorder *nativeRecorderForTest) wake() Wake {
+	return NewNativeWake(
+		uintptr(unsafe.Pointer(C.mln_go_test_native_call)),
+		uintptr(recorder.cell),
+		uintptr(unsafe.Pointer(C.mln_go_test_native_release)),
+	)
+}
+
+// queueLock returns a native queue lock whose lock, unlock, and release are C
+// functions.
+func (recorder *nativeRecorderForTest) queueLock() QueueLock {
+	return NewNativeQueueLock(
+		uintptr(unsafe.Pointer(C.mln_go_test_native_call)),
+		uintptr(unsafe.Pointer(C.mln_go_test_native_unlock)),
+		uintptr(recorder.cell),
+		uintptr(unsafe.Pointer(C.mln_go_test_native_release)),
+	)
 }

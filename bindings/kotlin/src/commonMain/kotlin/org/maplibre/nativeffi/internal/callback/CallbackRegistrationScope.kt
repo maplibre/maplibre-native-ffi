@@ -101,6 +101,7 @@ internal class CallbackOwner {
 
 internal class CallbackRegistrationScope : AutoCloseable {
   private val roots = mutableListOf<Pair<Long, CallbackRoot>>()
+  private val natives = mutableListOf<NativeRegistration>()
   private var accepted = false
 
   fun register(value: Any): Long {
@@ -115,13 +116,30 @@ internal class CallbackRegistrationScope : AutoCloseable {
     return token
   }
 
+  /** Consumes [registration] for this call, which releases it unless native code accepts. */
+  fun native(registration: NativeRegistration) {
+    registration.consume()
+    natives.add(registration)
+  }
+
+  /**
+   * Leaves the native registrations to native code, which accepted the call and releases them even
+   * when the binding fails to adopt what the call created.
+   */
+  fun handOff() {
+    natives.clear()
+  }
+
   fun accept(owner: CallbackOwner) {
     accepted = true
+    handOff()
     roots.forEach { owner.retain(it.second) }
   }
 
   override fun close() {
     if (!accepted) roots.asReversed().forEach { CallbackRoots.release(it.first) }
     roots.clear()
+    natives.asReversed().forEach { it.release() }
+    natives.clear()
   }
 }

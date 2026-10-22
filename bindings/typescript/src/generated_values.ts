@@ -4,6 +4,10 @@ import type {
   ResourceRequestHandle,
   ResourceTransformRequestHandle,
 } from "./generated_operations.ts";
+import {
+  type NativeRegistration,
+  nativeRegistration,
+} from "./internal/native_registrations.ts";
 
 export const AmbientCacheOperation = {
   resetDatabase: 1,
@@ -1905,6 +1909,47 @@ export const QueriedFeatureField = {
 export type QueriedFeatureField = number;
 
 /**
+ * Host lock on the graphics queue that a session shares with its host, copied
+ * by a successful attach.
+ *
+ * See `mln_queue_lock` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+export type QueueLock = NativeRegistration<"QueueLock">;
+export const QueueLock = {
+  /**
+   * Creates a native registration from a native function pointer for
+   * each callback, and an optional context and release. The binding
+   * copies them into the C descriptor unchanged. The first call that
+   * carries the registration consumes it: native code releases the
+   * context of a call that it accepts, and the binding releases it for
+   * any other call. A later call throws a `MaplibreError` with the
+   * invalid-state status.
+   */
+  native(fields: NativeQueueLockFields): NativeRegistration<"QueueLock"> {
+    return nativeRegistration("QueueLock", {
+      lock: fields.lock,
+      unlock: fields.unlock,
+      userData: fields.userData ?? 0n,
+      releaseUserData: fields.releaseUserData ?? 0n,
+    });
+  },
+};
+
+/** The fields of a native {@link QueueLock}, as native addresses. */
+export interface NativeQueueLockFields {
+  readonly lock: bigint;
+  readonly unlock: bigint;
+  readonly userData?: bigint;
+  /**
+   * Optional. Releases user_data once, after all callback invocations have
+   * returned and the session can no longer invoke the callbacks. A disabled
+   * lock leaves it null.
+   */
+  readonly releaseUserData?: bigint;
+}
+
+/**
  * What abandon did with a session's graphics resources.
  *
  * See `mln_render_abandon_disposition` in the
@@ -2123,6 +2168,12 @@ export interface RenderSessionAttachOptions {
    * work that a finished driver result releases.
    */
   driverWorkWake?: Wake;
+  /**
+   * Host lock on the graphics queue, disabled by default. Only Vulkan targets
+   * accept an enabled lock; other backends fail the attach with
+   * `MLN_STATUS_UNSUPPORTED`.
+   */
+  queueLock?: QueueLock;
 }
 
 /**
@@ -3786,7 +3837,36 @@ export interface VulkanTextureFrame {
  * See `mln_wake` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
  */
-export type Wake = () => void;
+export type Wake = (() => void) | NativeRegistration<"Wake">;
+export const Wake = {
+  /**
+   * Creates a native registration from a native function pointer for
+   * each callback, and an optional context and release. The binding
+   * copies them into the C descriptor unchanged. The first call that
+   * carries the registration consumes it: native code releases the
+   * context of a call that it accepts, and the binding releases it for
+   * any other call. A later call throws a `MaplibreError` with the
+   * invalid-state status.
+   */
+  native(fields: NativeWakeFields): NativeRegistration<"Wake"> {
+    return nativeRegistration("Wake", {
+      callback: fields.callback,
+      userData: fields.userData ?? 0n,
+      releaseUserData: fields.releaseUserData ?? 0n,
+    });
+  },
+};
+
+/** The fields of a native {@link Wake}, as native addresses. */
+export interface NativeWakeFields {
+  readonly callback: bigint;
+  readonly userData?: bigint;
+  /**
+   * Optional. Releases user_data after all callback invocations have returned.
+   * A disabled wake leaves it null.
+   */
+  readonly releaseUserData?: bigint;
+}
 
 /**
  * WebGL context fields shared by OpenGL render targets in the browser.

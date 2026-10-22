@@ -7,6 +7,7 @@ struct GeneratedInputStorage<'py> {
     roots: Vec<Bound<'py, PyAny>>,
     storage: maplibre_core::memory::InputStorage,
     callbacks: Vec<GeneratedPendingCallback>,
+    native_registrations: Vec<GeneratedPendingNative>,
 }
 
 impl<'py> GeneratedInputStorage<'py> {
@@ -111,6 +112,62 @@ impl Drop for GeneratedPendingCallback {
     }
 }
 
+/// A registration whose function pointers and context the host's native code
+/// supplies. The binding copies them unchanged into the C registration.
+#[pyclass(name = "_NativeRegistration", frozen)]
+struct GeneratedNativeRegistration {
+    /// The C registration type that it fills.
+    kind: String,
+    parts: GeneratedNativeParts,
+    consumed: std::sync::atomic::AtomicBool,
+}
+
+#[derive(Clone)]
+struct GeneratedNativeParts {
+    /// One address for each callback field, in field order.
+    callbacks: Vec<usize>,
+    user_data: usize,
+    release: usize,
+}
+
+#[pymethods]
+impl GeneratedNativeRegistration {
+    #[new]
+    fn new(kind: String, callbacks: Vec<usize>, user_data: usize, release: usize) -> Self {
+        Self {
+            kind,
+            parts: GeneratedNativeParts {
+                callbacks,
+                user_data,
+                release,
+            },
+            consumed: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+}
+
+/// A native registration that a call took. Unless native accepts the call,
+/// the binding releases its context, as native would have.
+struct GeneratedPendingNative {
+    user_data: usize,
+    release: Option<unsafe extern "C" fn(*mut c_void)>,
+    accepted: bool,
+}
+
+impl Drop for GeneratedPendingNative {
+    fn drop(&mut self) {
+        if self.accepted {
+            return;
+        }
+        if let Some(release) = self.release {
+            let user_data = self.user_data;
+            // SAFETY: the host supplied the release for this context, which
+            // native never accepted.
+            generated_finalize(move || unsafe { release(user_data as *mut c_void) });
+        }
+    }
+}
+
 impl GeneratedInputStorage<'_> {
     fn register_callbacks(&mut self, callbacks: Vec<Py<PyAny>>) -> *mut c_void {
         let root = Arc::new(Mutex::new(callbacks));
@@ -122,7 +179,50 @@ impl GeneratedInputStorage<'_> {
         native.cast()
     }
 
+    /// Takes the native registration that `value` holds, when it holds one
+    /// for the registration type `kind`. The call that takes it owns its
+    /// context until native accepts the call.
+    fn native_registration(
+        &mut self,
+        value: &Bound<'_, PyAny>,
+        kind: &str,
+    ) -> PyResult<Option<GeneratedNativeParts>> {
+        let Some(registration) = value.getattr_opt(pyo3::intern!(value.py(), "_registration"))?
+        else {
+            return Ok(None);
+        };
+        let registration = registration.cast_into::<GeneratedNativeRegistration>()?;
+        let registration = registration.get();
+        if registration.kind != kind {
+            return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+                "expected a native {kind}, got a native {}",
+                registration.kind
+            )));
+        }
+        if registration.consumed.swap(true, Ordering::AcqRel) {
+            return Err(invalid_state_error(
+                "a native registration is consumed by the first call that carries it",
+            ));
+        }
+        let parts = registration.parts.clone();
+        self.native_registrations.push(GeneratedPendingNative {
+            user_data: parts.user_data,
+            // SAFETY: a nonzero address is the host's release function, and
+            // zero is None.
+            release: unsafe {
+                std::mem::transmute::<usize, Option<unsafe extern "C" fn(*mut c_void)>>(
+                    parts.release,
+                )
+            },
+            accepted: false,
+        });
+        Ok(Some(parts))
+    }
+
     fn accept_callbacks(&mut self) -> Vec<std::sync::Weak<GeneratedCallbackRoot>> {
+        for pending in &mut self.native_registrations {
+            pending.accepted = true;
+        }
         self.callbacks
             .iter_mut()
             .map(|pending| {

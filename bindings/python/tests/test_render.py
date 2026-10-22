@@ -7,6 +7,7 @@ graphics object cannot be created fails its tests rather than skipping them.
 from __future__ import annotations
 
 import contextlib
+import ctypes
 import gc
 import subprocess
 import sys
@@ -92,6 +93,8 @@ class OwnedTexture:
     session's driver-work wake, and every frame wait blocks on its frame wake.
     An OpenGL context belongs to that thread for its whole life, as a host's
     would: the thread creates it, makes it current, and destroys it.
+    ``frame_wake`` makes the frame wake from the function that notifies the
+    frame wait.
     """
 
     def __init__(
@@ -100,6 +103,10 @@ class OwnedTexture:
         backend: str,
         driver: mln.RenderDriverKind,
         ring_depth: int | None = None,
+        frame_wake: Callable[[Callable[[], None]], mln.Wake | mln.NativeWake] = (
+            mln.Wake
+        ),
+        queue_lock: mln.QueueLock | mln.NativeQueueLock | None = None,
     ) -> None:
         opengl = backend in ("egl", "wgl")
         assert driver == mln.RenderDriverKind.CALLER_GRAPHICS_THREAD or not opengl
@@ -142,11 +149,13 @@ class OwnedTexture:
             options = replace(
                 mln.RenderSessionAttachOptions.default(),
                 driver=driver,
-                frame_wake=mln.Wake(self.frames.notify),
+                frame_wake=frame_wake(self.frames.notify),
                 driver_work_wake=mln.Wake(self._work.set),
             )
             if ring_depth is not None:
                 options = replace(options, requested_texture_ring_depth=ring_depth)
+            if queue_lock is not None:
+                options = replace(options, queue_lock=queue_lock)
             self.session, attached = self._attach(options)
             # A wake that fired before the session was stored found nothing
             # to service, so the graphics thread checks again.
@@ -478,6 +487,128 @@ def test_finalizing_a_sibling_frame_leaves_an_active_view_intact(
             check=lambda error: error.status == mln.Status.INVALID_STATE,
         ):
             frame.get_result()
+
+
+_NATIVE_CALLBACK = ctypes.CFUNCTYPE(None, ctypes.c_void_p)
+
+
+class _NativeCode:
+    """A callback and a release as native function pointers, which stand in
+    for a host's native code and record the context that each receives."""
+
+    def __init__(self, user_data: int) -> None:
+        self.user_data = user_data
+        self.notify: Callable[[], None] = lambda: None
+        self.calls: list[int | None] = []
+        self.releases: list[int | None] = []
+        self.called = threading.Event()
+        self.released = threading.Event()
+        self.registration: mln.NativeWake | None = None
+
+        def invoke(context: int | None) -> None:
+            self.calls.append(context)
+            self.called.set()
+            self.notify()
+
+        def release(context: int | None) -> None:
+            self.releases.append(context)
+            self.released.set()
+
+        # The ctypes objects own the function pointers, so they stay alive
+        # as long as this object.
+        self._callback = _NATIVE_CALLBACK(invoke)
+        self._release = _NATIVE_CALLBACK(release)
+        self.callback = ctypes.cast(self._callback, ctypes.c_void_p).value or 0
+        self.release = ctypes.cast(self._release, ctypes.c_void_p).value or 0
+
+    def wake(self, notify: Callable[[], None]) -> mln.NativeWake:
+        self.notify = notify
+        self.registration = mln.Wake.native(
+            callback=self.callback,
+            user_data=self.user_data,
+            release_user_data=self.release,
+        )
+        return self.registration
+
+
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_a_native_wake_reaches_native_and_the_first_call_consumes_it(
+    harness: Harness, backend: str
+) -> None:
+    # An address must fit a pointer.
+    with pytest.raises(OverflowError):
+        mln.Wake.native(callback=-1)
+    frames = _NativeCode(user_data=0x5EED)
+    driver = _default_driver(backend)
+    with OwnedTexture(harness, backend, driver, frame_wake=frames.wake) as target:
+        options = mln.RenderSessionAttachOptions.default()
+        target.render()
+        # Native code calls the function pointer with the context unchanged.
+        assert frames.called.wait(TIMEOUT)
+        assert set(frames.calls) == {frames.user_data}
+
+        # The attach consumed it, so another call raises before native code.
+        with pytest.raises(
+            mln.MaplibreError,
+            check=lambda error: error.status == mln.Status.INVALID_STATE,
+        ):
+            target._attach(replace(options, frame_wake=frames.registration))
+
+        # Native code rejects a disabled wake that carries a release, so the
+        # binding releases the context before the call returns.
+        rejected = _NativeCode(user_data=0xD1E)
+        with pytest.raises(
+            mln.MaplibreError,
+            check=lambda error: error.status == mln.Status.INVALID_ARGUMENT,
+        ):
+            target._attach(
+                replace(
+                    options,
+                    frame_wake=mln.Wake.native(
+                        callback=0,
+                        user_data=rejected.user_data,
+                        release_user_data=rejected.release,
+                    ),
+                )
+            )
+        assert rejected.releases == [rejected.user_data]
+        assert frames.releases == []
+
+    # Native code releases the accepted wake once the session is gone.
+    assert frames.released.wait(TIMEOUT)
+    assert frames.releases == [frames.user_data]
+
+
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_a_native_queue_lock_reaches_native(harness: Harness, backend: str) -> None:
+    host = _NativeCode(user_data=0x10C)
+    lock = mln.QueueLock.native(
+        lock=host.callback,
+        unlock=host.callback,
+        user_data=host.user_data,
+        release_user_data=host.release,
+    )
+    driver = _default_driver(backend)
+    if backend == "vulkan":
+        with OwnedTexture(harness, backend, driver, queue_lock=lock) as target:
+            target.render()
+            # Native code takes the lock around its queue submissions.
+            assert host.called.wait(TIMEOUT)
+        assert host.released.wait(TIMEOUT)
+    else:
+        # Only a Vulkan target takes a queue lock, so native code reports the
+        # lock as unsupported, and the binding releases its context.
+        with (
+            OwnedTexture(harness, backend, driver) as target,
+            pytest.raises(
+                mln.MaplibreError,
+                check=lambda error: error.status == mln.Status.UNSUPPORTED,
+            ),
+        ):
+            target._attach(
+                replace(mln.RenderSessionAttachOptions.default(), queue_lock=lock)
+            )
+    assert host.releases == [host.user_data]
 
 
 _SHUTDOWN_WITH_AN_ATTACHED_SESSION = """

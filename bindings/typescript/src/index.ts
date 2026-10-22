@@ -4,8 +4,18 @@
  * Every callback reaches the realm's event loop after the native call that
  * raised it has returned, so native code answers each synchronous decision
  * itself. A provider or transform request arrives as an owner that the host
- * answers later. Render sessions take no queue lock, so a Vulkan session's
- * graphics queue belongs to the session alone.
+ * answers later.
+ *
+ * Native code in the host can supply a wake or a queue lock as a native
+ * registration: `Wake.native({ callback, userData, releaseUserData })` or
+ * `QueueLock.native({ lock, unlock, userData, releaseUserData })`, with each
+ * function pointer and the context as a `bigint` address. Native code calls a
+ * native wake directly, without a post to the realm. A queue lock has only this
+ * form, because native code relies on the lock being held when its callback
+ * returns. The first call that carries a native registration consumes it, and a
+ * later call throws a `MaplibreError` with the invalid-state status. Native code
+ * releases the context of a call that it accepts, and the binding calls the
+ * release for any other call.
  *
  * A pending binding Promise keeps the process alive, and a callback
  * registration or a wake does not. To wait for a callback, call the `wake`
@@ -72,6 +82,7 @@ export * from "./generated_operations.ts";
 export * from "./generated_values.ts";
 export type { CommandCompletion } from "./internal/completions.ts";
 export { AbiVersionMismatchError, MaplibreError } from "./internal/errors.ts";
+export type { NativeRegistration } from "./internal/native_registrations.ts";
 export {
   AwaitableWake,
   type AwaitableWakeOptions,

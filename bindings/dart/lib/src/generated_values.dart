@@ -2760,7 +2760,55 @@ typedef WakeCallback = void Function();
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
 final class Wake {
   const Wake({this.callback});
+
+  /// Creates a native registration from [callback], [userData], and
+  /// [releaseUserData], which native code in the host supplies. The binding
+  /// copies them unchanged.
+  ///
+  /// The first call that carries the registration consumes it, and a later
+  /// call throws an invalid-state error. Native code releases the context
+  /// of a call that it accepts, and the binding calls [releaseUserData] for
+  /// a call that native code does not accept.
+  Wake.native({
+    required NativePointer callback,
+    NativePointer userData = NativePointer.nullPointer,
+    NativePointer releaseUserData = NativePointer.nullPointer,
+  }) : callback = null {
+    nativeRegistrations[this] = NativeRegistration(
+      [callback],
+      userData,
+      releaseUserData,
+    );
+  }
   final WakeCallback? callback;
+}
+
+/// Host lock on the graphics queue that a session shares with its host, copied
+/// by a successful attach.
+///
+/// See `mln_queue_lock` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class QueueLock {
+  /// Creates a native registration from [lock], [unlock], [userData], and
+  /// [releaseUserData], which native code in the host supplies. The binding
+  /// copies them unchanged.
+  ///
+  /// The first call that carries the registration consumes it, and a later
+  /// call throws an invalid-state error. Native code releases the context
+  /// of a call that it accepts, and the binding calls [releaseUserData] for
+  /// a call that native code does not accept.
+  QueueLock.native({
+    required NativePointer lock,
+    required NativePointer unlock,
+    NativePointer userData = NativePointer.nullPointer,
+    NativePointer releaseUserData = NativePointer.nullPointer,
+  }) {
+    nativeRegistrations[this] = NativeRegistration(
+      [lock, unlock],
+      userData,
+      releaseUserData,
+    );
+  }
 }
 
 /// Common attachment policy copied before an attach call returns.
@@ -2774,6 +2822,7 @@ final class RenderSessionAttachOptions extends _Value {
     GpuSyncKind? producerSyncKind,
     Wake? frameWake,
     Wake? driverWorkWake,
+    this.queueLock,
   }) : driver = driver ?? renderSessionAttachOptionsDefault().driver,
        requestedTextureRingDepth =
            requestedTextureRingDepth ??
@@ -2809,6 +2858,11 @@ final class RenderSessionAttachOptions extends _Value {
   /// including work that a finished driver result releases.
   final Wake driverWorkWake;
 
+  /// Host lock on the graphics queue, disabled by default. Only Vulkan targets
+  /// accept an enabled lock; other backends fail the attach with
+  /// `MLN_STATUS_UNSUPPORTED`.
+  final QueueLock? queueLock;
+
   @override
   List<Object?> get _members => [
     driver,
@@ -2816,6 +2870,7 @@ final class RenderSessionAttachOptions extends _Value {
     producerSyncKind,
     frameWake,
     driverWorkWake,
+    queueLock,
   ];
 }
 

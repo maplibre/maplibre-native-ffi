@@ -3680,6 +3680,13 @@ fn generated_input_mln_queue_lock<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_queue_lock> {
     let mut raw: sys::mln_queue_lock = unsafe { std::mem::zeroed() };
+    if let Some(native) = storage.native_registration(value, "mln_queue_lock")? {
+        raw.user_data = native.user_data as _;
+        raw.release_user_data = unsafe { std::mem::transmute::<usize, _>(native.release) };
+        raw.lock = unsafe { std::mem::transmute::<usize, _>(native.callbacks[0]) };
+        raw.unlock = unsafe { std::mem::transmute::<usize, _>(native.callbacks[1]) };
+        return Ok(raw);
+    }
     let lock_enabled = !value.getattr("lock")?.is_none();
     let unlock_enabled = !value.getattr("unlock")?.is_none();
     if lock_enabled || unlock_enabled {
@@ -4197,6 +4204,12 @@ fn generated_input_mln_wake<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_wake> {
     let mut raw: sys::mln_wake = unsafe { std::mem::zeroed() };
+    if let Some(native) = storage.native_registration(value, "mln_wake")? {
+        raw.user_data = native.user_data as _;
+        raw.release_user_data = unsafe { std::mem::transmute::<usize, _>(native.release) };
+        raw.callback = unsafe { std::mem::transmute::<usize, _>(native.callbacks[0]) };
+        return Ok(raw);
+    }
     let callback_enabled = !value.getattr("callback")?.is_none();
     if callback_enabled {
         raw.user_data =

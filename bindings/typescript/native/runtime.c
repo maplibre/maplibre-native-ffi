@@ -177,6 +177,10 @@ bool mln_ts_is_absent(mln_ts_call* call, napi_value value) {
   return type == napi_undefined || type == napi_null;
 }
 
+bool mln_ts_is_object(mln_ts_call* call, napi_value value) {
+  return type_of(call, value) == napi_object;
+}
+
 bool mln_ts_member(
   mln_ts_call* call, napi_value object, const char* key, napi_value* out
 ) {

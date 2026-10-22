@@ -19,4 +19,10 @@ static inline uintptr_t binding_handle_value(const void* cell) {
   return *(const uintptr_t*)cell;
 }
 static inline void binding_handle_free(void* cell) { free(cell); }
+// Calls the release of a native registration that native code did not accept.
+static inline void binding_release_native(
+  uintptr_t release, uintptr_t user_data
+) {
+  ((void (*)(void*))release)((void*)user_data);
+}
 #endif

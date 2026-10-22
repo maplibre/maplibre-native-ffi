@@ -66,6 +66,7 @@ type bindingArena struct {
 	pins        runtime.Pinner
 	allocations []unsafe.Pointer
 	callbacks   []*bindingCallbackTicket
+	natives     []*bindingNativeRegistration
 	owners      []*bindingOwner
 }
 
@@ -122,6 +123,7 @@ func (arena *bindingArena) close() {
 	for _, ticket := range arena.callbacks {
 		ticket.release()
 	}
+	arena.releaseNatives()
 	for _, allocation := range arena.allocations {
 		C.free(allocation)
 	}
@@ -145,6 +147,8 @@ func (arena *bindingArena) accept(owner *bindingOwner) {
 		ticket.mu.Unlock()
 	}
 	arena.callbacks = nil
+	// Native code releases the native registrations it accepted.
+	arena.natives = nil
 }
 
 // decline releases the callback roots of a registration that native reported
@@ -154,6 +158,41 @@ func (arena *bindingArena) decline() {
 		ticket.release()
 	}
 	arena.callbacks = nil
+	arena.releaseNatives()
+}
+
+// bindingNativeRegistration is a registration whose function pointers,
+// context, and release native code in the host supplies. The binding copies
+// them unchanged, and the first call that carries the registration consumes
+// it.
+type bindingNativeRegistration struct {
+	callbacks []uintptr
+	userData  uintptr
+	release   uintptr
+	consumed  atomic.Bool
+}
+
+func bindingNewNativeRegistration(userData, release uintptr, callbacks ...uintptr) *bindingNativeRegistration {
+	return &bindingNativeRegistration{callbacks: callbacks, userData: userData, release: release}
+}
+
+// native consumes registration for the arena's call. Unless native accepts the
+// call, the arena releases the registration's context when it closes.
+func (arena *bindingArena) native(registration *bindingNativeRegistration) *bindingNativeRegistration {
+	if !registration.consumed.CompareAndSwap(false, true) {
+		panic(bindingFailure{newBindingError(StatusInvalidState, "a native registration was already used")})
+	}
+	arena.natives = append(arena.natives, registration)
+	return registration
+}
+
+func (arena *bindingArena) releaseNatives() {
+	for _, registration := range arena.natives {
+		if registration.release != 0 {
+			C.binding_release_native(C.uintptr_t(registration.release), C.uintptr_t(registration.userData))
+		}
+	}
+	arena.natives = nil
 }
 
 func (arena *bindingArena) array(count int, size uintptr) unsafe.Pointer {

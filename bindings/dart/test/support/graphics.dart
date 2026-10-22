@@ -96,6 +96,10 @@ int _buildBackend() {
 /// drive.
 bool get buildHasCoreWorkerTexture => _buildBackend() != _backendWgl;
 
+/// Whether this build attaches sessions to Vulkan, the one backend whose
+/// sessions take a queue lock.
+bool get buildAttachesVulkan => _buildBackend() == _backendVulkan;
+
 /// Whether a core-worker session on this build exposes its frames to the host.
 /// Metal and Vulkan sessions do. An OpenGL session exposes frames only from a
 /// context that it shares with the host, which only a caller-driven session

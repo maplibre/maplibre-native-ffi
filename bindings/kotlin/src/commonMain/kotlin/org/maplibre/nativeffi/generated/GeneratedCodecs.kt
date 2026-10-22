@@ -1662,6 +1662,14 @@ internal fun NativeArena.writeMetalBorrowedTexture(value: MetalBorrowedTexture):
   allocate(w(4, 8), w(4, 8)).also { putMetalBorrowedTexture(it, value) }
 
 internal fun NativeCall.putWake(target: Long, value: Wake) {
+  val native = value.bindingNative
+  if (native != null) {
+    registrations.native(native)
+    writeAddress(target, native.functions[0])
+    writeAddress(target + w(4, 8), native.userData)
+    writeAddress(target + w(8, 16), native.releaseUserData)
+    return
+  }
   if (value.callback == null) return
   writeAddress(target + w(4, 8), registrations.register(value))
   writeAddress(target, UpcallStubs.wakeCallback)
@@ -1672,6 +1680,15 @@ internal fun NativeCall.writeWake(value: Wake): Long =
   allocate(w(12, 24), w(4, 8)).also { putWake(it, value) }
 
 internal fun NativeCall.putQueueLock(target: Long, value: QueueLock) {
+  val native = value.bindingNative
+  if (native != null) {
+    registrations.native(native)
+    writeAddress(target, native.functions[0])
+    writeAddress(target + w(4, 8), native.functions[1])
+    writeAddress(target + w(8, 16), native.userData)
+    writeAddress(target + w(12, 24), native.releaseUserData)
+    return
+  }
   if (value.lock == null && value.unlock == null) return
   writeAddress(target + w(8, 16), registrations.register(value))
   writeAddress(target, if (value.lock == null) 0L else UpcallStubs.queueLockLock)

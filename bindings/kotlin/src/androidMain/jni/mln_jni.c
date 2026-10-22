@@ -312,9 +312,21 @@ static jint mln_jni_android_init(
   );
 }
 
+// Releases the context of a native registration that native code did not
+// accept, through the host's own release function.
+static void mln_jni_call_user_data_release(
+  JNIEnv* env, jclass type, jlong release, jlong user_data
+) {
+  (void)env;
+  (void)type;
+  MLN_JNI_POINTER(mln_user_data_release, release)
+  (MLN_JNI_POINTER(void*, user_data));
+}
+
 static const JNINativeMethod mln_jni_runtime_methods[] = {
   {"upcallStub", "(I)J", (void*)mln_jni_upcall_stub},
   {"androidInit", "(Ljava/lang/Object;J)I", (void*)mln_jni_android_init},
+  {"callUserDataRelease", "(JJ)V", (void*)mln_jni_call_user_data_release},
 };
 
 static bool mln_jni_register(

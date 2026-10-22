@@ -37,6 +37,7 @@
 "CB-09" = "bindings/dart/test/queue_registration_test.dart::a camera end handler root is released after the handler runs"
 "CB-10" = "bindings/dart/test/resource_provider_test.dart::a routed provider answers the requests its routes match"
 "CB-11" = "bindings/dart/test/resource_transform_test.dart::a transform answers its request after its callback returns"
+"CB-12" = "bindings/dart/test/native_registration_test.dart::a native wake reaches native unchanged and only its first call"
 "VAL-01" = "bindings/dart/test/values_test.dart::host strings use views and native-lent strings decode"
 "VAL-02" = "bindings/dart/test/values_test.dart::presence fields keep a present zero apart from an absent one"
 "VAL-03" = "bindings/dart/test/internal_support_test.dart::a drained batch is indexed by its stride and copied field by field"

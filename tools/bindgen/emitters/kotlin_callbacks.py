@@ -15,7 +15,15 @@ thread:
   ownership, and releases it when the callback throws or the registration is
   gone. Kotlin/Wasm sets the registration's queue and runs the same site when
   it drains the delivery.
-- A `wake`, `disabled`, or callback-less registration keeps its callbacks.
+- A `wake`, `native`, or callback-less registration keeps its callbacks.
+
+A registration that `async_hosts.accepts_native` admits also takes a native
+registration: the host's own function pointers, context, and release, which
+the binding copies into the C record unchanged. A Kotlin callback enters the
+JVM, ART, or the Kotlin/Native runtime on every call, and a native registration
+calls the host's native function directly. Common code holds the registration
+in an internal member of the record. The threaded source set declares its
+factory, because a Kotlin/Wasm page has no native functions of its own to pass.
 
 A registration whose answer a callback computes, or a rule replaces, is split:
 its forms differ by target, so common code declares none of them (see
@@ -31,7 +39,7 @@ each form.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .. import async_hosts, docs
 from ..model import CType
@@ -213,6 +221,13 @@ def split_note(value, values):
 def declaration_doc(value, values):
     """The KDoc of a declaration, which says how a split form differs by target."""
     found = values.bound.doc(value.native)
+    if accepts_native(value, values) and found:
+        factory = native_factory(value, values)
+        note = (
+            f"The JVM, Android, and Kotlin/Native also create one from the host's "
+            f"native functions with `{factory.registration}.{factory.function}`."
+        )
+        return docs.block_comment(replace(found, notes=(*found.notes, note)))
     if split(value, values):
         note = split_note(value, values)
     else:
@@ -247,18 +262,130 @@ def declaration(value, values):
             "internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope)"
         )
     parameters = []
+    defaults = []
     for member, typ, field in values.members(value):
         default = "null" if typ.endswith("?") else values.field_default(field)
+        defaults.append(f"{member}: {typ}" + (f" = {default}" if default else ""))
         parameters.append(
             doc(values.bound, f"{value.native}.{field.name}", "  ")
             + f"  public val {member}: {typ}"
-            + (f" = {default}" if default else "")
+            + ("" if accepts_native(value, values) or not default else f" = {default}")
         )
+    if not accepts_native(value, values):
+        return (
+            f"{declaration_doc(value, values)}public data class {public}(\n"
+            + ",\n".join(parameters)
+            + "\n)"
+        )
+    # The internal member holds a native registration, which only the threaded
+    # factory creates, so the public constructor leaves it null.
+    members = ", ".join(member for member, _typ, _field in values.members(value))
+    parameters.append(f"  internal val {NATIVE_MEMBER}: NativeRegistration?")
     return (
-        f"{declaration_doc(value, values)}public data class {public}(\n"
+        f"{declaration_doc(value, values)}@ConsistentCopyVisibility\n"
+        f"public data class {public} internal constructor(\n"
         + ",\n".join(parameters)
-        + "\n)"
+        + "\n) {\n"
+        f"  /** A registration of Kotlin callbacks. */\n"
+        f"  public constructor({', '.join(defaults)}) : this({members}, null)\n\n"
+        "  public companion object\n"
+        "}"
     )
+
+
+# The internal member of a registration that holds its native registration.
+NATIVE_MEMBER = "bindingNative"
+
+
+def accepts_native(value, values):
+    """Whether a registration also takes a native registration (see `async_hosts`)."""
+    return bool(value.registration) and async_hosts.accepts_native(values.bound, value)
+
+
+@dataclass(frozen=True)
+class NativeFactory:
+    """The factory of a registration's native form: each parameter, as a Kotlin
+    name and the C field that the binding copies it to."""
+
+    registration: str
+    function: str
+    parameters: tuple[tuple[str, str], ...]
+
+
+def native_factory(value, values):
+    """The factory that creates [value]'s native form, which takes one function
+    pointer per callback, then the context and its release."""
+    registration = value.registration
+    fields = [
+        *(field.name for field in async_hosts.callback_fields(value)),
+        registration.user_data,
+        registration.release,
+    ]
+    return NativeFactory(
+        name(value.native),
+        "native",
+        tuple((identifier(field), field) for field in fields),
+    )
+
+
+def native_factories(values):
+    """The threaded source set's factories of every native form that common code
+    declares."""
+    factories = []
+    for value in values.used.values():
+        if not accepts_native(value, values):
+            continue
+        factory = native_factory(value, values)
+        public = factory.registration
+        callbacks = async_hosts.callback_fields(value)
+        if [field for _member, _typ, field in values.members(value)] != callbacks:
+            raise Unsupported("a native registration needs a record of callbacks only")
+        *functions, (context, _), (release, _) = factory.parameters
+        types = ", ".join(
+            f"`{member}` is an `{field.value.native}`"
+            for (member, _), field in zip(functions, callbacks)
+        )
+        found = values.bound.doc(value.native)
+        summary = (
+            f"Creates a `{public}` of the host's native functions, which the "
+            "binding copies to native code unchanged. Native code calls each "
+            f"function with `{context}`: {types}, and `{release}` is an "
+            "`mln_user_data_release`. A null pointer leaves its field null."
+        )
+        ownership = (
+            "The first call that carries the registration consumes it. "
+            f"Native code calls `{release}` once it accepts the call. When "
+            "native code does not accept the call, the binding calls "
+            f"`{release}` before the call returns or throws. A later call "
+            "that carries the registration throws an invalid-state "
+            "`MaplibreException` before it calls native code."
+        )
+        targets = (
+            "Only the JVM, Android, and Kotlin/Native declare this function, "
+            "because a Kotlin/Wasm page has no native functions of its own."
+        )
+        documentation = docs.block_comment(
+            docs.Doc(
+                value.native,
+                summary,
+                found.url if found else "",
+                (ownership, targets),
+            )
+        )
+        parameters = [f"  {member}: NativePointer" for member, _ in functions] + [
+            f"  {member}: NativePointer = NativePointer.NULL_POINTER"
+            for member in (context, release)
+        ]
+        addresses = ", ".join(f"{member}.address" for member, _ in functions)
+        factories.append(
+            f"{documentation}public fun {public}.Companion.{factory.function}(\n"
+            + ",\n".join(parameters)
+            + f"\n): {public} =\n  {public}("
+            + "".join("null, " for _ in functions)
+            + f"NativeRegistration(longArrayOf({addresses}), "
+            f"{context}.address, {release}.address))"
+        )
+    return factories
 
 
 def common(values):
@@ -764,6 +891,24 @@ def put_function(value, values):
         lines.append("}")
         lines.append(writer(value, values, public))
         return "\n".join(lines)
+    if accepts_native(value, values):
+        # The call consumes a native registration before it writes the fields,
+        # which it copies unchanged, and releases it unless native accepts.
+        lines.append(f"  val native = value.{NATIVE_MEMBER}")
+        lines.append("  if (native != null) {")
+        lines.append("    registrations.native(native)")
+        for index, field in enumerate(async_hosts.callback_fields(value)):
+            lines.append(
+                f"    writeAddress({values.at('target', value, field.name)}, native.functions[{index}])"
+            )
+        lines.append(
+            f"    writeAddress({values.at('target', value, value.registration.user_data)}, native.userData)"
+        )
+        lines.append(
+            f"    writeAddress({values.at('target', value, value.registration.release)}, native.releaseUserData)"
+        )
+        lines.append("    return")
+        lines.append("  }")
     # With every callback nullable, the descriptor stays unregistered when all
     # are absent. A lone callback is then known present past that return.
     all_nullable = all(f.value.nullable for f in callbacks)

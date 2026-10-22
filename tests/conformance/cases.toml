@@ -36,6 +36,7 @@
 "CB-09" = "A registration nested in a command's input record is rooted until native runs and releases it, and a command that native rejects does not root it"
 "CB-10" = "A provider's routes cross to native as a copied array: the provider receives only the requests its routes match, and a route that names only a URL pattern matches every resource kind"
 "CB-11" = "A resource transform owns the request handle its callback receives, and another thread answers it after the callback returns"
+"CB-12" = "A native registration reaches native with its function pointers and context unchanged, the first call that carries it consumes it, and the binding releases its context when native code does not accept the call"
 
 # Generated value shapes
 "VAL-01" = "Host strings cross as explicit-length views; native-lent terminated strings decode, and native rejects embedded NUL where a string reaches a C-string consumer"

@@ -1,7 +1,7 @@
 """How a callback registration reaches a host that runs no code on native threads.
 
 Dart isolates and Node-API realms run host code only on their own thread, after
-native code returns. Such a host gives each registration one of four forms:
+native code returns. Such a host gives each registration one of five forms:
 
 - `queue`: the registration names a delivery queue, and every callback has a
   queue delivery. The host sets its queue and a token in place of the
@@ -13,9 +13,16 @@ native code returns. Such a host gives each registration one of four forms:
 - `rules`: every callback must answer on its native thread and has no queue
   delivery. The host leaves them unset, so the native rules that the
   registration carries answer each call.
-- `disabled`: the callbacks are optional and synchronous, so native code relies
-  on their work being done when they return. A record with a native default
-  keeps such a field at its disabled default.
+- `native`: the callbacks are optional and synchronous, so native code relies
+  on their work being done when they return. The host accepts only a native
+  registration, whose function pointers and context native code supplies, and
+  a record with a native default keeps such a field at its disabled default.
+
+A wake also accepts a native registration, which skips the post to the host's
+thread. Python, Kotlin, .NET, and Go accept one for the same registrations:
+each of their callbacks enters the language runtime on the native thread, by
+taking the interpreter lock or by a garbage-collector transition, which a
+native function never needs.
 
 Both the Dart and the TypeScript emitters choose a registration's form here.
 """
@@ -94,13 +101,13 @@ def rules_only(bound: BoundApi, value: ValuePlan) -> bool:
     return bool(fields) and all(omitted(bound, f) for f in fields)
 
 
-def left_disabled(bound: BoundApi, value: ValuePlan) -> bool:
-    """Whether a registration field keeps its native default, disabled.
+def native_only(bound: BoundApi, value: ValuePlan) -> bool:
+    """Whether a registration accepts only a native registration.
 
     The host cannot run a synchronous callback that native code calls on its
-    own thread, so a registration with one has no form. A record that holds it
-    and has a native default keeps the field disabled, as that default
-    provides it.
+    own thread, so only native code can supply one. A record that holds such a
+    registration and has a native default keeps the field disabled until the
+    host supplies one.
     """
     callbacks = [f.value for f in callback_fields(value)]
     return (
@@ -121,9 +128,17 @@ def form(bound: BoundApi, value: ValuePlan) -> str | None:
         return "queue"
     if rules_only(bound, value):
         return "rules"
-    if left_disabled(bound, value):
-        return "disabled"
+    if native_only(bound, value):
+        return "native"
     return None
+
+
+def accepts_native(bound: BoundApi, value: ValuePlan) -> bool:
+    """Whether a registration accepts a native registration: a wake, or one
+    that only native code can supply."""
+    return bool(value.registration) and (
+        is_wake(bound, value) or native_only(bound, value)
+    )
 
 
 def rule_answered_operations(

@@ -128,6 +128,19 @@ final class _NativeRegistration<T extends Struct> {
   final void Function()? releaseMemory;
 }
 
+/// Takes the native registration that [value] carries for one call, or returns
+/// null when it carries none. A registration that an earlier call carried is
+/// invalid state, whatever native code did with it.
+NativeRegistration? _takeNativeRegistration(Object value) {
+  final native = nativeRegistrations[value];
+  if (native == null) return null;
+  if (native.consumed) {
+    throwInvalidState('a native registration reaches only its first call');
+  }
+  native.consumed = true;
+  return native;
+}
+
 /// Native acceptance keeps registrations rooted until native release.
 /// Every other outcome rejects them before the call returns.
 final class _NativeRegistrations {
