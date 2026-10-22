@@ -2,7 +2,7 @@ include: package:lints/recommended.yaml
 
 analyzer:
   exclude:
-    - tool/flutter_smoke/**
+    - tool/flutter_*/**
   language:
     strict-casts: true
     strict-inference: true

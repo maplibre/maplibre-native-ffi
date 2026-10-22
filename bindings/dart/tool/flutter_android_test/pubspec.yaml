@@ -1,0 +1,27 @@
+name: testhost
+description: Android host for the portable Dart binding suites.
+publish_to: none
+version: 0.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  maplibre_native_ffi:
+    path: ../..
+
+dev_dependencies:
+  ffi: ^2.1.4
+  integration_test:
+    sdk: flutter
+  test: ^1.31.1
+
+hooks:
+  user_defines:
+    maplibre_native_ffi:
+      local_build: ../native
+
+flutter:
+  uses-material-design: false

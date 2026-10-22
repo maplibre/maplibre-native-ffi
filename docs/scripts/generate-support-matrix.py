@@ -131,7 +131,11 @@ def command_support(command: str) -> list[tuple[str, str]]:
         return []
     project_id = f"{kind}-{name}"
 
-    status = "tested" if action in {"test", "run"} else "build-only"
+    status = (
+        "tested"
+        if (action == "run" or action == "test" or action.startswith("test:"))
+        else "build-only"
+    )
     return [(project_id, status)]
 
 

@@ -175,7 +175,8 @@ def android_commands(preset: str, abi: str) -> list[str]:
             f"mise run //bindings/rust:build {preset}",
             f"mise run //bindings/zig:build {preset}",
         ]
-    commands.append(f"mise run //bindings/dart:build:mobile {preset}")
+    dart_action = "test:android" if preset in EMULATOR_TESTED else "build:mobile"
+    commands.append(f"mise run //bindings/dart:{dart_action} {preset}")
     return commands
 
 

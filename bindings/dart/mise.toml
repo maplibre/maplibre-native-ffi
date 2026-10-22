@@ -133,6 +133,25 @@ case "$usage_preset" in
 esac
 '''
 
+[tasks."test:android"]
+description = "Run portable Dart binding suites in a Flutter Android host."
+usage = '''
+arg "<preset>" {
+  choices "android-arm64-egl" "android-arm64-vulkan" "android-x64-egl" "android-x64-vulkan"
+}
+'''
+depends = [
+  { task = "//:build", args = [
+    "{{usage.preset}}",
+  ] },
+  { task = ":_native-prefix", args = [
+    "{{usage.preset}}",
+  ] },
+]
+run = '''
+exec "$MISE_MONOREPO_ROOT/scripts/test-dart-android-device.sh" "$usage_preset"
+'''
+
 # pubspec.yaml and the Flutter smoke host name this link as their local build.
 # Git Bash on Windows copies the prefix in place of linking it.
 [tasks._native-prefix]
