@@ -828,6 +828,7 @@ pub struct mln_metal_owned_texture_descriptor {
     pub size: u32,
     pub extent: mln_logical_extent,
     pub context: mln_metal_context_descriptor,
+    pub pixel_format: u64,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

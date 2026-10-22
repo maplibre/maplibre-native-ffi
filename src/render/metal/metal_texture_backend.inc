@@ -19,7 +19,8 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
 
  public:
   MetalTextureBackend(
-    MTL::Device* host_device, mln::Size size, std::size_t ring_depth
+    MTL::Device* host_device, mln::Size size, std::size_t ring_depth,
+    MTL::PixelFormat pixel_format
   );
   MetalTextureBackend(
     std::vector<MTL::Texture*> borrowed_textures, mln::Size size
@@ -55,6 +56,8 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   // Recorded when this session took borrowed_textures_, which it does not
   // retain and the host may already have released.
   MTL::PixelFormat borrowed_pixel_format_ = MTL::PixelFormatInvalid;
+  // The format of a session-owned ring's textures.
+  MTL::PixelFormat owned_pixel_format_ = MTL::PixelFormatInvalid;
   RenderableSlotRing ring_;
 };
 

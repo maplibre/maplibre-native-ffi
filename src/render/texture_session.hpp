@@ -9,6 +9,11 @@ struct mln_render_session_object;
 
 namespace mln::core {
 
+// The MTLPixelFormat values a session-owned Metal ring accepts. Builds without
+// Metal validate them too; the Metal build asserts that they match.
+inline constexpr uint64_t metal_rgba8_unorm = 70;
+inline constexpr uint64_t metal_bgra8_unorm = 80;
+
 auto supported_render_backend_mask() noexcept -> uint32_t;
 auto metal_owned_texture_descriptor_default() noexcept
   -> mln_metal_owned_texture_descriptor;

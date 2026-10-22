@@ -649,6 +649,8 @@ final class mln_metal_owned_texture_descriptor extends Struct {
   external int size;
   external mln_logical_extent extent;
   external mln_metal_context_descriptor context;
+  @Uint64()
+  external int pixel_format;
 }
 
 final class mln_metal_surface_descriptor extends Struct {

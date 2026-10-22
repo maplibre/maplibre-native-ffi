@@ -358,7 +358,7 @@ public object GeneratedApi {
    */
   public fun metalOwnedTextureDescriptorDefault(): MetalOwnedTextureDescriptor =
     nativeCall(null, null) {
-      val out = sized(32, 8)
+      val out = sized(40, 8)
       C.mln_metal_owned_texture_descriptor_default(out)
       readMetalOwnedTextureDescriptor(out)
     }

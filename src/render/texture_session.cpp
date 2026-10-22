@@ -29,9 +29,11 @@ auto metal_owned_texture_descriptor_default() noexcept
         .height = 256,
         .scale_factor = 1.0,
       },
-    .context = mln_metal_context_descriptor{
-      .device = nullptr,
-    },
+    .context =
+      mln_metal_context_descriptor{
+        .device = nullptr,
+      },
+    .pixel_format = metal_rgba8_unorm,
   };
 }
 
@@ -261,6 +263,15 @@ auto validate_metal_owned_texture_descriptor(
   );
   if (extent_status != MLN_STATUS_OK) {
     return extent_status;
+  }
+  if (
+    descriptor->pixel_format != metal_rgba8_unorm &&
+    descriptor->pixel_format != metal_bgra8_unorm
+  ) {
+    set_thread_error(
+      "Metal texture pixel format must be RGBA8Unorm or BGRA8Unorm"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
   return validate_metal_context(descriptor->context, true);
 }

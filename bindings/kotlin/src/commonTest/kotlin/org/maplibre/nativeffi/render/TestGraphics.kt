@@ -206,7 +206,12 @@ internal object TestGraphics {
     return when (backend) {
       TestBackend.METAL ->
         map.attachMetalOwnedTexture(
-          MetalOwnedTextureDescriptor(extent, MetalContextDescriptor(pointer(context.metalDevice))),
+          MetalOwnedTextureDescriptor(
+            extent,
+            MetalContextDescriptor(pointer(context.metalDevice)),
+            // MTLPixelFormatBGRA8Unorm.
+            pixelFormat = 80uL,
+          ),
           options,
         )
       TestBackend.VULKAN ->

@@ -1169,7 +1169,12 @@ internal static unsafe class GeneratedValues
 
     internal static MetalOwnedTextureDescriptor CopyMetalOwnedTextureDescriptor(
         mln_metal_owned_texture_descriptor value
-    ) => new(CopyLogicalExtent(value.extent), CopyMetalContextDescriptor(value.context));
+    ) =>
+        new(
+            CopyLogicalExtent(value.extent),
+            CopyMetalContextDescriptor(value.context),
+            value.pixel_format
+        );
 
     internal static mln_metal_owned_texture_descriptor NativeMetalOwnedTextureDescriptor(
         MetalOwnedTextureDescriptor value
@@ -1179,6 +1184,7 @@ internal static unsafe class GeneratedValues
         native.size = (uint)sizeof(mln_metal_owned_texture_descriptor);
         native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeMetalContextDescriptor(value.Context);
+        native.pixel_format = value.PixelFormat;
         return native;
     }
 

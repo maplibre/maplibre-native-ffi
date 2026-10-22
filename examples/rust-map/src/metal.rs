@@ -178,7 +178,7 @@ impl MetalBorrowedTexture {
         // SAFETY: The descriptor and texture are created on the live Metal device.
         let descriptor = unsafe {
             MTLTextureDescriptor::texture2DDescriptorWithPixelFormat_width_height_mipmapped(
-                MTLPixelFormat::RGBA8Unorm,
+                MTLPixelFormat::BGRA8Unorm,
                 viewport.physical_width as _,
                 viewport.physical_height as _,
                 false,

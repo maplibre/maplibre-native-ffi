@@ -10,7 +10,6 @@ const types = @import("../../types.zig");
 extern "c" fn MTLCreateSystemDefaultDevice() objc.c.id;
 
 const MTLPixelFormatBGRA8Unorm: u64 = 80;
-const MTLPixelFormatRGBA8Unorm: u64 = 70;
 const MTLLoadActionClear: u64 = 2;
 const MTLStoreActionStore: u64 = 1;
 const MTLPrimitiveTypeTriangle: u64 = 3;
@@ -236,6 +235,7 @@ const MetalOwnedTextureBackend = struct {
         const attachment = maplibre.mapAttachMetalOwnedTexture(std.heap.smp_allocator, map.*, .{
             .extent = render_target.extent(viewport),
             .context = .{ .device = (self.compositor.view.device.value.?) },
+            .pixel_format = MTLPixelFormatBGRA8Unorm,
         }, options, &diagnostic) catch |err| {
             diagnostics.logError("Metal texture attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
@@ -408,7 +408,7 @@ const MetalSurfaceBackend = struct {
 fn createBorrowedTexture(device: objc.Object, viewport: types.Viewport) !objc.Object {
     const descriptor = objc.getClass("MTLTextureDescriptor").?
         .msgSend(objc.Object, "texture2DDescriptorWithPixelFormat:width:height:mipmapped:", .{
-        @as(u64, MTLPixelFormatRGBA8Unorm),
+        @as(u64, MTLPixelFormatBGRA8Unorm),
         @as(c_ulong, viewport.physical_width),
         @as(c_ulong, viewport.physical_height),
         false,

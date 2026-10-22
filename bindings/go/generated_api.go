@@ -3410,12 +3410,17 @@ type MetalOwnedTextureDescriptor struct {
 	Extent LogicalExtent
 	// Metal backend context. device is required.
 	Context MetalContextDescriptor
+	// Backend-native MTLPixelFormat value of the ring's textures: either
+	// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Defaults to
+	// MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
+	PixelFormat uint64
 }
 
 func copyMetalOwnedTextureDescriptor(raw C.mln_metal_owned_texture_descriptor) MetalOwnedTextureDescriptor {
 	var result MetalOwnedTextureDescriptor
 	result.Extent = copyLogicalExtent(raw.extent)
 	result.Context = copyMetalContextDescriptor(raw.context)
+	result.PixelFormat = uint64(raw.pixel_format)
 	return result
 }
 
@@ -3424,6 +3429,7 @@ func nativeMetalOwnedTextureDescriptor(input MetalOwnedTextureDescriptor, arena 
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.context = nativeMetalContextDescriptor(input.Context, arena)
+	raw.pixel_format = C.uint64_t(input.PixelFormat)
 	return raw
 }
 

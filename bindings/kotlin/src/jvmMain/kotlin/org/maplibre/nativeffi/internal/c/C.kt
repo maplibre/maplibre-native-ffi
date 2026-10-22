@@ -3478,6 +3478,7 @@ internal val mln_metal_owned_texture_descriptor: GroupLayout =
     Ffm.pad(4),
     mln_logical_extent.withName("extent"),
     mln_metal_context_descriptor.withName("context"),
+    JAVA_LONG.withName("pixel_format"),
   )
 internal val mln_metal_surface_descriptor: GroupLayout =
   Ffm.struct(

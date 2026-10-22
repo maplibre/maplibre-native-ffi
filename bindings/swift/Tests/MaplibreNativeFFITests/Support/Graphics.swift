@@ -60,7 +60,10 @@ final class TestGraphics: @unchecked Sendable {
       return try map.attachMetalOwnedTexture(
         descriptor: MetalOwnedTextureDescriptor(
           extent: extent,
-          context: MetalContextDescriptor(device: pointer(context.metal_device))
+          context: MetalContextDescriptor(device: pointer(context
+              .metal_device)),
+          // MTLPixelFormatBGRA8Unorm.
+          pixelFormat: 80
         ),
         options: options
       )

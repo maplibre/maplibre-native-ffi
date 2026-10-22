@@ -177,6 +177,8 @@ impl Graphics {
                         context: MetalContextDescriptor {
                             device: context.metal_device,
                         },
+                        // MTLPixelFormatBGRA8Unorm.
+                        pixel_format: 80,
                     },
                     options,
                 ),

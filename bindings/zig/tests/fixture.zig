@@ -426,7 +426,12 @@ pub const OwnedTexture = struct {
         options.frame_wake = self.wakes.wake();
         options.driver_work_wake = self.wakes.wake();
         const attachment = if (build_options.supports_metal)
-            try maplibre.mapAttachMetalOwnedTexture(testing.allocator, map, .{ .extent = extent, .context = .{ .device = self.graphics.context.metal_device } }, options, null)
+            try maplibre.mapAttachMetalOwnedTexture(testing.allocator, map, .{
+                .extent = extent,
+                .context = .{ .device = self.graphics.context.metal_device },
+                // MTLPixelFormatBGRA8Unorm.
+                .pixel_format = 80,
+            }, options, null)
         else if (build_options.supports_vulkan)
             try maplibre.mapAttachVulkanOwnedTexture(testing.allocator, map, .{ .extent = extent, .context = self.graphics.vulkanContext() }, options, null)
         else attachment: {

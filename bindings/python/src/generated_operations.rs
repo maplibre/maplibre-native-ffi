@@ -1047,6 +1047,7 @@ fn generated_copy_mln_metal_owned_texture_descriptor(
         "context",
         generated_copy_mln_metal_context_descriptor(py, &value.context)?,
     )?;
+    dict.set_item("pixel_format", generated_value(py, value.pixel_format)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -3429,6 +3430,7 @@ fn generated_input_mln_metal_owned_texture_descriptor<'py>(
     raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.context =
         generated_input_mln_metal_context_descriptor(&value.getattr("context")?, storage)?;
+    raw.pixel_format = value.getattr("pixel_format")?.extract::<u64>()?;
     Ok(raw)
 }
 

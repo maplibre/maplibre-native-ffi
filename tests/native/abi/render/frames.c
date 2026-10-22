@@ -1,7 +1,8 @@
-// Rendered frames: readback, the texture an acquired frame exposes through its
-// backend's getter, the checks every accessor and release makes, borrowed
-// views and disposal, the texture ring across a resize, physical sizes, and
-// the updates a camera transition publishes.
+// Rendered frames: readback, the pixel formats of an owned Metal ring, the
+// texture an acquired frame exposes through its backend's getter, the checks
+// every accessor and release makes, borrowed views and disposal, the texture
+// ring across a resize, physical sizes, and the updates a camera transition
+// publishes.
 
 #include <math.h>
 
@@ -10,7 +11,7 @@
 #include "support/style.h"
 #include "support/test_support.h"
 
-#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
 #include "support/host_graphics.h"
 #endif
 
@@ -78,6 +79,35 @@ static void texture_readback_copies_the_latest_rendered_frame(void) {
   mln_test_render_release_frame(&frame);
   detach(runtime, map, &fixture);
 }
+
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+// A session-owned Metal ring renders in the pixel format it attached with, and
+// reads back RGBA8 in either.
+static void an_owned_metal_ring_renders_in_its_pixel_format(void) {
+  // MTLPixelFormatRGBA8Unorm and MTLPixelFormatBGRA8Unorm.
+  const uint64_t formats[] = {70, 80};
+  for (size_t index = 0; index < 2; index += 1) {
+    mln_runtime runtime = mln_test_create_runtime();
+    mln_map map = mln_test_create_map(runtime);
+    mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
+    mln_test_render_fixture fixture = {0};
+    TEST_ASSERT_TRUE(mln_test_render_fixture_create_metal_owned_texture(
+      map, &fixture, formats[index]
+    ));
+    mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 270);
+    mln_metal_texture_frame texture = {.size = sizeof(texture)};
+    MLN_TEST_OK(mln_acquired_frame_get_metal_texture(frame, &texture, NULL));
+    TEST_ASSERT_EQUAL_UINT64(formats[index], texture.pixel_format);
+    mln_texture_image_info info = {0};
+    uint8_t pixel[4] = {0};
+    MLN_TEST_OK(mln_test_render_read_back(&fixture, &info, pixel, 4));
+    const uint8_t red[4] = {255, 0, 0, 255};
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(red, pixel, 4);
+    mln_test_render_release_frame(&frame);
+    detach(runtime, map, &fixture);
+  }
+}
+#endif
 
 enum frame_backend { METAL, VULKAN, OPENGL, WEBGPU };
 
@@ -772,6 +802,9 @@ static void a_camera_transition_publishes_an_update_after_every_frame(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(texture_readback_copies_the_latest_rendered_frame);
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  RUN_TEST(an_owned_metal_ring_renders_in_its_pixel_format);
+#endif
   RUN_TEST(only_the_sessions_backend_describes_its_frame_texture);
   RUN_TEST(accessors_and_release_reject_a_broken_frame_or_record);
   RUN_TEST(acquired_frame_release_after_abandon_is_cpu_only);

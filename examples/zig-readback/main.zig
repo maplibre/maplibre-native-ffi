@@ -301,6 +301,8 @@ fn attachOwnedTexture(
         try maplibre.mapAttachMetalOwnedTexture(allocator, map.*, .{
             .extent = extent,
             .context = context.descriptor(),
+            // MTLPixelFormatBGRA8Unorm, the format Apple's drawables use.
+            .pixel_format = 80,
         }, withDriver(wakes, .core_worker), null)
     else if (build_options.supports_opengl)
         try maplibre.mapAttachOpenglOwnedTexture(allocator, map.*, .{

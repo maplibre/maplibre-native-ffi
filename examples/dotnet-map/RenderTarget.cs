@@ -465,6 +465,7 @@ internal sealed class OwnedTextureRenderTarget : TextureRenderTarget
                             {
                                 Extent = viewport.LogicalExtent,
                                 Context = metal.Descriptor(),
+                                PixelFormat = MetalContext.MtlPixelFormatBgra8Unorm,
                             },
                             options
                         ),

@@ -24,6 +24,10 @@ static void surface_without_layer(void* call) {
 static void owned_without_device(void* call) {
   ((mln_test_target_call*)call)->descriptor.metal_owned.context.device = NULL;
 }
+static void owned_with_another_pixel_format(void* call) {
+  // MTLPixelFormatRGBA16Float.
+  ((mln_test_target_call*)call)->descriptor.metal_owned.pixel_format = 115;
+}
 static void borrowed_without_texture(void* call) {
   mln_test_target_call* edited = call;
   edited->textures.metal[0].texture = NULL;
@@ -167,6 +171,8 @@ static void metal_attach_rejects_malformed_calls(void) {
     MLN_TEST_DESCRIPTOR_CASES(metal_owned),
     MLN_TEST_OVERFLOW_CASE(metal_owned),
     {"null device", owned_without_device, MLN_STATUS_INVALID_ARGUMENT, NULL},
+    {"an unaccepted pixel format", owned_with_another_pixel_format,
+     MLN_STATUS_INVALID_ARGUMENT, "RGBA8Unorm or BGRA8Unorm"},
 #if !defined(MLN_FFI_TEST_BACKEND_METAL)
     {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},

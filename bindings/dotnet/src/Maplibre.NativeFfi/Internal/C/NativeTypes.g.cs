@@ -427,6 +427,7 @@ internal unsafe struct mln_metal_owned_texture_descriptor
     public uint size;
     public mln_logical_extent extent;
     public mln_metal_context_descriptor context;
+    public ulong pixel_format;
 }
 
 internal unsafe struct mln_metal_surface_descriptor

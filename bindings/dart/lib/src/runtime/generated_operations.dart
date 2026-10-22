@@ -1194,6 +1194,7 @@ _writeMetalOwnedTextureDescriptor(
   result.ref = raw.mln_metal_owned_texture_descriptor_default();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeMetalContextDescriptor(value.context, arena).ref;
+  result.ref.pixel_format = uint64ToNative(value.pixelFormat, 'uint64_t');
   return result;
 }
 
@@ -1202,6 +1203,7 @@ MetalOwnedTextureDescriptor _readMetalOwnedTextureDescriptor(
 ) => MetalOwnedTextureDescriptor(
   extent: _readLogicalExtent(source.extent),
   context: _readMetalContextDescriptor(source.context),
+  pixelFormat: uint64FromNative(source.pixel_format),
 );
 
 Pointer<raw.mln_metal_surface_descriptor> _writeMetalSurfaceDescriptor(

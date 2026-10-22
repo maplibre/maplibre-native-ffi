@@ -24,7 +24,6 @@ extern void objc_autoreleasePoolPop(void* pool);
 // Metal enum values stated directly, so the example needs no Objective-C
 // headers. Each matches its MTL* counterpart by name.
 static constexpr unsigned long mtl_pixel_format_bgra8_unorm = 80;
-static constexpr unsigned long mtl_pixel_format_rgba8_unorm = 70;
 static constexpr unsigned long mtl_load_action_clear = 2;
 static constexpr unsigned long mtl_store_action_store = 1;
 static constexpr unsigned long mtl_primitive_type_triangle = 3;
@@ -332,7 +331,7 @@ static app_error borrowed_texture_create(
     sel_registerName(
       "texture2DDescriptorWithPixelFormat:width:height:mipmapped:"
     ),
-    mtl_pixel_format_rgba8_unorm, current_viewport.physical_width,
+    mtl_pixel_format_bgra8_unorm, current_viewport.physical_width,
     current_viewport.physical_height, false
   );
   if (descriptor == nullptr) {
@@ -510,6 +509,7 @@ app_error render_target_attach(
       descriptor.extent = render_target_extent(current_viewport);
       descriptor.context =
         metal_context_descriptor(target->as.owned.compositor.view.device);
+      descriptor.pixel_format = mtl_pixel_format_bgra8_unorm;
       status = mln_map_attach_metal_owned_texture(
         map, &descriptor, &options, &session, &completion, &diagnostic
       );

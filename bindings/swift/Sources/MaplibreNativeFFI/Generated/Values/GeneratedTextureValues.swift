@@ -106,6 +106,10 @@ public struct MetalOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   public var extent: LogicalExtent
   /// Metal backend context. device is required.
   public var context: MetalContextDescriptor
+  /// Backend-native MTLPixelFormat value of the ring's textures: either
+  /// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Defaults to
+  /// MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
+  public var pixelFormat: UInt64
   public static var `default`: Self {
     Self(raw: mln_metal_owned_texture_descriptor_default())
   }
@@ -113,21 +117,25 @@ public struct MetalOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   public init(
     extent: LogicalExtent = MetalOwnedTextureDescriptor.default.extent,
     context: MetalContextDescriptor = MetalOwnedTextureDescriptor.default
-      .context
+      .context,
+    pixelFormat: UInt64 = MetalOwnedTextureDescriptor.default.pixelFormat
   ) {
     self.extent = extent
     self.context = context
+    self.pixelFormat = pixelFormat
   }
 
   init(raw: mln_metal_owned_texture_descriptor) {
     extent = LogicalExtent(raw: raw.extent)
     context = MetalContextDescriptor(raw: raw.context)
+    pixelFormat = raw.pixel_format
   }
 
   func nativeValue() -> mln_metal_owned_texture_descriptor {
     var raw = mln_metal_owned_texture_descriptor_default()
     raw.extent = extent.nativeValue()
     raw.context = context.nativeValue()
+    raw.pixel_format = pixelFormat
     return raw
   }
 }

@@ -1886,16 +1886,22 @@ pub const MetalOwnedTextureDescriptor = struct {
     extent: LogicalExtent,
     /// Metal backend context. device is required.
     context: MetalContextDescriptor,
+    /// Backend-native MTLPixelFormat value of the ring's textures: either
+    /// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Defaults to
+    /// MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
+    pixel_format: u64,
     pub fn toNative(self: MetalOwnedTextureDescriptor) c.mln_metal_owned_texture_descriptor {
         var raw = c.mln_metal_owned_texture_descriptor_default();
         raw.extent = self.extent.toNative();
         raw.context = self.context.toNative();
+        raw.pixel_format = self.pixel_format;
         return raw;
     }
     pub fn fromNative(raw: c.mln_metal_owned_texture_descriptor) MetalOwnedTextureDescriptor {
         return .{
             .extent = LogicalExtent.fromNative(raw.extent),
             .context = MetalContextDescriptor.fromNative(raw.context),
+            .pixel_format = raw.pixel_format,
         };
     }
 };

@@ -18,6 +18,9 @@
 
 namespace {
 
+static_assert(mln::core::metal_rgba8_unorm == MTL::PixelFormatRGBA8Unorm);
+static_assert(mln::core::metal_bgra8_unorm == MTL::PixelFormatBGRA8Unorm);
+
 auto metal_textures(std::span<const mln_metal_borrowed_texture> entries)
   -> std::vector<MTL::Texture*> {
   auto textures = std::vector<MTL::Texture*>{};
@@ -88,9 +91,10 @@ class MetalTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
   MetalTextureSessionBackend(
-    MTL::Device* host_device, mln::Size size, std::size_t ring_depth
+    MTL::Device* host_device, mln::Size size, std::size_t ring_depth,
+    MTL::PixelFormat pixel_format
   )
-      : backend_(host_device, size, ring_depth) {}
+      : backend_(host_device, size, ring_depth, pixel_format) {}
 
   MetalTextureSessionBackend(
     std::vector<MTL::Texture*> borrowed_textures, mln::Size size
@@ -218,15 +222,17 @@ auto metal_owned_texture_attach_start(
   auto device =
     NS::RetainPtr(static_cast<MTL::Device*>(descriptor->context.device));
   const auto ring_depth = attach_ring_depth(options);
-  session->initialize_backend = [device = std::move(device), ring_depth](
-                                  mln_render_session_object& target
-                                ) mutable {
-    target.texture.backend = std::make_unique<MetalTextureSessionBackend>(
-      device.get(), mln::Size{target.physical_width, target.physical_height},
-      ring_depth
-    );
-    return MLN_STATUS_OK;
-  };
+  const auto pixel_format =
+    static_cast<MTL::PixelFormat>(descriptor->pixel_format);
+  session->initialize_backend =
+    [device = std::move(device), ring_depth,
+     pixel_format](mln_render_session_object& target) mutable {
+      target.texture.backend = std::make_unique<MetalTextureSessionBackend>(
+        device.get(), mln::Size{target.physical_width, target.physical_height},
+        ring_depth, pixel_format
+      );
+      return MLN_STATUS_OK;
+    };
   const auto capabilities = mln_render_session_capabilities{
     .size = sizeof(mln_render_session_capabilities),
     .driver = 0,

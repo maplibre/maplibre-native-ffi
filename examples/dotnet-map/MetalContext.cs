@@ -6,8 +6,7 @@ namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal sealed unsafe class MetalContext : IGraphicsContext
 {
-    private const ulong MtlPixelFormatRgba8Unorm = 70;
-    private const ulong MtlPixelFormatBgra8Unorm = 80;
+    internal const ulong MtlPixelFormatBgra8Unorm = 80;
     private const ulong MtlTextureType2D = 2;
     private const ulong MtlTextureUsageShaderRead = 1;
     private const ulong MtlTextureUsageRenderTarget = 4;
@@ -106,7 +105,7 @@ internal sealed unsafe class MetalContext : IGraphicsContext
             using var pool = MacObjectiveC.AutoreleasePool();
             descriptor = MacObjectiveC.AllocInit("MTLTextureDescriptor");
             MacObjectiveC.SendVoid(descriptor, "setTextureType:", MtlTextureType2D);
-            MacObjectiveC.SendVoid(descriptor, "setPixelFormat:", MtlPixelFormatRgba8Unorm);
+            MacObjectiveC.SendVoid(descriptor, "setPixelFormat:", MtlPixelFormatBgra8Unorm);
             MacObjectiveC.SendVoid(descriptor, "setWidth:", (ulong)viewport.PhysicalWidth);
             MacObjectiveC.SendVoid(descriptor, "setHeight:", (ulong)viewport.PhysicalHeight);
             MacObjectiveC.SendVoid(descriptor, "setDepth:", 1UL);

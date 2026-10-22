@@ -27,6 +27,12 @@ typedef struct mln_metal_owned_texture_descriptor {
   mln_logical_extent extent;
   /** Metal backend context. device is required. */
   mln_metal_context_descriptor context;
+  /**
+   * Backend-native MTLPixelFormat value of the ring's textures: either
+   * MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Defaults to
+   * MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
+   */
+  uint64_t pixel_format;
 } mln_metal_owned_texture_descriptor;
 
 /** One caller-owned Metal texture of a borrowed texture ring. */
@@ -513,9 +519,9 @@ mln_webgpu_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
  *   options, or completion is null or undersized; a required backend handle is
  *   null; descriptor->extent has a zero width or height, a scale_factor that
  *   is not finite and positive, or a scaled dimension past UINT32_MAX;
- *   out_session is null or does not point to the null handle; or the
- *   requested driver kind is unknown, or options carry a malformed wake or
- *   queue lock.
+ *   descriptor->pixel_format is neither format it accepts; out_session is
+ *   null or does not point to the null handle; or the requested driver kind is
+ *   unknown, or options carry a malformed wake or queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or
  *   options enable a queue lock.

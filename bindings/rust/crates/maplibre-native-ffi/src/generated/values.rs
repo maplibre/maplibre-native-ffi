@@ -2543,6 +2543,10 @@ pub struct MetalOwnedTextureDescriptor {
     pub extent: LogicalExtent,
     /// Metal backend context. device is required.
     pub context: MetalContextDescriptor,
+    /// Backend-native MTLPixelFormat value of the ring's textures: either
+    /// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Defaults to
+    /// MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
+    pub pixel_format: u64,
 }
 impl Default for MetalOwnedTextureDescriptor {
     fn default() -> Self {
@@ -2550,8 +2554,16 @@ impl Default for MetalOwnedTextureDescriptor {
     }
 }
 impl MetalOwnedTextureDescriptor {
-    pub const fn new(extent: LogicalExtent, context: MetalContextDescriptor) -> Self {
-        Self { extent, context }
+    pub const fn new(
+        extent: LogicalExtent,
+        context: MetalContextDescriptor,
+        pixel_format: u64,
+    ) -> Self {
+        Self {
+            extent,
+            context,
+            pixel_format,
+        }
     }
 }
 impl ToNative<sys::mln_metal_owned_texture_descriptor> for MetalOwnedTextureDescriptor {
@@ -2561,6 +2573,7 @@ impl ToNative<sys::mln_metal_owned_texture_descriptor> for MetalOwnedTextureDesc
         raw.size = std::mem::size_of::<sys::mln_metal_owned_texture_descriptor>() as _;
         raw.extent = to_native(&self.extent, arena)?;
         raw.context = to_native(&self.context, arena)?;
+        raw.pixel_format = self.pixel_format;
         Ok(raw)
     }
 }
@@ -2569,6 +2582,7 @@ impl FromNative<sys::mln_metal_owned_texture_descriptor> for MetalOwnedTextureDe
         Ok(Self {
             extent: unsafe { from_native(raw.extent) }?,
             context: unsafe { from_native(raw.context) }?,
+            pixel_format: raw.pixel_format,
         })
     }
 }

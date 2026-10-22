@@ -1292,6 +1292,12 @@ export interface MetalOwnedTextureDescriptor {
    * Metal backend context. device is required.
    */
   context?: MetalContextDescriptor;
+  /**
+   * Backend-native MTLPixelFormat value of the ring's textures: either
+   * MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Defaults to
+   * MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
+   */
+  pixelFormat?: bigint;
 }
 
 /**

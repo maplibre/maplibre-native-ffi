@@ -246,6 +246,8 @@ internal sealed class RenderFixture : IDisposable
                 {
                     Extent = extent,
                     Context = new MetalContextDescriptor { Device = Borrow(context.MetalDevice) },
+                    // MTLPixelFormatBGRA8Unorm.
+                    PixelFormat = 80,
                 },
                 options
             ),

@@ -2387,11 +2387,20 @@ class MetalOwnedTextureDescriptor:
     )
     """Metal backend context. device is required."""
 
+    pixel_format: int = field(
+        default_factory=lambda: MetalOwnedTextureDescriptor.default().pixel_format
+    )
+    """Backend-native MTLPixelFormat value of the ring's textures: either
+    MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Defaults to
+    MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
+    """
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
             extent=LogicalExtent._from_native(raw["extent"]),
             context=MetalContextDescriptor._from_native(raw["context"]),
+            pixel_format=raw["pixel_format"],
         )
 
     @classmethod

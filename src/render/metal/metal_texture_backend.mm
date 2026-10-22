@@ -1,9 +1,10 @@
+#include <cstddef>
 #include <memory>
+#include <new>
 #include <utility>
 #include <vector>
 
 #include <mln/gfx/backend_scope.hpp>
-#include <mln/gfx/offscreen_texture.hpp>
 #include <mln/mtl/context.hpp>
 #include <mln/mtl/renderable_resource.hpp>
 #include <mln/mtl/texture2d.hpp>
@@ -12,6 +13,7 @@
 #include <Metal/MTLCommandBuffer.hpp>
 #include <Metal/MTLCommandQueue.hpp>
 #include <Metal/MTLRenderPass.hpp>
+#include <Metal/MTLTexture.hpp>
 #include <TargetConditionals.h>
 
 #include "render/metal/metal_texture_backend.inc"
@@ -23,18 +25,13 @@ class MetalTextureBackend::MetalTextureRenderableResource final
  public:
   MetalTextureRenderableResource(
     MetalTextureBackend& backend_, mln::mtl::Context& context_, mln::Size size_,
-    MTL::Texture* borrowed_texture_
+    MTL::Texture* borrowed_texture_, MTL::PixelFormat owned_pixel_format_
   )
       : backend(backend_),
         context(context_),
         size(size_),
-        borrowedTexture(borrowed_texture_) {
-    if (borrowedTexture == nullptr) {
-      offscreenTexture = context.createOffscreenTexture(
-        size, mln::gfx::TextureChannelDataType::UnsignedByte, true, true
-      );
-      return;
-    }
+        borrowedTexture(borrowed_texture_),
+        ownedPixelFormat(owned_pixel_format_) {
     depthTexture = context.createTexture2D();
     depthTexture->setSize(size);
     depthTexture->setFormat(
@@ -85,15 +82,26 @@ class MetalTextureBackend::MetalTextureRenderableResource final
     -> MetalTextureRenderableResource& = delete;
 
   ~MetalTextureRenderableResource() override {
-    if (borrowedTexture != nullptr) {
-      context.renderingStats().numFrameBuffers--;
-    }
+    context.renderingStats().numFrameBuffers--;
   }
 
   void bind() override {
-    if (offscreenTexture != nullptr) {
-      offscreenTexture->getResource<mln::mtl::RenderableResource>().bind();
-      return;
+    // mbgl's offscreen texture is RGBA8 only, so a session-owned ring makes
+    // its own color texture, on the first draw as mbgl's would.
+    if (borrowedTexture == nullptr && !ownedTexture) {
+      auto descriptor = NS::RetainPtr(
+        MTL::TextureDescriptor::texture2DDescriptor(
+          ownedPixelFormat, size.width, size.height, false
+        )
+      );
+      descriptor->setUsage(
+        MTL::TextureUsageShaderRead | MTL::TextureUsageShaderWrite |
+        MTL::TextureUsageRenderTarget
+      );
+      ownedTexture = context.createMetalTexture(std::move(descriptor));
+      if (!ownedTexture) {
+        throw std::bad_alloc();
+      }
     }
 
     assert(context.getBackend().getCommandQueue());
@@ -104,7 +112,7 @@ class MetalTextureBackend::MetalTextureRenderableResource final
     if (
       auto* colorTarget = renderPassDescriptor->colorAttachments()->object(0)
     ) {
-      colorTarget->setTexture(borrowedTexture);
+      colorTarget->setTexture(metal_texture());
     }
     if (depthTexture != nullptr) {
       depthTexture->create();
@@ -131,11 +139,6 @@ class MetalTextureBackend::MetalTextureRenderableResource final
   }
 
   void swap() override {
-    if (offscreenTexture != nullptr) {
-      offscreenTexture->getResource<mln::mtl::RenderableResource>().swap();
-      return;
-    }
-
     assert(commandBuffer);
     commandBuffer->commit();
     commandBuffer->waitUntilCompleted();
@@ -144,22 +147,28 @@ class MetalTextureBackend::MetalTextureRenderableResource final
   }
 
   auto readStillImage() -> mln::PremultipliedImage {
-    if (offscreenTexture == nullptr) {
+    if (borrowedTexture != nullptr || !ownedTexture) {
       return {};
     }
-    return offscreenTexture->readStillImage();
+    auto image = mln::PremultipliedImage{size};
+    ownedTexture->getBytes(
+      image.data.get(), static_cast<NS::UInteger>(size.width) * 4,
+      MTL::Region::Make2D(0, 0, size.width, size.height), 0
+    );
+    // Readback is RGBA8 in either of the ring's formats.
+    if (ownedPixelFormat == MTL::PixelFormatBGRA8Unorm) {
+      for (std::size_t offset = 0; offset < image.bytes(); offset += 4) {
+        std::swap(image.data[offset], image.data[offset + 2]);
+      }
+    }
+    return image;
   }
 
   auto metal_texture() -> MTL::Texture* {
     if (borrowedTexture != nullptr) {
       return borrowedTexture;
     }
-    // Offscreen textures are created by the Metal context for this backend.
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-    return static_cast<mln::mtl::Texture2D*>(
-             offscreenTexture->getTexture().get()
-    )
-      ->getMetalTexture();
+    return ownedTexture.get();
   }
 
   [[nodiscard]] auto getBackend() const
@@ -169,28 +178,16 @@ class MetalTextureBackend::MetalTextureRenderableResource final
 
   [[nodiscard]] auto getCommandBuffer() const
     -> const mln::mtl::MTLCommandBufferPtr& override {
-    if (offscreenTexture != nullptr) {
-      return offscreenTexture->getResource<mln::mtl::RenderableResource>()
-        .getCommandBuffer();
-    }
     return commandBuffer;
   }
 
   [[nodiscard]] auto getUploadPassDescriptor() const
     -> mln::mtl::MTLBlitPassDescriptorPtr override {
-    if (offscreenTexture != nullptr) {
-      return offscreenTexture->getResource<mln::mtl::RenderableResource>()
-        .getUploadPassDescriptor();
-    }
     return NS::TransferPtr(MTL::BlitPassDescriptor::alloc()->init());
   }
 
   [[nodiscard]] auto getRenderPassDescriptor() const
     -> const mln::mtl::MTLRenderPassDescriptorPtr& override {
-    if (offscreenTexture != nullptr) {
-      return offscreenTexture->getResource<mln::mtl::RenderableResource>()
-        .getRenderPassDescriptor();
-    }
     assert(renderPassDescriptor);
     return renderPassDescriptor;
   }
@@ -200,7 +197,8 @@ class MetalTextureBackend::MetalTextureRenderableResource final
   mln::mtl::Context& context;
   mln::Size size;
   MTL::Texture* borrowedTexture = nullptr;
-  std::unique_ptr<mln::gfx::OffscreenTexture> offscreenTexture;
+  MTL::PixelFormat ownedPixelFormat;
+  mln::mtl::MTLTexturePtr ownedTexture;
   mln::gfx::Texture2DPtr depthTexture;
   mln::gfx::Texture2DPtr stencilTexture;
   mln::mtl::MTLCommandBufferPtr commandBuffer;
@@ -208,10 +206,12 @@ class MetalTextureBackend::MetalTextureRenderableResource final
 };
 
 MetalTextureBackend::MetalTextureBackend(
-  MTL::Device* host_device, mln::Size size, std::size_t ring_depth
+  MTL::Device* host_device, mln::Size size, std::size_t ring_depth,
+  MTL::PixelFormat pixel_format
 )
     : mln::mtl::RendererBackend(mln::gfx::ContextMode::Unique),
       mln::gfx::HeadlessBackend(size),
+      owned_pixel_format_(pixel_format),
       ring_(ring_depth) {
   device = NS::RetainPtr(host_device);
   commandQueue = NS::TransferPtr(device->newCommandQueue());
@@ -243,7 +243,8 @@ auto MetalTextureBackend::getDefaultRenderable() -> mln::gfx::Renderable& {
       // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
       *this, static_cast<mln::mtl::Context&>(getContext()), getSize(),
       borrowed_textures_.empty() ? nullptr
-                                 : borrowed_textures_[ring_.selected()]
+                                 : borrowed_textures_[ring_.selected()],
+      owned_pixel_format_
     );
     // Recorded with the resource it describes, so a slot that keeps an older
     // resource keeps the size that resource was built for.

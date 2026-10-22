@@ -15,6 +15,8 @@ func attachOwnedTexture(
 	attachment, err := m.AttachMetalOwnedTexture(MetalOwnedTextureDescriptor{
 		Extent:  extent,
 		Context: MetalContextDescriptor{Device: context.MetalDevice},
+		// MTLPixelFormatBGRA8Unorm.
+		PixelFormat: 80,
 	}, options)
 	return attachment.Session, attachment.Completion, err
 }

@@ -2845,8 +2845,11 @@ final class MetalOwnedTextureDescriptor extends _Value {
   MetalOwnedTextureDescriptor({
     LogicalExtent? extent,
     MetalContextDescriptor? context,
+    BigInt? pixelFormat,
   }) : extent = extent ?? metalOwnedTextureDescriptorDefault().extent,
-       context = context ?? metalOwnedTextureDescriptorDefault().context;
+       context = context ?? metalOwnedTextureDescriptorDefault().context,
+       pixelFormat =
+           pixelFormat ?? metalOwnedTextureDescriptorDefault().pixelFormat;
 
   /// Logical texture extent. A scale_factor that differs from the map's is
   /// accepted and logged as a warning.
@@ -2855,8 +2858,13 @@ final class MetalOwnedTextureDescriptor extends _Value {
   /// Metal backend context. device is required.
   final MetalContextDescriptor context;
 
+  /// Backend-native MTLPixelFormat value of the ring's textures: either
+  /// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Defaults to
+  /// MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
+  final BigInt pixelFormat;
+
   @override
-  List<Object?> get _members => [extent, context];
+  List<Object?> get _members => [extent, context, pixelFormat];
 }
 
 /// Metal attachment options for a native surface.

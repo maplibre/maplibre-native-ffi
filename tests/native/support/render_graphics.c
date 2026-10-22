@@ -47,6 +47,11 @@ static mln_test_graphics* shared_graphics = NULL;
 #if defined(HOST_OPENGL)
 static bool attach_fence_sync = false;
 #endif
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+// Set only while mln_test_render_fixture_create_metal_owned_texture()
+// attaches; zero leaves the descriptor's default.
+static uint64_t attach_pixel_format = 0;
+#endif
 
 static void host_state_free(host_state* state) {
   if (state->owns_graphics) {
@@ -196,6 +201,7 @@ bool mln_test_backend_attach(
     mln_metal_owned_texture_descriptor_default();
   descriptor.extent = host_extent();
   descriptor.context = host_context(&state->context);
+  if (attach_pixel_format != 0) descriptor.pixel_format = attach_pixel_format;
   *out_status = mln_map_attach_metal_owned_texture(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
@@ -428,6 +434,17 @@ bool mln_test_render_fixture_create_borrowed_ring(
   attach_ring_depth = 1;
   return attached;
 }
+
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+bool mln_test_render_fixture_create_metal_owned_texture(
+  mln_map map, mln_test_render_fixture* fixture, uint64_t pixel_format
+) {
+  attach_pixel_format = pixel_format;
+  const bool attached = mln_test_render_fixture_create(map, fixture);
+  attach_pixel_format = 0;
+  return attached;
+}
+#endif
 
 #if defined(HOST_OPENGL)
 bool mln_test_render_fixture_create_opengl_fence_texture(

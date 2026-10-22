@@ -40,6 +40,14 @@ bool mln_test_render_fixture_create_borrowed_ring(
   mln_map map, mln_test_render_fixture* fixture, size_t depth, uint32_t driver
 );
 
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+// mln_test_render_fixture_create() for a session-owned ring of `pixel_format`,
+// an MTLPixelFormat value.
+bool mln_test_render_fixture_create_metal_owned_texture(
+  mln_map map, mln_test_render_fixture* fixture, uint64_t pixel_format
+);
+#endif
+
 #if defined(MLN_FFI_TEST_BACKEND_OPENGL)
 // Attaches a shared OpenGL texture target with fence producer synchronization.
 bool mln_test_render_fixture_create_opengl_fence_texture(

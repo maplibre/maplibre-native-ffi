@@ -99,7 +99,12 @@ function attachOwnedTexture(
   const extent = renderExtent;
   if (backend === "metal") {
     return map.attachMetalOwnedTexture(
-      { extent, context: { device: context.metalDevice } },
+      {
+        extent,
+        context: { device: context.metalDevice },
+        // MTLPixelFormatBGRA8Unorm.
+        pixelFormat: 80n,
+      },
       options,
     );
   }

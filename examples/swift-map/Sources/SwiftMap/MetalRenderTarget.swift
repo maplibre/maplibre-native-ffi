@@ -102,7 +102,8 @@ final class MetalRenderTarget {
         map.attachMetalOwnedTexture(
           descriptor: MetalOwnedTextureDescriptor(
             extent: viewport.extent,
-            context: graphics.contextDescriptor
+            context: graphics.contextDescriptor,
+            pixelFormat: UInt64(MTLPixelFormat.bgra8Unorm.rawValue)
           ),
           options: options
         )
@@ -394,7 +395,7 @@ final class MetalBorrowedTexture {
 
   init(graphics: MetalGraphicsContext, viewport: Viewport) throws {
     let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-      pixelFormat: .rgba8Unorm,
+      pixelFormat: .bgra8Unorm,
       width: Int(viewport.physicalWidth),
       height: Int(viewport.physicalHeight),
       mipmapped: false

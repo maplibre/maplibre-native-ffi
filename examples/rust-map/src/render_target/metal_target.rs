@@ -1,6 +1,7 @@
 use std::error::Error as StdError;
 
 use maplibre_native_ffi::{MapHandle, RenderDriverKind};
+use objc2_metal::MTLPixelFormat;
 
 use crate::graphics::GraphicsContext;
 use crate::metal::{MetalBorrowedTexture, MetalTextureCompositor};
@@ -48,6 +49,7 @@ impl RenderTarget {
                 let descriptor = maplibre_native_ffi::MetalOwnedTextureDescriptor {
                     extent: extent(viewport),
                     context: metal.context_descriptor(),
+                    pixel_format: MTLPixelFormat::BGRA8Unorm.0 as u64,
                 };
                 let session = Session::new(
                     unsafe { map.attach_metal_owned_texture(&descriptor, &options) }?,

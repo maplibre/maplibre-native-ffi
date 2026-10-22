@@ -1603,6 +1603,11 @@ napi_value mln_ts_read_metal_owned_texture_descriptor(
         )
       ))
     return NULL;
+  if (!mln_ts_set(
+        env, result, "pixelFormat",
+        mln_ts_u64(env, (uint64_t)(source->pixel_format))
+      ))
+    return NULL;
   return result;
 }
 
@@ -5858,6 +5863,15 @@ bool mln_ts_write_metal_owned_texture_descriptor(
           call, member, &out->context, child
         ))
       return false;
+  }
+  if (!mln_ts_member(call, value, "pixelFormat", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "pixelFormat");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->pixel_format = (uint64_t)number;
+    }
   }
   return true;
 }

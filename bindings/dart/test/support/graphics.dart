@@ -151,6 +151,8 @@ final class TestGraphics {
             context: MetalContextDescriptor(
               device: pointer(context.metalDevice),
             ),
+            // MTLPixelFormatBGRA8Unorm.
+            pixelFormat: BigInt.from(80),
           ),
           options,
         );

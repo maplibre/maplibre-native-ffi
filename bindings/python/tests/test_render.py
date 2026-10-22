@@ -170,6 +170,8 @@ class OwnedTexture:
                     context=mln.MetalContextDescriptor(
                         device=context.metal_device or 0
                     ),
+                    # MTLPixelFormatBGRA8Unorm.
+                    pixel_format=80,
                 ),
                 options,
             )

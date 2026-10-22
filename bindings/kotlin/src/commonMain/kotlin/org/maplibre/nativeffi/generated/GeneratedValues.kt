@@ -3067,6 +3067,12 @@ public data class MetalOwnedTextureDescriptor(
   public val extent: LogicalExtent = MetalOwnedTextureDescriptor.default.extent,
   /** Metal backend context. device is required. */
   public val context: MetalContextDescriptor = MetalOwnedTextureDescriptor.default.context,
+  /**
+   * Backend-native MTLPixelFormat value of the ring's textures: either MTLPixelFormatRGBA8Unorm or
+   * MTLPixelFormatBGRA8Unorm. Defaults to MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for
+   * either format.
+   */
+  public val pixelFormat: ULong = MetalOwnedTextureDescriptor.default.pixelFormat,
 ) {
   public companion object {
     internal val default: MetalOwnedTextureDescriptor by lazy {

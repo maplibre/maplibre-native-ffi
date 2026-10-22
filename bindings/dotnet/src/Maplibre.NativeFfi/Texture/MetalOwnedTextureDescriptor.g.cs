@@ -16,13 +16,19 @@ namespace Maplibre.NativeFfi;
 /// <param name="Context">
 /// Metal backend context. device is required.
 /// </param>
+/// <param name="PixelFormat">
+/// Backend-native MTLPixelFormat value of the ring's textures: either
+/// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Defaults to
+/// MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
+/// </param>
 public readonly partial record struct MetalOwnedTextureDescriptor(
     LogicalExtent Extent,
-    MetalContextDescriptor Context
+    MetalContextDescriptor Context,
+    ulong PixelFormat
 )
 {
     public MetalOwnedTextureDescriptor()
-        : this(default!, default!)
+        : this(default!, default!, default!)
     {
         this = Default;
     }
