@@ -587,31 +587,11 @@ case "$operation" in
       usage
       exit 2
     fi
-    release_version_args=()
-    if [[ -n "$version" ]]; then
-      release_version_args=("-Pmaplibre.maven.version=$version")
-    fi
     verify_args=("$partition")
     if [[ -n "$version" ]]; then
       verify_args+=("$version")
     fi
     mise run //:kotlin:verify-staging "${verify_args[@]}"
-
-    ./gradlew \
-      :examples:compose-map:packageUberJarForCurrentOS \
-      :examples:lwjgl-map:installDist \
-      -Pmaplibre.usePublishedKotlin=true \
-      -Pmaplibre.runtime.backend=metal \
-      "${release_version_args[@]}" \
-      -Pmaplibre.maven.localRepository="$partition"
-
-    ./gradlew \
-      :examples:android-map:assembleDebug \
-      -Pmaplibre.usePublishedKotlin=true \
-      -Pmaplibre.android.backend=opengl \
-      -Pmaplibre.android.abis=armeabi-v7a,arm64-v8a,x86_64 \
-      "${release_version_args[@]}" \
-      -Pmaplibre.maven.localRepository="$partition"
     ;;
   *)
     usage

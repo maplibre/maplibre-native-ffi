@@ -19,8 +19,8 @@ const uses_egl = build_options.supports_opengl and
     (builtin.os.tag == .linux or builtin.os.tag == .macos);
 
 /// Whether this run is a smoke test, which `MLN_EXAMPLE_SMOKE=1` selects: the
-/// example loads an inline style instead of fetching one and exits after its
-/// first rendered frame.
+/// example opens a hidden window, loads an inline style instead of fetching
+/// one, and exits after its first rendered frame.
 fn isSmokeRun(init_args: std.process.Init) bool {
     const value = init_args.environ_map.get("MLN_EXAMPLE_SMOKE") orelse return false;
     return std.mem.eql(u8, value, "1");
@@ -66,13 +66,10 @@ pub fn main(init_args: std.process.Init) !void {
         }
     }
 
-    // Mesa's Windows Vulkan presenter copies pixels with StretchBlt, which
-    // needs a visible window even during the smoke run.
-    const visible = !smoke or (builtin.os.tag == .windows and build_options.supports_vulkan);
     const window_flags = RenderTarget.window_flags |
         c.SDL_WINDOW_RESIZABLE |
         c.SDL_WINDOW_HIGH_PIXEL_DENSITY |
-        (if (visible) 0 else c.SDL_WINDOW_HIDDEN);
+        (if (smoke) c.SDL_WINDOW_HIDDEN else 0);
     const window = c.SDL_CreateWindow(
         "MapLibre SDL3 Map",
         viewport.window_width,

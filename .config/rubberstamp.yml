@@ -94,9 +94,8 @@ labels:
       also about the bindings only when the binding layer needs its own design
       or fixes.
     "area:examples": >-
-      The demo apps in `examples/` (android-map, c-map, compose-map, dotnet-map,
-      go-map, lwjgl-map, rust-map, swift-map, zig-map, zig-readback) and the
-      hosts they run in.
+      The demo apps in `examples/` (c-map, dotnet-map, go-map, rust-map,
+      swift-map, zig-map, zig-readback) and the hosts they run in.
     "area:docs": >-
       The documentation as the subject: the documentation site, the
       specifications, public header comments, API reference generation,
@@ -112,8 +111,7 @@ labels:
       MapLibre Native, such as the C++ in `src/` that wraps it, does not
       qualify.
     "binding:kotlin": >-
-      The Kotlin binding, or an example built with it: android-map, compose-map,
-      or lwjgl-map.
+      The Kotlin binding and its runtime publications.
     "binding:swift": >-
       The Swift binding, or an example built with it such as swift-map.
     "binding:rust": >-
@@ -294,15 +292,13 @@ ci:
         Android on ARM, ARM64, and x64 with OpenGL ES (EGL) and Vulkan, built
         with the NDK. The x64 jobs run the C API, Kotlin, Go, Rust, Zig, and
         Python tests in the Android emulator; the ARM jobs only build. Also
-        builds the Dart binding and the Android example, and verifies multi-ABI
-        packaging. Catches NDK, Android API, JNI, emulator, and AAR packaging
-        problems. Platform-independent code that Linux x64 already tests does
-        not need it.
+        builds the Dart binding and verifies multi-ABI packaging. Catches NDK,
+        Android API, JNI, emulator, and AAR packaging problems.
+        Platform-independent code that Linux x64 already tests does not need it.
       paths:
         - src/platform/android/*
         - cmake/platform/android.cmake
         - mise.android.*
-        - examples/android-map/*
         - bindings/kotlin/src/android*
         - .mise/tasks/kotlin/check-android-api-floor
         - .mise/tasks/kotlin/verify-android-multi-abi

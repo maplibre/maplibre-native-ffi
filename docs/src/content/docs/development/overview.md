@@ -149,6 +149,12 @@ Each target job runs every suite even after one fails, and a final step fails
 the job. CI retries a failed run once when every failed job failed in an
 infrastructure step that `ci/retry.py` lists.
 
+Windows x64 jobs use Blacksmith's software graphics drivers. The native Vulkan
+suite runs through `ci/with-windows-console.ps1` in the VM's interactive desktop
+session because Mesa presents Win32 surfaces through GDI. The fixture shows
+those windows so that presentation succeeds. WGL, binding suites, and headless
+examples run in the runner's service session. Windows ARM64 uses GitHub runners.
+
 `ci/snapshots.toml` declares the inputs of each component that the daily
 snapshot workflow publishes, and `mise run ci:check-snapshot-scopes` keeps every
 tracked path classified.

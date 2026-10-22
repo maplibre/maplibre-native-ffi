@@ -1,14 +1,11 @@
 [versions]
 kotlin = "2.4.21"
-compose = "1.12.2"
 agp = "9.1.1"
 dokka = "2.2.0"
 maven-publish = "0.37.0"
 coroutines = "1.11.0"
-lwjgl = "3.4.3"
 android-compileSdk = "36"
 android-minSdk = "24"
-android-targetSdk = "36"
 java-toolchain = "25"
 java-release = "24"
 java-android-release = "17"
@@ -17,16 +14,6 @@ androidx-test-runner = "1.7.0"
 [libraries]
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
 coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
-lwjgl-bom = { module = "org.lwjgl:lwjgl-bom", version.ref = "lwjgl" }
-lwjgl = { module = "org.lwjgl:lwjgl" }
-lwjgl-egl = { module = "org.lwjgl:lwjgl-egl" }
-lwjgl-glfw = { module = "org.lwjgl:lwjgl-glfw" }
-lwjgl-opengl = { module = "org.lwjgl:lwjgl-opengl" }
-lwjgl-opengles = { module = "org.lwjgl:lwjgl-opengles" }
-lwjgl-vulkan = { module = "org.lwjgl:lwjgl-vulkan" }
-lwjgl-shaderc = { module = "org.lwjgl:lwjgl-shaderc" }
 
 [plugins]
-compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose" }
-compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }

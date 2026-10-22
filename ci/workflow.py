@@ -72,7 +72,7 @@ def backend(preset: str) -> str:
 
 # Blacksmith runs CI through its open source program. Windows ARM64 uses
 # GitHub-hosted runners. Windows x64 uses Mesa software drivers for the native
-# suites and the windowed smoke apps.
+# suites and the headless smoke app.
 LINUX_RUNNER = "blacksmith-4vcpu-ubuntu-2404"
 LINUX_ARM_RUNNER = "blacksmith-4vcpu-ubuntu-2404-arm"
 MACOS_RUNNER = "blacksmith-6vcpu-macos-26"
@@ -138,6 +138,10 @@ def suite_steps(
                 continue
             if preset in command.get("exclude", []):
                 continue
+            # Windows surface coverage lives in the native suite. Windowed
+            # examples run on Linux and macOS; headless examples still run here.
+            if command.get("display") and platform(preset) == "windows":
+                continue
             arguments = [str(command["task"])]
             # A command with `preset = false` runs once for the job it lands in
             # rather than against the job's build tree.
@@ -151,7 +155,7 @@ def suite_steps(
     return commands
 
 
-def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
+def android_commands(preset: str, abi: str) -> list[str]:
     render_backend = "opengl" if backend(preset) == "egl" else backend(preset)
     arguments = f"{render_backend} {abi}"
     if preset in EMULATOR_TESTED:
@@ -173,15 +177,6 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
             f"mise run //bindings/rust:build {preset}",
             f"mise run //bindings/zig:build {preset}",
         ]
-    if build_map:
-        # The example draws with either backend, so every emulator target
-        # renders it; the others only build it.
-        if preset in EMULATOR_TESTED:
-            commands.append(f"mise run //examples/android-map:smoke {preset}")
-        else:
-            commands.append(
-                f"mise run //examples/android-map:build {arguments} --prebuilt"
-            )
     commands.append(f"mise run //bindings/dart:build:mobile {preset}")
     return commands
 
@@ -251,7 +246,7 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
             "arm64": "arm64-v8a",
             "x64": "x86_64",
         }[architecture(preset)]
-        commands.extend(android_commands(preset, abi, True))
+        commands.extend(android_commands(preset, abi))
     elif target_platform == "ohos":
         commands.extend(ohos_commands(preset))
     elif target_platform == "ios":
@@ -316,9 +311,6 @@ def uses_zig(commands: list[str]) -> bool:
 
 GRADLE_PROJECTS = (
     "mise run //bindings/kotlin:",
-    "mise run //examples/android-map:",
-    "mise run //examples/compose-map:",
-    "mise run //examples/lwjgl-map:",
     "mise run //:kotlin:",
 )
 

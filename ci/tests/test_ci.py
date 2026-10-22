@@ -88,9 +88,42 @@ class BindingWorkflowTest(unittest.TestCase):
             f"{XVFB_RUN} mise run //examples/zig-map:smoke linux-gnu-x64-egl",
             linux["consumer_commands"],
         )
-        # The wrapped Zig and Gradle examples still count toward their caches.
+        # The wrapped Zig example and Kotlin binding still enable their caches.
         self.assertTrue(linux["zig"])
         self.assertTrue(linux["gradle"])
+
+    def test_windows_keeps_native_and_binding_suites_and_headless_examples(self):
+        jobs = self.workflows["ci-coverage.yml"]["jobs"]
+        for arch in ("x64", "arm64"):
+            for backend in ("wgl", "vulkan"):
+                preset = f"windows-{arch}-{backend}"
+                with self.subTest(preset=preset):
+                    job = jobs[f"target-{preset}"]
+                    commands = [s["run"] for s in job["steps"] if "run" in s]
+                    native = next(s for s in job["steps"] if s.get("id") == "suite-1")
+                    if preset == "windows-x64-vulkan":
+                        self.assertIn("with-windows-console.ps1", native["run"])
+                        self.assertEqual(native["shell"], "pwsh")
+                    else:
+                        self.assertEqual(native["run"], f"mise run test {preset}")
+                    for binding in ("rust", "kotlin", "dotnet", "python", "dart"):
+                        self.assertIn(
+                            f"mise run //bindings/{binding}:test {preset}", commands
+                        )
+                    for example in ("rust-map", "zig-map", "dotnet-map"):
+                        self.assertFalse(
+                            any(f"//examples/{example}:smoke" in c for c in commands)
+                        )
+                    if arch == "x64":
+                        self.assertTrue(job["runs-on"].startswith("blacksmith-"))
+                        self.assertIn(
+                            f"mise run //bindings/zig:test {preset}", commands
+                        )
+                        self.assertIn(
+                            f"mise run //examples/zig-readback:smoke {preset}", commands
+                        )
+                    else:
+                        self.assertEqual(job["runs-on"], "windows-11-arm")
 
     def test_a_suite_environment_reaches_its_commands_in_the_listed_targets(self):
         source = copy.deepcopy(self.source)

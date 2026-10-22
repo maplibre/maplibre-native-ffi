@@ -20,21 +20,19 @@ internal static class Shell
             """u8.ToArray();
 
     /// <summary>
-    /// Runs the example until its window closes. A smoke run renders an inline style and tears
-    /// down as a closed window would after the first frame that reaches the window.
+    /// Runs the example until its window closes. A smoke run instead renders an inline style in a
+    /// hidden window, so it needs no network, and tears down as a closed window would after the
+    /// first frame that reaches the window.
     /// </summary>
     /// <returns>False when a smoke run rendered no frame before its deadline.</returns>
     public static bool Run(RenderTargetMode mode, RenderBackendFlag backends, bool smoke)
     {
-        // Mesa's Windows Vulkan presenter uses StretchBlt, which needs a visible window.
-        var visible =
-            !smoke || (OperatingSystem.IsWindows() && backends.HasFlag(RenderBackendFlag.Vulkan));
         using var graphics = GraphicsContext.Create(
             "dotnet-map",
             InitialWidth,
             InitialHeight,
             backends,
-            visible: visible
+            visible: !smoke
         );
         using var state = MapState.Create(graphics.ReadViewport(), smoke ? SmokeStyle : null);
         using var input = new InputController(graphics.Window, state);

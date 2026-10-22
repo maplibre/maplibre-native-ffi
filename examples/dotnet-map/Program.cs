@@ -85,7 +85,7 @@ internal static class Program
 
     /// <summary>
     /// Whether <c>MLN_EXAMPLE_SMOKE=1</c> selects a smoke run, which renders one frame in a
-    /// window and exits.
+    /// hidden window and exits.
     /// </summary>
     private static bool SmokeMode() =>
         Environment.GetEnvironmentVariable("MLN_EXAMPLE_SMOKE") == "1";

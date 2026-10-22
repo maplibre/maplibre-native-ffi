@@ -239,11 +239,11 @@ Verification checks:
 - JNI library placement and Rustls helper presence in Android AARs;
 - Android runtime publications resolving without the Kotlin binding;
 - native resource presence in JVM classifier JARs;
-- Dokka-generated API pages in every API-bearing javadoc JAR;
-- published JVM consumption through the Compose and LWJGL examples;
-- published Android consumption through the Android map example.
+- Dokka-generated API pages in every API-bearing javadoc JAR.
 
-The binding suites cover Kotlin/Native behavior.
+The binding suites cover Kotlin/Native behavior. Downstream projects such as
+[MapLibre Compose](https://github.com/maplibre/maplibre-compose) exercise the
+published JVM and Android artifacts in applications.
 
 ## Tagged release finalization
 

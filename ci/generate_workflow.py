@@ -7,7 +7,6 @@ import difflib
 import io
 import pathlib
 import re
-import shlex
 import sys
 
 from ruamel.yaml import YAML
@@ -21,7 +20,6 @@ from ci.workflow import (
     SMALL_RUNNER,
     load_configuration,
     runner,
-    suite_commands,
     target_rows,
 )
 
@@ -151,6 +149,20 @@ def target_job(row: dict) -> dict:
         suites.append(f"suite-{len(suites) + 1}")
         env = {**(env or {}), **row["environment"].get(command, {})}
         fields = {"env": env} if env else {}
+        # Lavapipe presents Win32 surfaces through GDI, which needs the VM's
+        # interactive desktop. WGL and the binding suites run in service session 0.
+        if preset == "windows-x64-vulkan" and command == f"mise run test {preset}":
+            command = (
+                "./ci/with-windows-console.ps1 "
+                f"-Command @('mise', 'run', 'test', '{preset}')"
+            )
+            fields.update(
+                {
+                    "name": "Run native tests in the Windows desktop session",
+                    "shell": "pwsh",
+                    "timeout-minutes": 15,
+                }
+            )
         steps.append(run(command, id=suites[-1], **{"if": guard()}, **fields))
 
     for command in checks:
@@ -476,101 +488,11 @@ def retry_workflow() -> dict:
     }
 
 
-def windows_probe_workflow(source: dict, presets: dict) -> dict:
-    """Temporarily run only Windows x64 while investigating Blacksmith."""
-
-    def console_command(command: str) -> str:
-        arguments = ", ".join(
-            "'" + argument.replace("'", "''") + "'" for argument in shlex.split(command)
-        )
-        return f"./ci/with-windows-console.ps1 -Command @({arguments})"
-
-    workflow = ci_workflow(source, presets)
-    desktop_source = {
-        **source,
-        "suites": [
-            {
-                **suite,
-                "commands": [c for c in suite["commands"] if c.get("display")],
-            }
-            for suite in source["suites"]
-        ],
-    }
-    selected = {"target-windows-x64-wgl", "target-windows-x64-vulkan"}
-    jobs = workflow["jobs"]
-    # Keep the coverage generator and required check intact. This draft's plan
-    # is fixed, so Rubberstamp cannot expand it to unrelated targets.
-    jobs["plan"]["outputs"] = {"all": "false", "units": '["windows"]'}
-    for name, job in jobs.items():
-        if name in {"plan", "required"}:
-            continue
-        if name not in selected:
-            job["needs"] = list(dict.fromkeys(["plan", *job.get("needs", [])]))
-            job["if"] = "fromJSON(needs.plan.outputs.all)"
-            continue
-        job["steps"].insert(
-            1,
-            run(
-                "./ci/windows-desktop-probe.ps1",
-                name="Inspect Windows desktop and session",
-                shell="pwsh",
-            ),
-        )
-        job["steps"].insert(
-            2,
-            run(
-                console_command("pwsh -NoProfile -File ./ci/windows-desktop-probe.ps1"),
-                name="Inspect Windows console desktop",
-                shell="pwsh",
-                **{"timeout-minutes": 3},
-            ),
-        )
-        display_commands = set(
-            suite_commands(desktop_source, name.removeprefix("target-"))
-        )
-        for step in job["steps"]:
-            if step.get("id", "").startswith("suite-"):
-                step["timeout-minutes"] = 15
-                if step["id"] == "suite-1" or step["run"] in display_commands:
-                    step["shell"] = "pwsh"
-                    step["run"] = console_command(step["run"])
-        native_index = next(
-            i for i, step in enumerate(job["steps"]) if step.get("id") == "suite-1"
-        )
-        job["steps"].insert(
-            native_index + 1,
-            action(
-                "actions/upload-artifact",
-                {
-                    "name": f"diagnostics-{name}",
-                    "path": f"build/{name.removeprefix('target-')}/Testing/Temporary/",
-                    "if-no-files-found": "warn",
-                },
-                name="Upload native test diagnostics",
-                **{"if": "always()"},
-            ),
-        )
-        job["steps"].insert(
-            -1,
-            action(
-                "actions/upload-artifact",
-                {
-                    "name": f"console-logs-{name}",
-                    "path": "build/windows-console-logs/",
-                    "if-no-files-found": "warn",
-                },
-                name="Upload Windows console logs",
-                **{"if": "always()"},
-            ),
-        )
-    return workflow
-
-
 def workflows(source: dict, presets: dict) -> dict[str, dict]:
     return {
         # A closed pull request runs the workflow file in its frozen merge ref,
         # so the old ci.yml path stays disabled in the repository settings.
-        "ci-coverage.yml": windows_probe_workflow(source, presets),
+        "ci-coverage.yml": ci_workflow(source, presets),
         "ci-retry.yml": retry_workflow(),
     }
 

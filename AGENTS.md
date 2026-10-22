@@ -19,7 +19,7 @@ tests/
   bindgen/                Generator tests and protocol fixtures
   conformance/            Cases that every binding suite maps to a test
   graphics/               GPU fixtures for every test suite (see README.md)
-examples/                 One map app per binding and toolkit (see README.md)
+examples/                 Map apps and headless rendering examples (see README.md)
 docs/                     Astro/Starlight site; development/ is for maintainers
 ci/                       Workflow generator, coverage planning, release tools
 cmake/, CMakePresets.json Native build and the target/backend presets

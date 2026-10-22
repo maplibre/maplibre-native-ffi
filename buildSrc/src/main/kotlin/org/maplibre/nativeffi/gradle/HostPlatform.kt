@@ -16,17 +16,6 @@ class HostPlatform private constructor(osName: String, arch: String) {
   val isArm64: Boolean
     get() = arch == "aarch64" || arch == "arm64"
 
-  val lwjglNativeClassifier: String
-    get() =
-      when {
-        isMac && isArm64 -> "natives-macos-arm64"
-        isLinux && isArm64 -> "natives-linux-arm64"
-        isLinux -> "natives-linux"
-        isWindows && isArm64 -> "natives-windows-arm64"
-        isWindows -> "natives-windows"
-        else -> throw IllegalStateException("Unsupported LWJGL native platform: $osName/$arch")
-      }
-
   val maplibreNativeClassifier: String
     get() =
       when {
