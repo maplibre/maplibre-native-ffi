@@ -2,6 +2,22 @@
 //!
 //! This crate mirrors the C boundary: constants, layouts, opaque handle types,
 //! and unsafe extern functions. Prefer the safe `maplibre-native-ffi` crate.
+//!
+//! # Linking
+//!
+//! The build script links the native library statically. It takes the library
+//! from the local build that `MAPLIBRE_NATIVE_FFI_LOCAL_BUILD` names: the
+//! absolute path of an install prefix, or of a build directory holding
+//! `<preset>/install` for each target. Without one, a published crate
+//! downloads the release that it was published against, from the base URL in
+//! `MAPLIBRE_NATIVE_FFI_RELEASE_URL` when that is set.
+//!
+//! The `metal`, `opengl`, `vulkan`, and `webgpu` features select the render
+//! backend, and at most one can be enabled. Without one, a target takes Metal
+//! on Apple platforms, OpenGL on Android and OpenHarmony, WebGPU in the
+//! browser, and Vulkan elsewhere. Dependents read the backend from
+//! `DEP_MAPLIBRE_NATIVE_C_RENDER_BACKEND` and the install prefix from
+//! `DEP_MAPLIBRE_NATIVE_C_PREFIX`.
 
 #![allow(non_camel_case_types)]
 

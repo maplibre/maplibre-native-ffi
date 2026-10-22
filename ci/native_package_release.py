@@ -84,6 +84,18 @@ def native_archives(
     return [release_dir / name for name in sorted(expected)]
 
 
+def archive_digests(checksums: str) -> dict[str, str]:
+    """The SHA-256 digest of each native archive that SHA256SUMS lists."""
+    digests = {}
+    for line in checksums.splitlines():
+        digest, _, name = line.partition("  ")
+        if name.startswith(ARCHIVE_PREFIX) and name.endswith(ARCHIVE_SUFFIX):
+            digests[name] = digest
+    if not digests:
+        raise SystemExit("SHA256SUMS lists no native archives")
+    return dict(sorted(digests.items()))
+
+
 def safe_member_name(member: tarfile.TarInfo, root: str) -> None:
     path = pathlib.PurePosixPath(member.name)
     if path.is_absolute() or ".." in path.parts:

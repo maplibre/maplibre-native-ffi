@@ -80,7 +80,7 @@ export CIBW_CONFIG_SETTINGS_ANDROID='build-args=--no-default-features'
 # The wheel build names the NDK compiler as CC, and a cross build still
 # compiles build scripts for the machine doing the build.
 host_cc=$(command -v cc)
-export CIBW_ENVIRONMENT_ANDROID="MAPLIBRE_NATIVE_C_INSTALL_DIR=$native_install_dir HOST_CC=$host_cc"
+export CIBW_ENVIRONMENT_ANDROID="MAPLIBRE_NATIVE_FFI_LOCAL_BUILD=$native_install_dir HOST_CC=$host_cc"
 # The graphics loader comes from Android, so wheel repair leaves it external.
 export CIBW_REPAIR_WHEEL_COMMAND_ANDROID="auditwheel repair --exclude $system_graphics_library --ldpaths {ldpaths} -w {dest_dir} {wheel}"
 export CIBW_TEST_COMMAND_ANDROID='python -m pytest tests'

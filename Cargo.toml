@@ -13,10 +13,18 @@ exclude = [
   "build/dependencies/rustls-platform-verifier/rustls-platform-verifier",
 ]
 
+# The release workflow stamps the release version into the published crates,
+# here and in their requirements on each other, which ship in lockstep.
 [workspace.package]
+version = "0.0.0"
 edition = "2024"
+homepage = "https://maplibre.org/maplibre-native-ffi/"
 license = "BSD-2-Clause"
 repository = "https://github.com/maplibre/maplibre-native-ffi"
+
+[workspace.dependencies]
+maplibre-native-ffi-core = { path = "bindings/rust/crates/maplibre-native-ffi-core", version = "=0.0.0" }
+maplibre-native-ffi-sys = { path = "bindings/rust/crates/maplibre-native-ffi-sys", version = "=0.0.0" }
 
 [patch.crates-io]
 rustls-platform-verifier = { path = "build/dependencies/rustls-platform-verifier/rustls-platform-verifier" }

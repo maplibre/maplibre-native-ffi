@@ -1,8 +1,19 @@
 [package]
 name = "maplibre-native-ffi-sys"
-version = "0.0.0"
+description = "Raw declarations for the MapLibre Native C API, and the native library they link."
+version.workspace = true
 build = "build.rs"
+categories = ["external-ffi-bindings", "graphics", "rendering"]
 edition.workspace = true
+homepage.workspace = true
+include = [
+  "/build.rs",
+  "/src/",
+  "/LICENSE",
+  "/README.md",
+  "/native_release.json",
+]
+keywords = ["maplibre", "map", "ffi", "sys"]
 license.workspace = true
 links = "maplibre-native-c"
 repository.workspace = true
@@ -15,6 +26,8 @@ opengl = []
 vulkan = []
 webgpu = []
 
+# The release workflow drops this table, because the platform crate is not
+# published and the published crates do not support Emscripten.
 [target.'cfg(target_os = "emscripten")'.dependencies]
 mln-ffi-platform = { path = "../../../../src/platform/rust" }
 

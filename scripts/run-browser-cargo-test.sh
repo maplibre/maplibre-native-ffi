@@ -18,7 +18,7 @@ for argument in "$@"; do
 done
 
 backend_args=()
-descriptor="${MAPLIBRE_NATIVE_C_INSTALL_DIR:-}/share/maplibre-native-c/artifact.json"
+descriptor="${MAPLIBRE_NATIVE_FFI_LOCAL_BUILD:-}/share/maplibre-native-c/artifact.json"
 if [[ -f "$descriptor" ]]; then
   backend=$(sed -n 's/.*"renderBackend": *"\([^"]*\)".*/\1/p' "$descriptor")
   if [[ -n "$backend" ]]; then

@@ -1,14 +1,20 @@
 [package]
 name = "maplibre-native-ffi"
-version = "0.0.0"
+description = "Low-level, memory-safe Rust bindings for the MapLibre Native map renderer's C API."
+version.workspace = true
+categories = ["api-bindings", "graphics", "rendering"]
+documentation = "https://maplibre.org/maplibre-native-ffi/reference/rust/maplibre_native_ffi/"
 edition.workspace = true
+homepage.workspace = true
+include = ["/build.rs", "/emscripten/", "/src/", "/LICENSE", "/README.md"]
+keywords = ["maplibre", "map", "ffi", "gis"]
 license.workspace = true
 repository.workspace = true
 
 [dependencies]
 bitflags = "2.10.0"
-maplibre-native-ffi-core = { path = "../maplibre-native-ffi-core" }
-maplibre-native-ffi-sys = { path = "../maplibre-native-ffi-sys" }
+maplibre-native-ffi-core.workspace = true
+maplibre-native-ffi-sys.workspace = true
 
 # Re-exported so the render backend is selectable by crates that depend on this
 # crate alone. Enable at most one.

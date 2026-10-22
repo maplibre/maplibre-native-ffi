@@ -283,7 +283,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/rust:test:download linux-gnu-x64-vulkan
+        run: mise run //bindings/rust:test:package linux-gnu-x64-vulkan
       - id: suite-7
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:

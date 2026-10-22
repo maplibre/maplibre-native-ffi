@@ -35,12 +35,13 @@ commands = [
 ]
 
 # Every other binding step is handed a local install prefix. These commands
-# serve the package that this job built through the snapshot acquisition path.
-# The path differs only in which preset it resolves, so one platform is enough.
+# serve the package that this job built through a published crate's download
+# path. The path differs only in which preset it resolves, so one platform is
+# enough.
 [[suites]]
 platforms = ["linux-gnu"]
 commands = [
-  { task = "//bindings/rust:test:download", include = [
+  { task = "//bindings/rust:test:package", include = [
     "linux-gnu-x64-vulkan",
   ] },
 ]

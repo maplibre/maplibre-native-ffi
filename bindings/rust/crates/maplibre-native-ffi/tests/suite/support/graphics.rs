@@ -28,7 +28,7 @@ const BACKEND_WGL: u32 = 4;
 )))]
 compile_error!(
     "the native install names no render backend these tests can drive; \
-     check the artifact descriptor under MAPLIBRE_NATIVE_C_INSTALL_DIR"
+     check the artifact descriptor under MAPLIBRE_NATIVE_FFI_LOCAL_BUILD"
 );
 
 /// The tests/graphics backend that provides this build's render backend.

@@ -8,7 +8,7 @@ preset=${1:?usage: test-rust-browser.sh <emscripten-preset>}
 cd "$MISE_MONOREPO_ROOT"
 
 native_install_dir="$MISE_MONOREPO_ROOT/build/$preset/install"
-export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+export MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$native_install_dir"
 
 link_flags_file="$native_install_dir/share/maplibre-native-c/emscripten-link-flags.txt"
 if [[ ! -f "$link_flags_file" ]]; then

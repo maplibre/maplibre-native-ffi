@@ -7,7 +7,7 @@ extends = "ffi:preset"
 run = '''
 maturin_flags=()
 if [ "$(uname -s)" = Linux ]; then maturin_flags=(--zig); fi
-MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   uv run --project . --no-sync maturin build --release "${maturin_flags[@]}"
 '''
 
@@ -23,7 +23,7 @@ fi
 rm -rf dist
 maturin_flags=()
 if [ "$(uname -s)" = Linux ]; then maturin_flags=(--zig); fi
-MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   uv run --project . --no-sync maturin build --release --out dist "${maturin_flags[@]}"
 uv pip install --python "$MISE_MONOREPO_ROOT/.venv" --reinstall --no-index --find-links dist \
   "maplibre-native-ffi==0.0.0"

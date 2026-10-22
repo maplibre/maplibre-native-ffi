@@ -8,23 +8,11 @@ import json
 import pathlib
 import re
 
-from native_package_release import ARCHIVE_PREFIX, ARCHIVE_SUFFIX
+from native_package_release import archive_digests
 from release_version import parse_tag
 
 PIN_PATH = pathlib.Path("hook/native_release.json")
 RELEASES_URL = "https://github.com/maplibre/maplibre-native-ffi/releases/tag"
-
-
-def archive_digests(checksums: str) -> dict[str, str]:
-    """The SHA-256 digest of each native archive that SHA256SUMS lists."""
-    digests = {}
-    for line in checksums.splitlines():
-        digest, _, name = line.partition("  ")
-        if name.startswith(ARCHIVE_PREFIX) and name.endswith(ARCHIVE_SUFFIX):
-            digests[name] = digest
-    if not digests:
-        raise SystemExit("SHA256SUMS lists no native archives")
-    return dict(sorted(digests.items()))
 
 
 def prepare(package: pathlib.Path, tag: str, checksums: str) -> None:

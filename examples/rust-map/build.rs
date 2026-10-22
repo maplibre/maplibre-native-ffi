@@ -7,9 +7,9 @@ fn main() {
     println!(
         "cargo:rustc-check-cfg=cfg(maplibre_render_backend, values(\"metal\", \"opengl\", \"vulkan\"))"
     );
-    println!("cargo:rerun-if-env-changed=MAPLIBRE_NATIVE_C_INSTALL_DIR");
-    let install_dir = env::var_os("MAPLIBRE_NATIVE_C_INSTALL_DIR")
-        .expect("MAPLIBRE_NATIVE_C_INSTALL_DIR is required");
+    println!("cargo:rerun-if-env-changed=MAPLIBRE_NATIVE_FFI_LOCAL_BUILD");
+    let install_dir = env::var_os("MAPLIBRE_NATIVE_FFI_LOCAL_BUILD")
+        .expect("MAPLIBRE_NATIVE_FFI_LOCAL_BUILD is required");
     if env::var("CARGO_CFG_TARGET_FAMILY").as_deref() == Ok("unix") {
         println!(
             "cargo:rustc-link-arg=-Wl,-rpath,{}/lib",

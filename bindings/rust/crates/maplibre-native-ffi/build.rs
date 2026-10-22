@@ -14,9 +14,8 @@ fn main() {
         println!("cargo:rustc-cfg=mln_render_backend=\"{backend}\"");
     }
     // The GPU fixtures that the tests load from tests/graphics install beside
-    // the C API library.
-    println!("cargo:rerun-if-env-changed=MAPLIBRE_NATIVE_C_INSTALL_DIR");
-    if let Some(install) = env::var_os("MAPLIBRE_NATIVE_C_INSTALL_DIR") {
+    // the C API library in a local build.
+    if let Some(install) = env::var_os("DEP_MAPLIBRE_NATIVE_C_PREFIX") {
         let directory = if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
             "bin"
         } else {

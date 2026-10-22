@@ -264,18 +264,31 @@ Take one distribution:
 
 <SnapshotOnly />
 
-Depend on the `maplibre-native-ffi` crate from Git and enable one backend
-feature. The build script downloads the matching native artifact.
+Depend on the `maplibre-native-ffi` crate from Git.
 
 ```toml title="Cargo.toml"
 [dependencies]
-maplibre-native-ffi = { git = "https://github.com/maplibre/maplibre-native-ffi", features = ["vulkan"] }
+maplibre-native-ffi = { git = "https://github.com/maplibre/maplibre-native-ffi" }
 ```
 
-Enable one backend feature: `opengl`, `metal`, `vulkan`, or `webgpu`.
+Install the [C library](#build-against-a-prefix), then set
+`MAPLIBRE_NATIVE_FFI_LOCAL_BUILD` to its absolute path. Name an install prefix,
+or a build directory that holds `<preset>/install` for each target.
 
-Set `MAPLIBRE_NATIVE_C_INSTALL_DIR` to an install prefix to use your own build
-instead.
+```toml title=".cargo/config.toml"
+[env]
+MAPLIBRE_NATIVE_FFI_LOCAL_BUILD = { value = "../maplibre-native-ffi/build", relative = true }
+```
+
+Each target uses Metal on Apple platforms, OpenGL on Android and OpenHarmony,
+WebGPU in the browser, and Vulkan elsewhere. Enable one backend feature,
+`opengl`, `metal`, `vulkan`, or `webgpu`, to choose another. A feature on a
+target-specific dependency applies to that target alone.
+
+```toml title="Cargo.toml"
+[target.'cfg(target_os = "android")'.dependencies]
+maplibre-native-ffi = { git = "https://github.com/maplibre/maplibre-native-ffi", features = ["vulkan"] }
+```
 
 ### Swift
 

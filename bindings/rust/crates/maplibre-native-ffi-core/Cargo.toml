@@ -1,10 +1,14 @@
 [package]
 name = "maplibre-native-ffi-core"
-version = "0.0.0"
+description = "Runtime shared by the MapLibre Native FFI Rust and Python bindings. Depend on maplibre-native-ffi instead."
+version.workspace = true
+categories = ["external-ffi-bindings"]
 edition.workspace = true
+homepage.workspace = true
+include = ["/src/", "/LICENSE", "/README.md"]
+keywords = ["maplibre", "map", "ffi"]
 license.workspace = true
-publish = false
 repository.workspace = true
 
 [dependencies]
-maplibre-native-ffi-sys = { path = "../maplibre-native-ffi-sys" }
+maplibre-native-ffi-sys.workspace = true

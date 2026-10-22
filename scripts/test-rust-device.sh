@@ -33,7 +33,7 @@ esac
 
 cd "$MISE_MONOREPO_ROOT"
 native_install_dir="$MISE_MONOREPO_ROOT/build/$preset/install"
-export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+export MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$native_install_dir"
 # shellcheck source=scripts/rust-cross-env.sh
 source "$MISE_MONOREPO_ROOT/scripts/rust-cross-env.sh" "$preset"
 

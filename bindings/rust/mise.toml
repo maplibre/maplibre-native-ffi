@@ -3,7 +3,7 @@ extends = "ffi:preset"
 dir = "../.."
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+export MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$native_install_dir"
 
 # A host build lets cargo pick its own target and toolchain. Cross builds name
 # the target and point every tool that compiles or links at the platform SDK.
@@ -49,7 +49,7 @@ case "$usage_preset" in
 esac
 
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+export MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$native_install_dir"
 if [[ "$usage_preset" == linux-musl-* ]]; then
   # Rendering loads Alpine's graphics implementation, so the test process uses
   # musl's dynamic loader while the packaged native archive remains static.
@@ -96,7 +96,7 @@ fi
 run_windows = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
-export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+export MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$native_install_dir"
 cargo_args=()
 if [[ "$usage_profile" == "release" ]]; then
   cargo_args+=(--release)
@@ -114,15 +114,53 @@ if [[ "$usage_profile" == "dev" ]]; then
 fi
 '''
 
-[tasks."test:download"]
-description = "Test the sys crate against a downloaded native snapshot archive."
+[tasks.prepare-release]
+description = "Pin a release's native archives in the sys crate and stamp the crate versions, before publishing."
+usage = 'arg "<tag>" help="The release tag, such as v0.202610.2"'
+dir = "../.."
+run = '''
+checksums="$(mktemp)"
+trap 'rm -f "$checksums"' EXIT
+curl --fail --location --silent --show-error --retry 3 --output "$checksums" \
+  "https://github.com/maplibre/maplibre-native-ffi/releases/download/$usage_tag/SHA256SUMS"
+python3 ci/rust_release.py . "$usage_tag" "$checksums"
+'''
+
+[tasks."test:package"]
+description = "Package the crates as a release prepares them, and test the sys crate against this build's native archive."
 dir = "../.."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-# Stops at maplibre-native-ffi-sys: only the build script's acquisition path is
-# under test, and the crates above it stop compiling whenever the snapshot
-# release lags a header change in this commit.
+# Tests the packaged sys crate alone: the crates above it add nothing to how the
+# native library arrives.
 run = '''
-python3 ci/native_download_fixture.py \
-  "build/packages/native/dist/maplibre-native-c-$usage_preset.tar.gz" \
-  -- env -u MAPLIBRE_NATIVE_C_INSTALL_DIR cargo test -p maplibre-native-ffi-sys
+set -euo pipefail
+archive="$MISE_MONOREPO_ROOT/build/packages/native/dist/maplibre-native-c-$usage_preset.tar.gz"
+tag=v0.202601.0
+scratch="$(mktemp -d)"
+trap 'rm -rf "$scratch"' EXIT
+
+# A copy of the workspace stands in for the release checkout, which the release
+# prepares in place. The workspace patches crates.io from build/dependencies.
+workspace="$scratch/workspace"
+mkdir -p "$workspace/build"
+git ls-files -z --cached --others --exclude-standard -- \
+  Cargo.toml Cargo.lock LICENSE bindings/python bindings/rust examples/rust-map src/platform/rust |
+  tar -c --null -T - | tar -x -C "$workspace"
+ln -s "$MISE_MONOREPO_ROOT/build/dependencies" "$workspace/build/dependencies"
+printf '%s  %s\n' "$(shasum -a 256 "$archive" | cut -d ' ' -f 1)" "$(basename "$archive")" \
+  >"$scratch/SHA256SUMS"
+python3 ci/rust_release.py "$workspace" "$tag" "$scratch/SHA256SUMS"
+cargo package --manifest-path "$workspace/Cargo.toml" --no-verify \
+  --target-dir "$scratch/target" \
+  -p maplibre-native-ffi-sys \
+  -p maplibre-native-ffi-core \
+  -p maplibre-native-ffi
+
+package="$scratch/maplibre-native-ffi-sys"
+mkdir "$package"
+tar -xzf "$scratch/target/package/maplibre-native-ffi-sys-${tag#v}.crate" -C "$package" --strip-components 1
+# An empty cache makes the build script download the archive.
+python3 ci/native_download_fixture.py "$archive" "$tag" -- \
+  env -u MAPLIBRE_NATIVE_FFI_LOCAL_BUILD XDG_CACHE_HOME="$scratch/cache" \
+  cargo test --locked --manifest-path "$package/Cargo.toml" --target-dir "$MISE_MONOREPO_ROOT/target"
 '''
