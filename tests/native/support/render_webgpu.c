@@ -157,8 +157,8 @@ static bool thread_context(mln_webgpu_context_descriptor* out_context) {
 // The textures of a borrowed ring fixture, in slot order. An owned-texture
 // fixture has no state of its own: the device belongs to the thread.
 typedef struct webgpu_ring {
-  WGPUTexture textures[MLN_TEST_WEBGPU_MAX_RING_DEPTH];
-  WGPUTextureView views[MLN_TEST_WEBGPU_MAX_RING_DEPTH];
+  WGPUTexture textures[MLN_TEXTURE_RING_MAX_DEPTH];
+  WGPUTextureView views[MLN_TEXTURE_RING_MAX_DEPTH];
   size_t texture_count;
 } webgpu_ring;
 
@@ -221,7 +221,7 @@ static bool attach_borrowed_ring(
   if (ring == NULL) {
     return false;
   }
-  mln_webgpu_borrowed_texture entries[MLN_TEST_WEBGPU_MAX_RING_DEPTH];
+  mln_webgpu_borrowed_texture entries[MLN_TEXTURE_RING_MAX_DEPTH];
   for (size_t index = 0; index < attach_ring_depth; index += 1) {
     const WGPUTextureDescriptor texture_descriptor = {
       .usage = WGPUTextureUsage_RenderAttachment |
@@ -273,7 +273,7 @@ static bool attach_borrowed_ring(
 bool mln_test_webgpu_borrowed_ring_create(
   mln_map map, mln_test_render_fixture* fixture, size_t depth
 ) {
-  if (depth == 0 || depth > MLN_TEST_WEBGPU_MAX_RING_DEPTH) {
+  if (depth == 0 || depth > MLN_TEXTURE_RING_MAX_DEPTH) {
     return false;
   }
   attach_ring_depth = depth;

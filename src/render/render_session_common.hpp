@@ -432,7 +432,8 @@ struct RenderSurfaceState {
   std::unique_ptr<SurfaceSessionBackend> backend = nullptr;
 };
 
-inline constexpr std::size_t max_texture_ring_depth = 3;
+inline constexpr std::size_t max_texture_ring_depth =
+  MLN_TEXTURE_RING_MAX_DEPTH;
 
 struct RenderTextureSlot {
   mln_render_frame_result result{};
@@ -1194,15 +1195,14 @@ auto lease_valid_acquired_frame(
   std::shared_ptr<mln_acquired_frame_object>& out_frame
 ) -> mln_status;
 
-// Slot count a session-owned texture ring is granted, between one and three.
-// Attachment rejects null options, but some backends size their ring before
-// they reach that check, so null options take one slot.
+// Slot count a session-owned texture ring is granted, between one and
+// max_texture_ring_depth. Attachment rejects null options, but some backends
+// size their ring before they reach that check, so null options take one slot.
 inline auto attach_ring_depth(const mln_render_session_attach_options* options)
   -> uint32_t {
-  constexpr auto max_ring_depth = 3U;
   return std::clamp(
     options == nullptr ? 1U : options->requested_texture_ring_depth, 1U,
-    max_ring_depth
+    static_cast<uint32_t>(max_texture_ring_depth)
   );
 }
 

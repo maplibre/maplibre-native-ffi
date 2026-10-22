@@ -29,7 +29,7 @@ typedef struct host_state {
   // False when the graphics object belongs to another fixture.
   bool owns_graphics;
   mln_test_graphics_context context;
-  mln_test_graphics_texture* textures[MLN_TEST_MAX_RING_DEPTH];
+  mln_test_graphics_texture* textures[MLN_TEXTURE_RING_MAX_DEPTH];
   size_t texture_count;
   mln_test_graphics_surface* surface;
   mln_test_graphics_texture* extra_textures[EXTRA_TARGETS];
@@ -332,7 +332,7 @@ static bool attach_borrowed_texture(
     );
     state->texture_count += state->textures[index] != NULL;
   }
-  borrowed_entry entries[MLN_TEST_MAX_RING_DEPTH];
+  borrowed_entry entries[MLN_TEXTURE_RING_MAX_DEPTH];
   borrowed_descriptor descriptor;
   if (
     state->texture_count != attach_ring_depth ||
@@ -417,7 +417,7 @@ bool mln_test_render_fixture_create_borrowed_texture(
 bool mln_test_render_fixture_create_borrowed_ring(
   mln_map map, mln_test_render_fixture* fixture, size_t depth, uint32_t driver
 ) {
-  if (depth == 0 || depth > MLN_TEST_MAX_RING_DEPTH) {
+  if (depth == 0 || depth > MLN_TEXTURE_RING_MAX_DEPTH) {
     return false;
   }
   attach_ring_depth = depth;
@@ -638,10 +638,10 @@ mln_status mln_test_render_fixture_set_textures(
   const mln_completion* completion
 ) {
   mln_test_graphics_context context = {0};
-  borrowed_entry entries[MLN_TEST_MAX_RING_DEPTH];
+  borrowed_entry entries[MLN_TEXTURE_RING_MAX_DEPTH];
   borrowed_descriptor descriptor;
   if (
-    count > MLN_TEST_MAX_RING_DEPTH ||
+    count > MLN_TEXTURE_RING_MAX_DEPTH ||
     !mln_test_graphics_get_context(graphics, &context) ||
     !describe_ring(&context, textures, count, entries, &descriptor)
   ) {

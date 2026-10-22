@@ -159,7 +159,7 @@ auto validate_borrowed_textures(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (count > max_texture_ring_depth) {
-    set_thread_error("texture_count must be at most 3");
+    set_thread_error("texture_count exceeds MLN_TEXTURE_RING_MAX_DEPTH");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   for (size_t index = 0; index < count; ++index) {

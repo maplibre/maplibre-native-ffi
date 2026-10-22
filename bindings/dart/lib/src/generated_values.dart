@@ -2794,10 +2794,10 @@ final class RenderSessionAttachOptions extends _Value {
   /// `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
   final RenderDriverKind driver;
 
-  /// Requested slot count of a session-owned texture ring, from one to three.
-  /// Private targets grant one slot regardless of this value. A borrowed
-  /// texture ring's depth is its texture count, so borrowed and other targets
-  /// ignore this value. Defaults to 1.
+  /// Requested slot count of a session-owned texture ring, from one to
+  /// `MLN_TEXTURE_RING_MAX_DEPTH`. Private targets grant one slot regardless of
+  /// this value. A borrowed texture ring's depth is its texture count, so
+  /// borrowed and other targets ignore this value. Defaults to 1.
   final int requestedTextureRingDepth;
 
   /// Producer synchronization for acquired texture frames. Defaults to

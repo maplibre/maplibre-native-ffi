@@ -28,6 +28,9 @@ typedef uint64_t mln_vulkan_non_dispatchable_handle;
 /** Null Vulkan non-dispatchable handle. */
 #define MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL UINT64_C(0)
 
+/** The most slots a texture ring holds, owned or borrowed. */
+#define MLN_TEXTURE_RING_MAX_DEPTH 8
+
 /** Execution placement for one render session. */
 typedef enum mln_render_driver_kind : uint32_t {
   /**
@@ -116,10 +119,10 @@ typedef struct mln_render_session_attach_options {
    */
   uint32_t driver MLN_BINDING("enum=mln_render_driver_kind");
   /**
-   * Requested slot count of a session-owned texture ring, from one to three.
-   * Private targets grant one slot regardless of this value. A borrowed
-   * texture ring's depth is its texture count, so borrowed and other targets
-   * ignore this value. Defaults to 1.
+   * Requested slot count of a session-owned texture ring, from one to
+   * MLN_TEXTURE_RING_MAX_DEPTH. Private targets grant one slot regardless of
+   * this value. A borrowed texture ring's depth is its texture count, so
+   * borrowed and other targets ignore this value. Defaults to 1.
    */
   uint32_t requested_texture_ring_depth;
   /**

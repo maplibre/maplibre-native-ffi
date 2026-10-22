@@ -106,12 +106,9 @@ bool mln_test_transferred_webgl_surface_create(
 #endif
 
 #if defined(MLN_FFI_TEST_BACKEND_WEBGPU)
-// The deepest borrowed ring that mln_test_webgpu_borrowed_ring_create()
-// attaches.
-#define MLN_TEST_WEBGPU_MAX_RING_DEPTH 3U
-
-// Attaches a session to a borrowed ring of `depth` 64x64 RGBA8 textures that
-// the fixture creates on the thread's device and owns.
+// Attaches a session to a borrowed ring of `depth` 64x64 RGBA8 textures, up to
+// MLN_TEXTURE_RING_MAX_DEPTH, that the fixture creates on the thread's device
+// and owns.
 bool mln_test_webgpu_borrowed_ring_create(
   mln_map map, mln_test_render_fixture* fixture, size_t depth
 );

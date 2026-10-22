@@ -24,9 +24,6 @@ extern "C" {
 // The size of every fixture target, in pixels, at a scale factor of 1.
 #define MLN_TEST_HOST_TARGET_SIZE 64U
 
-// The deepest borrowed ring a fixture attaches or replaces.
-#define MLN_TEST_MAX_RING_DEPTH 3U
-
 // Asks mln_test_render_fixture_create_borrowed_ring() for the preset's driver.
 #define MLN_TEST_PRESET_DRIVER UINT32_MAX
 
@@ -38,7 +35,7 @@ bool mln_test_render_fixture_create_borrowed_texture(
 );
 
 // Attaches a session on `driver` to a borrowed ring of `depth` textures, up to
-// MLN_TEST_MAX_RING_DEPTH, that the fixture creates and owns.
+// MLN_TEXTURE_RING_MAX_DEPTH, that the fixture creates and owns.
 bool mln_test_render_fixture_create_borrowed_ring(
   mln_map map, mln_test_render_fixture* fixture, size_t depth, uint32_t driver
 );
@@ -147,9 +144,9 @@ mln_test_graphics_surface* mln_test_render_fixture_new_sized_surface(
 
 // Submits the backend's borrowed-texture or surface set_target for the
 // fixture's session, naming the `count` `textures`, up to
-// MLN_TEST_MAX_RING_DEPTH, or `surface`, and the context of `graphics`, which
-// created them. Returns the submission status, or MLN_STATUS_NATIVE_ERROR when
-// the target cannot be described.
+// MLN_TEXTURE_RING_MAX_DEPTH, or `surface`, and the context of `graphics`,
+// which created them. Returns the submission status, or MLN_STATUS_NATIVE_ERROR
+// when the target cannot be described.
 mln_status mln_test_render_fixture_set_textures(
   const mln_test_render_fixture* fixture, mln_test_graphics* graphics,
   mln_test_graphics_texture* const* textures, size_t count,

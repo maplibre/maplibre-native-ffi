@@ -3210,10 +3210,10 @@ class RenderSessionAttachOptions:
             RenderSessionAttachOptions.default().requested_texture_ring_depth
         )
     )
-    """Requested slot count of a session-owned texture ring, from one to three.
-    Private targets grant one slot regardless of this value. A borrowed
-    texture ring's depth is its texture count, so borrowed and other targets
-    ignore this value. Defaults to 1.
+    """Requested slot count of a session-owned texture ring, from one to
+    `MLN_TEXTURE_RING_MAX_DEPTH`. Private targets grant one slot regardless
+    of this value. A borrowed texture ring's depth is its texture count, so
+    borrowed and other targets ignore this value. Defaults to 1.
     """
 
     producer_sync_kind: GpuSyncKind = field(
