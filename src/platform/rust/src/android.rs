@@ -4,7 +4,7 @@ use std::os::raw::{c_char, c_void};
 #[cfg(target_os = "android")]
 use std::io::Write;
 #[cfg(target_os = "android")]
-use std::os::unix::fs::OpenOptionsExt;
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 #[cfg(target_os = "android")]
 use std::path::{Path, PathBuf};
 #[cfg(target_os = "android")]
@@ -164,7 +164,13 @@ fn write_tls_helper_dex(cache_dir: &Path) -> std::io::Result<PathBuf> {
         .map(|byte| format!("{byte:02x}"))
         .collect();
     let path = cache_dir.join(format!("maplibre-native-ffi-tls-{signature}.dex"));
-    if path.exists() {
+    // Another process that runs as the application may have written the path,
+    // so a cached file counts only when it holds this dex and is read-only.
+    // Otherwise the rename below replaces it.
+    if let (Ok(cached), Ok(metadata)) = (std::fs::read(&path), std::fs::metadata(&path))
+        && cached == TLS_HELPER_DEX
+        && metadata.permissions().mode() & 0o222 == 0
+    {
         return Ok(path);
     }
 
