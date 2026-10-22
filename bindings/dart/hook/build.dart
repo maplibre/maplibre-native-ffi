@@ -28,12 +28,19 @@ Future<void> main(List<String> arguments) async {
     }
 
     final code = input.config.code;
-    final preset =
-        '${_targetPlatform(code)}-${_backendSuffix(input, code.targetOS)}';
+    final platform = _targetPlatform(code);
+    final backend = _selectedBackend(input, code.targetOS);
+    final preset = '$platform-${_backendSuffix(backend, code.targetOS)}';
     final localBuild = input.userDefines.path('local_build');
     final prefix = localBuild == null
         ? await _download(input, output, preset)
-        : _localPrefix(Uri.directory(localBuild.toFilePath()), preset, output);
+        : _localPrefix(
+            Uri.directory(localBuild.toFilePath()),
+            platform,
+            backend,
+            preset,
+            output,
+          );
 
     final library = _libraryFile(prefix, code.targetOS);
     output.dependencies.add(library.absolute.uri);
@@ -78,38 +85,66 @@ String _targetPlatform(CodeConfig code) {
   };
 }
 
-/// The backend half of the preset serving [os]: the application's choice, or
+/// The backend that the application selected for [os], if it selected one.
+String? _selectedBackend(BuildInput input, OS os) =>
+    switch (input.userDefines['backend']) {
+      null => null,
+      final Map<Object?, Object?> backends => switch (backends[os.name]) {
+        null => null,
+        final String backend
+            when backend == 'opengl' ||
+                backend == 'metal' ||
+                backend == 'vulkan' =>
+          backend,
+        final other => throw FormatException(
+          '$_defines.backend.${os.name} must be opengl, metal, or vulkan; '
+          'found $other',
+        ),
+      },
+      final other => throw FormatException(
+        '$_defines.backend must map an OS to a backend; found $other',
+      ),
+    };
+
+/// The backend half of the preset serving [os]: the [selected] backend, or
 /// else Metal on Apple platforms, OpenGL on Android, and Vulkan elsewhere.
 /// Preset names spell OpenGL by its context provider.
-String _backendSuffix(BuildInput input, OS os) {
-  final selected = switch (input.userDefines['backend']) {
-    null => null,
-    final Map<Object?, Object?> backends => backends[os.name],
-    final other => throw FormatException(
-      '$_defines.backend must map an OS to a backend; found $other',
-    ),
-  };
-  return switch (selected ?? _defaultBackend(os)) {
-    'opengl' => os == OS.windows ? 'wgl' : 'egl',
-    final String backend when backend == 'metal' || backend == 'vulkan' =>
-      backend,
-    _ => throw FormatException(
-      '$_defines.backend.${os.name} must be opengl, metal, or vulkan; found '
-      '$selected',
-    ),
-  };
+String _backendSuffix(String? selected, OS os) {
+  final backend =
+      selected ??
+      switch (os) {
+        OS.macOS || OS.iOS => 'metal',
+        OS.android => 'opengl',
+        _ => 'vulkan',
+      };
+  return backend == 'opengl' ? (os == OS.windows ? 'wgl' : 'egl') : backend;
 }
-
-String _defaultBackend(OS os) => switch (os) {
-  OS.macOS || OS.iOS => 'metal',
-  OS.android => 'opengl',
-  _ => 'vulkan',
-};
 
 /// Resolves a local build, which is either an install prefix or a CMake build
 /// root holding an install for each preset.
-Uri _localPrefix(Uri directory, String preset, BuildOutputBuilder output) {
+Uri _localPrefix(
+  Uri directory,
+  String platform,
+  String? backend,
+  String preset,
+  BuildOutputBuilder output,
+) {
   if (_descriptor(directory).existsSync()) {
+    // A prefix serves one platform, so a build for several targets names a
+    // build root instead. Only a selected backend can conflict; without one,
+    // the prefix's own backend serves.
+    final descriptor =
+        jsonDecode(_descriptor(directory).readAsStringSync())
+            as Map<String, Object?>;
+    final built =
+        '${descriptor['targetPlatform']} ${descriptor['renderBackend']}';
+    if (descriptor['targetPlatform'] != platform ||
+        (backend != null && descriptor['renderBackend'] != backend)) {
+      throw StateError(
+        '$_defines.local_build names an install prefix built for $built, '
+        'which cannot serve $platform${backend == null ? '' : ' $backend'}.',
+      );
+    }
     return directory;
   }
   final prefix = directory.resolve('$preset/install/');
@@ -204,13 +239,18 @@ Future<Uint8List> _fetch(String url) async {
     // NO_PROXY are among the variables passed through.
     ..findProxy = HttpClient.findProxyFromEnvironment;
   try {
-    final response = await (await client.getUrl(Uri.parse(url))).close();
-    if (response.statusCode != HttpStatus.ok) {
-      throw HttpException('HTTP ${response.statusCode}', uri: Uri.parse(url));
-    }
-    final builder = BytesBuilder(copy: false);
-    await response.forEach(builder.add);
-    return builder.takeBytes();
+    // The connection timeout ends at the response headers, so this bound
+    // covers a body that stalls. It allows for a slow link pulling a 30 MB
+    // archive.
+    return await () async {
+      final response = await (await client.getUrl(Uri.parse(url))).close();
+      if (response.statusCode != HttpStatus.ok) {
+        throw HttpException('HTTP ${response.statusCode}', uri: Uri.parse(url));
+      }
+      final builder = BytesBuilder(copy: false);
+      await response.forEach(builder.add);
+      return builder.takeBytes();
+    }().timeout(const Duration(minutes: 10));
   } finally {
     client.close(force: true);
   }
