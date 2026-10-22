@@ -1,1 +1,3 @@
 .dart_tool/
+# Written by the publish job, and kept in the package by .pubignore.
+/hook/native_release.json

@@ -18,10 +18,10 @@ mise run //bindings/dart:build:mobile ios-arm64-metal
 mise run //bindings/dart:build:mobile ios-simulator-arm64-metal
 ```
 
-The test task builds the selected CMake preset, points the build hook at the
-resulting install prefix, analyzes the package, and runs the Dart tests. The
-private raw declarations in `lib/src/internal/c/maplibre_native_c.g.dart` are
-checked in so Git and pub package consumers receive a complete library.
+The test task builds the selected CMake preset, points the build hook at its
+install prefix, analyzes the package, and runs the Dart tests. The private raw
+declarations in `lib/src/internal/c/maplibre_native_c.g.dart` are checked in so
+Git and pub package consumers receive a complete library.
 `mise run bindings:generate` writes them with the rest of the generated binding,
 and `mise run bindings:check` fails on any diff.
 
@@ -46,12 +46,18 @@ pads with extra Mach-O header space (`scripts/pad-macos-angle.py`), so Dart
 native assets can rewrite their install names.
 
 The native library reaches Dart as a code asset that `hook/build.dart` declares,
-which is how the generated `@Native` declarations resolve it. Build hooks run in
-a semi-hermetic environment that strips arbitrary environment variables, so the
-hook reads the install prefix from `.dart_tool/maplibre_native_install_dir`
-rather than from an environment variable; the mise tasks write it. Without that
-file the hook downloads the artifact matching the target from the snapshot
-release, which is what a consumer taking this package as a git dependency gets.
+which is how the generated `@Native` declarations resolve it. The hook takes its
+settings from `hooks.user_defines` in the root pubspec, as the
+[install guide](https://maplibre.org/maplibre-native-ffi/install/#dart)
+describes. This package's pubspec and the Flutter smoke host set `local_build`
+to `.dart_tool/native`, which the test tasks link to the selected preset's
+install prefix.
+
+A published package downloads the core release named in
+`hook/native_release.json`. The publish job writes that file with
+`mise run //bindings/dart:pin-native <core tag>`, which requires the core
+release to be tagged on the published commit. Git ignores the file and
+`.pubignore` keeps it in the package.
 
 ## Android host integration
 

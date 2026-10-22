@@ -176,8 +176,7 @@ Take one runtime package:
 
 <SnapshotOnly />
 
-Depend on the package from Git. The build hook downloads a native artifact for
-your target when you build.
+Depend on the package from Git.
 
 ```yaml title="pubspec.yaml"
 dependencies:
@@ -187,22 +186,31 @@ dependencies:
       path: bindings/dart
 ```
 
-The hook chooses the default backend from the target. Name a different one in
-your application's pubspec to override that.
+Install the [C library](#build-against-a-prefix), then name it in your
+application's pubspec. Name an install prefix, or a build directory that holds
+`<preset>/install` for each target. A relative path resolves against the
+pubspec.
 
 ```yaml title="pubspec.yaml"
 hooks:
   user_defines:
     maplibre_native_ffi:
-      backend: vulkan
+      local_build: ../maplibre-native-ffi/build
 ```
 
-The backends are `opengl`, `metal`, and `vulkan`.
+Each target uses Metal on Apple platforms, OpenGL on Android, and Vulkan
+elsewhere. Set `backend` to one backend for every target, or map an OS to one.
 
-Write an install prefix into `.dart_tool/maplibre_native_install_dir` to use
-your own build instead. A pinned Git revision keeps the Dart code fixed, and the
-hook still resolves the current snapshot for a build that has no artifact
-cached. Point the hook at your own prefix when you need a fixed native library.
+```yaml title="pubspec.yaml"
+hooks:
+  user_defines:
+    maplibre_native_ffi:
+      backend:
+        android: vulkan
+```
+
+The backends are `opengl`, `metal`, and `vulkan`. The map keys are `android`,
+`ios`, `linux`, `macos`, `windows`, and `default`.
 
 ### Go
 

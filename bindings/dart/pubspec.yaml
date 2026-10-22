@@ -7,10 +7,12 @@ repository: https://github.com/maplibre/maplibre-native-ffi
 homepage: https://maplibre.org/maplibre-native-ffi/
 publish_to: none
 
+# Applies only where this package is the root, as in its own tests. The mise
+# test task links the selected preset's install prefix here.
 hooks:
   user_defines:
     maplibre_native_ffi:
-      test_snapshot_base_url_file: .dart_tool/maplibre_native_test_snapshot_base_url
+      local_build: .dart_tool/native
 
 environment:
   sdk: ^3.11.0

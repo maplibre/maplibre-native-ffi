@@ -11,5 +11,12 @@ dependencies:
   maplibre_native_ffi:
     path: ../..
 
+# The mise task creates this host in .dart_tool/flutter_smoke, beside the link
+# to the selected preset's install prefix.
+hooks:
+  user_defines:
+    maplibre_native_ffi:
+      local_build: ../native
+
 flutter:
   uses-material-design: false

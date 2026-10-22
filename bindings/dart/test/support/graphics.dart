@@ -66,9 +66,8 @@ final class _Library {
 final _library = _Library(DynamicLibrary.open(_libraryPath()));
 
 String _libraryPath() {
-  final prefix = File(
-    '.dart_tool/maplibre_native_install_dir',
-  ).readAsStringSync().trim();
+  // The install prefix that `mise run //bindings/dart:test` links.
+  const prefix = '.dart_tool/native';
   if (Platform.isWindows) return '$prefix/bin/mln_test_graphics.dll';
   if (Platform.isMacOS) return '$prefix/lib/libmln_test_graphics.dylib';
   return '$prefix/lib/libmln_test_graphics.so';

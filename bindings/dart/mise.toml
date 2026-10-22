@@ -105,16 +105,16 @@ case "$usage_preset" in
 esac
 '''
 
-# Build hooks run with a stripped environment, so hook/build.dart takes the
-# install prefix from a file rather than from MLN_FFI_NATIVE_LIBRARY.
+# pubspec.yaml and the Flutter smoke host name this link as their local build.
+# Git Bash on Windows copies the prefix in place of linking it.
 [tasks._native-prefix]
 description = "Point the Dart build hook at a locally built native library."
 hide = true
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 run = '''
 mkdir -p .dart_tool
-printf '%s\n' "$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
-  >.dart_tool/maplibre_native_install_dir
+rm -rf .dart_tool/native
+ln -s "$MISE_MONOREPO_ROOT/build/$usage_preset/install" .dart_tool/native
 '''
 
 [tasks.test]
@@ -135,21 +135,7 @@ export PATH="$(cygpath -u "$MISE_MONOREPO_ROOT/build/$usage_preset/install/bin")
 dart test
 '''
 
-[tasks."test:download"]
-description = "Test the build hook against a downloaded native snapshot archive."
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-# Runs one file rather than the suite, because what this task checks is the
-# acquisition path rather than binding behavior. Removing the pointer forces the
-# download; it goes back afterwards so a local prefix survives this task.
-run = '''
-pointer=.dart_tool/maplibre_native_install_dir
-saved="$(mktemp)"
-trap 'if [[ -s "$saved" ]]; then mv "$saved" "$pointer"; else rm -f "$saved"; fi' EXIT
-if [[ -f "$pointer" ]]; then
-  mv "$pointer" "$saved"
-fi
-python3 "$MISE_MONOREPO_ROOT/ci/native_download_fixture.py" \
-  --dart-pointer .dart_tool/maplibre_native_test_snapshot_base_url \
-  "$MISE_MONOREPO_ROOT/build/packages/native/dist/maplibre-native-c-$usage_preset.tar.gz" \
-  -- dart test test/native_library_test.dart
-'''
+[tasks.pin-native]
+description = "Pin the core release that the published package downloads."
+usage = 'arg "<tag>" help="A core release tag on the checked-out commit"'
+run = 'python3 "$MISE_MONOREPO_ROOT/ci/dart_native_pin.py" "$usage_tag" hook/native_release.json'
