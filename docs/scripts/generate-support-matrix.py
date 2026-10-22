@@ -120,6 +120,8 @@ def command_support(command: str) -> list[tuple[str, str]]:
             return [("bindings-kotlin-native", "build-only")]
         if action == "test":
             preset = command.rsplit(" ", 1)[-1]
+            if preset.startswith("android-"):
+                return [("bindings-kotlin-android", "tested")]
             if preset.startswith(("ios-simulator-", "tvos-simulator-")):
                 return [("bindings-kotlin-native", "tested")]
             if preset.startswith("emscripten-"):
