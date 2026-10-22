@@ -84,11 +84,9 @@ String _targetPlatform(CodeConfig code) {
 String _backendSuffix(BuildInput input, OS os) {
   final selected = switch (input.userDefines['backend']) {
     null => null,
-    final Map<Object?, Object?> backends =>
-      backends[os.name] ?? backends['default'],
+    final Map<Object?, Object?> backends => backends[os.name],
     final other => throw FormatException(
-      '$_defines.backend must map an OS or `default` to a backend; found '
-      '$other',
+      '$_defines.backend must map an OS to a backend; found $other',
     ),
   };
   return switch (selected ?? _defaultBackend(os)) {
