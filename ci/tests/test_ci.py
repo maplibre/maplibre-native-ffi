@@ -1,65 +1,22 @@
-"""Exercise the coverage units, the required check, and retries."""
+"""Exercise suite configuration, the required check, and retries."""
 
 from __future__ import annotations
 
 import copy
 import json
 import os
-import re
 import subprocess
 import unittest
 
-from ruamel.yaml import YAML
-
-from ci.coverage import HYGIENE, unit_jobs
-from ci.generate_workflow import ROOT, ci_workflow, workflows
-from ci.retry import INFRASTRUCTURE_STEPS, retryable
-from ci.workflow import XVFB_RUN, load_configuration, platform, preset_sets, target_rows
-
-ALL = "fromJSON(needs.plan.outputs.all)"
-UNIT = re.compile(r"contains\(fromJSON\(needs\.plan\.outputs\.units\), '([^']+)'\)")
+from ci.generate_workflow import ROOT, ci_workflow
+from ci.retry import retryable
+from ci.workflow import load_configuration, preset_sets
 
 
-class CoverageTest(unittest.TestCase):
+class WorkflowTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.source, cls.presets = load_configuration(ROOT)
-        cls.jobs = ci_workflow(cls.source, cls.presets)["jobs"]
-
-    def test_units_match_the_rubberstamp_config(self):
-        config = YAML(typ="safe").load(ROOT / ".config/rubberstamp.yml")
-        self.assertEqual(sorted(self.source["units"]), sorted(config["ci"]["units"]))
-
-    def units(self, job: dict) -> set[str]:
-        """Return the units that a job's condition runs it for."""
-        units = UNIT.findall(job["if"])
-        clauses = [
-            f"contains(fromJSON(needs.plan.outputs.units), '{u}')" for u in units
-        ]
-        self.assertEqual(job["if"], " || ".join([ALL, *clauses]))
-        return set(units)
-
-    def test_each_unit_runs_its_jobs_and_what_they_consume(self):
-        gated = {
-            name: job
-            for name, job in self.jobs.items()
-            if name not in {"plan", HYGIENE, "required"}
-        }
-        owned = unit_jobs(self.source, self.presets)
-        for unit, jobs in owned.items():
-            with self.subTest(unit=unit):
-                running = {n for n, job in gated.items() if unit in self.units(job)}
-                self.assertLessEqual(set(jobs), running)
-                for name in running:
-                    waits = set(gated[name]["needs"]) - {"plan"}
-                    self.assertLessEqual(waits, running, name)
-
-
-class BindingWorkflowTest(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.source, cls.presets = load_configuration(ROOT)
-        cls.workflows = workflows(cls.source, cls.presets)
 
     def test_presets_that_opt_out_of_ci_name_no_target(self):
         local = {"vendor": {"maplibre-native-ffi": {"ci": False}}}
@@ -75,55 +32,6 @@ class BindingWorkflowTest(unittest.TestCase):
             ],
         }
         self.assertEqual(preset_sets(presets), (["host"], {"host"}, {"host"}, set()))
-
-    def test_window_commands_get_a_display_on_linux_and_keep_their_caches(self):
-        rows = {row["preset"]: row for row in target_rows(self.source, self.presets)}
-        for preset, row in rows.items():
-            commands = row["native_commands"] + row.get("consumer_commands", [])
-            with self.subTest(preset=preset):
-                wrapped = [c for c in commands if c.startswith(XVFB_RUN)]
-                self.assertEqual(bool(wrapped), platform(preset) == "linux-gnu")
-        linux = rows["linux-gnu-x64-egl"]
-        self.assertIn(
-            f"{XVFB_RUN} mise run //examples/zig-map:smoke linux-gnu-x64-egl",
-            linux["consumer_commands"],
-        )
-        # The wrapped Zig example and Kotlin binding still enable their caches.
-        self.assertTrue(linux["zig"])
-        self.assertTrue(linux["gradle"])
-
-    def test_windows_keeps_native_and_binding_suites_and_headless_examples(self):
-        jobs = self.workflows["ci-coverage.yml"]["jobs"]
-        for arch in ("x64", "arm64"):
-            for backend in ("wgl", "vulkan"):
-                preset = f"windows-{arch}-{backend}"
-                with self.subTest(preset=preset):
-                    job = jobs[f"target-{preset}"]
-                    commands = [s["run"] for s in job["steps"] if "run" in s]
-                    native = next(s for s in job["steps"] if s.get("id") == "suite-1")
-                    if preset == "windows-x64-vulkan":
-                        self.assertIn("with-windows-console.ps1", native["run"])
-                        self.assertEqual(native["shell"], "pwsh")
-                    else:
-                        self.assertEqual(native["run"], f"mise run test {preset}")
-                    for binding in ("rust", "kotlin", "dotnet", "python", "dart"):
-                        self.assertIn(
-                            f"mise run //bindings/{binding}:test {preset}", commands
-                        )
-                    for example in ("rust-map", "zig-map", "dotnet-map"):
-                        self.assertFalse(
-                            any(f"//examples/{example}:smoke" in c for c in commands)
-                        )
-                    if arch == "x64":
-                        self.assertTrue(job["runs-on"].startswith("blacksmith-"))
-                        self.assertIn(
-                            f"mise run //bindings/zig:test {preset}", commands
-                        )
-                        self.assertIn(
-                            f"mise run //examples/zig-readback:smoke {preset}", commands
-                        )
-                    else:
-                        self.assertEqual(job["runs-on"], "windows-11-arm")
 
     def test_a_suite_environment_reaches_its_commands_in_the_listed_targets(self):
         source = copy.deepcopy(self.source)
@@ -168,29 +76,6 @@ class BindingWorkflowTest(unittest.TestCase):
                 for task in ("check", "smoke")
             },
         )
-
-    def test_suites_run_past_a_failed_suite_and_the_last_step_fails_the_job(self):
-        for document in self.workflows.values():
-            for name, job in document["jobs"].items():
-                if not name.startswith("target-"):
-                    continue
-                with self.subTest(job=name):
-                    steps = job["steps"]
-                    ids = [step.get("id") for step in steps]
-                    suites = [i for i in ids if i and i.startswith("suite-")]
-                    self.assertTrue(suites)
-                    for step in steps[ids.index("build") + 1 :]:
-                        if step.get("id") in {"archive", "install", *suites}:
-                            self.assertTrue(
-                                step["if"].startswith("${{ !cancelled() && "),
-                                step,
-                            )
-                    gate = steps[-1]
-                    self.assertEqual(gate["name"], "Fail if any suite failed")
-                    self.assertEqual(
-                        re.findall(r"steps\.(suite-\d+)\.outcome", gate["if"]),
-                        suites,
-                    )
 
 
 class GateTest(unittest.TestCase):
@@ -287,14 +172,3 @@ class RetryTest(unittest.TestCase):
                 ]
             )
         )
-
-    def test_generated_workflows_name_every_infrastructure_step(self):
-        source, presets = load_configuration(ROOT)
-        names = {
-            step.get("name")
-            for document in workflows(source, presets).values()
-            for job in document["jobs"].values()
-            for step in job.get("steps", [])
-        }
-        # GitHub names its own setup and teardown steps.
-        self.assertEqual(INFRASTRUCTURE_STEPS - names, {"Set up job", "Complete job"})

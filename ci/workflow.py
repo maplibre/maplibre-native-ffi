@@ -76,6 +76,8 @@ def backend(preset: str) -> str:
 LINUX_RUNNER = "blacksmith-4vcpu-ubuntu-2404"
 LINUX_ARM_RUNNER = "blacksmith-4vcpu-ubuntu-2404-arm"
 MACOS_RUNNER = "blacksmith-6vcpu-macos-26"
+WINDOWS_RUNNER = "blacksmith-4vcpu-windows-2025"
+WINDOWS_ARM_RUNNER = "windows-11-arm"
 SMALL_RUNNER = "blacksmith-2vcpu-ubuntu-2404"
 
 
@@ -96,11 +98,7 @@ def runner(preset: str) -> str:
     }:
         return MACOS_RUNNER
     if target_platform == "windows":
-        return (
-            "windows-11-arm"
-            if target_architecture == "arm64"
-            else "blacksmith-4vcpu-windows-2025"
-        )
+        return WINDOWS_ARM_RUNNER if target_architecture == "arm64" else WINDOWS_RUNNER
     if target_platform in {"android", "emscripten", "ohos"}:
         return LINUX_RUNNER
     raise SystemExit(f"error: cannot determine runner from preset {preset!r}")
