@@ -123,6 +123,7 @@ typedef struct mln_completion_result {
   uint32_t disposition BIND("enum=mln_command_disposition");
   uint32_t value_size;
   uint64_t generation;
+  uint64_t render_update_generation;
   mln_buffer_view diagnostic;
   const void* value;
   size_t value_count;

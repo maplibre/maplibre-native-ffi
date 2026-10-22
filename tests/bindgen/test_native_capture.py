@@ -260,7 +260,8 @@ int main() {
   owned.view.payload.completion = mln_completion_result{
     .size = sizeof(mln_completion_result), .status = MLN_STATUS_OK,
     .disposition = 0, .value_size = sizeof(mln_map), .generation = 0,
-    .diagnostic = {}, .value = maps, .value_count = 2
+    .render_update_generation = 0, .diagnostic = {}, .value = maps,
+    .value_count = 2
   };
   mln::delivery::completion_capture<mln_map>.discard(owned);
   assert(disposed == 2);
