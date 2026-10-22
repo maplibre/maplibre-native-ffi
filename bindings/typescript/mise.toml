@@ -75,14 +75,15 @@ node scripts/pack.ts --version "$usage_version" build/npm "$usage_preset"
 description = "Run the TypeScript binding suite under Node, Bun, and Deno, or on ArkTS for an OpenHarmony preset."
 usage = '''
 arg "[preset]" default="{{vars.host_native_preset}}"
-arg "[runtime]" help="One runtime instead of all three, for a desktop preset" {
-  choices "node" "bun" "deno"
+arg "[runtime]" help="One runtime instead of all three, for a desktop preset; hermes runs only when named" {
+  choices "node" "bun" "deno" "hermes"
 }
 '''
 depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 # The preset selects the host: OpenHarmony presets run the suite on ArkTS from
 # a signed HAP on the emulator, and desktop presets run it in one process per
-# runtime, after packing the preset's packages as the pack task does.
+# runtime, after packing the preset's packages as the pack task does. Hermes
+# runs on the test host in test/hermes/host, which builds Hermes from source.
 run = '''
 case "$usage_preset" in
   ohos-*)
@@ -93,6 +94,9 @@ case "$usage_preset" in
     exec mise run :_test-arkts "$usage_preset"
     ;;
 esac
+if [[ ${usage_runtime:-} == hermes ]]; then
+  exec scripts/test-hermes.sh "$usage_preset"
+fi
 exec scripts/test-desktop.sh "$usage_preset" ${usage_runtime:-}
 '''
 

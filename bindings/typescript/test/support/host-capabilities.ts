@@ -3,7 +3,7 @@
 // A case declares the capabilities it needs. The harness leaves a case out
 // only for a capability that `unavailable` names, and fails the run when a
 // case would be left out for any other reason. This module serves Node, Bun,
-// and Deno; the ArkTS bundle replaces it with test/arkts/host-capabilities.ts.
+// and Deno; the ArkTS and Hermes bundles replace it with their own.
 
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
@@ -12,7 +12,7 @@ import type { AddressInfo } from "node:net";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-export type Host = "node" | "bun" | "deno" | "arkts";
+export type Host = "node" | "bun" | "deno" | "arkts" | "hermes";
 
 export type Capability =
   | "httpOrigin"
