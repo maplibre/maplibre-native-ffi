@@ -71,11 +71,12 @@ jobs:
             for i in $(seq 1 25); do
               for mode in owned-texture borrowed-texture; do
                 echo "::group::$variant $i $mode"
-                "$procdump" -accepteula -e -x "$(cygpath -w "$dumps")" "$(cygpath -w "$exe")" "$mode" 2>&1 | iconv -f UTF-16LE -t UTF-8 2>/dev/null | tr -d '\r' | grep -v '^\s*$' | tail -5
+                "$procdump" -accepteula -e -x "$(cygpath -w "$dumps")" "$(cygpath -w "$exe")" "$mode" > /dev/null 2>&1 || true
+                echo "dumps so far: $(ls "$dumps" | grep -c '\.dmp$' || true)"
                 echo "::endgroup::"
               done
             done
-            echo "$variant crashes: $(ls "$dumps" | grep -c '\.dmp$') of 50 runs"
+            echo "$variant crashes: $(ls "$dumps" | grep -c '\.dmp$' || true) of 50 runs"
           }
           # llvmpipe rasterizes on the calling thread, so a crash shows the GL call.
           LP_NUM_THREADS=0 run_variant llvmpipe-single-thread
