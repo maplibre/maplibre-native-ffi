@@ -5,3 +5,10 @@ packages:
 allowBuilds:
   esbuild: true
   sharp: true
+
+# TypeDoc's peer range stops at TypeScript 6.0.x. Alias its typescript
+# dependency to @typescript/typescript6. Drop this (and .pnpmfile.cjs)
+# once TypeDoc supports TS 7, expected around the TS 7.1 release:
+# https://github.com/TypeStrong/typedoc/issues/3098
+overrides:
+  "typedoc>typescript": npm:@typescript/typescript6@6.0.2
