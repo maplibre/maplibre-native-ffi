@@ -11,8 +11,18 @@
 #include "unity.h"
 #include "wait.h"
 
+// The style turns its transition off. A default transition keeps the map
+// publishing an update after every frame for its 300 ms, and nothing paces a
+// fixture's frames, so a wait for idle would render thousands of them. A
+// browser WebGPU device then spends seconds after the case on their returns.
+static const char prepared_style_json[] =
+  "{\"version\":8,\"transition\":{\"duration\":0,\"delay\":0},"
+  "\"sources\":{},\"layers\":[]}";
+
 void mln_test_render_prepare_map(mln_map map) {
-  MLN_TEST_OK(mln_test_map_set_style_json(map, mln_test_empty_style_json));
+  MLN_TEST_OK(
+    mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL(prepared_style_json))
+  );
   MLN_TEST_OK(mln_test_map_fence(map));
 }
 

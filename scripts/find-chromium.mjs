@@ -37,11 +37,12 @@ export function findChromium() {
   if (existsSync(cache)) {
     for (const entry of readdirSync(cache).sort().reverse()) {
       if (!entry.startsWith("chromium-")) continue;
-      // Playwright has shipped both layouts; newer builds carry the arch.
+      // Playwright has shipped several layouts; newer builds carry the arch.
       for (const relative of [
         "chrome-linux64/chrome",
         "chrome-linux/chrome",
         "chrome-mac/Chromium.app/Contents/MacOS/Chromium",
+        `chrome-mac-${process.arch}/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`,
       ]) {
         const candidate = path.join(cache, entry, relative);
         if (existsSync(candidate)) return candidate;

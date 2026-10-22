@@ -22,8 +22,8 @@
 extern "C" {
 #endif
 
-// Loads the empty style and waits for the runtime to apply it, so a demand
-// has an update to render.
+// Loads an empty style with no transition and waits for the runtime to apply
+// it, so a demand has an update to render.
 void mln_test_render_prepare_map(mln_map map);
 
 // Requests a forced frame of the latest update with the supplied token.
