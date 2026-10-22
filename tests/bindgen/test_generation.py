@@ -69,6 +69,13 @@ class GenerationTests(unittest.TestCase):
 mln_status mln_probe_batch(unsigned point_count, double *out_values BIND("direction=out;length=point_count"), mln_diagnostic *out_diagnostic);
 """)
 
+    def test_output_array_cannot_share_its_count_with_two_input_arrays(self):
+        with self.assertRaisesRegex(ModelError, "output array length"):
+            self.parse("""
+mln_status mln_probe_batch(const double *left BIND("length=count"), const double *right BIND("length=count"), unsigned count,
+  double *out_values BIND("direction=out;length=count"), mln_diagnostic *out_diagnostic);
+""")
+
     def test_output_array_cannot_take_its_count_from_a_byte_buffer(self):
         with self.assertRaisesRegex(ModelError, "output array length"):
             self.parse("""

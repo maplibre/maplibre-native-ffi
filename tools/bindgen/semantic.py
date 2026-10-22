@@ -144,6 +144,17 @@ class ValuePlan:
         return self.element if self.kind == "reference" else self
 
 
+def plain_value(value: ValuePlan) -> bool:
+    """Whether a value is fixed-size data that zeroed storage represents."""
+    if value.kind in {"scalar", "enum"}:
+        return True
+    return (
+        value.kind == "record"
+        and value.default is None
+        and all(plain_value(field.value) for field in value.fields)
+    )
+
+
 # Field roles that hold control state: a struct's size, reserved space, an
 # array's count or stride, a presence mask, a union tag, a
 # callback context, a registration's release callback, and a registration's
@@ -653,6 +664,19 @@ class Binder:
                     element = self.value(
                         pointee, child_metadata, context + " output element"
                     )
+                    # Each emitter decodes the elements after the call from
+                    # zeroed storage, so an element must own nothing, borrow
+                    # nothing, and need no native default.
+                    if not plain_value(element):
+                        raise ModelError(
+                            [
+                                (
+                                    f"{context}: a caller-sized output element "
+                                    "must be a scalar, an enum, or a record of "
+                                    "them without a native default"
+                                )
+                            ]
+                        )
                     return ValuePlan(kind="array", element=element, **common)
                 if pointee.kind == "pointer" and "length" in metadata:
                     child_metadata["length"] = metadata["length"]

@@ -561,6 +561,41 @@ mln_status copy_values(
         self.assertEqual((output.value.kind, output.value.length), ("array", "count"))
         self.assertEqual(output.sized_by, "values")
 
+    # A binding decodes caller-sized elements after the call from zeroed
+    # storage, so an element that owns, borrows, or needs a default is refused.
+    def test_counted_output_elements_must_be_plain_values(self):
+        for element, declarations in (
+            (
+                "owner",
+                (
+                    'typedef unsigned long owner BIND("kind=handle;release=release_owner");\n'
+                    "void release_owner(owner value);"
+                ),
+            ),
+            (
+                "item",
+                "typedef struct item { mln_buffer_view message; } item;",
+            ),
+            (
+                "item",
+                (
+                    "typedef struct item { double value; } item;\nitem item_default(void);\n"
+                    "mln_status use_item(item value, mln_diagnostic *out_diagnostic);"
+                ),
+            ),
+        ):
+            source = f"""
+{declarations}
+mln_status copy_values(
+  const double *values BIND("length=count"),
+  {element} *out BIND("direction=out;length=count"), unsigned count, mln_diagnostic *out_diagnostic);
+"""
+            with (
+                self.subTest(declarations=declarations),
+                self.assertRaisesRegex(ModelError, "caller-sized output element"),
+            ):
+                bind(self.parse(source), require_complete=True)
+
     def test_an_absence_status_names_the_one_output_it_reports_absent(self):
         model = bind(
             parse(groups=("absent_handle", "absent_value")), require_complete=True

@@ -699,33 +699,36 @@ def validate(api: Api) -> None:
             ):
                 errors.append(f"{pcontext}: length names an absent parameter")
             # A caller-sized output array takes one element per element of an
-            # input array, so its count must be an input that also counts one.
-            # An owned pointer output instead counts the array native returns.
+            # input array, so its count must be an input that counts exactly
+            # one other array, an input one. A binding sizes the output from
+            # that array and passes its length, so a second array sharing the
+            # count could disagree with it. An owned pointer output instead
+            # counts the array native returns.
             if (
                 parameter.metadata.get("direction") == "out"
                 and parameter.metadata.get("length") not in {None, "1"}
                 and parameter.type.pointee is not None
                 and parameter.type.pointee.kind != "pointer"
-                and (
-                    parameters.get(parameter.metadata["length"]) is None
-                    or parameters[parameter.metadata["length"]].metadata.get(
-                        "direction", "in"
-                    )
-                    != "in"
-                    or not any(
-                        input_.metadata.get("direction", "in") == "in"
-                        and input_.type.kind == "pointer"
-                        and input_.type.pointee is not None
-                        and input_.metadata.get("encoding") is None
-                        and input_.metadata.get("length")
-                        == parameter.metadata["length"]
-                        for input_ in function.parameters
-                    )
-                )
             ):
-                errors.append(
-                    f"{pcontext}: output array length must name an input array's count"
-                )
+                counted = [
+                    other
+                    for other in function.parameters
+                    if other is not parameter
+                    and other.metadata.get("length") == parameter.metadata["length"]
+                ]
+                count = parameters.get(parameter.metadata["length"])
+                if (
+                    count is None
+                    or count.metadata.get("direction", "in") != "in"
+                    or len(counted) != 1
+                    or counted[0].metadata.get("direction", "in") != "in"
+                    or counted[0].type.kind != "pointer"
+                    or counted[0].type.pointee is None
+                    or counted[0].metadata.get("encoding") is not None
+                ):
+                    errors.append(
+                        f"{pcontext}: output array length must name the count of exactly one input array"
+                    )
     for record in api.records:
         context = f"{record.location}: {record.name}"
         # A presence bit guards one member, so a value that several fields
