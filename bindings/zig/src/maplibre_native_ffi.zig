@@ -2335,7 +2335,7 @@ pub const OpenglContextDescriptorData = union(enum) {
 /// See `mln_opengl_context_ownership` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const OpenglContextOwnership = enum(u32) {
-    /// The session owns its thread's OpenGL context.
+    /// The session keeps its own OpenGL context current on its thread.
     dedicated = 1,
     /// The session shares its thread with host graphics work.
     shared = 0,

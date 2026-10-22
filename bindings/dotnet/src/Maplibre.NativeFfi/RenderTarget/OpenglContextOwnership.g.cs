@@ -17,7 +17,7 @@ public enum OpenglContextOwnership : uint
     Shared = 0,
 
     /// <summary>
-    /// The session owns its thread's OpenGL context.
+    /// The session keeps its own OpenGL context current on its thread.
     /// </summary>
     Dedicated = 1,
 }

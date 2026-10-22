@@ -1646,7 +1646,7 @@ export const OpenglContextOwnership = {
    */
   shared: 0,
   /**
-   * The session owns its thread's OpenGL context.
+   * The session keeps its own OpenGL context current on its thread.
    */
   dedicated: 1,
 } as const;

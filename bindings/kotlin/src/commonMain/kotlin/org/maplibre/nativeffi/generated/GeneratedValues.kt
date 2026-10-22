@@ -816,7 +816,7 @@ public data class OpenglContextOwnership(public val rawValue: UInt) {
   public companion object {
     /** The session shares its thread with host graphics work. */
     public val SHARED: OpenglContextOwnership = OpenglContextOwnership(0u)
-    /** The session owns its thread's OpenGL context. */
+    /** The session keeps its own OpenGL context current on its thread. */
     public val DEDICATED: OpenglContextOwnership = OpenglContextOwnership(1u)
   }
 }

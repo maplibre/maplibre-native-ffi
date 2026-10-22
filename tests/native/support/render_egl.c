@@ -172,6 +172,23 @@ bool mln_test_egl_context_is_current(void) {
   return eglGetCurrentContext() != EGL_NO_CONTEXT;
 }
 
+bool mln_test_dedicated_egl_surface_is_current(
+  const mln_test_render_fixture* fixture
+) {
+  const dedicated_state* state = fixture->backend_state;
+  mln_test_graphics_surface_info surface = {0};
+  return mln_test_graphics_surface_get_info(state->surface, &surface) &&
+         eglGetCurrentContext() != EGL_NO_CONTEXT &&
+         eglGetCurrentSurface(EGL_DRAW) == surface.opengl_surface;
+}
+
+bool mln_test_dedicated_egl_make_host_context_current(
+  mln_test_render_fixture* fixture
+) {
+  dedicated_state* state = fixture->backend_state;
+  return mln_test_graphics_make_current(state->graphics);
+}
+
 bool mln_test_dedicated_egl_texture_create(
   mln_map map, mln_test_render_fixture* fixture
 ) {

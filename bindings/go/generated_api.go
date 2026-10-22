@@ -771,7 +771,7 @@ type OpenglContextOwnership uint32
 const (
 	// The session shares its thread with host graphics work.
 	OpenglContextOwnershipShared OpenglContextOwnership = OpenglContextOwnership(C.MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED)
-	// The session owns its thread's OpenGL context.
+	// The session keeps its own OpenGL context current on its thread.
 	OpenglContextOwnershipDedicated OpenglContextOwnership = OpenglContextOwnership(C.MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED)
 )
 

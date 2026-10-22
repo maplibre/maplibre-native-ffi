@@ -628,7 +628,7 @@ final class OpenglContextOwnership extends _Enum {
   /// The session shares its thread with host graphics work.
   static const shared = OpenglContextOwnership.fromRawValue(0);
 
-  /// The session owns its thread's OpenGL context.
+  /// The session keeps its own OpenGL context current on its thread.
   static const dedicated = OpenglContextOwnership.fromRawValue(1);
   @override
   String toString() => switch (rawValue) {

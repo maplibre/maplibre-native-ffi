@@ -298,13 +298,17 @@ typedef enum mln_opengl_context_platform : uint32_t {
  * context joins the host share group named by the descriptor, so a host may
  * hand the session a texture and sample it from its own context.
  *
- * A dedicated session keeps its context current between renders and joins no
- * share group.
+ * A dedicated session joins no share group and leaves its context current
+ * after a render instead of restoring what was current before. A render that
+ * finds another context current makes its own current again, so several
+ * dedicated sessions can share one thread, and the host can use its own
+ * context between renders. Teardown releases the session context from the
+ * thread and restores nothing.
  */
 typedef enum mln_opengl_context_ownership : uint32_t {
   /** The session shares its thread with host graphics work. */
   MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED = 0u,
-  /** The session owns its thread's OpenGL context. */
+  /** The session keeps its own OpenGL context current on its thread. */
   MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED = 1u,
 } mln_opengl_context_ownership;
 

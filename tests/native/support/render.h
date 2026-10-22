@@ -165,6 +165,15 @@ bool mln_test_dedicated_egl_surface_create(
 );
 void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture);
 bool mln_test_egl_context_is_current(void);
+// Whether the calling thread has a context current on the fixture's pbuffer.
+bool mln_test_dedicated_egl_surface_is_current(
+  const mln_test_render_fixture* fixture
+);
+// Makes the fixture's tests/graphics context current, as a host that draws
+// with its own context between renders would.
+bool mln_test_dedicated_egl_make_host_context_current(
+  mln_test_render_fixture* fixture
+);
 // Attaches a private OpenGL owned texture target whose context and driver both
 // belong to the native core worker.
 bool mln_test_dedicated_egl_texture_create(

@@ -3180,7 +3180,7 @@ native_enum! {
 pub enum OpenglContextOwnership: u32 {
     /// The session shares its thread with host graphics work.
     Shared = 0,
-    /// The session owns its thread's OpenGL context.
+    /// The session keeps its own OpenGL context current on its thread.
     Dedicated = 1,
 } Unknown
 }

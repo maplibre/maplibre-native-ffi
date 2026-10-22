@@ -290,7 +290,7 @@ public struct OpenglContextOwnership: RawRepresentable, CustomStringConvertible,
 
   /// The session shares its thread with host graphics work.
   public static let shared: OpenglContextOwnership = .init(rawValue: 0)
-  /// The session owns its thread's OpenGL context.
+  /// The session keeps its own OpenGL context current on its thread.
   public static let dedicated: OpenglContextOwnership = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
