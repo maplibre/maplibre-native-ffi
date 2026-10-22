@@ -199,7 +199,7 @@ hooks:
 ```
 
 Each target uses Metal on Apple platforms, OpenGL on Android, and Vulkan
-elsewhere. Set `backend` to one backend for every target, or map an OS to one.
+elsewhere. Map an OS to a different backend in `backend`.
 
 ```yaml title="pubspec.yaml"
 hooks:
@@ -209,8 +209,9 @@ hooks:
         android: vulkan
 ```
 
-The backends are `opengl`, `metal`, and `vulkan`. The map keys are `android`,
-`ios`, `linux`, `macos`, `windows`, and `default`.
+The backends are `opengl`, `metal`, and `vulkan`. The keys are `android`,
+`ios`, `linux`, `macos`, `windows`, and `default`, which covers every OS that
+the map leaves out.
 
 ### Go
 

@@ -83,17 +83,21 @@ String _targetPlatform(CodeConfig code) {
 /// Preset names spell OpenGL by its context provider.
 String _backendSuffix(BuildInput input, OS os) {
   final selected = switch (input.userDefines['backend']) {
+    null => null,
     final Map<Object?, Object?> backends =>
       backends[os.name] ?? backends['default'],
-    final backend => backend,
+    final other => throw FormatException(
+      '$_defines.backend must map an OS or `default` to a backend; found '
+      '$other',
+    ),
   };
   return switch (selected ?? _defaultBackend(os)) {
     'opengl' => os == OS.windows ? 'wgl' : 'egl',
     final String backend when backend == 'metal' || backend == 'vulkan' =>
       backend,
     _ => throw FormatException(
-      '$_defines.backend must be opengl, metal, or vulkan, or a map from an OS '
-      'or `default` to one of those; found $selected',
+      '$_defines.backend.${os.name} must be opengl, metal, or vulkan; found '
+      '$selected',
     ),
   };
 }
