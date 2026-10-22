@@ -58,6 +58,15 @@ states what a completion guarantees.
 [Load a style](/maplibre-native-ffi/guides/load-a-style/) introduces the source
 and layer workflow.
 
+### Locale expressions on Linux
+
+On Linux, the `number-format`, `collator`, and `resolved-locale` expressions use
+locale data that the library carries, so they work without system locale
+packages. An expression without a locale, or with a language that the data
+lacks, uses the language of the first nonempty environment variable among
+`LC_ALL`, then `LC_COLLATE` for a collator or `LC_NUMERIC` for a number, then
+`LANG`. The `C` and `POSIX` locales use `en-US`.
+
 ## Render session
 
 A render session draws one map into one render target. A map has at most one

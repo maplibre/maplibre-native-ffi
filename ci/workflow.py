@@ -162,10 +162,14 @@ def android_commands(preset: str, abi: str) -> list[str]:
         commands = [
             f"mise run //bindings/kotlin:build {preset}",
             f"mise run //bindings/kotlin:test {preset}",
+            f"mise run //bindings/kotlin:test:native {preset}",
             f"mise run //bindings/go:test {preset}",
             f"mise run //bindings/rust:test {preset}",
             f"mise run //bindings/zig:test {preset}",
+            f"mise run //bindings/dart:test:android {preset}",
         ]
+        # Python replaces the EGL suite's API 26 emulator with a newer API,
+        # so run it after every suite that reuses the API 26 device.
         commands.append(f"mise run //bindings/python:test {preset}")
     else:
         commands = [
@@ -174,9 +178,8 @@ def android_commands(preset: str, abi: str) -> list[str]:
             f"mise run //bindings/go:build {preset}",
             f"mise run //bindings/rust:build {preset}",
             f"mise run //bindings/zig:build {preset}",
+            f"mise run //bindings/dart:build:mobile {preset}",
         ]
-    dart_action = "test:android" if preset in EMULATOR_TESTED else "build:mobile"
-    commands.append(f"mise run //bindings/dart:{dart_action} {preset}")
     return commands
 
 
@@ -263,7 +266,7 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
                 f"mise run //bindings/kotlin:test {preset}",
                 f"mise run //bindings/swift:test {preset}",
                 "mise run //examples/swift-map:build:ios-simulator",
-                f"mise run //bindings/dart:build:mobile {preset}",
+                f"mise run //bindings/dart:test:ios {preset}",
             ]
         )
     elif target_platform == "ios-maccatalyst":
