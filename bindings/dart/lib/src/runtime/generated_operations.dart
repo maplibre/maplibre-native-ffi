@@ -6170,7 +6170,7 @@ final class MapProjectionHandle implements Finalizable {
           points.isEmpty ? 1 : points.length,
         );
         for (var index = 0; index < points.length; index++) {
-          nativepoints[index] = _writeScreenPoint(points[index], arena).ref;
+          _writeScreenPoint(points[index], arena, into: nativepoints + index);
         }
         final outCoordinates = arena<raw.mln_lat_lng>(
           points.isEmpty ? 1 : points.length,
@@ -6202,7 +6202,7 @@ final class MapProjectionHandle implements Finalizable {
           points.isEmpty ? 1 : points.length,
         );
         for (var index = 0; index < points.length; index++) {
-          nativepoints[index] = _writeScreenPoint(points[index], arena).ref;
+          _writeScreenPoint(points[index], arena, into: nativepoints + index);
         }
         final outCoordinates = arena<raw.mln_lat_lng>(
           points.isEmpty ? 1 : points.length,
@@ -6269,10 +6269,11 @@ final class MapProjectionHandle implements Finalizable {
           coordinates.isEmpty ? 1 : coordinates.length,
         );
         for (var index = 0; index < coordinates.length; index++) {
-          nativecoordinates[index] = _writeLatLng(
+          _writeLatLng(
             coordinates[index],
             arena,
-          ).ref;
+            into: nativecoordinates + index,
+          );
         }
         final outPoints = arena<raw.mln_screen_point>(
           coordinates.isEmpty ? 1 : coordinates.length,
