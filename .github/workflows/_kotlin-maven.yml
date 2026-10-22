@@ -213,8 +213,9 @@ jobs:
             echo "$GITHUB_REF_NAME moved from $PUBLISH_SHA to $tag_sha" >&2
             exit 1
           fi
-          context="$(mise run --no-deps ci:release-version "$GITHUB_REF_NAME")"
-          if [[ "$(jq -r '.version' <<<"$context")" != "$KOTLIN_VERSION" ]]; then
+          # The release checked its order when it started, and a newer tag
+          # waits for it in the release concurrency group.
+          if [[ "${GITHUB_REF_NAME#v}" != "$KOTLIN_VERSION" ]]; then
             echo "$GITHUB_REF_NAME no longer names version $KOTLIN_VERSION" >&2
             exit 1
           fi

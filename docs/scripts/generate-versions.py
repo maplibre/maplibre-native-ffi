@@ -14,12 +14,21 @@ from ci.release_version import release_tags
 
 def main() -> int:
     tags = release_tags(repository=REPO_ROOT)
-    if not tags:
+    # Pages quote the latest release as `{{version}}`. Before the first release
+    # under one tag, the latest Kotlin release is the version that the pages'
+    # Maven coordinates can name.
+    current = {tag: version for tag, version in tags.items() if tag.startswith("v")}
+    if not current:
+        current = {
+            tag: version
+            for tag, version in tags.items()
+            if tag.startswith("bindings/kotlin/v")
+        }
+    if not current:
         raise SystemExit(
             "the checkout has no release tags; fetch tags to build the docs"
         )
-    # Pages quote the latest release as `{{version}}`.
-    versions = {"version": str(max(tags.values()))}
+    versions = {"version": str(max(current.values()))}
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(json.dumps(versions, indent=2) + "\n", encoding="utf-8")
     return 0

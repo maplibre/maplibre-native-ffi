@@ -59,7 +59,9 @@ release together.
 The release workflow accepts a tag when its revision follows every earlier
 release in the same epoch and month. The tag month must be the current UTC
 month, and the tagged commit must belong to `main` and have a successful main CI
-run. The workflow repeats the tag checks before it publishes.
+run. Before it publishes each package, the workflow checks again that the tag
+names the same commit and version. Releases run one at a time, so a tag pushed
+during a release waits for it.
 
 Earlier releases tagged the native library as `core/v<version>` and each binding
 as `bindings/<name>/v<version>`. Those versions count as earlier releases, so a
