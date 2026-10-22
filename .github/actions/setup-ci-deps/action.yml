@@ -129,10 +129,10 @@ runs:
     - name: Install sccache
       uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
 
-    # GitHub-hosted x64 runners prefer azure.archive.ubuntu.com. When that
-    # mirror crawls, apt keeps the connection instead of failing over, and
-    # `mise bootstrap`'s libclang-dev download sits in this action for tens
-    # of minutes. Demote Azure and bound idle fetches before any apt-get.
+    # x64 runners, GitHub-hosted and Blacksmith alike, prefer
+    # azure.archive.ubuntu.com. When that mirror crawls, apt keeps the
+    # connection instead of failing over, and `mise bootstrap`'s libclang-dev
+    # download sits in this action for tens of minutes. Demote Azure and bound idle fetches before any apt-get.
     # ARM runners use ports.ubuntu.com instead.
     - name: Bound apt downloads on Linux
       if: ${{ runner.os == 'Linux' }}
