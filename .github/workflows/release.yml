@@ -8,8 +8,10 @@ on:
 permissions:
   contents: read
 
+# Each release checks that its tag is the newest before it publishes, so
+# releases run one at a time across every tag.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 jobs:
