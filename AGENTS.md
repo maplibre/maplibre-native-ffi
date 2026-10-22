@@ -55,16 +55,14 @@ need and the code cannot say:
 pull request from `.config/rubberstamp.yml`. Don't label by hand; correct a
 wrong label instead, and leave GitHub's native issue type unset.
 
-Write a PR title and description for a reviewer who has not seen your session:
+Write a short PR title and description for a reviewer who will read the diff.
+Say what the diff, its doc comments, and CI can't:
 
-- Describe the final diff. Rewrite both when review changes the scope.
-- Open with the user-visible problem and what users can now do. For internal
-  work, give the concrete benefit to maintainers instead.
-- Make it concrete: a small example of new API or commands, the trigger and the
-  before and after of a bug, and measured numbers with their method.
-- State what a host must adopt: new options, defaults, platforms, and breaking
-  changes.
-- Report validation that CI does not show, and its limits.
+- Open with the problem and what users can now do, or what maintainers gain.
+- Show one small example of new API, or a bug's trigger with before and after.
+- Add these only if they apply: what a host must adopt, measured numbers with a
+  one-line method, and validation that CI does not run.
+- Rewrite both when review changes the scope.
 
 When you post AI-contributed GitHub content, including a new Discussion or
 Issue, a reply, or a PR description or comment, append this disclosure:
