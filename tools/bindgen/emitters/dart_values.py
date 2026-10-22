@@ -270,6 +270,16 @@ class Values:
         roots = ", registrations.roots" if self.queue_callbacks(value) else ""
         return f"registrations.add(_prepare{public_name(value.native)}({expression}{roots}))"
 
+    # Writes a record element in place rather than through a temporary copy.
+    def write_element(self, value, expression, array):
+        if value.kind == "record" and not value.registration:
+            return (
+                f"_write{public_name(value.native)}({expression}, arena"
+                + (", registrations" if self.has_registrations(value) else "")
+                + f", into: {array} + index);"
+            )
+        return f"{array}[index] = {self.native(value, expression)};"
+
     def native(self, value, expression):
         if value.registration:
             return f"{self.prepared(value, expression)}.ref"
@@ -597,7 +607,7 @@ class Values:
                 writes += [
                     f"    result.ref.{field.name} = arena<{self.ffi(child)}>({expression}.isEmpty ? 1 : {expression}.length);",
                     f"    result.ref.{field.value.length} = {expression}.length;",
-                    f"    for (var index = 0; index < {expression}.length; index++) {{ result.ref.{field.name}[index] = {self.native(child, expression + '[index]')}; }}",
+                    f"    for (var index = 0; index < {expression}.length; index++) {{ {self.write_element(child, expression + '[index]', 'result.ref.' + field.name)} }}",
                 ]
             elif field.presence and field.presence.mask:
                 writes.append(
@@ -757,7 +767,7 @@ class Values:
             else ""
         )
         conversion = (
-            f"Pointer<raw.{value.native}> _write{public}({public} value, Allocator arena) {{\n  final result = arena<raw.{value.native}>();\n{initialize}\n  switch(value) {{\n"
+            f"Pointer<raw.{value.native}> _write{public}({public} value, Allocator arena, {{Pointer<raw.{value.native}>? into}}) {{\n  final result = into ?? arena<raw.{value.native}>();\n{initialize}\n  switch(value) {{\n"
             + "\n".join(writes)
             + f"\n  }}\n  return result;\n}}\n{public} _read{public}(raw.{value.native} source) => switch(source.{union.presence.tag}) {{\n"
             + "\n".join(reads)
@@ -844,7 +854,7 @@ class Values:
             else ""
         )
         conversion = (
-            f"Pointer<raw.{value.native}> _write{public}({public} value, Allocator arena) {{\n  final result = arena<raw.{value.native}>();\n{initialize}\n"
+            f"Pointer<raw.{value.native}> _write{public}({public} value, Allocator arena, {{Pointer<raw.{value.native}>? into}}) {{\n  final result = into ?? arena<raw.{value.native}>();\n{initialize}\n"
             + "\n".join(writes)
             + f"\n  switch(value.{identifier(union.name)}) {{\n"
             + "\n".join(cases)
@@ -986,8 +996,8 @@ class Values:
                     if self.has_registrations(value)
                     else ""
                 )
-                + ") {",
-                f"  final result = arena<raw.{value.native}>();",
+                + f", {{Pointer<raw.{value.native}>? into}}) {{",
+                f"  final result = into ?? arena<raw.{value.native}>();",
             ]
             if value.default:
                 write.append(f"  result.ref = raw.{value.default}();")
@@ -1031,7 +1041,7 @@ class Values:
                     lines = [
                         f"  {native_field} = arena<{self.ffi(child)}>({items}.isEmpty ? 1 : {items}.length);",
                         f"  result.ref.{field.value.length} = {items}.length;",
-                        f"  for (var index = 0; index < {items}.length; index++) {{ {native_field}[index] = {self.native(child, items + '[index]')}; }}",
+                        f"  for (var index = 0; index < {items}.length; index++) {{ {self.write_element(child, items + '[index]', native_field)} }}",
                     ]
                     if field.value.nullable:
                         lines = [

@@ -30,8 +30,12 @@ OpenglTextureFrame _readOpenglTextureFrame(
   type: source.type,
 );
 
-Pointer<raw.mln_gpu_sync> _writeGpuSync(GpuSync value, Allocator arena) {
-  final result = arena<raw.mln_gpu_sync>();
+Pointer<raw.mln_gpu_sync> _writeGpuSync(
+  GpuSync value,
+  Allocator arena, {
+  Pointer<raw.mln_gpu_sync>? into,
+}) {
+  final result = into ?? arena<raw.mln_gpu_sync>();
   result.ref = raw.mln_gpu_sync_default();
   result.ref.kind = value.kind.rawValue;
   result.ref.object = uint64ToNative(value.object, 'uint64_t');
@@ -43,8 +47,12 @@ GpuSync _readGpuSync(raw.mln_gpu_sync source) => GpuSync(
   object: uint64FromNative(source.object),
 );
 
-Pointer<raw.mln_lat_lng> _writeLatLng(LatLng value, Allocator arena) {
-  final result = arena<raw.mln_lat_lng>();
+Pointer<raw.mln_lat_lng> _writeLatLng(
+  LatLng value,
+  Allocator arena, {
+  Pointer<raw.mln_lat_lng>? into,
+}) {
+  final result = into ?? arena<raw.mln_lat_lng>();
   result.ref.latitude = value.latitude;
   result.ref.longitude = value.longitude;
   return result;
@@ -55,9 +63,10 @@ LatLng _readLatLng(raw.mln_lat_lng source) =>
 
 Pointer<raw.mln_edge_insets> _writeEdgeInsets(
   EdgeInsets value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_edge_insets>();
+  Allocator arena, {
+  Pointer<raw.mln_edge_insets>? into,
+}) {
+  final result = into ?? arena<raw.mln_edge_insets>();
   result.ref.top = value.top;
   result.ref.left = value.left;
   result.ref.bottom = value.bottom;
@@ -74,9 +83,10 @@ EdgeInsets _readEdgeInsets(raw.mln_edge_insets source) => EdgeInsets(
 
 Pointer<raw.mln_screen_point> _writeScreenPoint(
   ScreenPoint value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_screen_point>();
+  Allocator arena, {
+  Pointer<raw.mln_screen_point>? into,
+}) {
+  final result = into ?? arena<raw.mln_screen_point>();
   result.ref.x = value.x;
   result.ref.y = value.y;
   return result;
@@ -87,9 +97,10 @@ ScreenPoint _readScreenPoint(raw.mln_screen_point source) =>
 
 Pointer<raw.mln_camera_options> _writeCameraOptions(
   CameraOptions value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_camera_options>();
+  Allocator arena, {
+  Pointer<raw.mln_camera_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_camera_options>();
   result.ref = raw.mln_camera_options_default();
   if (value.center != null) {
     result.ref.fields |= raw.MLN_CAMERA_OPTION_CENTER;
@@ -160,9 +171,10 @@ CameraOptions _readCameraOptions(
 
 Pointer<raw.mln_logical_extent> _writeLogicalExtent(
   LogicalExtent value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_logical_extent>();
+  Allocator arena, {
+  Pointer<raw.mln_logical_extent>? into,
+}) {
+  final result = into ?? arena<raw.mln_logical_extent>();
   result.ref = raw.mln_logical_extent_default();
   result.ref.width = _nativeInteger(value.width, 0, 4294967295);
   result.ref.height = _nativeInteger(value.height, 0, 4294967295);
@@ -179,9 +191,10 @@ LogicalExtent _readLogicalExtent(raw.mln_logical_extent source) =>
 
 Pointer<raw.mln_projection_mode> _writeProjectionMode(
   ProjectionMode value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_projection_mode>();
+  Allocator arena, {
+  Pointer<raw.mln_projection_mode>? into,
+}) {
+  final result = into ?? arena<raw.mln_projection_mode>();
   result.ref = raw.mln_projection_mode_default();
   if (value.axonometric != null) {
     result.ref.fields |= raw.MLN_PROJECTION_MODE_AXONOMETRIC;
@@ -213,9 +226,10 @@ ProjectionMode _readProjectionMode(raw.mln_projection_mode source) =>
 
 Pointer<raw.mln_map_viewport_options> _writeMapViewportOptions(
   MapViewportOptions value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_map_viewport_options>();
+  Allocator arena, {
+  Pointer<raw.mln_map_viewport_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_map_viewport_options>();
   result.ref = raw.mln_map_viewport_options_default();
   if (value.northOrientation != null) {
     result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
@@ -259,8 +273,12 @@ MapViewportOptions _readMapViewportOptions(
       : null,
 );
 
-Pointer<raw.mln_map_view> _writeMapView(MapView value, Allocator arena) {
-  final result = arena<raw.mln_map_view>();
+Pointer<raw.mln_map_view> _writeMapView(
+  MapView value,
+  Allocator arena, {
+  Pointer<raw.mln_map_view>? into,
+}) {
+  final result = into ?? arena<raw.mln_map_view>();
   result.ref.size = sizeOf<raw.mln_map_view>();
   result.ref.camera = _writeCameraOptions(value.camera, arena).ref;
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
@@ -323,9 +341,10 @@ WebgpuTextureFrame _readWebgpuTextureFrame(
 
 Pointer<raw.mln_unit_bezier> _writeUnitBezier(
   UnitBezier value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_unit_bezier>();
+  Allocator arena, {
+  Pointer<raw.mln_unit_bezier>? into,
+}) {
+  final result = into ?? arena<raw.mln_unit_bezier>();
   result.ref.x1 = value.x1;
   result.ref.y1 = value.y1;
   result.ref.x2 = value.x2;
@@ -387,9 +406,10 @@ _prepareCameraTransitionHandler(
 Pointer<raw.mln_animation_options> _writeAnimationOptions(
   AnimationOptions value,
   Allocator arena,
-  _NativeRegistrations registrations,
-) {
-  final result = arena<raw.mln_animation_options>();
+  _NativeRegistrations registrations, {
+  Pointer<raw.mln_animation_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_animation_options>();
   result.ref = raw.mln_animation_options_default();
   if (value.durationMs != null) {
     result.ref.fields |= raw.MLN_ANIMATION_OPTION_DURATION;
@@ -442,9 +462,10 @@ AnimationOptions _readAnimationOptions(raw.mln_animation_options source) =>
 
 Pointer<raw.mln_lat_lng_bounds> _writeLatLngBounds(
   LatLngBounds value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_lat_lng_bounds>();
+  Allocator arena, {
+  Pointer<raw.mln_lat_lng_bounds>? into,
+}) {
+  final result = into ?? arena<raw.mln_lat_lng_bounds>();
   result.ref.southwest = _writeLatLng(value.southwest, arena).ref;
   result.ref.northeast = _writeLatLng(value.northeast, arena).ref;
   return result;
@@ -457,9 +478,10 @@ LatLngBounds _readLatLngBounds(raw.mln_lat_lng_bounds source) => LatLngBounds(
 
 Pointer<raw.mln_bound_options> _writeBoundOptions(
   BoundOptions value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_bound_options>();
+  Allocator arena, {
+  Pointer<raw.mln_bound_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_bound_options>();
   result.ref = raw.mln_bound_options_default();
   if (value.unbounded) {
     result.ref.fields |= raw.MLN_BOUND_OPTION_UNBOUNDED;
@@ -509,9 +531,10 @@ BoundOptions _readBoundOptions(raw.mln_bound_options source) => BoundOptions(
 Pointer<raw.mln_camera_delta> _writeCameraDelta(
   CameraDelta value,
   Allocator arena,
-  _NativeRegistrations registrations,
-) {
-  final result = arena<raw.mln_camera_delta>();
+  _NativeRegistrations registrations, {
+  Pointer<raw.mln_camera_delta>? into,
+}) {
+  final result = into ?? arena<raw.mln_camera_delta>();
   result.ref = raw.mln_camera_delta_default();
   if (value.offset != null) {
     result.ref.fields |= raw.MLN_CAMERA_DELTA_OFFSET;
@@ -564,9 +587,10 @@ CameraDelta _readCameraDelta(raw.mln_camera_delta source) => CameraDelta(
 
 Pointer<raw.mln_camera_fit_options> _writeCameraFitOptions(
   CameraFitOptions value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_camera_fit_options>();
+  Allocator arena, {
+  Pointer<raw.mln_camera_fit_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_camera_fit_options>();
   result.ref = raw.mln_camera_fit_options_default();
   if (value.padding != null) {
     result.ref.fields |= raw.MLN_CAMERA_FIT_OPTION_PADDING;
@@ -599,9 +623,10 @@ CameraFitOptions _readCameraFitOptions(raw.mln_camera_fit_options source) =>
 Pointer<raw.mln_camera_update> _writeCameraUpdate(
   CameraUpdate value,
   Allocator arena,
-  _NativeRegistrations registrations,
-) {
-  final result = arena<raw.mln_camera_update>();
+  _NativeRegistrations registrations, {
+  Pointer<raw.mln_camera_update>? into,
+}) {
+  final result = into ?? arena<raw.mln_camera_update>();
   result.ref = raw.mln_camera_update_default();
   result.ref.mode = value.mode.rawValue;
   result.ref.camera = _writeCameraOptions(value.camera, arena).ref;
@@ -623,9 +648,10 @@ CameraUpdate _readCameraUpdate(raw.mln_camera_update source) => CameraUpdate(
 
 Pointer<raw.mln_canonical_tile_id> _writeCanonicalTileId(
   CanonicalTileId value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_canonical_tile_id>();
+  Allocator arena, {
+  Pointer<raw.mln_canonical_tile_id>? into,
+}) {
+  final result = into ?? arena<raw.mln_canonical_tile_id>();
   result.ref.z = _nativeInteger(value.z, 0, 4294967295);
   result.ref.x = _nativeInteger(value.x, 0, 4294967295);
   result.ref.y = _nativeInteger(value.y, 0, 4294967295);
@@ -792,9 +818,10 @@ CustomMvtVectorSourceOptions _readCustomMvtVectorSourceOptions(
 
 Pointer<raw.mln_frame_demand> _writeFrameDemand(
   FrameDemand value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_frame_demand>();
+  Allocator arena, {
+  Pointer<raw.mln_frame_demand>? into,
+}) {
+  final result = into ?? arena<raw.mln_frame_demand>();
   result.ref = raw.mln_frame_demand_default();
   result.ref.flags = value.flags.rawValue;
   result.ref.token = uint64ToNative(value.token, 'uint64_t');
@@ -806,8 +833,12 @@ FrameDemand _readFrameDemand(raw.mln_frame_demand source) => FrameDemand(
   token: uint64FromNative(source.token),
 );
 
-Pointer<raw.mln_vec3> _writeVec3(Vec3 value, Allocator arena) {
-  final result = arena<raw.mln_vec3>();
+Pointer<raw.mln_vec3> _writeVec3(
+  Vec3 value,
+  Allocator arena, {
+  Pointer<raw.mln_vec3>? into,
+}) {
+  final result = into ?? arena<raw.mln_vec3>();
   result.ref.x = value.x;
   result.ref.y = value.y;
   result.ref.z = value.z;
@@ -819,9 +850,10 @@ Vec3 _readVec3(raw.mln_vec3 source) =>
 
 Pointer<raw.mln_quaternion> _writeQuaternion(
   Quaternion value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_quaternion>();
+  Allocator arena, {
+  Pointer<raw.mln_quaternion>? into,
+}) {
+  final result = into ?? arena<raw.mln_quaternion>();
   result.ref.x = value.x;
   result.ref.y = value.y;
   result.ref.z = value.z;
@@ -834,9 +866,10 @@ Quaternion _readQuaternion(raw.mln_quaternion source) =>
 
 Pointer<raw.mln_free_camera_options> _writeFreeCameraOptions(
   FreeCameraOptions value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_free_camera_options>();
+  Allocator arena, {
+  Pointer<raw.mln_free_camera_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_free_camera_options>();
   result.ref = raw.mln_free_camera_options_default();
   if (value.position != null) {
     result.ref.fields |= raw.MLN_FREE_CAMERA_OPTION_POSITION;
@@ -861,9 +894,10 @@ FreeCameraOptions _readFreeCameraOptions(raw.mln_free_camera_options source) =>
 
 Pointer<raw.mln_geojson_source_options> _writeGeojsonSourceOptions(
   GeojsonSourceOptions value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_geojson_source_options>();
+  Allocator arena, {
+  Pointer<raw.mln_geojson_source_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_geojson_source_options>();
   result.ref = raw.mln_geojson_source_options_default();
   if (value.minZoom != null) {
     result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM;
@@ -968,9 +1002,10 @@ GeojsonSourceOptions _readGeojsonSourceOptions(
 
 Pointer<raw.mln_http_header> _writeHttpHeader(
   HttpHeader value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_http_header>();
+  Allocator arena, {
+  Pointer<raw.mln_http_header>? into,
+}) {
+  final result = into ?? arena<raw.mln_http_header>();
   result.ref.name = nativeStringView(value.name, arena).value;
   result.ref.value = nativeStringView(value.value, arena).value;
   return result;
@@ -983,9 +1018,10 @@ HttpHeader _readHttpHeader(raw.mln_http_header source) => HttpHeader(
 
 Pointer<raw.mln_http_header_rule> _writeHttpHeaderRule(
   HttpHeaderRule value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_http_header_rule>();
+  Allocator arena, {
+  Pointer<raw.mln_http_header_rule>? into,
+}) {
+  final result = into ?? arena<raw.mln_http_header_rule>();
   result.ref = raw.mln_http_header_rule_default();
   result.ref.kinds = value.kinds.rawValue;
   result.ref.flags = value.flags.rawValue;
@@ -995,10 +1031,11 @@ Pointer<raw.mln_http_header_rule> _writeHttpHeaderRule(
   );
   result.ref.header_count = value.headers.length;
   for (var index = 0; index < value.headers.length; index++) {
-    result.ref.headers[index] = _writeHttpHeader(
+    _writeHttpHeader(
       value.headers[index],
       arena,
-    ).ref;
+      into: result.ref.headers + index,
+    );
   }
   return result;
 }
@@ -1018,9 +1055,10 @@ HttpHeaderRule _readHttpHeaderRule(raw.mln_http_header_rule source) =>
 
 Pointer<raw.mln_projected_meters> _writeProjectedMeters(
   ProjectedMeters value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_projected_meters>();
+  Allocator arena, {
+  Pointer<raw.mln_projected_meters>? into,
+}) {
+  final result = into ?? arena<raw.mln_projected_meters>();
   result.ref.northing = value.northing;
   result.ref.easting = value.easting;
   return result;
@@ -1069,9 +1107,10 @@ _NativeRegistration<raw.mln_log_handler> _prepareLogHandler(
 
 Pointer<raw.mln_premultiplied_rgba8_image> _writePremultipliedRgba8Image(
   PremultipliedRgba8Image value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_premultiplied_rgba8_image>();
+  Allocator arena, {
+  Pointer<raw.mln_premultiplied_rgba8_image>? into,
+}) {
+  final result = into ?? arena<raw.mln_premultiplied_rgba8_image>();
   result.ref = raw.mln_premultiplied_rgba8_image_default();
   result.ref.width = _nativeInteger(value.width, 0, 4294967295);
   result.ref.height = _nativeInteger(value.height, 0, 4294967295);
@@ -1095,9 +1134,10 @@ PremultipliedRgba8Image _readPremultipliedRgba8Image(
 
 Pointer<raw.mln_metal_borrowed_texture> _writeMetalBorrowedTexture(
   MetalBorrowedTexture value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_metal_borrowed_texture>();
+  Allocator arena, {
+  Pointer<raw.mln_metal_borrowed_texture>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_borrowed_texture>();
   result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
   return result;
 }
@@ -1109,9 +1149,10 @@ MetalBorrowedTexture _readMetalBorrowedTexture(
 Pointer<raw.mln_metal_borrowed_texture_descriptor>
 _writeMetalBorrowedTextureDescriptor(
   MetalBorrowedTextureDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_metal_borrowed_texture_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_metal_borrowed_texture_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_borrowed_texture_descriptor>();
   result.ref = raw.mln_metal_borrowed_texture_descriptor_default();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.physical_width = _nativeInteger(
@@ -1129,10 +1170,11 @@ _writeMetalBorrowedTextureDescriptor(
   );
   result.ref.texture_count = value.textures.length;
   for (var index = 0; index < value.textures.length; index++) {
-    result.ref.textures[index] = _writeMetalBorrowedTexture(
+    _writeMetalBorrowedTexture(
       value.textures[index],
       arena,
-    ).ref;
+      into: result.ref.textures + index,
+    );
   }
   return result;
 }
@@ -1154,9 +1196,10 @@ MetalBorrowedTextureDescriptor _readMetalBorrowedTextureDescriptor(
 Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
   RenderSessionAttachOptions value,
   Allocator arena,
-  _NativeRegistrations registrations,
-) {
-  final result = arena<raw.mln_render_session_attach_options>();
+  _NativeRegistrations registrations, {
+  Pointer<raw.mln_render_session_attach_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_render_session_attach_options>();
   result.ref = raw.mln_render_session_attach_options_default();
   result.ref.driver = value.driver.rawValue;
   result.ref.requested_texture_ring_depth = _nativeInteger(
@@ -1186,9 +1229,10 @@ RenderSessionAttachOptions _readRenderSessionAttachOptions(
 
 Pointer<raw.mln_metal_context_descriptor> _writeMetalContextDescriptor(
   MetalContextDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_metal_context_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_metal_context_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_context_descriptor>();
   result.ref.device = Pointer<Void>.fromAddress(value.device.address).cast();
   return result;
 }
@@ -1200,9 +1244,10 @@ MetalContextDescriptor _readMetalContextDescriptor(
 Pointer<raw.mln_metal_owned_texture_descriptor>
 _writeMetalOwnedTextureDescriptor(
   MetalOwnedTextureDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_metal_owned_texture_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_metal_owned_texture_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_owned_texture_descriptor>();
   result.ref = raw.mln_metal_owned_texture_descriptor_default();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeMetalContextDescriptor(value.context, arena).ref;
@@ -1220,9 +1265,10 @@ MetalOwnedTextureDescriptor _readMetalOwnedTextureDescriptor(
 
 Pointer<raw.mln_metal_surface_descriptor> _writeMetalSurfaceDescriptor(
   MetalSurfaceDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_metal_surface_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_metal_surface_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_surface_descriptor>();
   result.ref = raw.mln_metal_surface_descriptor_default();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeMetalContextDescriptor(value.context, arena).ref;
@@ -1240,9 +1286,10 @@ MetalSurfaceDescriptor _readMetalSurfaceDescriptor(
 
 Pointer<raw.mln_wgl_context_descriptor> _writeWglContextDescriptor(
   WglContextDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_wgl_context_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_wgl_context_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_wgl_context_descriptor>();
   result.ref.device_context = Pointer<Void>.fromAddress(
     value.deviceContext.address,
   ).cast();
@@ -1265,9 +1312,10 @@ WglContextDescriptor _readWglContextDescriptor(
 
 Pointer<raw.mln_egl_context_descriptor> _writeEglContextDescriptor(
   EglContextDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_egl_context_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_egl_context_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_egl_context_descriptor>();
   result.ref.display = Pointer<Void>.fromAddress(value.display.address).cast();
   result.ref.config = Pointer<Void>.fromAddress(value.config.address).cast();
   result.ref.share_context = Pointer<Void>.fromAddress(
@@ -1292,9 +1340,10 @@ EglContextDescriptor _readEglContextDescriptor(
 
 Pointer<raw.mln_webgl_context_descriptor> _writeWebglContextDescriptor(
   WebglContextDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_webgl_context_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_webgl_context_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_webgl_context_descriptor>();
   result.ref.kind = value.kind.rawValue;
   result.ref.context = _nativeInteger(value.context, -2147483648, 2147483647);
   result.ref.canvas_selector = nativeStringView(
@@ -1314,9 +1363,10 @@ WebglContextDescriptor _readWebglContextDescriptor(
 
 Pointer<raw.mln_opengl_context_descriptor> _writeOpenglContextDescriptor(
   OpenglContextDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_opengl_context_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_opengl_context_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_opengl_context_descriptor>();
 
   result.ref.ownership = value.ownership.rawValue;
   switch (value.data) {
@@ -1368,9 +1418,10 @@ OpenglContextDescriptor _readOpenglContextDescriptor(
 
 Pointer<raw.mln_opengl_borrowed_texture> _writeOpenglBorrowedTexture(
   OpenglBorrowedTexture value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_opengl_borrowed_texture>();
+  Allocator arena, {
+  Pointer<raw.mln_opengl_borrowed_texture>? into,
+}) {
+  final result = into ?? arena<raw.mln_opengl_borrowed_texture>();
   result.ref.texture = _nativeInteger(value.texture, 0, 4294967295);
   return result;
 }
@@ -1382,9 +1433,10 @@ OpenglBorrowedTexture _readOpenglBorrowedTexture(
 Pointer<raw.mln_opengl_borrowed_texture_descriptor>
 _writeOpenglBorrowedTextureDescriptor(
   OpenglBorrowedTextureDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_opengl_borrowed_texture_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_opengl_borrowed_texture_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_opengl_borrowed_texture_descriptor>();
   result.ref = raw.mln_opengl_borrowed_texture_descriptor_default();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.physical_width = _nativeInteger(
@@ -1403,10 +1455,11 @@ _writeOpenglBorrowedTextureDescriptor(
   );
   result.ref.texture_count = value.textures.length;
   for (var index = 0; index < value.textures.length; index++) {
-    result.ref.textures[index] = _writeOpenglBorrowedTexture(
+    _writeOpenglBorrowedTexture(
       value.textures[index],
       arena,
-    ).ref;
+      into: result.ref.textures + index,
+    );
   }
   result.ref.target = _nativeInteger(value.target, 0, 4294967295);
   return result;
@@ -1431,9 +1484,10 @@ OpenglBorrowedTextureDescriptor _readOpenglBorrowedTextureDescriptor(
 Pointer<raw.mln_opengl_owned_texture_descriptor>
 _writeOpenglOwnedTextureDescriptor(
   OpenglOwnedTextureDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_opengl_owned_texture_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_opengl_owned_texture_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_opengl_owned_texture_descriptor>();
   result.ref = raw.mln_opengl_owned_texture_descriptor_default();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeOpenglContextDescriptor(value.context, arena).ref;
@@ -1449,9 +1503,10 @@ OpenglOwnedTextureDescriptor _readOpenglOwnedTextureDescriptor(
 
 Pointer<raw.mln_opengl_surface_descriptor> _writeOpenglSurfaceDescriptor(
   OpenglSurfaceDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_opengl_surface_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_opengl_surface_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_opengl_surface_descriptor>();
   result.ref = raw.mln_opengl_surface_descriptor_default();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeOpenglContextDescriptor(value.context, arena).ref;
@@ -1469,9 +1524,10 @@ OpenglSurfaceDescriptor _readOpenglSurfaceDescriptor(
 
 Pointer<raw.mln_vulkan_context_descriptor> _writeVulkanContextDescriptor(
   VulkanContextDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_vulkan_context_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_vulkan_context_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_vulkan_context_descriptor>();
   result.ref.instance = Pointer<Void>.fromAddress(
     value.instance.address,
   ).cast();
@@ -1510,9 +1566,10 @@ VulkanContextDescriptor _readVulkanContextDescriptor(
 
 Pointer<raw.mln_vulkan_borrowed_texture> _writeVulkanBorrowedTexture(
   VulkanBorrowedTexture value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_vulkan_borrowed_texture>();
+  Allocator arena, {
+  Pointer<raw.mln_vulkan_borrowed_texture>? into,
+}) {
+  final result = into ?? arena<raw.mln_vulkan_borrowed_texture>();
   result.ref.image = uint64ToNative(
     value.image,
     'mln_vulkan_non_dispatchable_handle',
@@ -1534,9 +1591,10 @@ VulkanBorrowedTexture _readVulkanBorrowedTexture(
 Pointer<raw.mln_vulkan_borrowed_texture_descriptor>
 _writeVulkanBorrowedTextureDescriptor(
   VulkanBorrowedTextureDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_vulkan_borrowed_texture_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_vulkan_borrowed_texture_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_vulkan_borrowed_texture_descriptor>();
   result.ref = raw.mln_vulkan_borrowed_texture_descriptor_default();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.physical_width = _nativeInteger(
@@ -1555,10 +1613,11 @@ _writeVulkanBorrowedTextureDescriptor(
   );
   result.ref.texture_count = value.textures.length;
   for (var index = 0; index < value.textures.length; index++) {
-    result.ref.textures[index] = _writeVulkanBorrowedTexture(
+    _writeVulkanBorrowedTexture(
       value.textures[index],
       arena,
-    ).ref;
+      into: result.ref.textures + index,
+    );
   }
   result.ref.format = _nativeInteger(value.format, 0, 4294967295);
   result.ref.initial_layout = _nativeInteger(
@@ -1591,9 +1650,10 @@ VulkanBorrowedTextureDescriptor _readVulkanBorrowedTextureDescriptor(
 Pointer<raw.mln_vulkan_owned_texture_descriptor>
 _writeVulkanOwnedTextureDescriptor(
   VulkanOwnedTextureDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_vulkan_owned_texture_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_vulkan_owned_texture_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_vulkan_owned_texture_descriptor>();
   result.ref = raw.mln_vulkan_owned_texture_descriptor_default();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
@@ -1609,9 +1669,10 @@ VulkanOwnedTextureDescriptor _readVulkanOwnedTextureDescriptor(
 
 Pointer<raw.mln_vulkan_surface_descriptor> _writeVulkanSurfaceDescriptor(
   VulkanSurfaceDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_vulkan_surface_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_vulkan_surface_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_vulkan_surface_descriptor>();
   result.ref = raw.mln_vulkan_surface_descriptor_default();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
@@ -1632,9 +1693,10 @@ VulkanSurfaceDescriptor _readVulkanSurfaceDescriptor(
 
 Pointer<raw.mln_webgpu_context_descriptor> _writeWebgpuContextDescriptor(
   WebgpuContextDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_webgpu_context_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_webgpu_context_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_webgpu_context_descriptor>();
   result.ref.instance = Pointer<Void>.fromAddress(
     value.instance.address,
   ).cast();
@@ -1653,9 +1715,10 @@ WebgpuContextDescriptor _readWebgpuContextDescriptor(
 
 Pointer<raw.mln_webgpu_borrowed_texture> _writeWebgpuBorrowedTexture(
   WebgpuBorrowedTexture value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_webgpu_borrowed_texture>();
+  Allocator arena, {
+  Pointer<raw.mln_webgpu_borrowed_texture>? into,
+}) {
+  final result = into ?? arena<raw.mln_webgpu_borrowed_texture>();
   result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
   result.ref.texture_view = Pointer<Void>.fromAddress(
     value.textureView.address,
@@ -1673,9 +1736,10 @@ WebgpuBorrowedTexture _readWebgpuBorrowedTexture(
 Pointer<raw.mln_webgpu_borrowed_texture_descriptor>
 _writeWebgpuBorrowedTextureDescriptor(
   WebgpuBorrowedTextureDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_webgpu_borrowed_texture_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_webgpu_borrowed_texture_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_webgpu_borrowed_texture_descriptor>();
   result.ref = raw.mln_webgpu_borrowed_texture_descriptor_default();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.physical_width = _nativeInteger(
@@ -1694,10 +1758,11 @@ _writeWebgpuBorrowedTextureDescriptor(
   );
   result.ref.texture_count = value.textures.length;
   for (var index = 0; index < value.textures.length; index++) {
-    result.ref.textures[index] = _writeWebgpuBorrowedTexture(
+    _writeWebgpuBorrowedTexture(
       value.textures[index],
       arena,
-    ).ref;
+      into: result.ref.textures + index,
+    );
   }
   result.ref.format = _nativeInteger(value.format, 0, 4294967295);
   return result;
@@ -1722,9 +1787,10 @@ WebgpuBorrowedTextureDescriptor _readWebgpuBorrowedTextureDescriptor(
 Pointer<raw.mln_webgpu_owned_texture_descriptor>
 _writeWebgpuOwnedTextureDescriptor(
   WebgpuOwnedTextureDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_webgpu_owned_texture_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_webgpu_owned_texture_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_webgpu_owned_texture_descriptor>();
   result.ref = raw.mln_webgpu_owned_texture_descriptor_default();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeWebgpuContextDescriptor(value.context, arena).ref;
@@ -1740,9 +1806,10 @@ WebgpuOwnedTextureDescriptor _readWebgpuOwnedTextureDescriptor(
 
 Pointer<raw.mln_webgpu_surface_descriptor> _writeWebgpuSurfaceDescriptor(
   WebgpuSurfaceDescriptor value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_webgpu_surface_descriptor>();
+  Allocator arena, {
+  Pointer<raw.mln_webgpu_surface_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_webgpu_surface_descriptor>();
   result.ref = raw.mln_webgpu_surface_descriptor_default();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeWebgpuContextDescriptor(value.context, arena).ref;
@@ -1768,9 +1835,10 @@ CameraQueryResult _readCameraQueryResult(raw.mln_camera_query_result source) =>
 
 Pointer<raw.mln_feature_state_selector> _writeFeatureStateSelector(
   FeatureStateSelector value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_feature_state_selector>();
+  Allocator arena, {
+  Pointer<raw.mln_feature_state_selector>? into,
+}) {
+  final result = into ?? arena<raw.mln_feature_state_selector>();
   result.ref.size = sizeOf<raw.mln_feature_state_selector>();
   result.ref.source_id = nativeStringView(value.sourceId, arena).value;
   if (value.sourceLayerId != null) {
@@ -1793,9 +1861,10 @@ Pointer<raw.mln_feature_state_selector> _writeFeatureStateSelector(
 
 Pointer<raw.mln_map_tile_options> _writeMapTileOptions(
   MapTileOptions value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_map_tile_options>();
+  Allocator arena, {
+  Pointer<raw.mln_map_tile_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_map_tile_options>();
   result.ref = raw.mln_map_tile_options_default();
   if (value.prefetchZoomDelta != null) {
     result.ref.fields |= raw.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
@@ -1871,9 +1940,10 @@ MapSnapshot _readMapSnapshot(raw.mln_map_snapshot source) => MapSnapshot(
 
 Pointer<raw.mln_image_stretch> _writeImageStretch(
   ImageStretch value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_image_stretch>();
+  Allocator arena, {
+  Pointer<raw.mln_image_stretch>? into,
+}) {
+  final result = into ?? arena<raw.mln_image_stretch>();
   result.ref.from = value.from;
   result.ref.to = value.to;
   return result;
@@ -1884,9 +1954,10 @@ ImageStretch _readImageStretch(raw.mln_image_stretch source) =>
 
 Pointer<raw.mln_image_content> _writeImageContent(
   ImageContent value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_image_content>();
+  Allocator arena, {
+  Pointer<raw.mln_image_content>? into,
+}) {
+  final result = into ?? arena<raw.mln_image_content>();
   result.ref.left = value.left;
   result.ref.top = value.top;
   result.ref.right = value.right;
@@ -1993,9 +2064,10 @@ StyleSourceInfo _readStyleSourceInfo(raw.mln_style_source_info source) =>
 
 Pointer<raw.mln_style_transition_options> _writeStyleTransitionOptions(
   StyleTransitionOptions value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_style_transition_options>();
+  Allocator arena, {
+  Pointer<raw.mln_style_transition_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_style_transition_options>();
   result.ref = raw.mln_style_transition_options_default();
   if (value.durationMs != null) {
     result.ref.fields |= raw.MLN_STYLE_TRANSITION_OPTION_DURATION;
@@ -2032,9 +2104,10 @@ StyleTransitionOptions _readStyleTransitionOptions(
 
 Pointer<raw.mln_map_options> _writeMapOptions(
   MapOptions value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_map_options>();
+  Allocator arena, {
+  Pointer<raw.mln_map_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_map_options>();
   result.ref = raw.mln_map_options_default();
   result.ref.initial_extent = _writeLogicalExtent(
     value.initialExtent,
@@ -2055,9 +2128,10 @@ MapOptions _readMapOptions(raw.mln_map_options source) => MapOptions(
 
 Pointer<raw.mln_style_image_options> _writeStyleImageOptions(
   StyleImageOptions value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_style_image_options>();
+  Allocator arena, {
+  Pointer<raw.mln_style_image_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_style_image_options>();
   result.ref = raw.mln_style_image_options_default();
   if (value.stretchX != null) {
     result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_STRETCH_X;
@@ -2066,10 +2140,11 @@ Pointer<raw.mln_style_image_options> _writeStyleImageOptions(
     );
     result.ref.stretch_x_count = value.stretchX!.length;
     for (var index = 0; index < value.stretchX!.length; index++) {
-      result.ref.stretch_x[index] = _writeImageStretch(
+      _writeImageStretch(
         value.stretchX![index],
         arena,
-      ).ref;
+        into: result.ref.stretch_x + index,
+      );
     }
   }
   if (value.stretchY != null) {
@@ -2079,10 +2154,11 @@ Pointer<raw.mln_style_image_options> _writeStyleImageOptions(
     );
     result.ref.stretch_y_count = value.stretchY!.length;
     for (var index = 0; index < value.stretchY!.length; index++) {
-      result.ref.stretch_y[index] = _writeImageStretch(
+      _writeImageStretch(
         value.stretchY![index],
         arena,
-      ).ref;
+        into: result.ref.stretch_y + index,
+      );
     }
   }
   if (value.content != null) {
@@ -2193,8 +2269,12 @@ RenderSessionSnapshot _readRenderSessionSnapshot(
   pendingChanges: source.pending_changes,
 );
 
-Pointer<raw.mln_screen_box> _writeScreenBox(ScreenBox value, Allocator arena) {
-  final result = arena<raw.mln_screen_box>();
+Pointer<raw.mln_screen_box> _writeScreenBox(
+  ScreenBox value,
+  Allocator arena, {
+  Pointer<raw.mln_screen_box>? into,
+}) {
+  final result = into ?? arena<raw.mln_screen_box>();
   result.ref.min = _writeScreenPoint(value.min, arena).ref;
   result.ref.max = _writeScreenPoint(value.max, arena).ref;
   return result;
@@ -2202,27 +2282,30 @@ Pointer<raw.mln_screen_box> _writeScreenBox(ScreenBox value, Allocator arena) {
 
 Pointer<raw.mln_screen_line_string> _writeScreenLineString(
   ScreenLineString value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_screen_line_string>();
+  Allocator arena, {
+  Pointer<raw.mln_screen_line_string>? into,
+}) {
+  final result = into ?? arena<raw.mln_screen_line_string>();
   result.ref.points = arena<raw.mln_screen_point>(
     value.points.isEmpty ? 1 : value.points.length,
   );
   result.ref.point_count = value.points.length;
   for (var index = 0; index < value.points.length; index++) {
-    result.ref.points[index] = _writeScreenPoint(
+    _writeScreenPoint(
       value.points[index],
       arena,
-    ).ref;
+      into: result.ref.points + index,
+    );
   }
   return result;
 }
 
 Pointer<raw.mln_rendered_query_geometry> _writeRenderedQueryGeometry(
   RenderedQueryGeometry value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_rendered_query_geometry>();
+  Allocator arena, {
+  Pointer<raw.mln_rendered_query_geometry>? into,
+}) {
+  final result = into ?? arena<raw.mln_rendered_query_geometry>();
   result.ref.size = sizeOf<raw.mln_rendered_query_geometry>();
   switch (value) {
     case RenderedQueryGeometryPoint():
@@ -2244,9 +2327,10 @@ Pointer<raw.mln_rendered_query_geometry> _writeRenderedQueryGeometry(
 Pointer<raw.mln_rendered_feature_query_options>
 _writeRenderedFeatureQueryOptions(
   RenderedFeatureQueryOptions value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_rendered_feature_query_options>();
+  Allocator arena, {
+  Pointer<raw.mln_rendered_feature_query_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_rendered_feature_query_options>();
   result.ref = raw.mln_rendered_feature_query_options_default();
   if (value.layerIds != null) {
     result.ref.fields |= raw.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
@@ -2302,9 +2386,10 @@ QueriedFeature _readQueriedFeature(raw.mln_queried_feature source) =>
 
 Pointer<raw.mln_source_feature_query_options> _writeSourceFeatureQueryOptions(
   SourceFeatureQueryOptions value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_source_feature_query_options>();
+  Allocator arena, {
+  Pointer<raw.mln_source_feature_query_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_source_feature_query_options>();
   result.ref = raw.mln_source_feature_query_options_default();
   if (value.sourceLayerIds != null) {
     result.ref.fields |= raw.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
@@ -2362,9 +2447,10 @@ TextureReadbackResult _readTextureReadbackResult(
 
 Pointer<raw.mln_resource_response> _writeResourceResponse(
   ResourceResponse value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_resource_response>();
+  Allocator arena, {
+  Pointer<raw.mln_resource_response>? into,
+}) {
+  final result = into ?? arena<raw.mln_resource_response>();
   result.ref.size = sizeOf<raw.mln_resource_response>();
   result.ref.status = value.status.rawValue;
   result.ref.error_reason = value.errorReason.rawValue;
@@ -2432,9 +2518,10 @@ _prepareResourceRequestCancelHandler(
 
 Pointer<raw.mln_resource_route> _writeResourceRoute(
   ResourceRoute value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_resource_route>();
+  Allocator arena, {
+  Pointer<raw.mln_resource_route>? into,
+}) {
+  final result = into ?? arena<raw.mln_resource_route>();
   result.ref = raw.mln_resource_route_default();
   result.ref.kinds = value.kinds.rawValue;
   result.ref.flags = value.flags.rawValue;
@@ -2451,9 +2538,10 @@ ResourceRoute _readResourceRoute(raw.mln_resource_route source) =>
 
 Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
   RuntimeOptions value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_runtime_options>();
+  Allocator arena, {
+  Pointer<raw.mln_runtime_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_runtime_options>();
   result.ref = raw.mln_runtime_options_default();
   result.ref.asset_path = nativeStringView(
     (value.assetPath ?? ''),
@@ -2479,9 +2567,11 @@ RuntimeOptions _readRuntimeOptions(raw.mln_runtime_options source) =>
 Pointer<raw.mln_offline_tile_pyramid_region_definition>
 _writeOfflineTilePyramidRegionDefinition(
   OfflineTilePyramidRegionDefinition value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_offline_tile_pyramid_region_definition>();
+  Allocator arena, {
+  Pointer<raw.mln_offline_tile_pyramid_region_definition>? into,
+}) {
+  final result =
+      into ?? arena<raw.mln_offline_tile_pyramid_region_definition>();
   result.ref.style_url = nativeStringView(value.styleUrl, arena).value;
   result.ref.bounds = _writeLatLngBounds(value.bounds, arena).ref;
   result.ref.min_zoom = value.minZoom;
@@ -2505,9 +2595,10 @@ OfflineTilePyramidRegionDefinition _readOfflineTilePyramidRegionDefinition(
 Pointer<raw.mln_offline_geometry_region_definition>
 _writeOfflineGeometryRegionDefinition(
   OfflineGeometryRegionDefinition value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_offline_geometry_region_definition>();
+  Allocator arena, {
+  Pointer<raw.mln_offline_geometry_region_definition>? into,
+}) {
+  final result = into ?? arena<raw.mln_offline_geometry_region_definition>();
   result.ref.style_url = nativeStringView(value.styleUrl, arena).value;
   result.ref.geometry = nativeBufferView(value.geometry, arena);
   result.ref.min_zoom = value.minZoom;
@@ -2530,9 +2621,10 @@ OfflineGeometryRegionDefinition _readOfflineGeometryRegionDefinition(
 
 Pointer<raw.mln_offline_region_definition> _writeOfflineRegionDefinition(
   OfflineRegionDefinition value,
-  Allocator arena,
-) {
-  final result = arena<raw.mln_offline_region_definition>();
+  Allocator arena, {
+  Pointer<raw.mln_offline_region_definition>? into,
+}) {
+  final result = into ?? arena<raw.mln_offline_region_definition>();
   result.ref.size = sizeOf<raw.mln_offline_region_definition>();
   switch (value) {
     case OfflineRegionDefinitionTilePyramid():
@@ -2767,10 +2859,11 @@ _NativeRegistration<raw.mln_http_header_transform> _prepareHttpHeaderTransform(
     );
     result.ref.rule_count = value.rules.length;
     for (var index = 0; index < value.rules.length; index++) {
-      result.ref.rules[index] = _writeHttpHeaderRule(
+      _writeHttpHeaderRule(
         value.rules[index],
         arena,
-      ).ref;
+        into: result.ref.rules + index,
+      );
     }
     return _NativeRegistration(result, () {}, arena.releaseAll);
   } catch (_) {
@@ -2852,10 +2945,11 @@ _NativeRegistration<raw.mln_resource_provider> _prepareResourceProvider(
     );
     result.ref.route_count = value.routes.length;
     for (var index = 0; index < value.routes.length; index++) {
-      result.ref.routes[index] = _writeResourceRoute(
+      _writeResourceRoute(
         value.routes[index],
         arena,
-      ).ref;
+        into: result.ref.routes + index,
+      );
     }
     final registered = registration = roots.registerQueued({
       raw.MLN_DELIVERY_TYPE_RESOURCE_REQUEST: (batch, index, delivery) =>
@@ -3895,7 +3989,7 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       coordinates.isEmpty ? 1 : coordinates.length,
     );
     for (var index = 0; index < coordinates.length; index++) {
-      nativecoordinates[index] = _writeLatLng(coordinates[index], arena).ref;
+      _writeLatLng(coordinates[index], arena, into: nativecoordinates + index);
     }
     return raw.mln_map_add_image_source_image(
       _handle.raw,
@@ -3916,7 +4010,7 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       coordinates.isEmpty ? 1 : coordinates.length,
     );
     for (var index = 0; index < coordinates.length; index++) {
-      nativecoordinates[index] = _writeLatLng(coordinates[index], arena).ref;
+      _writeLatLng(coordinates[index], arena, into: nativecoordinates + index);
     }
     return raw.mln_map_add_image_source_url(
       _handle.raw,
@@ -4209,10 +4303,11 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
           coordinates.isEmpty ? 1 : coordinates.length,
         );
         for (var index = 0; index < coordinates.length; index++) {
-          nativecoordinates[index] = _writeLatLng(
+          _writeLatLng(
             coordinates[index],
             arena,
-          ).ref;
+            into: nativecoordinates + index,
+          );
         }
         return raw.mln_map_set_image_source_coordinates(
           _handle.raw,
@@ -4486,7 +4581,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       coordinates.isEmpty ? 1 : coordinates.length,
     );
     for (var index = 0; index < coordinates.length; index++) {
-      nativecoordinates[index] = _writeLatLng(coordinates[index], arena).ref;
+      _writeLatLng(coordinates[index], arena, into: nativecoordinates + index);
     }
     return raw.mln_map_add_image_source_image(
       _handle.raw,
@@ -4512,7 +4607,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       coordinates.isEmpty ? 1 : coordinates.length,
     );
     for (var index = 0; index < coordinates.length; index++) {
-      nativecoordinates[index] = _writeLatLng(coordinates[index], arena).ref;
+      _writeLatLng(coordinates[index], arena, into: nativecoordinates + index);
     }
     return raw.mln_map_add_image_source_url(
       _handle.raw,
@@ -5033,7 +5128,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       coordinates.isEmpty ? 1 : coordinates.length,
     );
     for (var index = 0; index < coordinates.length; index++) {
-      nativecoordinates[index] = _writeLatLng(coordinates[index], arena).ref;
+      _writeLatLng(coordinates[index], arena, into: nativecoordinates + index);
     }
     return raw.mln_map_camera_for_lat_lngs(
       _handle.raw,
@@ -5715,7 +5810,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       coordinates.isEmpty ? 1 : coordinates.length,
     );
     for (var index = 0; index < coordinates.length; index++) {
-      nativecoordinates[index] = _writeLatLng(coordinates[index], arena).ref;
+      _writeLatLng(coordinates[index], arena, into: nativecoordinates + index);
     }
     return raw.mln_map_set_image_source_coordinates(
       _handle.raw,

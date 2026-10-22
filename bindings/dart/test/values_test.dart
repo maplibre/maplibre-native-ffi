@@ -126,14 +126,17 @@ void main() {
     expect(end.outcome, CameraTransitionOutcome.cancelled);
   });
 
+  // Fitting bounds fits their corners, so a fit of the two diagonal corners
+  // matches only when each element reaches native in its own slot.
   test('an array input is copied when the call submits it', () async {
     final fixture = await openRuntime();
     final map = await fixture.openStyledMap();
-    final coordinates = [
-      const LatLng(latitude: 10, longitude: 20),
-      const LatLng(latitude: 12, longitude: 21),
-    ];
-    final expected = await map.cameraForLatLngs(List.of(coordinates));
+    const southwest = LatLng(latitude: 10, longitude: 20);
+    const northeast = LatLng(latitude: 12, longitude: 21);
+    final coordinates = [southwest, northeast];
+    final expected = await map.cameraForLatLngBounds(
+      const LatLngBounds(southwest: southwest, northeast: northeast),
+    );
     final pending = map.cameraForLatLngs(coordinates);
     coordinates.clear();
     expect(await pending, expected);

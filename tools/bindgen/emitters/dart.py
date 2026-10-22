@@ -238,7 +238,7 @@ def lower_function(
             child = value.element
             setup += [
                 f"final native{local} = arena<{values.ffi(child)}>({local}.isEmpty ? 1 : {local}.length);",
-                f"for (var index = 0; index < {local}.length; index++) {{ native{local}[index] = {values.native(child, local + '[index]')}; }}",
+                f"for (var index = 0; index < {local}.length; index++) {{ {values.write_element(child, local + '[index]', 'native' + local)} }}",
             ]
             args.append(f"native{local}")
         else:
