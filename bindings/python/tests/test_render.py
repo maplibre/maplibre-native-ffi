@@ -591,10 +591,11 @@ def test_a_native_queue_lock_reaches_native(harness: Harness, backend: str) -> N
     driver = _default_driver(backend)
     if backend == "vulkan":
         with OwnedTexture(harness, backend, driver, queue_lock=lock) as target:
-            target.render()
-            # Native code takes the lock around its queue submissions.
-            assert host.called.wait(TIMEOUT)
+            # Rendering and reading back a styled frame submits to the queue,
+            # which native code does only while it holds the lock.
+            target.render_red()
         assert host.released.wait(TIMEOUT)
+        assert host.calls
     else:
         # Only a Vulkan target takes a queue lock, so native code reports the
         # lock as unsupported, and the binding releases its context.
