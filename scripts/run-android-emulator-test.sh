@@ -107,6 +107,26 @@ if [[ -n "$fixture_dir" ]]; then
   fixture_environment="MLN_FFI_TEST_FIXTURE_DIR='$remote_dir/fixtures' "
 fi
 
+# Says whether the emulator that boot-android-emulator.sh started at the serial
+# still runs, and if it exited, prints the tail of its log, which holds the
+# reason the emulator gives.
+report_emulator_state() {
+  local serial_file state_dir pid
+  for serial_file in "$MISE_MONOREPO_ROOT"/build/android-emulator/*/serial; do
+    state_dir=${serial_file%/serial}
+    [[ -f "$state_dir/emulator.pid" && "$(<"$serial_file")" == "$serial" ]] ||
+      continue
+    pid=$(<"$state_dir/emulator.pid")
+    if kill -0 "$pid" 2>/dev/null; then
+      echo "The Android emulator at $serial is still running." >&2
+    else
+      echo "The Android emulator at $serial exited. The end of its log:" >&2
+      tail -50 "$state_dir/emulator.log" >&2
+    fi
+    return
+  done
+}
+
 for test_executable in "${test_executables[@]}"; do
   echo "Running $(basename "$test_executable") on Android device $serial."
   "$adb" -s "$serial" push "$test_executable" "$remote_dir/test-executable" >/dev/null
@@ -132,12 +152,13 @@ for test_executable in "${test_executables[@]}"; do
   set -e
   test_status=$(sed -n 's/^__MLN_FFI_TEST_STATUS__=//p' "$output_file" | tail -1 | tr -d '\r')
   rm -f "$output_file"
+  if [[ ! "$test_status" =~ ^[0-9]+$ ]]; then
+    echo "$(basename "$test_executable") returned no exit status; adb exited $transport_status." >&2
+    report_emulator_state
+    exit $((transport_status != 0 ? transport_status : 1))
+  fi
   if ((transport_status != 0)); then
     exit "$transport_status"
-  fi
-  if [[ ! "$test_status" =~ ^[0-9]+$ ]]; then
-    echo "Android test returned no exit status." >&2
-    exit 1
   fi
   if ((test_status != 0)); then
     exit "$test_status"

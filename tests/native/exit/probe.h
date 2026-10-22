@@ -36,6 +36,8 @@ typedef struct probe_latch {
   mln_status status;
   // The completion's value, for a creation that delivers a handle.
   uint64_t handle;
+  // The completion's diagnostic, which a failure prints.
+  char diagnostic[MLN_DIAGNOSTIC_MESSAGE_CAPACITY];
 } probe_latch;
 
 static inline void probe_latch_init(probe_latch* latch) {
@@ -56,6 +58,14 @@ static inline void probe_latch_deliver(
   if (result->value != NULL && result->value_count == 1) {
     memcpy(&handle, result->value, sizeof(handle));
   }
+  size_t diagnostic_size = result->diagnostic.size;
+  if (diagnostic_size >= sizeof(latch->diagnostic)) {
+    diagnostic_size = sizeof(latch->diagnostic) - 1;
+  }
+  if (diagnostic_size > 0) {
+    memcpy(latch->diagnostic, result->diagnostic.data, diagnostic_size);
+  }
+  latch->diagnostic[diagnostic_size] = '\0';
 #ifdef _WIN32
   latch->status = result->status;
   latch->handle = handle;
@@ -91,6 +101,9 @@ static inline mln_status probe_latch_wait(probe_latch* latch) {
   }
   pthread_mutex_unlock(&latch->lock);
 #endif
+  if (latch->status != MLN_STATUS_OK && latch->diagnostic[0] != '\0') {
+    (void)fprintf(stderr, "%s\n", latch->diagnostic);
+  }
   return latch->status;
 }
 

@@ -9,8 +9,10 @@
 # running untouched, whatever port they hold.
 set -euo pipefail
 
-api=${1:?usage: boot-android-emulator.sh <api> <abi>}
-image_arch=${2:?usage: boot-android-emulator.sh <api> <abi>}
+usage="usage: boot-android-emulator.sh <api> <abi> <minimum-emulator-version>"
+api=${1:?$usage}
+image_arch=${2:?$usage}
+emulator_version=${3:?$usage}
 case "$image_arch" in
   arm64-v8a | x86_64) ;;
   *)
@@ -80,23 +82,19 @@ if [[ -z "$sdkmanager" ]]; then
   exit 1
 fi
 
-# Each package with the directory that proves it is installed, so a rerun starts
-# no JVM and reaches no network.
-missing=()
-for entry in "platform-tools|platform-tools" "emulator|emulator" "$image|${image//;//}"; do
-  if [[ ! -d "$sdk_root/${entry#*|}" ]]; then
-    missing+=("${entry%%|*}")
-  fi
-done
-if ((${#missing[@]})); then
-  echo "Installing Android SDK packages: ${missing[*]}"
+# Installs packages from the given channel and the more stable ones.
+install_packages() {
+  local channel=$1
+  shift
+  echo "Installing Android SDK packages: $*"
   # One `y` per license prompt, as a here-string rather than a pipe: `yes` would
   # take a SIGPIPE when sdkmanager stops reading, and that becomes the
   # pipeline's status.
-  accepts="$(printf 'y\n%.0s' "${missing[@]}")"
+  local accepts install_status
+  accepts="$(printf 'y\n%.0s' "$@")"
   for attempt in 1 2 3; do
-    if "$sdkmanager" --sdk_root="$sdk_root" --install "${missing[@]}" <<<"$accepts"; then
-      break
+    if "$sdkmanager" --sdk_root="$sdk_root" --channel="$channel" --install "$@" <<<"$accepts"; then
+      return
     else
       install_status=$?
     fi
@@ -107,6 +105,37 @@ if ((${#missing[@]})); then
     echo "Android SDK package installation failed (attempt $attempt/3); retrying." >&2
     sleep "$((attempt * 5))"
   done
+}
+
+# Each package with the directory that proves it is installed, so a rerun starts
+# no JVM and reaches no network.
+missing=()
+for entry in "platform-tools|platform-tools" "$image|${image//;//}"; do
+  if [[ ! -d "$sdk_root/${entry#*|}" ]]; then
+    missing+=("${entry%%|*}")
+  fi
+done
+if ((${#missing[@]})); then
+  install_packages 0 "${missing[@]}"
+fi
+
+# Emulators before the minimum can hang for good when a guest process exits
+# while it still owns GLES objects (gfxstream b/561516389). Until the stable
+# channel carries the fix, the update comes from the dev channel.
+emulator_revision() {
+  sed -n 's/^Pkg\.Revision=//p' "$sdk_root/emulator/source.properties" 2>/dev/null |
+    tr -d '\r'
+}
+emulator_current() {
+  [[ "$(printf '%s\n' "$emulator_version" "$(emulator_revision)" |
+    sort -V | head -n1)" == "$emulator_version" ]]
+}
+if ! emulator_current; then
+  install_packages 2 emulator
+  if ! emulator_current; then
+    echo "The Android emulator is at revision $(emulator_revision), below $emulator_version." >&2
+    exit 1
+  fi
 fi
 
 mkdir -p "$ANDROID_AVD_HOME" "$state_dir"

@@ -90,13 +90,20 @@ class AndroidEmulatorPackagesTest(unittest.TestCase):
         tools.mkdir(parents=True)
         commands = self.directory / "commands"
         commands.mkdir()
+        # An install of the emulator leaves the revision that EMULATOR_REVISION
+        # names.
         self.write_command(
             tools / "sdkmanager",
             'attempt=$(($(cat "$CAPTURE_PATH/count" 2>/dev/null || printf 0) + 1))\n'
             'echo "$attempt" > "$CAPTURE_PATH/count"\n'
             'printf "%s\\n" "$@" > "$CAPTURE_PATH/arguments-$attempt"\n'
             "cat >/dev/null\n"
-            "if ((attempt <= SDK_FAILURES)); then exit 17; fi\n",
+            "if ((attempt <= SDK_FAILURES)); then exit 17; fi\n"
+            'for package in "$@"; do\n'
+            '  [[ "$package" == emulator ]] || continue\n'
+            '  mkdir -p "$ANDROID_HOME/emulator"\n'
+            '  echo "Pkg.Revision=$EMULATOR_REVISION" > "$ANDROID_HOME/emulator/source.properties"\n'
+            "done\n",
         )
         # Stop at AVD creation so the tests exercise provisioning without a device.
         self.write_command(
@@ -109,15 +116,28 @@ class AndroidEmulatorPackagesTest(unittest.TestCase):
             "MISE_MONOREPO_ROOT": str(self.directory),
             "CAPTURE_PATH": str(self.directory),
             "PATH": f"{commands}{os.pathsep}{os.defpath}",
+            "EMULATOR_REVISION": "37.3.5",
         }
 
     def write_command(self, path, body):
         path.write_text("#!/usr/bin/env bash\n" + body)
         path.chmod(0o755)
 
-    def provision(self, failures):
+    def install_emulator(self, revision):
+        (self.sdk / "emulator").mkdir()
+        (self.sdk / "emulator/source.properties").write_text(
+            f"Pkg.Path=emulator\nPkg.Revision={revision}\n"
+        )
+
+    def provision(self, failures=0):
         return subprocess.run(
-            ["bash", str(ROOT / "scripts/boot-android-emulator.sh"), "26", "x86_64"],
+            [
+                "bash",
+                str(ROOT / "scripts/boot-android-emulator.sh"),
+                "26",
+                "x86_64",
+                "37.3.5",
+            ],
             env=self.environment | {"SDK_FAILURES": str(failures)},
             check=False,
             capture_output=True,
@@ -125,25 +145,63 @@ class AndroidEmulatorPackagesTest(unittest.TestCase):
             timeout=10,
         )
 
+    def arguments(self, attempt):
+        return (self.directory / f"arguments-{attempt}").read_text().splitlines()
+
+    def install_count(self):
+        count = self.directory / "count"
+        return int(count.read_text()) if count.exists() else 0
+
     def test_transient_download_failures_recover_before_avd_creation(self):
         result = self.provision(failures=2)
         self.assertEqual(result.returncode, 73, result.stderr)
         self.assertTrue((self.directory / "avd-reached").exists())
         for attempt in range(1, 4):
             self.assertEqual(
-                (self.directory / f"arguments-{attempt}").read_text().splitlines(),
+                self.arguments(attempt),
                 [
                     f"--sdk_root={self.sdk}",
+                    "--channel=0",
                     "--install",
                     "platform-tools",
-                    "emulator",
                     "system-images;android-26;default;x86_64",
                 ],
             )
+        self.assertEqual(
+            self.arguments(4),
+            [f"--sdk_root={self.sdk}", "--channel=2", "--install", "emulator"],
+        )
 
     def test_persistent_download_failures_stop_with_the_sdkmanager_status(self):
         result = self.provision(failures=3)
         self.assertEqual(result.returncode, 17, result.stderr)
-        self.assertEqual((self.directory / "count").read_text().strip(), "3")
+        self.assertEqual(self.install_count(), 3)
         self.assertFalse((self.directory / "avd-reached").exists())
         self.assertIn("installation failed after 3 attempts", result.stderr)
+
+    def test_an_emulator_below_the_minimum_is_updated_from_the_dev_channel(self):
+        (self.sdk / "platform-tools").mkdir()
+        (self.sdk / "system-images/android-26/default/x86_64").mkdir(parents=True)
+        self.install_emulator("37.2.12")
+        result = self.provision()
+        self.assertEqual(result.returncode, 73, result.stderr)
+        self.assertEqual(self.install_count(), 1)
+        self.assertEqual(
+            self.arguments(1),
+            [f"--sdk_root={self.sdk}", "--channel=2", "--install", "emulator"],
+        )
+
+    def test_an_emulator_at_or_past_the_minimum_is_kept(self):
+        (self.sdk / "platform-tools").mkdir()
+        (self.sdk / "system-images/android-26/default/x86_64").mkdir(parents=True)
+        self.install_emulator("37.10.0")
+        result = self.provision()
+        self.assertEqual(result.returncode, 73, result.stderr)
+        self.assertEqual(self.install_count(), 0)
+
+    def test_an_update_that_stays_below_the_minimum_stops_before_avd_creation(self):
+        self.environment["EMULATOR_REVISION"] = "37.2.12"
+        result = self.provision()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertFalse((self.directory / "avd-reached").exists())
+        self.assertIn("revision 37.2.12, below 37.3.5", result.stderr)
