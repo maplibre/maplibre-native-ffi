@@ -94,9 +94,9 @@ class MetalTextureBackend::MetalTextureRenderableResource final
           ownedPixelFormat, size.width, size.height, false
         )
       );
+      // No shader writes, which would cost lossless compression on Apple GPUs.
       descriptor->setUsage(
-        MTL::TextureUsageShaderRead | MTL::TextureUsageShaderWrite |
-        MTL::TextureUsageRenderTarget
+        MTL::TextureUsageShaderRead | MTL::TextureUsageRenderTarget
       );
       ownedTexture = context.createMetalTexture(std::move(descriptor));
       if (!ownedTexture) {
