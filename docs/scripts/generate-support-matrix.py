@@ -125,7 +125,8 @@ def command_support(command: str) -> list[tuple[str, str]]:
             return [("kotlin-native", "tested")]
         if action == "android-build":
             return [("kotlin-android", "build-only")]
-        if action == "ios-build":
+        # Both tasks compile the preset's Kotlin/Native target.
+        if action in ("build", "ios-build"):
             return [("kotlin-native", "build-only")]
         if action == "test":
             preset = command.rsplit(" ", 1)[-1]
