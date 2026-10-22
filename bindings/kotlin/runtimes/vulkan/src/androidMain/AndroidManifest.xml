@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- The Vulkan renderer targets Vulkan 1.0. -->
+  <uses-feature
+    android:name="android.hardware.vulkan.version"
+    android:version="0x400003"
+    android:required="true"
+  />
+</manifest>
