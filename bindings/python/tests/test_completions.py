@@ -3,20 +3,15 @@
 import asyncio
 import gc
 import threading
+import weakref
 from concurrent.futures import CancelledError, Future, wait
 
 import maplibre_native_ffi as mln
 import pytest
+from maplibre_native_ffi import _future
 from maplibre_native_ffi._future import NativeFuture
 from maplibre_native_ffi._operation import _adopt_future
 from support import EMPTY_STYLE, TIMEOUT, Harness, leak_reports, result
-
-
-def _live_native_futures() -> int:
-    # Any binding call applies the releases native made without the GIL.
-    mln.network_get_status()
-    gc.collect()
-    return sum(isinstance(value, NativeFuture) for value in gc.get_objects())
 
 
 def test_discarded_commands_are_fenced_and_sync_rejection_raises(
@@ -37,16 +32,30 @@ def test_discarded_commands_are_fenced_and_sync_rejection_raises(
         )
 
 
-def test_a_rejected_submission_frees_its_future(map_handle: mln.MapHandle) -> None:
-    before = _live_native_futures()
+def test_a_rejected_submission_frees_its_future(
+    map_handle: mln.MapHandle, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    made: list[weakref.ref[NativeFuture[object]]] = []
+
+    class TrackedFuture(NativeFuture[object]):
+        def __init__(self) -> None:
+            super().__init__()
+            made.append(weakref.ref(self))
+
+    # The binding looks the class up for each submission.
+    monkeypatch.setattr(_future, "NativeFuture", TrackedFuture)
     with pytest.raises(mln.MaplibreError) as raised:
         map_handle.get_feature_state(
             mln.FeatureStateSelector(source_id="source", state_key="hover")
         )
     # Native rejected the submission, after the binding made its future.
     assert raised.value.status == mln.Status.INVALID_ARGUMENT
+    assert len(made) == 1
 
-    assert _live_native_futures() == before
+    # Any binding call applies the releases native made without the GIL.
+    mln.network_get_status()
+    gc.collect()
+    assert made[0]() is None
 
 
 def test_a_dropped_creation_result_retires_the_map_it_created(
