@@ -24,7 +24,6 @@
     "src/platform/rust/about.hbs",
     "gradlew",
     "gradlew.bat",
-    "**/*.g.cs",
     // Oxc rejects the declaration-only style attribute in this logo.
     "docs/src/assets/maplibre-logo-square-for-light-bg.svg",
   ],
@@ -38,6 +37,8 @@
   "ktfmt": { "style": "google", "lineWidth": 100 },
   "googleJavaFormat": { "lineWidth": 100 },
   "csharpier": {
+    // Bindgen formats the C# it generates as `*.g.cs`.
+    "includeGenerated": true,
     "csharp.lineWidth": 100,
     "csharp.indentWidth": 4,
     "associations": [
@@ -63,6 +64,7 @@
     ],
   },
   "clangFormat": {
+    "associations": ["**/*.inc"],
     "BasedOnStyle": "Google",
     "ColumnLimit": 80,
     "IndentWidth": 2,

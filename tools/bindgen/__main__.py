@@ -75,12 +75,6 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
             "zig": zig,
         }.items()
     }
-    outputs = format_outputs(outputs, staging)
-    empty = [path for path, text in outputs.items() if not text.strip()]
-    if empty:
-        raise ModelError(
-            [f"{path}: formatter produced empty generated output" for path in empty]
-        )
     generated_binding_paths = {
         path.removeprefix("bindings/")
         for path in outputs
@@ -102,77 +96,42 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
     }
     if unsupported:
         report["unsupported"] = unsupported
-    outputs[COVERAGE] = dprint_format(
-        json.dumps(report, indent=2, sort_keys=True) + "\n", "json"
-    )
-    return outputs, report
+    outputs[COVERAGE] = json.dumps(report, indent=2, sort_keys=True) + "\n"
+    return format_outputs(outputs, staging), report
 
 
-def run_tool(*command: str, cwd: Path = ROOT, quiet: bool = False, **options):
+def run_tool(*command: str, cwd: Path = ROOT) -> None:
     """Run a repository tool through mise and fail on a nonzero exit."""
-    if quiet:
-        options["stdout"] = subprocess.DEVNULL
-    return subprocess.run(
-        ["mise", "exec", "--no-deps", "--", *command], cwd=cwd, check=True, **options
+    subprocess.run(
+        ["mise", "exec", "--no-deps", "--", *command],
+        cwd=cwd,
+        check=True,
+        stdout=subprocess.DEVNULL,
     )
-
-
-def dprint_format(source: str, extension: str) -> str:
-    """Format a source with the formatter dprint routes the extension to."""
-    return run_tool(
-        "dprint",
-        "fmt",
-        "--stdin",
-        extension,
-        input=source,
-        capture_output=True,
-        text=True,
-    ).stdout
 
 
 def format_outputs(outputs: dict[str, str], staging: Path) -> dict[str, str]:
-    """Run each language's formatter over the outputs in a staging directory."""
+    """Format the outputs in a staging directory as `mise run fix` would."""
     for path, source in outputs.items():
         target = staging / path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(source)
-
-    def staged(*suffixes: str) -> list[str]:
-        return [str(staging / path) for path in outputs if path.endswith(suffixes)]
-
-    for path in outputs:
-        if not path.endswith((".h", ".inc", ".c", ".go", ".cs", ".kt", ".ts")):
-            continue
-        target = staging / path
-        extension = "cpp" if target.suffix == ".inc" else target.suffix[1:]
-        target.write_text(dprint_format(target.read_text(), extension))
-    run_tool("rustfmt", "--edition", "2024", *staged(".rs"))
-    python_files = staged(".py", ".pyi")
-    run_tool(
-        "uv", "run", "--no-sync", "ruff", "check", "--fix", *python_files, quiet=True
-    )
-    run_tool("uv", "run", "--no-sync", "ruff", "format", *python_files, quiet=True)
-    run_tool(
-        "swiftformat",
-        "--indent",
-        "2",
-        "--max-width",
-        "80",
-        "--quiet",
-        str(staging / "bindings/swift/Sources/MaplibreNativeFFI/Generated"),
-    )
-    # Dart formats staged files with the binding package's minimum language
-    # version, read from its pubspec so the output never depends on whether
-    # `dart pub get` has run.
+    python_files = [
+        str(staging / path) for path in outputs if path.endswith((".py", ".pyi"))
+    ]
+    run_tool("uv", "run", "--no-sync", "ruff", "check", "--fix", *python_files)
+    # The staging directory sits in the ignored build directory.
+    run_tool("dprint", "fmt", "--no-gitignore", str(staging))
+    # Dart formats with the binding package's minimum language version, read
+    # from its pubspec so the output never depends on whether `dart pub get`
+    # has run.
     run_tool(
         "dart",
         "format",
         f"--language-version={dart_language_version()}",
-        *staged(".dart"),
+        str(staging),
         cwd=ROOT / "bindings/dart",
-        quiet=True,
     )
-    run_tool("zig", "fmt", *staged(".zig"), cwd=ROOT / "bindings/zig", quiet=True)
     return {path: (staging / path).read_text() for path in outputs}
 
 
@@ -246,25 +205,17 @@ def main() -> int:
     parser.add_argument("--require-complete", action="store_true")
     args = parser.parse_args()
 
-    def load() -> Api:
+    try:
         api = parse_headers(
             args.include,
             clang=args.clang,
             clang_args=(f"-I{args.native_include.resolve()}", *args.clang_arg),
         )
         validate(api)
-        bound = compile_api(api)
-        if bound.diagnostics:
-            raise ModelError(list(bound.diagnostics))
-        return api
-
-    try:
-        api = load()
         return generate(api, args.check, args.require_complete)
     except (ModelError, OSError, subprocess.CalledProcessError) as error:
         print(error, file=sys.stderr)
         return 1
-    return 0
 
 
 if __name__ == "__main__":
