@@ -475,35 +475,43 @@ runs:
         MISE_NO_HOOKS: "1"
       run: mise bootstrap --skip files
 
-    # `mise bootstrap` above installs the root config's tools; `--monorepo` adds
-    # every `[monorepo].config_roots` entry, which is what the jobs run against.
-    # Installing them here rather than lazily keeps the cache saved below
-    # identical no matter which job writes it.
-    - name: Install project toolchains (Unix)
+    # `mise deps --monorepo` installs tools and fetches packages for every
+    # `[monorepo].config_roots` entry. Download failures during setup qualify
+    # for the infrastructure retry, and every job populates the same tool cache.
+    - name: Install project dependencies (Unix)
       if: runner.os != 'Windows'
       shell: bash
       env:
         GITHUB_TOKEN: ${{ github.token }}
-      run: MISE_NO_HOOKS=1 mise install --monorepo
+      run: MISE_NO_HOOKS=1 mise deps --monorepo
 
     # Git Bash/MSYS2 is x86_64 under Windows ARM64 emulation and can terminate
     # with a native exception while spawning processes. Keep the retry supervisor
     # in native PowerShell so it survives that failure:
     # https://github.com/actions/runner-images/issues/14052
     # https://github.com/git-for-windows/git/issues/6287
-    - name: Install project toolchains (Windows)
+    - name: Install project dependencies (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
       env:
         GITHUB_TOKEN: ${{ github.token }}
       run: |
         $env:MISE_NO_HOOKS = "1"
+        $depsArgs = @("--monorepo")
+        # Windows ARM64 has no Zig toolchain; its target suites omit Zig too.
+        if ($env:RUNNER_ARCH -eq "ARM64") {
+          $depsArgs += @(
+            "--skip", "//bindings/zig:zig",
+            "--skip", "//examples/zig-map:zig",
+            "--skip", "//examples/zig-readback:zig"
+          )
+        }
         foreach ($attempt in 1..2) {
-          mise install --monorepo
+          mise deps @depsArgs
           if ($LASTEXITCODE -eq 0) {
             exit 0
           }
-          Write-Output "::warning::mise install --monorepo failed (attempt $attempt/2)"
+          Write-Output "::warning::mise deps --monorepo failed (attempt $attempt/2)"
           if ($attempt -lt 2) {
             Start-Sleep -Seconds 5
           }
