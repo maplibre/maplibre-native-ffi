@@ -1,3 +1,7 @@
+Keeps present on-demand images registered to their requestor when the same
+request also needs missing images, so cache cleanup keeps them.
+Upstream: https://github.com/maplibre/maplibre-native/pull/4575
+
 diff --git a/src/mln/renderer/image_manager.cpp b/src/mln/renderer/image_manager.cpp
 index 3fdccb67b68e..279446b6d6bf 100644
 --- a/src/mln/renderer/image_manager.cpp

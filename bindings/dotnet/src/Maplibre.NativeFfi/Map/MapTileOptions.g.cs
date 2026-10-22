@@ -12,7 +12,7 @@ namespace Maplibre.NativeFfi;
 public sealed record MapTileOptions
 {
     /// <summary>
-    /// Native uint8_t prefetch zoom delta.
+    /// Prefetch zoom delta, at most 255.
     /// </summary>
     public uint? PrefetchZoomDelta { get; set; }
     public double? LodMinRadius { get; set; }

@@ -1,3 +1,7 @@
+Clears deferred symbol placement when no layer supplies placement data, so idle
+frames stop requesting repaints (https://github.com/maplibre/maplibre-native-ffi/issues/735).
+Upstream: https://github.com/maplibre/maplibre-native/pull/4722
+
 diff --git a/src/mln/renderer/render_orchestrator.cpp b/src/mln/renderer/render_orchestrator.cpp
 index ef2d2e4052b0..48e3532a8c8c 100644
 --- a/src/mln/renderer/render_orchestrator.cpp

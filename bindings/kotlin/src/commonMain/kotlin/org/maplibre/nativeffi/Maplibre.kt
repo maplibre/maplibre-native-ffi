@@ -4,10 +4,13 @@ import org.maplibre.nativeffi.render.NativePointer
 
 /** Process-global entry points for the MapLibre Native FFI binding. */
 public expect object Maplibre {
-  /** C ABI contract version expected by this binding. */
+  /** The C ABI version that this binding requires; loading fails on any other. */
   public val EXPECTED_C_ABI_VERSION: Long
 
-  /** Loads or verifies access to the native library for the current platform. */
+  /**
+   * Loads the native library, or verifies it where the platform links it, and checks its C ABI
+   * version.
+   */
   public fun loadNativeLibrary()
 
   /**

@@ -22,7 +22,7 @@ namespace Maplibre.NativeFfi;
 /// UI-to-device pixel scale used for this frame.
 /// </param>
 /// <param name="FrameId">
-/// Opaque frame identity used to reject stale releases.
+/// Opaque identity of this frame.
 /// </param>
 /// <param name="Slot">
 /// Ring slot that holds this frame. For a borrowed target, the index of its

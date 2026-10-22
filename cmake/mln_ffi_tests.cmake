@@ -1,5 +1,6 @@
 # Builds the native suites under tests/native and registers how each target
-# runs them. See tests/native/README.md for the layout and the rules.
+# runs them. tests/native/support/test_support.h states how a test file is laid
+# out and the rules that cases follow.
 
 include(mln_ffi_test_graphics)
 

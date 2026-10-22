@@ -1,3 +1,7 @@
+Rebuilds layout only for the tiles that requested an image while it was
+missing, so a late image shows without discarding other tiles.
+Upstream: https://github.com/maplibre/maplibre-native/pull/4714, which rebuilds every tile
+
 diff --git a/src/mln/renderer/image_manager.cpp b/src/mln/renderer/image_manager.cpp
 index f45d750..720e73c 100644
 --- a/src/mln/renderer/image_manager.cpp

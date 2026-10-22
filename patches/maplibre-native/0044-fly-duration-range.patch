@@ -1,3 +1,6 @@
+Rejects a flight whose derived duration does not fit Native's duration type.
+Upstream: not proposed
+
 diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
 --- a/src/mln/map/transform.cpp
 +++ b/src/mln/map/transform.cpp

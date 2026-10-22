@@ -52,7 +52,7 @@ mlt_vendor_paths=(
 
 # Changes we carry against the pinned commit until they land upstream. They are
 # applied to the worktree rather than tracked as a fork, so the submodule keeps
-# pointing at maplibre/maplibre-native. See patches/maplibre-native/README.md.
+# pointing at maplibre/maplibre-native. Each patch file opens with its reason.
 mln_patches=(
   "$repo_root/patches/maplibre-native/0004-opengl-valid-api-calls.patch"
   "$repo_root/patches/maplibre-native/0007-retain-active-on-demand-images.patch"

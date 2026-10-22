@@ -151,8 +151,9 @@ mln_source_feature_query_options_default(void) MLN_NOEXCEPT;
 /**
  * Starts a rendered-feature query against the session's latest driver state.
  *
- * The completion borrows value_count mln_queried_feature values, value_size
- * bytes apart.
+ * The query reads the last frame that the session rendered, so render after a
+ * camera or style change for a result that matches it. The completion borrows
+ * value_count mln_queried_feature values, value_size bytes apart.
  *
  * Box geometry is normalized and clipped to the viewport, so a box that
  * over-covers the viewport queries everything visible. A box that lies entirely
@@ -165,12 +166,12 @@ mln_source_feature_query_options_default(void) MLN_NOEXCEPT;
  *   null, undersized, or names an unknown kind, options is undersized or
  *   carries an invalid field, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
  * - MLN_STATUS_TARGET_LOST when the session is abandoned or its target is lost
  *   before the query runs.
- * - MLN_STATUS_NATIVE_ERROR when the query throws on the driver.
+ * - MLN_STATUS_NATIVE_ERROR when the query fails.
  */
 MLN_BINDING("execution=query;result=mln_queried_feature;shape=array")
 MLN_API mln_status mln_render_session_query_rendered_features(
@@ -183,8 +184,9 @@ MLN_API mln_status mln_render_session_query_rendered_features(
 /**
  * Starts a source-feature query against the session's latest driver state.
  *
- * The completion borrows value_count mln_queried_feature values, value_size
- * bytes apart.
+ * The query covers only the tiles that the source loaded for rendering, and a
+ * source loads tiles only while a visible layer uses it. The completion borrows
+ * value_count mln_queried_feature values, value_size bytes apart.
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
@@ -192,12 +194,12 @@ MLN_API mln_status mln_render_session_query_rendered_features(
  *   invalid or empty, options is undersized or carries an invalid field, or
  *   completion is invalid.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
  * - MLN_STATUS_TARGET_LOST when the session is abandoned or its target is lost
  *   before the query runs.
- * - MLN_STATUS_NATIVE_ERROR when the query throws on the driver.
+ * - MLN_STATUS_NATIVE_ERROR when the query fails.
  */
 MLN_BINDING("execution=query;result=mln_queried_feature;shape=array")
 MLN_API mln_status mln_render_session_query_source_features(
@@ -211,18 +213,24 @@ MLN_API mln_status mln_render_session_query_source_features(
  * completion borrows one mln_buffer_view holding UTF-8 JSON (value_count 1),
  * valid only for the callback.
  *
+ * For the supercluster extension, the feature's cluster_id property and the
+ * limit and offset arguments are nonnegative JSON integers, such as 5 rather
+ * than 5.0. A feature without such a cluster_id yields an empty result. Leaves
+ * use a limit of 10 unless the arguments supply one, and apply an offset only
+ * with a limit.
+ *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, any of
  *   source_id, feature, extension, or extension_field is invalid or empty,
  *   arguments is invalid, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
  * - MLN_STATUS_TARGET_LOST when the session is abandoned or its target is lost
  *   before the query runs.
- * - MLN_STATUS_NATIVE_ERROR when the query throws on the driver.
+ * - MLN_STATUS_NATIVE_ERROR when the query fails.
  */
 MLN_BINDING("execution=query;result=mln_buffer_view;encoding=json")
 MLN_API mln_status mln_render_session_query_feature_extensions(

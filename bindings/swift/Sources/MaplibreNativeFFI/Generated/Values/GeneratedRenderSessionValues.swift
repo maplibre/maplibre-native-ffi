@@ -65,11 +65,9 @@ public struct FrameDemandFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   /// with `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can
   /// follow the results of demands accepted after it. The flag does not pace: a
   /// host that re-arms a waiting demand as each result arrives renders every
-  /// update the map publishes. The map publishes one update for the commands
-  /// that its runtime worker runs back to back, but a command that reaches the
-  /// worker while a frame renders appears in a later frame. To show several
-  /// commands in one frame, submit them in a command group, or arm demands once
-  /// per display frame.
+  /// update the map publishes, and a command that arrives while a frame renders
+  /// appears in a later frame. To show several commands in one frame, submit
+  /// them in a command group, or arm demands once per display frame.
   public static let waitForUpdate: FrameDemandFlag = .init(rawValue: 4)
 }
 
@@ -172,15 +170,11 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
   public var frameGeneration: UInt64
   /// Whether the map asked for another frame while it rendered this one, as
   /// during an ongoing paint transition. Set only when disposition is
-  /// `MLN_RENDER_RESULT_RENDERED`, and false for every other outcome. This is
-  /// the same signal that `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED` carries
-  /// in its needs_repaint field, delivered with the frame result so a host can
-  /// re-arm its frame loop without the runtime event round trip. A camera
-  /// transition does not set it by itself: the map publishes a new update after
-  /// each of the transition's frames instead, which a render-if-needed demand
-  /// renders. A demand with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` renders each
-  /// transition update without a runtime-event round trip; the host re-arms the
-  /// demand as each result arrives.
+  /// `MLN_RENDER_RESULT_RENDERED`, and false for every other outcome. It
+  /// matches the needs_repaint field of
+  /// `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`. A camera transition does
+  /// not set it: the map publishes an update for each of the transition's
+  /// frames instead, which a render-if-needed demand renders.
   public var needsRepaint: Bool
   /// The view that this frame drew, from the transform of the map update that
   /// it rendered. A host that displays the frame builds its projection with

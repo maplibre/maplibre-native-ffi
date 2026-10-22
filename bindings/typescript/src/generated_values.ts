@@ -40,15 +40,15 @@ export type AnimationOptionField = number;
  */
 export interface AnimationOptions {
   /**
-   * Duration in milliseconds. Must be finite and non-negative. Values that
-   * would overflow MapLibre Native's internal duration are invalid.
+   * Duration in milliseconds. Must be finite, non-negative, and short enough to
+   * represent as a duration.
    */
   durationMs?: number;
   /**
    * Average fly velocity in screenfuls per second. Must be positive and finite;
-   * defaults to 1.2 when omitted. A flight whose derived duration exceeds
-   * Native's nanosecond duration range fails its completion with
-   * `MLN_STATUS_NATIVE_ERROR`. An explicit duration overrides velocity.
+   * defaults to 1.2 when omitted. A flight whose derived duration is too long
+   * to represent fails its completion with `MLN_STATUS_NATIVE_ERROR`. An
+   * explicit duration overrides velocity.
    */
   velocity?: number;
   /**
@@ -556,7 +556,9 @@ export interface FeatureStateSelector {
    */
   sourceLayerId?: string;
   /**
-   * Optional feature ID. Required by set and get, optional for remove.
+   * Optional feature ID. Required by set and get, optional for remove. A
+   * numeric feature ID matches its decimal text, such as "7" for the GeoJSON id
+   * 7.
    */
   featureId?: string;
   /**
@@ -624,11 +626,9 @@ export const FrameDemandFlag = {
    * `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can follow
    * the results of demands accepted after it. The flag does not pace: a host
    * that re-arms a waiting demand as each result arrives renders every update
-   * the map publishes. The map publishes one update for the commands that its
-   * runtime worker runs back to back, but a command that reaches the worker
-   * while a frame renders appears in a later frame. To show several commands in
-   * one frame, submit them in a command group, or arm demands once per display
-   * frame.
+   * the map publishes, and a command that arrives while a frame renders appears
+   * in a later frame. To show several commands in one frame, submit them in a
+   * command group, or arm demands once per display frame.
    */
   waitForUpdate: 4,
 } as const;
@@ -732,7 +732,8 @@ export interface GeojsonSourceOptions {
    */
   cluster?: boolean;
   /**
-   * Slices requested tiles inline during the update pass. Defaults to false.
+   * Tiles the data for the next render update instead of in the background.
+   * Defaults to false.
    */
   synchronousTiling?: boolean;
 }
@@ -1141,7 +1142,7 @@ export type MapTileOptionField = number;
  */
 export interface MapTileOptions {
   /**
-   * Native uint8_t prefetch zoom delta.
+   * Prefetch zoom delta, at most 255.
    */
   prefetchZoomDelta?: number;
   lodMinRadius?: number;
@@ -1242,10 +1243,9 @@ export interface MetalBorrowedTexture {
  */
 export interface MetalBorrowedTextureDescriptor {
   /**
-   * Logical texture extent. The map viewport uses width and height and the
-   * renderer uses scale_factor; the physical size is stated separately below. A
-   * scale_factor that differs from the map's is accepted and logged as a
-   * warning.
+   * Logical texture extent; physical_width and physical_height give the
+   * texture's size. A scale_factor that differs from the map's is accepted and
+   * logged as a warning.
    */
   extent?: LogicalExtent;
   /**
@@ -1346,7 +1346,7 @@ export interface MetalTextureFrame {
    */
   readonly scaleFactor: number;
   /**
-   * Opaque frame identity used to reject stale releases.
+   * Opaque identity of this frame.
    */
   readonly frameId: bigint;
   /**
@@ -1411,8 +1411,8 @@ export interface OfflineGeometryRegionDefinition {
   geometry: string;
   minZoom?: number;
   /**
-   * Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
-   * each tile source use its own maximum zoom.
+   * Maximum zoom. Positive infinity lets each tile source use its own maximum
+   * zoom.
    */
   maxZoom?: number;
   pixelRatio?: number;
@@ -1518,8 +1518,8 @@ export interface OfflineTilePyramidRegionDefinition {
   bounds?: LatLngBounds;
   minZoom?: number;
   /**
-   * Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
-   * each tile source use its own maximum zoom.
+   * Maximum zoom. Positive infinity lets each tile source use its own maximum
+   * zoom.
    */
   maxZoom?: number;
   pixelRatio?: number;
@@ -1547,10 +1547,9 @@ export interface OpenglBorrowedTexture {
  */
 export interface OpenglBorrowedTextureDescriptor {
   /**
-   * Logical texture extent. The map viewport uses width and height and the
-   * renderer uses scale_factor; the physical size is stated separately below. A
-   * scale_factor that differs from the map's is accepted and logged as a
-   * warning.
+   * Logical texture extent; physical_width and physical_height give the
+   * texture's size. A scale_factor that differs from the map's is accepted and
+   * logged as a warning.
    */
   extent?: LogicalExtent;
   /**
@@ -1763,7 +1762,7 @@ export interface OpenglTextureFrame {
    */
   readonly scaleFactor: number;
   /**
-   * Opaque frame identity used to reject stale releases.
+   * Opaque identity of this frame.
    */
   readonly frameId: bigint;
   /**
@@ -1842,11 +1841,11 @@ export interface ProjectionMode {
    */
   axonometric?: boolean;
   /**
-   * Native x-skew factor used by the axonometric transform.
+   * X-skew factor of the axonometric transform.
    */
   xSkew?: number;
   /**
-   * Native y-skew factor used by the axonometric transform.
+   * Y-skew factor of the axonometric transform.
    */
   ySkew?: number;
 }
@@ -2021,15 +2020,10 @@ export interface RenderFrameResult {
   /**
    * Whether the map asked for another frame while it rendered this one, as
    * during an ongoing paint transition. Set only when disposition is
-   * `MLN_RENDER_RESULT_RENDERED`, and false for every other outcome. This is
-   * the same signal that `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED` carries
-   * in its needs_repaint field, delivered with the frame result so a host can
-   * re-arm its frame loop without the runtime event round trip. A camera
-   * transition does not set it by itself: the map publishes a new update after
-   * each of the transition's frames instead, which a render-if-needed demand
-   * renders. A demand with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` renders each
-   * transition update without a runtime-event round trip; the host re-arms the
-   * demand as each result arrives.
+   * `MLN_RENDER_RESULT_RENDERED`, and false for every other outcome. It matches
+   * the needs_repaint field of `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`. A
+   * camera transition does not set it: the map publishes an update for each of
+   * the transition's frames instead, which a render-if-needed demand renders.
    */
   readonly needsRepaint: boolean;
   /**
@@ -2636,9 +2630,8 @@ export interface RuntimeEvent {
    */
   readonly generation: bigint;
   /**
-   * Secondary event detail whose meaning type selects. Depending on type it
-   * carries an `mln_camera_change_mode`, a MapLibre Native error ordinal, or 0.
-   * See `mln_runtime_event_type` for the per-type meaning.
+   * Secondary event detail whose meaning type selects; see
+   * `mln_runtime_event_type`.
    */
   readonly code: number;
   /**
@@ -2929,7 +2922,8 @@ export interface ScreenLineString {
 }
 
 /**
- * Screen-space point in logical map pixels.
+ * Screen-space point in logical map pixels, from the top-left of the viewport
+ * with y growing downward.
  *
  * See `mln_screen_point` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2994,7 +2988,7 @@ export const Status = {
    */
   unsupported: -4,
   /**
-   * A native MapLibre error or C++ exception was converted to status.
+   * Native code failed; the diagnostic describes the error.
    */
   nativeError: -5,
   /**
@@ -3407,13 +3401,13 @@ export type StyleTransitionOptionField = number;
  */
 export interface StyleTransitionOptions {
   /**
-   * Transition duration in milliseconds. Must be finite and non-negative.
-   * Values that would overflow MapLibre Native's internal duration are invalid.
+   * Transition duration in milliseconds. Must be finite, non-negative, and
+   * short enough to represent as a duration.
    */
   durationMs?: number;
   /**
-   * Transition delay in milliseconds. Must be finite and non-negative. Values
-   * that would overflow MapLibre Native's internal duration are invalid.
+   * Transition delay in milliseconds. Must be finite, non-negative, and short
+   * enough to represent as a duration.
    */
   delayMs?: number;
   /**
@@ -3609,10 +3603,9 @@ export interface VulkanBorrowedTexture {
  */
 export interface VulkanBorrowedTextureDescriptor {
   /**
-   * Logical texture extent. The map viewport uses width and height and the
-   * renderer uses scale_factor; the physical size is stated separately below. A
-   * scale_factor that differs from the map's is accepted and logged as a
-   * warning.
+   * Logical texture extent; physical_width and physical_height give the
+   * texture's size. A scale_factor that differs from the map's is accepted and
+   * logged as a warning.
    */
   extent?: LogicalExtent;
   /**
@@ -3752,7 +3745,7 @@ export interface VulkanTextureFrame {
    */
   readonly scaleFactor: number;
   /**
-   * Opaque frame identity used to reject stale releases.
+   * Opaque identity of this frame.
    */
   readonly frameId: bigint;
   /**
@@ -3864,10 +3857,9 @@ export interface WebgpuBorrowedTexture {
  */
 export interface WebgpuBorrowedTextureDescriptor {
   /**
-   * Logical texture extent. The map viewport uses width and height and the
-   * renderer uses scale_factor; the physical size is stated separately below. A
-   * scale_factor that differs from the map's is accepted and logged as a
-   * warning.
+   * Logical texture extent; physical_width and physical_height give the
+   * texture's size. A scale_factor that differs from the map's is accepted and
+   * logged as a warning.
    */
   extent?: LogicalExtent;
   /**
@@ -3987,7 +3979,7 @@ export interface WebgpuTextureFrame {
    */
   readonly scaleFactor: number;
   /**
-   * Opaque frame identity used to reject stale releases.
+   * Opaque identity of this frame.
    */
   readonly frameId: bigint;
   /**

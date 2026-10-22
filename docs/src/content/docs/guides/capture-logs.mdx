@@ -15,37 +15,28 @@ Android, the system log on Apple platforms, hilog on OpenHarmony, stderr and the
 debugger output stream on Windows, and stderr on Linux and Emscripten. Install a
 callback to send records to a host logger, file, crash reporter, or test.
 
-A record contains a severity, category, optional numeric code, and message. The
-callback return value either consumes the record or forwards it to the platform
-logger as well. Forward records while validating a new host logger.
+The callback's return value consumes the record or also forwards it to the
+platform logger, which helps while you validate a new host logger.
 
 <Code code={region(logCallback, "callback")} lang="c" title="log-callback.c" />
 
-One callback serves the whole process. Install it before creating a runtime to
-catch setup records. Keep its user data alive until the handler retires; use its
-release callback to reclaim that state.
+One callback serves the whole process. Install it before you create a runtime
+to catch setup records.
 
 <Code code={region(logCallback, "install")} lang="c" title="log-callback.c" />
 
 ## Receive records safely
 
-MapLibre invokes the callback on the thread that produced the record, including
-worker and network threads. The callback can run while MapLibre holds logging
-locks.
-
-Make the callback thread-safe and return quickly. Do not call a MapLibre function
-from the callback; the call can deadlock. Copy and queue the record before
-returning when the host needs more processing.
+The callback runs on the thread that produced the record, including worker and
+network threads. Make it thread-safe, return quickly, and call no MapLibre
+function from it. Copy and queue a record that needs more processing.
 
 ## Choose delivery timing
 
-Errors reach the callback synchronously. Informational and warning records may
-arrive after the work that produced them. Asynchronous delivery keeps MapLibre
-threads available while the host logger runs.
-
-Clear the mask when every record must be ordered with the call that produced it,
-such as in a log assertion. Production hosts usually keep the default because
-synchronous delivery blocks MapLibre threads on the host logger.
+Errors reach the callback synchronously, and other records may arrive later, so
+that MapLibre threads don't wait on the host logger. Clear the asynchronous mask
+when every record must stay ordered with the call that produced it, as in a log
+assertion.
 
 <Code code={region(logCallback, "async")} lang="c" title="log-callback.c" />
 

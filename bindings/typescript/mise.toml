@@ -56,7 +56,7 @@ description = "Generate the TypeScript API reference HTML with TypeDoc."
 run = '''
 rm -rf build/typedoc
 pnpm exec typedoc --entryPoints src/index.ts --excludeInternal --out build/typedoc \
-  --name @maplibre/native-ffi --readme README.md
+  --name @maplibre/native-ffi --readme none
 '''
 
 [tasks.pack]

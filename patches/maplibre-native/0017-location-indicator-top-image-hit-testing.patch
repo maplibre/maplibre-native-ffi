@@ -1,3 +1,6 @@
+Includes the location indicator's top image in rendered-feature queries.
+Upstream: https://github.com/maplibre/maplibre-native/pull/4640 at 0b5d2502
+
 diff --git a/metrics/ignores/platform-ios.json b/metrics/ignores/platform-ios.json
 index 4950ad168d8d..99bd57d52f99 100644
 --- a/metrics/ignores/platform-ios.json

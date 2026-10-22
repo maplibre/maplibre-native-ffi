@@ -1,3 +1,7 @@
+Builds line gradient, heatmap, and color relief ramps from the current update's
+global state, not the previous one.
+Upstream: not proposed
+
 diff --git a/src/mln/renderer/layers/render_color_relief_layer.cpp b/src/mln/renderer/layers/render_color_relief_layer.cpp
 index 78d8564c0178..7aef68f3638f 100644
 --- a/src/mln/renderer/layers/render_color_relief_layer.cpp

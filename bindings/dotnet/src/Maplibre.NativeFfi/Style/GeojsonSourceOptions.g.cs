@@ -70,7 +70,8 @@ public sealed record GeojsonSourceOptions
     public bool? Cluster { get; set; }
 
     /// <summary>
-    /// Slices requested tiles inline during the update pass. Defaults to false.
+    /// Tiles the data for the next render update instead of in the background.
+    /// Defaults to false.
     /// </summary>
     public bool? SynchronousTiling { get; set; }
     public static GeojsonSourceOptions Default

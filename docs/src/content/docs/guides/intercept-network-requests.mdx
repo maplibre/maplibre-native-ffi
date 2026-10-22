@@ -17,40 +17,31 @@ Choose a resource transform to rewrite URLs, an HTTP header transform to add
 headers, or a resource provider to supply response bytes from host storage.
 Register each configuration on the runtime.
 
-Callbacks can run concurrently on native threads. Protect shared state and
-return quickly. Keep registered callback state reachable until native code
-releases it. Release host locks that callbacks acquire before closing the
-runtime.
+Callbacks can run concurrently on native threads, so protect shared state and
+return quickly.
 
 ## Rewrite a URL
 
-Use a transform to sign a URL or select another host. Each request reaches the
-transform with a request handle, and MapLibre waits for the answer before it
-fetches. Check the destination before adding credentials: styles can request
-tiles, sprites, and glyphs from origins that the host does not control.
-Releasing the handle without an answer keeps the URL.
+Use a transform to sign a URL or select another host. Check the destination
+before you add credentials, because styles can request tiles, sprites, and
+glyphs from origins that the host does not control.
 
 <Code code={region(transformSnippet, "match")} lang="c" title="resource-transform.c" />
 
-Complete the request with the replacement URL, then release it. The handle
-also answers later from any thread, so a host can compute the URL
-asynchronously.
+Complete the request with the replacement URL, then release it. A host can also
+answer later, from any thread.
 
 <Code code={region(transformSnippet, "rewrite")} lang="c" title="resource-transform.c" />
 
-Register the transform before loading resources that need it. A host that
-cannot run code on MapLibre threads sets a delivery queue in place of the
-callback and answers each drained request.
+Register the transform before you load resources that need it.
 
 <Code code={region(transformSnippet, "install")} lang="c" title="resource-transform.c" />
 
 ## Add HTTP headers
 
-Use a header transform for credentials that belong in headers. It runs after URL
-transformation, so check the transformed origin before returning credentials.
-A table of header rules supplies fixed headers without a callback, for hosts
-that cannot run code on MapLibre threads; the first matching rule supplies its
-complete header list.
+Use a header transform for credentials that belong in headers, and check the
+transformed origin before you return them. A host that cannot run code on
+MapLibre threads supplies a table of header rules instead of a callback.
 
 <Code code={region(headerSnippet, "match")} lang="c" title="http-header-transform.c" />
 
@@ -82,27 +73,18 @@ callback.
 
 <Code code={region(providerSnippet, "complete")} lang="c" title="resource-provider.c" />
 
-Register routes to restrict which requests reach the provider. Routes compare
-the normalized resolved URL that native loading fetches. Select
-all resource kinds explicitly in C; binding constructors provide that default.
-Go uses its `DefaultResourceRoute()` factory. Register the provider before
-loading its resources.
+Register routes to restrict which requests reach the provider, and register it
+before you load its resources.
 
 <Code code={region(providerSnippet, "install")} lang="c" title="resource-provider.c" />
 
-For asynchronous I/O, retain the request handle, complete it when the bytes
-arrive, and release it after completion or cancellation. If host lookup declines
-the request later, pass its handle to native loading and then release it. A
-cancelled request no longer needs a response; use a cancel callback to stop an
-in-flight fetch.
+For asynchronous I/O, keep the request handle and complete it when the bytes
+arrive. Use a cancel callback to stop an in-flight fetch, and pass a request
+that the host declines to native loading.
 
 <Code code={region(providerSnippet, "cancel")} lang="c" title="resource-provider.c" />
 
 <Code code={region(providerSnippet, "pass-through")} lang="c" title="resource-provider.c" />
-
-A queue provider can also pass through a request after draining and taking its
-handle. Routes reduce queue traffic; the host still decides whether to serve
-each routed request. A released queue or failed request copy fails the request.
 
 The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html) defines
 request ownership, cancellation, callback reentry, and registration retirement.

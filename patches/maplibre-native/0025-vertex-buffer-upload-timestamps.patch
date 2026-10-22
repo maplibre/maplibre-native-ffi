@@ -1,3 +1,7 @@
+Initializes and preserves vertex buffer upload timestamps in Metal, Vulkan, and
+WebGPU, which could otherwise suppress uploads after feature-state changes.
+Upstream: https://github.com/maplibre/maplibre-native/pull/4679 at 02ddb45f
+
 diff --git a/include/mln/mtl/vertex_buffer_resource.hpp b/include/mln/mtl/vertex_buffer_resource.hpp
 index 72c2c89b7b9c..e9207fd28052 100644
 --- a/include/mln/mtl/vertex_buffer_resource.hpp

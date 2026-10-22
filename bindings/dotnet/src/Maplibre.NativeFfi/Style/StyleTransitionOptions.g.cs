@@ -12,16 +12,14 @@ namespace Maplibre.NativeFfi;
 public sealed record StyleTransitionOptions
 {
     /// <summary>
-    /// Transition duration in milliseconds. Must be finite and non-negative.
-    /// Values that would overflow MapLibre Native's internal duration are
-    /// invalid.
+    /// Transition duration in milliseconds. Must be finite, non-negative, and
+    /// short enough to represent as a duration.
     /// </summary>
     public double? DurationMs { get; set; }
 
     /// <summary>
-    /// Transition delay in milliseconds. Must be finite and non-negative.
-    /// Values that would overflow MapLibre Native's internal duration are
-    /// invalid.
+    /// Transition delay in milliseconds. Must be finite, non-negative, and
+    /// short enough to represent as a duration.
     /// </summary>
     public double? DelayMs { get; set; }
 

@@ -180,16 +180,14 @@ Add the package from [pub.dev](https://pub.dev/packages/maplibre_native_ffi).
 dart pub add maplibre_native_ffi
 ```
 
-The package's build hook downloads the C library for each target from the
-release that the package version names, and checks each archive against the
-SHA-256 digest that the package records. Releases include macOS for arm64
-alone.
+The package downloads the C library for each target when it builds. Releases
+include macOS for arm64 alone.
 
 To build against your own copy of the [C library](#build-against-a-prefix),
 name it in your application's pubspec. Name an install prefix, or a build
 directory that holds `<preset>/install` for each target. A relative path
 resolves against the pubspec. A Git dependency on the package needs a local
-build, because only a published package records the archives to download.
+build.
 
 ```yaml title="pubspec.yaml"
 hooks:
@@ -253,8 +251,8 @@ explicit = true
 maplibre-native-ffi-vulkan = { index = "maplibre-snapshots" }
 ```
 
-This index configuration uses uv. The explicit index limits snapshot resolution
-to this package; all other dependencies continue to resolve from PyPI.
+This configuration uses uv, and resolves only this package from the snapshot
+index.
 
 Take one distribution:
 
@@ -375,8 +373,7 @@ app packages nothing else for it.
 
 An app's native code, built with CMake or ndk-build, links the runtime AAR's
 library through [Prefab](https://developer.android.com/build/native-dependencies).
-The library links libc++ statically and exports only C entry points, so the app
-can use any `ANDROID_STL`.
+The app can use any `ANDROID_STL`.
 
 ```kotlin title="build.gradle.kts"
 android {
@@ -402,8 +399,8 @@ under its own name.
 ### iOS
 
 iOS runs the Metal backend, on the device, in the simulator, and under Mac
-Catalyst. The Mac Catalyst library is the iOS surface built against the macOS
-SDK, which a Catalyst app links in place of the macOS library.
+Catalyst. A Mac Catalyst app links the Mac Catalyst library in place of the
+macOS library.
 
 ### OpenHarmony
 

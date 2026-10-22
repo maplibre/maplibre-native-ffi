@@ -1,3 +1,7 @@
+Registers glyph and image dependencies before requesting either, so layout
+waits for both on synchronous GeoJSON tiles (https://github.com/maplibre/maplibre-native-ffi/issues/698).
+Upstream: https://github.com/maplibre/maplibre-native/pull/4580
+
 diff --git a/src/mln/tile/geometry_tile_worker.cpp b/src/mln/tile/geometry_tile_worker.cpp
 index 2b3a193d09fb2dbb1d6bb0d3f8ed470c5d2d4fe5..885d61897eabc3f56a4226998653bdf7915f46a9 100644
 --- a/src/mln/tile/geometry_tile_worker.cpp

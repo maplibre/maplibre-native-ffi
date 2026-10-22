@@ -49,7 +49,7 @@ labels:
       labels: [upstream]
     dependencies:
       labels: [dependencies]
-  # The meanings tuned with ci/label_eval.py, longer than GitHub allows.
+  # Meanings longer than a GitHub label description allows.
   describe:
     bug: >-
       Fixes or reports broken behavior: a crash, a wrong result, a failing build
@@ -159,8 +159,13 @@ labels:
     "renderer:webgpu": >-
       The WebGPU render backend.
     upstream: >-
-      The cause of the bug, or the missing capability, is in MapLibre Native's
-      own code rather than in this repository's C API, bindings, or tooling.
+      The work is in MapLibre Native's own code. For an issue, the cause of the
+      bug, or the missing capability, is in MapLibre Native rather than in this
+      repository. For a pull request, the diff adds or changes a patch under
+      `patches/maplibre-native/`, or moves the `third_party/maplibre-native`
+      submodule commit. The C++ in `src/` is this repository's code, even when
+      it calls, wraps, or works around MapLibre Native, so a pull request that
+      changes only that code does not qualify.
     dependencies: >-
       Upgrading, adding, removing, or managing a dependency is the substantive
       subject, such as a package, toolchain, or submodule version change.
@@ -309,7 +314,10 @@ ci:
         TypeScript (ArkTS) tests in the Oniro emulator; the ARM64 jobs only
         build. Catches OpenHarmony SDK and platform problems.
         Platform-independent code that Linux x64 already tests does not need it.
-      paths: [cmake/platform/ohos.cmake, mise.ohos.*]
+      paths:
+        - cmake/platform/ohos.cmake
+        - mise.ohos.*
+        - tests/native/abi/platform/transport.c
     web:
       covers: >-
         The browser, built with Emscripten for WebGL and WebGPU. Runs the C API

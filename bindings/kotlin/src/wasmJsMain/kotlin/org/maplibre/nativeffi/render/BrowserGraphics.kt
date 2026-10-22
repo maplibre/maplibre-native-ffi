@@ -205,9 +205,8 @@ public class RegisteredWebglContext internal constructor(private val handle: Int
     }
 
   /**
-   * Removes the registration. The module keeps the handle's few bytes, so no later registration
-   * reuses the handle, and a descriptor that still names it fails to make a context current. A
-   * second call does nothing.
+   * Removes the registration. No later registration reuses the handle, so a descriptor that still
+   * names it fails to make a context current. A second call does nothing.
    */
   override fun close() {
     if (closed) return

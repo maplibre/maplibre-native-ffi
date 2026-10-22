@@ -9,7 +9,7 @@ from typing import Any, Self
 
 
 class NativeHandleMixin:
-    """Mixin for public handles backed by a private `_native` handle."""
+    """Lifecycle methods that every handle shares."""
 
     _handle_name = "Handle"
     _native: Any

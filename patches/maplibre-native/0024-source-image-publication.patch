@@ -1,3 +1,7 @@
+Publishes render updates after source insertion, source removal, and image
+removal (https://github.com/maplibre/maplibre-native-ffi/issues/736).
+Upstream: https://github.com/maplibre/maplibre-native/pull/4676
+
 diff --git a/src/mln/style/style_impl.cpp b/src/mln/style/style_impl.cpp
 index 111f9b4d851f4a0eb5043efe7c3c210064f38a5b..6240b4106283e5c9a728c89c5dd18f4967fc9db0 100644
 --- a/src/mln/style/style_impl.cpp

@@ -1167,14 +1167,14 @@ class AnimationOptions:
     """
 
     duration_ms: float | None = None
-    """Duration in milliseconds. Must be finite and non-negative. Values that
-    would overflow MapLibre Native's internal duration are invalid.
+    """Duration in milliseconds. Must be finite, non-negative, and short enough
+    to represent as a duration.
     """
 
     velocity: float | None = None
     """Average fly velocity in screenfuls per second. Must be positive and
-    finite; defaults to 1.2 when omitted. A flight whose derived duration
-    exceeds Native's nanosecond duration range fails its completion with
+    finite; defaults to 1.2 when omitted. A flight whose derived duration is
+    too long to represent fails its completion with
     `MLN_STATUS_NATIVE_ERROR`. An explicit duration overrides velocity.
     """
 
@@ -1690,7 +1690,10 @@ class FeatureStateSelector:
     """Optional source layer ID. Required for vector-source disambiguation."""
 
     feature_id: str | None = None
-    """Optional feature ID. Required by set and get, optional for remove."""
+    """Optional feature ID. Required by set and get, optional for remove. A
+    numeric feature ID matches its decimal text, such as "7" for the GeoJSON
+    id 7.
+    """
 
     state_key: str | None = None
     """Optional state key. Used only by remove and requires feature_id."""
@@ -1801,7 +1804,9 @@ class GeojsonSourceOptions:
     """Clusters point features. Defaults to false."""
 
     synchronous_tiling: bool | None = None
-    """Slices requested tiles inline during the update pass. Defaults to false."""
+    """Tiles the data for the next render update instead of in the background.
+    Defaults to false.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -2177,7 +2182,7 @@ class MapTileOptions:
     """
 
     prefetch_zoom_delta: int | None = None
-    """Native uint8_t prefetch zoom delta."""
+    """Prefetch zoom delta, at most 255."""
 
     lod_min_radius: float | None = None
 
@@ -2308,10 +2313,9 @@ class MetalBorrowedTextureDescriptor:
     extent: LogicalExtent = field(
         default_factory=lambda: MetalBorrowedTextureDescriptor.default().extent
     )
-    """Logical texture extent. The map viewport uses width and height and the
-    renderer uses scale_factor; the physical size is stated separately below.
-    A scale_factor that differs from the map's is accepted and logged as a
-    warning.
+    """Logical texture extent; physical_width and physical_height give the
+    texture's size. A scale_factor that differs from the map's is accepted
+    and logged as a warning.
     """
 
     physical_width: int = field(
@@ -2469,7 +2473,7 @@ class MetalTextureFrame:
     """UI-to-device pixel scale used for this frame."""
 
     frame_id: int
-    """Opaque frame identity used to reject stale releases."""
+    """Opaque identity of this frame."""
 
     slot: int
     """Ring slot that holds this frame. For a borrowed target, the index of its
@@ -2517,8 +2521,8 @@ class OfflineGeometryRegionDefinition:
     min_zoom: float
 
     max_zoom: float
-    """Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
-    each tile source use its own maximum zoom.
+    """Maximum zoom. Positive infinity lets each tile source use its own maximum
+    zoom.
     """
 
     pixel_ratio: float
@@ -2649,8 +2653,8 @@ class OfflineTilePyramidRegionDefinition:
     min_zoom: float
 
     max_zoom: float
-    """Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
-    each tile source use its own maximum zoom.
+    """Maximum zoom. Positive infinity lets each tile source use its own maximum
+    zoom.
     """
 
     pixel_ratio: float
@@ -2696,10 +2700,9 @@ class OpenglBorrowedTextureDescriptor:
     extent: LogicalExtent = field(
         default_factory=lambda: OpenglBorrowedTextureDescriptor.default().extent
     )
-    """Logical texture extent. The map viewport uses width and height and the
-    renderer uses scale_factor; the physical size is stated separately below.
-    A scale_factor that differs from the map's is accepted and logged as a
-    warning.
+    """Logical texture extent; physical_width and physical_height give the
+    texture's size. A scale_factor that differs from the map's is accepted
+    and logged as a warning.
     """
 
     physical_width: int = field(
@@ -2893,7 +2896,7 @@ class OpenglTextureFrame:
     """UI-to-device pixel scale used for this frame."""
 
     frame_id: int
-    """Opaque frame identity used to reject stale releases."""
+    """Opaque identity of this frame."""
 
     slot: int
     """Ring slot that holds this frame. For a borrowed target, the index of its
@@ -3005,10 +3008,10 @@ class ProjectionMode:
     """Enables a non-perspective axonometric render transform."""
 
     x_skew: float | None = None
-    """Native x-skew factor used by the axonometric transform."""
+    """X-skew factor of the axonometric transform."""
 
     y_skew: float | None = None
-    """Native y-skew factor used by the axonometric transform."""
+    """Y-skew factor of the axonometric transform."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3166,16 +3169,11 @@ class RenderFrameResult:
     needs_repaint: bool
     """Whether the map asked for another frame while it rendered this one, as
     during an ongoing paint transition. Set only when disposition is
-    `MLN_RENDER_RESULT_RENDERED`, and false for every other outcome. This is
-    the same signal that `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`
-    carries in its needs_repaint field, delivered with the frame result so a
-    host can re-arm its frame loop without the runtime event round trip. A
-    camera transition does not set it by itself: the map publishes a new
-    update after each of the transition's frames instead, which a
-    render-if-needed demand renders. A demand with
-    `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` renders each transition update without
-    a runtime-event round trip; the host re-arms the demand as each result
-    arrives.
+    `MLN_RENDER_RESULT_RENDERED`, and false for every other outcome. It
+    matches the needs_repaint field of
+    `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`. A camera transition does
+    not set it: the map publishes an update for each of the transition's
+    frames instead, which a render-if-needed demand renders.
     """
 
     view: MapView
@@ -3677,9 +3675,8 @@ class RuntimeEvent:
     """
 
     code: int
-    """Secondary event detail whose meaning type selects. Depending on type it
-    carries an `mln_camera_change_mode`, a MapLibre Native error ordinal, or
-    0. See `mln_runtime_event_type` for the per-type meaning.
+    """Secondary event detail whose meaning type selects; see
+    `mln_runtime_event_type`.
     """
 
     message: str
@@ -3927,7 +3924,8 @@ class ScreenLineString:
 
 @dataclass(frozen=True, slots=True)
 class ScreenPoint:
-    """Screen-space point in logical map pixels.
+    """Screen-space point in logical map pixels, from the top-left of the
+    viewport with y growing downward.
 
     See `mln_screen_point` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -4226,14 +4224,13 @@ class StyleTransitionOptions:
     """
 
     duration_ms: float | None = None
-    """Transition duration in milliseconds. Must be finite and non-negative.
-    Values that would overflow MapLibre Native's internal duration are
-    invalid.
+    """Transition duration in milliseconds. Must be finite, non-negative, and
+    short enough to represent as a duration.
     """
 
     delay_ms: float | None = None
-    """Transition delay in milliseconds. Must be finite and non-negative. Values
-    that would overflow MapLibre Native's internal duration are invalid.
+    """Transition delay in milliseconds. Must be finite, non-negative, and short
+    enough to represent as a duration.
     """
 
     enable_placement_transitions: bool | None = None
@@ -4403,10 +4400,9 @@ class VulkanBorrowedTextureDescriptor:
     extent: LogicalExtent = field(
         default_factory=lambda: VulkanBorrowedTextureDescriptor.default().extent
     )
-    """Logical texture extent. The map viewport uses width and height and the
-    renderer uses scale_factor; the physical size is stated separately below.
-    A scale_factor that differs from the map's is accepted and logged as a
-    warning.
+    """Logical texture extent; physical_width and physical_height give the
+    texture's size. A scale_factor that differs from the map's is accepted
+    and logged as a warning.
     """
 
     physical_width: int = field(
@@ -4617,7 +4613,7 @@ class VulkanTextureFrame:
     """UI-to-device pixel scale used for this frame."""
 
     frame_id: int
-    """Opaque frame identity used to reject stale releases."""
+    """Opaque identity of this frame."""
 
     slot: int
     """Ring slot that holds this frame. For a borrowed target, the index of its
@@ -4737,10 +4733,9 @@ class WebgpuBorrowedTextureDescriptor:
     extent: LogicalExtent = field(
         default_factory=lambda: WebgpuBorrowedTextureDescriptor.default().extent
     )
-    """Logical texture extent. The map viewport uses width and height and the
-    renderer uses scale_factor; the physical size is stated separately below.
-    A scale_factor that differs from the map's is accepted and logged as a
-    warning.
+    """Logical texture extent; physical_width and physical_height give the
+    texture's size. A scale_factor that differs from the map's is accepted
+    and logged as a warning.
     """
 
     physical_width: int = field(
@@ -4924,7 +4919,7 @@ class WebgpuTextureFrame:
     """UI-to-device pixel scale used for this frame."""
 
     frame_id: int
-    """Opaque frame identity used to reject stale releases."""
+    """Opaque identity of this frame."""
 
     slot: int
     """Ring slot that holds this frame. For a borrowed target, the index of its

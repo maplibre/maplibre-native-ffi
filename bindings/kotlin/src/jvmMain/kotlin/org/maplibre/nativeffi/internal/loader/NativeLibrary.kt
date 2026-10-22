@@ -12,7 +12,7 @@ import java.nio.file.attribute.PosixFilePermissions
 import java.security.MessageDigest
 import java.util.Optional
 
-/** Loads the native Maplibre C ABI library for the Kotlin/JVM FFM bridge. */
+/** Finds and loads the native library and its runtime dependencies. */
 internal object NativeLibrary {
   const val LIBRARY_NAME: String = "maplibre-native-c"
   const val LIBRARY_PATH_PROPERTY: String = "org.maplibre.nativeffi.library.path"
@@ -37,14 +37,8 @@ internal object NativeLibrary {
   @Volatile private var loadedLibrary: LoadedLibrary? = null
 
   /**
-   * Loads the native library once.
-   *
-   * Lookup order:
-   *
-   * 1. exact library file path from [LIBRARY_PATH_PROPERTY]
-   * 2. exact library file path from [LIBRARY_PATH_ENV]
-   * 3. the matching native runtime JAR on the classpath
-   * 4. [System.loadLibrary] with [LIBRARY_NAME]
+   * Loads the native library once, in the order that
+   * [org.maplibre.nativeffi.Maplibre.loadNativeLibrary] states.
    */
   fun load() {
     if (isLoaded()) {

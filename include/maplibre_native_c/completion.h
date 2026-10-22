@@ -29,8 +29,7 @@ typedef enum mln_command_disposition : uint32_t {
  * The submitting function defines the type behind value and the meaning of
  * value_count. A function with no result completes with value null and
  * value_count zero, as does any failed completion. Every pointer remains valid
- * only for the completion callback. A binding copies any result or diagnostic
- * that it keeps.
+ * only for the completion callback.
  *
  * disposition and generation are meaningful for commands. Other one-shot
  * functions set disposition to MLN_COMMAND_DISPOSITION_COMMITTED and
@@ -89,8 +88,8 @@ typedef void (*mln_completion_callback)(
  * and leaves user_data owned by the caller.
  *
  * A command, which the header marks MLN_BINDING("execution=command"), also
- * accepts a null completion, which discards its outcome: native allocates no
- * completion state and runs no callback. The command otherwise behaves as it
+ * accepts a null completion, which discards its outcome and runs no callback.
+ * The command otherwise behaves as it
  * would with a completion. It returns the same status and diagnostic, runs in
  * acceptance order, publishes its snapshot generation, and queues its events.
  * A discarded command that fails logs its status and diagnostic as a warning
@@ -101,8 +100,8 @@ typedef void (*mln_completion_callback)(
  * command or query on the same map follows every earlier discarded command,
  * and a map snapshot read after it observes them. A render session barrier
  * fences only the session's applied extent after a discarded resize; the
- * resize completion fences both the session and the map.
- * A snapshot generation alone does not, because other work also publishes
+ * resize completion fences both the session and the map. A snapshot generation
+ * alone does not, because other work also publishes
  * generations.
  *
  * The completion thread is unspecified and may be the submitting thread. It

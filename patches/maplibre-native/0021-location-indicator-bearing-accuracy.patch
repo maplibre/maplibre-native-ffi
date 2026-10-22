@@ -1,3 +1,7 @@
+Adds a bearing-accuracy sector to the location indicator. Kept until a location
+indicator plugin can replace the core layer.
+Upstream: closed https://github.com/maplibre/maplibre-native/pull/4644 at 02d9a4b2
+
 diff --git a/include/mln/shaders/gl/location_indicator.hpp b/include/mln/shaders/gl/location_indicator.hpp
 index 9a95c730e7c9..c1bc5c1a9759 100644
 --- a/include/mln/shaders/gl/location_indicator.hpp

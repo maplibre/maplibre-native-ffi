@@ -11,56 +11,43 @@ import { region } from "../../../snippets";
 import featureState from "../../../../snippets/c/feature-state.c?raw";
 import featureStateRead from "../../../../snippets/c/feature-state-read.c?raw";
 
-Feature state is data that your host attaches to one feature at runtime and that
-style expressions read while the map draws. One styling rule then covers
-selection, hover, a live value, or a computed status, because each feature
-supplies its own input to that rule.
-
-Feature state belongs to the [map](/maplibre-native-ffi/concepts/#map) and
-appears in rendering on the next map update.
+Feature state is data that your host attaches to one feature at runtime, and
+that style expressions read while the map draws. One styling rule then covers
+selection, hover, or a live value, because each feature supplies its own input.
+Feature state belongs to the [map](/maplibre-native-ffi/concepts/#map).
 
 ## Set state on a feature
 
-A selector contains the source ID, the source-layer ID for a vector source, and
-the feature ID. Feature IDs match as text. Select a feature whose GeoJSON `id`
-is the number 7 with `"7"`.
+A selector names the source, the source layer of a vector source, and the
+feature ID.
 
 <Code code={region(featureState, "select")} lang="c" title="feature-state.c" />
 
-The state is a JSON object, and each state key holds one JSON value.
+The state is a JSON object.
 
 <Code code={region(featureState, "value")} lang="c" title="feature-state.c" />
 
-Setting state writes the keys of the object that you pass, leaves the feature's
-other keys at their current values, and requests a repaint.
-
 <Code code={region(featureState, "set")} lang="c" title="feature-state.c" />
 
-An expression reads one key with `feature-state`, and its fallback value applies
-to every feature that has no value for that key. A circle layer that enlarges
-the selected feature reads
-`["case", ["boolean", ["feature-state", "selected"], false], 10, 5]` for
-`circle-radius`.
+An expression reads one key with `feature-state`. A circle layer that enlarges
+the selected feature sets `circle-radius` to
+`["case", ["boolean", ["feature-state", "selected"], false], 10, 5]`.
 
-Remove the selected key when its value is no longer needed.
+Remove a key when its value is no longer needed.
 
 <Code code={region(featureState, "remove")} lang="c" title="feature-state.c" />
 
 ## Read state back
 
-Read state through a completion, with or without a render session.
-
 <Code code={region(featureStateRead, "get")} lang="c" title="feature-state-read.c" />
 
-Parse the returned JSON object with the host's JSON library.
+The result is a JSON object.
 
 <Code code={region(featureStateRead, "member")} lang="c" title="feature-state-read.c" />
 
-Copy any value that you keep, because the result bytes stay valid only for the
-completion callback.
+Copy what you keep.
 
 <Code code={region(featureStateRead, "read")} lang="c" title="feature-state-read.c" />
 
-Feature state survives render-target changes. The
-[style reference](/maplibre-native-ffi/reference/c/style_8h.html) defines selector
-matching, removal scopes, and state lifetime.
+The [map reference](/maplibre-native-ffi/reference/c/map_8h.html) defines selectors and feature-state
+commands.

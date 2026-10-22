@@ -12,14 +12,11 @@ import offlineRegion from "../../../../snippets/c/offline-region.c?raw";
 import offlineStorage from "../../../../snippets/c/offline-storage.c?raw";
 
 Set a writable cache path in the runtime options to keep resources across host
-runs. The default in-memory database lasts for the runtime's lifetime.
+runs. Without one, the cache lives in memory.
 
-The ambient cache evicts fetched resources within a byte budget. Offline regions
-retain the resources needed for defined areas outside that budget. Download a
-region when the host must draw a known area without a network.
-
-Database operations complete asynchronously. Copy borrowed results that the host
-keeps before their completion callback returns.
+The ambient cache keeps recently fetched resources within a size budget. An
+offline region keeps everything that a defined area needs, outside that budget.
+Download a region when the host must draw a known area without a network.
 
 ## Download a region
 
@@ -27,16 +24,13 @@ Define the style, area, and zoom range that the host needs.
 
 <Code code={region(offlineRegion, "define")} lang="c" title="offline-region.c" />
 
-Choose a tile-pyramid definition for a bounding box or a geometry definition for
-a GeoJSON shape.
+Choose a tile pyramid for a bounding box, or a geometry for a GeoJSON shape.
 
 <Code code={region(offlineRegion, "tag")} lang="c" title="offline-region.c" />
 
-Create the region with metadata such as a display name or version.
+Create the region with metadata such as a display name.
 
 <Code code={region(offlineRegion, "create")} lang="c" title="offline-region.c" />
-
-Read the region record from the completion.
 
 <Code code={region(offlineRegion, "result")} lang="c" title="offline-region.c" />
 
@@ -44,28 +38,21 @@ Keep the region ID for later operations.
 
 <Code code={region(offlineRegion, "region-id")} lang="c" title="offline-region.c" />
 
-Enable observation for progress events, then activate the download.
+Observe the region, then activate its download.
 
 <Code code={region(offlineRegion, "download")} lang="c" title="offline-region.c" />
 
-Drain progress and error events from the runtime, as
-[Handle events](/maplibre-native-ffi/guides/handle-events/) describes. Progress
-reports downloaded resources and stored bytes; a resource failure can occur while
-the rest of the download continues.
+Drain its progress and error events, as
+[Handle events](/maplibre-native-ffi/guides/handle-events/) describes.
 
 <Code code={region(offlineRegion, "progress")} lang="c" title="offline-region.c" />
 
-Set the download state to inactive to pause and active to resume.
+Set the download state to inactive to pause it, and to active to resume it.
 
 ## Import a downloaded database
 
-Merge an offline database prepared by another runtime to import its regions.
-Keep the file present and unchanged until the merge completes. Both databases
-must use the same MapLibre offline schema. Load MBTiles through an `mbtiles://`
-source instead.
-
-The [map reference](/maplibre-native-ffi/reference/c/map_8h.html) defines region
-operations, merge results, and storage controls.
+Merge an offline database that another runtime prepared to import its regions.
+Load MBTiles through an `mbtiles://` source instead.
 
 ## List and delete regions
 
@@ -73,15 +60,17 @@ List regions to read what earlier host runs stored.
 
 <Code code={region(offlineStorage, "list")} lang="c" title="offline-storage.c" />
 
-Copy the region records and metadata that the host keeps. In C, use the
-completion's stride to read the array.
+Copy what you keep.
 
 <Code code={region(offlineStorage, "result")} lang="c" title="offline-storage.c" />
 
-Each entry contains an ID, definition, and metadata.
+Each entry has an ID, a definition, and metadata.
 
 <Code code={region(offlineStorage, "entries")} lang="c" title="offline-storage.c" />
 
-Delete a region to remove its record and resources that no other region needs.
+Delete a region that the host no longer needs.
 
 <Code code={region(offlineStorage, "delete")} lang="c" title="offline-storage.c" />
+
+The [map reference](/maplibre-native-ffi/reference/c/map_8h.html) defines region operations, merges, and
+storage controls.

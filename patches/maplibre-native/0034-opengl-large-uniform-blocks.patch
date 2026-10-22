@@ -1,3 +1,7 @@
+Fixes allocator alignment at the 8 KiB page boundary for dedicated OpenGL
+uniform buffers.
+Upstream: https://github.com/maplibre/maplibre-native/pull/4707
+
 diff --git a/src/mln/gl/buffer_allocator.cpp b/src/mln/gl/buffer_allocator.cpp
 index 4cf4a39..918a1ab 100644
 --- a/src/mln/gl/buffer_allocator.cpp

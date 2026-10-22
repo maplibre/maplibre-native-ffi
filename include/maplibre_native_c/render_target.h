@@ -19,9 +19,8 @@ extern "C" {
 /**
  * Bit pattern of a Vulkan non-dispatchable handle.
  *
- * Vulkan defines these handles as pointers on 64-bit targets and as uint64_t
- * values on 32-bit targets. This fixed-width carrier preserves either native
- * representation across the C ABI. Zero represents VK_NULL_HANDLE.
+ * It carries either native representation of the handle, a pointer or a
+ * uint64_t. Zero represents VK_NULL_HANDLE.
  */
 typedef uint64_t mln_vulkan_non_dispatchable_handle;
 
@@ -77,9 +76,8 @@ typedef void (*mln_queue_lock_callback)(void* user_data);
  * lock must not carry release_user_data. A session without a lock assumes that
  * the host leaves the queue alone while the session is attached.
  *
- * The callbacks run inside a native lock that every session's submissions to
- * the queue take, so they must not call the C API. Each status-returning
- * function returns MLN_STATUS_INVALID_STATE when a callback calls it. The host
+ * The callbacks must not call the C API; each status-returning function
+ * returns MLN_STATUS_INVALID_STATE when a callback calls it. The host
  * must not hold the lock while calling the C API or waiting on a thread that
  * does. Sessions sharing a queue must use the same host mutex.
  *
@@ -137,6 +135,10 @@ typedef struct mln_render_session_attach_options {
   /**
    * Wakes the graphics receiver when caller-driver work is available,
    * including work that a finished driver result releases.
+   *
+   * The host services that work whenever the wake fires, even while it renders
+   * no frames, because attach, detach, and queries complete only through
+   * service.
    */
   mln_wake driver_work_wake;
   /**
@@ -183,21 +185,20 @@ typedef enum mln_gpu_sync_kind : uint32_t {
    * GLsync in the shared EGL or WGL context's share group, used only by a
    * caller-graphics-thread driver. object is nonzero.
    *
-   * The producer inserts glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0) and
-   * calls glFlush before publishing the frame. Before reading the texture,
+   * A producer fence is a flushed GL_SYNC_GPU_COMMANDS_COMPLETE fence. Before
+   * reading the texture,
    * the host queues glWaitSync(object, 0, GL_TIMEOUT_IGNORED) in a context in
    * that share group and binds the texture again. A CPU read instead waits
    * with glClientWaitSync. EGL targets use GLsync, not EGLSync.
    *
    * The session owns producer fences. The host borrows one until it releases
    * or disposes the acquired frame and must never delete it. A view scope
-   * extends that borrowing. The session deletes fences on slot reuse or
-   * normal detach while its context is current.
+   * extends that borrowing.
    *
    * The host inserts a consumer fence after its reads and calls glFlush in
    * that context before releasing the frame. A successful release transfers
-   * the fence to the session. The driver queues glWaitSync before reusing the
-   * slot and deletes the fence after queueing the wait.
+   * the fence to the session, which waits on it before it renders into the
+   * slot again.
    *
    * Target loss invalidates frame access and may retain consumer fences until
    * process exit. Abandon performs no graphics cleanup and may retain producer

@@ -1,3 +1,7 @@
+Evaluates rendered-feature query filters at the overscaled tile zoom. Keeps the
+fix of 0028, which it follows.
+Upstream: https://github.com/maplibre/maplibre-native/pull/4704
+
 diff --git a/CHANGELOG.md b/CHANGELOG.md
 index b92b64c02f4cf20da58aab4c82da02a0b16466ba..05b837ed1288510ba7b5158d28769169679df9d3 100644
 --- a/CHANGELOG.md

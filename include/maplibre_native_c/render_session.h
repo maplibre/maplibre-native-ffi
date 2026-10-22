@@ -80,11 +80,10 @@ typedef enum MLN_BINDING("kind=bitmask") mln_frame_demand_flag : uint32_t {
    * MLN_RENDER_RESULT_TARGET_NOT_READY.
    * A waiting demand's result can follow the results of demands accepted after
    * it. The flag does not pace: a host that re-arms a waiting demand as each
-   * result arrives renders every update the map publishes. The map publishes
-   * one update for the commands that its runtime worker runs back to back, but
-   * a command that reaches the worker while a frame renders appears in a later
-   * frame. To show several commands in one frame, submit them in a command
-   * group, or arm demands once per display frame.
+   * result arrives renders every update the map publishes, and a command that
+   * arrives while a frame renders appears in a later frame. To show several
+   * commands in one frame, submit them in a command group, or arm demands once
+   * per display frame.
    */
   MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 1U << 2U,
 } mln_frame_demand_flag;
@@ -134,15 +133,10 @@ typedef struct mln_render_frame_result {
   /**
    * Whether the map asked for another frame while it rendered this one, as
    * during an ongoing paint transition. Set only when disposition is
-   * MLN_RENDER_RESULT_RENDERED, and false for every other outcome. This is the
-   * same signal that MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED carries in
-   * its needs_repaint field, delivered with the frame result so a host can
-   * re-arm its frame loop without the runtime event round trip. A camera
-   * transition does not set it by itself: the map publishes a new update
-   * after each of the transition's frames instead, which a render-if-needed
-   * demand renders. A demand with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE renders
-   * each transition update without a runtime-event round trip; the host
-   * re-arms the demand as each result arrives.
+   * MLN_RENDER_RESULT_RENDERED, and false for every other outcome. It matches
+   * the needs_repaint field of MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED. A
+   * camera transition does not set it: the map publishes an update for each of
+   * the transition's frames instead, which a render-if-needed demand renders.
    */
   bool needs_repaint;
   /**
@@ -235,7 +229,7 @@ MLN_API mln_frame_demand mln_frame_demand_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
  *   out_capabilities is null or undersized.
  * - MLN_STATUS_INVALID_STATE when session has been released.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_render_session_get_capabilities(
   mln_render_session session,
@@ -252,7 +246,7 @@ MLN_API mln_status mln_render_session_get_capabilities(
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
  *   out_snapshot is null or undersized.
  * - MLN_STATUS_INVALID_STATE when session has been released.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_BINDING("execution=snapshot")
 MLN_API mln_status mln_render_session_get_snapshot(
@@ -274,7 +268,7 @@ MLN_API mln_status mln_render_session_get_snapshot(
  *   MLN_FRAME_DEMAND_IF_NEEDED.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or every slot of its texture ring is quarantined.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * A slot is quarantined when its frame is disposed, or when its release fails
  * to wait for consumer synchronization. A demand accepted before the last
@@ -299,7 +293,7 @@ MLN_API mln_status mln_render_session_request_frame(
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or out_batch
  *   is null or does not point to the null handle.
  * - MLN_STATUS_INVALID_STATE when session has been released.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_BINDING("execution=event_batch")
 MLN_API mln_status mln_render_session_drain_frame_results(
@@ -316,7 +310,7 @@ MLN_API mln_status mln_render_session_drain_frame_results(
  * - MLN_STATUS_INVALID_ARGUMENT when batch is an invalid handle, or out_view is
  *   null or out_view->size is too small.
  * - MLN_STATUS_INVALID_STATE when batch has been released.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_render_frame_batch_get(
   mln_render_frame_batch batch,
@@ -345,7 +339,7 @@ MLN_API void mln_render_frame_batch_release(
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
  * - MLN_STATUS_UNSUPPORTED when the target does not grant
  *   MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_BINDING("absent_on=MLN_STATUS_NOT_READY")
 MLN_API mln_status mln_render_session_acquire_frame(
@@ -363,7 +357,7 @@ MLN_API mln_status mln_render_session_acquire_frame(
  *   is null or undersized.
  * - MLN_STATUS_INVALID_STATE when frame has been released.
  * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_acquired_frame_get_result(
   mln_acquired_frame frame,
@@ -387,7 +381,7 @@ MLN_API mln_status mln_acquired_frame_get_result(
  *   null or undersized.
  * - MLN_STATUS_INVALID_STATE when frame has been released.
  * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_BINDING("view_owner=frame")
 MLN_API mln_status mln_acquired_frame_get_producer_sync(
@@ -398,12 +392,10 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
 /**
  * Releases an acquired frame after optional consumer GPU work.
  *
- * The call consumes frame on success. The session retires the ring slot
- * through its selected driver before reusing it.
- * A synchronization kind the backend does not support fails with
- * MLN_STATUS_UNSUPPORTED before the handle is consumed, so the caller keeps
- * frame ownership. After abandonment the call closes the handle without
- * graphics work. When the driver fails to wait for the consumer
+ * The call consumes frame on success. A synchronization kind the backend does
+ * not support fails with MLN_STATUS_UNSUPPORTED before the handle is consumed,
+ * so the caller keeps frame ownership. After abandonment the call closes the
+ * handle without graphics work. When the driver fails to wait for the consumer
  * synchronization, the host's GPU may still read the frame's texture, so the
  * frame's slot is quarantined as mln_acquired_frame_dispose() quarantines it.
  *
@@ -416,7 +408,7 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  *   active.
  * - MLN_STATUS_UNSUPPORTED when the backend does not support the named
  *   mln_gpu_sync_kind. The handle is not consumed.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_acquired_frame_release(
   mln_acquired_frame frame, const mln_gpu_sync* consumer_completion,
@@ -441,7 +433,7 @@ MLN_API mln_status mln_acquired_frame_release(
  * - MLN_STATUS_INVALID_STATE when frame has been released or disposed.
  * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target, or
  *   disposal of the session has begun.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_acquired_frame_view_begin(
   mln_acquired_frame frame,
@@ -478,7 +470,7 @@ MLN_API void mln_acquired_frame_view_end(
  *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when the target is a caller-owned texture, which its
  *   owner sizes through the backend's set_target function.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
  * - MLN_STATUS_OK and MLN_COMMAND_DISPOSITION_COMMITTED once the map and driver
@@ -504,7 +496,7 @@ MLN_API mln_status mln_render_session_resize(
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
  *   completion is null or undersized.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
  * - MLN_STATUS_OK once earlier driver work has finished.
@@ -524,7 +516,7 @@ MLN_API mln_status mln_render_session_barrier(
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
  *   completion is null or undersized.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver ran the release.
@@ -545,7 +537,7 @@ MLN_API mln_status mln_render_session_reduce_memory_use(
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
  *   completion is null or undersized.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver cleared the data.
@@ -566,7 +558,7 @@ MLN_API mln_status mln_render_session_clear_data(
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
  *   completion is null or undersized.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver emitted the logs.
@@ -608,7 +600,7 @@ MLN_API mln_status mln_render_session_dump_debug_logs(
  * - MLN_STATUS_WRONG_THREAD when another native thread already fixed the
  *   session's graphics-thread identity.
  * - MLN_STATUS_BUSY when a driver call is already in flight.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_render_session_service_driver_work(
   mln_render_session session, mln_diagnostic* out_diagnostic
@@ -637,7 +629,7 @@ MLN_API mln_status mln_render_session_service_driver_work(
  *   completion is null or undersized.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or a frame is still acquired.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Demands still outstanding receive MLN_RENDER_RESULT_TARGET_NOT_READY.
  *
@@ -679,10 +671,9 @@ MLN_API mln_status mln_render_session_detach(
  * destroy them. One exception is a kept Vulkan object: it is a child of the
  * host's VkDevice, and a kept swapchain is also a child of its VkSurfaceKHR,
  * so the host keeps those parents until the process exits. The other
- * exception is a browser WebGPU readback whose copy is still mapping: when the
- * graphics thread's event loop later delivers the map, the library reads and
- * releases its own staging buffer there. The buffer keeps what it needs of the
- * host's device alive, so the host may still release its objects. A Vulkan GPU
+ * exception is a browser WebGPU readback whose copy is still mapping: the
+ * library finishes it when the graphics thread's event loop delivers the map,
+ * and the host may still release its objects. A Vulkan GPU
  * that hangs without reporting device loss blocks the call. Do not call from a
  * MapLibre worker callback.
  *
@@ -696,7 +687,7 @@ MLN_API mln_status mln_render_session_detach(
  *   out_result is null or undersized.
  * - MLN_STATUS_INVALID_STATE when session has been released, or the session
  *   already released its target.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_render_session_abandon(
   mln_render_session session,
@@ -720,7 +711,7 @@ MLN_API mln_status mln_render_session_abandon(
  *   mln_acquired_frame_view_begin() or on driver work, or the calling thread is
  *   the one abandoning the session, as in a completion that the abandonment
  *   delivers. The session owner remains live.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_render_session_release(
   mln_render_session session, mln_diagnostic* out_diagnostic
@@ -731,19 +722,17 @@ MLN_API mln_status mln_render_session_release(
  *
  * Queued driver work completes with MLN_STATUS_TARGET_LOST. An attached
  * core-worker session with no acquired frame detaches after in-flight driver
- * work ends. Every
- * other session is abandoned after in-flight driver work and scopes from
- * mln_acquired_frame_view_begin() end, following mln_render_session_abandon().
- * A session waiting for those does not delay other sessions' retirement.
- * Retirement releases the map attachment. The host keeps its graphics objects
- * alive until the session's wake release callbacks run. Disposal reports
- * nothing about what it keeps, so a Vulkan host keeps its VkDevice and
- * VkSurfaceKHR, and their VkInstance, until the process exits. The exception
- * is a session whose target an earlier detach or abandon already released:
- * the rules of that call apply. Acquired frame accessors report target loss
- * after acceptance; their owners still release or dispose those frames.
- * Teardown may allocate; allocation failure after acceptance terminates the
- * process.
+ * work ends. Every other session is abandoned after in-flight driver work and
+ * scopes from mln_acquired_frame_view_begin() end, following
+ * mln_render_session_abandon(). Retirement releases the map attachment. The
+ * host keeps its graphics objects alive until the session's wake release
+ * callbacks run. Disposal reports nothing about what it keeps, so a Vulkan host
+ * keeps its VkDevice and VkSurfaceKHR, and their VkInstance, until the process
+ * exits. The exception is a session whose target an earlier detach or abandon
+ * already released: the rules of that call apply. Acquired frame accessors
+ * report target loss after acceptance; their owners still release or dispose
+ * those frames. Teardown may allocate; allocation failure after acceptance
+ * terminates the process.
  *
  * Returns MLN_STATUS_OK on acceptance, MLN_STATUS_INVALID_ARGUMENT for an
  * invalid handle, or MLN_STATUS_INVALID_STATE for a session that has been

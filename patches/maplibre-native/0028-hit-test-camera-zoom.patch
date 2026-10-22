@@ -1,3 +1,6 @@
+Evaluates hit-test paint properties at the camera zoom.
+Upstream: https://github.com/maplibre/maplibre-native/pull/4703
+
 diff --git a/CHANGELOG.md b/CHANGELOG.md
 index 32157bc2e1919f27e7039761670b8689d88dbe38..b92b64c02f4cf20da58aab4c82da02a0b16466ba 100644
 --- a/CHANGELOG.md

@@ -1,4 +1,5 @@
-//! Header-generated API. Release owners explicitly or call deinit.
+//! Low-level Zig binding for the MapLibre Native C API. Release owners
+//! explicitly or call deinit.
 //! OwnedValue snapshots and futures retain their allocator until deinit.
 //! Each has unique ownership: move it rather than copy it, since deinit on two
 //! copies releases the native value twice.
@@ -141,12 +142,12 @@ pub const AnimationOptionField = struct {
 /// See `mln_animation_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const AnimationOptions = struct {
-    /// Duration in milliseconds. Must be finite and non-negative. Values that
-    /// would overflow MapLibre Native's internal duration are invalid.
+    /// Duration in milliseconds. Must be finite, non-negative, and short enough
+    /// to represent as a duration.
     duration_ms: ?f64 = null,
     /// Average fly velocity in screenfuls per second. Must be positive and
-    /// finite; defaults to 1.2 when omitted. A flight whose derived duration
-    /// exceeds Native's nanosecond duration range fails its completion with
+    /// finite; defaults to 1.2 when omitted. A flight whose derived duration is
+    /// too long to represent fails its completion with
     /// `MLN_STATUS_NATIVE_ERROR`. An explicit duration overrides velocity.
     velocity: ?f64 = null,
     /// Peak zoom for flyTo transitions.
@@ -901,7 +902,9 @@ pub const FeatureStateSelector = struct {
     source_id: []const u8 = &.{},
     /// Optional source layer ID. Required for vector-source disambiguation.
     source_layer_id: ?[]const u8 = null,
-    /// Optional feature ID. Required by set and get, optional for remove.
+    /// Optional feature ID. Required by set and get, optional for remove. A
+    /// numeric feature ID matches its decimal text, such as "7" for the GeoJSON
+    /// id 7.
     feature_id: ?[]const u8 = null,
     /// Optional state key. Used only by remove and requires feature_id.
     state_key: ?[]const u8 = null,
@@ -996,11 +999,9 @@ pub const FrameDemandFlag = struct {
     /// with `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can
     /// follow the results of demands accepted after it. The flag does not pace:
     /// a host that re-arms a waiting demand as each result arrives renders
-    /// every update the map publishes. The map publishes one update for the
-    /// commands that its runtime worker runs back to back, but a command that
-    /// reaches the worker while a frame renders appears in a later frame. To
-    /// show several commands in one frame, submit them in a command group, or
-    /// arm demands once per display frame.
+    /// every update the map publishes, and a command that arrives while a frame
+    /// renders appears in a later frame. To show several commands in one frame,
+    /// submit them in a command group, or arm demands once per display frame.
     wait_for_update: bool = false,
     unknown_bits: u32 = 0,
     pub const native_bits = [_]u32{ 1, 2, 4 };
@@ -1096,7 +1097,8 @@ pub const GeojsonSourceOptions = struct {
     line_metrics: ?bool = null,
     /// Clusters point features. Defaults to false.
     cluster: ?bool = null,
-    /// Slices requested tiles inline during the update pass. Defaults to false.
+    /// Tiles the data for the next render update instead of in the background.
+    /// Defaults to false.
     synchronous_tiling: ?bool = null,
     pub fn toNative(self: GeojsonSourceOptions, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_geojson_source_options {
         _ = allocator;
@@ -1675,7 +1677,7 @@ pub const MapTileOptionField = struct {
 /// See `mln_map_tile_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const MapTileOptions = struct {
-    /// Native uint8_t prefetch zoom delta.
+    /// Prefetch zoom delta, at most 255.
     prefetch_zoom_delta: ?u32 = null,
     lod_min_radius: ?f64 = null,
     lod_scale: ?f64 = null,
@@ -1814,10 +1816,9 @@ pub const MetalBorrowedTexture = struct {
 /// See `mln_metal_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const MetalBorrowedTextureDescriptor = struct {
-    /// Logical texture extent. The map viewport uses width and height and the
-    /// renderer uses scale_factor; the physical size is stated separately
-    /// below. A scale_factor that differs from the map's is accepted and logged
-    /// as a warning.
+    /// Logical texture extent; physical_width and physical_height give the
+    /// texture's size. A scale_factor that differs from the map's is accepted
+    /// and logged as a warning.
     extent: LogicalExtent,
     /// Physical texture width in device pixels. Must be positive. Defaults to
     /// 256.
@@ -1947,7 +1948,7 @@ pub const MetalTextureFrame = struct {
     height: u32 = std.mem.zeroes(u32),
     /// UI-to-device pixel scale used for this frame.
     scale_factor: f64 = std.mem.zeroes(f64),
-    /// Opaque frame identity used to reject stale releases.
+    /// Opaque identity of this frame.
     frame_id: u64 = std.mem.zeroes(u64),
     /// Ring slot that holds this frame. For a borrowed target, the index of its
     /// texture in the descriptor's textures array.
@@ -2005,8 +2006,8 @@ pub const OfflineGeometryRegionDefinition = struct {
     /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
     geometry: []const u8 = &.{},
     min_zoom: f64 = std.mem.zeroes(f64),
-    /// Maximum zoom. Positive infinity follows MapLibre Native behavior and
-    /// lets each tile source use its own maximum zoom.
+    /// Maximum zoom. Positive infinity lets each tile source use its own
+    /// maximum zoom.
     max_zoom: f64 = std.mem.zeroes(f64),
     pixel_ratio: f32 = std.mem.zeroes(f32),
     include_ideographs: bool = std.mem.zeroes(bool),
@@ -2153,8 +2154,8 @@ pub const OfflineTilePyramidRegionDefinition = struct {
     style_url: []const u8 = &.{},
     bounds: LatLngBounds = .{},
     min_zoom: f64 = std.mem.zeroes(f64),
-    /// Maximum zoom. Positive infinity follows MapLibre Native behavior and
-    /// lets each tile source use its own maximum zoom.
+    /// Maximum zoom. Positive infinity lets each tile source use its own
+    /// maximum zoom.
     max_zoom: f64 = std.mem.zeroes(f64),
     pixel_ratio: f32 = std.mem.zeroes(f32),
     include_ideographs: bool = std.mem.zeroes(bool),
@@ -2207,10 +2208,9 @@ pub const OpenglBorrowedTexture = struct {
 /// See `mln_opengl_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const OpenglBorrowedTextureDescriptor = struct {
-    /// Logical texture extent. The map viewport uses width and height and the
-    /// renderer uses scale_factor; the physical size is stated separately
-    /// below. A scale_factor that differs from the map's is accepted and logged
-    /// as a warning.
+    /// Logical texture extent; physical_width and physical_height give the
+    /// texture's size. A scale_factor that differs from the map's is accepted
+    /// and logged as a warning.
     extent: LogicalExtent,
     /// Physical texture width in device pixels. Must be positive. Defaults to
     /// 256.
@@ -2450,7 +2450,7 @@ pub const OpenglTextureFrame = struct {
     height: u32 = std.mem.zeroes(u32),
     /// UI-to-device pixel scale used for this frame.
     scale_factor: f64 = std.mem.zeroes(f64),
-    /// Opaque frame identity used to reject stale releases.
+    /// Opaque identity of this frame.
     frame_id: u64 = std.mem.zeroes(u64),
     /// Ring slot that holds this frame. For a borrowed target, the index of its
     /// texture in the descriptor's textures array.
@@ -2548,9 +2548,9 @@ pub const ProjectedMeters = struct {
 pub const ProjectionMode = struct {
     /// Enables a non-perspective axonometric render transform.
     axonometric: ?bool = null,
-    /// Native x-skew factor used by the axonometric transform.
+    /// X-skew factor of the axonometric transform.
     x_skew: ?f64 = null,
-    /// Native y-skew factor used by the axonometric transform.
+    /// Y-skew factor of the axonometric transform.
     y_skew: ?f64 = null,
     pub fn toNative(self: ProjectionMode) c.mln_projection_mode {
         var raw = c.mln_projection_mode_default();
@@ -2803,16 +2803,11 @@ pub const RenderFrameResult = struct {
     frame_generation: u64 = std.mem.zeroes(u64),
     /// Whether the map asked for another frame while it rendered this one, as
     /// during an ongoing paint transition. Set only when disposition is
-    /// `MLN_RENDER_RESULT_RENDERED`, and false for every other outcome. This is
-    /// the same signal that `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`
-    /// carries in its needs_repaint field, delivered with the frame result so a
-    /// host can re-arm its frame loop without the runtime event round trip. A
-    /// camera transition does not set it by itself: the map publishes a new
-    /// update after each of the transition's frames instead, which a
-    /// render-if-needed demand renders. A demand with
-    /// `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` renders each transition update
-    /// without a runtime-event round trip; the host re-arms the demand as each
-    /// result arrives.
+    /// `MLN_RENDER_RESULT_RENDERED`, and false for every other outcome. It
+    /// matches the needs_repaint field of
+    /// `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`. A camera transition does
+    /// not set it: the map publishes an update for each of the transition's
+    /// frames instead, which a render-if-needed demand renders.
     needs_repaint: bool = std.mem.zeroes(bool),
     /// The view that this frame drew, from the transform of the map update that
     /// it rendered. A host that displays the frame builds its projection with
@@ -3577,9 +3572,8 @@ pub const RuntimeEvent = struct {
     /// Map snapshot generation that the event reports, or zero when source_type
     /// is `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
     generation: u64 = std.mem.zeroes(u64),
-    /// Secondary event detail whose meaning type selects. Depending on type it
-    /// carries an `mln_camera_change_mode`, a MapLibre Native error ordinal, or
-    /// 0. See `mln_runtime_event_type` for the per-type meaning.
+    /// Secondary event detail whose meaning type selects; see
+    /// `mln_runtime_event_type`.
     code: i32 = std.mem.zeroes(i32),
     /// Borrowed UTF-8 message bytes, empty when this event carries no message.
     message: []const u8 = &.{},
@@ -3932,7 +3926,8 @@ pub const ScreenLineString = struct {
     }
 };
 
-/// Screen-space point in logical map pixels.
+/// Screen-space point in logical map pixels, from the top-left of the viewport
+/// with y growing downward.
 ///
 /// See `mln_screen_point` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -4025,7 +4020,7 @@ pub const Status = enum(i32) {
     busy = -7,
     /// The operation reached its terminal cancelled disposition.
     cancelled = -6,
-    /// A native MapLibre error or C++ exception was converted to status.
+    /// Native code failed; the diagnostic describes the error.
     native_error = -5,
     /// The entry point or requested behavior is unavailable in this build.
     unsupported = -4,
@@ -4420,13 +4415,11 @@ pub const StyleTransitionOptionField = struct {
 /// See `mln_style_transition_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleTransitionOptions = struct {
-    /// Transition duration in milliseconds. Must be finite and non-negative.
-    /// Values that would overflow MapLibre Native's internal duration are
-    /// invalid.
+    /// Transition duration in milliseconds. Must be finite, non-negative, and
+    /// short enough to represent as a duration.
     duration_ms: ?f64 = null,
-    /// Transition delay in milliseconds. Must be finite and non-negative.
-    /// Values that would overflow MapLibre Native's internal duration are
-    /// invalid.
+    /// Transition delay in milliseconds. Must be finite, non-negative, and
+    /// short enough to represent as a duration.
     delay_ms: ?f64 = null,
     /// Whether symbol placement changes cross-fade.
     enable_placement_transitions: ?bool = null,
@@ -4658,10 +4651,9 @@ pub const VulkanBorrowedTexture = struct {
 /// See `mln_vulkan_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const VulkanBorrowedTextureDescriptor = struct {
-    /// Logical texture extent. The map viewport uses width and height and the
-    /// renderer uses scale_factor; the physical size is stated separately
-    /// below. A scale_factor that differs from the map's is accepted and logged
-    /// as a warning.
+    /// Logical texture extent; physical_width and physical_height give the
+    /// texture's size. A scale_factor that differs from the map's is accepted
+    /// and logged as a warning.
     extent: LogicalExtent,
     /// Physical image width in device pixels. Must be positive. Defaults to
     /// 256.
@@ -4831,7 +4823,7 @@ pub const VulkanTextureFrame = struct {
     height: u32 = std.mem.zeroes(u32),
     /// UI-to-device pixel scale used for this frame.
     scale_factor: f64 = std.mem.zeroes(f64),
-    /// Opaque frame identity used to reject stale releases.
+    /// Opaque identity of this frame.
     frame_id: u64 = std.mem.zeroes(u64),
     /// Ring slot that holds this frame. For a borrowed target, the index of its
     /// image in the descriptor's textures array.
@@ -4977,10 +4969,9 @@ pub const WebgpuBorrowedTexture = struct {
 /// See `mln_webgpu_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const WebgpuBorrowedTextureDescriptor = struct {
-    /// Logical texture extent. The map viewport uses width and height and the
-    /// renderer uses scale_factor; the physical size is stated separately
-    /// below. A scale_factor that differs from the map's is accepted and logged
-    /// as a warning.
+    /// Logical texture extent; physical_width and physical_height give the
+    /// texture's size. A scale_factor that differs from the map's is accepted
+    /// and logged as a warning.
     extent: LogicalExtent,
     /// Physical texture width in device pixels. Defaults to 256.
     physical_width: u32,
@@ -5128,7 +5119,7 @@ pub const WebgpuTextureFrame = struct {
     height: u32 = std.mem.zeroes(u32),
     /// UI-to-device pixel scale used for this frame.
     scale_factor: f64 = std.mem.zeroes(f64),
-    /// Opaque frame identity used to reject stale releases.
+    /// Opaque identity of this frame.
     frame_id: u64 = std.mem.zeroes(u64),
     /// Ring slot that holds this frame. For a borrowed target, the index of its
     /// texture in the descriptor's textures array.
@@ -5949,7 +5940,7 @@ pub fn mapProjectionSetCamera(allocator: std.mem.Allocator, projection: MapProje
     return call.invoke("mln_map_projection_set_camera", .handle, projection, allocator, diagnostic, .{camera});
 }
 
-/// Releases a map after synchronous state preflight.
+/// Releases a map asynchronously.
 ///
 /// See `mln_map_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

@@ -1,3 +1,6 @@
+Moves the Kotlin package and the matching Rust JNI descriptors under the
+MapLibre Native FFI namespace, so an app can also use the upstream helper.
+
 diff --git a/README.md b/README.md
 index bbe35ef..ac832a8 100644
 --- a/README.md

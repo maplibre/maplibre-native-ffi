@@ -216,6 +216,11 @@ postinstall = [
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 
+# A desktop example takes its render target as its one positional argument.
+# With MLN_EXAMPLE_SMOKE=1 it loads an inline style, exits 0 after the first
+# frame that it shows, and exits nonzero on a failure or after 60 seconds, so
+# its smoke task needs no network. The examples share their style, initial
+# camera, window size, and controls; keep them in step when one changes.
 [task_templates."ffi:example-run"]
 usage = '''
 arg "[render-target]" default="owned-texture" {

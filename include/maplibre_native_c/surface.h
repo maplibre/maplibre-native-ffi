@@ -132,7 +132,7 @@ mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or options
  *   enable a queue lock.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver owns the target.
@@ -164,7 +164,7 @@ MLN_API mln_status mln_map_attach_metal_surface(
  *   queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver owns the target.
@@ -202,7 +202,7 @@ MLN_API mln_status mln_map_attach_vulkan_surface(
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, its
  *   context provider is unavailable; the requested driver does not match the
  *   context placement; or options enable a queue lock.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver owns the target.
@@ -236,7 +236,7 @@ MLN_API mln_status mln_map_attach_opengl_surface(
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
  *   requested driver is not MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, or
  *   options enable a queue lock.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver owns the target.
@@ -267,7 +267,7 @@ MLN_API mln_status mln_map_attach_webgpu_surface(
  *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or the
  *   session does not render through a native surface.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver renders through the new target.
@@ -296,14 +296,14 @@ MLN_API mln_status mln_render_session_set_metal_surface_target(
  *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend, or the
  *   session does not render through a native surface.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver renders through the new target.
  * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another context, or
  *   its surface cannot present from the context's graphics queue.
- * - MLN_STATUS_UNSUPPORTED when the replacement surface does not report the
- *   color format and transform this session compiled for.
+ * - MLN_STATUS_UNSUPPORTED when the replacement surface's color format or
+ *   transform differs from those the session attached with.
  * - MLN_STATUS_NATIVE_ERROR when querying the replacement surface fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
@@ -329,7 +329,7 @@ MLN_API mln_status mln_render_session_set_vulkan_surface_target(
  *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, or the
  *   session does not render through a native surface.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver renders through the new target.
@@ -358,14 +358,14 @@ MLN_API mln_status mln_render_session_set_opengl_surface_target(
  *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
  *   session does not render through a native surface.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver renders through the new target.
  * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another device or
  *   queue.
- * - MLN_STATUS_UNSUPPORTED when the replacement does not have the format this
- *   session built its render pipelines for.
+ * - MLN_STATUS_UNSUPPORTED when the replacement's format differs from the one
+ *   the session attached with.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation")

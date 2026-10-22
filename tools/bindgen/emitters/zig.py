@@ -197,7 +197,8 @@ pub const OwnedValue = marshal.OwnedValue;
             f'pub fn Discarding(comptime Handle: type) type {{\n{choices}\n@compileError("handle has no commands");\n}}\n'
         )
     docs = (
-        "//! Header-generated API. Release owners explicitly or call deinit.\n"
+        "//! Low-level Zig binding for the MapLibre Native C API. Release owners\n"
+        "//! explicitly or call deinit.\n"
         "//! OwnedValue snapshots and futures retain their allocator until deinit.\n"
         "//! Each has unique ownership: move it rather than copy it, since deinit on two\n"
         "//! copies releases the native value twice.\n"

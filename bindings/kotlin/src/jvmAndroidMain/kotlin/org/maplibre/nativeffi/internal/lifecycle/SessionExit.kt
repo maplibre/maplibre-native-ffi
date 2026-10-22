@@ -7,7 +7,7 @@ import org.maplibre.nativeffi.internal.c.Upcalls
 import org.maplibre.nativeffi.internal.memory.NativeArena
 import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
-/** Every render session that the binding attached, for the shutdown hook to abandon. */
+// Every render session that the binding attached, for the shutdown hook to abandon.
 private val exitSessions = ExitSessions()
 
 private val exitHookInstalled = AtomicBoolean(false)
@@ -25,27 +25,22 @@ internal actual fun endGraphicsAtExit(state: HandleState) {
   exitSessions.enroll(state)
 }
 
-/**
- * Abandons every render session still held, unless exit began inside a MapLibre callback.
- *
- * The thread that calls `System.exit` waits for this hook to finish. When that thread is inside a
- * MapLibre callback, it can be a core worker inside a session's driver call, and abandon from
- * another thread waits for that call to end, so abandoning would hang the process. C also forbids
- * abandon from inside a MapLibre callback. A host that exits from a callback therefore ends its
- * sessions' graphics calls itself first.
- */
+// Abandons every render session still held, unless exit began inside a MapLibre callback.
+//
+// The thread that calls `System.exit` waits for this hook to finish. When that thread is inside a
+// MapLibre callback, it can be a core worker inside a session's driver call, and abandon from
+// another thread waits for that call to end, so abandoning would hang the process. C also forbids
+// abandon from inside a MapLibre callback. A host that exits from a callback therefore ends its
+// sessions' graphics calls itself first.
 private fun runExitHook() {
   if (exitStartedInCallback(Thread.getAllStackTraces().values)) return
   exitSessions.abandonAll()
 }
 
-/**
- * The class whose static methods every native callback into the binding enters through: the FFM
- * upcall stubs target it on the JVM, and the JNI shim dispatches to it on Android.
- */
+// The class whose static methods every native callback into the binding enters through: the FFM
+// upcall stubs target it on the JVM, and the JNI shim dispatches to it on Android.
 private val UPCALL_ENTRY_CLASS: String = Upcalls::class.java.name
 
-/** Whether a thread called `Runtime.exit` from inside a MapLibre callback. */
 private fun exitStartedInCallback(stacks: Collection<Array<StackTraceElement>>): Boolean =
   stacks.any { stack ->
     // A stack trace lists the innermost frame first, so the callback's entry follows the exit.
@@ -108,12 +103,10 @@ internal class ExitSessions {
   }
 }
 
-/**
- * Abandons the render session [handle] for exit, whatever state the session is in.
- *
- * Every status is ignored: busy leaves a caller-driven session as its host left it, and an invalid
- * state or argument means that the session already released its target or its handle.
- */
+// Abandons the render session [handle] for exit, whatever state the session is in.
+//
+// Every status is ignored: busy leaves a caller-driven session as its host left it, and an invalid
+// state or argument means that the session already released its target or its handle.
 private fun abandonAtExit(handle: Long) {
   NativeArena().use { call ->
     val out = call.sized(RenderAbandonResultLayout.SIZEOF, RenderAbandonResultLayout.ALIGNOF)

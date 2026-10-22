@@ -10,9 +10,8 @@ import { region } from "../../../snippets";
 
 import createMap from "../../../../snippets/c/create-map.c?raw";
 
-A map belongs to a runtime. One runtime serves multiple maps and shares their
-scheduler, event handler, network services, and cache database. Any host thread can
-submit runtime and map work.
+A map belongs to a runtime. One runtime serves several maps and shares their
+scheduler, event handler, network services, and cache database.
 
 Set an event handler to receive events from the runtime and its maps.
 [Handle events](/maplibre-native-ffi/guides/handle-events/) describes callback
@@ -20,14 +19,13 @@ and delivery queue registration.
 
 <Code code={region(createMap, "runtime")} lang="c" title="create-map.c" />
 
-Runtime creation waits for its scheduler thread to become ready. A browser host
-creates the runtime on a Web Worker. Map creation completes asynchronously and
-returns the map handle through its completion.
+A browser host creates the runtime on a Web Worker. Map creation completes
+asynchronously with the map handle.
 
 ## Choose the initial map state
 
-Set the logical width, height, and display scale factor. Keep that scale factor
-for the map's lifetime; it controls resource selection as well as rendering.
+Set the logical width, height, and display scale factor. The scale factor stays
+fixed for the map's lifetime.
 
 Use continuous mode for an interactive map, static mode for one image per
 request, and tile mode for an image of a single tile.
@@ -38,9 +36,8 @@ Enable FastPFOR decoding when your MapLibre Tiles sources use that encoding.
 
 ## Release in order
 
-Detach and destroy any render session, then release the map and the runtime.
-Wait for the runtime release completion before destroying state that its
-callbacks use.
+Detach any render session, then release the map and the runtime. Wait for the
+runtime's release to complete before you destroy state that its callbacks use.
 
 <Code code={region(createMap, "release")} lang="c" title="create-map.c" />
 

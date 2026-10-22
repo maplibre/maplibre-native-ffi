@@ -44,7 +44,7 @@ public struct Status: RawRepresentable, CustomStringConvertible,
   public static let wrongThread: Status = .init(rawValue: -3)
   /// The entry point or requested behavior is unavailable in this build.
   public static let unsupported: Status = .init(rawValue: -4)
-  /// A native MapLibre error or C++ exception was converted to status.
+  /// Native code failed; the diagnostic describes the error.
   public static let nativeError: Status = .init(rawValue: -5)
   /// The operation reached its terminal cancelled disposition.
   public static let cancelled: Status = .init(rawValue: -6)

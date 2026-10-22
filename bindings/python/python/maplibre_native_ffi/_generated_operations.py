@@ -889,7 +889,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.move_style_layer(layer_id, before_layer_id)
 
     def close(self) -> Future[None]:
-        """Releases a map after synchronous state preflight.
+        """Releases a map asynchronously.
 
         See `mln_map_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

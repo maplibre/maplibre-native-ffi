@@ -6,9 +6,8 @@ import org.maplibre.nativeffi.internal.loader.ensureNativeLibrary
 import org.maplibre.nativeffi.internal.status.invalidArgument
 import org.maplibre.nativeffi.render.NativePointer
 
-/** Process-global entry points for the Kotlin/Wasm binding. */
+/** Process-global entry points for the MapLibre Native FFI binding. */
 public actual object Maplibre {
-  /** C ABI contract version expected by this Kotlin/Wasm binding. */
   public actual const val EXPECTED_C_ABI_VERSION: Long =
     org.maplibre.nativeffi.internal.loader.EXPECTED_C_ABI_VERSION
 

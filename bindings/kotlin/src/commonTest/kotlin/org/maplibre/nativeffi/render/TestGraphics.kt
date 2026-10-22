@@ -61,7 +61,8 @@ internal class TestCanvas(val selector: String, private val remove: () -> Unit) 
 /**
  * The test graphics library over this platform's FFI: tests/graphics over FFM on the JVM, JNI on
  * Android, and cinterop on Kotlin/Native, and on wasm the page's own WebGL context or WebGPU
- * device, which the suite imports into the browser module. See tests/graphics/README.md.
+ * device, which the suite imports into the browser module. See
+ * tests/graphics/include/mln_test_graphics.h.
  */
 internal expect object TestGraphicsLibrary {
   /**

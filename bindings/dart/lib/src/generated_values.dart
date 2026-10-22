@@ -285,11 +285,9 @@ final class FrameDemandFlag extends _Flags<FrameDemandFlag> {
   /// with `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can
   /// follow the results of demands accepted after it. The flag does not pace: a
   /// host that re-arms a waiting demand as each result arrives renders every
-  /// update the map publishes. The map publishes one update for the commands
-  /// that its runtime worker runs back to back, but a command that reaches the
-  /// worker while a frame renders appears in a later frame. To show several
-  /// commands in one frame, submit them in a command group, or arm demands once
-  /// per display frame.
+  /// update the map publishes, and a command that arrives while a frame renders
+  /// appears in a later frame. To show several commands in one frame, submit
+  /// them in a command group, or arm demands once per display frame.
   static const waitForUpdate = FrameDemandFlag.fromRawValue(4);
   @override
   FrameDemandFlag _of(int rawValue) => FrameDemandFlag.fromRawValue(rawValue);
@@ -1251,7 +1249,7 @@ final class Status extends _Enum {
   /// The entry point or requested behavior is unavailable in this build.
   static const unsupported = Status.fromRawValue(-4);
 
-  /// A native MapLibre error or C++ exception was converted to status.
+  /// Native code failed; the diagnostic describes the error.
   static const nativeError = Status.fromRawValue(-5);
 
   /// The operation reached its terminal cancelled disposition.
@@ -1611,7 +1609,7 @@ final class MetalTextureFrame extends _Value {
   /// UI-to-device pixel scale used for this frame.
   final double scaleFactor;
 
-  /// Opaque frame identity used to reject stale releases.
+  /// Opaque identity of this frame.
   final BigInt frameId;
 
   /// Ring slot that holds this frame. For a borrowed target, the index of its
@@ -1672,7 +1670,7 @@ final class OpenglTextureFrame extends _Value {
   /// UI-to-device pixel scale used for this frame.
   final double scaleFactor;
 
-  /// Opaque frame identity used to reject stale releases.
+  /// Opaque identity of this frame.
   final BigInt frameId;
 
   /// Ring slot that holds this frame. For a borrowed target, the index of its
@@ -1767,7 +1765,8 @@ final class EdgeInsets extends _Value {
   List<Object?> get _members => [top, left, bottom, right];
 }
 
-/// Screen-space point in logical map pixels.
+/// Screen-space point in logical map pixels, from the top-left of the viewport
+/// with y growing downward.
 ///
 /// See `mln_screen_point` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1855,10 +1854,10 @@ final class ProjectionMode extends _Value {
   /// Enables a non-perspective axonometric render transform.
   final bool? axonometric;
 
-  /// Native x-skew factor used by the axonometric transform.
+  /// X-skew factor of the axonometric transform.
   final double? xSkew;
 
-  /// Native y-skew factor used by the axonometric transform.
+  /// Y-skew factor of the axonometric transform.
   final double? ySkew;
 
   @override
@@ -1965,15 +1964,11 @@ final class RenderFrameResult extends _Value {
 
   /// Whether the map asked for another frame while it rendered this one, as
   /// during an ongoing paint transition. Set only when disposition is
-  /// `MLN_RENDER_RESULT_RENDERED`, and false for every other outcome. This is
-  /// the same signal that `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED` carries
-  /// in its needs_repaint field, delivered with the frame result so a host can
-  /// re-arm its frame loop without the runtime event round trip. A camera
-  /// transition does not set it by itself: the map publishes a new update after
-  /// each of the transition's frames instead, which a render-if-needed demand
-  /// renders. A demand with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` renders each
-  /// transition update without a runtime-event round trip; the host re-arms the
-  /// demand as each result arrives.
+  /// `MLN_RENDER_RESULT_RENDERED`, and false for every other outcome. It
+  /// matches the needs_repaint field of
+  /// `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`. A camera transition does
+  /// not set it: the map publishes an update for each of the transition's
+  /// frames instead, which a render-if-needed demand renders.
   final bool needsRepaint;
 
   /// The view that this frame drew, from the transform of the map update that
@@ -2026,7 +2021,7 @@ final class VulkanTextureFrame extends _Value {
   /// UI-to-device pixel scale used for this frame.
   final double scaleFactor;
 
-  /// Opaque frame identity used to reject stale releases.
+  /// Opaque identity of this frame.
   final BigInt frameId;
 
   /// Ring slot that holds this frame. For a borrowed target, the index of its
@@ -2096,7 +2091,7 @@ final class WebgpuTextureFrame extends _Value {
   /// UI-to-device pixel scale used for this frame.
   final double scaleFactor;
 
-  /// Opaque frame identity used to reject stale releases.
+  /// Opaque identity of this frame.
   final BigInt frameId;
 
   /// Ring slot that holds this frame. For a borrowed target, the index of its
@@ -2198,14 +2193,14 @@ final class AnimationOptions extends _Value {
     CameraTransitionHandler? endHandler,
   }) : endHandler = endHandler ?? animationOptionsDefault().endHandler;
 
-  /// Duration in milliseconds. Must be finite and non-negative. Values that
-  /// would overflow MapLibre Native's internal duration are invalid.
+  /// Duration in milliseconds. Must be finite, non-negative, and short enough
+  /// to represent as a duration.
   final double? durationMs;
 
   /// Average fly velocity in screenfuls per second. Must be positive and
-  /// finite; defaults to 1.2 when omitted. A flight whose derived duration
-  /// exceeds Native's nanosecond duration range fails its completion with
-  /// `MLN_STATUS_NATIVE_ERROR`. An explicit duration overrides velocity.
+  /// finite; defaults to 1.2 when omitted. A flight whose derived duration is
+  /// too long to represent fails its completion with `MLN_STATUS_NATIVE_ERROR`.
+  /// An explicit duration overrides velocity.
   final double? velocity;
 
   /// Peak zoom for flyTo transitions.
@@ -2563,7 +2558,8 @@ final class GeojsonSourceOptions extends _Value {
   /// Clusters point features. Defaults to false.
   final bool? cluster;
 
-  /// Slices requested tiles inline during the update pass. Defaults to false.
+  /// Tiles the data for the next render update instead of in the background.
+  /// Defaults to false.
   final bool? synchronousTiling;
 
   @override
@@ -2725,10 +2721,9 @@ final class MetalBorrowedTextureDescriptor extends _Value {
          textures ?? metalBorrowedTextureDescriptorDefault().textures,
        );
 
-  /// Logical texture extent. The map viewport uses width and height and the
-  /// renderer uses scale_factor; the physical size is stated separately below.
-  /// A scale_factor that differs from the map's is accepted and logged as a
-  /// warning.
+  /// Logical texture extent; physical_width and physical_height give the
+  /// texture's size. A scale_factor that differs from the map's is accepted and
+  /// logged as a warning.
   final LogicalExtent extent;
 
   /// Physical texture width in device pixels. Must be positive. Defaults to
@@ -3078,10 +3073,9 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
        ),
        target = target ?? openglBorrowedTextureDescriptorDefault().target;
 
-  /// Logical texture extent. The map viewport uses width and height and the
-  /// renderer uses scale_factor; the physical size is stated separately below.
-  /// A scale_factor that differs from the map's is accepted and logged as a
-  /// warning.
+  /// Logical texture extent; physical_width and physical_height give the
+  /// texture's size. A scale_factor that differs from the map's is accepted and
+  /// logged as a warning.
   final LogicalExtent extent;
 
   /// Physical texture width in device pixels. Must be positive. Defaults to
@@ -3266,10 +3260,9 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
        finalLayout =
            finalLayout ?? vulkanBorrowedTextureDescriptorDefault().finalLayout;
 
-  /// Logical texture extent. The map viewport uses width and height and the
-  /// renderer uses scale_factor; the physical size is stated separately below.
-  /// A scale_factor that differs from the map's is accepted and logged as a
-  /// warning.
+  /// Logical texture extent; physical_width and physical_height give the
+  /// texture's size. A scale_factor that differs from the map's is accepted and
+  /// logged as a warning.
   final LogicalExtent extent;
 
   /// Physical image width in device pixels. Must be positive. Defaults to 256.
@@ -3430,10 +3423,9 @@ final class WebgpuBorrowedTextureDescriptor extends _Value {
        ),
        format = format ?? webgpuBorrowedTextureDescriptorDefault().format;
 
-  /// Logical texture extent. The map viewport uses width and height and the
-  /// renderer uses scale_factor; the physical size is stated separately below.
-  /// A scale_factor that differs from the map's is accepted and logged as a
-  /// warning.
+  /// Logical texture extent; physical_width and physical_height give the
+  /// texture's size. A scale_factor that differs from the map's is accepted and
+  /// logged as a warning.
   final LogicalExtent extent;
 
   /// Physical texture width in device pixels. Defaults to 256.
@@ -3552,7 +3544,9 @@ final class FeatureStateSelector extends _Value {
   /// Optional source layer ID. Required for vector-source disambiguation.
   final String? sourceLayerId;
 
-  /// Optional feature ID. Required by set and get, optional for remove.
+  /// Optional feature ID. Required by set and get, optional for remove. A
+  /// numeric feature ID matches its decimal text, such as "7" for the GeoJSON
+  /// id 7.
   final String? featureId;
 
   /// Optional state key. Used only by remove and requires feature_id.
@@ -3576,7 +3570,7 @@ final class MapTileOptions extends _Value {
     this.lodMode,
   });
 
-  /// Native uint8_t prefetch zoom delta.
+  /// Prefetch zoom delta, at most 255.
   final int? prefetchZoomDelta;
   final double? lodMinRadius;
   final double? lodScale;
@@ -3907,13 +3901,12 @@ final class StyleTransitionOptions extends _Value {
     this.enablePlacementTransitions,
   });
 
-  /// Transition duration in milliseconds. Must be finite and non-negative.
-  /// Values that would overflow MapLibre Native's internal duration are
-  /// invalid.
+  /// Transition duration in milliseconds. Must be finite, non-negative, and
+  /// short enough to represent as a duration.
   final double? durationMs;
 
-  /// Transition delay in milliseconds. Must be finite and non-negative. Values
-  /// that would overflow MapLibre Native's internal duration are invalid.
+  /// Transition delay in milliseconds. Must be finite, non-negative, and short
+  /// enough to represent as a duration.
   final double? delayMs;
 
   /// Whether symbol placement changes cross-fade.
@@ -4436,8 +4429,8 @@ final class OfflineTilePyramidRegionDefinition extends _Value {
   final LatLngBounds bounds;
   final double minZoom;
 
-  /// Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
-  /// each tile source use its own maximum zoom.
+  /// Maximum zoom. Positive infinity lets each tile source use its own maximum
+  /// zoom.
   final double maxZoom;
   final double pixelRatio;
   final bool includeIdeographs;
@@ -4476,8 +4469,8 @@ final class OfflineGeometryRegionDefinition extends _Value {
   final Uint8List geometry;
   final double minZoom;
 
-  /// Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
-  /// each tile source use its own maximum zoom.
+  /// Maximum zoom. Positive infinity lets each tile source use its own maximum
+  /// zoom.
   final double maxZoom;
   final double pixelRatio;
   final bool includeIdeographs;
@@ -4793,9 +4786,8 @@ final class RuntimeEvent {
   /// is `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
   final BigInt generation;
 
-  /// Secondary event detail whose meaning type selects. Depending on type it
-  /// carries an `mln_camera_change_mode`, a MapLibre Native error ordinal, or
-  /// 0. See `mln_runtime_event_type` for the per-type meaning.
+  /// Secondary event detail whose meaning type selects; see
+  /// `mln_runtime_event_type`.
   final int code;
 
   /// Borrowed UTF-8 message bytes, empty when this event carries no message.

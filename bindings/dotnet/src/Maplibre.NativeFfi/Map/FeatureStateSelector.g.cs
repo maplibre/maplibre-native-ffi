@@ -22,7 +22,9 @@ public sealed record FeatureStateSelector
     public string? SourceLayerId { get; set; }
 
     /// <summary>
-    /// Optional feature ID. Required by set and get, optional for remove.
+    /// Optional feature ID. Required by set and get, optional for remove. A
+    /// numeric feature ID matches its decimal text, such as "7" for the GeoJSON
+    /// id 7.
     /// </summary>
     public string? FeatureId { get; set; }
 

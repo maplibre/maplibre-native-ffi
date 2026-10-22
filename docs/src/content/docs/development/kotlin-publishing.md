@@ -1,306 +1,48 @@
 ---
 title: Kotlin publishing
 description:
-  Maven publication design for the Kotlin Multiplatform binding and its native
-  runtimes.
+  Publish the Kotlin binding to Maven, and consume an unreleased build.
 sidebar:
   order: 6
 ---
 
-The Kotlin Multiplatform binding publishes snapshots and tagged releases through
-Maven. Consumers obtain every MapLibre Native FFI component through Gradle; the
-host operating system continues to provide its graphics frameworks, loaders, and
-drivers.
+The Kotlin binding publishes an API module and one runtime module per render
+backend; [Install](/maplibre-native-ffi/install/#kotlin) lists them. Snapshots
+and releases publish as
+[Releases and snapshots](/maplibre-native-ffi/development/versioning/)
+describes.
 
-## Coordinates
+Publishing needs the `org.maplibre.nativeffi` namespace registered on the
+Central Portal with snapshots enabled, and a Central Portal user token in the
+`MAVEN_CENTRAL_USERNAME` and `MAVEN_CENTRAL_PASSWORD` secrets.
 
-All publications use the `org.maplibre.nativeffi` group and share one version.
-Snapshot consumers add the Central Portal snapshot repository because snapshots
-are not served by the immutable Maven Central release repository.
+## Consume an unreleased build
 
-```kotlin
-repositories {
-  maven {
-    url = uri("https://central.sonatype.com/repository/maven-snapshots/")
-    content { includeGroup("org.maplibre.nativeffi") }
-  }
-  mavenCentral()
-}
-```
-
-| Artifact                             | Contents                                      |
-| ------------------------------------ | --------------------------------------------- |
-| `maplibre-native-ffi`                | Backend-agnostic Kotlin Multiplatform binding |
-| `maplibre-native-ffi-runtime-opengl` | OpenGL, EGL, or WGL native runtime            |
-| `maplibre-native-ffi-runtime-vulkan` | Vulkan native runtime                         |
-| `maplibre-native-ffi-runtime-metal`  | Metal native runtime                          |
-
-Applications declare the binding and a runtime separately: the binding carries
-the API, and a runtime carries the native payload for one backend. Applications
-whose targets are all supported by one backend may declare that runtime in
-`commonMain`. Applications using different backends select runtime publications
-from their platform source sets. The runtimes depend on nothing of ours, which
-keeps the Android runtime AARs consumable by hosts that are not written in
-Kotlin.
-
-Every `maplibre-native-ffi` module attaches Dokka-generated API documentation as
-its Maven javadoc artifact. The generated site covers the common API and each
-platform API. The runtime modules carry no public API, so their javadoc
-artifacts remain empty placeholders for the Central requirement.
-
-```kotlin
-commonMain.dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi:$version")
-}
-
-androidMain.dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl:$version")
-}
-
-linuxMain.dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl:$version")
-}
-
-macosMain.dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-metal:$version")
-}
-```
-
-## Platform payloads
-
-### Kotlin/Native
-
-Each native runtime KLIB embeds the complete backend-specific static archive
-produced by the CMake build. Its cinterop definition also carries the system
-link requirements for that target and backend. The final application links the
-archive without acquiring a separate MapLibre Native FFI shared library or
-framework.
-
-The static archive also carries the dex that the Android TLS stack loads, so an
-Android host links the KLIB and packages nothing else for the native library.
-
-The native runtime publications are OpenGL and Vulkan for Android arm32, Android
-arm64, Android x64, Linux arm64, Linux x64, and macOS arm64, plus Metal for
-macOS arm64, iOS arm64, the iOS arm64 simulator, tvOS arm64, and the tvOS arm64
-simulator. Each published Kotlin/Native target has a matching runtime variant. A
-Linux x64 host cross-compiles the Linux arm64 publications because Kotlin/Native
-does not run on Linux arm64 hosts. Publication compiles and links the arm64 test
-binary without executing it.
-
-The Kotlin/Native Linux toolchain is the tightest consumer of the Linux archive.
-Its sysroot supplies glibc 2.19 and GCC 8.3, and it statically links its own
-libstdc++ into every consumer binary. Two properties of the archive keep that
-link working, and both come from the zig toolchain described in the
-[overview](/maplibre-native-ffi/development/overview/):
-
-- The archive requires no glibc symbol newer than 2.17, because the toolchain
-  targets that release rather than the build host's glibc.
-- The archive carries its own C++ runtime with internal linkage, so it never
-  needs, and never collides with, the C++ runtime a consumer links. Only the
-  `mln_*` entry points keep external linkage.
-
-The OpenGL and Vulkan runtimes declare no graphics link requirement. Both open
-their loader on first use. Linux hosts supply the system loader, and macOS hosts
-supply ANGLE or MoltenVK.
-
-Kotlin/Native test binaries in this repository link the C API shared library
-instead of the archive. That library carries the same glibc floor, so the
-Kotlin/Native sysroot resolves its references directly.
-
-The Kotlin/Native Android targets are build-only. CI cross-compiles all three
-architectures and publishes their KLIBs.
-
-Gradle registers this target set consistently on every host. Local and CI
-workflows invoke target-specific KLIB and test tasks, leaving targets
-unavailable on the current host idle.
-
-System graphics components remain platform dependencies, such as the Metal
-frameworks supplied by the Apple SDK.
-
-### Android
-
-Each Android runtime AAR contains `jni/<abi>/libmaplibre-native-c.so` for its
-backend. OpenGL and Vulkan use separate runtime publications because the native
-library is compiled for one render backend, and both AARs name the library
-identically, so an app packages one of them. The Android presets link libc++
-statically and the C API library exports only its `mln_*` entry points, so the
-AAR carries that one library per ABI and redistributes no `libc++_shared.so`.
-Runtime AARs include the native dependency notices and the Android NDK notice
-under `META-INF/licenses`.
-
-Each Android runtime AAR also contains a Prefab module, `maplibre-native-c`,
-with the C headers and a second copy of each `jni/` library for a host's native
-build to link. The copy doubles the native payload of the AAR, but an APK
-packages only the `jni/` library.
-
-The native library embeds the JVM helper that its TLS stack calls, as a dex that
-`mln_android_init` loads in a class loader of its own, so the AAR carries no
-Java code or keep rule for it. An Android host written in another language
-depends on a runtime publication alone and calls `mln_android_init` before
-creating a runtime.
-
-The Android target of `maplibre-native-ffi` carries the Kotlin API and
-`jni/<abi>/libmaplibre-native-ffi-jni.so`, the JNI shim that is private to this
-binding. When the shim loads, it registers its natives and looks up the Kotlin
-methods that its upcalls call, all by name. The publication's consumer R8 rule
-keeps those classes and members, so apps that minify add no rule of their own.
-The shim is C built with the NDK, and this AAR carries the Android NDK notice
-under `META-INF/licenses`.
-
-### JVM
-
-The runtime module name selects the render backend. A classifier on the JVM
-runtime artifact selects the operating system and architecture.
-
-```kotlin
-implementation("org.maplibre.nativeffi:maplibre-native-ffi:$version")
-runtimeOnly(
-  "org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl-jvm:$version:natives-linux-x64"
-)
-```
-
-Classifier names use `natives-<os>-<arch>`, for example `natives-linux-arm64`,
-`natives-macos-arm64`, and `natives-windows-x64`. The runtime JAR contains the
-MapLibre Native FFI shared library and the runtime dependencies that the project
-redistributes. It carries their notices under
-`META-INF/licenses/maplibre-native-c`. The JVM binding extracts that packaged
-set to a directory keyed by its content digest. On Linux and macOS, that
-directory sits under an owner-only, per-user root in the temporary directory, so
-every process that loads the same runtime reuses one copy. On Windows, and for a
-second copy of the binding in one JVM, each extraction gets a private temporary
-directory. The binding loads packaged dependencies before the C API library.
-Linux hosts still need the selected graphics loader and driver. Explicit
-native-library path configuration remains available as an override.
-
-## Snapshot publication
-
-Snapshot versions end in `-SNAPSHOT` and publish from the exact commit that
-passed the main CI workflow. A Linux x64 runner builds the Android and Linux
-publications, cross-compiling and linking the Linux arm64 Kotlin suite. A macOS
-runner builds the JVM, macOS, iOS, and tvOS publications. Each consumes native
-build artifacts produced by the platform and backend CI matrix.
-
-A daily schedule drives publication rather than each push to `main`: the Publish
-snapshots workflow picks the latest successful CI run on `main` and publishes
-from its artifacts. Each publishable component, such as the native package
-release, the Kotlin modules, the Python and .NET packages, and the docs site,
-carries an input scope in `ci/snapshots.toml`, and the workflow hashes that
-scope at the source commit. A component publishes when its hash differs from the
-hash of the commit it last published from, so a change confined to another
-binding leaves the Kotlin modules alone. That commit is recorded as a floating
-`snapshot-state/<component>` tag, whose annotated message carries the timestamp
-and run URL of the publish, and only components that published successfully have
-their tag moved, so a failure is retried the next day.
-`git ls-remote --tags origin 'refs/tags/snapshot-state/*'` reports where every
-snapshot stands. Dispatch the workflow manually to publish sooner: `all` applies
-the same gate immediately, and naming one component republishes it whether or
-not its inputs changed.
-
-The Central Portal namespace covering `org.maplibre.nativeffi` must be
-registered with snapshot publishing enabled. The repository stores a Central
-Portal user token in the `MAVEN_CENTRAL_USERNAME` and `MAVEN_CENTRAL_PASSWORD`
-GitHub Actions secrets. Central does not require snapshot signing. The workflow
-still signs snapshots with the release key so that every publish exercises the
-shared signing path.
-
-Each host first stages its publications in a local Maven repository. CI rejects
-duplicate paths while it merges the Android and Apple repositories, then
-inspects the published AAR, JAR, and KLIB payloads. The snapshot finalizer
-uploads that verified repository to the Central Portal snapshot endpoint. It
-uploads every leaf module before the canonical multiplatform root modules.
-Serialized publishing prevents two commits from interleaving those uploads. Both
-snapshot and tagged release jobs reuse the CI-produced native archives and the
-same staged repository; they do not rebuild MapLibre Native.
-
-CI runs the same staging and verification wherever it runs complete coverage: on
-`main`, on manual runs, and on pull requests labeled `ci:full` or opened by
-Dependabot. It uses the native artifacts from the same run, so a pull request
-with complete coverage catches a change that breaks the publish pipeline before
-merge. Snapshot publication reuses the verified repository that the CI run on
-`main` uploaded, and adds only signing and the Central Portal upload. Tagged
-releases stage again at their release version, through the same workflow.
-
-Verification checks:
-
-- Maven and Gradle module metadata for every publication;
-- native archive presence in published KLIBs;
-- JNI library placement in Android AARs;
-- Android runtime metadata declaring no dependency on the Kotlin binding;
-- native resource presence in JVM classifier JARs;
-- Dokka-generated API pages in every API-bearing javadoc JAR.
-
-The binding suites cover Kotlin/Native behavior. Downstream projects such as
-[MapLibre Compose](https://github.com/maplibre/maplibre-compose) exercise the
-published JVM and Android artifacts in applications.
-
-## Tagged release finalization
-
-Pushing a `v<version>` release tag publishes the native release on GitHub, then
-starts the Kotlin release for the tag's exact commit. Tagged releases use the
-same host staging and merged-repository verification as snapshots. Host jobs
-have no publishing credentials. The release path then:
-
-1. merges the partitions and rejects missing modules or conflicting paths;
-2. runs the same semantic payload and coordinate verification used for
-   snapshots;
-3. signs every publishable file and writes the required checksums;
-4. creates one ZIP whose root is the Maven repository layout; and
-5. uploads that ZIP once through the Central Publisher API with automatic
-   publication.
-
-The finalizer waits for Central to validate and publish the deployment. A failed
-validation fails the workflow with the deployment's errors. The merged, verified
-repository is the source of truth for both publication modes. Tagged releases
-gain one atomic Central deployment boundary, while snapshot uploads preserve
-leaf-first/root-last ordering on Central's mutable snapshot endpoint.
-
-## Local and pull-request publications
-
-A host under development can consume unreleased publications from a local Maven
-repository. The `local` operation builds each named native preset and installs
-the components that its package carries, then publishes the binding and the
-runtimes that those presets feed:
+The `local` operation builds each named preset and publishes the modules that
+those presets feed to `build/packages/kotlin/maven-local`:
 
 ```bash
 mise run //:kotlin:publish local macos-arm64-metal macos-arm64-vulkan macos-arm64-egl
 ```
 
-The repository is `build/packages/kotlin/maven-local`. The default version is
-`0.1.0-local.<commit>`. When the worktree has uncommitted changes, the task
-appends `.dirty-<hash>`, a hash of the worktree's tracked and untracked files,
-so each edit publishes at its own version. Every task run resets the MapLibre
-Native submodule to its pinned commit and patches, which the hash covers. The
-`MAPLIBRE_MAVEN_VERSION` environment variable overrides the version; a host that
-keeps one version across edits must republish every preset it uses after each
-change to native code. The task rejects a preset that the host cannot build
-before it builds anything. Android presets build against `ANDROID_HOME`; to use
-the pinned SDK, run `mise -E android run //:kotlin:publish local <preset>...`.
+Each edit publishes at its own version, `0.1.0-local.<commit>` with a
+`.dirty-<hash>` suffix for uncommitted changes. If you pin the version with
+`MAPLIBRE_MAVEN_VERSION`, republish every preset that you use after each native
+change. Each publish rewrites a backend's JVM runtime module and the Android
+AARs with only that run's presets, so name every preset of a backend in one run.
 
-The repository holds only the targets that the named presets feed, although each
-root module still names every published target. The `wasmJs` target publishes
-nothing, and the root module leaves it out, until a package carries its browser
-module for each backend. Later runs at the same version add Kotlin/Native
-targets and backends to the repository. Each publish rewrites a backend's JVM
-runtime module and Android AAR, and the binding's AAR, so they hold only the
-classifiers and ABIs from their latest publish. Both backends share the
-binding's AAR, which carries the JNI shim. Name every classifier of a backend,
-and every Android preset of both backends, in one run.
-
-A pull request with complete coverage publishes its verified repository the same
-way. The version is `0.1.0-pr<number>.<run id>`, where the run id is the one
-that `gh run download` takes. The artifact is `kotlin-maven-verified-<sha>`,
-named for the commit that the run tested, and CI retains it for seven days. This
-command places the repository in `maplibre-maven/kotlin-maven-verified-<sha>`:
+A pull request that runs the `maven` CI unit uploads its verified repository as
+the `kotlin-maven-verified-<sha>` artifact, at version
+`0.1.0-pr<number>.<run id>`:
 
 ```bash
 gh run download <run id> --repo maplibre/maplibre-native-ffi \
   --pattern 'kotlin-maven-verified-*' --dir maplibre-maven
 ```
 
-Gradle takes each module from the first repository that holds it. `mavenLocal()`
-can hold stale or partial modules of this group, for example `0.1.0-SNAPSHOT`
-modules that `publishToMavenLocal` left behind. Declare the downloaded or local
-repository as the exclusive source of the group:
+Declare the repository as the only source of the group, because Gradle takes
+each module from the first repository that holds it, and `mavenLocal()` can hold
+stale modules:
 
 ```kotlin
 repositories {

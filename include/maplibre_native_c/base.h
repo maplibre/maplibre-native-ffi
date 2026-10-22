@@ -5,15 +5,13 @@
  * Handles are opaque 64-bit ids. Each handle remains distinguishable from
  * every later handle after release. A release or disposal ends a handle once
  * the call accepts it. Passing a released handle reports
- * MLN_STATUS_INVALID_STATE. Passing an invalid handle,
- * which is the null handle, a handle of another type, or a value this library
- * never issued, reports MLN_STATUS_INVALID_ARGUMENT. Either way the call has no
- * effect, and its diagnostic names the case.
- * Handle values are safe to copy, compare, hash, and move between threads, and
- * carry no ownership on their own.
+ * MLN_STATUS_INVALID_STATE. Passing an invalid handle, which is the null
+ * handle, a handle of another type, or a value this library never issued,
+ * reports MLN_STATUS_INVALID_ARGUMENT. Either way the call has no effect, and
+ * its diagnostic names the case. Handle values are safe to copy, compare, hash,
+ * and move between threads, and carry no ownership on their own.
  *
- * Hosts must pass handles back as issued, without decoding or synthesizing
- * them.
+ * Hosts pass handles back as issued, without decoding or synthesizing them.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_BASE_H
@@ -70,7 +68,7 @@ typedef enum mln_status : int32_t {
   MLN_STATUS_WRONG_THREAD = -3,
   /** The entry point or requested behavior is unavailable in this build. */
   MLN_STATUS_UNSUPPORTED = -4,
-  /** A native MapLibre error or C++ exception was converted to status. */
+  /** Native code failed; the diagnostic describes the error. */
   MLN_STATUS_NATIVE_ERROR = -5,
   /** The operation reached its terminal cancelled disposition. */
   MLN_STATUS_CANCELLED = -6,

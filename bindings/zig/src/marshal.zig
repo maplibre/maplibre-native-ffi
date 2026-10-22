@@ -1,8 +1,4 @@
-//! Conversions between binding values and the native values they mirror.
-//!
-//! Generated value types convert their own fields with these helpers, and the
-//! operation runtime in call.zig decodes outputs and completion results with
-//! `decode`.
+// Conversions between binding values and the native values they mirror.
 
 const std = @import("std");
 

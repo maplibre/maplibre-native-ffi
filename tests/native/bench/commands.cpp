@@ -1,3 +1,18 @@
+// Measures command submission and completion latency, and allocations, for
+// bursts of map commands. The target is outside the default build and CTest:
+//
+//   mise exec -- cmake --build build/linux-gnu-x64-vulkan --target
+//   mln_command_bench mise exec --
+//   build/linux-gnu-x64-vulkan/tests/native/bench/mln_command_bench 200
+//
+// The argument sets the measured repetitions, and the output is CSV. A gate
+// holds the runtime worker while each burst is submitted, so the numbers
+// measure command transport without worker scheduling races. Completion latency
+// includes the time behind the gate, and a discarded command's completion ends
+// at the query that fences the burst. Allocation counts come from the replaced
+// operator new below and leave out the GPU driver and direct C or Rust
+// allocations. Compare only runs built with the same toolchain.
+
 #include <algorithm>
 #include <array>
 #include <atomic>

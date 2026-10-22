@@ -16,9 +16,8 @@ extern "C" {
  * Initializes Android platform services.
  *
  * Required once per Android process, before creating a runtime. Configures
- * locale services, TLS verification, and APK asset access. The library carries
- * the Java code that TLS verification calls and loads it from the
- * application's code cache, so the host packages only the library.
+ * locale services, TLS verification, and APK asset access. The host packages
+ * only the library, which carries the Java code that TLS verification calls.
  *
  * `jni_env` must be a `JNIEnv*` valid for the calling thread. `context` must be
  * an Android `android.content.Context` object. Any Context subtype may be

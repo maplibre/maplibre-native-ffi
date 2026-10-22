@@ -5,13 +5,20 @@ import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.render.NativePointer
 
-/** Process-global entry points for the Kotlin/JVM FFM bridge. */
+/** Process-global entry points for the MapLibre Native FFI binding. */
 public actual object Maplibre {
-  /** C ABI contract version expected by this Kotlin/JVM binding. */
   public actual const val EXPECTED_C_ABI_VERSION: Long =
     org.maplibre.nativeffi.internal.loader.EXPECTED_C_ABI_VERSION
 
-  /** Loads the native library using the binding's standard lookup order. */
+  /**
+   * Loads the native library from the first of these that is set or present:
+   * 1. the file that the `org.maplibre.nativeffi.library.path` system property or the
+   *    `MAPLIBRE_NATIVE_FFI_LIBRARY_PATH` environment variable names;
+   * 2. a runtime JAR on the classpath;
+   * 3. `System.loadLibrary("maplibre-native-c")`, after the library's dependencies from the
+   *    directories that `org.maplibre.nativeffi.library.dirs` or `MAPLIBRE_NATIVE_FFI_LIBRARY_DIRS`
+   *    lists.
+   */
   public actual fun loadNativeLibrary() {
     NativeAccess.ensureLoaded()
   }

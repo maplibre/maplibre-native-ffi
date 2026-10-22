@@ -100,8 +100,6 @@ shared = [
   "!.github/FUNDING.yml",
   "!.config/rubberstamp.yml",
   "!.coderabbit.yaml",
-  "!.agents/**",
-  "!.claude/**",
   "!.idea/**",
   "!.ona/**",
   "!.vscode/**",

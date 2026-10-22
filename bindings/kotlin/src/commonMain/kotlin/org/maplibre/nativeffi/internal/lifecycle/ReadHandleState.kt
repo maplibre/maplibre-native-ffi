@@ -11,7 +11,7 @@ internal class ReadHandleState(
   handle: Long,
   dispose: (Long) -> Unit,
 ) : HandleState(typeName, handle, dispose) {
-  /** The number of reads in progress, or minus the number of releases in progress. */
+  // The number of reads in progress, or minus the number of releases in progress.
   private val gate = AtomicInt(0)
 
   fun <T> read(block: () -> T): T {

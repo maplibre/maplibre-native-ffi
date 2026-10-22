@@ -1,3 +1,7 @@
+Matches reflected OpenGL attributes by name, so attribute IDs stay stable when
+linked locations differ from metadata order.
+Upstream: https://github.com/maplibre/maplibre-native/pull/4708
+
 diff --git a/src/mln/shaders/gl/shader_program_gl.cpp b/src/mln/shaders/gl/shader_program_gl.cpp
 index d46d0d29b2a9f38a06baaa24435b997d7488db3e..3b4bbf28238ef69bef5a934e2781ba53b9172a4f 100644
 --- a/src/mln/shaders/gl/shader_program_gl.cpp

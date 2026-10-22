@@ -1,3 +1,8 @@
+Animates partial camera commands independently
+(https://github.com/maplibre/maplibre-native/issues/2790). The Android and
+macOS SDKs cancel transitions first to keep their behavior.
+Upstream: https://github.com/maplibre/maplibre-native/pull/4637
+
 diff --git a/include/mln/map/camera.hpp b/include/mln/map/camera.hpp
 index 63e7d2b92c20..a67ab2dddec5 100644
 --- a/include/mln/map/camera.hpp

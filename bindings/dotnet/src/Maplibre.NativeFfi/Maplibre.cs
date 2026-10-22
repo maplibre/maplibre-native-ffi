@@ -20,13 +20,21 @@ public static unsafe partial class Maplibre
     internal static EventHandler<CallbackExceptionEventArgs>? CallbackExceptionHandlers =>
         CallbackException;
 
-    /// <summary>Loads the native library using the binding's standard lookup order.</summary>
+    /// <summary>
+    /// Loads the native library and checks its C ABI version. The library is the file that
+    /// <c>MAPLIBRE_NATIVE_FFI_LIBRARY_PATH</c> names, or else the one that .NET's native library
+    /// probing finds, such as a runtime package's, after its dependencies from the directories
+    /// that <c>MAPLIBRE_NATIVE_FFI_LIBRARY_DIRS</c> lists.
+    /// </summary>
     public static void LoadNativeLibrary()
     {
         NativeLibraryLoader.EnsureLoaded();
     }
 
-    /// <summary>Loads the native library from an exact file path.</summary>
+    /// <summary>
+    /// Loads the native library from an exact file path. Call it before any other native call,
+    /// which otherwise loads the library through <see cref="LoadNativeLibrary()" />.
+    /// </summary>
     public static void LoadNativeLibrary(string libraryPath)
     {
         NativeLibraryLoader.Load(libraryPath);

@@ -4,7 +4,8 @@
 // GPU contexts, textures, and surfaces for tests, in the shapes that the render
 // target descriptors in maplibre_native_c/ take. The C suite and every binding
 // suite create their graphics objects here, so that one implementation stands
-// in for the host that owns them.
+// in for the host that owns them. Browser builds create WebGL contexts and
+// WebGPU devices in JavaScript instead.
 //
 // The library loads each graphics API at run time and links none, so a caller
 // can load it from any language over its C ABI. MLN_FFI_VULKAN_LOADER_DIR names

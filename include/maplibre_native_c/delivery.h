@@ -18,8 +18,7 @@
  *
  * A queue is FIFO in push order. A map command queues the runtime events it
  * raises before pushing its completion. Events and completions that select
- * the same queue arrive in that order. Adjacent events share one delivery
- * and its event and message storage.
+ * the same queue arrive in that order. Adjacent events share one delivery.
  *
  * A queue has no bound. A host that stops draining keeps every pushed item in
  * memory until it drains or releases the queue.
@@ -169,8 +168,7 @@ typedef union mln_delivery_payload {
 /**
  * One drained delivery.
  *
- * Step through deliveries by mln_delivery_batch_view.delivery_size; the
- * payload stays last so a later variant only widens the stride.
+ * Step through deliveries by mln_delivery_batch_view.delivery_size.
  */
 typedef struct mln_delivery {
   /** One of mln_delivery_type. */
@@ -272,8 +270,8 @@ MLN_API void mln_delivery_queue_release(mln_delivery_queue queue) MLN_NOEXCEPT;
  * - MLN_STATUS_OK when a batch holding at least one delivery is published in
  *   *out_batch and its view in *out_view.
  * - MLN_STATUS_NOT_READY when no delivery is queued. This is not an error:
- *   *out_batch and *out_view are left unchanged, no batch is allocated, and
- *   the caller drains again after the next wake.
+ *   *out_batch and *out_view are left unchanged, and the caller drains again
+ *   after the next wake.
  * - MLN_STATUS_INVALID_ARGUMENT when queue is an invalid handle, out_batch is
  *   null or does not point to the null handle, or out_view is null or
  *   out_view->size is too small.

@@ -1,3 +1,7 @@
+Marks the two substantively changed files as modified, as Apache-2.0 section
+4(b) requires. NOTICE states the same for the compiled AARs; refresh it
+whenever these patches change.
+
 diff --git a/android/rustls-platform-verifier/src/main/java/org/rustls/platformverifier/CertificateVerifier.kt b/android/rustls-platform-verifier/src/main/java/org/rustls/platformverifier/CertificateVerifier.kt
 index 677088b..4b91d71 100644
 --- a/android/rustls-platform-verifier/src/main/java/org/rustls/platformverifier/CertificateVerifier.kt

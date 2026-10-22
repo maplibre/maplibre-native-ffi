@@ -71,13 +71,10 @@ internal fun readSize(address: Long): ULong = readAddress(address).toULong()
 
 internal fun writeSize(address: Long, value: ULong) = writeAddress(address, value.toLong())
 
-/**
- * Narrows a native count to a list index, refusing one a Kotlin collection cannot hold.
- *
- * The unsigned values these helpers take are compared as signed Longs, because unsigned comparison
- * on Android needs API 26. A value past Long.MAX_VALUE turns negative and fails the same checks.
- */
+/** Narrows a native count to a list index, refusing one a Kotlin collection cannot hold. */
 internal fun count(value: ULong): Int {
+  // Unsigned comparison on Android needs API 26, so compare as a signed Long. A value past
+  // Long.MAX_VALUE turns negative and fails the same check.
   val signed = value.toLong()
   require(signed in 0..Int.MAX_VALUE) { "native count $value exceeds Int.MAX_VALUE" }
   return signed.toInt()

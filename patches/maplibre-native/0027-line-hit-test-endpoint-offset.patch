@@ -1,3 +1,6 @@
+Applies the full line offset to the last vertex in hit testing.
+Upstream: https://github.com/maplibre/maplibre-native/pull/4702
+
 diff --git a/CHANGELOG.md b/CHANGELOG.md
 index 5c1c2ca0412b2b7c46fc2c33502209fff6d2d92e..32157bc2e1919f27e7039761670b8689d88dbe38 100644
 --- a/CHANGELOG.md

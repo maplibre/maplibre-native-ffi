@@ -27,6 +27,5 @@ internal class CallbackScope(val parent: CallbackScope?) : AutoCloseable {
   }
 }
 
-/** Runs [block] in a new [CallbackScope] on this thread. */
 internal inline fun <T> withCallbackScope(block: (CallbackScope) -> T): T =
   CallbackScope(CallbackContext.current).also { CallbackContext.current = it }.use(block)

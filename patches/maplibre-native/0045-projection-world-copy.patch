@@ -1,3 +1,6 @@
+Converts a coordinate in the world copy nearest the camera center.
+Upstream: not proposed
+
 diff --git a/src/mln/map/map_projection.cpp b/src/mln/map/map_projection.cpp
 --- a/src/mln/map/map_projection.cpp
 +++ b/src/mln/map/map_projection.cpp

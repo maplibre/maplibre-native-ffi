@@ -2,11 +2,7 @@ package org.maplibre.nativeffi.internal.loader
 
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
 
-/**
- * Loads the native library and checks its C ABI version once, before the first native call.
- *
- * Every generated operation calls this; after the first call it costs one volatile read.
- */
+/** Loads the native library and checks its C ABI version once, before the first native call. */
 internal expect fun ensureNativeLibrary()
 
 /** The C ABI contract version this binding expects. */

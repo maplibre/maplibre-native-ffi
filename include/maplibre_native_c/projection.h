@@ -40,7 +40,7 @@ extern "C" {
  *   finite or out of range, or the extent has a zero width or height or a
  *   scale_factor that is not finite and positive; or when out_projection is
  *   null or does not point to the null handle.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_map_projection_create(
   const mln_map_view* view,
@@ -60,7 +60,7 @@ MLN_API mln_status mln_map_projection_create(
  * - MLN_STATUS_OK when the projection was released by this call.
  * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle.
  * - MLN_STATUS_INVALID_STATE when projection has been released.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_map_projection_release(
   mln_map_projection projection, mln_diagnostic* out_diagnostic
@@ -69,16 +69,15 @@ MLN_API mln_status mln_map_projection_release(
 /**
  * Copies the projection camera into out_camera.
  *
- * out_camera->size must be at least sizeof(mln_camera_options). The result
- * observes every earlier projection setter. This function may be called from
- * any thread.
+ * The result observes every earlier projection setter. This function may be
+ * called from any thread.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, or
  *   out_camera is null or undersized.
  * - MLN_STATUS_INVALID_STATE when projection has been released.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_map_projection_get_camera(
   mln_map_projection projection,
@@ -99,7 +98,7 @@ MLN_API mln_status mln_map_projection_get_camera(
  * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, or camera
  *   is null, undersized, or carries an invalid field.
  * - MLN_STATUS_INVALID_STATE when projection has been released.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_map_projection_set_camera(
   mln_map_projection projection, const mln_camera_options* camera,
@@ -119,7 +118,7 @@ MLN_API mln_status mln_map_projection_set_camera(
  * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, out_point
  *   is null, or coordinate is out of range.
  * - MLN_STATUS_INVALID_STATE when projection has been released.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_map_projection_pixel_for_lat_lng(
   mln_map_projection projection, mln_lat_lng coordinate,
@@ -140,7 +139,7 @@ MLN_API mln_status mln_map_projection_pixel_for_lat_lng(
  * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle,
  *   out_coordinate is null, or point is not finite.
  * - MLN_STATUS_INVALID_STATE when projection has been released.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_map_projection_lat_lng_for_pixel(
   mln_map_projection projection, mln_screen_point point,
@@ -161,7 +160,7 @@ MLN_API mln_status mln_map_projection_lat_lng_for_pixel(
  * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle,
  *   out_coordinate is null, or point contains non-finite values.
  * - MLN_STATUS_INVALID_STATE when projection has been released.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(
   mln_map_projection projection, mln_screen_point point,
@@ -182,7 +181,7 @@ MLN_API mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(
  *   out_meters_per_pixel is null, or latitude is not finite or falls outside
  *   the range from -90 to 90 degrees.
  * - MLN_STATUS_INVALID_STATE when projection has been released.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_map_projection_meters_per_pixel_at_latitude(
   mln_map_projection projection, double latitude,
@@ -197,7 +196,7 @@ MLN_API mln_status mln_map_projection_meters_per_pixel_at_latitude(
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when out_meters is null or coordinate contains
  *   invalid latitude or longitude values.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_projected_meters_for_lat_lng(
   mln_lat_lng coordinate,
@@ -212,7 +211,7 @@ MLN_API mln_status mln_projected_meters_for_lat_lng(
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when out_coordinate is null or meters contains
  *   non-finite values.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_lat_lng_for_projected_meters(
   mln_projected_meters meters,

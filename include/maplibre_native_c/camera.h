@@ -64,10 +64,10 @@ MLN_API mln_map_tile_options mln_map_tile_options_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options carries
  *   a bit outside mln_map_debug_option, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the mask throws.
+ * - MLN_STATUS_NATIVE_ERROR when applying the mask fails.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_debug_options(
@@ -85,10 +85,10 @@ MLN_API mln_status mln_map_set_debug_options(
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
  *   invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the visibility throws.
+ * - MLN_STATUS_NATIVE_ERROR when applying the visibility fails.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_rendering_stats_view_enabled(
@@ -103,10 +103,10 @@ MLN_API mln_status mln_map_set_rendering_stats_view_enabled(
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
  *   invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the dump throws.
+ * - MLN_STATUS_NATIVE_ERROR when the dump fails.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_dump_debug_logs(
@@ -123,10 +123,10 @@ MLN_API mln_status mln_map_dump_debug_logs(
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options is null,
  *   undersized, or carries an invalid field, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the options throws.
+ * - MLN_STATUS_NATIVE_ERROR when applying the options fails.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_viewport_options(
@@ -144,10 +144,10 @@ MLN_API mln_status mln_map_set_viewport_options(
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options is null,
  *   undersized, or carries an invalid field, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the options throws.
+ * - MLN_STATUS_NATIVE_ERROR when applying the options fails.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_tile_options(
@@ -181,10 +181,10 @@ MLN_API mln_status mln_map_set_tile_options(
  *   or undersized, update->mode or update->gesture_phase is out of range,
  *   update->camera or update->animation is invalid, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the camera write throws.
+ * - MLN_STATUS_NATIVE_ERROR when the camera write fails.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_update_camera(
@@ -213,10 +213,10 @@ MLN_API mln_status mln_map_update_camera(
  *   SCALE, BEARING, or PITCH, ANCHOR and OFFSET are selected with a positive
  *   animation duration, delta->animation is invalid, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the camera write throws.
+ * - MLN_STATUS_NATIVE_ERROR when the camera write fails.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_apply_camera_delta(
@@ -236,10 +236,10 @@ MLN_API mln_status mln_map_apply_camera_delta(
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
  *   invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the cancellation throws.
+ * - MLN_STATUS_NATIVE_ERROR when the cancellation fails.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_cancel_transitions(
@@ -261,10 +261,10 @@ MLN_API mln_status mln_map_cancel_transitions(
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
  *   invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the cancellation throws.
+ * - MLN_STATUS_NATIVE_ERROR when the cancellation fails.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_cancel_camera_transition(
@@ -283,10 +283,10 @@ MLN_API mln_status mln_map_cancel_camera_transition(
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
  *   invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when reading the camera throws.
+ * - MLN_STATUS_NATIVE_ERROR when reading the camera fails.
  */
 MLN_BINDING("execution=query;result=mln_camera_query_result")
 MLN_API mln_status mln_map_get_camera(
@@ -306,10 +306,10 @@ MLN_API mln_status mln_map_get_camera(
  *   valid ordered pair of coordinates, or fit_options is undersized or carries
  *   an invalid field, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the fit throws.
+ * - MLN_STATUS_NATIVE_ERROR when the fit fails.
  */
 MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_lat_lng_bounds(
@@ -331,10 +331,10 @@ MLN_API mln_status mln_map_camera_for_lat_lng_bounds(
  *   fit_options is undersized or carries an invalid field, or completion is
  *   invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the fit throws.
+ * - MLN_STATUS_NATIVE_ERROR when the fit fails.
  */
 MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_lat_lngs(
@@ -357,10 +357,10 @@ MLN_API mln_status mln_map_camera_for_lat_lngs(
  *   a GeoJSON Geometry, carries no coordinate, or fit_options is undersized or
  *   carries an invalid field, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the fit throws.
+ * - MLN_STATUS_NATIVE_ERROR when the fit fails.
  */
 MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_geometry(
@@ -383,10 +383,10 @@ MLN_API mln_status mln_map_camera_for_geometry(
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, camera is null,
  *   undersized, or carries an invalid field, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the projection throws.
+ * - MLN_STATUS_NATIVE_ERROR when the projection fails.
  */
 MLN_BINDING("execution=query;result=mln_lat_lng_bounds")
 MLN_API mln_status mln_map_lat_lng_bounds_for_camera(
@@ -410,10 +410,10 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera(
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, camera is null,
  *   undersized, or carries an invalid field, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the projection throws.
+ * - MLN_STATUS_NATIVE_ERROR when the projection fails.
  */
 MLN_BINDING("execution=query;result=mln_lat_lng_bounds")
 MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
@@ -432,10 +432,10 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options is null,
  *   undersized, or carries an invalid field, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the constraints throws.
+ * - MLN_STATUS_NATIVE_ERROR when applying the constraints fails.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_bounds(
@@ -454,10 +454,10 @@ MLN_API mln_status mln_map_set_bounds(
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options is null,
  *   undersized, or carries an invalid field, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the options throws.
+ * - MLN_STATUS_NATIVE_ERROR when applying the options fails.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_free_camera_options(
@@ -477,10 +477,10 @@ MLN_API mln_status mln_map_set_free_camera_options(
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, mode is null,
  *   undersized, or carries an invalid field, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the mode throws.
+ * - MLN_STATUS_NATIVE_ERROR when applying the mode fails.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_projection_mode(

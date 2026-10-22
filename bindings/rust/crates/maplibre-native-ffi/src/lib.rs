@@ -1,9 +1,7 @@
 //! Safe Rust binding for the MapLibre Native C API.
 //!
 //! Runtime and map control handles are any-thread; graphics sessions retain
-//! their backend thread affinity. This crate also owns parent retention, Rust
-//! errors, callback closures, and render-resource lifetimes. Shared C ABI
-//! adaptation lives in `maplibre-native-ffi-core`.
+//! their backend thread affinity. A child handle keeps its parent alive.
 //!
 //! Native registrations retain their callback closures until they are cleared
 //! or their owner retires. A callback that needs its own owner should capture a

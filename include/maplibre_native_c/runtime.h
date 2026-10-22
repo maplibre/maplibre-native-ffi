@@ -76,10 +76,8 @@ typedef struct mln_offline_region_status {
  * - MAP_STYLE_LOADED: code is 0; payload NONE.
  * - MAP_LOADING_STARTED: code is 0; payload NONE.
  * - MAP_LOADING_FINISHED: code is 0; payload NONE.
- * - MAP_LOADING_FAILED: code is the ordinal of MapLibre Native's internal map
- *   load error kind, which this API does not name as an enum, and is 0 when the
- *   failure came from a style-loading exception raised inside a C API call.
- *   Read message for the failure text in both cases; payload NONE.
+ * - MAP_LOADING_FAILED: code identifies the kind of failure, or is 0, and has
+ * no named values; message carries the failure text; payload NONE.
  * - MAP_IDLE: code is 0; payload NONE.
  * - MAP_RENDER_ERROR: code is 0; message carries the error text; payload NONE.
  * - MAP_RENDER_FRAME_STARTED: code is 0; payload NONE.
@@ -331,7 +329,7 @@ typedef enum mln_resource_provider_decision : uint32_t {
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when out_status is null.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_network_get_status(
   uint32_t* out_status MLN_BINDING("direction=out;enum=mln_network_status"),
@@ -341,15 +339,14 @@ MLN_API mln_status mln_network_get_status(
 /**
  * Sets MapLibre Native's process-global network status.
  *
- * MLN_NETWORK_STATUS_ONLINE allows HTTP and HTTPS requests and wakes native
- * subscribers when transitioning from offline. MLN_NETWORK_STATUS_OFFLINE makes
- * MapLibre's online source stop starting network requests until reachability
- * returns. Runtime-scoped resource configuration is unchanged.
+ * MLN_NETWORK_STATUS_ONLINE allows network requests.
+ * MLN_NETWORK_STATUS_OFFLINE stops new network requests until the status
+ * returns to online. Runtime-scoped resource configuration is unchanged.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when status is not a mln_network_status value.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_network_set_status(
   uint32_t status MLN_BINDING("enum=mln_network_status"),
@@ -434,7 +431,13 @@ typedef struct mln_runtime_event_offline_region_status {
   mln_offline_region_status status;
 } mln_runtime_event_offline_region_status;
 
-/** Payload for MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR. */
+/**
+ * Payload for MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR.
+ *
+ * A download skips a resource that fails with
+ * MLN_RESOURCE_ERROR_REASON_NOT_FOUND and continues with the rest of the
+ * region. A resource that fails for another reason stays outstanding.
+ */
 typedef struct mln_runtime_event_offline_region_response_error {
   mln_offline_region_id region_id;
   /** One of mln_resource_error_reason. */
@@ -517,9 +520,8 @@ typedef struct mln_runtime_event {
    */
   uint64_t generation;
   /**
-   * Secondary event detail whose meaning type selects. Depending on type it
-   * carries an mln_camera_change_mode, a MapLibre Native error ordinal, or 0.
-   * See mln_runtime_event_type for the per-type meaning.
+   * Secondary event detail whose meaning type selects; see
+   * mln_runtime_event_type.
    */
   int32_t code;
   /** One of mln_runtime_event_payload_type. */
@@ -572,8 +574,7 @@ typedef void (*mln_runtime_event_callback)(
  * Callback mode borrows the events for the call and releases user_data after
  * replacement, clear, or runtime teardown. Queue mode copies events into
  * MLN_DELIVERY_TYPE_RUNTIME_EVENTS deliveries carrying user_data, followed by
- * MLN_DELIVERY_TYPE_RETIRED when the registration retires. Adjacent events
- * for one registration share record and message storage. Queue mode requires
+ * MLN_DELIVERY_TYPE_RETIRED when the registration retires. Queue mode requires
  * release_user_data to be null.
  */
 typedef struct mln_runtime_event_handler {
@@ -630,7 +631,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_resource_kind_mask : uint32_t {
 /// A glob accepts at most 4096 tokens. Each literal byte, escaped byte, `?`,
 /// or consecutive run of `*` bytes counts as one token. Registering a longer
 /// glob returns MLN_STATUS_INVALID_ARGUMENT. Exact URL matches have no token
-/// limit. Matching uses bounded stack storage.
+/// limit.
 ///
 /// Confining `*` to one path segment is what makes a host pattern hold:
 /// `https://*.example.com/**` matches every subdomain of example.com and never
@@ -731,11 +732,8 @@ typedef struct mln_resource_transform {
    * and every in-flight callback has returned. Requests the callback already
    * received keep their handles.
    *
-   * It may run on a runtime, worker, network, or closing thread, and never runs
-   * for a rejected registration. Another thread may retire an accepted
-   * registration before its registration function returns, so the caller
-   * transfers user_data before entering that function and reclaims it only
-   * when the registration is rejected. Null in queue mode.
+   * Its threads and its handoff follow
+   * mln_resource_provider.release_user_data. Null in queue mode.
    */
   mln_user_data_release release_user_data;
   /**
@@ -824,11 +822,8 @@ typedef struct mln_http_header_transform {
    * after replacement, clear, or runtime teardown has retired the registration
    * and every in-flight callback has returned.
    *
-   * It may run on a runtime, worker, network, or closing thread, and never runs
-   * for a rejected registration. Another thread may retire an accepted
-   * registration before its registration function returns, so the caller
-   * transfers user_data before entering that function and reclaims it only
-   * when the registration is rejected.
+   * Its threads and its handoff follow
+   * mln_resource_provider.release_user_data.
    */
   mln_user_data_release release_user_data;
   /** Header rules for a transform without a callback; empty with one. */
@@ -938,8 +933,7 @@ typedef struct mln_resource_response {
 /**
  * Intercepts a network resource request.
  *
- * The callback runs synchronously on the MapLibre thread that reaches the C API
- * network file source.
+ * The callback runs synchronously on a MapLibre thread.
  *
  * Request handling follows these rules:
  *
@@ -1076,11 +1070,11 @@ typedef struct mln_resource_provider {
    * MLN_RESOURCE_PROVIDER_DECISION_HANDLE and queues a copy of the request
    * with its handle as an MLN_DELIVERY_TYPE_RESOURCE_REQUEST delivery carrying
    * user_data. A request the queue refuses, because the queue was released or
-   * the copy could not be allocated, fails without native loading. Process exit
-   * permits pass-through. After
-   * replacement, clear, or runtime teardown retires the registration, the
-   * queue receives one MLN_DELIVERY_TYPE_RETIRED delivery carrying user_data,
-   * after the registration's last request delivery.
+   * the copy could not be allocated, fails without native loading, except
+   * during process exit, which passes it through. After replacement, clear, or
+   * runtime teardown retires the registration, the queue receives one
+   * MLN_DELIVERY_TYPE_RETIRED delivery carrying user_data, after the
+   * registration's last request delivery.
    */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
   /** The requests that reach the provider; empty to claim every request. */
@@ -1126,9 +1120,8 @@ MLN_API mln_status mln_runtime_create(
  * The provider sees every network request, including one the ambient cache
  * holds a fresh copy of. MapLibre delivers the cached copy first, then asks the
  * provider to revalidate it, with prior_etag, prior_modified, and
- * prior_expires describing that copy. Unlike the native online file source,
- * the C API does not wait for the copy to expire before asking; the provider
- * decides whether the copy is still fresh, and answers NOT_MODIFIED to keep it.
+ * prior_expires describing that copy, even before the copy expires. The
+ * provider answers NOT_MODIFIED to keep it.
  *
  * The function copies the provider shape and accepts the change from any
  * thread. Execution is ordered with every other command for this runtime.
@@ -1145,9 +1138,7 @@ MLN_API mln_status mln_runtime_create(
  *
  * In queue mode, no host code runs on the requesting thread: each request
  * reaches the provider's queue, and the host completes it or passes it through
- * after draining. A refused delivery, including a released queue or failed
- * request copy, fails the request. Only process exit permits automatic
- * pass-through after a refused delivery.
+ * after draining.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
@@ -1174,9 +1165,9 @@ MLN_API mln_status mln_runtime_set_resource_provider(
  * The function accepts the change from any thread and orders it with every
  * other command for this runtime. The completion reports the terminal command
  * disposition. The C API invokes the previous provider's release_user_data
- * after every in-flight callback returns. Later requests use MapLibre's online
- * file source. Requests that the previous provider already handled retain their
- * handles.
+ * after every in-flight callback returns. Later requests use the built-in
+ * network loader. Requests that the previous provider already handled retain
+ * their handles.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
@@ -1211,7 +1202,7 @@ MLN_API mln_status mln_runtime_clear_resource_provider(
  * - MLN_STATUS_INVALID_STATE when handle has been released, or the request was
  *   cancelled, already completed, passed through, or can no longer accept a
  * response.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_resource_request_complete(
   mln_resource_request handle, const mln_resource_response* response,
@@ -1310,8 +1301,8 @@ MLN_API mln_status mln_resource_request_set_cancel_callback(
  * to complete it. A provider callback that returns
  * MLN_RESOURCE_PROVIDER_DECISION_HANDLE may release the handle inline.
  * Releasing a handled request that is neither completed nor cancelled fails it
- * with an MLN_RESOURCE_ERROR_REASON_OTHER error, so MapLibre never waits on a
- * request its provider dropped. That failure reaches the map asynchronously.
+ * with an MLN_RESOURCE_ERROR_REASON_OTHER error, which reaches the map
+ * asynchronously.
  * A request handle is not a child of its runtime, whether the provider still
  * holds it or its failure is still queued, so it never makes
  * mln_runtime_release() or mln_map_release() return MLN_STATUS_INVALID_STATE.
@@ -1394,7 +1385,7 @@ MLN_API mln_status mln_runtime_clear_resource_transform(
  *   empty, or url has null data with a nonzero size or contains embedded NUL.
  * - MLN_STATUS_INVALID_STATE when request has been released or already
  *   answered.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_resource_transform_request_complete(
   mln_resource_transform_request request, mln_buffer_view url,
@@ -1428,8 +1419,8 @@ MLN_API void mln_resource_transform_request_release(
  * keeps user_data valid until a committed replacement or clear command, or
  * until native runtime teardown finishes.
  *
- * A transform without a callback adds headers through its rules in native
- * code, which a host that cannot run code on a MapLibre thread can use.
+ * A transform without a callback adds headers through its rules, so a host
+ * that cannot run code on a MapLibre thread can use it.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
@@ -1545,15 +1536,17 @@ MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
  * released maps' teardown and each submission's completion and release
  * callback, has finished. The runtime's worker has exited, including its
  * thread-local cleanup, and runtime-owned callback and resource state has
- * retired. A shared finalizer delivers the completion after joining that
- * worker. The completion must not block. Shared native services and the
- * finalizer's own return remain outside this guarantee; release completion does
- * not permit unloading the library. A host that outlives its runtimes may pass
+ * retired. The completion must not block. Shared native services remain
+ * outside this guarantee; release completion does not permit unloading the
+ * library. A host that outlives its runtimes may pass
  * a discarding completion.
  *
+ * Items that the runtime's registrations already pushed to a delivery queue
+ * stay in that queue, so the completion can run before the host drains them.
+ *
  * Teardown may allocate. Allocation failure after acceptance terminates the
- * process. A worker that exits slowly delays other runtimes' release
- * completions on the shared finalizer.
+ * process. A runtime whose teardown is slow delays other runtimes' release
+ * completions.
  *
  * A process may exit at any point, including while runtimes and maps are live
  * and their work is in flight. Render sessions may stay live too, once their
@@ -1611,7 +1604,6 @@ MLN_API mln_status mln_runtime_release(
 /**
  * Consumes a runtime handle without observing its asynchronous retirement.
  *
- * Retirement releases callback state and resources on their required threads.
  * A successful call consumes the handle before returning. A failed call
  * retains caller ownership. Retirement waits for live and pending children and
  * accepted work. Existing children retain their own cleanup obligations;
@@ -1690,7 +1682,7 @@ MLN_API mln_status mln_runtime_clear_event_handler(
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or mask
  *   holds a bit outside MLN_RUNTIME_EVENT_MASK_ALL.
  * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_runtime_set_event_mask(
   mln_runtime runtime, uint64_t mask MLN_BINDING("enum=mln_runtime_event_mask"),
@@ -1710,7 +1702,7 @@ MLN_API mln_status mln_runtime_set_event_mask(
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or out_mask
  *   is null.
  * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_runtime_get_event_mask(
   mln_runtime runtime,

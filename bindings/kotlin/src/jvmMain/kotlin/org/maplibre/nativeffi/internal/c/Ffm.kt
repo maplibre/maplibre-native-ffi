@@ -13,14 +13,11 @@ import java.lang.invoke.MethodHandle
 import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
 
-/**
- * Builds the FFM downcalls and upcall stubs that the generated declarations name.
- *
- * Pointers cross as `JAVA_LONG`: every JVM target is 64-bit, where a pointer and a 64-bit integer
- * share one calling convention. A record passed or returned by value keeps its full layout, which
- * the calling convention classifies field by field.
- */
+/** Builds the FFM downcalls and upcall stubs that the generated declarations name. */
 internal object Ffm {
+  // Pointers cross as `JAVA_LONG`: every JVM target is 64-bit, where a pointer and a 64-bit
+  // integer share one calling convention. A record passed or returned by value keeps its full
+  // layout, which the calling convention classifies field by field.
   private val linker = Linker.nativeLinker()
   private val symbols = SymbolLookup.loaderLookup()
   private val segmentAddress =

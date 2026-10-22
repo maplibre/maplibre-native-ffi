@@ -8,13 +8,10 @@
  * Include this header separately from maplibre_native_c.h.
  *
  * A plugin integration calls its own registration entry point with the
- * function returned by mln_plugin_get_register_function_v1(). The plugin
- * registers its descriptors through that pointer, into this library's copy
- * of MapLibre Native. The integration owns loading the plugin and keeping
- * its code loaded for the process lifetime.
+ * function returned by mln_plugin_get_register_function_v1(), once per process
+ * and before any style that uses its layer types loads. The integration owns
+ * loading the plugin and keeping its code loaded for the process lifetime.
  *
- * A plugin registers once per process, before any style that uses its layer
- * types loads, into the copy of MapLibre Native that this library carries.
  * The plugin must be built against the same MapLibre Native revision as the
  * library; upstream does not yet promise ABI stability for this API.
  *
@@ -42,11 +39,7 @@
 extern "C" {
 #endif
 
-/**
- * Returns the process-wide mln_plugin_register_v1 entry point; never null.
- *
- * The returned function follows the registration contract in this header.
- */
+/** Returns the process-wide mln_plugin_register_v1 entry point; never null. */
 MLN_BINDING("kind=native_pointer;ownership=borrowed;lifetime=process")
 MLN_API mln_plugin_register_function_v1
 mln_plugin_get_register_function_v1(void) MLN_NOEXCEPT;

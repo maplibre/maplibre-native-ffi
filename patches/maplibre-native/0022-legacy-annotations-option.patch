@@ -1,3 +1,7 @@
+Adds the MLN_WITH_LEGACY_ANNOTATIONS CMake option, which this build turns off, so
+a style gains no annotation source.
+Upstream: https://github.com/maplibre/maplibre-native/pull/4675
+
 diff --git a/CMakeLists.txt b/CMakeLists.txt
 index 77756c64ef19..4e3ba384640a 100644
 --- a/CMakeLists.txt

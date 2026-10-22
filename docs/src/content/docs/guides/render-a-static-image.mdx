@@ -10,41 +10,34 @@ import { region } from "../../../snippets";
 
 import stillImage from "../../../../snippets/c/still-image.c?raw";
 
-A still-image job uses a session-owned texture target with a ring depth of one.
-The host requests a frame, waits for its terminal result, and starts readback of
-the completed texture.
+A still image renders one frame into a session-owned texture and reads its
+pixels back to the CPU.
 
 ## Request one image
 
-Create a static map and an owned texture target at the required logical size.
-Use private OpenGL through EGL for CPU readback on a core worker. Keep the EGL
-display initialized until detach completes.
+Create a static map, and attach an owned texture target at the image size. For
+CPU readback, use OpenGL on a private EGL context.
 
 <Code code={region(stillImage, "create")} lang="c" title="still-image.c" />
 
 <Code code={region(stillImage, "attach")} lang="c" title="still-image.c" />
 
-After attachment completes, load the style and request a still image on the map.
-Submit frame demand on the session with a token that identifies the job. A
-core-worker target needs no host graphics service.
-
-The frame wake schedules a host turn without blocking. Drain the frame results
-and continue requesting until the job has a rendered frame.
+After attachment completes, load the style, request a still image on the map,
+and demand a frame on the session. Drain frame results when the frame wake
+fires, until the frame renders.
 
 <Code code={region(stillImage, "drain-result")} lang="c" title="still-image.c" />
 
-Readback needs both the rendered result and the still-image completion, which
-run independently of each other.
+Start readback once both the rendered frame and the still-image completion have
+arrived.
 
 <Code code={region(stillImage, "start-readback")} lang="c" title="still-image.c" />
 
 ## Read the pixels
 
-After both signals arrive, start readback. Copy its premultiplied RGBA8 bytes
-before the completion callback returns, using the reported row stride.
+Copy the pixels that you keep.
 
 <Code code={region(stillImage, "read")} lang="c" title="still-image.c" />
 
-Detach and destroy the session after readback, then release the map and runtime.
-The [texture reference](/maplibre-native-ffi/reference/c/texture_8h.html) covers
-readback capabilities and pixel layout.
+Detach the session, then release the map and runtime. The
+[texture reference](/maplibre-native-ffi/reference/c/texture_8h.html) defines readback and its pixel layout.

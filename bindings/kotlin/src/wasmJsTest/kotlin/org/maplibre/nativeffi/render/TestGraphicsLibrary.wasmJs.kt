@@ -11,7 +11,8 @@ import org.maplibre.nativeffi.internal.memory.NativeMemory
  * The browser's graphics fixtures. The page creates its WebGL 2 context or WebGPU device, which the
  * suite imports through [BrowserGraphics], and `bindings/kotlin/wasm/test_support.c` adds the
  * canvases that a session's core worker takes over. The browser keeps its own fixtures, because
- * WebGL contexts and WebGPU devices come from JavaScript; see tests/graphics/README.md.
+ * WebGL contexts and WebGPU devices come from JavaScript; see
+ * tests/graphics/include/mln_test_graphics.h.
  */
 internal actual object TestGraphicsLibrary {
   // Kept for the process, as the context that every caller-driven session shares.

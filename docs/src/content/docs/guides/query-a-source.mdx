@@ -11,58 +11,41 @@ import { region } from "../../../snippets";
 import sourceFeatures from "../../../../snippets/c/query-source-features.c?raw";
 import clusterLeaves from "../../../../snippets/c/cluster-leaves.c?raw";
 
-A source query reports the loaded features in a source, including features that
+A source query reads the loaded features of a source, including features that
 no layer draws. To find features at a screen position, use
-[Query a map](/maplibre-native-ffi/guides/query-a-map/).
-
-Run the query on a session that has rendered a frame. Continue caller-driver
-service until the query completes.
+[Query a map](/maplibre-native-ffi/guides/query-a-map/). The query covers only
+the tiles loaded for the current camera, so its result changes as the camera
+moves.
 
 ## Run the query
 
-Name the source-layer IDs for a vector source, because one tile can hold several
-layers. A GeoJSON source needs only its source ID.
+A vector source needs its source-layer IDs, because one tile can hold several
+layers.
 
 <Code code={region(sourceFeatures, "options")} lang="c" title="query-source-features.c" />
 
-Name the source itself by its style source ID. That ID is the query's second
-argument, and it differs from the source-layer IDs in the options.
+Name the source by its style source ID.
 
 <Code code={region(sourceFeatures, "query")} lang="c" title="query-source-features.c" />
 
-Copy every value that the host keeps.
+Copy what you keep.
 
 <Code code={region(sourceFeatures, "read")} lang="c" title="query-source-features.c" />
 
-A query covers the tiles that the source loaded for the current camera. Its
-result therefore changes as the camera moves and more tiles arrive. A source
-loads tiles only while a layer uses it.
-
 ## Expand a cluster
 
-Use the `supercluster` extension on a cluster feature from a GeoJSON source.
-Its `leaves` field returns the features in that cluster.
-
-`supercluster` matches numbers by exact native JSON type. Encode `limit` and
-`offset` as nonnegative integer literals so MapLibre reads them as unsigned
-values.
+The `supercluster` extension's `leaves` field returns the features inside a
+cluster feature from a GeoJSON source. Its arguments are a JSON object.
 
 <Code code={region(clusterLeaves, "arguments")} lang="c" title="cluster-leaves.c" />
 
-The call names the source, the cluster feature, the extension, and the field
-within that extension.
+Pass the cluster feature from a query result.
 
 <Code code={region(clusterLeaves, "query")} lang="c" title="cluster-leaves.c" />
 
-Parse the borrowed JSON result as a GeoJSON FeatureCollection before the callback
-returns, or copy it for later use.
+The result is a GeoJSON FeatureCollection.
 
 <Code code={region(clusterLeaves, "leaves")} lang="c" title="cluster-leaves.c" />
 
-Pass the Feature bytes from a queried feature to the extension query.
-`supercluster` also matches `cluster_id` by exact JSON type. Preserve its
-nonnegative integer literal; rewriting every number as a double produces a
-successful query with an empty result.
-
-The [query reference](/maplibre-native-ffi/reference/c/query_8h.html) covers
-source queries and extension results.
+The [query reference](/maplibre-native-ffi/reference/c/query_8h.html) defines source queries and extension
+results.

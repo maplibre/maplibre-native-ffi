@@ -1,3 +1,7 @@
+Removes the extra PKIXRevocationChecker pass and keeps Android's trust-manager
+policy, as Element X Android resolved
+https://github.com/rustls/rustls-platform-verifier/issues/221.
+
 diff --git a/android/rustls-platform-verifier/src/main/java/org/rustls/platformverifier/CertificateVerifier.kt b/android/rustls-platform-verifier/src/main/java/org/rustls/platformverifier/CertificateVerifier.kt
 index febbcfd..b45bd5e 100644
 --- a/android/rustls-platform-verifier/src/main/java/org/rustls/platformverifier/CertificateVerifier.kt

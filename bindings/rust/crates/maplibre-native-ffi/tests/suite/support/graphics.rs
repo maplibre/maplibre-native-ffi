@@ -1,7 +1,8 @@
 //! GPU contexts from tests/graphics, loaded over its C ABI.
 //!
 //! The library installs beside the C API library, so it loads from the same
-//! search path the test process already has. See tests/graphics/README.md.
+//! search path the test process already has. See
+//! tests/graphics/include/mln_test_graphics.h.
 //! The backend is the one this build compiled in, which the build script reads
 //! from the native install as `mln_render_backend`.
 

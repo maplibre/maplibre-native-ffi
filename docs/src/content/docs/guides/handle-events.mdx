@@ -24,13 +24,10 @@ reads.
 
 ## Receive and route events
 
-A callback borrows a span of events until it returns. Copy values that the host
-keeps. Bindings copy the records and their messages before invoking the host.
+A callback borrows a span of events until it returns, so copy what the host
+keeps.
 
 <Code code={region(handleEvents, "drain")} lang="c" title="handle-events.c" />
-
-In C, step through records using the batch's stride. Read message bytes at the
-offset carried by each event.
 
 Check the source kind and ID before interpreting an event, because one runtime
 can serve several maps. Bindings expose a handle's ID for this comparison.
@@ -43,28 +40,12 @@ Read the structured payload according to its type.
 
 ## Receive callbacks on the host loop
 
-A host whose runtime cannot run code on a native thread, such as a JavaScript
-engine, receives every callback it need not answer at once through a delivery
-queue: completions, log records, resource requests and their cancellations,
-resource transform requests, camera transition ends, runtime event spans, and
-custom source tile fetches and cancels. It creates one queue with a wake, and
-sets that queue in place of the callbacks of each registration.
-
-The wake schedules a drain on the host loop and returns promptly. A queue
-that receives log records also follows the log callback restrictions: its wake
-and wake release callback must not call the library. Each drain returns every
-queued delivery in one owned batch, in push order. Take each handle that the
-host keeps, such as a created map or a resource request, from the batch before
-releasing it; the batch disposes what the host leaves. A drain that cannot
-allocate its batch keeps the deliveries queued, and the next delivery wakes the
-queue again; a host that cannot wait for it drains again on its own schedule.
-The [delivery reference](/maplibre-native-ffi/reference/c/delivery_8h.html)
-lists the delivery types and their payloads.
-
-Use opaque host tokens as each registration's user data. Retain the token state
-until its final delivery is handled, or abandon that state when releasing the
-queue. A runtime release waits for native insertion of earlier deliveries; the
-host may still have batches to drain afterward.
+A host that cannot run code on a native thread, such as a JavaScript engine,
+creates one delivery queue and sets it in place of the callbacks of each
+registration. The queue's wake schedules a drain on the host loop, and each
+drain returns the queued completions, events, and requests in one batch. The
+[delivery reference](/maplibre-native-ffi/reference/c/delivery_8h.html) states
+the queue's rules.
 
 ## React to changes
 

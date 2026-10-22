@@ -11,9 +11,7 @@ namespace Maplibre.NativeFfi.Internal.Memory;
 /// when the call returns.
 /// </summary>
 /// <remarks>
-/// A registration becomes permanent only after <see cref="Accept"/>. The
-/// operation half of this class, in NativeCallScope.Operation.cs, enters
-/// generated operations and submits their completions.
+/// A registration becomes permanent only after <see cref="Accept"/>.
 /// </remarks>
 internal sealed unsafe partial class NativeCallScope : IDisposable
 {

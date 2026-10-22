@@ -1321,7 +1321,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Releases a map after synchronous state preflight.
+    /// Releases a map asynchronously.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_release</c> in the <see

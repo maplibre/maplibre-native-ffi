@@ -4,11 +4,10 @@ import java.lang.ref.PhantomReference
 import java.lang.ref.ReferenceQueue
 import java.util.concurrent.ConcurrentHashMap
 
+// Built on `PhantomReference` because `java.lang.ref.Cleaner` needs API 33 and the binding
+// supports API 24.
 /**
  * Runs registered actions once their referents become unreachable.
- *
- * Built on `PhantomReference` because `java.lang.ref.Cleaner` needs API 33 and the binding supports
- * API 24.
  *
  * A registered action must hold cleanup state only. An action that captures its referent keeps the
  * referent strongly reachable from this registry, so the action never runs.
@@ -18,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap
 internal class UnreachableActions private constructor(threadName: String) {
   private val queue = ReferenceQueue<Any>()
 
-  /** Keeps registrations reachable so the collector can enqueue them. */
+  // Keeps registrations reachable so the collector can enqueue them.
   private val pending = ConcurrentHashMap.newKeySet<Registration>()
   private val pendingLock = Any()
 

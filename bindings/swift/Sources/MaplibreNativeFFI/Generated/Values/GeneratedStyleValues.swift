@@ -354,7 +354,8 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
   public var lineMetrics: Bool?
   /// Clusters point features. Defaults to false.
   public var cluster: Bool?
-  /// Slices requested tiles inline during the update pass. Defaults to false.
+  /// Tiles the data for the next render update instead of in the background.
+  /// Defaults to false.
   public var synchronousTiling: Bool?
   public static var `default`: Self {
     try! Self(raw: mln_geojson_source_options_default())
@@ -1203,12 +1204,11 @@ public struct StyleTransitionOptionField: OptionSet, NativeOpenValue, Equatable,
 /// See `mln_style_transition_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleTransitionOptions: Equatable, Hashable, Sendable {
-  /// Transition duration in milliseconds. Must be finite and non-negative.
-  /// Values that would overflow MapLibre Native's internal duration are
-  /// invalid.
+  /// Transition duration in milliseconds. Must be finite, non-negative, and
+  /// short enough to represent as a duration.
   public var durationMs: Double?
-  /// Transition delay in milliseconds. Must be finite and non-negative. Values
-  /// that would overflow MapLibre Native's internal duration are invalid.
+  /// Transition delay in milliseconds. Must be finite, non-negative, and short
+  /// enough to represent as a duration.
   public var delayMs: Double?
   /// Whether symbol placement changes cross-fade.
   public var enablePlacementTransitions: Bool?

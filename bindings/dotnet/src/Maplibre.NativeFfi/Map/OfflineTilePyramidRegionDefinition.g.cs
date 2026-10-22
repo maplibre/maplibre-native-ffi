@@ -13,8 +13,8 @@ namespace Maplibre.NativeFfi;
 /// Style URL. Copied during region creation.
 /// </param>
 /// <param name="MaxZoom">
-/// Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
-/// each tile source use its own maximum zoom.
+/// Maximum zoom. Positive infinity lets each tile source use its own maximum
+/// zoom.
 /// </param>
 public readonly partial record struct OfflineTilePyramidRegionDefinition(
     string StyleUrl,

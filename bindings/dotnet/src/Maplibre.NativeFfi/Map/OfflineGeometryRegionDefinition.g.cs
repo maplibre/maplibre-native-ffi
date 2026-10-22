@@ -45,8 +45,8 @@ public readonly record struct OfflineGeometryRegionDefinition
     public double MinZoom { get; init; }
 
     /// <summary>
-    /// Maximum zoom. Positive infinity follows MapLibre Native behavior and
-    /// lets each tile source use its own maximum zoom.
+    /// Maximum zoom. Positive infinity lets each tile source use its own
+    /// maximum zoom.
     /// </summary>
     public double MaxZoom { get; init; }
     public float PixelRatio { get; init; }

@@ -17,12 +17,12 @@ public sealed record ProjectionMode
     public bool? Axonometric { get; set; }
 
     /// <summary>
-    /// Native x-skew factor used by the axonometric transform.
+    /// X-skew factor of the axonometric transform.
     /// </summary>
     public double? XSkew { get; set; }
 
     /// <summary>
-    /// Native y-skew factor used by the axonometric transform.
+    /// Y-skew factor of the axonometric transform.
     /// </summary>
     public double? YSkew { get; set; }
     public static ProjectionMode Default

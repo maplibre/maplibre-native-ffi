@@ -2,6 +2,10 @@
 
 Plans contain semantic decisions, never target-language source. Backends render
 these plans and keep allocation, callback roots, and scheduling in their runtime.
+A plan names each public member once, and an emitter only converts its case and
+escapes keywords. Resolve a new relationship here, once, so that every emitter
+consumes it; emitters report the shapes that they cannot lower and never invent
+ownership.
 """
 
 from __future__ import annotations
@@ -87,6 +91,7 @@ class MaskFlag:
     mask: str
     name: str
     value: int
+    # The flag constant without its enum's shared prefix.
     member: str = ""
 
 
@@ -249,6 +254,8 @@ class BorrowedViewPlan:
     output: ParameterPlan
     begin: str
     end: str
+    # The view operation's member without a leading `get_`, read as
+    # `with_<stem>`.
     stem: str
 
 
@@ -311,6 +318,8 @@ class OperationPlan:
     result: ValuePlan | None
     registrations: tuple[RegistrationPlan, ...] = ()
     consumes: str | None = None
+    # The record default, handle disposal, borrowed view scope, or delivery
+    # protocol that the operation backs.
     support: DefaultSupport | DisposeSupport | ViewSupport | DeliverySupport | None = (
         None
     )
@@ -318,8 +327,11 @@ class OperationPlan:
     owned_outputs: tuple[OwnedOutputPlan, ...] = ()
     view: BorrowedViewPlan | None = None
     scoped_receiver: str | None = None
+    # Whether the function returns the status enum.
     status: bool = False
+    # The public name; see Binder.member.
     member: str = ""
+    # The `absent_on=` status, its value, and the output that it reports absent.
     absence: AbsencePlan | None = None
     # What an immediate call waits for before it returns, such as a native
     # thread start, which some host threads cannot wait for.

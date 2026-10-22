@@ -27,13 +27,13 @@ public struct AnimationOptionField: OptionSet, NativeOpenValue, Equatable,
 /// See `mln_animation_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct AnimationOptions: Sendable {
-  /// Duration in milliseconds. Must be finite and non-negative. Values that
-  /// would overflow MapLibre Native's internal duration are invalid.
+  /// Duration in milliseconds. Must be finite, non-negative, and short enough
+  /// to represent as a duration.
   public var durationMs: Double?
   /// Average fly velocity in screenfuls per second. Must be positive and
-  /// finite; defaults to 1.2 when omitted. A flight whose derived duration
-  /// exceeds Native's nanosecond duration range fails its completion with
-  /// `MLN_STATUS_NATIVE_ERROR`. An explicit duration overrides velocity.
+  /// finite; defaults to 1.2 when omitted. A flight whose derived duration is
+  /// too long to represent fails its completion with `MLN_STATUS_NATIVE_ERROR`.
+  /// An explicit duration overrides velocity.
   public var velocity: Double?
   /// Peak zoom for flyTo transitions.
   public var minZoom: Double?
@@ -781,7 +781,9 @@ public struct FeatureStateSelector: Equatable, Hashable, Sendable {
   public var sourceId: String
   /// Optional source layer ID. Required for vector-source disambiguation.
   public var sourceLayerId: String?
-  /// Optional feature ID. Required by set and get, optional for remove.
+  /// Optional feature ID. Required by set and get, optional for remove. A
+  /// numeric feature ID matches its decimal text, such as "7" for the GeoJSON
+  /// id 7.
   public var featureId: String?
   /// Optional state key. Used only by remove and requires feature_id.
   public var stateKey: String?
@@ -1260,7 +1262,7 @@ public struct MapTileOptionField: OptionSet, NativeOpenValue, Equatable,
 /// See `mln_map_tile_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapTileOptions: Equatable, Hashable, Sendable {
-  /// Native uint8_t prefetch zoom delta.
+  /// Prefetch zoom delta, at most 255.
   public var prefetchZoomDelta: UInt32?
   public var lodMinRadius: Double?
   public var lodScale: Double?
@@ -1505,8 +1507,8 @@ public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
   /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
   public var geometry: Data
   public var minZoom: Double
-  /// Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
-  /// each tile source use its own maximum zoom.
+  /// Maximum zoom. Positive infinity lets each tile source use its own maximum
+  /// zoom.
   public var maxZoom: Double
   public var pixelRatio: Float
   public var includeIdeographs: Bool
@@ -1694,8 +1696,8 @@ public struct OfflineTilePyramidRegionDefinition: Equatable, Hashable,
   public var styleUrl: String
   public var bounds: LatLngBounds
   public var minZoom: Double
-  /// Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
-  /// each tile source use its own maximum zoom.
+  /// Maximum zoom. Positive infinity lets each tile source use its own maximum
+  /// zoom.
   public var maxZoom: Double
   public var pixelRatio: Float
   public var includeIdeographs: Bool
@@ -1789,9 +1791,9 @@ public struct ProjectedMeters: Equatable, Hashable, Sendable {
 public struct ProjectionMode: Equatable, Hashable, Sendable {
   /// Enables a non-perspective axonometric render transform.
   public var axonometric: Bool?
-  /// Native x-skew factor used by the axonometric transform.
+  /// X-skew factor of the axonometric transform.
   public var xSkew: Double?
-  /// Native y-skew factor used by the axonometric transform.
+  /// Y-skew factor of the axonometric transform.
   public var ySkew: Double?
   public static var `default`: Self {
     Self(raw: mln_projection_mode_default())
@@ -1892,7 +1894,8 @@ public struct Quaternion: Equatable, Hashable, Sendable {
   }
 }
 
-/// Screen-space point in logical map pixels.
+/// Screen-space point in logical map pixels, from the top-left of the viewport
+/// with y growing downward.
 ///
 /// See `mln_screen_point` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

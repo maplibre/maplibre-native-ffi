@@ -15,9 +15,8 @@ rendering a new map.
 
 ## Choose where the style comes from
 
-Set a style URL for a hosted base map. MapLibre fetches it through the resource
-system that also loads tiles. The request therefore uses the runtime's cache,
-offline regions, and resource transform.
+Set a style URL for a hosted base map. Like a tile request, it uses the
+runtime's cache, offline regions, and resource transform.
 
 <Code code={region(loadStyle, "url")} lang="c" title="load-style.c" />
 
@@ -53,8 +52,6 @@ of them.
 A host adds its own data after the style-loaded event and repeats those changes
 after every later style load. A host that switches base maps keeps the changes
 that it needs to replay.
-
-Camera state survives a style load unchanged.
 
 The [style reference](/maplibre-native-ffi/reference/c/style_8h.html) defines
 style commands and their completion outcomes.

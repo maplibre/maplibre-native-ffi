@@ -10,13 +10,13 @@ import { region } from "../../../snippets";
 
 import styleByData from "../../../../snippets/c/style-by-data.c?raw";
 
-A layer property contains a constant or an expression. An expression reads each
-feature's data, allowing one rule to style every feature. A property value
-belongs to the loaded style. Set it again after every later style load, as
+A layer property holds a constant or an expression. An expression reads each
+feature's data, so one rule styles every feature. A property value belongs to
+the loaded style, so set it again after each later style load, as
 [Load a style](/maplibre-native-ffi/guides/load-a-style/) describes.
 
-Style properties use style-spec JSON values. An expression is an array whose
-first element names the operator and whose remaining elements are its arguments.
+Style properties use style-spec JSON. An expression is an array whose first
+element names the operator, followed by its arguments.
 
 <Code code={region(styleByData, "node")} lang="c" title="style-by-data.c" />
 
@@ -25,24 +25,17 @@ selects linear interpolation.
 
 <Code code={region(styleByData, "expression")} lang="c" title="style-by-data.c" />
 
-Interpolate the circle radius from 4 pixels at magnitude 1 to 24 pixels at
-magnitude 6.
+This property interpolates the circle radius from 4 pixels at magnitude 1 to 24
+pixels at magnitude 6.
 
 <Code code={region(styleByData, "property")} lang="c" title="style-by-data.c" />
 
-Setting a property takes one layer and one property name, and the name is the
-one that the style specification defines for that layer's type.
+Name the property as the style specification does for the layer's type.
 
 <Code code={region(styleByData, "set")} lang="c" title="style-by-data.c" />
 
-Set the `filter` property to select which source features the layer draws.
-Pass JSON `null` to clear the filter.
+The `filter` property selects which source features the layer draws.
 
 <Code code={region(styleByData, "filter")} lang="c" title="style-by-data.c" />
 
-The host owns the byte storage. Each call copies the property value before it
-returns.
-
-Render the next map update to show the new appearance. The
-[style reference](/maplibre-native-ffi/reference/c/style_8h.html) defines property
-and filter commands.
+The [style reference](/maplibre-native-ffi/reference/c/style_8h.html) defines property and filter commands.

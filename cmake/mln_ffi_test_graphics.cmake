@@ -1,6 +1,8 @@
 # Builds tests/graphics, the GPU fixtures that the C suite and the binding
-# suites share. See tests/graphics/README.md for its interface and how each
-# binding loads it.
+# suites share. tests/graphics/include/mln_test_graphics.h states its interface.
+# A binding that compiles graphics.c itself, as Swift does, adds MapLibre
+# Native's vendor/Vulkan-Headers/include to its include path, and links dl on
+# Linux, or user32 and gdi32 on Windows.
 #
 # Two targets come from the one source file:
 #

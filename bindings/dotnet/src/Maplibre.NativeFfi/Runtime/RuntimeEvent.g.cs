@@ -24,9 +24,8 @@ namespace Maplibre.NativeFfi;
 /// <c>MLN_RUNTIME_EVENT_SOURCE_RUNTIME</c>.
 /// </param>
 /// <param name="Code">
-/// Secondary event detail whose meaning type selects. Depending on type it
-/// carries an <c>mln_camera_change_mode</c>, a MapLibre Native error ordinal,
-/// or 0. See <c>mln_runtime_event_type</c> for the per-type meaning.
+/// Secondary event detail whose meaning type selects; see
+/// <c>mln_runtime_event_type</c>.
 /// </param>
 /// <param name="Message">
 /// Borrowed UTF-8 message bytes, empty when this event carries no message.

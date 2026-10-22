@@ -1,3 +1,9 @@
+Keeps thread-exit cleanup of the implicit run loop under
+-fno-c++-static-destructors. That flag also drops the destructor of vendored
+glslang's per-thread default pool, so a thread leaks what it allocated from
+that pool outside a TShader or TProgram.
+Upstream: not proposed
+
 diff --git a/src/mln/actor/scheduler.cpp b/src/mln/actor/scheduler.cpp
 index 6caba3b..e69ff4e 100644
 --- a/src/mln/actor/scheduler.cpp

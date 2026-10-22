@@ -7,8 +7,7 @@ interface Waiter {
 }
 
 /**
- * The part of an `AbortSignal` that {@link AwaitableWake.next} reads. It is
- * declared here so that the package's types name no host global.
+ * The part of an `AbortSignal` that {@link AwaitableWake.next} reads.
  */
 export interface AwaitableWakeSignal {
   readonly aborted: boolean;
@@ -42,7 +41,7 @@ export class AwaitableWake {
   #latched = false;
   readonly #waiters = new Set<Waiter>();
 
-  /** The wake callback, which the realm runs when native code wakes it. */
+  /** The wake callback to pass to native code or call from a callback. */
   readonly wake: () => void = () => {
     if (this.#waiters.size === 0) {
       this.#latched = true;

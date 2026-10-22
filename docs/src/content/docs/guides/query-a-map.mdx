@@ -10,43 +10,28 @@ import { region } from "../../../snippets";
 
 import querySnippet from "../../../../snippets/c/query-rendered-features.c?raw";
 
-A rendered feature query finds features in the last frame at a screen position.
-Use it for hit testing. To read source features that no layer draws, use
+A rendered feature query finds the features drawn at a screen position, for hit
+testing. To read source features that no layer draws, use
 [Query a source](/maplibre-native-ffi/guides/query-a-source/).
 
-Run the query on a session that has rendered a frame. Continue caller-driver
-service until the query completes.
+The query reads the last frame that the session drew, so run it after a frame
+renders.
 
-The query uses the last frame that the session drew. Render after a camera move
-or style change when the result must match the new state. A query finds features
-after the relevant tiles load and render.
-
-Screen coordinates are logical map pixels measured from the top-left of the
-viewport. The map's coordinate-to-pixel query uses the same space. A host that
-tracks positions in physical device pixels divides them by the render session's
-scale factor.
-
-The geometry states where to search. A point matches the exact position, and a
-box matches a rectangle around it. A hit test uses a box with a few logical
-pixels of tolerance around the position, because symbols and thin lines are
-small targets.
+Search a box of a few logical pixels around the position rather than a point,
+because symbols and thin lines are small targets.
 
 <Code code={region(querySnippet, "geometry")} lang="c" title="query-rendered-features.c" />
 
-Naming the layer IDs that your host treats as selectable keeps background and
-land fills out of the result.
+Name the layers that your host treats as selectable, so that background and
+land fills stay out of the result.
 
 <Code code={region(querySnippet, "layers")} lang="c" title="query-rendered-features.c" />
 
-On success, the query returns queried features. Copy every value that the host
-keeps.
-
 <Code code={region(querySnippet, "query")} lang="c" title="query-rendered-features.c" />
 
-Each hit is a GeoJSON Feature plus optional source ID, source-layer ID, and
-feature state.
+Each hit carries its feature as GeoJSON. Copy what you keep.
 
 <Code code={region(querySnippet, "read")} lang="c" title="query-rendered-features.c" />
 
-The [query reference](/maplibre-native-ffi/reference/c/query_8h.html) defines
-query options and result ownership.
+The [query reference](/maplibre-native-ffi/reference/c/query_8h.html) defines the geometry, options, and
+results.

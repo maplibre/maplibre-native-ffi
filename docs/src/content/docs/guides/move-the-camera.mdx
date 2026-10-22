@@ -26,18 +26,17 @@ restored position, or for a camera that the host computes each frame.
 
 <Code code={region(cameraSnippet, "jump")} lang="c" title="camera.c" />
 
-Use ease for a short move that remains easy to follow. Set a duration to animate
-the move; the default duration applies it immediately.
+Use ease for a short move that remains easy to follow, with a duration to
+animate it.
 
 <Code code={region(cameraSnippet, "ease")} lang="c" title="camera.c" />
 
-Use fly for a long move. Its curved path zooms out while crossing the distance.
-MapLibre derives a duration when the host leaves it unset.
+Use fly for a long move. Its curved path zooms out while crossing the
+distance.
 
 <CameraPaths />
 
-Animated transitions advance on the native scheduler. Keep requesting frames
-while the repaint flag is set, as
+Keep requesting frames while the repaint flag is set, as
 [Run the render loop](/maplibre-native-ffi/guides/run-the-render-loop/) describes.
 
 ## Apply gesture input
@@ -61,8 +60,7 @@ A rotation or tilt can change bearing and pitch about the same anchor.
 <Code code={region(gestureSnippet, "rotate")} lang="c" title="camera-gesture.c" />
 
 Use an animated delta for release momentum, or end the gesture without changing
-camera fields when it has no momentum. Submit the next animated delta after the
-previous one finishes.
+camera fields when it has no momentum.
 
 <Code code={region(gestureSnippet, "release")} lang="c" title="camera-gesture.c" />
 
@@ -79,9 +77,7 @@ Apply the returned camera with the transition timing that you want.
 
 ## Observe or stop a transition
 
-Set an end handler to learn when the transition ends and read its final snapshot
-generation. A command completion reports application of the update; the end
-handler reports the transition's outcome.
+Set an end handler to learn when and how the transition ends.
 
 <Code code={region(cameraSnippet, "end")} lang="c" title="camera.c" />
 

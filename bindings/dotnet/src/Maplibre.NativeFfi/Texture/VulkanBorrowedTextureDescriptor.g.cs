@@ -38,10 +38,9 @@ public readonly record struct VulkanBorrowedTextureDescriptor
     }
 
     /// <summary>
-    /// Logical texture extent. The map viewport uses width and height and the
-    /// renderer uses scale_factor; the physical size is stated separately
-    /// below. A scale_factor that differs from the map's is accepted and logged
-    /// as a warning.
+    /// Logical texture extent; physical_width and physical_height give the
+    /// texture's size. A scale_factor that differs from the map's is accepted
+    /// and logged as a warning.
     /// </summary>
     public LogicalExtent Extent { get; init; }
 

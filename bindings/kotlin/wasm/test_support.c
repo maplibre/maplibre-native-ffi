@@ -204,9 +204,10 @@ EMSCRIPTEN_KEEPALIVE void mln_kw_test_pool_release(void) {
 // WebGL canvases
 //
 // The browser builds keep their own GPU fixtures, since WebGL contexts come
-// from JavaScript; see tests/graphics/README.md. The page creates the context
-// that its sessions share, and these fixtures add the canvases that a session's
-// core worker takes over. The JavaScript halves are in test_support.js.
+// from JavaScript; see tests/graphics/include/mln_test_graphics.h. The page
+// creates the context that its sessions share, and these fixtures add the
+// canvases that a session's core worker takes over. The JavaScript halves are
+// in test_support.js.
 
 void mln_kw_test_register_transferred_canvas(
   const char* selector, int32_t width, int32_t height, void* shared

@@ -1100,9 +1100,8 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
   /// Map snapshot generation that the event reports, or zero when source_type
   /// is `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
   public var generation: UInt64
-  /// Secondary event detail whose meaning type selects. Depending on type it
-  /// carries an `mln_camera_change_mode`, a MapLibre Native error ordinal, or
-  /// 0. See `mln_runtime_event_type` for the per-type meaning.
+  /// Secondary event detail whose meaning type selects; see
+  /// `mln_runtime_event_type`.
   public var code: Int32
   /// Borrowed UTF-8 message bytes, empty when this event carries no message.
   public var message: String

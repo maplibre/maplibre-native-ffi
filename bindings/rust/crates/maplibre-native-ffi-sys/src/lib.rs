@@ -1,9 +1,7 @@
 //! Raw declarations for the MapLibre Native public C ABI.
 //!
 //! This crate mirrors the C boundary: constants, layouts, opaque handle types,
-//! and unsafe extern functions that tools/bindgen generates from
-//! `include/maplibre_native_c.h` and `include/maplibre_native_c/plugin.h`.
-//! Safety policy and ergonomic adaptation live in crates above this layer.
+//! and unsafe extern functions. Prefer the safe `maplibre-native-ffi` crate.
 
 #![allow(non_camel_case_types)]
 

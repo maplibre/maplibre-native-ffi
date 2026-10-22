@@ -9,9 +9,9 @@ const sync = @import("sync.zig");
 pub const CommandDisposition = @import("maplibre_native_ffi.zig").CommandDisposition;
 const Wake = @import("maplibre_native_ffi.zig").Wake;
 
-/// Who holds the wake slot of a future: nobody yet, a registered wake that the
-/// completion fires, or nobody ever again because the completion arrived or the
-/// owner dropped the future.
+// Who holds the wake slot of a future: nobody yet, a registered wake that the
+// completion fires, or nobody ever again because the completion arrived or the
+// owner dropped the future.
 const WakeSlot = enum(u8) { idle, armed, settled };
 
 /// Runs a wake the future took, then releases its context.

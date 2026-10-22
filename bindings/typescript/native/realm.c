@@ -769,7 +769,8 @@ static void realm_cleanup(void* data) {
   pthread_mutex_lock(&realm->owners_lock);
   while (realm->owners != NULL) {
     // The external's own finalizer, if the host still runs it, frees the
-    // owner and finds no token.
+    // owner and finds no token. Bun 1.4.3 and Deno 2.9.7 never run it for an
+    // external that outlives a worker, so that owner's record leaks.
     mln_ts_owner* owner = realm->owners;
     realm->owners = owner->next;
     owner->linked = false;

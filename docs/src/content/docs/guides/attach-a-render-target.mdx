@@ -24,27 +24,20 @@ Metal and Vulkan support either driver. WebGPU requires the caller driver.
 ### OpenGL targets
 
 Existing EGL, WGL, and WebGL contexts use the caller driver. A private EGL owned
-texture target uses a core worker and supports CPU readback. A transferred
-`OffscreenCanvas` also uses a core worker. The
-[target reference](/maplibre-native-ffi/reference/c/render__target_8h.html)
-states each context's ownership rules.
+texture target and a transferred `OffscreenCanvas` use a core worker.
 
 ### Shared Vulkan queues
 
-Pass a queue lock when the host and session submit to the same Vulkan queue.
-Both take the same lock around queue calls. Release it before calling the C API
-so that driver work can acquire it.
+Pass a queue lock when the host and the session submit to the same Vulkan queue.
+The [target reference](/maplibre-native-ffi/reference/c/render__target_8h.html)
+states the rules for contexts and queue locks.
 
 ## Attach the target
 
-Provide the graphics context and extent in the backend descriptor. Install wakes
-to schedule frame-result drains and caller-driver service. Wake callbacks must
-return without blocking. Keep the host's graphics resources alive until teardown
-finishes.
-
-Attachment returns a session and completes asynchronously. Service a caller
-driver while attachment is pending, and await completion before using the
-attached session.
+Provide the graphics context and extent in the backend descriptor, and install
+wakes that schedule frame-result drains and caller-driver service on the host.
+Attachment completes asynchronously; keep servicing a caller driver until it
+does.
 
 An OpenGL native surface through EGL uses the caller driver:
 
@@ -56,9 +49,8 @@ capabilities to choose acquisition or CPU readback.
 <Code code={region(renderTarget, "owned")} lang="c" title="render-target.c" />
 
 A borrowed texture target names the host's textures and their physical size.
-Acquire a frame before reading its texture and release it with consumer
-synchronization afterward. A ring of two textures lets the session render while
-the host reads the previous frame.
+A ring of two textures lets the session render while the host reads the previous
+frame.
 
 <Code code={region(renderTarget, "borrowed")} lang="c" title="render-target.c" />
 
@@ -68,29 +60,23 @@ backend descriptors and capabilities.
 
 ## Resize and release
 
-Resize an attached map through its session so that the map and target stay at
-the same logical size. Keep the session's current scale factor when resizing.
+Resize an attached map through its session so that the map and the target stay
+the same size.
 
 <Code code={region(renderTarget, "resize")} lang="c" title="render-target.c" />
 
 For borrowed textures, release acquired frames, allocate a new ring, and replace
-the target. Keep the outgoing textures until replacement completes. Replace a
-native surface similarly when the host recreates its window or view.
+the target. Replace a native surface the same way when the host recreates its
+window or view.
 
 <Code code={region(renderTarget, "set-target")} lang="c" title="render-target.c" />
 
-A target replacement can change the session's scale factor; the map retains its
-creation scale factor. Keep them equal for a consistent display density.
-
-For normal shutdown, release acquired frames with their consumer synchronization,
-detach the session, and continue caller-driver service until detach completes.
-Then destroy the session and the host graphics resources.
-
-Abandon handles a target whose graphics work can no longer be serviced. Stop
-caller-driver service first. Abandon may keep graphics resources until process
-exit; inspect its result before destroying the host resources that they depend
-on. The [session reference](/maplibre-native-ffi/reference/c/render__session_8h.html)
-defines those retention rules.
+To shut down, release acquired frames, detach the session, and keep servicing a
+caller driver until detach completes. Then destroy the session and the host's
+graphics resources. Abandon a session whose graphics work can no longer be
+serviced; the
+[session reference](/maplibre-native-ffi/reference/c/render__session_8h.html)
+states what it keeps until the process exits.
 
 <Code code={region(renderTarget, "teardown")} lang="c" title="render-target.c" />
 

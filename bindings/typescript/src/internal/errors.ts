@@ -32,9 +32,8 @@ export class MaplibreError extends Error {
 }
 
 /**
- * The loaded addon was generated from other C headers than this package. The
- * facade and the addon ship as separate packages, so their versions must
- * match. The status is {@link Status.unsupported}.
+ * The loaded addon does not match this package. Install the facade and the
+ * addon package at the same version. The status is {@link Status.unsupported}.
  */
 export class AbiVersionMismatchError extends MaplibreError {
   constructor(diagnostic: string) {

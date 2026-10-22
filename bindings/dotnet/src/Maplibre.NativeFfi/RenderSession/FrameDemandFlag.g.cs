@@ -34,11 +34,9 @@ public enum FrameDemandFlag : uint
     /// <c>MLN_RENDER_RESULT_TARGET_NOT_READY</c>. A waiting demand's result can
     /// follow the results of demands accepted after it. The flag does not pace:
     /// a host that re-arms a waiting demand as each result arrives renders
-    /// every update the map publishes. The map publishes one update for the
-    /// commands that its runtime worker runs back to back, but a command that
-    /// reaches the worker while a frame renders appears in a later frame. To
-    /// show several commands in one frame, submit them in a command group, or
-    /// arm demands once per display frame.
+    /// every update the map publishes, and a command that arrives while a frame
+    /// renders appears in a later frame. To show several commands in one frame,
+    /// submit them in a command group, or arm demands once per display frame.
     /// </summary>
     WaitForUpdate = 4,
 }

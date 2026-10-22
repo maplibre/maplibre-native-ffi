@@ -1,3 +1,7 @@
+Preserves omitted fraction limits at the platform formatter boundary
+(https://github.com/maplibre/maplibre-native-ffi/issues/797).
+Upstream: https://github.com/maplibre/maplibre-native/pull/4744
+
 diff --git a/include/mln/i18n/number_format.hpp b/include/mln/i18n/number_format.hpp
 index 6d1c6aeae1b0..5d75c91d13ca 100644
 --- a/include/mln/i18n/number_format.hpp

@@ -14,7 +14,7 @@ pub enum Status {
     WrongThread,
     /// The entry point or requested behavior is unavailable in this build.
     Unsupported,
-    /// A native MapLibre error or C++ exception was converted to status.
+    /// Native code failed; the diagnostic describes the error.
     NativeError,
     /// The operation reached its terminal cancelled disposition.
     Cancelled,

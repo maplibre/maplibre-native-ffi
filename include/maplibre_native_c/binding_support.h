@@ -1,12 +1,7 @@
 /**
  * @file maplibre_native_c/binding_support.h
- * Binding-internal C declarations for this repository's generated bindings.
- *
- * Finalizer tokens and shutdown abandonment tie native handles to a host
- * runtime's memory management. A Dart wake posts to a Dart isolate, which then
- * drains its delivery queue or services the woken session. Hosts that write
- * their own integration use the public headers, including queue delivery in
- * delivery.h for every callback a host need not answer on a native thread.
+ * Declarations that only this repository's bindings use, to tie native handles
+ * to a host runtime's memory management and to wake a Dart isolate.
  *
  * This header is not installed and carries no compatibility promise. Bindings
  * may resolve its exported functions from the shipped library.
@@ -79,9 +74,7 @@ MLN_API mln_status mln_binding_render_session_abandon_at_exit(
  *
  * post_cobject is NativeApi.postCObject and port is a Dart SendPort.nativePort.
  * Callback messages contain 0; release messages contain 1. Posting to a closed
- * port safely discards the message. The native release callback frees the
- * descriptor context after posting. A rejected owning call invokes that release
- * callback directly to release the context.
+ * port discards the message.
  *
  * Returns:
  * - MLN_STATUS_OK when out_wake receives the wake.

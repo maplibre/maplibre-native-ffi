@@ -1,3 +1,7 @@
+Declares shared uniform blocks first in five OpenGL shaders, which SwiftShader
+otherwise misreads (https://github.com/maplibre/maplibre-native-ffi/issues/713).
+Upstream: https://github.com/maplibre/maplibre-native/pull/4625
+
 diff --git a/include/mln/shaders/gl/background_pattern.hpp b/include/mln/shaders/gl/background_pattern.hpp
 index f0f3eaedddd3..9d0c0eb25075 100644
 --- a/include/mln/shaders/gl/background_pattern.hpp

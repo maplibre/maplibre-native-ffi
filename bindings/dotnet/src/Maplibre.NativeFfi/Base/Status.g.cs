@@ -33,7 +33,7 @@ public enum Status : int
     Unsupported = -4,
 
     /// <summary>
-    /// A native MapLibre error or C++ exception was converted to status.
+    /// Native code failed; the diagnostic describes the error.
     /// </summary>
     NativeError = -5,
 

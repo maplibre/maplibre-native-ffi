@@ -24,16 +24,14 @@ tile URLs and properties directly.
 
 ## From a TileJSON document
 
-Set `url` in the source JSON when the server publishes a TileJSON document.
-MapLibre reads the tile URLs, zoom range, scheme, bounds, and attribution. Then add a layer that names the source.
+Set `url` in the source JSON when the server publishes a TileJSON document,
+which supplies the tile URLs, zoom range, and attribution. Then add a layer that
+names the source.
 
 <Code code={region(tilejsonSnippet, "source")} lang="c" title="tile-source-tilejson.c" />
 
-For vector sources, `minzoom`, `maxzoom`, and `encoding` in the source JSON
-override the loaded TileJSON. Vector tiles decode as MVT by default; set
-`encoding` to `"mlt"` for MapLibre Tiles. Set `tileSize` for raster and raster-DEM
-sources when the server uses a tile size other than 512. MapLibre Tiles data with
-FastPFOR integer streams also requires the FastPFOR map option.
+Set `encoding` to `"mlt"` for MapLibre Tiles. Tiles whose integer streams use
+FastPFOR also need the FastPFOR map option.
 
 A vector tile carries several named layers. A layer that draws one of them sets
 `source` to the source ID and `source-layer` to the name inside the tile.
@@ -42,15 +40,9 @@ A vector tile carries several named layers. A layer that draws one of them sets
 
 ## From URL templates
 
-Supply URL templates when the server has no TileJSON document. Each template
-contains the `{z}`, `{x}`, and `{y}` placeholders. MapLibre fills them for each
-tile. Several templates with different host names distribute requests among
-those hosts.
-
-Set bounds and zoom levels to match the server's coverage, and preserve its
-attribution. Bounds list west, south, east, and north. The default XYZ scheme
-numbers rows from the north; set `scheme` to `"tms"` when the server numbers them
-from the south.
+Supply URL templates with the `{z}`, `{x}`, and `{y}` placeholders when the
+server has no TileJSON document. Set the bounds, zoom range, and attribution to
+match the server.
 
 <Code code={region(templatesSnippet, "json")} lang="c" title="tile-source-templates.c" />
 
@@ -60,9 +52,8 @@ Add the source JSON, then add a raster layer that names the source.
 
 ## Elevation tiles and hillshade
 
-Raster-DEM tiles encode elevation in their color channels as Mapbox Terrain-RGB
-or Terrarium. Mapbox Terrain-RGB is the default. Select the encoding that the
-server publishes to obtain the correct elevations.
+Raster-DEM tiles encode elevation in their color channels. Set the encoding
+that the server publishes.
 
 <Code code={region(rasterDemSnippet, "json")} lang="c" title="tile-source-raster-dem.c" />
 

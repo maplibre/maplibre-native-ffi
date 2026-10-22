@@ -1,5 +1,5 @@
-//! Native leases each id while its call runs.
-//! Encoded inputs and callback roots remain live until the native call settles.
+// Native leases each id while its call runs. Encoded inputs and callback roots
+// remain live until the native call settles.
 
 const std = @import("std");
 

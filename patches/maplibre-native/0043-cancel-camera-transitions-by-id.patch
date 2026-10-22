@@ -1,3 +1,6 @@
+Cancels only the camera commands that carry one transition ID. Needs 0015.
+Upstream: not proposed
+
 diff --git a/include/mln/map/camera.hpp b/include/mln/map/camera.hpp
 index a67ab2dddec5..c437052e42a9 100644
 --- a/include/mln/map/camera.hpp

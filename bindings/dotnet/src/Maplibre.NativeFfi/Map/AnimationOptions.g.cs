@@ -12,15 +12,15 @@ namespace Maplibre.NativeFfi;
 public sealed record AnimationOptions
 {
     /// <summary>
-    /// Duration in milliseconds. Must be finite and non-negative. Values that
-    /// would overflow MapLibre Native's internal duration are invalid.
+    /// Duration in milliseconds. Must be finite, non-negative, and short enough
+    /// to represent as a duration.
     /// </summary>
     public double? DurationMs { get; set; }
 
     /// <summary>
     /// Average fly velocity in screenfuls per second. Must be positive and
-    /// finite; defaults to 1.2 when omitted. A flight whose derived duration
-    /// exceeds Native's nanosecond duration range fails its completion with
+    /// finite; defaults to 1.2 when omitted. A flight whose derived duration is
+    /// too long to represent fails its completion with
     /// <c>MLN_STATUS_NATIVE_ERROR</c>. An explicit duration overrides velocity.
     /// </summary>
     public double? Velocity { get; set; }

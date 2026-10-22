@@ -1,3 +1,24 @@
+/**
+ * The low-level TypeScript binding for the MapLibre Native C API.
+ *
+ * Every callback reaches the realm's event loop after the native call that
+ * raised it has returned, so native code answers each synchronous decision
+ * itself. A provider or transform request arrives as an owner that the host
+ * answers later. Render sessions take no queue lock, so a Vulkan session's
+ * graphics queue belongs to the session alone.
+ *
+ * A pending binding Promise keeps the process alive, and a callback
+ * registration or a wake does not. To wait for a callback, call the `wake`
+ * member of an {@link AwaitableWake} from it and await `next()`.
+ *
+ * A realm runs on one thread, so it can drive a caller-driven render session:
+ * make its context current on the JavaScript thread and call
+ * `serviceDriverWork()` when the driver-work wake arrives. A realm loads one
+ * copy of the binding.
+ *
+ * @packageDocumentation
+ */
+
 // The entry point for Node.js, Bun, and Deno.
 
 import process from "node:process";

@@ -1,3 +1,7 @@
+Publishes render updates when the prefetch zoom delta or a tile LOD option
+changes.
+Upstream: https://github.com/maplibre/maplibre-native/pull/4678
+
 diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
 index 08160f6f3f5528a942ead01ee6d0b616cd0cc8aa..ef034b4bd8b10fe9b940b748e8f3ca7ab98ba0c1 100644
 --- a/src/mln/map/map.cpp

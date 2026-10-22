@@ -1,3 +1,7 @@
+Applies explicit fraction limits to Apple's Foundation formatters, and reports
+malformed UTF-8 as an expression error.
+Upstream: not proposed
+
 diff --git a/platform/darwin/core/collator.mm b/platform/darwin/core/collator.mm
 --- a/platform/darwin/core/collator.mm
 +++ b/platform/darwin/core/collator.mm

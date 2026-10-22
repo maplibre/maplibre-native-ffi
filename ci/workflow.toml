@@ -113,8 +113,9 @@ platforms = ["linux-gnu", "macos", "windows"]
 commands = [{ task = "//bindings/dart:test" }]
 
 # The TypeScript suite runs under Node, Bun, and Deno in turn, and loads the
-# packages that it packs and installs. The binding does not support Windows yet;
-# see bindings/typescript/README.md.
+# packages that it packs and installs. The binding does not support Windows yet:
+# on Windows x64, the addon's first double in a process reached JavaScript as a
+# heap address, for a reason that is unknown.
 [[suites]]
 platforms = ["linux-gnu", "macos"]
 commands = [{ task = "//bindings/typescript:test" }]

@@ -5397,7 +5397,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     ),
   );
 
-  /// Releases a map after synchronous state preflight.
+  /// Releases a map asynchronously.
   ///
   /// See `mln_map_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

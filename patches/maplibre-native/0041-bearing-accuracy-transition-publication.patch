@@ -1,3 +1,7 @@
+Refreshes the layer collection after bearing-accuracy transition changes.
+Needs 0021, and stays local with it.
+Upstream: not proposed
+
 diff --git a/src/mln/style/layers/location_indicator_layer.cpp b/src/mln/style/layers/location_indicator_layer.cpp
 index c085789a96ed8984e0f28b12a40cce6bb6b23a16..b89c32cf7342ffa3b2c55d265bdf633f77c39775 100644
 --- a/src/mln/style/layers/location_indicator_layer.cpp

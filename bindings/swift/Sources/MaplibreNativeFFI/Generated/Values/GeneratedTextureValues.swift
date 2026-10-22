@@ -37,10 +37,9 @@ public struct MetalBorrowedTexture: Equatable, Hashable, Sendable {
 /// See `mln_metal_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent. The map viewport uses width and height and the
-  /// renderer uses scale_factor; the physical size is stated separately below.
-  /// A scale_factor that differs from the map's is accepted and logged as a
-  /// warning.
+  /// Logical texture extent; physical_width and physical_height give the
+  /// texture's size. A scale_factor that differs from the map's is accepted and
+  /// logged as a warning.
   public var extent: LogicalExtent
   /// Physical texture width in device pixels. Must be positive. Defaults to
   /// 256.
@@ -153,7 +152,7 @@ public struct MetalTextureFrame: Equatable, Hashable, Sendable {
   public var height: UInt32
   /// UI-to-device pixel scale used for this frame.
   public var scaleFactor: Double
-  /// Opaque frame identity used to reject stale releases.
+  /// Opaque identity of this frame.
   public var frameId: UInt64
   /// Ring slot that holds this frame. For a borrowed target, the index of its
   /// texture in the descriptor's textures array.
@@ -237,10 +236,9 @@ public struct OpenglBorrowedTexture: Equatable, Hashable, Sendable {
 /// See `mln_opengl_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent. The map viewport uses width and height and the
-  /// renderer uses scale_factor; the physical size is stated separately below.
-  /// A scale_factor that differs from the map's is accepted and logged as a
-  /// warning.
+  /// Logical texture extent; physical_width and physical_height give the
+  /// texture's size. A scale_factor that differs from the map's is accepted and
+  /// logged as a warning.
   public var extent: LogicalExtent
   /// Physical texture width in device pixels. Must be positive. Defaults to
   /// 256.
@@ -367,7 +365,7 @@ public struct OpenglTextureFrame: Equatable, Hashable, Sendable {
   public var height: UInt32
   /// UI-to-device pixel scale used for this frame.
   public var scaleFactor: Double
-  /// Opaque frame identity used to reject stale releases.
+  /// Opaque identity of this frame.
   public var frameId: UInt64
   /// Ring slot that holds this frame. For a borrowed target, the index of its
   /// texture in the descriptor's textures array.
@@ -531,10 +529,9 @@ public struct VulkanBorrowedTexture: Equatable, Hashable, Sendable {
 /// See `mln_vulkan_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent. The map viewport uses width and height and the
-  /// renderer uses scale_factor; the physical size is stated separately below.
-  /// A scale_factor that differs from the map's is accepted and logged as a
-  /// warning.
+  /// Logical texture extent; physical_width and physical_height give the
+  /// texture's size. A scale_factor that differs from the map's is accepted and
+  /// logged as a warning.
   public var extent: LogicalExtent
   /// Physical image width in device pixels. Must be positive. Defaults to 256.
   public var physicalWidth: UInt32
@@ -665,7 +662,7 @@ public struct VulkanTextureFrame: Equatable, Hashable, Sendable {
   public var height: UInt32
   /// UI-to-device pixel scale used for this frame.
   public var scaleFactor: Double
-  /// Opaque frame identity used to reject stale releases.
+  /// Opaque identity of this frame.
   public var frameId: UInt64
   /// Ring slot that holds this frame. For a borrowed target, the index of its
   /// image in the descriptor's textures array.
@@ -773,10 +770,9 @@ public struct WebgpuBorrowedTexture: Equatable, Hashable, Sendable {
 /// See `mln_webgpu_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct WebgpuBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent. The map viewport uses width and height and the
-  /// renderer uses scale_factor; the physical size is stated separately below.
-  /// A scale_factor that differs from the map's is accepted and logged as a
-  /// warning.
+  /// Logical texture extent; physical_width and physical_height give the
+  /// texture's size. A scale_factor that differs from the map's is accepted and
+  /// logged as a warning.
   public var extent: LogicalExtent
   /// Physical texture width in device pixels. Defaults to 256.
   public var physicalWidth: UInt32
@@ -894,7 +890,7 @@ public struct WebgpuTextureFrame: Equatable, Hashable, Sendable {
   public var height: UInt32
   /// UI-to-device pixel scale used for this frame.
   public var scaleFactor: Double
-  /// Opaque frame identity used to reject stale releases.
+  /// Opaque identity of this frame.
   public var frameId: UInt64
   /// Ring slot that holds this frame. For a borrowed target, the index of its
   /// texture in the descriptor's textures array.

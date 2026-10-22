@@ -100,9 +100,9 @@ typedef struct mln_log_handler {
    * record the queue refuses, because the queue was released or the copy
    * could not be allocated, goes to the platform logger instead. Replacing or
    * clearing the handler queues one MLN_DELIVERY_TYPE_RETIRED delivery carrying
-   * user_data after the handler's final record. The queue wakes inline under
-   * the log mutex. Its wake and wake release callback follow the same
-   * restrictions as the log callback.
+   * user_data after the handler's final record. The queue's wake and wake
+   * release run inline on the logging thread, under the same restrictions as
+   * the log callback.
    */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_log_handler MLN_BINDING(
@@ -120,11 +120,9 @@ typedef struct mln_log_handler {
  * and invokes no release. mln_log_clear_callback() clears the handler.
  *
  * The callback may run on any thread, according to the async severity mask. It
- * must be thread-safe and return promptly. MapLibre Native holds its log mutex,
- * which is not recursive, while the callback runs, and nearly every native call
- * can log. So the callback must not call this C API or MapLibre Native APIs.
- * Each status-returning function of this API returns MLN_STATUS_INVALID_STATE
- * when the callback calls it.
+ * must be thread-safe, return promptly, and not call this C API: each
+ * status-returning function returns MLN_STATUS_INVALID_STATE when the callback
+ * calls it.
  *
  * In queue mode the handler's records reach the queue and its wake runs inline
  * on the logging thread. The wake follows the same restrictions.
@@ -135,7 +133,7 @@ typedef struct mln_log_handler {
  *   small, neither or both of callback and queue are set, release_user_data
  *   is set in queue mode, or queue is an invalid handle.
  * - MLN_STATUS_INVALID_STATE when queue has been released.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_log_set_callback(
   const mln_log_handler* handler, mln_diagnostic* out_diagnostic
@@ -149,7 +147,7 @@ MLN_API mln_status mln_log_set_callback(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status
 mln_log_clear_callback(mln_diagnostic* out_diagnostic) MLN_NOEXCEPT;
@@ -157,9 +155,8 @@ mln_log_clear_callback(mln_diagnostic* out_diagnostic) MLN_NOEXCEPT;
 /**
  * Controls which log severities MapLibre Native may dispatch asynchronously.
  *
- * MLN_LOG_SEVERITY_MASK_DEFAULT restores MapLibre Native's default behavior:
- * info and warning records may be asynchronous, while error records remain
- * synchronous.
+ * MLN_LOG_SEVERITY_MASK_DEFAULT lets info and warning records dispatch
+ * asynchronously and keeps error records synchronous.
  *
  * A severity outside the mask invokes the log callback synchronously on the
  * thread that emits the record, before the logging call returns.
@@ -167,7 +164,7 @@ mln_log_clear_callback(mln_diagnostic* out_diagnostic) MLN_NOEXCEPT;
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when mask contains unknown bits.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_log_set_async_severity_mask(
   uint32_t mask MLN_BINDING("enum=mln_log_severity_mask"),

@@ -18,8 +18,8 @@ _logger = logging.getLogger(__name__)
 class NativeFuture[T](Future[T]):
     """A native result whose user callbacks run away from the native worker.
 
-    Callbacks for one future run in registration order. Internal value conversion
-    finishes inline, so a user callback can wait for another binding future.
+    Callbacks for one future run in registration order, and a callback can wait
+    for another binding future.
     """
 
     def __init__(self) -> None:
@@ -57,10 +57,7 @@ class NativeFuture[T](Future[T]):
     def cancel(self) -> bool:
         """Abandon the wait, and wake every waiter at once.
 
-        Native work continues to its terminal disposition. A plain future
-        counts as done for ``wait()`` and ``as_completed()`` only once its
-        runner claims it, which native work may not reach for a long time, so
-        a successful cancellation notifies them now.
+        Native work continues to its terminal disposition.
         """
         if not super().cancel():
             return False

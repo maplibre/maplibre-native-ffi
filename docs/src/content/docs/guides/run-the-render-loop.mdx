@@ -10,59 +10,42 @@ import { region } from "../../../snippets";
 
 import frameLoopSnippet from "../../../../snippets/c/frame-loop.c?raw";
 
-The host decides when to request frames, using its display cadence or another
-scheduler. A core-worker session runs graphics work on its native worker. A
-caller-driver session also needs service on the host graphics thread.
+The host decides when to request frames. A core-worker session runs its graphics
+work on a native thread. A caller-driver session also needs service on the
+host's graphics thread.
 
 ## Request frames
 
-Request a frame with a host token to identify its result. Every accepted demand
-produces a terminal result. An if-needed demand supersedes an earlier queued
-demand with the same flags; forced demands remain independent. The host supplies
-the cadence.
-
-For rendering on demand, keep an if-needed demand armed with wait-for-update
-and re-arm it as results arrive. Pace requests to the display during animations.
-
-Use the present flag for a target that presents to a window or view.
+Each frame demand carries a host token that its result returns. To render on
+demand, keep one render-if-needed demand armed with the wait-for-update flag,
+and re-arm it as each result arrives. During animations, pace demands to the
+display. Set the present flag for a target that shows frames in a window or
+view.
 
 <Code code={region(frameLoopSnippet, "render")} lang="c" title="frame-loop.c" />
 
 ## Service a caller driver
 
-The driver-work wake schedules service on the thread where the graphics context
-is usable. The wake must return without blocking or waiting for that thread.
-Service calls run one at a time on the same graphics thread.
-
-Continue service while presentation is paused: attachment, queries, readback,
-resize, and detach also need graphics work. A core-worker session needs no host
-service.
+When the driver-work wake fires, schedule service on the graphics thread, and
+return from the wake without waiting. Keep servicing while presentation is
+paused, because attachment, queries, readback, resize, and detach also need
+driver work.
 
 <Code code={region(frameLoopSnippet, "service")} lang="c" title="frame-loop.c" />
 
-In a browser, the graphics thread also runs its event loop between service
-calls. A WebGPU readback finishes through that loop, and the session's later
-driver work waits for it.
-
-If the graphics thread cannot run again,
+If the graphics thread can no longer run,
 [abandon the target](/maplibre-native-ffi/guides/attach-a-render-target/#resize-and-release).
 
 ## Drain results
 
-The frame wake schedules a drain on the host loop. Drain until the queue is empty,
-read each batch, and release it. In C, use the view's stride to read its records.
-Copy any values that must outlive the batch.
-
-Preserve each result's outcome when scheduling the next frame. A no-update
-result waits for a map update. A target-not-ready result waits for
-host readiness or a paced retry. The
-[session reference](/maplibre-native-ffi/reference/c/render__session_8h.html)
-explains all outcomes and their retry conditions.
+When the frame wake fires, schedule a drain on the host loop. Drain until the
+queue is empty, read each batch, and release it.
 
 <Code code={region(frameLoopSnippet, "results")} lang="c" title="frame-loop.c" />
 
-For texture targets, acquire a frame and wait for its producer synchronization
-before reading the texture. Release it with consumer synchronization after host
-GPU reads. The [texture reference](/maplibre-native-ffi/reference/c/texture_8h.html)
-states the backend rules. [Render a static
-image](/maplibre-native-ffi/guides/render-a-static-image/) shows CPU readback.
+Each result's outcome tells the host when to demand again, as the
+[session reference](/maplibre-native-ffi/reference/c/render__session_8h.html) describes. To read a texture
+target, acquire its frame and follow the synchronization that the
+[texture reference](/maplibre-native-ffi/reference/c/texture_8h.html) states.
+[Render a static image](/maplibre-native-ffi/guides/render-a-static-image/)
+shows CPU readback.

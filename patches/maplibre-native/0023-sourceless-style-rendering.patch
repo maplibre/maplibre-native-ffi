@@ -1,3 +1,6 @@
+Renders a style that has no sources.
+Upstream: https://github.com/maplibre/maplibre-native/pull/4674
+
 diff --git a/src/mln/map/map_impl.cpp b/src/mln/map/map_impl.cpp
 index 52c156a314b2..48329c446a1c 100644
 --- a/src/mln/map/map_impl.cpp
