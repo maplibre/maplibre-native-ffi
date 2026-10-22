@@ -2,7 +2,9 @@ use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
 #[cfg(target_os = "android")]
-use std::os::unix::fs::PermissionsExt;
+use std::io::Write;
+#[cfg(target_os = "android")]
+use std::os::unix::fs::OpenOptionsExt;
 #[cfg(target_os = "android")]
 use std::path::{Path, PathBuf};
 #[cfg(target_os = "android")]
@@ -168,13 +170,20 @@ fn write_tls_helper_dex(cache_dir: &Path) -> std::io::Result<PathBuf> {
 
     // Each process writes a file of its own and renames it into place, so a
     // concurrent process never loads a partial dex. Android 14 refuses to load a
-    // dex that is still writable.
+    // dex that is still writable, and the file is read-only from its creation, so
+    // only the handle that created it can write the code.
     let temporary = cache_dir.join(format!(
         "maplibre-native-ffi-tls-{signature}.{}.tmp",
         std::process::id()
     ));
-    let result = std::fs::write(&temporary, TLS_HELPER_DEX)
-        .and_then(|()| std::fs::set_permissions(&temporary, std::fs::Permissions::from_mode(0o444)))
+    // A process that exited mid-write may have left a file under this PID.
+    let _ = std::fs::remove_file(&temporary);
+    let result = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o444)
+        .open(&temporary)
+        .and_then(|mut file| file.write_all(TLS_HELPER_DEX))
         .and_then(|()| std::fs::rename(&temporary, &path));
     if result.is_err() {
         let _ = std::fs::remove_file(&temporary);

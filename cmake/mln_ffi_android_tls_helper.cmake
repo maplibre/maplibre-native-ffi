@@ -3,7 +3,13 @@
 # packages no Java code and keeps no R8 rule for it.
 function(mln_ffi_android_tls_helper_dex out_var)
   find_program(MLN_FFI_JAVA_EXECUTABLE java REQUIRED)
-  find_program(MLN_FFI_KOTLINC_EXECUTABLE kotlinc REQUIRED)
+  # find_program tries only .com and .exe on Windows, where kotlinc is a batch
+  # file.
+  if(CMAKE_HOST_WIN32)
+    find_program(MLN_FFI_KOTLINC_EXECUTABLE kotlinc.bat REQUIRED)
+  else()
+    find_program(MLN_FFI_KOTLINC_EXECUTABLE kotlinc REQUIRED)
+  endif()
 
   # The commands name the tools by their install paths, and kotlinc finds its
   # JVM through JAVA_HOME, so a later `cmake --build` from an environment
