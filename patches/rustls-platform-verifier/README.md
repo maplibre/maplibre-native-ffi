@@ -18,7 +18,8 @@ these patches in order:
    redistributing them.
 
 `NOTICE` states the same modifications for recipients of the compiled artifacts.
-Gradle packages it beside the upstream licenses in the Android AARs.
+The Android native build installs it with the library's other notices, because
+the library embeds the patched Kotlin helper as a dex.
 
 When updating upstream, change the pinned tag and commit together, then rebase
 all three patches and refresh `NOTICE`. The mise dependency acquisition fails if

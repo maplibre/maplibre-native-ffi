@@ -76,11 +76,8 @@ link requirements for that target and backend. The final application links the
 archive without acquiring a separate MapLibre Native FFI shared library or
 framework.
 
-An Android runtime KLIB cannot place JVM bytecode in its host APK. The
-application packaging module therefore depends directly on the matching runtime
-AAR and excludes that AAR's `libmaplibre-native-c.so`. The AAR contributes the
-Rustls platform verifier classes, consumer keep rule, and licenses. The final
-Kotlin/Native host library already contains the static runtime from the KLIB.
+The static archive also carries the dex that the Android TLS stack loads, so an
+Android host links the KLIB and packages nothing else for the native library.
 
 The native runtime publications are OpenGL and Vulkan for Android arm32, Android
 arm64, Android x64, Linux arm64, Linux x64, and macOS arm64, plus Metal for
@@ -136,19 +133,11 @@ with the C headers and a second copy of each `jni/` library for a host's native
 build to link. The copy doubles the native payload of the AAR, but an APK
 packages only the `jni/` library.
 
-Each Android runtime AAR also contains the JVM helper built from the pinned,
-patched `rustls-platform-verifier` checkout acquired by mise, its consumer R8
-rule, and the upstream licenses. The helper and Rust JNI descriptors use the
-`org.maplibre.nativeffi.internal.rustlsplatformverifier` package so an app may
-also consume the upstream helper without duplicate classes. Consumers add no
-Rustls-specific Maven dependency.
-
-The helper travels with the native library rather than with the Kotlin binding
-because the native TLS stack is its only caller. An Android host written in
-another language depends on a runtime publication alone and gets a complete,
-packageable native payload; it binds nothing in the helper and adds no keep rule
-of its own. Such a host still calls `mln_android_init` before creating a
-runtime.
+The native library embeds the JVM helper that its TLS stack calls, as a dex that
+`mln_android_init` loads in a class loader of its own, so the AAR carries no
+Java code or keep rule for it. An Android host written in another language
+depends on a runtime publication alone and calls `mln_android_init` before
+creating a runtime.
 
 The Android target of `maplibre-native-ffi` carries the Kotlin API and
 `jni/<abi>/libmaplibre-native-ffi-jni.so`, the JNI shim that is private to this
@@ -235,7 +224,7 @@ Verification checks:
 
 - Maven and Gradle module metadata for every publication;
 - native archive presence in published KLIBs;
-- JNI library placement and Rustls helper presence in Android AARs;
+- JNI library placement in Android AARs;
 - Android runtime metadata declaring no dependency on the Kotlin binding;
 - native resource presence in JVM classifier JARs;
 - Dokka-generated API pages in every API-bearing javadoc JAR.

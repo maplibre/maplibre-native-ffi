@@ -33,15 +33,6 @@ kotlin {
     namespace = "org.maplibre.nativeffi.runtime.vulkan"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
-
-    // The native TLS stack calls the Rustls platform verifier over JNI, and nothing
-    // on the classpath references it, so only this rule survives minification.
-    optimization {
-      consumerKeepRules.file(
-        rootProject.file("bindings/rustls-platform-verifier-android/consumer-rules.pro"),
-      )
-      consumerKeepRules.publish = true
-    }
   }
 }
 

@@ -1,7 +1,0 @@
-[tools]
-"core:java" = "{{vars.java_version}}"
-
-[tasks.build]
-description = "Build the patched Android platform-verifier helper AAR."
-dir = "../.."
-run = "./gradlew :bindings:rustls-platform-verifier-android:bundleReleaseAar"
