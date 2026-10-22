@@ -290,7 +290,7 @@ def write_notes(
         published = required_env("PUBLISH_TIMESTAMP")
         lines = [f"Unstable native package snapshot, published {published}."]
     else:
-        lines = [f"Native package {version}."]
+        lines = [f"MapLibre Native FFI {version}."]
     lines += [
         "",
         f"Commit: {commit_url(sha)}",

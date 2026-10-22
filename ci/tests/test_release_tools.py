@@ -16,11 +16,7 @@ import zipfile
 from unittest import mock
 
 from native_package_release import XCFRAMEWORK_NAME, prepare_assets
-from release_version import (
-    family,
-    require_current_month,
-    validate_tag,
-)
+from release_version import require_current_month, validate_tag
 
 
 def run_git(repository: pathlib.Path, *arguments: str) -> None:
@@ -119,15 +115,12 @@ class ReleaseVersionTest(unittest.TestCase):
     def tag(self, name: str) -> None:
         run_git(self.repository, "tag", name)
 
-    def test_accepts_an_unregistered_binding_family(self) -> None:
-        tag = f"bindings/lua/v0.{self.month}.0"
+    def test_the_first_release_has_no_previous_tag(self) -> None:
+        tag = f"v0.{self.month}.0"
         self.tag(tag)
 
-        release_family, version, previous = validate_tag(
-            tag, repository=self.repository, now=self.now
-        )
+        version, previous = validate_tag(tag, repository=self.repository, now=self.now)
 
-        self.assertEqual(release_family.slug, "lua")
         self.assertEqual(version, f"0.{self.month}.0")
         self.assertEqual(previous, "")
 
@@ -136,29 +129,44 @@ class ReleaseVersionTest(unittest.TestCase):
             "%Y%m"
         )
         with self.assertRaisesRegex(SystemExit, "current UTC month"):
-            require_current_month(f"0.{previous}.0", family("core"), now=self.now)
+            require_current_month(f"0.{previous}.0", now=self.now)
 
-    def test_validates_revisions_and_returns_the_previous_family_tag(self) -> None:
-        first = f"core/v0.{self.month}.0"
-        second = f"core/v0.{self.month}.1"
-        self.tag(first)
-        self.tag(second)
+    def test_legacy_core_and_binding_tags_continue_the_revisions(self) -> None:
+        self.tag(f"core/v0.{self.month}.0")
         self.tag(f"bindings/kotlin/v0.{self.month}.0")
+        self.tag(f"core/v0.{self.month}.1")
+        self.tag(f"bindings/kotlin/v0.{self.month}.1")
+        tag = f"v0.{self.month}.2"
+        self.tag(tag)
 
-        release_family, version, previous = validate_tag(
-            second, repository=self.repository, now=self.now
+        version, previous = validate_tag(tag, repository=self.repository, now=self.now)
+
+        self.assertEqual(version, f"0.{self.month}.2")
+        self.assertIn(
+            previous, {f"core/v0.{self.month}.1", f"bindings/kotlin/v0.{self.month}.1"}
         )
 
-        self.assertEqual(release_family.slug, "core")
-        self.assertEqual(version, f"0.{self.month}.1")
-        self.assertEqual(previous, first)
+    def test_rejects_a_version_that_a_legacy_tag_published(self) -> None:
+        self.tag(f"bindings/kotlin/v0.{self.month}.0")
+        tag = f"v0.{self.month}.0"
+        self.tag(tag)
+
+        with self.assertRaisesRegex(SystemExit, "not newer"):
+            validate_tag(tag, repository=self.repository, now=self.now)
 
     def test_rejects_a_revision_gap(self) -> None:
-        self.tag(f"core/v0.{self.month}.0")
-        tag = f"core/v0.{self.month}.2"
+        self.tag(f"v0.{self.month}.0")
+        tag = f"v0.{self.month}.2"
         self.tag(tag)
 
         with self.assertRaisesRegex(SystemExit, r"expected \[0, 1, 2\]"):
+            validate_tag(tag, repository=self.repository, now=self.now)
+
+    def test_rejects_a_legacy_tag(self) -> None:
+        tag = f"core/v0.{self.month}.0"
+        self.tag(tag)
+
+        with self.assertRaisesRegex(SystemExit, "expected vAPI_EPOCH"):
             validate_tag(tag, repository=self.repository, now=self.now)
 
 
@@ -193,9 +201,9 @@ class NativePackageReleaseTest(unittest.TestCase):
             "CI_RUN_URL": "https://github.com/maplibre/repo/actions/runs/1",
             "GITHUB_REPOSITORY": "maplibre/repo",
             "GITHUB_RUN_ID": "2",
-            "PUBLISH_PREVIOUS_TAG": "core/v0.202607.0",
+            "PUBLISH_PREVIOUS_TAG": "v0.202607.0",
             "PUBLISH_SHA": self.sha,
-            "PUBLISH_TAG": f"core/v{self.version}",
+            "PUBLISH_TAG": f"v{self.version}",
             "PUBLISH_TIMESTAMP": "2026-08-07 01:01 UTC",
             **overrides,
         }
@@ -319,16 +327,16 @@ class NativePackageReleaseTest(unittest.TestCase):
 
     def test_release_assets_include_version_provenance_and_checksums(self) -> None:
         notes = self.assert_assets(
-            "release", self.version, f"Native package {self.version}."
+            "release", self.version, f"MapLibre Native FFI {self.version}."
         )
 
-        self.assertIn(f"/compare/core/v0.202607.0...core/v{self.version}", notes)
+        self.assertIn(f"/compare/v0.202607.0...v{self.version}", notes)
 
     def test_first_release_notes_omit_the_changelog(self) -> None:
         notes = self.assert_assets(
             "release",
             self.version,
-            f"Native package {self.version}.",
+            f"MapLibre Native FFI {self.version}.",
             PUBLISH_PREVIOUS_TAG="",
         )
 

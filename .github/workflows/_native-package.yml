@@ -8,8 +8,7 @@ on:
         required: true
         type: string
       previous_tag:
-        description:
-          Previous tag in the release family, linked from the release notes
+        description: Previous release tag, linked from the release notes
         default: ""
         required: false
         type: string
@@ -134,8 +133,8 @@ jobs:
           tag_name: ${{ inputs.tag }}
           target_commitish: ${{ inputs.sha }}
           name:
-            ${{ inputs.release && format('Native package {0}', inputs.version)
-            || format('Native package snapshot {0}',
+            ${{ inputs.release && format('MapLibre Native FFI {0}',
+            inputs.version) || format('Native package snapshot {0}',
             steps.publish.outputs.timestamp) }}
           body_path: build/packages/native/release/RELEASE_NOTES.md
           draft: ${{ inputs.release }}
@@ -233,7 +232,7 @@ jobs:
           release="$(gh release view "$PUBLISH_TAG" --json isDraft,isPrerelease,url)"
           jq -e '(.isDraft | not) and (.isPrerelease | not)' <<<"$release" >/dev/null
           {
-            echo "### Native package $PUBLISH_VERSION"
+            echo "### MapLibre Native FFI $PUBLISH_VERSION"
             echo
             echo "Published $(jq -r '.url' <<<"$release")."
           } >> "$GITHUB_STEP_SUMMARY"

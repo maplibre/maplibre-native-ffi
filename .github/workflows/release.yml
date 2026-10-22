@@ -1,15 +1,15 @@
-name: Publish Kotlin release
+name: Publish release
 
 on:
   push:
     tags:
-      - "bindings/kotlin/v*"
+      - "v*"
 
 permissions:
   contents: read
 
 concurrency:
-  group: kotlin-release-${{ github.ref }}
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -20,13 +20,31 @@ jobs:
       checks: read
       contents: read
     uses: ./.github/workflows/_release-context.yml
-    with:
-      family: kotlin
 
-  publish:
-    name: Publish
+  native:
+    name: Native
     needs:
       - source
+    permissions:
+      actions: read
+      contents: write
+    uses: ./.github/workflows/_native-package.yml
+    with:
+      ci_run_url: ${{ needs.source.outputs.ci_run_url }}
+      previous_tag: ${{ needs.source.outputs.previous_tag }}
+      release: true
+      run_id: ${{ needs.source.outputs.run_id }}
+      sha: ${{ needs.source.outputs.sha }}
+      tag: ${{ github.ref_name }}
+      version: ${{ needs.source.outputs.version }}
+
+  # The GitHub release publishes first, so every package of a version refers
+  # to native archives that exist.
+  kotlin:
+    name: Kotlin
+    needs:
+      - source
+      - native
     permissions:
       actions: read
       contents: read
@@ -42,7 +60,7 @@ jobs:
   docs:
     name: Docs
     needs:
-      - publish
+      - kotlin
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     permissions:

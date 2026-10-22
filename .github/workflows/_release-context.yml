@@ -2,17 +2,12 @@ name: "↳ Release context"
 
 on:
   workflow_call:
-    inputs:
-      family:
-        description: Release family named by the caller
-        required: true
-        type: string
     outputs:
       ci_run_url:
         description: URL of the successful main CI run
         value: ${{ jobs.resolve.outputs.ci_run_url }}
       previous_tag:
-        description: Previous tag in the release family
+        description: Previous release tag
         value: ${{ jobs.resolve.outputs.previous_tag }}
       run_id:
         description: Successful main CI run that produced the artifacts
@@ -59,7 +54,6 @@ jobs:
       - name: Resolve the tag and source CI run
         id: context
         env:
-          EXPECTED_FAMILY: ${{ inputs.family }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -74,12 +68,6 @@ jobs:
           release_context="$(
             mise run --no-deps ci:release-version "$GITHUB_REF_NAME"
           )"
-          family="$(jq -r '.family' <<<"$release_context")"
-          if [[ "$family" != "$EXPECTED_FAMILY" ]]; then
-            echo "$GITHUB_REF_NAME belongs to $family, expected $EXPECTED_FAMILY" >&2
-            exit 1
-          fi
-
           if ! git merge-base --is-ancestor "$source_sha" origin/main; then
             echo "$source_sha is not an ancestor of main; refusing to publish" >&2
             exit 1

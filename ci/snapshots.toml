@@ -42,7 +42,7 @@ shared = [
   ".mise/**",
   # The CI definitions that shape every snapshot artifact.
   ".github/workflows/**",
-  "!.github/workflows/*-release.yml",
+  "!.github/workflows/release.yml",
   "!.github/workflows/_*.yml",
   ".github/actions/**",
   "ci/**",

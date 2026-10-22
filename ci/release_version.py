@@ -11,13 +11,6 @@ import subprocess
 from dataclasses import dataclass
 
 
-@dataclass(frozen=True)
-class ReleaseFamily:
-    slug: str
-    name: str
-    prefix: str
-
-
 @dataclass(frozen=True, order=True)
 class ReleaseVersion:
     epoch: int
@@ -28,47 +21,23 @@ class ReleaseVersion:
         return f"{self.epoch}.{self.month:06d}.{self.revision}"
 
 
-BINDING_PATTERN = re.compile(r"^[a-z][a-z0-9-]*$")
 VERSION_PATTERN = re.compile(
     r"^(?P<epoch>0|[1-9][0-9]*)\."
     r"(?P<year>[0-9]{4})(?P<month>0[1-9]|1[0-2])\."
     r"(?P<revision>0|[1-9][0-9]*)$"
 )
+TAG_PREFIX = "v"
+# Before one tag released everything, the core and each binding had tags of
+# their own. Those tags stay in the version history, so a release follows
+# every version that any of them published.
+LEGACY_TAG = re.compile(r"^(?:core|bindings/[a-z][a-z0-9-]*)/v")
 
 
-def family(name: str) -> ReleaseFamily:
-    if name == "core":
-        return ReleaseFamily("core", "Core", "core")
-    if not BINDING_PATTERN.fullmatch(name):
-        raise SystemExit(
-            f"invalid release family {name!r}; expected core or a binding name"
-        )
-    return ReleaseFamily(name, f"{name} binding", f"bindings/{name}")
-
-
-def family_from_tag(tag: str) -> ReleaseFamily:
-    if tag.startswith("core/v"):
-        return family("core")
-    match = re.match(r"^bindings/([^/]+)/v", tag)
-    if match is not None:
-        return family(match.group(1))
-    raise SystemExit(
-        f"invalid release tag {tag!r}; expected "
-        "core/vAPI_EPOCH.YYYYMM.REVISION or "
-        "bindings/<name>/vAPI_EPOCH.YYYYMM.REVISION"
-    )
-
-
-def parse_version(
-    value: str, release_family: ReleaseFamily | None = None
-) -> ReleaseVersion:
+def parse_version(value: str) -> ReleaseVersion:
     match = VERSION_PATTERN.fullmatch(value)
     if match is None:
-        subject = (
-            "release" if release_family is None else f"{release_family.name} release"
-        )
         raise SystemExit(
-            f"invalid {subject} version {value!r}; expected API_EPOCH.YYYYMM.REVISION"
+            f"invalid release version {value!r}; expected API_EPOCH.YYYYMM.REVISION"
         )
     return ReleaseVersion(
         int(match.group("epoch")),
@@ -77,48 +46,45 @@ def parse_version(
     )
 
 
-def parse_tag(tag: str, release_family: ReleaseFamily) -> tuple[ReleaseVersion, str]:
-    prefix = f"{release_family.prefix}/v"
-    if not tag.startswith(prefix):
+def parse_tag(tag: str) -> tuple[ReleaseVersion, str]:
+    if not tag.startswith(TAG_PREFIX):
         raise SystemExit(
-            f"invalid {release_family.name} release tag {tag!r}; expected "
-            f"{release_family.prefix}/vAPI_EPOCH.YYYYMM.REVISION"
+            f"invalid release tag {tag!r}; expected vAPI_EPOCH.YYYYMM.REVISION"
         )
-    version = tag.removeprefix(prefix)
-    return parse_version(version, release_family), version
+    version = tag.removeprefix(TAG_PREFIX)
+    return parse_version(version), version
 
 
 def require_current_month(
-    version: str,
-    release_family: ReleaseFamily | None = None,
-    *,
-    now: datetime.datetime | None = None,
+    version: str, *, now: datetime.datetime | None = None
 ) -> None:
-    fields = parse_version(version, release_family)
+    fields = parse_version(version)
     current = now or datetime.datetime.now(datetime.UTC)
     current_month = int(current.strftime("%Y%m"))
     if fields.month != current_month:
-        subject = (
-            "release" if release_family is None else f"{release_family.name} release"
-        )
         raise SystemExit(
-            f"{subject} {version} names month {fields.month}; "
+            f"release {version} names month {fields.month}; "
             f"the current UTC month is {current_month}"
         )
 
 
 def release_tags(
-    release_family: ReleaseFamily, *, repository: pathlib.Path | None = None
+    *, repository: pathlib.Path | None = None
 ) -> dict[str, ReleaseVersion]:
+    """Every release tag in the checkout, legacy ones included, by version."""
     result = subprocess.run(
-        ["git", "tag", "--list", f"{release_family.prefix}/v*"],
+        ["git", "tag", "--list", "v*", "core/v*", "bindings/*/v*"],
         cwd=repository,
         check=True,
         stdout=subprocess.PIPE,
         text=True,
     )
-    tags = [line for line in result.stdout.splitlines() if line]
-    return {tag: parse_tag(tag, release_family)[0] for tag in tags}
+    tags = {}
+    for tag in filter(None, result.stdout.splitlines()):
+        legacy = LEGACY_TAG.match(tag)
+        version = tag[legacy.end() :] if legacy else tag.removeprefix(TAG_PREFIX)
+        tags[tag] = parse_version(version)
+    return tags
 
 
 def validate_tag(
@@ -126,37 +92,36 @@ def validate_tag(
     *,
     repository: pathlib.Path | None = None,
     now: datetime.datetime | None = None,
-) -> tuple[ReleaseFamily, str, str]:
-    release_family = family_from_tag(tag)
-    current, version = parse_tag(tag, release_family)
-    require_current_month(version, release_family, now=now)
-    parsed = release_tags(release_family, repository=repository)
+) -> tuple[str, str]:
+    current, version = parse_tag(tag)
+    require_current_month(version, now=now)
+    parsed = release_tags(repository=repository)
     if tag not in parsed:
-        raise SystemExit(
-            f"{release_family.name} release tag {tag} is not present in the checkout"
-        )
-    if current != max(parsed.values()):
-        latest = max(parsed, key=parsed.__getitem__)
-        raise SystemExit(
-            f"{tag} is not newer than existing {release_family.name} tag {latest}"
-        )
+        raise SystemExit(f"release tag {tag} is not present in the checkout")
+    previous = {other: fields for other, fields in parsed.items() if other != tag}
+    if previous and current <= max(previous.values()):
+        latest = max(previous, key=lambda other: (previous[other], other))
+        raise SystemExit(f"{tag} is not newer than existing release tag {latest}")
 
+    # A legacy core tag and a legacy binding tag may share a version.
     revisions = sorted(
-        fields.revision
-        for fields in parsed.values()
-        if (fields.epoch, fields.month) == (current.epoch, current.month)
+        {
+            fields.revision
+            for fields in parsed.values()
+            if (fields.epoch, fields.month) == (current.epoch, current.month)
+        }
     )
     expected_revisions = list(range(current.revision + 1))
     if revisions != expected_revisions:
         raise SystemExit(
-            f"{release_family.name} release revisions for "
-            f"{current.epoch}.{current.month} are {revisions}; "
-            f"expected {expected_revisions}"
+            f"release revisions for {current.epoch}.{current.month} are "
+            f"{revisions}; expected {expected_revisions}"
         )
 
-    previous = [candidate for candidate in parsed if candidate != tag]
-    previous_tag = max(previous, key=parsed.__getitem__) if previous else ""
-    return release_family, version, previous_tag
+    previous_tag = (
+        max(previous, key=lambda other: (previous[other], other)) if previous else ""
+    )
+    return version, previous_tag
 
 
 def main() -> int:
@@ -164,16 +129,8 @@ def main() -> int:
     parser.add_argument("tag")
 
     args = parser.parse_args()
-    release_family, version, previous = validate_tag(args.tag)
-    print(
-        json.dumps(
-            {
-                "family": release_family.slug,
-                "previousTag": previous,
-                "version": version,
-            }
-        )
-    )
+    version, previous = validate_tag(args.tag)
+    print(json.dumps({"previousTag": previous, "version": version}))
     return 0
 
 

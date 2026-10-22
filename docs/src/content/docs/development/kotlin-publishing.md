@@ -235,10 +235,10 @@ published JVM and Android artifacts in applications.
 
 ## Tagged release finalization
 
-Pushing a `bindings/kotlin/v<version>` tag starts a release for the tag's exact
-commit. Tagged releases use the same host staging and merged-repository
-verification as snapshots. Host jobs have no publishing credentials. The release
-path then:
+Pushing a `v<version>` release tag publishes the native release on GitHub, then
+starts the Kotlin release for the tag's exact commit. Tagged releases use the
+same host staging and merged-repository verification as snapshots. Host jobs
+have no publishing credentials. The release path then:
 
 1. merges the partitions and rejects missing modules or conflicting paths;
 2. runs the same semantic payload and coordinate verification used for
