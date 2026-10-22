@@ -131,7 +131,8 @@ enum class FrameFailure {
   Resources,
   Scheduler,
   Metadata,
-  Drawable
+  Drawable,
+  Release
 };
 
 class FailedActivation final : public mln::gfx::RendererBackend {
@@ -201,6 +202,15 @@ class FailingFrameBackend final : public mln::core::TextureSessionBackend {
     return backend_->prepare_off_thread_teardown();
   }
   void quarantine() noexcept override { backend_->quarantine(); }
+  // Takes any synchronization, then fails to wait for it.
+  auto supports_consumer_sync(mln_gpu_sync_kind kind) -> bool override {
+    return failure_ == FrameFailure::Release ||
+           backend_->supports_consumer_sync(kind);
+  }
+  auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status override {
+    if (failure_ == FrameFailure::Release) return MLN_STATUS_NATIVE_ERROR;
+    return backend_->release_consumer_sync(sync);
+  }
 
  private:
   std::unique_ptr<TextureSessionBackend> backend_;
@@ -1215,6 +1225,38 @@ void fence_driver(const Fixture& fixture) {
   mln_test_completion_destroy(&fence);
 }
 
+// A release whose wait for the host's GPU fails quarantines its slot.
+// Quarantining the last usable one ends the demand that waits for a map
+// update, which no slot could ever render.
+void a_failed_release_of_the_last_slot_ends_a_waiting_demand() {
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  render_until_idle(fixture);
+  install_frame_failure(fixture, FrameFailure::Release);
+  auto first = mln_test_render_and_acquire(&fixture.render, 171);
+  auto second = mln_test_render_and_acquire(&fixture.render, 172);
+  MLN_TEST_OK(request_waiting(fixture, 173));
+  fence_driver(fixture);
+  const auto fenced = mln_gpu_sync{
+    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_OPENGL_FENCE, .object = 1
+  };
+  MLN_TEST_OK(mln_acquired_frame_release(first, &fenced, nullptr));
+  MLN_TEST_OK(mln_acquired_frame_release(second, &fenced, nullptr));
+  const auto batch = wait_for_results(fixture);
+  const auto ended = batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(173, ended.token);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_TARGET_NOT_READY, ended.disposition
+  );
+  // Detach keeps the quarantined ring, and a kept Vulkan ring is a child of
+  // the host's device.
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  mln_test_render_fixture_keep_graphics_until_exit(&fixture.render);
+#endif
+  destroy_fixture(fixture);
+}
+
 auto latest_update_generation(mln_map map) -> uint64_t {
   auto snapshot = mln_map_snapshot{.size = sizeof(mln_map_snapshot)};
   if (mln_map_get_snapshot(map, &snapshot, nullptr) != MLN_STATUS_OK) return 0;
@@ -1442,6 +1484,7 @@ MLN_TEST_GROUP {
   RUN_TEST(abandon_destroys_a_ring_whose_frame_release_is_still_queued);
   RUN_TEST(abandon_keeps_a_ring_released_with_a_gpu_wait_as_it_abandons);
   RUN_TEST(a_demand_parked_as_disposal_quarantines_the_ring_gets_a_result);
+  RUN_TEST(a_failed_release_of_the_last_slot_ends_a_waiting_demand);
   RUN_TEST(a_waiting_demand_renders_an_update_that_lands_as_it_looks);
   RUN_TEST(a_barrier_ends_a_running_wait_without_ending_a_later_demand);
   RUN_TEST(
