@@ -216,13 +216,12 @@ shared signing path.
 
 Each host first stages its publications in a local Maven repository. CI rejects
 duplicate paths while it merges the Android and Apple repositories, then
-inspects the published AAR, JAR, and KLIB payloads and compiles the example
-consumers against the merged repository. The snapshot finalizer uploads that
-verified repository to the Central Portal snapshot endpoint. It uploads every
-leaf module before the canonical multiplatform root modules. Serialized
-publishing prevents two commits from interleaving those uploads. Both snapshot
-and tagged release jobs reuse the CI-produced native archives and the same
-staged repository; they do not rebuild MapLibre Native.
+inspects the published AAR, JAR, and KLIB payloads. The snapshot finalizer
+uploads that verified repository to the Central Portal snapshot endpoint. It
+uploads every leaf module before the canonical multiplatform root modules.
+Serialized publishing prevents two commits from interleaving those uploads. Both
+snapshot and tagged release jobs reuse the CI-produced native archives and the
+same staged repository; they do not rebuild MapLibre Native.
 
 CI runs the same staging and verification wherever it runs complete coverage: on
 `main`, on manual runs, and on pull requests labeled `ci:full` or opened by
@@ -237,7 +236,7 @@ Verification checks:
 - Maven and Gradle module metadata for every publication;
 - native archive presence in published KLIBs;
 - JNI library placement and Rustls helper presence in Android AARs;
-- Android runtime publications resolving without the Kotlin binding;
+- Android runtime metadata declaring no dependency on the Kotlin binding;
 - native resource presence in JVM classifier JARs;
 - Dokka-generated API pages in every API-bearing javadoc JAR.
 
