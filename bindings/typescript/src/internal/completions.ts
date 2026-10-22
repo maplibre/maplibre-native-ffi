@@ -15,6 +15,8 @@ export interface CommandCompletion {
   readonly disposition: CommandDisposition;
   /** The map snapshot generation that the command published. */
   readonly generation: bigint;
+  /** The first map render update that includes the command. */
+  readonly renderUpdateGeneration: bigint;
   readonly status: Status;
   readonly diagnostic: string;
 }
@@ -84,6 +86,7 @@ export function command(start: Start): Promise<CommandCompletion> {
     submit(start, (_index, header) => ({
       disposition: header.disposition,
       generation: header.generation,
+      renderUpdateGeneration: header.renderUpdateGeneration,
       status: header.status,
       diagnostic: header.diagnostic,
     })),

@@ -48,7 +48,7 @@ auto copy_result(
 }  // namespace
 
 auto CompletionSink::deliver(
-  mln_status status, std::uint32_t disposition, std::uint64_t generation,
+  mln_status status, std::uint32_t disposition, CommandGenerations generations,
   std::string_view diagnostic, const void* value, std::size_t value_count,
   std::uint32_t value_size, const delivery::CompletionCapture* capture
 ) const noexcept -> void {
@@ -57,7 +57,8 @@ auto CompletionSink::deliver(
     .status = status,
     .disposition = disposition,
     .value_size = value == nullptr ? 0 : value_size,
-    .generation = generation,
+    .generation = generations.snapshot,
+    .render_update_generation = generations.render_update,
     .diagnostic =
       mln_buffer_view{.data = diagnostic.data(), .size = diagnostic.size()},
     .value = value,
@@ -127,6 +128,7 @@ auto CompletionSink::deliver_queued(
       .disposition = result.disposition,
       .value_size = 0,
       .generation = result.generation,
+      .render_update_generation = result.render_update_generation,
       .diagnostic =
         mln_buffer_view{
           .data = uncopyable_result, .size = sizeof(uncopyable_result) - 1
@@ -144,8 +146,8 @@ auto ErasedCompletionValue::deliver(
   std::uint32_t size, const delivery::CompletionCapture* capture
 ) noexcept -> void {
   sink.deliver(
-    MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0, {}, value, count, size,
-    capture
+    MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, {}, {}, value, count,
+    size, capture
   );
 }
 
@@ -155,14 +157,14 @@ auto deliver_failure(
   if (status == MLN_STATUS_OK) {
     assert(false && "a failure delivery reported success");
     sink.deliver(
-      MLN_STATUS_NATIVE_ERROR, MLN_COMMAND_DISPOSITION_COMMITTED, 0,
+      MLN_STATUS_NATIVE_ERROR, MLN_COMMAND_DISPOSITION_COMMITTED, {},
       "native completion reported success without its result", nullptr, 0, 0,
       nullptr
     );
     return;
   }
   sink.deliver(
-    status, MLN_COMMAND_DISPOSITION_COMMITTED, 0, diagnostic, nullptr, 0, 0,
+    status, MLN_COMMAND_DISPOSITION_COMMITTED, {}, diagnostic, nullptr, 0, 0,
     nullptr
   );
 }
@@ -196,7 +198,7 @@ Completion::Completion(CompletionSink sink, delivery::ItemPtr fallback) noexcept
 Completion::~Completion() {
   if (state_.load() == State::Accepted) {
     sink_.deliver(
-      MLN_STATUS_CANCELLED, MLN_COMMAND_DISPOSITION_CANCELLED, 0,
+      MLN_STATUS_CANCELLED, MLN_COMMAND_DISPOSITION_CANCELLED, {},
       "asynchronous work was abandoned", nullptr, 0, 0, nullptr
     );
     release();
@@ -222,7 +224,7 @@ auto Completion::set_submission_lease(ControlLease lease) noexcept -> void {
 
 auto Completion::deliver_undelivered() noexcept -> void {
   sink_.deliver(
-    MLN_STATUS_NATIVE_ERROR, MLN_COMMAND_DISPOSITION_FAILED, 0,
+    MLN_STATUS_NATIVE_ERROR, MLN_COMMAND_DISPOSITION_FAILED, {},
     "the completion result could not be delivered", nullptr, 0, 0, nullptr
   );
 }
@@ -335,16 +337,16 @@ auto complete_failure(
 
 auto complete_command(
   const std::shared_ptr<Completion>& completion, std::uint32_t disposition,
-  mln_status status, std::uint64_t generation, std::string diagnostic
+  mln_status status, CommandGenerations generations, std::string diagnostic
 ) noexcept -> void {
   complete_command(
-    completion.get(), disposition, status, generation, std::move(diagnostic)
+    completion.get(), disposition, status, generations, std::move(diagnostic)
   );
 }
 
 auto complete_command(
   Completion* completion, std::uint32_t disposition, mln_status status,
-  std::uint64_t generation, std::string diagnostic
+  CommandGenerations generations, std::string diagnostic
 ) noexcept -> void {
   if (status != MLN_STATUS_OK) {
     disposition = status == MLN_STATUS_CANCELLED
@@ -363,11 +365,11 @@ auto complete_command(
     }
     return;
   }
-  completion->resolve([disposition, status, generation,
+  completion->resolve([disposition, status, generations,
                        diagnostic =
                          std::move(diagnostic)](const CompletionSink& sink) {
     sink.deliver(
-      status, disposition, generation, diagnostic, nullptr, 0, 0, nullptr
+      status, disposition, generations, diagnostic, nullptr, 0, 0, nullptr
     );
   });
 }

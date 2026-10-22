@@ -57,6 +57,13 @@ typedef struct mln_completion_result {
    * not a command.
    */
   uint64_t generation;
+  /**
+   * The latest_render_update_generation of the map snapshot at generation. A
+   * frame result with disposition MLN_RENDER_RESULT_RENDERED and a
+   * map_update_generation at or past this value was rendered from map state
+   * that includes the command. Zero when generation is zero.
+   */
+  uint64_t render_update_generation;
   /** Borrowed diagnostic bytes, empty on success. */
   mln_buffer_view diagnostic;
   /** Borrowed function-specific result, or null when the function has none. */

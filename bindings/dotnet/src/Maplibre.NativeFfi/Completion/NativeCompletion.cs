@@ -9,6 +9,7 @@ namespace Maplibre.NativeFfi;
 public readonly record struct CommandCompletion(
     CommandDisposition Disposition,
     ulong Generation,
+    ulong RenderUpdateGeneration,
     int RawStatus,
     string Diagnostic
 );
@@ -67,6 +68,7 @@ internal static unsafe class NativeCompletion
             static result => new CommandCompletion(
                 (CommandDisposition)result->disposition,
                 result->generation,
+                result->render_update_generation,
                 result->status,
                 ValueStructs.CopyUtf8View(result->diagnostic)
             ),

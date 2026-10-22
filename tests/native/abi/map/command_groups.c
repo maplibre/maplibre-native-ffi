@@ -46,10 +46,16 @@ static void begin_group(mln_map map) {
   );
 }
 
-static void end_group(mln_map map) {
-  MLN_TEST_AWAIT_OK(
-    mln_map_end_command_group(map, &completion.descriptor, NULL)
-  );
+// Ends the innermost group and returns the render update generation that its
+// completion reports.
+static uint64_t end_group(mln_map map) {
+  mln_test_completion ended = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_map_end_command_group(map, &ended.descriptor, NULL));
+  MLN_TEST_OK(mln_test_completion_finish(&ended));
+  const uint64_t render_update =
+    mln_test_completion_render_update_generation(&ended);
+  mln_test_completion_destroy(&ended);
+  return render_update;
 }
 
 // Moving a layer removes and re-adds it inside MapLibre, which publishes one
@@ -123,7 +129,7 @@ static void a_group_publishes_one_render_update_at_its_end(void) {
   TEST_ASSERT_TRUE(layer_exists(map, "a"));
   TEST_ASSERT_EQUAL_UINT64(before, render_update_generation(map));
 
-  end_group(map);
+  TEST_ASSERT_EQUAL_UINT64(before + 1, end_group(map));
   TEST_ASSERT_EQUAL_UINT64(before + 1, render_update_generation(map));
 
   mln_test_destroy_map(map);
@@ -138,10 +144,10 @@ static void nested_groups_publish_at_the_outermost_end(void) {
   begin_group(map);
   begin_group(map);
   add_background_layer(map, "{\"id\":\"a\",\"type\":\"background\"}");
-  end_group(map);
+  TEST_ASSERT_EQUAL_UINT64(before, end_group(map));
   TEST_ASSERT_EQUAL_UINT64(before, render_update_generation(map));
   add_background_layer(map, "{\"id\":\"b\",\"type\":\"background\"}");
-  end_group(map);
+  TEST_ASSERT_EQUAL_UINT64(before + 1, end_group(map));
   TEST_ASSERT_EQUAL_UINT64(before + 1, render_update_generation(map));
 
   mln_test_destroy_map(map);

@@ -510,6 +510,7 @@ fn py_command(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<P
         .call1((
             result.disposition,
             result.generation,
+            result.render_update_generation,
             result.status,
             copy_completion_diagnostic(result),
         ))?

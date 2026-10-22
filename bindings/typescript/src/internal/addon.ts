@@ -21,6 +21,7 @@ export interface CompletionHeader {
   readonly status: number;
   readonly disposition: number;
   readonly generation: bigint;
+  readonly renderUpdateGeneration: bigint;
   readonly diagnostic: string;
 }
 

@@ -93,6 +93,7 @@ struct CompletionState {
   mln_status status = MLN_STATUS_INVALID_STATE;
   std::uint32_t disposition = MLN_COMMAND_DISPOSITION_COMMITTED;
   std::uint64_t generation = 0;
+  std::uint64_t render_update_generation = 0;
   std::string diagnostic;
   std::vector<std::byte> value;
   std::size_t value_count = 0;
@@ -118,6 +119,7 @@ void receive_completion(
     probe->status = static_cast<mln_status>(result->status);
     probe->disposition = result->disposition;
     probe->generation = result->generation;
+    probe->render_update_generation = result->render_update_generation;
     probe->diagnostic.assign(
       static_cast<const char*>(result->diagnostic.data), result->diagnostic.size
     );
@@ -503,6 +505,15 @@ extern "C" auto mln_test_completion_generation(mln_test_completion* completion)
   if (probe == nullptr) return 0;
   const auto lock = std::scoped_lock{probe->mutex};
   return probe->generation;
+}
+
+extern "C" auto mln_test_completion_render_update_generation(
+  mln_test_completion* completion
+) -> uint64_t {
+  auto* probe = state(completion);
+  if (probe == nullptr) return 0;
+  const auto lock = std::scoped_lock{probe->mutex};
+  return probe->render_update_generation;
 }
 
 extern "C" auto mln_test_completion_diagnostic(mln_test_completion* completion)

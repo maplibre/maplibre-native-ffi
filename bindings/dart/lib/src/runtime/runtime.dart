@@ -128,6 +128,7 @@ Future<CommandCompletion> _startCommand(
   decode: (result) => CommandCompletion(
     disposition: CommandDisposition.fromRawValue(result.disposition),
     generation: uint64FromNative(result.generation),
+    renderUpdateGeneration: uint64FromNative(result.render_update_generation),
     status: Status.fromRawValue(result.status),
     diagnostic: copyCompletionDiagnostic(result.diagnostic),
   ),
@@ -137,12 +138,16 @@ final class CommandCompletion {
   const CommandCompletion({
     required this.disposition,
     required this.generation,
+    required this.renderUpdateGeneration,
     required this.status,
     required this.diagnostic,
   });
 
   final CommandDisposition disposition;
   final BigInt generation;
+
+  /// The first map render update that includes the command.
+  final BigInt renderUpdateGeneration;
   final Status status;
   final String diagnostic;
 }

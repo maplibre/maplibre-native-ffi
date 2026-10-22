@@ -16,8 +16,11 @@ import (
 type CommandCompletion struct {
 	Disposition CommandDisposition
 	Generation  uint64
-	Status      Status
-	Diagnostic  string
+	// RenderUpdateGeneration is the first render update that includes the
+	// command; compare it with RenderFrameResult.MapUpdateGeneration.
+	RenderUpdateGeneration uint64
+	Status                 Status
+	Diagnostic             string
 }
 
 type futureResult[T any] struct {
@@ -134,10 +137,11 @@ func completionCommand(result *C.mln_completion_result) (CommandCompletion, erro
 		return CommandCompletion{}, err
 	}
 	return CommandCompletion{
-		Disposition: CommandDisposition(result.disposition),
-		Generation:  uint64(result.generation),
-		Status:      Status(result.status),
-		Diagnostic:  completionDiagnostic(result),
+		Disposition:            CommandDisposition(result.disposition),
+		Generation:             uint64(result.generation),
+		RenderUpdateGeneration: uint64(result.render_update_generation),
+		Status:                 Status(result.status),
+		Diagnostic:             completionDiagnostic(result),
 	}, nil
 }
 

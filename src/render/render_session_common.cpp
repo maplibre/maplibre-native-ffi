@@ -3781,7 +3781,7 @@ auto render_session_resize_start(
         status != MLN_STATUS_OK
           ? static_cast<std::uint32_t>(MLN_COMMAND_DISPOSITION_FAILED)
           : static_cast<std::uint32_t>(MLN_COMMAND_DISPOSITION_COMMITTED),
-        status, 0, std::move(diagnostic)
+        status, {}, std::move(diagnostic)
       );
     },
     async, true

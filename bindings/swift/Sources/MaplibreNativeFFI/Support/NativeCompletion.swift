@@ -168,6 +168,7 @@ enum NativeCompletion {
       try CommandCompletion(
         disposition: CommandDisposition(rawValue: result.pointee.disposition),
         generation: result.pointee.generation,
+        renderUpdateGeneration: result.pointee.render_update_generation,
         rawStatus: result.pointee.status,
         diagnostic: NativeString.copyUTF8(
           data: result.pointee.diagnostic.data,

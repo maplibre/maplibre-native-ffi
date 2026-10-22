@@ -415,8 +415,8 @@ static mln_render_frame_result render_through_update(
   return (mln_render_frame_result){0};
 }
 
-// A committed command's snapshot names the latest render update, and the
-// first frame that renders that update or a later one draws the command.
+// A committed command's completion names the render update that includes it,
+// and the first frame that renders that update or a later one draws it.
 static void a_frame_at_a_commands_render_update_draws_the_command(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -440,18 +440,16 @@ static void a_frame_at_a_commands_render_update_draws_the_command(void) {
   TEST_ASSERT_EQUAL_UINT32(
     MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&jump)
   );
-  const uint64_t committed = mln_test_completion_generation(&jump);
+  const uint64_t render_update =
+    mln_test_completion_render_update_generation(&jump);
   mln_test_completion_destroy(&jump);
-  mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
-  MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
-  TEST_ASSERT_GREATER_OR_EQUAL_UINT64(committed, snapshot.generation);
   // The command published its render update before it completed.
   TEST_ASSERT_GREATER_THAN_UINT64(
-    before.rendered_update_generation, snapshot.latest_render_update_generation
+    before.rendered_update_generation, render_update
   );
 
   const mln_render_frame_result frame =
-    render_through_update(&fixture, snapshot.latest_render_update_generation);
+    render_through_update(&fixture, render_update);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, -21.0, frame.view.camera.center.latitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, 43.0, frame.view.camera.center.longitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, 2.0, frame.view.camera.zoom);

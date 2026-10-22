@@ -24,6 +24,7 @@ fn fireWake(wake: Wake) void {
 pub const CommandCompletion = struct {
     disposition: CommandDisposition,
     generation: u64,
+    render_update_generation: u64,
     raw_status: i32,
 
     /// Returns the native error carried by a failed or cancelled command.
@@ -299,6 +300,7 @@ pub fn command(result: *const c.mln_completion_result) status.Error!CommandCompl
     return .{
         .disposition = CommandDisposition.fromNative(result.disposition),
         .generation = result.generation,
+        .render_update_generation = result.render_update_generation,
         .raw_status = result.status,
     };
 }

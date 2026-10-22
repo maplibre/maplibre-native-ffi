@@ -18,6 +18,13 @@ namespace mln::core {
 
 class Completion;
 
+// The generations a map command's completion reports: the snapshot that the
+// command published, and the latest render update that snapshot reports.
+struct CommandGenerations {
+  std::uint64_t snapshot = 0;
+  std::uint64_t render_update = 0;
+};
+
 // Where one completion's terminal result goes: the host's callback, or a
 // delivery queue. make_completion() makes the only sinks that deliver, so a
 // submission that does not pass through it cannot construct a Completion.
@@ -32,9 +39,10 @@ class CompletionSink final {
   // Delivers one terminal result. A value that a queue cannot copy turns into
   // MLN_STATUS_NATIVE_ERROR, and its owned handles are disposed.
   auto deliver(
-    mln_status status, std::uint32_t disposition, std::uint64_t generation,
-    std::string_view diagnostic, const void* value, std::size_t value_count,
-    std::uint32_t value_size, const delivery::CompletionCapture* capture
+    mln_status status, std::uint32_t disposition,
+    CommandGenerations generations, std::string_view diagnostic,
+    const void* value, std::size_t value_count, std::uint32_t value_size,
+    const delivery::CompletionCapture* capture
   ) const noexcept -> void;
 
  private:
@@ -141,11 +149,12 @@ auto complete_failure(
 
 auto complete_command(
   Completion* completion, std::uint32_t disposition, mln_status status,
-  std::uint64_t generation = 0, std::string diagnostic = {}
+  CommandGenerations generations = {}, std::string diagnostic = {}
 ) noexcept -> void;
 auto complete_command(
   const std::shared_ptr<Completion>& completion, std::uint32_t disposition,
-  mln_status status, std::uint64_t generation = 0, std::string diagnostic = {}
+  mln_status status, CommandGenerations generations = {},
+  std::string diagnostic = {}
 ) noexcept -> void;
 
 }  // namespace mln::core

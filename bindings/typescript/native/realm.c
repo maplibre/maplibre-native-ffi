@@ -400,6 +400,10 @@ static napi_value completion_header(
       env, header, "generation", mln_ts_u64(env, result->generation)
     ) ||
     !mln_ts_set(
+      env, header, "renderUpdateGeneration",
+      mln_ts_u64(env, result->render_update_generation)
+    ) ||
+    !mln_ts_set(
       env, header, "diagnostic",
       mln_ts_text(env, result->diagnostic.data, result->diagnostic.size)
     )

@@ -139,6 +139,9 @@ bool mln_test_completion_poll(mln_test_completion* completion);
 mln_status mln_test_completion_status(mln_test_completion* completion);
 uint32_t mln_test_completion_disposition(mln_test_completion* completion);
 uint64_t mln_test_completion_generation(mln_test_completion* completion);
+uint64_t mln_test_completion_render_update_generation(
+  mln_test_completion* completion
+);
 const char* mln_test_completion_diagnostic(mln_test_completion* completion);
 size_t mln_test_completion_value_count(mln_test_completion* completion);
 bool mln_test_completion_copy_value(

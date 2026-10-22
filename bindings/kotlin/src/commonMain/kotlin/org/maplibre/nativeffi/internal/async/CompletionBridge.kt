@@ -126,6 +126,7 @@ internal object CompletionBridge {
     CommandCompletion(
       CommandDisposition(readU32(result + CompletionResultLayout.DISPOSITION)),
       readU64(result + CompletionResultLayout.GENERATION),
+      readU64(result + CompletionResultLayout.RENDER_UPDATE_GENERATION),
       Status(readI32(result + CompletionResultLayout.STATUS)),
       diagnostic(result),
     )

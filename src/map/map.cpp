@@ -2844,7 +2844,7 @@ auto close_map_transaction(MapObject& live, uint64_t generation) -> void {
 
 struct MapCommandOutcome {
   mln_status status = MLN_STATUS_NATIVE_ERROR;
-  uint64_t generation = 0;
+  CommandGenerations generations;
   std::string message;
 };
 
@@ -2878,7 +2878,12 @@ auto run_map_transaction(std::shared_ptr<MapObject> map, Work&& work)
     // The snapshot reports the update that the work produced, unless a
     // command group still holds it.
     live.frontend->store_held_update();
-    outcome.generation = publish_map_snapshot(live);
+    // Only the runtime worker stores updates, so the latest one is the one
+    // that the snapshot reports.
+    outcome.generations = {
+      .snapshot = publish_map_snapshot(live),
+      .render_update = live.frontend->latest_update_generation(),
+    };
   } catch (...) {
     if (outcome.status == MLN_STATUS_OK) {
       outcome.status = MLN_STATUS_NATIVE_ERROR;
@@ -2886,7 +2891,7 @@ auto run_map_transaction(std::shared_ptr<MapObject> map, Work&& work)
     }
   }
   try {
-    close_map_transaction(live, outcome.generation);
+    close_map_transaction(live, outcome.generations.snapshot);
   } catch (...) {
     if (outcome.status == MLN_STATUS_OK) {
       outcome.status = MLN_STATUS_NATIVE_ERROR;
@@ -2902,7 +2907,7 @@ auto complete_map_command(Completion* completion, MapCommandOutcome outcome)
     completion,
     outcome.status == MLN_STATUS_OK ? MLN_COMMAND_DISPOSITION_COMMITTED
                                     : MLN_COMMAND_DISPOSITION_FAILED,
-    outcome.status, outcome.generation, std::move(outcome.message)
+    outcome.status, outcome.generations, std::move(outcome.message)
   );
 }
 
@@ -3499,7 +3504,7 @@ auto submit_map_resize(
           if (attached) {
             complete_command(
               self.completion, MLN_COMMAND_DISPOSITION_FAILED,
-              MLN_STATUS_INVALID_STATE, 0,
+              MLN_STATUS_INVALID_STATE, {},
               "map still has an attached render session"
             );
             return;

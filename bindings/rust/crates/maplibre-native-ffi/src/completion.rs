@@ -18,6 +18,8 @@ use crate::{Error, Result};
 pub struct CommandCompletion {
     pub disposition: crate::CommandDisposition,
     pub generation: u64,
+    /// The first map render update that includes the command.
+    pub render_update_generation: u64,
     pub raw_status: i32,
     pub diagnostic: String,
 }
@@ -221,6 +223,7 @@ pub(crate) fn command(result: &sys::mln_completion_result) -> Result<CommandComp
     Ok(CommandCompletion {
         disposition: crate::CommandDisposition::from_raw(result.disposition),
         generation: result.generation,
+        render_update_generation: result.render_update_generation,
         raw_status: result.status,
         diagnostic: copy_diagnostic(result),
     })

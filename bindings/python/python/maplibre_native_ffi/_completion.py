@@ -11,6 +11,7 @@ class CommandCompletion:
 
     disposition: CommandDisposition
     generation: int
+    render_update_generation: int
     native_status_code: int
     diagnostic: str
 

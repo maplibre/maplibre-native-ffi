@@ -159,7 +159,8 @@ MLN_API mln_status mln_map_set_tile_options(
  * Submits one atomic camera update.
  *
  * The update is copied before return. The completion reports its terminal
- * disposition and the snapshot generation that the update published.
+ * disposition, the snapshot generation that the update published, and the
+ * render update generation that includes it.
  * update->gesture_phase is applied around the camera write; see
  * mln_gesture_phase.
  *
