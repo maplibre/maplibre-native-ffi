@@ -702,9 +702,10 @@ def validate(api: Api) -> None:
             # input array, so its count must be an input that counts exactly
             # one other array, an input one. A binding sizes the output from
             # that array and passes its length, so a second array sharing the
-            # count could disagree with it. Both come before the output, as
-            # every input does, since bindings pass outputs after inputs. An
-            # owned pointer output instead counts the array native returns.
+            # count could disagree with it. Every input comes before the
+            # output, as in every header, since bindings pass outputs after
+            # inputs. An owned pointer output instead counts the array native
+            # returns.
             if (
                 parameter.metadata.get("direction") == "out"
                 and parameter.metadata.get("length") not in {None, "1"}
@@ -718,9 +719,7 @@ def validate(api: Api) -> None:
                     and other.metadata.get("length") == parameter.metadata["length"]
                 ]
                 count = parameters.get(parameter.metadata["length"])
-                position = {
-                    other.name: index for index, other in enumerate(function.parameters)
-                }
+                later = function.parameters[function.parameters.index(parameter) + 1 :]
                 if (
                     count is None
                     or count.metadata.get("direction", "in") != "in"
@@ -729,11 +728,12 @@ def validate(api: Api) -> None:
                     or counted[0].type.kind != "pointer"
                     or counted[0].type.pointee is None
                     or counted[0].metadata.get("encoding") is not None
-                    or position[count.name] > position[parameter.name]
-                    or position[counted[0].name] > position[parameter.name]
+                    or any(
+                        other.metadata.get("direction", "in") == "in" for other in later
+                    )
                 ):
                     errors.append(
-                        f"{pcontext}: output array length must name the count of exactly one earlier input array"
+                        f"{pcontext}: output array length must name the count of exactly one input array, and the output must follow every input"
                     )
     for record in api.records:
         context = f"{record.location}: {record.name}"
