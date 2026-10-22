@@ -53,6 +53,7 @@ echo "$addon exports only napi_register_module_v1"
 
 [tasks.api]
 description = "Generate the TypeScript API reference HTML with TypeDoc."
+# Evaluation pin: typedoc is birkskyum/typedoc@18099a7 (unreleased TS 7.1 port).
 run = '''
 rm -rf build/typedoc
 pnpm exec typedoc --entryPoints src/index.ts --excludeInternal --out build/typedoc \

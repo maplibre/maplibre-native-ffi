@@ -19,7 +19,7 @@
   "devDependencies": {
     "@types/node": "^26.6.5",
     "node-api-headers": "^1.9.0",
-    "typedoc": "^0.28.20",
+    "typedoc": "github:birkskyum/typedoc#18099a7bc596326cca17dae294868c2b887a005d",
     "typescript": "^7.0.2"
   }
 }
