@@ -40,7 +40,7 @@ import org.maplibre.nativeffi.withMap
  */
 class GeneratedShapesTest {
   @Test
-  fun synchronousCallsFillCallerSizedOutputsInInputOrder(): Unit = runSuspendTest {
+  fun synchronousCallsFillCallerSizedOutputsInInputOrder() = runSuspendTest {
     withMap {
       val projection = GeneratedApi.mapProjectionCreate(map.getSnapshot().view)
       try {
