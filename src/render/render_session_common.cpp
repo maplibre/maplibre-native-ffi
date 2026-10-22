@@ -1085,17 +1085,22 @@ auto close_wakes(
 
 // Whether the driver can take the item at the front of its queue now. A
 // pending driver result holds the queue until it is ready.
+// Whether the work at the front of the queue renders a frame while the GPU has
+// as many unfinished frames as the texture ring has slots.
+auto frame_waits_for_gpu_locked(
+  const mln_render_session_object& session
+) noexcept -> bool {
+  const auto& texture = session.texture;
+  return !session.driver_work.empty() &&
+         session.driver_work.front().renders_frame && !texture.slots.empty() &&
+         texture.gpu_frames_in_flight >= texture.slots.size();
+}
+
 auto driver_work_runnable_locked(
   const mln_render_session_object& session
 ) noexcept -> bool {
   if (session.driver_work.empty()) return false;
-  // Frames in flight bound the GPU work queued ahead of the host's reads.
-  const auto& texture = session.texture;
-  if (
-    !texture.slots.empty() &&
-    texture.gpu_frames_in_flight >= texture.slots.size()
-  )
-    return false;
+  if (frame_waits_for_gpu_locked(session)) return false;
   const auto& ready = session.driver_work.front().ready;
   return !ready || ready();
 }
@@ -1140,10 +1145,11 @@ auto queue_frame_demand_work_locked(
   try {
     queue.push_back(
       RenderDriverWork{
-        [owner = session.shared_from_this(), expected]() {
-          run_frame_demand(owner, expected);
-        },
-        {}
+        .execute = [owner = session.shared_from_this(),
+                    expected]() { run_frame_demand(owner, expected); },
+        .abandon = {},
+        .ready = {},
+        .renders_frame = true,
       }
     );
   } catch (...) {
@@ -1427,12 +1433,14 @@ auto run_driver_result(
 
 }  // namespace
 
-void GpuFrameDone::run() const noexcept {
+void GpuWorkDone::run() const noexcept {
   const auto live = session.lock();
   if (live == nullptr) return;
   auto wakes = DeferredWakes{};
   const auto lock = std::scoped_lock{live->control_mutex};
-  --live->texture.gpu_frames_in_flight;
+  // The wait began with the driver held, so every frame in flight preceded it.
+  live->texture.gpu_frames_in_flight = 0;
+  live->texture.gpu_wait_pending = false;
   publish_driver_work_locked(*live, wakes);
 }
 
@@ -1708,15 +1716,18 @@ auto start_attach_render_session(
             )
               return;
             live->scheduler_service_queued = true;
+            const auto expected =
+              live->demands.empty() ? nullptr : live->demands.front();
             push_driver_work_locked(
               *live,
               RenderDriverWork{
-                [live, expected = live->demands.empty()
-                                    ? nullptr
-                                    : live->demands.front()]() {
-                  service_scheduler_work(live, expected);
-                },
-                {}
+                .execute =
+                  [live, expected]() {
+                    service_scheduler_work(live, expected);
+                  },
+                .abandon = {},
+                .ready = {},
+                .renders_frame = expected != nullptr,
               },
               wakes
             );
@@ -3047,11 +3058,12 @@ auto run_frame_demand(
           slot.available = !acquirable || metadata.has_value();
           slot.backend_metadata = std::move(metadata);
           slot.rendering = false;
-          if (session->texture.backend) ++session->texture.gpu_frames_in_flight;
+          if (
+            session->texture.backend &&
+            session->texture.backend->renders_ahead_of_gpu()
+          )
+            ++session->texture.gpu_frames_in_flight;
         }
-        // Registered without the lock, since a backend may report at once.
-        if (session->texture.backend)
-          session->texture.backend->when_gpu_done(GpuFrameDone{session});
       }
     }
     scope.reset();
@@ -3208,7 +3220,12 @@ auto render_session_request_frame(
   // Superseded work must not start a later demand ahead of ordered driver work.
   push_driver_work_locked(
     *live,
-    RenderDriverWork{[live, queued]() { run_frame_demand(live, queued); }, {}},
+    RenderDriverWork{
+      .execute = [live, queued]() { run_frame_demand(live, queued); },
+      .abandon = {},
+      .ready = {},
+      .renders_frame = true,
+    },
     wakes
   );
   return MLN_STATUS_OK;
@@ -3272,11 +3289,17 @@ auto render_session_service_driver_work(mln_render_session session)
       resubmit_parked_retirements(parked);
     }
   } guard{live};
+  auto wait_for_gpu = false;
   while (true) {
     auto item = RenderDriverWork{};
     {
       const auto lock = std::scoped_lock{live->control_mutex};
-      if (!driver_work_runnable_locked(*live)) break;
+      if (!driver_work_runnable_locked(*live)) {
+        // A frame that the frames in flight hold back asks once for their end.
+        wait_for_gpu = frame_waits_for_gpu_locked(*live) &&
+                       !std::exchange(live->texture.gpu_wait_pending, true);
+        break;
+      }
       item = std::move(live->driver_work.front());
       live->driver_work.pop_front();
     }
@@ -3292,6 +3315,8 @@ auto render_session_service_driver_work(mln_render_session session)
       if (item.abandon) item.abandon();
     }
   }
+  // Asked without the lock, since a backend may report at once.
+  if (wait_for_gpu) live->texture.backend->when_gpu_done(GpuWorkDone{live});
   return MLN_STATUS_OK;
 }
 

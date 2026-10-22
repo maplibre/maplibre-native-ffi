@@ -251,26 +251,26 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
   // A render only submits its frame, so the session learns of its completion
   // from the queue. In a browser the report arrives once the device's thread
   // returns to its event loop.
-  void when_gpu_done(mln::core::GpuFrameDone done) noexcept {
+  void when_gpu_done(mln::core::GpuWorkDone done) noexcept {
     WGPUQueueWorkDoneCallbackInfo callback_info{};
     callback_info.mode = WGPUCallbackMode_AllowSpontaneous;
     callback_info.callback =
       [](WGPUQueueWorkDoneStatus, WGPUStringView, void* userdata, void*) {
-        const auto owned = std::unique_ptr<mln::core::GpuFrameDone>{
-          static_cast<mln::core::GpuFrameDone*>(userdata)
+        const auto owned = std::unique_ptr<mln::core::GpuWorkDone>{
+          static_cast<mln::core::GpuWorkDone*>(userdata)
         };
         owned->run();
       };
     try {
-      callback_info.userdata1 = new mln::core::GpuFrameDone{done};
+      callback_info.userdata1 = new mln::core::GpuWorkDone{done};
     } catch (...) {
       done.run();
       return;
     }
     if (wgpuQueueOnSubmittedWorkDone(queue_, callback_info).id == 0) {
       // A refused registration never calls back.
-      const auto owned = std::unique_ptr<mln::core::GpuFrameDone>{
-        static_cast<mln::core::GpuFrameDone*>(callback_info.userdata1)
+      const auto owned = std::unique_ptr<mln::core::GpuWorkDone>{
+        static_cast<mln::core::GpuWorkDone*>(callback_info.userdata1)
       };
       owned->run();
     }
@@ -1195,7 +1195,10 @@ class WebGPUTextureSessionBackend final
                                       : MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  void when_gpu_done(mln::core::GpuFrameDone done) noexcept override {
+  [[nodiscard]] auto renders_ahead_of_gpu() const noexcept -> bool override {
+    return true;
+  }
+  void when_gpu_done(mln::core::GpuWorkDone done) noexcept override {
     backend_.when_gpu_done(std::move(done));
   }
 
