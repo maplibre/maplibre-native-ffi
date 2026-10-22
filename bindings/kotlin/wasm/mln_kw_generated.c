@@ -847,6 +847,28 @@ int32_t mln_kw_mln_map_projection_lat_lng_for_pixel_unwrapped(
   );
 }
 
+int32_t mln_kw_mln_map_projection_lat_lngs_for_pixels(
+  int64_t projection, uintptr_t points, uint32_t point_count,
+  uintptr_t out_coordinates, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_map_projection_lat_lngs_for_pixels(
+    (mln_map_projection)projection, (const mln_screen_point*)points,
+    (size_t)point_count, (mln_lat_lng*)out_coordinates,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_map_projection_lat_lngs_for_pixels_unwrapped(
+  int64_t projection, uintptr_t points, uint32_t point_count,
+  uintptr_t out_coordinates, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_map_projection_lat_lngs_for_pixels_unwrapped(
+    (mln_map_projection)projection, (const mln_screen_point*)points,
+    (size_t)point_count, (mln_lat_lng*)out_coordinates,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_map_projection_meters_per_pixel_at_latitude(
   int64_t projection, double latitude, uintptr_t out_meters_per_pixel,
   uintptr_t out_diagnostic
@@ -864,6 +886,17 @@ int32_t mln_kw_mln_map_projection_pixel_for_lat_lng(
   return (int32_t)mln_map_projection_pixel_for_lat_lng(
     (mln_map_projection)projection, *(const mln_lat_lng*)(uintptr_t)coordinate,
     (mln_screen_point*)out_point, (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_map_projection_pixels_for_lat_lngs(
+  int64_t projection, uintptr_t coordinates, uint32_t coordinate_count,
+  uintptr_t out_points, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_map_projection_pixels_for_lat_lngs(
+    (mln_map_projection)projection, (const mln_lat_lng*)coordinates,
+    (size_t)coordinate_count, (mln_screen_point*)out_points,
+    (mln_diagnostic*)out_diagnostic
   );
 }
 

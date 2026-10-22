@@ -169,6 +169,90 @@ MLN_API mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(
 ) MLN_NOEXCEPT;
 
 /**
+ * Converts geographic coordinates to screen points.
+ *
+ * Each output matches what mln_map_projection_pixel_for_lat_lng() returns for
+ * the coordinate at the same index. The caller provides space for
+ * coordinate_count outputs, written in input order. An empty batch is valid,
+ * and both arrays may be null when coordinate_count is zero. The whole input is
+ * validated before any output is written, and on failure the output is
+ * unchanged. The batch is one projection call, so it observes every earlier
+ * projection setter and no setter on another thread lands partway through it.
+ * This function may be called from any thread.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, either
+ *   array is null with a nonzero coordinate_count, or a coordinate is out of
+ *   range.
+ * - MLN_STATUS_INVALID_STATE when projection has been released.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ */
+MLN_API mln_status mln_map_projection_pixels_for_lat_lngs(
+  mln_map_projection projection,
+  const mln_lat_lng* coordinates MLN_BINDING("length=coordinate_count"),
+  size_t coordinate_count,
+  mln_screen_point* out_points
+    MLN_BINDING("direction=out;length=coordinate_count"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Converts screen points to geographic coordinates.
+ *
+ * Each output matches what mln_map_projection_lat_lng_for_pixel() returns for
+ * the point at the same index, with its longitude wrapped to -180 to 180. The
+ * caller provides space for point_count outputs, written in input order. An
+ * empty batch is valid, and both arrays may be null when point_count is zero.
+ * The whole input is validated before any output is written, and on failure the
+ * output is unchanged. The batch is one projection call, so it observes every
+ * earlier projection setter and no setter on another thread lands partway
+ * through it. This function may be called from any thread.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, either
+ *   array is null with a nonzero point_count, or a point is not finite.
+ * - MLN_STATUS_INVALID_STATE when projection has been released.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ */
+MLN_API mln_status mln_map_projection_lat_lngs_for_pixels(
+  mln_map_projection projection,
+  const mln_screen_point* points MLN_BINDING("length=point_count"),
+  size_t point_count,
+  mln_lat_lng* out_coordinates MLN_BINDING("direction=out;length=point_count"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Converts screen points to unwrapped geographic coordinates.
+ *
+ * Each output matches what mln_map_projection_lat_lng_for_pixel_unwrapped()
+ * returns for the point at the same index, with its longitude in the visible
+ * world copy. The caller provides space for point_count outputs, written in
+ * input order. An empty batch is valid, and both arrays may be null when
+ * point_count is zero. The whole input is validated before any output is
+ * written, and on failure the output is unchanged. The batch is one projection
+ * call, so it observes every earlier projection setter and no setter on another
+ * thread lands partway through it. This function may be called from any
+ * thread.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, either
+ *   array is null with a nonzero point_count, or a point is not finite.
+ * - MLN_STATUS_INVALID_STATE when projection has been released.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ */
+MLN_API mln_status mln_map_projection_lat_lngs_for_pixels_unwrapped(
+  mln_map_projection projection,
+  const mln_screen_point* points MLN_BINDING("length=point_count"),
+  size_t point_count,
+  mln_lat_lng* out_coordinates MLN_BINDING("direction=out;length=point_count"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
  * Reads the ground distance covered by one logical map pixel at a latitude for
  * the helper camera zoom.
  *

@@ -91,3 +91,54 @@ func TestArrayInputsAreCopiedAtSubmission(t *testing.T) {
 		t.Fatalf("style image = %+v, want the submitted pixels", got)
 	}
 }
+
+func TestSynchronousCallsFillCallerSizedOutputsInInputOrder(t *testing.T) {
+	f := newFixture(t)
+	snapshot, err := f.m.GetSnapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	projection, err := MapProjectionCreate(snapshot.View)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer projection.Close()
+	coordinates := []LatLng{{Latitude: 0, Longitude: 0}, {Latitude: 10, Longitude: 20}, {Latitude: -12, Longitude: -30}}
+	points, err := projection.PixelsForLatLngs(coordinates)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(points) != len(coordinates) {
+		t.Fatalf("got %d points", len(points))
+	}
+	wrapped, err := projection.LatLngsForPixels(points)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unwrapped, err := projection.LatLngsForPixelsUnwrapped(points)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index, coordinate := range coordinates {
+		point, err := projection.PixelForLatLng(coordinate)
+		if err != nil || point != points[index] {
+			t.Fatalf("point %d: %+v, %v", index, point, err)
+		}
+		single, err := projection.LatLngForPixel(point)
+		if err != nil || single != wrapped[index] {
+			t.Fatalf("coordinate %d: %+v, %v", index, single, err)
+		}
+		single, err = projection.LatLngForPixelUnwrapped(point)
+		if err != nil || single != unwrapped[index] {
+			t.Fatalf("unwrapped coordinate %d: %+v, %v", index, single, err)
+		}
+	}
+	emptyPoints, err := projection.PixelsForLatLngs(nil)
+	if err != nil || len(emptyPoints) != 0 {
+		t.Fatalf("empty points: %+v, %v", emptyPoints, err)
+	}
+	emptyCoordinates, err := projection.LatLngsForPixels(nil)
+	if err != nil || len(emptyCoordinates) != 0 {
+		t.Fatalf("empty coordinates: %+v, %v", emptyCoordinates, err)
+	}
+}

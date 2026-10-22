@@ -450,6 +450,22 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
+  fun mln_map_projection_lat_lngs_for_pixels(
+    projection: Long,
+    points: Long,
+    pointCount: Long,
+    outCoordinates: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_projection_lat_lngs_for_pixels_unwrapped(
+    projection: Long,
+    points: Long,
+    pointCount: Long,
+    outCoordinates: Long,
+    outDiagnostic: Long,
+  ): Int
+
   fun mln_map_projection_meters_per_pixel_at_latitude(
     projection: Long,
     latitude: Double,
@@ -461,6 +477,14 @@ internal expect object C {
     projection: Long,
     coordinate: Long,
     outPoint: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_projection_pixels_for_lat_lngs(
+    projection: Long,
+    coordinates: Long,
+    coordinateCount: Long,
+    outPoints: Long,
     outDiagnostic: Long,
   ): Int
 

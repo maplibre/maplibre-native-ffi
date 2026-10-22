@@ -2799,6 +2799,93 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_map_projection_lat_lngs_for_pixels(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_map_projection arg_projection = 0;
+  size_t count_points = 0;
+  mln_screen_point* arg_points = NULL;
+  mln_lat_lng* arg_out_coordinates = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "projection")) goto done;
+    arg_projection = (mln_map_projection)number;
+  }
+  {
+    mln_screen_point* items = NULL;
+    size_t count = 0;
+    if (!mln_ts_write_list_screen_point(
+          call, call->argv[1], UINT32_MAX, &items, &count, "points"
+        ))
+      goto done;
+    arg_points = items;
+    count_points = (size_t)count;
+  }
+  arg_out_coordinates =
+    mln_ts_allocate(call, sizeof *arg_out_coordinates * count_points);
+  if (arg_out_coordinates == NULL) goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_map_projection_lat_lngs_for_pixels(
+    arg_projection, arg_points, (size_t)count_points, arg_out_coordinates,
+    &diagnostic
+  );
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result =
+    mln_ts_read_items_lat_lng(env, arg_out_coordinates, count_points);
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value
+mln_ts_export_mln_map_projection_lat_lngs_for_pixels_unwrapped(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_map_projection arg_projection = 0;
+  size_t count_points = 0;
+  mln_screen_point* arg_points = NULL;
+  mln_lat_lng* arg_out_coordinates = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "projection")) goto done;
+    arg_projection = (mln_map_projection)number;
+  }
+  {
+    mln_screen_point* items = NULL;
+    size_t count = 0;
+    if (!mln_ts_write_list_screen_point(
+          call, call->argv[1], UINT32_MAX, &items, &count, "points"
+        ))
+      goto done;
+    arg_points = items;
+    count_points = (size_t)count;
+  }
+  arg_out_coordinates =
+    mln_ts_allocate(call, sizeof *arg_out_coordinates * count_points);
+  if (arg_out_coordinates == NULL) goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_map_projection_lat_lngs_for_pixels_unwrapped(
+    arg_projection, arg_points, (size_t)count_points, arg_out_coordinates,
+    &diagnostic
+  );
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result =
+    mln_ts_read_items_lat_lng(env, arg_out_coordinates, count_points);
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_map_projection_meters_per_pixel_at_latitude(
   napi_env env, napi_callback_info info
 ) {
@@ -2867,6 +2954,49 @@ static napi_value mln_ts_export_mln_map_projection_pixel_for_lat_lng(
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
   call->result =
     mln_ts_read_screen_point(env, &(arg_out_point), sizeof(arg_out_point));
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_map_projection_pixels_for_lat_lngs(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_map_projection arg_projection = 0;
+  size_t count_coordinates = 0;
+  mln_lat_lng* arg_coordinates = NULL;
+  mln_screen_point* arg_out_points = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "projection")) goto done;
+    arg_projection = (mln_map_projection)number;
+  }
+  {
+    mln_lat_lng* items = NULL;
+    size_t count = 0;
+    if (!mln_ts_write_list_lat_lng(
+          call, call->argv[1], UINT32_MAX, &items, &count, "coordinates"
+        ))
+      goto done;
+    arg_coordinates = items;
+    count_coordinates = (size_t)count;
+  }
+  arg_out_points =
+    mln_ts_allocate(call, sizeof *arg_out_points * count_coordinates);
+  if (arg_out_points == NULL) goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_map_projection_pixels_for_lat_lngs(
+    arg_projection, arg_coordinates, (size_t)count_coordinates, arg_out_points,
+    &diagnostic
+  );
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result =
+    mln_ts_read_items_screen_point(env, arg_out_points, count_coordinates);
 done:
   return mln_ts_end(call);
 }
@@ -6913,10 +7043,16 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_map_projection_lat_lng_for_pixel},
   {"mln_map_projection_lat_lng_for_pixel_unwrapped",
    mln_ts_export_mln_map_projection_lat_lng_for_pixel_unwrapped},
+  {"mln_map_projection_lat_lngs_for_pixels",
+   mln_ts_export_mln_map_projection_lat_lngs_for_pixels},
+  {"mln_map_projection_lat_lngs_for_pixels_unwrapped",
+   mln_ts_export_mln_map_projection_lat_lngs_for_pixels_unwrapped},
   {"mln_map_projection_meters_per_pixel_at_latitude",
    mln_ts_export_mln_map_projection_meters_per_pixel_at_latitude},
   {"mln_map_projection_pixel_for_lat_lng",
    mln_ts_export_mln_map_projection_pixel_for_lat_lng},
+  {"mln_map_projection_pixels_for_lat_lngs",
+   mln_ts_export_mln_map_projection_pixels_for_lat_lngs},
   {"mln_map_projection_release", mln_ts_export_mln_map_projection_release},
   {"mln_map_projection_set_camera",
    mln_ts_export_mln_map_projection_set_camera},

@@ -541,6 +541,26 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
+  private val mln_map_projection_lat_lngs_for_pixels =
+    Ffm.downcall(
+      "mln_map_projection_lat_lngs_for_pixels",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_map_projection_lat_lngs_for_pixels_unwrapped =
+    Ffm.downcall(
+      "mln_map_projection_lat_lngs_for_pixels_unwrapped",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_map_projection_meters_per_pixel_at_latitude =
     Ffm.downcall(
       "mln_map_projection_meters_per_pixel_at_latitude",
@@ -556,6 +576,16 @@ internal actual object C {
       JAVA_INT,
       JAVA_LONG,
       mln_lat_lng,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_map_projection_pixels_for_lat_lngs =
+    Ffm.downcall(
+      "mln_map_projection_pixels_for_lat_lngs",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
     )
@@ -2124,6 +2154,36 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
+  actual fun mln_map_projection_lat_lngs_for_pixels(
+    projection: Long,
+    points: Long,
+    pointCount: Long,
+    outCoordinates: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_projection_lat_lngs_for_pixels.invokeExact(
+      projection,
+      points,
+      pointCount,
+      outCoordinates,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_map_projection_lat_lngs_for_pixels_unwrapped(
+    projection: Long,
+    points: Long,
+    pointCount: Long,
+    outCoordinates: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_projection_lat_lngs_for_pixels_unwrapped.invokeExact(
+      projection,
+      points,
+      pointCount,
+      outCoordinates,
+      outDiagnostic,
+    ) as Int
+
   actual fun mln_map_projection_meters_per_pixel_at_latitude(
     projection: Long,
     latitude: Double,
@@ -2147,6 +2207,21 @@ internal actual object C {
       projection,
       Ffm.value(coordinate, mln_lat_lng),
       outPoint,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_map_projection_pixels_for_lat_lngs(
+    projection: Long,
+    coordinates: Long,
+    coordinateCount: Long,
+    outPoints: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_projection_pixels_for_lat_lngs.invokeExact(
+      projection,
+      coordinates,
+      coordinateCount,
+      outPoints,
       outDiagnostic,
     ) as Int
 

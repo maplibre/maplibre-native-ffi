@@ -157,3 +157,42 @@ fn array_inputs_are_copied_when_they_are_submitted() {
 fn a_record_built_from_its_default_equals_the_native_default() {
     assert_eq!(MapOptions::default(), map_options_default().unwrap());
 }
+
+#[test]
+fn synchronous_calls_fill_caller_sized_outputs_in_input_order() {
+    let fixture = Fixture::new();
+    let projection = map_projection_create(&fixture.map().get_snapshot().unwrap().view).unwrap();
+    let coordinates = [
+        LatLng::new(0.0, 0.0),
+        LatLng::new(10.0, 20.0),
+        LatLng::new(-12.0, -30.0),
+    ];
+    let points = projection.pixels_for_lat_lngs(&coordinates).unwrap();
+    let singles: Vec<_> = coordinates
+        .iter()
+        .map(|&value| projection.pixel_for_lat_lng(value).unwrap())
+        .collect();
+    assert_eq!(points, singles);
+    let wrapped: Vec<_> = points
+        .iter()
+        .map(|&point| projection.lat_lng_for_pixel(point).unwrap())
+        .collect();
+    assert_eq!(projection.lat_lngs_for_pixels(&points).unwrap(), wrapped);
+    let unwrapped: Vec<_> = points
+        .iter()
+        .map(|&point| projection.lat_lng_for_pixel_unwrapped(point).unwrap())
+        .collect();
+    assert_eq!(
+        projection.lat_lngs_for_pixels_unwrapped(&points).unwrap(),
+        unwrapped
+    );
+    assert!(projection.pixels_for_lat_lngs(&[]).unwrap().is_empty());
+    assert!(projection.lat_lngs_for_pixels(&[]).unwrap().is_empty());
+    assert!(
+        projection
+            .lat_lngs_for_pixels_unwrapped(&[])
+            .unwrap()
+            .is_empty()
+    );
+    projection.release().unwrap();
+}

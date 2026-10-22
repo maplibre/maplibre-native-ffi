@@ -40,6 +40,28 @@ import org.maplibre.nativeffi.withMap
  */
 class GeneratedShapesTest {
   @Test
+  fun synchronousCallsFillCallerSizedOutputsInInputOrder(): Unit = runSuspendTest {
+    withMap {
+      val projection = GeneratedApi.mapProjectionCreate(map.getSnapshot().view)
+      try {
+        val coordinates = listOf(LatLng(0.0, 0.0), LatLng(10.0, 20.0), LatLng(-12.0, -30.0))
+        val points = projection.pixelsForLatLngs(coordinates)
+        assertEquals(coordinates.map(projection::pixelForLatLng), points)
+        assertEquals(points.map(projection::latLngForPixel), projection.latLngsForPixels(points))
+        assertEquals(
+          points.map(projection::latLngForPixelUnwrapped),
+          projection.latLngsForPixelsUnwrapped(points),
+        )
+        assertEquals(emptyList(), projection.pixelsForLatLngs(emptyList()))
+        assertEquals(emptyList(), projection.latLngsForPixels(emptyList()))
+        assertEquals(emptyList(), projection.latLngsForPixelsUnwrapped(emptyList()))
+      } finally {
+        projection.close()
+      }
+    }
+  }
+
+  @Test
   fun submittingAnUnknownUnionVariantUsesTheBindingError() {
     NativeArena().use { arena ->
       val geometry = RenderedQueryGeometry(RenderedQueryGeometryData.Unknown(900u, byteArrayOf()))

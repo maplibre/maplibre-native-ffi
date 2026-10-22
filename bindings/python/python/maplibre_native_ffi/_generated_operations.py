@@ -1268,6 +1268,32 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         """
         return LatLng._from_native(self._native.lat_lng_for_pixel_unwrapped(point))
 
+    def lat_lngs_for_pixels(
+        self, points: tuple[ScreenPoint, ...]
+    ) -> tuple[LatLng, ...]:
+        """Converts screen points to geographic coordinates.
+
+        See `mln_map_projection_lat_lngs_for_pixels` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+        """
+        return tuple(
+            LatLng._from_native(item)
+            for item in self._native.lat_lngs_for_pixels(points)
+        )
+
+    def lat_lngs_for_pixels_unwrapped(
+        self, points: tuple[ScreenPoint, ...]
+    ) -> tuple[LatLng, ...]:
+        """Converts screen points to unwrapped geographic coordinates.
+
+        See `mln_map_projection_lat_lngs_for_pixels_unwrapped` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+        """
+        return tuple(
+            LatLng._from_native(item)
+            for item in self._native.lat_lngs_for_pixels_unwrapped(points)
+        )
+
     def meters_per_pixel_at_latitude(self, latitude: float) -> float:
         """Reads the ground distance covered by one logical map pixel at a
         latitude for the helper camera zoom.
@@ -1284,6 +1310,19 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
         """
         return ScreenPoint._from_native(self._native.pixel_for_lat_lng(coordinate))
+
+    def pixels_for_lat_lngs(
+        self, coordinates: tuple[LatLng, ...]
+    ) -> tuple[ScreenPoint, ...]:
+        """Converts geographic coordinates to screen points.
+
+        See `mln_map_projection_pixels_for_lat_lngs` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+        """
+        return tuple(
+            ScreenPoint._from_native(item)
+            for item in self._native.pixels_for_lat_lngs(coordinates)
+        )
 
     def close(self) -> None:
         """Releases a standalone projection.

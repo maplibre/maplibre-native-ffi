@@ -2100,6 +2100,20 @@ unsafe extern "C" {
         out_coordinate: *mut mln_lat_lng,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_map_projection_lat_lngs_for_pixels(
+        projection: mln_map_projection,
+        points: *const mln_screen_point,
+        point_count: usize,
+        out_coordinates: *mut mln_lat_lng,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_projection_lat_lngs_for_pixels_unwrapped(
+        projection: mln_map_projection,
+        points: *const mln_screen_point,
+        point_count: usize,
+        out_coordinates: *mut mln_lat_lng,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_map_projection_meters_per_pixel_at_latitude(
         projection: mln_map_projection,
         latitude: f64,
@@ -2110,6 +2124,13 @@ unsafe extern "C" {
         projection: mln_map_projection,
         coordinate: mln_lat_lng,
         out_point: *mut mln_screen_point,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_projection_pixels_for_lat_lngs(
+        projection: mln_map_projection,
+        coordinates: *const mln_lat_lng,
+        coordinate_count: usize,
+        out_points: *mut mln_screen_point,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_projection_release(

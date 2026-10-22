@@ -1188,6 +1188,34 @@ napi_value mln_ts_read_image_stretch(
   return result;
 }
 
+napi_value mln_ts_read_items_lat_lng(
+  napi_env env, const mln_lat_lng* items, size_t count
+) {
+  napi_value result = mln_ts_array(env, count);
+  if (result == NULL) return NULL;
+  for (size_t index = 0; index < count; index++) {
+    napi_value element =
+      mln_ts_read_lat_lng(env, &(items[index]), sizeof(items[index]));
+    if (element == NULL) return NULL;
+    if (!mln_ts_set_index(env, result, (uint32_t)index, element)) return NULL;
+  }
+  return result;
+}
+
+napi_value mln_ts_read_items_screen_point(
+  napi_env env, const mln_screen_point* items, size_t count
+) {
+  napi_value result = mln_ts_array(env, count);
+  if (result == NULL) return NULL;
+  for (size_t index = 0; index < count; index++) {
+    napi_value element =
+      mln_ts_read_screen_point(env, &(items[index]), sizeof(items[index]));
+    if (element == NULL) return NULL;
+    if (!mln_ts_set_index(env, result, (uint32_t)index, element)) return NULL;
+  }
+  return result;
+}
+
 napi_value mln_ts_read_lat_lng(
   napi_env env, const mln_lat_lng* source, size_t size
 ) {

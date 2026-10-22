@@ -650,6 +650,24 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_projection_lat_lngs_for_pixels(
+        MlnMapProjection projection,
+        mln_screen_point* points,
+        nuint point_count,
+        mln_lat_lng* out_coordinates,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_projection_lat_lngs_for_pixels_unwrapped(
+        MlnMapProjection projection,
+        mln_screen_point* points,
+        nuint point_count,
+        mln_lat_lng* out_coordinates,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_projection_meters_per_pixel_at_latitude(
         MlnMapProjection projection,
         double latitude,
@@ -662,6 +680,15 @@ internal static unsafe partial class NativeMethods
         MlnMapProjection projection,
         mln_lat_lng coordinate,
         mln_screen_point* out_point,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_projection_pixels_for_lat_lngs(
+        MlnMapProjection projection,
+        mln_lat_lng* coordinates,
+        nuint coordinate_count,
+        mln_screen_point* out_points,
         mln_diagnostic* out_diagnostic
     );
 

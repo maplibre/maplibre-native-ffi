@@ -11,6 +11,35 @@ import 'support/fixture.dart';
 const _featureCollection = '{"type":"FeatureCollection","features":[]}';
 
 void main() {
+  test(
+    'a synchronous call fills a caller-sized output array in input order',
+    () async {
+      final fixture = await openRuntime();
+      final map = await fixture.openMap();
+      final projection = mapProjectionCreate(map.getSnapshot().view);
+      addTearDown(projection.close);
+      const coordinates = [
+        LatLng(),
+        LatLng(latitude: 10, longitude: 20),
+        LatLng(latitude: -12, longitude: -30),
+      ];
+      final points = projection.pixelsForLatLngs(coordinates);
+      expect(points, [
+        for (final coordinate in coordinates)
+          projection.pixelForLatLng(coordinate),
+      ]);
+      expect(projection.latLngsForPixels(points), [
+        for (final point in points) projection.latLngForPixel(point),
+      ]);
+      expect(projection.latLngsForPixelsUnwrapped(points), [
+        for (final point in points) projection.latLngForPixelUnwrapped(point),
+      ]);
+      expect(projection.pixelsForLatLngs([]), isEmpty);
+      expect(projection.latLngsForPixels([]), isEmpty);
+      expect(projection.latLngsForPixelsUnwrapped([]), isEmpty);
+    },
+  );
+
   test('host strings use views and native-lent strings decode', () async {
     // Native rejects a NUL in a path view before a C-string consumer reads it.
     expect(

@@ -143,3 +143,26 @@ def test_public_type_hints_resolve() -> None:
                     typing.get_type_hints(member)
         elif callable(target):
             typing.get_type_hints(target)
+
+
+def test_synchronous_calls_fill_caller_sized_outputs_in_input_order(
+    map_handle: mln.MapHandle,
+) -> None:
+    projection = mln.map_projection_create(map_handle.get_snapshot().view)
+    try:
+        coordinates = (mln.LatLng(0, 0), mln.LatLng(10, 20), mln.LatLng(-12, -30))
+        points = projection.pixels_for_lat_lngs(coordinates)
+        assert points == tuple(
+            projection.pixel_for_lat_lng(value) for value in coordinates
+        )
+        assert projection.lat_lngs_for_pixels(points) == tuple(
+            projection.lat_lng_for_pixel(point) for point in points
+        )
+        assert projection.lat_lngs_for_pixels_unwrapped(points) == tuple(
+            projection.lat_lng_for_pixel_unwrapped(point) for point in points
+        )
+        assert projection.pixels_for_lat_lngs(()) == ()
+        assert projection.lat_lngs_for_pixels(()) == ()
+        assert projection.lat_lngs_for_pixels_unwrapped(()) == ()
+    finally:
+        projection.close()

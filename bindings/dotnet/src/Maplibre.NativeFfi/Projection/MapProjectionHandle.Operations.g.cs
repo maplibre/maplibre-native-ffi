@@ -124,6 +124,62 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
+    /// Converts screen points to geographic coordinates.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_projection_lat_lngs_for_pixels</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
+    public LatLng[] LatLngsForPixels(ScreenPoint[] points)
+    {
+        using var scope = new NativeCallScope(this);
+        var outCoordinates = scope.OutputArray<mln_lat_lng>(points.Length);
+        Check(
+            NativeMethods.mln_map_projection_lat_lngs_for_pixels(
+                Handle,
+                scope.Array<mln_screen_point, ScreenPoint>(points, item => NativeScreenPoint(item)),
+                checked((nuint)points.Length),
+                outCoordinates,
+                Diagnostic
+            )
+        );
+        scope.Accept();
+        return NativeCallScope.CopyArray<mln_lat_lng, LatLng>(
+            outCoordinates,
+            (nuint)(points.Length),
+            static item => CopyLatLng(item)
+        );
+    }
+
+    /// <summary>
+    /// Converts screen points to unwrapped geographic coordinates.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_projection_lat_lngs_for_pixels_unwrapped</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
+    public LatLng[] LatLngsForPixelsUnwrapped(ScreenPoint[] points)
+    {
+        using var scope = new NativeCallScope(this);
+        var outCoordinates = scope.OutputArray<mln_lat_lng>(points.Length);
+        Check(
+            NativeMethods.mln_map_projection_lat_lngs_for_pixels_unwrapped(
+                Handle,
+                scope.Array<mln_screen_point, ScreenPoint>(points, item => NativeScreenPoint(item)),
+                checked((nuint)points.Length),
+                outCoordinates,
+                Diagnostic
+            )
+        );
+        scope.Accept();
+        return NativeCallScope.CopyArray<mln_lat_lng, LatLng>(
+            outCoordinates,
+            (nuint)(points.Length),
+            static item => CopyLatLng(item)
+        );
+    }
+
+    /// <summary>
     /// Reads the ground distance covered by one logical map pixel at a latitude
     /// for the helper camera zoom.
     /// </summary>
@@ -166,6 +222,34 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
             )
         );
         return CopyScreenPoint(outPoint);
+    }
+
+    /// <summary>
+    /// Converts geographic coordinates to screen points.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_projection_pixels_for_lat_lngs</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
+    public ScreenPoint[] PixelsForLatLngs(LatLng[] coordinates)
+    {
+        using var scope = new NativeCallScope(this);
+        var outPoints = scope.OutputArray<mln_screen_point>(coordinates.Length);
+        Check(
+            NativeMethods.mln_map_projection_pixels_for_lat_lngs(
+                Handle,
+                scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
+                checked((nuint)coordinates.Length),
+                outPoints,
+                Diagnostic
+            )
+        );
+        scope.Accept();
+        return NativeCallScope.CopyArray<mln_screen_point, ScreenPoint>(
+            outPoints,
+            (nuint)(coordinates.Length),
+            static item => CopyScreenPoint(item)
+        );
     }
 
     /// <summary>

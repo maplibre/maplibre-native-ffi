@@ -10,6 +10,7 @@ import {
   type LatLng,
   MaplibreError,
   mapOptionsDefault,
+  mapProjectionCreate,
   runtimeCreate,
   Status,
 } from "../src/index.ts";
@@ -147,4 +148,35 @@ test("a record with omitted members equals the native default", async () => {
   const { generation: _second, ...fromDefault } = defaulted.getSnapshot();
   assert.deepEqual(fromOmitted, fromDefault);
   assert.deepEqual(fromOmitted.view.extent, mapOptionsDefault().initialExtent);
+});
+
+test("a synchronous call fills a caller-sized output array in input order", async () => {
+  const fixture = await openRuntime();
+  const map = await fixture.openMap();
+  const projection = mapProjectionCreate(map.getSnapshot().view);
+  try {
+    const coordinates: LatLng[] = [
+      { latitude: 0, longitude: 0 },
+      { latitude: 10, longitude: 20 },
+      { latitude: -12, longitude: -30 },
+    ];
+    const points = projection.pixelsForLatLngs(coordinates);
+    assert.deepEqual(
+      points,
+      coordinates.map((coordinate) => projection.pixelForLatLng(coordinate)),
+    );
+    assert.deepEqual(
+      projection.latLngsForPixels(points),
+      points.map((point) => projection.latLngForPixel(point)),
+    );
+    assert.deepEqual(
+      projection.latLngsForPixelsUnwrapped(points),
+      points.map((point) => projection.latLngForPixelUnwrapped(point)),
+    );
+    assert.deepEqual(projection.pixelsForLatLngs([]), []);
+    assert.deepEqual(projection.latLngsForPixels([]), []);
+    assert.deepEqual(projection.latLngsForPixelsUnwrapped([]), []);
+  } finally {
+    projection.close();
+  }
 });

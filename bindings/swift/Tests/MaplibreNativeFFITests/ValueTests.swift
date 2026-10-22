@@ -123,3 +123,27 @@ import Testing
 @Test func aRecordBuiltFromItsInitializerDefaultsEqualsTheNativeDefault() {
   #expect(MapOptions() == MapOptions.default)
 }
+
+@Test func synchronousCallsFillCallerSizedOutputsInInputOrder() async throws {
+  try await withMapFixture { fixture in
+    let projection = try Maplibre.mapProjectionCreate(
+      view: fixture.map.getSnapshot().view
+    )
+    defer { try! projection.close() }
+    let coordinates = [
+      LatLng(latitude: 0, longitude: 0),
+      LatLng(latitude: 10, longitude: 20),
+      LatLng(latitude: -12, longitude: -30),
+    ]
+    let points = try projection.pixelsForLatLngs(coordinates: coordinates)
+    #expect(try points ==
+      (coordinates.map { try projection.pixelForLatLng(coordinate: $0) }))
+    #expect(try projection.latLngsForPixels(points: points) == points
+      .map { try projection.latLngForPixel(point: $0) })
+    #expect(try projection.latLngsForPixelsUnwrapped(points: points) == points
+      .map { try projection.latLngForPixelUnwrapped(point: $0) })
+    #expect(try projection.pixelsForLatLngs(coordinates: []).isEmpty)
+    #expect(try projection.latLngsForPixels(points: []).isEmpty)
+    #expect(try projection.latLngsForPixelsUnwrapped(points: []).isEmpty)
+  }
+}

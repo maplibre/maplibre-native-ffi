@@ -39,6 +39,17 @@ static void projection_outlives_its_source_map_and_runtime(void) {
   MLN_TEST_INVALID_STATE(mln_map_projection_pixel_for_lat_lng(
     projection, (mln_lat_lng){.latitude = 0.0, .longitude = 0.0}, &point, NULL
   ));
+  const mln_lat_lng coordinate = {.latitude = 0.0, .longitude = 0.0};
+  MLN_TEST_INVALID_STATE(mln_map_projection_pixels_for_lat_lngs(
+    projection, &coordinate, 1, &point, NULL
+  ));
+  mln_lat_lng converted = {0};
+  MLN_TEST_INVALID_STATE(mln_map_projection_lat_lngs_for_pixels(
+    projection, &point, 1, &converted, NULL
+  ));
+  MLN_TEST_INVALID_STATE(mln_map_projection_lat_lngs_for_pixels_unwrapped(
+    projection, &point, 1, &converted, NULL
+  ));
 }
 
 static void creation_observes_earlier_map_camera_commands(void) {
@@ -334,12 +345,26 @@ static mln_lat_lng coordinate_for_pixel(
   return coordinate;
 }
 
+// Converts a batch and checks that each element agrees with the single call.
 static void coordinates_for_pixels(
   mln_map_projection projection, const mln_screen_point* points, size_t count,
-  bool unwrapped, mln_lat_lng* out
+  bool unwrapped, mln_lat_lng* out_coordinates
 ) {
+  MLN_TEST_OK(
+    unwrapped ? mln_map_projection_lat_lngs_for_pixels_unwrapped(
+                  projection, points, count, out_coordinates, NULL
+                )
+              : mln_map_projection_lat_lngs_for_pixels(
+                  projection, points, count, out_coordinates, NULL
+                )
+  );
   for (size_t index = 0; index < count; ++index) {
-    out[index] = coordinate_for_pixel(projection, points[index], unwrapped);
+    const mln_lat_lng single =
+      coordinate_for_pixel(projection, points[index], unwrapped);
+    TEST_ASSERT_EQUAL_DOUBLE(single.latitude, out_coordinates[index].latitude);
+    TEST_ASSERT_EQUAL_DOUBLE(
+      single.longitude, out_coordinates[index].longitude
+    );
   }
 }
 
@@ -356,7 +381,7 @@ static void jump_to(mln_map map, double longitude, double zoom) {
 
 // A viewport wider than one world copy, or one across the antimeridian, shows
 // longitudes that the wrapped conversions fold into -180 to 180 and that the
-// unwrapped ones keep in the visible copy.
+// unwrapped ones keep in the visible copy. Single and batch conversions agree.
 static void unwrapped_conversion_preserves_world_copies(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_map_options_default();
@@ -637,7 +662,9 @@ static void projection_setters_reject_invalid_values(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Invalid coordinates leave the output untouched.
+// Invalid inputs leave the output untouched. A batch validates its whole input
+// before it writes any output, so an invalid last element leaves every output
+// as it was.
 static void conversions_reject_invalid_inputs_without_writing_outputs(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -667,6 +694,60 @@ static void conversions_reject_invalid_inputs_without_writing_outputs(void) {
     projection, (mln_screen_point){0.0, 0.0}, NULL, NULL
   ));
   TEST_ASSERT_EQUAL_MEMORY(&original, &converted, sizeof(converted));
+
+  const mln_lat_lng coordinates[] = {{0.0, 0.0}, {10.0, 20.0}, {91.0, 0.0}};
+  mln_screen_point points[] = {{-1.0, -2.0}, {-3.0, -4.0}, {-5.0, -6.0}};
+  const mln_screen_point points_before[3] = {
+    {-1.0, -2.0}, {-3.0, -4.0}, {-5.0, -6.0}
+  };
+  MLN_TEST_INVALID(mln_map_projection_pixels_for_lat_lngs(
+    projection, coordinates, 3, points, MLN_TEST_DIAGNOSTIC
+  ));
+  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "latitude"));
+  MLN_TEST_INVALID(mln_map_projection_pixels_for_lat_lngs(
+    projection, NULL, 1, points, MLN_TEST_DIAGNOSTIC
+  ));
+  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "coordinates"));
+  MLN_TEST_INVALID(mln_map_projection_pixels_for_lat_lngs(
+    projection, coordinates, 1, NULL, MLN_TEST_DIAGNOSTIC
+  ));
+  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "out_points"));
+  MLN_TEST_INVALID(mln_map_projection_pixels_for_lat_lngs(
+    MLN_HANDLE_NULL, coordinates, 1, points, NULL
+  ));
+  TEST_ASSERT_EQUAL_MEMORY(points_before, points, sizeof(points));
+
+  typedef mln_status (*convert_points)(
+    mln_map_projection, const mln_screen_point*, size_t, mln_lat_lng*,
+    mln_diagnostic*
+  );
+  const convert_points conversions[] = {
+    mln_map_projection_lat_lngs_for_pixels,
+    mln_map_projection_lat_lngs_for_pixels_unwrapped,
+  };
+  const mln_screen_point invalid[] = {{0.0, 0.0}, {20.0, 10.0}, {0.0, NAN}};
+  mln_lat_lng outputs[] = {{-1.0, -2.0}, {-3.0, -4.0}, {-5.0, -6.0}};
+  const mln_lat_lng outputs_before[3] = {
+    {-1.0, -2.0}, {-3.0, -4.0}, {-5.0, -6.0}
+  };
+  for (size_t index = 0; index < 2; ++index) {
+    MLN_TEST_INVALID(
+      conversions[index](projection, invalid, 3, outputs, MLN_TEST_DIAGNOSTIC)
+    );
+    TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "finite"));
+    MLN_TEST_INVALID(
+      conversions[index](projection, NULL, 1, outputs, MLN_TEST_DIAGNOSTIC)
+    );
+    TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "points"));
+    MLN_TEST_INVALID(
+      conversions[index](projection, invalid, 1, NULL, MLN_TEST_DIAGNOSTIC)
+    );
+    TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "out_coordinates"));
+    MLN_TEST_INVALID(
+      conversions[index](MLN_HANDLE_NULL, invalid, 1, outputs, NULL)
+    );
+  }
+  TEST_ASSERT_EQUAL_MEMORY(outputs_before, outputs, sizeof(outputs));
 
   MLN_TEST_OK(mln_map_projection_release(projection, NULL));
   mln_test_destroy_map(map);

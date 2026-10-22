@@ -3361,6 +3361,29 @@ export class MapProjectionHandle extends Owner {
   }
 
   /**
+   * Converts screen points to geographic coordinates.
+   *
+   * See `mln_map_projection_lat_lngs_for_pixels` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   */
+  latLngsForPixels(points: readonly ScreenPoint[]): readonly LatLng[] {
+    return native.mln_map_projection_lat_lngs_for_pixels(this.id, points);
+  }
+
+  /**
+   * Converts screen points to unwrapped geographic coordinates.
+   *
+   * See `mln_map_projection_lat_lngs_for_pixels_unwrapped` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   */
+  latLngsForPixelsUnwrapped(points: readonly ScreenPoint[]): readonly LatLng[] {
+    return native.mln_map_projection_lat_lngs_for_pixels_unwrapped(
+      this.id,
+      points,
+    );
+  }
+
+  /**
    * Reads the ground distance covered by one logical map pixel at a latitude
    * for the helper camera zoom.
    *
@@ -3382,6 +3405,16 @@ export class MapProjectionHandle extends Owner {
    */
   pixelForLatLng(coordinate: LatLng = {}): ScreenPoint {
     return native.mln_map_projection_pixel_for_lat_lng(this.id, coordinate);
+  }
+
+  /**
+   * Converts geographic coordinates to screen points.
+   *
+   * See `mln_map_projection_pixels_for_lat_lngs` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   */
+  pixelsForLatLngs(coordinates: readonly LatLng[]): readonly ScreenPoint[] {
+    return native.mln_map_projection_pixels_for_lat_lngs(this.id, coordinates);
   }
 
   /**

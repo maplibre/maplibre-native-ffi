@@ -41,6 +41,7 @@
 # which reads through that reader, covers it. The installed wheel offers no seam
 # to deliver a synthetic result.
 "VAL-07" = "bindings/rust/crates/maplibre-native-ffi/src/completion.rs::an_array_result_is_read_at_its_value_size"
+"VAL-08" = "bindings/python/tests/test_values.py::test_synchronous_calls_fill_caller_sized_outputs_in_input_order"
 "VIEW-01" = "bindings/python/tests/test_render.py::test_a_frame_view_holds_its_owners_until_its_scope_ends"
 "REND-01" = "bindings/python/tests/test_render.py::test_an_owned_texture_renders_pixels_the_binding_reads_back"
 "REND-02" = "bindings/python/tests/test_render.py::test_a_caller_driven_session_is_serviced_from_a_python_thread"

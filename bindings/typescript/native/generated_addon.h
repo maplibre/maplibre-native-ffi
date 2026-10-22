@@ -18,7 +18,7 @@
 #include "maplibre_native_c/texture.h"
 #include "runtime.h"
 
-#define MLN_TS_ABI_DIGEST "43df64bba4bb4186"
+#define MLN_TS_ABI_DIGEST "6a77af382014ce96"
 
 napi_value mln_ts_decode_buffer_view(
   napi_env env, const mln_completion_result* result
@@ -153,6 +153,12 @@ napi_value mln_ts_read_image_content(
 );
 napi_value mln_ts_read_image_stretch(
   napi_env env, const mln_image_stretch* source, size_t size
+);
+napi_value mln_ts_read_items_lat_lng(
+  napi_env env, const mln_lat_lng* items, size_t count
+);
+napi_value mln_ts_read_items_screen_point(
+  napi_env env, const mln_screen_point* items, size_t count
 );
 napi_value mln_ts_read_lat_lng(
   napi_env env, const mln_lat_lng* source, size_t size

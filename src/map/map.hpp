@@ -516,6 +516,18 @@ auto map_projection_lat_lng_for_pixel_unwrapped(
   mln_map_projection projection, mln_screen_point point,
   mln_lat_lng* out_coordinate
 ) -> mln_status;
+auto map_projection_pixels_for_lat_lngs(
+  mln_map_projection projection, const mln_lat_lng* coordinates,
+  size_t coordinate_count, mln_screen_point* out_points
+) -> mln_status;
+auto map_projection_lat_lngs_for_pixels(
+  mln_map_projection projection, const mln_screen_point* points,
+  size_t point_count, mln_lat_lng* out_coordinates
+) -> mln_status;
+auto map_projection_lat_lngs_for_pixels_unwrapped(
+  mln_map_projection projection, const mln_screen_point* points,
+  size_t point_count, mln_lat_lng* out_coordinates
+) -> mln_status;
 auto map_list_style_layers(
   MapObject& live, std::vector<StyleLayerRecord>& layers
 ) -> mln_status;

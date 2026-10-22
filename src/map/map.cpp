@@ -1862,6 +1862,29 @@ auto validate_screen_point(mln_screen_point point) -> mln_status {
   return MLN_STATUS_OK;
 }
 
+auto validate_screen_point_array(
+  const mln_screen_point* points, size_t point_count
+) -> mln_status {
+  if (point_count == 0) {
+    return MLN_STATUS_OK;
+  }
+
+  if (points == nullptr) {
+    mln::core::set_thread_error("points must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  const auto point_span =
+    std::span<const mln_screen_point>{points, point_count};
+  for (const auto point : point_span) {
+    const auto status = validate_screen_point(point);
+    if (status != MLN_STATUS_OK) {
+      return status;
+    }
+  }
+  return MLN_STATUS_OK;
+}
+
 auto validate_edge_insets(mln_edge_insets padding) -> mln_status {
   if (
     !std::isfinite(padding.top) || !std::isfinite(padding.left) ||
@@ -4705,6 +4728,85 @@ auto map_projection_lat_lng_for_pixel_unwrapped(
 ) -> mln_status {
   return projection_lat_lng_for_pixel(
     projection, point, out_coordinate, mln::LatLng::Unwrapped
+  );
+}
+
+// A batch converts into scratch storage under one projection lease and copies
+// the results out afterwards, so a conversion that throws partway leaves the
+// caller's output unchanged.
+auto map_projection_pixels_for_lat_lngs(
+  mln_map_projection projection, const mln_lat_lng* coordinates,
+  size_t coordinate_count, mln_screen_point* out_points
+) -> mln_status {
+  if (coordinate_count != 0 && out_points == nullptr) {
+    set_thread_error(
+      "out_points must not be null when coordinate_count is nonzero"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto status =
+    validate_lat_lng_array(coordinates, coordinate_count, true);
+  if (status != MLN_STATUS_OK) return status;
+  const auto inputs = std::span{coordinates, coordinate_count};
+  auto converted = std::vector<mln_screen_point>(coordinate_count);
+  return with_projection(projection, [&](mln::MapProjection& value) {
+    std::ranges::transform(
+      inputs, converted.begin(), [&value](mln_lat_lng coordinate) {
+        return from_native_screen_point(
+          value.pixelForLatLng(to_native_lat_lng(coordinate))
+        );
+      }
+    );
+    std::ranges::copy(converted, out_points);
+  });
+}
+
+namespace {
+
+auto projection_lat_lngs_for_pixels(
+  mln_map_projection projection, const mln_screen_point* points,
+  size_t point_count, mln_lat_lng* out_coordinates,
+  mln::LatLng::WrapMode wrap_mode
+) -> mln_status {
+  if (point_count != 0 && out_coordinates == nullptr) {
+    set_thread_error(
+      "out_coordinates must not be null when point_count is nonzero"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto status = validate_screen_point_array(points, point_count);
+  if (status != MLN_STATUS_OK) return status;
+  const auto inputs = std::span{points, point_count};
+  auto converted = std::vector<mln_lat_lng>(point_count);
+  return with_projection(projection, [&](mln::MapProjection& value) {
+    std::ranges::transform(
+      inputs, converted.begin(), [&value, wrap_mode](mln_screen_point point) {
+        return from_native_lat_lng(
+          value.latLngForPixel(to_native_screen_point(point), wrap_mode)
+        );
+      }
+    );
+    std::ranges::copy(converted, out_coordinates);
+  });
+}
+
+}  // namespace
+
+auto map_projection_lat_lngs_for_pixels(
+  mln_map_projection projection, const mln_screen_point* points,
+  size_t point_count, mln_lat_lng* out_coordinates
+) -> mln_status {
+  return projection_lat_lngs_for_pixels(
+    projection, points, point_count, out_coordinates, mln::LatLng::Wrapped
+  );
+}
+
+auto map_projection_lat_lngs_for_pixels_unwrapped(
+  mln_map_projection projection, const mln_screen_point* points,
+  size_t point_count, mln_lat_lng* out_coordinates
+) -> mln_status {
+  return projection_lat_lngs_for_pixels(
+    projection, points, point_count, out_coordinates, mln::LatLng::Unwrapped
   );
 }
 

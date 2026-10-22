@@ -846,6 +846,36 @@ internal actual object C {
       word(outDiagnostic),
     )
 
+  actual fun mln_map_projection_lat_lngs_for_pixels(
+    projection: Long,
+    points: Long,
+    pointCount: Long,
+    outCoordinates: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_projection_lat_lngs_for_pixels(
+      projection,
+      word(points),
+      word(pointCount),
+      word(outCoordinates),
+      word(outDiagnostic),
+    )
+
+  actual fun mln_map_projection_lat_lngs_for_pixels_unwrapped(
+    projection: Long,
+    points: Long,
+    pointCount: Long,
+    outCoordinates: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_projection_lat_lngs_for_pixels_unwrapped(
+      projection,
+      word(points),
+      word(pointCount),
+      word(outCoordinates),
+      word(outDiagnostic),
+    )
+
   actual fun mln_map_projection_meters_per_pixel_at_latitude(
     projection: Long,
     latitude: Double,
@@ -869,6 +899,21 @@ internal actual object C {
       projection,
       word(coordinate),
       word(outPoint),
+      word(outDiagnostic),
+    )
+
+  actual fun mln_map_projection_pixels_for_lat_lngs(
+    projection: Long,
+    coordinates: Long,
+    coordinateCount: Long,
+    outPoints: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_projection_pixels_for_lat_lngs(
+      projection,
+      word(coordinates),
+      word(coordinateCount),
+      word(outPoints),
       word(outDiagnostic),
     )
 
@@ -2557,6 +2602,28 @@ private fun mln_kw_mln_map_projection_lat_lng_for_pixel_unwrapped(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_lat_lng_for_pixel_unwrapped(p0, p1, p2, p3)",
   )
 
+private fun mln_kw_mln_map_projection_lat_lngs_for_pixels(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+  p4: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_lat_lngs_for_pixels(p0, p1, p2, p3, p4)",
+  )
+
+private fun mln_kw_mln_map_projection_lat_lngs_for_pixels_unwrapped(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+  p4: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_lat_lngs_for_pixels_unwrapped(p0, p1, p2, p3, p4)",
+  )
+
 private fun mln_kw_mln_map_projection_meters_per_pixel_at_latitude(
   p0: Long,
   p1: Double,
@@ -2570,6 +2637,17 @@ private fun mln_kw_mln_map_projection_meters_per_pixel_at_latitude(
 private fun mln_kw_mln_map_projection_pixel_for_lat_lng(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_pixel_for_lat_lng(p0, p1, p2, p3)",
+  )
+
+private fun mln_kw_mln_map_projection_pixels_for_lat_lngs(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+  p4: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_pixels_for_lat_lngs(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_projection_release(p0: Long, p1: Int): Int =

@@ -7632,6 +7632,45 @@ func (receiver *MapProjectionHandle) LatLngForPixelUnwrapped(point ScreenPoint) 
 	})
 }
 
+// LatLngsForPixels converts screen points to geographic coordinates.
+//
+// See mln_map_projection_lat_lngs_for_pixels in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
+func (receiver *MapProjectionHandle) LatLngsForPixels(points []ScreenPoint) ([]LatLng, error) {
+	outCoordinates := make([]C.mln_lat_lng, len(points))
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_lat_lngs_for_pixels(C.mln_map_projection(raw), bindingArray(points, arena, nativeScreenPoint), bindingCount[C.size_t](len(points)), unsafe.SliceData(outCoordinates), diagnostic))
+	}, func(arena *bindingArena) []LatLng {
+		return func() []LatLng {
+			result := make([]LatLng, len(outCoordinates))
+			for index, item := range outCoordinates {
+				result[index] = copyLatLng(item)
+			}
+			return result
+		}()
+	})
+}
+
+// LatLngsForPixelsUnwrapped converts screen points to unwrapped geographic
+// coordinates.
+//
+// See mln_map_projection_lat_lngs_for_pixels_unwrapped in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
+func (receiver *MapProjectionHandle) LatLngsForPixelsUnwrapped(points []ScreenPoint) ([]LatLng, error) {
+	outCoordinates := make([]C.mln_lat_lng, len(points))
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_lat_lngs_for_pixels_unwrapped(C.mln_map_projection(raw), bindingArray(points, arena, nativeScreenPoint), bindingCount[C.size_t](len(points)), unsafe.SliceData(outCoordinates), diagnostic))
+	}, func(arena *bindingArena) []LatLng {
+		return func() []LatLng {
+			result := make([]LatLng, len(outCoordinates))
+			for index, item := range outCoordinates {
+				result[index] = copyLatLng(item)
+			}
+			return result
+		}()
+	})
+}
+
 // MetersPerPixelAtLatitude reads the ground distance covered by one logical map
 // pixel at a latitude for the helper camera zoom.
 //
@@ -7656,6 +7695,25 @@ func (receiver *MapProjectionHandle) PixelForLatLng(coordinate LatLng) (ScreenPo
 		return int32(C.mln_map_projection_pixel_for_lat_lng(C.mln_map_projection(raw), nativeLatLng(coordinate, arena), &outPoint, diagnostic))
 	}, func(arena *bindingArena) ScreenPoint {
 		return copyScreenPoint(outPoint)
+	})
+}
+
+// PixelsForLatLngs converts geographic coordinates to screen points.
+//
+// See mln_map_projection_pixels_for_lat_lngs in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
+func (receiver *MapProjectionHandle) PixelsForLatLngs(coordinates []LatLng) ([]ScreenPoint, error) {
+	outPoints := make([]C.mln_screen_point, len(coordinates))
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_pixels_for_lat_lngs(C.mln_map_projection(raw), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), unsafe.SliceData(outPoints), diagnostic))
+	}, func(arena *bindingArena) []ScreenPoint {
+		return func() []ScreenPoint {
+			result := make([]ScreenPoint, len(outPoints))
+			for index, item := range outPoints {
+				result[index] = copyScreenPoint(item)
+			}
+			return result
+		}()
 	})
 }
 

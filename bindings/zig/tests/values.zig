@@ -156,3 +156,32 @@ test "native record defaults round trip through generated conversion" {
     const options = try maplibre.mapOptionsDefault();
     try testing.expectEqual(options, maplibre.MapOptions.fromNative(options.toNative()));
 }
+
+test "synchronous calls fill caller-sized outputs in input order" {
+    const fixture = try support.Fixture.create(.{});
+    defer fixture.destroy();
+    const projection = try maplibre.mapProjectionCreate(testing.allocator, (try maplibre.mapGetSnapshot(fixture.map, null)).view, null);
+    defer maplibre.mapProjectionRelease(projection, null) catch unreachable;
+    const coordinates = [_]maplibre.LatLng{ .{ .latitude = 0, .longitude = 0 }, .{ .latitude = 10, .longitude = 20 }, .{ .latitude = -12, .longitude = -30 } };
+    var points = try maplibre.mapProjectionPixelsForLatLngs(testing.allocator, projection, &coordinates, null);
+    defer points.deinit();
+    try testing.expectEqual(coordinates.len, points.value.len);
+    var wrapped = try maplibre.mapProjectionLatLngsForPixels(testing.allocator, projection, points.value, null);
+    defer wrapped.deinit();
+    var unwrapped = try maplibre.mapProjectionLatLngsForPixelsUnwrapped(testing.allocator, projection, points.value, null);
+    defer unwrapped.deinit();
+    for (coordinates, points.value, wrapped.value, unwrapped.value) |coordinate, point, single_wrapped, single_unwrapped| {
+        try testing.expectEqualDeep(try maplibre.mapProjectionPixelForLatLng(projection, coordinate, null), point);
+        try testing.expectEqualDeep(try maplibre.mapProjectionLatLngForPixel(projection, point, null), single_wrapped);
+        try testing.expectEqualDeep(try maplibre.mapProjectionLatLngForPixelUnwrapped(projection, point, null), single_unwrapped);
+    }
+    var empty_points = try maplibre.mapProjectionPixelsForLatLngs(testing.allocator, projection, &.{}, null);
+    defer empty_points.deinit();
+    try testing.expectEqual(@as(usize, 0), empty_points.value.len);
+    var empty_wrapped = try maplibre.mapProjectionLatLngsForPixels(testing.allocator, projection, &.{}, null);
+    defer empty_wrapped.deinit();
+    try testing.expectEqual(@as(usize, 0), empty_wrapped.value.len);
+    var empty_unwrapped = try maplibre.mapProjectionLatLngsForPixelsUnwrapped(testing.allocator, projection, &.{}, null);
+    defer empty_unwrapped.deinit();
+    try testing.expectEqual(@as(usize, 0), empty_unwrapped.value.len);
+}

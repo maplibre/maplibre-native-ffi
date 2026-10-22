@@ -64,6 +64,58 @@ impl MapProjectionHandle {
         Ok(unsafe { from_native(out_coordinate) }?)
     }
 
+    /// Converts screen points to geographic coordinates.
+    ///
+    /// See `mln_map_projection_lat_lngs_for_pixels` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+    pub fn lat_lngs_for_pixels(&self, points: &[ScreenPoint]) -> Result<Vec<LatLng>> {
+        let mut call = self.inner.call();
+        let point_count = convert::count(points.len())?;
+        let mut out_coordinates: Vec<sys::mln_lat_lng> = (0..points.len())
+            .map(|_| unsafe { std::mem::zeroed() })
+            .collect();
+        let points = call.array(points)?;
+        call.status(|projection, out_diagnostic| unsafe {
+            sys::mln_map_projection_lat_lngs_for_pixels(
+                projection,
+                points,
+                point_count,
+                out_coordinates.as_mut_ptr(),
+                out_diagnostic,
+            )
+        })?;
+        Ok(out_coordinates
+            .into_iter()
+            .map(|item| Ok(unsafe { from_native(item) }?))
+            .collect::<Result<Vec<_>>>()?)
+    }
+
+    /// Converts screen points to unwrapped geographic coordinates.
+    ///
+    /// See `mln_map_projection_lat_lngs_for_pixels_unwrapped` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+    pub fn lat_lngs_for_pixels_unwrapped(&self, points: &[ScreenPoint]) -> Result<Vec<LatLng>> {
+        let mut call = self.inner.call();
+        let point_count = convert::count(points.len())?;
+        let mut out_coordinates: Vec<sys::mln_lat_lng> = (0..points.len())
+            .map(|_| unsafe { std::mem::zeroed() })
+            .collect();
+        let points = call.array(points)?;
+        call.status(|projection, out_diagnostic| unsafe {
+            sys::mln_map_projection_lat_lngs_for_pixels_unwrapped(
+                projection,
+                points,
+                point_count,
+                out_coordinates.as_mut_ptr(),
+                out_diagnostic,
+            )
+        })?;
+        Ok(out_coordinates
+            .into_iter()
+            .map(|item| Ok(unsafe { from_native(item) }?))
+            .collect::<Result<Vec<_>>>()?)
+    }
+
     /// Reads the ground distance covered by one logical map pixel at a latitude
     /// for the helper camera zoom.
     ///
@@ -100,6 +152,32 @@ impl MapProjectionHandle {
             )
         })?;
         Ok(unsafe { from_native(out_point) }?)
+    }
+
+    /// Converts geographic coordinates to screen points.
+    ///
+    /// See `mln_map_projection_pixels_for_lat_lngs` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+    pub fn pixels_for_lat_lngs(&self, coordinates: &[LatLng]) -> Result<Vec<ScreenPoint>> {
+        let mut call = self.inner.call();
+        let coordinate_count = convert::count(coordinates.len())?;
+        let mut out_points: Vec<sys::mln_screen_point> = (0..coordinates.len())
+            .map(|_| unsafe { std::mem::zeroed() })
+            .collect();
+        let coordinates = call.array(coordinates)?;
+        call.status(|projection, out_diagnostic| unsafe {
+            sys::mln_map_projection_pixels_for_lat_lngs(
+                projection,
+                coordinates,
+                coordinate_count,
+                out_points.as_mut_ptr(),
+                out_diagnostic,
+            )
+        })?;
+        Ok(out_points
+            .into_iter()
+            .map(|item| Ok(unsafe { from_native(item) }?))
+            .collect::<Result<Vec<_>>>()?)
     }
 
     /// Releases a standalone projection.

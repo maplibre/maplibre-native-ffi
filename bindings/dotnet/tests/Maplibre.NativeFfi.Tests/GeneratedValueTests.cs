@@ -9,6 +9,24 @@ namespace Maplibre.NativeFfi.Tests;
 /// <summary>One representative of each generated value shape, crossing to native and back.</summary>
 public sealed class GeneratedValueTests
 {
+    [Fact]
+    public async Task SynchronousCallsFillCallerSizedOutputsInInputOrder()
+    {
+        await using var fixture = await NativeFixture.CreateAsync();
+        using var projection = MapProjectionHandle.Create(fixture.Map.GetSnapshot().View);
+        LatLng[] coordinates = [new(0, 0), new(10, 20), new(-12, -30)];
+        var points = projection.PixelsForLatLngs(coordinates);
+        Assert.Equal(coordinates.Select(projection.PixelForLatLng), points);
+        Assert.Equal(points.Select(projection.LatLngForPixel), projection.LatLngsForPixels(points));
+        Assert.Equal(
+            points.Select(projection.LatLngForPixelUnwrapped),
+            projection.LatLngsForPixelsUnwrapped(points)
+        );
+        Assert.Empty(projection.PixelsForLatLngs([]));
+        Assert.Empty(projection.LatLngsForPixels([]));
+        Assert.Empty(projection.LatLngsForPixelsUnwrapped([]));
+    }
+
     private static byte[] EmptyGeoJsonSource =>
         """{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}"""u8.ToArray();
 

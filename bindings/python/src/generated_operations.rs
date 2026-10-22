@@ -8060,6 +8060,66 @@ impl MapProjectionHandle {
         }?;
         generated_copy_mln_lat_lng(py, &out_coordinate)
     }
+    #[pyo3(signature = (points))]
+    fn lat_lngs_for_pixels(
+        &self,
+        py: Python<'_>,
+        points: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let points_values = generated_items(points, |item| {
+            generated_input_mln_screen_point(&item, storage)
+        })?;
+        let handle = self.input();
+        let mut out_coordinates: Vec<sys::mln_lat_lng> = (0..points_values.len())
+            .map(|_| unsafe { std::mem::zeroed() })
+            .collect();
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_map_projection_lat_lngs_for_pixels(
+                    handle,
+                    points_values.as_ptr(),
+                    points_values.len(),
+                    out_coordinates.as_mut_ptr(),
+                    diagnostic,
+                )
+            })
+        }?;
+        generated_list(py, &out_coordinates, |element| {
+            generated_copy_mln_lat_lng(py, element)
+        })
+    }
+    #[pyo3(signature = (points))]
+    fn lat_lngs_for_pixels_unwrapped(
+        &self,
+        py: Python<'_>,
+        points: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let points_values = generated_items(points, |item| {
+            generated_input_mln_screen_point(&item, storage)
+        })?;
+        let handle = self.input();
+        let mut out_coordinates: Vec<sys::mln_lat_lng> = (0..points_values.len())
+            .map(|_| unsafe { std::mem::zeroed() })
+            .collect();
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_map_projection_lat_lngs_for_pixels_unwrapped(
+                    handle,
+                    points_values.as_ptr(),
+                    points_values.len(),
+                    out_coordinates.as_mut_ptr(),
+                    diagnostic,
+                )
+            })
+        }?;
+        generated_list(py, &out_coordinates, |element| {
+            generated_copy_mln_lat_lng(py, element)
+        })
+    }
     #[pyo3(signature = (latitude))]
     fn meters_per_pixel_at_latitude(&self, py: Python<'_>, latitude: f64) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
@@ -8099,6 +8159,36 @@ impl MapProjectionHandle {
             })
         }?;
         generated_copy_mln_screen_point(py, &out_point)
+    }
+    #[pyo3(signature = (coordinates))]
+    fn pixels_for_lat_lngs(
+        &self,
+        py: Python<'_>,
+        coordinates: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let coordinates_values = generated_items(coordinates, |item| {
+            generated_input_mln_lat_lng(&item, storage)
+        })?;
+        let handle = self.input();
+        let mut out_points: Vec<sys::mln_screen_point> = (0..coordinates_values.len())
+            .map(|_| unsafe { std::mem::zeroed() })
+            .collect();
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_map_projection_pixels_for_lat_lngs(
+                    handle,
+                    coordinates_values.as_ptr(),
+                    coordinates_values.len(),
+                    out_points.as_mut_ptr(),
+                    diagnostic,
+                )
+            })
+        }?;
+        generated_list(py, &out_points, |element| {
+            generated_copy_mln_screen_point(py, element)
+        })
     }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {

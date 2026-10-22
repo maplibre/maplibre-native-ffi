@@ -5908,6 +5908,22 @@ pub fn mapProjectionLatLngForPixelUnwrapped(projection: MapProjection, point: Sc
     return call.invoke("mln_map_projection_lat_lng_for_pixel_unwrapped", .handle, projection, null, diagnostic, .{ point, call.out(LatLng) });
 }
 
+/// Converts screen points to geographic coordinates.
+///
+/// See `mln_map_projection_lat_lngs_for_pixels` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+pub fn mapProjectionLatLngsForPixels(allocator: std.mem.Allocator, projection: MapProjection, points: []const ScreenPoint, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue([]const LatLng) {
+    return call.invoke("mln_map_projection_lat_lngs_for_pixels", .handle, projection, allocator, diagnostic, .{ points, points.len, call.outArray(LatLng, call.len(points)) });
+}
+
+/// Converts screen points to unwrapped geographic coordinates.
+///
+/// See `mln_map_projection_lat_lngs_for_pixels_unwrapped` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+pub fn mapProjectionLatLngsForPixelsUnwrapped(allocator: std.mem.Allocator, projection: MapProjection, points: []const ScreenPoint, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue([]const LatLng) {
+    return call.invoke("mln_map_projection_lat_lngs_for_pixels_unwrapped", .handle, projection, allocator, diagnostic, .{ points, points.len, call.outArray(LatLng, call.len(points)) });
+}
+
 /// Reads the ground distance covered by one logical map pixel at a latitude for
 /// the helper camera zoom.
 ///
@@ -5923,6 +5939,14 @@ pub fn mapProjectionMetersPerPixelAtLatitude(projection: MapProjection, latitude
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
 pub fn mapProjectionPixelForLatLng(projection: MapProjection, coordinate: LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!ScreenPoint {
     return call.invoke("mln_map_projection_pixel_for_lat_lng", .handle, projection, null, diagnostic, .{ coordinate, call.out(ScreenPoint) });
+}
+
+/// Converts geographic coordinates to screen points.
+///
+/// See `mln_map_projection_pixels_for_lat_lngs` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+pub fn mapProjectionPixelsForLatLngs(allocator: std.mem.Allocator, projection: MapProjection, coordinates: []const LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue([]const ScreenPoint) {
+    return call.invoke("mln_map_projection_pixels_for_lat_lngs", .handle, projection, allocator, diagnostic, .{ coordinates, coordinates.len, call.outArray(ScreenPoint, call.len(coordinates)) });
 }
 
 /// Releases a standalone projection.

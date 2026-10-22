@@ -65,6 +65,7 @@
 "VAL-05" = "bindings/typescript/test/values.test.ts::an array input is copied when the call submits it"
 "VAL-06" = "bindings/typescript/test/values.test.ts::a record with omitted members equals the native default"
 "VAL-07" = "tests/bindgen/test_typescript_emitter.py::test_generated_decoders_keep_unknown_arms_and_read_at_the_reported_stride"
+"VAL-08" = "bindings/typescript/test/values.test.ts::a synchronous call fills a caller-sized output array in input order"
 # An EGL core-worker session keeps its frames in its own context, so EGL builds
 # view the frames of a caller-driven session, and Vulkan builds those of a
 # core-worker session.

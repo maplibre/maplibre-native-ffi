@@ -53,6 +53,48 @@ public extension MapProjectionHandle {
     } result: { LatLng(raw: value0) }
   }
 
+  /// Converts screen points to geographic coordinates.
+  ///
+  /// See `mln_map_projection_lat_lngs_for_pixels` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+  func latLngsForPixels(points bindingArg0: [ScreenPoint]) throws -> [LatLng] {
+    var value0: [mln_lat_lng] = Array(
+      repeating: mln_lat_lng(),
+      count: bindingArg0.count
+    )
+    return try nativeInvoke { raw, arena, diagnostic in
+      try mln_map_projection_lat_lngs_for_pixels(
+        raw,
+        arena.array(bindingArg0.map { $0.nativeValue() }),
+        NativeInputArena.count(bindingArg0.count),
+        &value0,
+        diagnostic
+      )
+    } result: { value0.map { item in LatLng(raw: item) } }
+  }
+
+  /// Converts screen points to unwrapped geographic coordinates.
+  ///
+  /// See `mln_map_projection_lat_lngs_for_pixels_unwrapped` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+  func latLngsForPixelsUnwrapped(points bindingArg0: [ScreenPoint]) throws
+    -> [LatLng]
+  {
+    var value0: [mln_lat_lng] = Array(
+      repeating: mln_lat_lng(),
+      count: bindingArg0.count
+    )
+    return try nativeInvoke { raw, arena, diagnostic in
+      try mln_map_projection_lat_lngs_for_pixels_unwrapped(
+        raw,
+        arena.array(bindingArg0.map { $0.nativeValue() }),
+        NativeInputArena.count(bindingArg0.count),
+        &value0,
+        diagnostic
+      )
+    } result: { value0.map { item in LatLng(raw: item) } }
+  }
+
   /// Reads the ground distance covered by one logical map pixel at a latitude
   /// for
   /// the helper camera zoom.
@@ -85,6 +127,28 @@ public extension MapProjectionHandle {
         diagnostic
       )
     } result: { ScreenPoint(raw: value0) }
+  }
+
+  /// Converts geographic coordinates to screen points.
+  ///
+  /// See `mln_map_projection_pixels_for_lat_lngs` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+  func pixelsForLatLngs(coordinates bindingArg0: [LatLng]) throws
+    -> [ScreenPoint]
+  {
+    var value0: [mln_screen_point] = Array(
+      repeating: mln_screen_point(),
+      count: bindingArg0.count
+    )
+    return try nativeInvoke { raw, arena, diagnostic in
+      try mln_map_projection_pixels_for_lat_lngs(
+        raw,
+        arena.array(bindingArg0.map { $0.nativeValue() }),
+        NativeInputArena.count(bindingArg0.count),
+        &value0,
+        diagnostic
+      )
+    } result: { value0.map { item in ScreenPoint(raw: item) } }
   }
 
   /// Releases a standalone projection.

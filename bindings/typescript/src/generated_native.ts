@@ -76,7 +76,7 @@ import type {
 } from "./generated_values.ts";
 
 /** The digest of the C headers that this facade and its addon came from. */
-export const ABI_DIGEST = "43df64bba4bb4186";
+export const ABI_DIGEST = "6a77af382014ce96";
 
 /** The index of each completion decoder in the addon's decoder table. */
 export const Decoder = {
@@ -400,6 +400,14 @@ export interface NativeOperations {
     projection: bigint,
     point: ScreenPoint | undefined,
   ): LatLng;
+  mln_map_projection_lat_lngs_for_pixels(
+    projection: bigint,
+    points: readonly ScreenPoint[],
+  ): readonly LatLng[];
+  mln_map_projection_lat_lngs_for_pixels_unwrapped(
+    projection: bigint,
+    points: readonly ScreenPoint[],
+  ): readonly LatLng[];
   mln_map_projection_meters_per_pixel_at_latitude(
     projection: bigint,
     latitude: number,
@@ -408,6 +416,10 @@ export interface NativeOperations {
     projection: bigint,
     coordinate: LatLng | undefined,
   ): ScreenPoint;
+  mln_map_projection_pixels_for_lat_lngs(
+    projection: bigint,
+    coordinates: readonly LatLng[],
+  ): readonly ScreenPoint[];
   mln_map_projection_release(
     projection: bigint,
     token: object | undefined,

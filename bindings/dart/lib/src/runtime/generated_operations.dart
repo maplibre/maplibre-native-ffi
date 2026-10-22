@@ -6160,6 +6160,70 @@ final class MapProjectionHandle implements Finalizable {
     return _readLatLng(outCoordinate.ref);
   });
 
+  /// Converts screen points to geographic coordinates.
+  ///
+  /// See `mln_map_projection_lat_lngs_for_pixels` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+  List<LatLng> latLngsForPixels(List<ScreenPoint> points) =>
+      withNativeArena((arena) {
+        final nativepoints = arena<raw.mln_screen_point>(
+          points.isEmpty ? 1 : points.length,
+        );
+        for (var index = 0; index < points.length; index++) {
+          nativepoints[index] = _writeScreenPoint(points[index], arena).ref;
+        }
+        final outCoordinates = arena<raw.mln_lat_lng>(
+          points.isEmpty ? 1 : points.length,
+        );
+        _check(
+          raw.mln_map_projection_lat_lngs_for_pixels(
+            _handle.raw,
+            nativepoints,
+            points.length,
+            outCoordinates,
+            nativeDiagnostic,
+          ),
+        );
+        return List<LatLng>.unmodifiable(
+          List.generate(
+            points.length,
+            (index) => _readLatLng(outCoordinates[index]),
+          ),
+        );
+      });
+
+  /// Converts screen points to unwrapped geographic coordinates.
+  ///
+  /// See `mln_map_projection_lat_lngs_for_pixels_unwrapped` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+  List<LatLng> latLngsForPixelsUnwrapped(List<ScreenPoint> points) =>
+      withNativeArena((arena) {
+        final nativepoints = arena<raw.mln_screen_point>(
+          points.isEmpty ? 1 : points.length,
+        );
+        for (var index = 0; index < points.length; index++) {
+          nativepoints[index] = _writeScreenPoint(points[index], arena).ref;
+        }
+        final outCoordinates = arena<raw.mln_lat_lng>(
+          points.isEmpty ? 1 : points.length,
+        );
+        _check(
+          raw.mln_map_projection_lat_lngs_for_pixels_unwrapped(
+            _handle.raw,
+            nativepoints,
+            points.length,
+            outCoordinates,
+            nativeDiagnostic,
+          ),
+        );
+        return List<LatLng>.unmodifiable(
+          List.generate(
+            points.length,
+            (index) => _readLatLng(outCoordinates[index]),
+          ),
+        );
+      });
+
   /// Reads the ground distance covered by one logical map pixel at a latitude
   /// for the helper camera zoom.
   ///
@@ -6194,6 +6258,41 @@ final class MapProjectionHandle implements Finalizable {
     );
     return _readScreenPoint(outPoint.ref);
   });
+
+  /// Converts geographic coordinates to screen points.
+  ///
+  /// See `mln_map_projection_pixels_for_lat_lngs` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+  List<ScreenPoint> pixelsForLatLngs(List<LatLng> coordinates) =>
+      withNativeArena((arena) {
+        final nativecoordinates = arena<raw.mln_lat_lng>(
+          coordinates.isEmpty ? 1 : coordinates.length,
+        );
+        for (var index = 0; index < coordinates.length; index++) {
+          nativecoordinates[index] = _writeLatLng(
+            coordinates[index],
+            arena,
+          ).ref;
+        }
+        final outPoints = arena<raw.mln_screen_point>(
+          coordinates.isEmpty ? 1 : coordinates.length,
+        );
+        _check(
+          raw.mln_map_projection_pixels_for_lat_lngs(
+            _handle.raw,
+            nativecoordinates,
+            coordinates.length,
+            outPoints,
+            nativeDiagnostic,
+          ),
+        );
+        return List<ScreenPoint>.unmodifiable(
+          List.generate(
+            coordinates.length,
+            (index) => _readScreenPoint(outPoints[index]),
+          ),
+        );
+      });
 
   /// Releases a standalone projection.
   ///
