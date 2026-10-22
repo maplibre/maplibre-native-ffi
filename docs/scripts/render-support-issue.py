@@ -50,11 +50,11 @@ def table(header: list[str], rows: list[list[str]]) -> list[str]:
 
 
 def language_grid(matrix: dict[str, Any]) -> list[str]:
-    platforms = matrix["platforms"]
+    languages = matrix["languages"]
     rows = []
-    for index, language in enumerate(matrix["languages"]):
-        row = [language["label"]]
-        for platform in platforms:
+    for platform in matrix["platforms"]:
+        row = [platform["label"]]
+        for index in range(len(languages)):
             statuses = [
                 backend["cells"][index]["status"]
                 for arch in platform["architectures"]
@@ -62,7 +62,7 @@ def language_grid(matrix: dict[str, Any]) -> list[str]:
             ]
             row.append(ICONS[best(statuses)])
         rows.append(row)
-    return table(["Language", *(p["label"] for p in platforms)], rows)
+    return table(["Platform", *(language["label"] for language in languages)], rows)
 
 
 def architecture_grid(matrix: dict[str, Any]) -> list[str]:
