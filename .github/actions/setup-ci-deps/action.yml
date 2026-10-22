@@ -478,12 +478,24 @@ runs:
     # `mise deps --monorepo` installs tools and fetches packages for every
     # `[monorepo].config_roots` entry. Download failures during setup qualify
     # for the infrastructure retry, and every job populates the same tool cache.
+    # Run providers serially so Zig projects reuse the downloaded packages.
+    # Retry failed installs in place to retain successful downloads on the runner.
     - name: Install project dependencies (Unix)
       if: runner.os != 'Windows'
       shell: bash
       env:
         GITHUB_TOKEN: ${{ github.token }}
-      run: MISE_NO_HOOKS=1 mise deps --monorepo
+      run: |
+        for attempt in 1 2 3; do
+          if MISE_NO_HOOKS=1 mise deps --monorepo --jobs 1; then
+            exit 0
+          fi
+          echo "::warning::mise deps --monorepo failed (attempt $attempt/3)"
+          if (( attempt < 3 )); then
+            sleep 5
+          fi
+        done
+        exit 1
 
     # Git Bash/MSYS2 is x86_64 under Windows ARM64 emulation and can terminate
     # with a native exception while spawning processes. Keep the retry supervisor
@@ -497,7 +509,7 @@ runs:
         GITHUB_TOKEN: ${{ github.token }}
       run: |
         $env:MISE_NO_HOOKS = "1"
-        $depsArgs = @("--monorepo")
+        $depsArgs = @("--monorepo", "--jobs", "1")
         # Windows ARM64 has no Zig toolchain; its target suites omit Zig too.
         if ($env:RUNNER_ARCH -eq "ARM64") {
           $depsArgs += @(
@@ -506,13 +518,13 @@ runs:
             "--skip", "//examples/zig-readback:zig"
           )
         }
-        foreach ($attempt in 1..2) {
+        foreach ($attempt in 1..3) {
           mise deps @depsArgs
           if ($LASTEXITCODE -eq 0) {
             exit 0
           }
-          Write-Output "::warning::mise deps --monorepo failed (attempt $attempt/2)"
-          if ($attempt -lt 2) {
+          Write-Output "::warning::mise deps --monorepo failed (attempt $attempt/3)"
+          if ($attempt -lt 3) {
             Start-Sleep -Seconds 5
           }
         }
