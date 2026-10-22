@@ -174,22 +174,22 @@ Take one runtime package:
 
 ### Dart
 
-<SnapshotOnly />
+Add the package from [pub.dev](https://pub.dev/packages/maplibre_native_ffi).
 
-Depend on the package from Git.
-
-```yaml title="pubspec.yaml"
-dependencies:
-  maplibre_native_ffi:
-    git:
-      url: https://github.com/maplibre/maplibre-native-ffi
-      path: bindings/dart
+```bash
+dart pub add maplibre_native_ffi
 ```
 
-Install the [C library](#build-against-a-prefix), then name it in your
-application's pubspec. Name an install prefix, or a build directory that holds
-`<preset>/install` for each target. A relative path resolves against the
-pubspec.
+The package's build hook downloads the C library for each target from the
+release that the package version names, and checks each archive against the
+SHA-256 digest that the package records. Releases include macOS for arm64
+alone.
+
+To build against your own copy of the [C library](#build-against-a-prefix),
+name it in your application's pubspec. Name an install prefix, or a build
+directory that holds `<preset>/install` for each target. A relative path
+resolves against the pubspec. A Git dependency on the package needs a local
+build, because only a published package records the archives to download.
 
 ```yaml title="pubspec.yaml"
 hooks:
@@ -211,6 +211,16 @@ hooks:
 
 The backends are `opengl`, `metal`, and `vulkan`. The keys are `android`,
 `ios`, `linux`, `macos`, and `windows`.
+
+To download through a mirror, name its base URL in `release_url`. The mirror
+serves each release tag as a directory that holds that release's archives.
+
+```yaml title="pubspec.yaml"
+hooks:
+  user_defines:
+    maplibre_native_ffi:
+      release_url: https://mirror.internal/maplibre-native-ffi
+```
 
 ### Go
 

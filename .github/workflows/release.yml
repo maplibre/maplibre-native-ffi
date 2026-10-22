@@ -58,10 +58,25 @@ jobs:
       version: ${{ needs.source.outputs.version }}
     secrets: inherit
 
+  dart:
+    name: Dart
+    needs:
+      - source
+      - native
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/_dart-pub.yml
+    with:
+      sha: ${{ needs.source.outputs.sha }}
+      tag: ${{ github.ref_name }}
+      version: ${{ needs.source.outputs.version }}
+
   # The docs quote the latest release, so republish them after it publishes.
   docs:
     name: Docs
     needs:
+      - dart
       - kotlin
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5

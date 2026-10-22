@@ -1,0 +1,84 @@
+name: "↳ Dart pub"
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        description: Source commit named by the release tag
+        required: true
+        type: string
+      tag:
+        description:
+          Release tag, whose GitHub release the package downloads from
+        required: true
+        type: string
+      version:
+        description: Package version
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Dart pub publish
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    # pub.dev accepts an OIDC token from a tag push in this repository when the
+    # package's automated publishing names this environment.
+    environment:
+      name: pub.dev
+      url:
+        https://pub.dev/packages/maplibre_native_ffi/versions/${{ inputs.version
+        }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      MISE_NO_HOOKS: "1"
+      PUBLISH_TAG: ${{ inputs.tag }}
+      PUBLISH_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          ref: ${{ inputs.sha }}
+          persist-credentials: false
+      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        with:
+          cache: false
+          install_args: python
+      - name: Skip a version that pub.dev already has
+        id: existing
+        run: |
+          set -euo pipefail
+
+          url="https://pub.dev/api/packages/maplibre_native_ffi/versions/$PUBLISH_VERSION"
+          status="$(curl --silent --output /dev/null --write-out '%{http_code}' "$url")"
+          case "$status" in
+            200) echo "published=true" >> "$GITHUB_OUTPUT" ;;
+            404) echo "published=false" >> "$GITHUB_OUTPUT" ;;
+            *)
+              echo "pub.dev returned HTTP $status for $url" >&2
+              exit 1
+              ;;
+          esac
+      - name: Prepare the package
+        if: ${{ steps.existing.outputs.published == 'false' }}
+        run: mise run //bindings/dart:prepare-release "$PUBLISH_TAG"
+      - name: Publish
+        if: ${{ steps.existing.outputs.published == 'false' }}
+        working-directory: bindings/dart
+        run: |
+          set -euo pipefail
+
+          token="$(
+            curl --fail --silent --show-error \
+              --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://pub.dev" |
+              jq -r '.value'
+          )"
+          echo "::add-mask::$token"
+          PUB_TOKEN="$token" mise exec dart -- dart pub token add https://pub.dev --env-var PUB_TOKEN
+          PUB_TOKEN="$token" mise exec dart -- dart pub publish --force
+          echo "### Dart $PUBLISH_VERSION" >> "$GITHUB_STEP_SUMMARY"

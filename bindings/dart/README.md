@@ -53,11 +53,26 @@ describes. This package's pubspec and the Flutter smoke host set `local_build`
 to `.dart_tool/native`, which the test tasks link to the selected preset's
 install prefix.
 
-The package belongs to the core release family, because it downloads the core
-release's archives rather than carrying its own. A published package downloads
-the archives named in `hook/native_release.json`, which the core release job
-writes from that release's `SHA256SUMS`. Git ignores the file and `.pubignore`
-keeps it in the package.
+## Publishing
+
+A published package downloads the native archives of its own release rather than
+carrying them, because pub.dev has no per-platform packages. The release
+workflow runs `mise run //bindings/dart:prepare-release <tag>` on the tagged
+commit, which writes `hook/native_release.json` from the release's `SHA256SUMS`,
+stamps the version into `pubspec.yaml`, and adds it to `CHANGELOG.md`. The
+workflow then publishes with an OIDC token from the tag push. Git ignores the
+pin file, and `.pubignore` keeps it in the package. `LICENSE` links to the
+repository's license, and pub publishes the file that it names.
+
+The test task runs `mise run //bindings/dart:check-publish`, which prepares a
+copy of the package outside Git and checks it with `dart pub publish --dry-run`.
+
+pub.dev enables automated publishing only for a package that exists, so a
+maintainer publishes the first version by hand: run `prepare-release` for a
+published release tag, then `dart pub publish` from this directory. Then, on the
+package's admin page, enable publishing from GitHub Actions for
+`maplibre/maplibre-native-ffi` with the tag pattern `v{{version}}` and the
+`pub.dev` environment.
 
 ## Android host integration
 

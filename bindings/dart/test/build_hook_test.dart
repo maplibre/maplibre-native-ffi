@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:archive/archive.dart';
 import 'package:code_assets/code_assets.dart';
+import 'package:crypto/crypto.dart';
 import 'package:hooks/hooks.dart';
 import 'package:test/test.dart';
 
@@ -121,6 +123,77 @@ void main() {
         contains(preset),
       );
     }
+  });
+
+  group('a published package', () {
+    late HttpServer server;
+    final served = <String, List<int>>{};
+    setUp(() async {
+      served.clear();
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((request) async {
+        final body = served[request.uri.path];
+        request.response.statusCode = body == null
+            ? HttpStatus.notFound
+            : HttpStatus.ok;
+        if (body != null) {
+          request.response.add(body);
+        }
+        await request.response.close();
+      });
+      addTearDown(() => server.close(force: true));
+    });
+
+    /// Serves [preset]'s archive in the release [tag] and pins it in the
+    /// package, under [digest] when given and its own digest otherwise.
+    void release(String tag, String preset, {String? digest}) {
+      final root = 'maplibre-native-c-$preset';
+      final archive = Archive()
+        ..addFile(
+          ArchiveFile.string('$root/lib/libmaplibre-native-c.so', preset),
+        );
+      final bytes = GZipEncoder().encode(TarEncoder().encode(archive));
+      served['/$tag/$root.tar.gz'] = bytes;
+      File.fromUri(temporary.uri.resolve('package/hook/native_release.json'))
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync(
+          jsonEncode({
+            'tag': tag,
+            'sha256': {
+              '$root.tar.gz': digest ?? sha256.convert(bytes).toString(),
+            },
+          }),
+        );
+    }
+
+    Map<String, Object?> mirror() => {
+      'release_url': 'http://${server.address.host}:${server.port}/',
+    };
+
+    test('downloads its pinned archive once', () async {
+      release('v0.202610.2', 'android-arm64-egl');
+      final output = await runHook(_android(Architecture.arm64), mirror());
+      expect(
+        await File.fromUri(output.assets.code.single.file!).readAsString(),
+        'android-arm64-egl',
+      );
+
+      // A later build unpacks nothing and reaches no server.
+      served.clear();
+      final again = await runHook(_android(Architecture.arm64), mirror());
+      expect(
+        await File.fromUri(again.assets.code.single.file!).readAsString(),
+        'android-arm64-egl',
+      );
+    });
+
+    test('rejects an archive that differs from its pinned digest', () async {
+      release('v0.202610.2', 'android-arm64-egl', digest: '0' * 64);
+      await expectLater(
+        runHook(_android(Architecture.arm64), mirror()),
+        throwsStateError,
+      );
+    });
   });
 }
 
