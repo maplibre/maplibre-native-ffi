@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 from . import native_capture
@@ -20,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 COVERAGE = "bindings/generated-coverage.json"
 
 
-def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
+def render(api: Api) -> tuple[dict[str, str], dict]:
     from . import native_results
     from .emitters import (
         dart,
@@ -97,51 +95,18 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
     if unsupported:
         report["unsupported"] = unsupported
     outputs[COVERAGE] = json.dumps(report, indent=2, sort_keys=True) + "\n"
-    return format_outputs(outputs, staging), report
+    return outputs, report
 
 
-def run_tool(*command: str, cwd: Path = ROOT) -> None:
-    """Run a repository tool through mise and fail on a nonzero exit."""
+def format_files(paths: list[str], root: Path) -> None:
+    """Format and lint-fix the files under `root` as `mise run fix` would."""
     subprocess.run(
-        ["mise", "exec", "--no-deps", "--", *command],
-        cwd=cwd,
+        ["hk", "fix", "--files0-from", "-"],
+        input="\0".join(paths),
+        text=True,
+        cwd=root,
         check=True,
-        stdout=subprocess.DEVNULL,
     )
-
-
-def format_outputs(outputs: dict[str, str], staging: Path) -> dict[str, str]:
-    """Format the outputs in a staging directory as `mise run fix` would."""
-    for path, source in outputs.items():
-        target = staging / path
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(source)
-    python_files = [
-        str(staging / path) for path in outputs if path.endswith((".py", ".pyi"))
-    ]
-    run_tool("uv", "run", "--no-sync", "ruff", "check", "--fix", *python_files)
-    # The staging directory sits in the ignored build directory.
-    run_tool("dprint", "fmt", "--no-gitignore", str(staging))
-    # Dart formats with the binding package's minimum language version, read
-    # from its pubspec so the output never depends on whether `dart pub get`
-    # has run.
-    run_tool(
-        "dart",
-        "format",
-        f"--language-version={dart_language_version()}",
-        str(staging),
-        cwd=ROOT / "bindings/dart",
-    )
-    return {path: (staging / path).read_text() for path in outputs}
-
-
-def dart_language_version() -> str:
-    """Returns the major.minor floor of the Dart binding's SDK constraint."""
-    pubspec = (ROOT / "bindings/dart/pubspec.yaml").read_text()
-    match = re.search(r"^\s+sdk:\s*['\"]?[\^>=]*\s*(\d+)\.(\d+)", pubspec, re.MULTILINE)
-    if match is None:
-        raise SystemExit("bindings/dart/pubspec.yaml names no SDK constraint")
-    return f"{match[1]}.{match[2]}"
 
 
 def previous_outputs(root: Path) -> set[str]:
@@ -152,42 +117,24 @@ def previous_outputs(root: Path) -> set[str]:
     return set(json.loads(manifest.read_text())["files"])
 
 
-def generate(api: Api, check: bool, require_complete: bool, root: Path = ROOT) -> int:
-    """Write or check the outputs under `root` and return the exit status.
+def generate(api: Api, require_complete: bool, root: Path = ROOT) -> int:
+    """Write and format the outputs under `root` and return the exit status.
 
     A file that the previous run recorded and this run no longer writes is
-    stale: a check reports it, and a generation deletes it.
+    stale, and generation deletes it.
     """
     previous = previous_outputs(root)
-    (root / "build").mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(
-        prefix="bindgen-", dir=root / "build"
-    ) as directory:
-        outputs, report = render(api, Path(directory))
-    stale = {path for path in previous - outputs.keys() if (root / path).is_file()}
-    different = [
-        path
-        for path, source in outputs.items()
-        if not (root / path).is_file() or (root / path).read_text() != source
-    ]
-    if check:
-        for path in sorted(stale):
-            print(f"stale generated file: {path}", file=sys.stderr)
-        for path in sorted(different):
-            print(f"regeneration required: {path}", file=sys.stderr)
-    else:
-        for path in stale:
-            (root / path).unlink()
-        for path in different:
-            target = root / path
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(outputs[path])
-    incomplete = bool(report.get("unsupported"))
+    outputs, report = render(api)
+    for path in previous - outputs.keys():
+        (root / path).unlink(missing_ok=True)
+    for path, source in outputs.items():
+        target = root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(source)
+    format_files(list(outputs), root)
     for language, missing in sorted(report.get("unsupported", {}).items()):
         print(f"{language}: {len(missing)} declarations require implementation")
-    return int(
-        (check and bool(stale or different)) or (require_complete and incomplete)
-    )
+    return int(require_complete and bool(report.get("unsupported")))
 
 
 def main() -> int:
@@ -201,7 +148,6 @@ def main() -> int:
     )
     parser.add_argument("--clang", default="clang")
     parser.add_argument("--clang-arg", action="append", default=[])
-    parser.add_argument("--check", action="store_true")
     parser.add_argument("--require-complete", action="store_true")
     args = parser.parse_args()
 
@@ -212,7 +158,7 @@ def main() -> int:
             clang_args=(f"-I{args.native_include.resolve()}", *args.clang_arg),
         )
         validate(api)
-        return generate(api, args.check, args.require_complete)
+        return generate(api, args.require_complete)
     except (ModelError, OSError, subprocess.CalledProcessError) as error:
         print(error, file=sys.stderr)
         return 1

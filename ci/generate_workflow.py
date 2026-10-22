@@ -248,7 +248,7 @@ def hygiene_job() -> dict:
             "mise run bindings:test-generator",
             env={"MLN_BINDGEN_REQUIRE_TOOLCHAINS": "1"},
         ),
-        run("mise run bindings:check"),
+        run("mise run bindings:generate --require-complete"),
         run("dprint output-resolved-config > /dev/null"),
         run("mise run fix"),
     ]
@@ -263,7 +263,9 @@ def hygiene_job() -> dict:
             run(
                 "git update-index -q --refresh\n"
                 "git diff --exit-code -- . ':(exclude)mise*.lock'\n"
-                "git diff --cached --exit-code -- . ':(exclude)mise*.lock'\n",
+                "git diff --cached --exit-code -- . ':(exclude)mise*.lock'\n"
+                'untracked="$(git ls-files --others --exclude-standard)"\n'
+                'test -z "$untracked" || { echo "$untracked"; exit 1; }\n',
                 name="Check generated and formatted files",
             ),
         ],

@@ -89,7 +89,7 @@ steps {
     check = "mise run //docs:check-snippets"
   }
   ["ruff"] {
-    glob = List("**/*.py")
+    glob = List("**/*.py", "**/*.pyi")
     exclude = List("third_party/**")
     check = "uv run --no-sync ruff check {{files}} && uv run --no-sync ruff format --check {{files}}"
     fix = "uv run --no-sync ruff check --fix {{files}} && uv run --no-sync ruff format {{files}}"
@@ -100,7 +100,6 @@ steps {
   }
   ["dart-format"] {
     glob = List("bindings/dart/**/*.dart")
-    exclude = List("bindings/dart/**/*.g.dart")
     check = "mise run --quiet //bindings/dart:_format-check {{files}}"
     fix = "mise run --quiet //bindings/dart:_format-fix {{files}}"
   }

@@ -556,10 +556,6 @@ run = 'python3 ci/kotlin_release.py "$@"'
 description = "Regenerate native declarations and public binding APIs from C headers."
 run = "uv run --no-sync python -m tools.bindgen generate"
 
-[tasks."bindings:check"]
-description = "Check header contracts and committed generated binding output."
-run = "uv run --no-sync python -m tools.bindgen generate --check --require-complete"
-
 [tasks."bindings:test-generator"]
 description = "Test compiler extraction, contract diagnostics, and language lowering."
 run = "uv run --no-sync python -m unittest discover -s tests/bindgen"
