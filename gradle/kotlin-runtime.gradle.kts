@@ -53,18 +53,16 @@ fun nativeTargets(backend: MaplibreRuntimeBackend): Map<String, NativeTargetConf
     MaplibreRuntimeBackend.OPENGL,
     MaplibreRuntimeBackend.VULKAN ->
       buildMap {
-        AndroidTarget.entries
-          .filter { it.supportsBackend(backend.id) }
-          .forEach { target ->
-            put(
-              target.kotlinNativeTarget,
-              NativeTargetConfiguration(
-                "android-${backend.id}.def",
-                target.targetPlatform,
-                listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
-              ),
-            )
-          }
+        AndroidTarget.entries.forEach { target ->
+          put(
+            target.kotlinNativeTarget,
+            NativeTargetConfiguration(
+              "android-${backend.id}.def",
+              target.targetPlatform,
+              listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
+            ),
+          )
+        }
         put(
           "linuxArm64",
           NativeTargetConfiguration(
@@ -212,11 +210,8 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
   val verifyPublicationInputs =
     tasks.register("verifyAndroidRuntimePublicationInputs") { dependsOn(verifyBackend) }
   val androidTargets =
-    AndroidTarget.compatibleAbis(
-      providers
-        .gradleProperty("maplibre.android.abis")
-        .getOrElse(AndroidTarget.defaultAbis(backend.id)),
-      backend.id,
+    AndroidTarget.parseAbis(
+      providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS),
     )
   val selectedInstalls = mutableListOf<File>()
   androidTargets.forEach { target ->
@@ -439,14 +434,12 @@ canonicalizeKmpRootMetadata(
       MaplibreRuntimeBackend.VULKAN ->
         buildMap {
           put("android", "$mavenArtifact-android")
-          AndroidTarget.entries
-            .filter { it.supportsBackend(backend.id) }
-            .forEach { target ->
-              put(
-                target.kotlinNativeTarget,
-                "$mavenArtifact-${target.kotlinNativeTarget.lowercase()}",
-              )
-            }
+          AndroidTarget.entries.forEach { target ->
+            put(
+              target.kotlinNativeTarget,
+              "$mavenArtifact-${target.kotlinNativeTarget.lowercase()}",
+            )
+          }
           put("jvm", "$mavenArtifact-jvm")
           put("linuxArm64", "$mavenArtifact-linuxarm64")
           put("linuxX64", "$mavenArtifact-linuxx64")

@@ -5,7 +5,7 @@
 # the build runs on, and leaves the artifacts free of any libstdc++ ABI
 # requirement. Kotlin/Native's bundled Linux sysroot is the tightest consumer:
 # it supplies glibc 2.19 and GCC 8.3, and it statically links its own libstdc++
-# into every consumer binary. See the Kotlin publishing doc.
+# into every consumer binary.
 #
 # A same-architecture glibc preset is a native build, so CMAKE_SYSTEM_NAME stays
 # unset and try_run, find_package, and test binaries work on the host. Musl is

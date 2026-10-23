@@ -34,17 +34,6 @@ RETENTION = "${{ github.event_name == 'pull_request' && 1 || 30 }}"
 OPEN = "github.event.pull_request.state != 'closed'"
 
 KOTLIN_SNAPSHOT_VERSION = "0.1.0-SNAPSHOT"
-# A pull request stages at a version of its own, so a consumer of its verified
-# repository never resolves a stale snapshot from another source. The run id is
-# the one `gh run download` takes. Other runs keep the snapshot version, which
-# snapshot publication reuses.
-KOTLIN_CI_VERSION = (
-    "${{ github.event_name == 'pull_request' && "
-    f"format('{KOTLIN_SNAPSHOT_VERSION.removesuffix('-SNAPSHOT')}-pr{{0}}.{{1}}', "
-    "github.event.pull_request.number, github.run_id) || "
-    f"'{KOTLIN_SNAPSHOT_VERSION}' }}}}"
-)
-KOTLIN_VERIFIED_RETENTION = "${{ github.event_name == 'pull_request' && 7 || 30 }}"
 
 
 def action(reference: str, inputs: dict | None = None, **fields) -> dict:
@@ -382,8 +371,8 @@ def apple_xcframework_job(needs: list[str]) -> dict:
 
 
 def kotlin_maven_job(needs: list[str]) -> dict:
-    # The full run also retains its verified Maven repository for snapshot
-    # publication.
+    # Every run stages at the snapshot version, because snapshot publication
+    # reuses the verified repository of a run on main.
     return {
         "name": job_name("kotlin-maven"),
         "permissions": {"actions": "read", "contents": "read"},
@@ -393,8 +382,7 @@ def kotlin_maven_job(needs: list[str]) -> dict:
             "publish": False,
             "run_id": "${{ github.run_id }}",
             "sha": "${{ github.sha }}",
-            "verified_retention_days": KOTLIN_VERIFIED_RETENTION,
-            "version": KOTLIN_CI_VERSION,
+            "version": KOTLIN_SNAPSHOT_VERSION,
         },
     }
 

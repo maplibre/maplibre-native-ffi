@@ -40,20 +40,13 @@ enum class AndroidTarget(
   /** The NDK C compiler driver for this ABI at [apiLevel]. */
   fun ndkCompilerName(apiLevel: Int): String = "$ndkTargetTriple$apiLevel-clang"
 
-  fun supportsBackend(backend: String): Boolean = backend == "opengl" || backend == "vulkan"
-
-  fun cmakePreset(backend: String): String {
-    require(supportsBackend(backend)) {
-      "Android ABI '$ndkAbi' does not support the $backend backend"
-    }
-    return "android-$cmakeArchitecture-${if (backend == "opengl") "egl" else "vulkan"}"
-  }
+  fun cmakePreset(backend: String): String =
+    "android-$cmakeArchitecture-${if (backend == "opengl") "egl" else "vulkan"}"
 
   companion object {
     const val DEFAULT_BACKEND = "opengl"
 
-    fun defaultAbis(backend: String): String =
-      entries.filter { it.supportsBackend(backend) }.joinToString(",") { it.ndkAbi }
+    val DEFAULT_ABIS: String = entries.joinToString(",") { it.ndkAbi }
 
     fun parseAbis(value: String): List<AndroidTarget> {
       val abis = value.split(',').map(String::trim)
@@ -72,21 +65,6 @@ enum class AndroidTarget(
           )
       }
     }
-
-    fun parseAbis(value: String, backend: String): List<AndroidTarget> {
-      val targets = parseAbis(value)
-      val unsupported = targets.filterNot { it.supportsBackend(backend) }
-      require(unsupported.isEmpty()) {
-        "Android backend '$backend' does not support ABIs: " +
-          unsupported.joinToString(",") { it.ndkAbi }
-      }
-      return targets
-    }
-
-    fun compatibleAbis(value: String, backend: String): List<AndroidTarget> =
-      parseAbis(value)
-        .filter { it.supportsBackend(backend) }
-        .ifEmpty { parseAbis(defaultAbis(backend)) }
 
     fun parseBackend(value: String): String {
       val backend = value.trim().lowercase()

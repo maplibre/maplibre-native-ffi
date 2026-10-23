@@ -10,8 +10,7 @@ val maplibreNativeCInstallDir =
 // inside the SDK, through the same variable the Python loader reads.
 val maplibreNativeCHostLibraryDirs =
   providers
-    .gradleProperty("maplibreNativeCHostLibraryDirs")
-    .orElse(providers.environmentVariable("MAPLIBRE_NATIVE_C_RUNTIME_LIBRARY_DIRS"))
+    .environmentVariable("MAPLIBRE_NATIVE_C_RUNTIME_LIBRARY_DIRS")
     .map { value ->
       value.split(File.pathSeparator).filter(String::isNotBlank).map(rootProject::file)
     }

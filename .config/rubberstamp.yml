@@ -345,4 +345,6 @@ ci:
         artifact contents, and the staging and verification tasks. Ordinary
         Kotlin source and test changes, and native packaging for one platform,
         are covered by the target units.
-      paths: [ci/kotlin_maven_modules.json]
+      paths:
+        - .mise/tasks/kotlin/publish
+        - .mise/tasks/kotlin/verify-staging

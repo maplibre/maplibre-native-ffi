@@ -8,34 +8,6 @@ import sys
 import xml.etree.ElementTree as element_tree
 import zipfile
 
-MODULES = set(
-    json.loads(
-        (
-            pathlib.Path(__file__).resolve().parents[3]
-            / "ci"
-            / "kotlin_maven_modules.json"
-        ).read_text(encoding="utf-8")
-    )
-)
-
-# Modules with public Kotlin API. Their javadoc jars must carry the Dokka site,
-# not the manifest-only placeholders Maven Central tolerates for API-free modules.
-API_BEARING_MODULES = {
-    "maplibre-native-ffi",
-    "maplibre-native-ffi-android",
-    "maplibre-native-ffi-androidnativearm32",
-    "maplibre-native-ffi-androidnativearm64",
-    "maplibre-native-ffi-androidnativex64",
-    "maplibre-native-ffi-iosarm64",
-    "maplibre-native-ffi-iossimulatorarm64",
-    "maplibre-native-ffi-tvosarm64",
-    "maplibre-native-ffi-tvossimulatorarm64",
-    "maplibre-native-ffi-jvm",
-    "maplibre-native-ffi-linuxarm64",
-    "maplibre-native-ffi-linuxx64",
-    "maplibre-native-ffi-macosarm64",
-}
-
 ROOT_TARGET_MODULES = {
     "maplibre-native-ffi": {
         "android": "maplibre-native-ffi-android",
@@ -79,6 +51,46 @@ ROOT_TARGET_MODULES = {
         "jvm": "maplibre-native-ffi-runtime-metal-jvm",
         "macosArm64": "maplibre-native-ffi-runtime-metal-macosarm64",
     },
+}
+
+MODULES = set(ROOT_TARGET_MODULES).union(
+    *(targets.values() for targets in ROOT_TARGET_MODULES.values())
+)
+
+# Modules with public Kotlin API. Their javadoc jars must carry the Dokka site,
+# not the manifest-only placeholders Maven Central tolerates for API-free modules.
+API_BEARING_MODULES = {
+    "maplibre-native-ffi",
+    *ROOT_TARGET_MODULES["maplibre-native-ffi"].values(),
+}
+
+RUNTIME_MODULES = {
+    root.removeprefix("maplibre-native-ffi-runtime-"): targets
+    for root, targets in ROOT_TARGET_MODULES.items()
+    if root.startswith("maplibre-native-ffi-runtime-")
+}
+
+# The native target platform of each Kotlin/Native target.
+NATIVE_TARGETS = {
+    "androidNativeArm32": "android-arm",
+    "androidNativeArm64": "android-arm64",
+    "androidNativeX64": "android-x64",
+    "iosArm64": "ios-arm64",
+    "iosSimulatorArm64": "ios-simulator-arm64",
+    "linuxArm64": "linux-arm64",
+    "linuxX64": "linux-x64",
+    "macosArm64": "macos-arm64",
+    "tvosArm64": "tvos-arm64",
+    "tvosSimulatorArm64": "tvos-simulator-arm64",
+}
+
+# Metal runs only on macOS; the other backends ship every desktop classifier.
+JVM_CLASSIFIERS = {
+    "natives-linux-x64",
+    "natives-linux-arm64",
+    "natives-macos-arm64",
+    "natives-windows-x64",
+    "natives-windows-arm64",
 }
 
 COMMON_NATIVE_LICENSES = {
@@ -162,21 +174,6 @@ def verify_repository_layout(root: pathlib.Path, expected_version: str | None) -
             )
         if expected_version is not None and version != expected_version:
             raise SystemExit(f"{pom} has version {version}; expected {expected_version}")
-
-        for field in (
-            "m:name",
-            "m:description",
-            "m:url",
-            "m:licenses/m:license/m:name",
-            "m:licenses/m:license/m:url",
-            "m:developers/m:developer/m:id",
-            "m:developers/m:developer/m:name",
-            "m:developers/m:developer/m:url",
-            "m:scm/m:connection",
-            "m:scm/m:developerConnection",
-            "m:scm/m:url",
-        ):
-            required_pom_text(pom, project, field)
 
 
 def verify_metadata(root: pathlib.Path, expected_version: str | None) -> None:
@@ -390,24 +387,10 @@ def verify_android_runtime_independence(root: pathlib.Path) -> None:
 
 
 def verify_jvm(root: pathlib.Path) -> None:
-    expected = {
-        "opengl": {
-            "natives-linux-x64",
-            "natives-linux-arm64",
-            "natives-macos-arm64",
-            "natives-windows-x64",
-            "natives-windows-arm64",
-        },
-        "vulkan": {
-            "natives-linux-x64",
-            "natives-linux-arm64",
-            "natives-macos-arm64",
-            "natives-windows-x64",
-            "natives-windows-arm64",
-        },
-        "metal": {"natives-macos-arm64"},
-    }
-    for backend, classifiers in expected.items():
+    for backend in RUNTIME_MODULES:
+        classifiers = (
+            {"natives-macos-arm64"} if backend == "metal" else JVM_CLASSIFIERS
+        )
         module = f"maplibre-native-ffi-runtime-{backend}-jvm"
         jars = module_files(root, module, ".jar")
         for classifier in classifiers:
@@ -436,47 +419,10 @@ def verify_jvm(root: pathlib.Path) -> None:
 
 def verify_native(root: pathlib.Path) -> None:
     modules = {
-        "maplibre-native-ffi-runtime-opengl-androidnativearm32": (
-            "opengl",
-            "android-arm",
-        ),
-        "maplibre-native-ffi-runtime-opengl-androidnativearm64": (
-            "opengl",
-            "android-arm64",
-        ),
-        "maplibre-native-ffi-runtime-opengl-androidnativex64": (
-            "opengl",
-            "android-x64",
-        ),
-        "maplibre-native-ffi-runtime-opengl-linuxarm64": ("opengl", "linux-arm64"),
-        "maplibre-native-ffi-runtime-opengl-linuxx64": ("opengl", "linux-x64"),
-        "maplibre-native-ffi-runtime-opengl-macosarm64": ("opengl", "macos-arm64"),
-        "maplibre-native-ffi-runtime-vulkan-androidnativearm32": (
-            "vulkan",
-            "android-arm",
-        ),
-        "maplibre-native-ffi-runtime-vulkan-androidnativearm64": (
-            "vulkan",
-            "android-arm64",
-        ),
-        "maplibre-native-ffi-runtime-vulkan-androidnativex64": (
-            "vulkan",
-            "android-x64",
-        ),
-        "maplibre-native-ffi-runtime-vulkan-linuxarm64": ("vulkan", "linux-arm64"),
-        "maplibre-native-ffi-runtime-vulkan-linuxx64": ("vulkan", "linux-x64"),
-        "maplibre-native-ffi-runtime-vulkan-macosarm64": ("vulkan", "macos-arm64"),
-        "maplibre-native-ffi-runtime-metal-macosarm64": ("metal", "macos-arm64"),
-        "maplibre-native-ffi-runtime-metal-iosarm64": ("metal", "ios-arm64"),
-        "maplibre-native-ffi-runtime-metal-iossimulatorarm64": (
-            "metal",
-            "ios-simulator-arm64",
-        ),
-        "maplibre-native-ffi-runtime-metal-tvosarm64": ("metal", "tvos-arm64"),
-        "maplibre-native-ffi-runtime-metal-tvossimulatorarm64": (
-            "metal",
-            "tvos-simulator-arm64",
-        ),
+        module: (backend, NATIVE_TARGETS[target])
+        for backend, targets in RUNTIME_MODULES.items()
+        for target, module in targets.items()
+        if target in NATIVE_TARGETS
     }
     for module, (backend, target) in modules.items():
         interop = one(

@@ -3,7 +3,7 @@
 # an old ABI floor, and the musl target stays independent of a host sysroot.
 # That is what lets each distributed archive stand on its own.
 #
-# See cmake/toolchains/zig-linux.cmake and the Kotlin publishing doc.
+# See cmake/toolchains/zig-linux.cmake.
 function(mln_ffi_configure_linux_archive_contents target)
   if(NOT MLN_FFI_CXX_RUNTIME_IS_BUNDLED)
     return()

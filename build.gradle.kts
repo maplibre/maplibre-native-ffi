@@ -6,7 +6,6 @@ plugins {
   // The typed runtime convention compiles against these plugins in buildSrc, so their versions
   // come from that classpath and the project applies them by ID.
   id("org.jetbrains.kotlin.multiplatform") apply false
-  id("com.android.library") apply false
   id("com.android.kotlin.multiplatform.library") apply false
   id("com.vanniktech.maven.publish") apply false
   alias(libs.plugins.dokka) apply false
@@ -15,9 +14,7 @@ plugins {
 allprojects {
   repositories.mavenCentral()
 
-  pluginManager.withPlugin("com.android.library") { repositories.android() }
-
-  pluginManager.withPlugin("com.android.kotlin.multiplatform.library") { repositories.android() }
+  pluginManager.withPlugin("com.android.kotlin.multiplatform.library") { repositories.google() }
 
   pluginManager.withPlugin("maven-publish") {
     rootProject.providers.gradleProperty("maplibre.maven.localRepository").orNull?.let {
@@ -38,8 +35,4 @@ allprojects {
       }
     }
   }
-}
-
-fun RepositoryHandler.android() {
-  google()
 }

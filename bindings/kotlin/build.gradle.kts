@@ -38,10 +38,7 @@ val androidBackend =
   )
 val androidTargets =
   AndroidTarget.parseAbis(
-    providers
-      .gradleProperty("maplibre.android.abis")
-      .getOrElse(AndroidTarget.defaultAbis(androidBackend)),
-    androidBackend,
+    providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS),
   )
 val packagedAndroidBindingLibs = layout.buildDirectory.dir("generated/jniLibs/androidMain")
 val mavenGroup = providers.gradleProperty("maplibre.maven.group").get()

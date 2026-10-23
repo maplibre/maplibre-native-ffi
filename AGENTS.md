@@ -45,9 +45,7 @@ need and the code cannot say:
 - [C API guidelines](docs/src/content/docs/development/c-api-guidelines.md):
   read before you change a C declaration.
 - [Releases and snapshots](docs/src/content/docs/development/versioning.md):
-  versions, tags, and snapshot publishing.
-- [Kotlin publishing](docs/src/content/docs/development/kotlin-publishing.md):
-  consume an unreleased Kotlin build.
+  versions, tags, snapshot publishing, and registry setup.
 
 ## Issues and pull requests
 

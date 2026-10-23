@@ -10,34 +10,13 @@ import pathlib
 import shutil
 import subprocess
 import tempfile
-import time
 import urllib.parse
-import zipfile
-from collections.abc import Callable
-
-from release_version import require_current_month
 
 GROUP_PATH = pathlib.PurePosixPath("org/maplibre/nativeffi")
-MODULES = set(
-    json.loads(
-        pathlib.Path(__file__)
-        .with_name("kotlin_maven_modules.json")
-        .read_text(encoding="utf-8")
-    )
-)
-ROOT_MODULES = {
-    "maplibre-native-ffi",
-    "maplibre-native-ffi-runtime-metal",
-    "maplibre-native-ffi-runtime-opengl",
-    "maplibre-native-ffi-runtime-vulkan",
-}
-
 CHECKSUM_SUFFIXES = (".md5", ".sha1", ".sha256", ".sha512")
-MAX_BUNDLE_BYTES = 1_000_000_000
 SNAPSHOT_USER_AGENT = (
     "maplibre-native-ffi-publisher/1 (+https://github.com/maplibre/maplibre-native-ffi)"
 )
-UPLOAD_PROGRESS_INTERVAL_SECONDS = 5.0
 
 
 def repository_files(root: pathlib.Path) -> list[pathlib.Path]:
@@ -173,124 +152,84 @@ def write_checksum(path: pathlib.Path, algorithm: str) -> None:
     )
 
 
-def copy_release_files(
-    repository: pathlib.Path, bundle_root: pathlib.Path, version: str
-) -> list[pathlib.Path]:
-    if version.endswith("-SNAPSHOT"):
-        raise SystemExit("a Maven Central release version cannot end in -SNAPSHOT")
-    require_current_month(version)
+def module_names(repository: pathlib.Path) -> list[str]:
     group_root = repository / GROUP_PATH
-    actual_modules = {path.name for path in group_root.iterdir() if path.is_dir()}
-    if actual_modules != MODULES:
-        raise SystemExit(
-            f"the Maven repository contains modules {sorted(actual_modules)}; "
-            f"expected {sorted(MODULES)}"
-        )
-
-    copied: list[pathlib.Path] = []
-    for module in sorted(MODULES):
-        version_root = group_root / module / version
-        if not version_root.is_dir():
-            raise SystemExit(f"the Maven repository is missing {version_root}")
-        for source in repository_files(version_root):
-            if source.is_symlink():
-                raise SystemExit(f"Maven repository contains a symbolic link: {source}")
-            if source.name == "maven-metadata.xml" or source.name.endswith(
-                (".asc", *CHECKSUM_SUFFIXES)
-            ):
-                continue
-            relative = source.relative_to(repository)
-            destination = bundle_root / relative
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, destination)
-            copied.append(destination)
-    if not copied:
-        raise SystemExit("the Maven repository contains no release files")
-    return copied
+    if not group_root.is_dir():
+        raise SystemExit(f"the Maven repository is missing {group_root}")
+    return sorted(path.name for path in group_root.iterdir() if path.is_dir())
 
 
-def write_deterministic_zip(root: pathlib.Path, output: pathlib.Path) -> None:
-    with zipfile.ZipFile(
-        output, mode="x", compression=zipfile.ZIP_DEFLATED, compresslevel=9
-    ) as archive:
-        for path in repository_files(root):
-            relative = path.relative_to(root).as_posix()
-            info = zipfile.ZipInfo(relative, date_time=(1980, 1, 1, 0, 0, 0))
-            info.compress_type = zipfile.ZIP_DEFLATED
-            info.external_attr = 0o100644 << 16
-            with path.open("rb") as stream:
-                archive.writestr(info, stream.read())
-    size = output.stat().st_size
-    if size >= MAX_BUNDLE_BYTES:
-        output.unlink()
-        raise SystemExit(
-            f"the Maven Central bundle is {size} bytes; it must remain below "
-            f"{MAX_BUNDLE_BYTES} bytes"
-        )
+def version_root(repository: pathlib.Path, module: str, version: str) -> pathlib.Path:
+    root = repository / GROUP_PATH / module / version
+    if not root.is_dir():
+        raise SystemExit(f"the Maven repository is missing {root}")
+    return root
 
 
-def create_bundle(repository: pathlib.Path, output: pathlib.Path, version: str) -> None:
-    if output.exists():
-        raise SystemExit(f"bundle output already exists: {output}")
+def is_root_module(repository: pathlib.Path, module: str, version: str) -> bool:
+    """A Kotlin Multiplatform root module points each target at its own module."""
+    metadata = next(version_root(repository, module, version).glob("*.module"))
+    variants = json.loads(metadata.read_text(encoding="utf-8"))["variants"]
+    return any("available-at" in variant for variant in variants)
+
+
+def sign_files(paths: list[pathlib.Path], work_directory: pathlib.Path) -> None:
     private_key = os.environ.get("GPG_PRIVATE_KEY")
     passphrase = os.environ.get("GPG_PASSPHRASE")
     if private_key is None or passphrase is None:
         raise SystemExit("GPG_PRIVATE_KEY and GPG_PASSPHRASE are required")
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(dir=output.parent) as temporary_directory:
-        temporary_root = pathlib.Path(temporary_directory)
-        bundle_root = temporary_root / "repository"
-        release_files = copy_release_files(repository, bundle_root, version)
-        gnupg_home = temporary_root / "gnupg"
-        gnupg_home.mkdir(mode=0o700)
-        fingerprint = import_signing_key(gnupg_home, private_key)
-        for path in release_files:
-            sign_file(path, gnupg_home, fingerprint, passphrase)
-            write_checksum(path, "md5")
-            write_checksum(path, "sha1")
-        write_deterministic_zip(bundle_root, output)
-
-
-def sign_snapshot(repository: pathlib.Path, version: str) -> None:
-    if not version.endswith("-SNAPSHOT"):
-        raise SystemExit("snapshot signing requires a version ending in -SNAPSHOT")
-    private_key = os.environ.get("GPG_PRIVATE_KEY")
-    passphrase = os.environ.get("GPG_PASSPHRASE")
-    if private_key is None or passphrase is None:
-        raise SystemExit("GPG_PRIVATE_KEY and GPG_PASSPHRASE are required")
-
-    release_files: list[pathlib.Path] = []
-    for module in sorted(MODULES):
-        version_root = repository / GROUP_PATH / module / version
-        if not version_root.is_dir():
-            raise SystemExit(f"the Maven repository is missing {version_root}")
-        for path in repository_files(version_root):
-            if path.name.startswith("maven-metadata.xml"):
-                continue
-            if path.name.endswith((".asc", *CHECKSUM_SUFFIXES)):
-                path.unlink()
-            else:
-                release_files.append(path)
-
-    with tempfile.TemporaryDirectory(dir=repository.parent) as temporary_directory:
+    with tempfile.TemporaryDirectory(dir=work_directory) as temporary_directory:
         gnupg_home = pathlib.Path(temporary_directory) / "gnupg"
         gnupg_home.mkdir(mode=0o700)
         fingerprint = import_signing_key(gnupg_home, private_key)
-        for path in release_files:
+        for path in paths:
             sign_file(path, gnupg_home, fingerprint, passphrase)
             write_checksum(path, "md5")
             write_checksum(path, "sha1")
+
+
+def is_signature_or_checksum(path: pathlib.Path) -> bool:
+    return path.name.endswith((".asc", *CHECKSUM_SUFFIXES))
+
+
+def create_bundle(repository: pathlib.Path, output: pathlib.Path, version: str) -> None:
+    if output.suffix != ".zip":
+        raise SystemExit(f"the bundle output must end in .zip: {output}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=output.parent) as temporary_directory:
+        bundle_root = pathlib.Path(temporary_directory) / "repository"
+        release_files: list[pathlib.Path] = []
+        for module in module_names(repository):
+            for source in repository_files(version_root(repository, module, version)):
+                if source.name == "maven-metadata.xml" or is_signature_or_checksum(
+                    source
+                ):
+                    continue
+                destination = bundle_root / source.relative_to(repository)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, destination)
+                release_files.append(destination)
+        sign_files(release_files, output.parent)
+        shutil.make_archive(os.fspath(output.with_suffix("")), "zip", bundle_root)
+
+
+def sign_snapshot(repository: pathlib.Path, version: str) -> None:
+    release_files: list[pathlib.Path] = []
+    for module in module_names(repository):
+        for path in repository_files(version_root(repository, module, version)):
+            if path.name.startswith("maven-metadata.xml"):
+                continue
+            if is_signature_or_checksum(path):
+                path.unlink()
+            else:
+                release_files.append(path)
+    sign_files(release_files, repository.parent)
 
 
 def snapshot_module_files(
     repository: pathlib.Path, module: str, version: str
 ) -> list[pathlib.Path]:
-    module_root = repository / GROUP_PATH / module
-    version_root = module_root / version
-    if not version_root.is_dir():
-        raise SystemExit(f"the Maven repository is missing {version_root}")
-
-    version_files = repository_files(version_root)
+    version_files = repository_files(version_root(repository, module, version))
     artifacts = [
         path for path in version_files if not path.name.startswith("maven-metadata.xml")
     ]
@@ -299,103 +238,25 @@ def snapshot_module_files(
     ]
     module_metadata = sorted(
         path
-        for path in module_root.iterdir()
+        for path in (repository / GROUP_PATH / module).iterdir()
         if path.is_file() and path.name.startswith("maven-metadata.xml")
     )
     return artifacts + version_metadata + module_metadata
 
 
-def snapshot_upload_order(
-    repository: pathlib.Path, version: str
-) -> list[tuple[str, list[pathlib.Path]]]:
-    if not version.endswith("-SNAPSHOT"):
-        raise SystemExit("snapshot publishing requires a version ending in -SNAPSHOT")
-    group_root = repository / GROUP_PATH
-    actual_modules = {path.name for path in group_root.iterdir() if path.is_dir()}
-    if actual_modules != MODULES:
-        raise SystemExit(
-            f"the Maven repository contains modules {sorted(actual_modules)}; "
-            f"expected {sorted(MODULES)}"
-        )
-    leaves = sorted(MODULES - ROOT_MODULES)
-    roots = sorted(ROOT_MODULES)
-    return [
-        (module, snapshot_module_files(repository, module, version))
-        for module in leaves + roots
+def snapshot_upload_order(repository: pathlib.Path, version: str) -> list[pathlib.Path]:
+    """Files to upload, every target module before the root modules that point
+    at them, so a consumer never resolves a root whose targets are missing."""
+    modules = module_names(repository)
+    roots = [
+        module for module in modules if is_root_module(repository, module, version)
     ]
-
-
-def format_upload_bytes(byte_count: int) -> str:
-    value = float(byte_count)
-    for unit in ("B", "KiB", "MiB", "GiB"):
-        if value < 1024 or unit == "GiB":
-            precision = 0 if unit == "B" else 1
-            return f"{value:.{precision}f} {unit}"
-        value /= 1024
-    raise AssertionError("upload byte formatter did not return")
-
-
-def format_upload_rate(byte_count: int, elapsed_seconds: float) -> str:
-    if elapsed_seconds <= 0:
-        return "n/a"
-    return f"{format_upload_bytes(round(byte_count / elapsed_seconds))}/s"
-
-
-def put_snapshot_file(
-    connection: http.client.HTTPSConnection,
-    repository: pathlib.Path,
-    path: pathlib.Path,
-    authorization: str,
-    progress: Callable[[int, int, float], None],
-) -> http.client.HTTPSConnection:
-    relative = path.relative_to(repository).as_posix()
-    request_path = "/repository/maven-snapshots/" + urllib.parse.quote(relative)
-    for attempt in range(1, 4):
-        if attempt > 1:
-            print(
-                f"retrying snapshot file {relative} (attempt {attempt}/3)",
-                flush=True,
-            )
-        try:
-            attempt_started = time.monotonic()
-            next_progress_at = attempt_started + UPLOAD_PROGRESS_INTERVAL_SECONDS
-            sent_bytes = 0
-            connection.putrequest("PUT", request_path)
-            connection.putheader("Authorization", authorization)
-            connection.putheader("User-Agent", SNAPSHOT_USER_AGENT)
-            connection.putheader("Content-Type", "application/octet-stream")
-            connection.putheader("Content-Length", str(path.stat().st_size))
-            connection.endheaders()
-            with path.open("rb") as stream:
-                while chunk := stream.read(1024 * 1024):
-                    connection.send(chunk)
-                    sent_bytes += len(chunk)
-                    now = time.monotonic()
-                    if now >= next_progress_at:
-                        progress(attempt, sent_bytes, now - attempt_started)
-                        next_progress_at = now + UPLOAD_PROGRESS_INTERVAL_SECONDS
-            response = connection.getresponse()
-            response_body = response.read()
-            if 200 <= response.status < 300:
-                return connection
-            if response.status < 500 and response.status != 429:
-                message = response_body.decode(errors="replace")[:1000]
-                raise SystemExit(
-                    f"snapshot upload of {relative} returned HTTP "
-                    f"{response.status}: {message}"
-                )
-        except (OSError, http.client.HTTPException) as error:
-            if attempt == 3:
-                raise SystemExit(
-                    f"snapshot upload of {relative} failed: {error}"
-                ) from error
-        connection.close()
-        if attempt < 3:
-            time.sleep(attempt * 2)
-            connection = http.client.HTTPSConnection(
-                "central.sonatype.com", timeout=120
-            )
-    raise AssertionError("snapshot upload retry loop did not return")
+    leaves = [module for module in modules if module not in roots]
+    return [
+        path
+        for module in leaves + roots
+        for path in snapshot_module_files(repository, module, version)
+    ]
 
 
 def upload_snapshot(repository: pathlib.Path, version: str) -> None:
@@ -406,79 +267,30 @@ def upload_snapshot(repository: pathlib.Path, version: str) -> None:
             "MAVEN_CENTRAL_USERNAME and MAVEN_CENTRAL_PASSWORD are required"
         )
     credentials = base64.b64encode(f"{username}:{password}".encode()).decode("ascii")
-    authorization = f"Basic {credentials}"
     connection = http.client.HTTPSConnection("central.sonatype.com", timeout=120)
-    modules = snapshot_upload_order(repository, version)
-    total_files = sum(len(paths) for _, paths in modules)
-    total_bytes = sum(path.stat().st_size for _, paths in modules for path in paths)
-    uploaded_files = 0
-    uploaded_bytes = 0
-    upload_started = time.monotonic()
     try:
-        print(
-            f"uploading snapshot repository ({total_files} files, "
-            f"{format_upload_bytes(total_bytes)})",
-            flush=True,
-        )
-        for module_index, (module, paths) in enumerate(modules, start=1):
-            module_bytes = sum(path.stat().st_size for path in paths)
-            print(
-                f"uploading snapshot module {module_index}/{len(modules)} {module} "
-                f"({len(paths)} files, {format_upload_bytes(module_bytes)})",
-                flush=True,
-            )
-            for path in paths:
-                file_index = uploaded_files + 1
-                file_bytes = path.stat().st_size
-                relative = path.relative_to(repository).as_posix()
-                print(
-                    f"uploading snapshot file {file_index}/{total_files} {relative} "
-                    f"({format_upload_bytes(file_bytes)})",
-                    flush=True,
+        for path in snapshot_upload_order(repository, version):
+            relative = path.relative_to(repository).as_posix()
+            print(f"uploading {relative}", flush=True)
+            with path.open("rb") as body:
+                connection.request(
+                    "PUT",
+                    "/repository/maven-snapshots/" + urllib.parse.quote(relative),
+                    body=body,
+                    headers={
+                        "Authorization": f"Basic {credentials}",
+                        "User-Agent": SNAPSHOT_USER_AGENT,
+                        "Content-Type": "application/octet-stream",
+                        "Content-Length": str(path.stat().st_size),
+                    },
                 )
-                file_started = time.monotonic()
-
-                def report_progress(
-                    attempt: int,
-                    sent_bytes: int,
-                    elapsed_seconds: float,
-                    current_file_index: int = file_index,
-                    current_file_bytes: int = file_bytes,
-                ) -> None:
-                    percentage = (
-                        sent_bytes / current_file_bytes * 100
-                        if current_file_bytes
-                        else 100
-                    )
-                    print(
-                        f"snapshot file progress {current_file_index}/{total_files} "
-                        f"(attempt {attempt}/3): {format_upload_bytes(sent_bytes)}/"
-                        f"{format_upload_bytes(current_file_bytes)} "
-                        f"({percentage:.1f}%) at "
-                        f"{format_upload_rate(sent_bytes, elapsed_seconds)}",
-                        flush=True,
-                    )
-
-                connection = put_snapshot_file(
-                    connection,
-                    repository,
-                    path,
-                    authorization,
-                    report_progress,
-                )
-                file_elapsed = time.monotonic() - file_started
-                uploaded_files += 1
-                uploaded_bytes += file_bytes
-                overall_elapsed = time.monotonic() - upload_started
-                overall_percentage = uploaded_bytes / total_bytes * 100
-                print(
-                    f"uploaded snapshot file {uploaded_files}/{total_files} in "
-                    f"{file_elapsed:.1f}s at "
-                    f"{format_upload_rate(file_bytes, file_elapsed)}; overall "
-                    f"{format_upload_bytes(uploaded_bytes)}/"
-                    f"{format_upload_bytes(total_bytes)} ({overall_percentage:.1f}%) at "
-                    f"{format_upload_rate(uploaded_bytes, overall_elapsed)}",
-                    flush=True,
+                response = connection.getresponse()
+                response_body = response.read()
+            if not 200 <= response.status < 300:
+                message = response_body.decode(errors="replace")[:1000]
+                raise SystemExit(
+                    f"snapshot upload of {relative} returned HTTP "
+                    f"{response.status}: {message}"
                 )
     finally:
         connection.close()

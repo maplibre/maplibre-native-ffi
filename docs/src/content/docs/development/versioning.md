@@ -40,6 +40,11 @@ checkout of a published release tag.
   crate's settings, add a trusted publisher for `maplibre/maplibre-native-ffi`,
   with the workflow `release.yml` and the `crates.io` environment.
 
+Maven Central needs the `org.maplibre.nativeffi` namespace registered on the
+Central Portal, with snapshots enabled, and a Central Portal user token in the
+`MAVEN_CENTRAL_USERNAME` and `MAVEN_CENTRAL_PASSWORD` secrets. `GPG_PRIVATE_KEY`
+and `GPG_PASSPHRASE` hold the key that signs every release and snapshot file.
+
 ## Snapshots
 
 The Publish snapshots workflow runs daily from the artifacts of the latest

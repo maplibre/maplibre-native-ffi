@@ -12,8 +12,7 @@ val backend =
   )
 val targets =
   AndroidTarget.parseAbis(
-    providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.defaultAbis(backend)),
-    backend,
+    providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS),
   )
 @Suppress("UNCHECKED_CAST")
 val sdk = extensions.extraProperties["maplibreAndroidSdkDirectory"] as Provider<Directory>

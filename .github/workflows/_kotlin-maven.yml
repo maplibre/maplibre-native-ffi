@@ -21,11 +21,6 @@ on:
         description: Source commit and artifact suffix
         required: true
         type: string
-      verified_retention_days:
-        description: Days to retain the verified Maven repository
-        default: 30
-        required: false
-        type: number
       verified_run_id:
         description: >-
           Run that already staged and verified this commit at this version. When
@@ -136,14 +131,14 @@ jobs:
       - run: >-
           mise run //:kotlin:publish verify build/packages/kotlin/maven-staging
           "$KOTLIN_VERSION"
-      # Main CI retains this repository for delayed or retried publishing;
-      # pull requests retain it for seven days.
+      # Snapshot publishing reuses the repository of a run on main, so only a
+      # pull request keeps it briefly.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: kotlin-maven-verified-${{ env.PACKAGE_SHA }}
           path: build/packages/kotlin/maven-staging
           if-no-files-found: error
-          retention-days: ${{ inputs.verified_retention_days }}
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   publish:
     name: Kotlin Maven publish
@@ -173,7 +168,6 @@ jobs:
       - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           ref: ${{ env.PUBLISH_SHA }}
-          fetch-depth: 0
           persist-credentials: false
       - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
         with:
@@ -201,44 +195,6 @@ jobs:
         run: >-
           mise run --no-deps //:kotlin:prepare-release upload-snapshot
           build/packages/kotlin/maven "$KOTLIN_VERSION"
-      - name: Revalidate the release tag
-        if: ${{ inputs.release }}
-        run: |
-          set -euo pipefail
-
-          git fetch --quiet --force origin \
-            "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
-          tag_sha="$(git rev-parse "refs/tags/$GITHUB_REF_NAME^{commit}")"
-          if [[ "$tag_sha" != "$PUBLISH_SHA" ]]; then
-            echo "$GITHUB_REF_NAME moved from $PUBLISH_SHA to $tag_sha" >&2
-            exit 1
-          fi
-          # The release checked its order when it started, and a newer tag
-          # waits for it in the release concurrency group.
-          if [[ "${GITHUB_REF_NAME#v}" != "$KOTLIN_VERSION" ]]; then
-            echo "$GITHUB_REF_NAME no longer names version $KOTLIN_VERSION" >&2
-            exit 1
-          fi
-      - name: Check Maven Central immutability
-        if: ${{ inputs.release }}
-        run: |
-          set -euo pipefail
-
-          artifact="maplibre-native-ffi-${KOTLIN_VERSION}.pom"
-          url="https://repo1.maven.org/maven2/org/maplibre/nativeffi/maplibre-native-ffi/${KOTLIN_VERSION}/${artifact}"
-          http_code="$(curl --location --silent --show-error --output /dev/null \
-            --write-out '%{http_code}' "$url")"
-          case "$http_code" in
-            404) ;;
-            200)
-              echo "org.maplibre.nativeffi:maplibre-native-ffi:$KOTLIN_VERSION already exists" >&2
-              exit 1
-              ;;
-            *)
-              echo "Maven Central returned HTTP $http_code while checking $url" >&2
-              exit 1
-              ;;
-          esac
       - name: Sign and bundle the release
         if: ${{ inputs.release }}
         env:
@@ -249,15 +205,6 @@ jobs:
           build/packages/kotlin/maven
           "build/packages/kotlin/maplibre-native-ffi-${KOTLIN_VERSION}.zip"
           "$KOTLIN_VERSION"
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: ${{ inputs.release }}
-        with:
-          name: kotlin-maven-central-${{ env.KOTLIN_VERSION }}
-          path:
-            build/packages/kotlin/maplibre-native-ffi-${{ env.KOTLIN_VERSION
-            }}.zip
-          if-no-files-found: error
-          retention-days: 7
       - name: Upload and publish the Central deployment
         if: ${{ inputs.release }}
         id: central

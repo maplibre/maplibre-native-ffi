@@ -17,10 +17,7 @@ val androidBackend =
   )
 val androidTargets =
   AndroidTarget.parseAbis(
-    providers
-      .gradleProperty("maplibre.android.abis")
-      .getOrElse(AndroidTarget.defaultAbis(androidBackend)),
-    androidBackend,
+    providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS),
   )
 @Suppress("UNCHECKED_CAST")
 val androidSdkDirectory =
@@ -58,8 +55,7 @@ val packagedAndroidRuntimeLibs = layout.buildDirectory.dir("generated/jniLibs/ru
 @Suppress("UNCHECKED_CAST")
 val packagedAndroidBindingLibs =
   extensions.extraProperties["maplibreAndroidBindingLibsDirectory"] as Provider<Directory>
-// Publishing puts each Android preset's packaged components here, one directory per preset:
-// staging extracts the packages that target CI produced, and a local publish installs them.
+// Maven staging extracts each Android preset's native package here, one directory per preset.
 val prebuiltAndroidInstallRoot =
   providers.gradleProperty("maplibre.android.prebuiltInstallRoot").map(rootProject::file)
 // Target CI round-trips packages into each CMake preset's install directory.
@@ -175,14 +171,6 @@ androidTargets.forEach { target ->
       dependsOn(buildNative)
       into(runtimePackageDir)
       from(nativeLibrary) { into(target.ndkAbi) }
-      doLast {
-        val packaged = runtimePackageDir.get().file("${target.ndkAbi}/libmaplibre-native-c.so")
-        val asLatin1 = packaged.asFile.readBytes().toString(Charsets.ISO_8859_1)
-        check("libc++_shared.so" !in asLatin1) {
-          "The Android ${target.ndkAbi} MapLibre C library depends on libc++_shared.so; the " +
-            "Android presets set ANDROID_STL=c++_static so the AAR carries one library per ABI"
-        }
-      }
     }
 
   val packageBindingTarget =

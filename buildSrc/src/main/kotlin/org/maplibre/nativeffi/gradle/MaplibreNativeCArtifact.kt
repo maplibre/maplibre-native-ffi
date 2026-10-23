@@ -60,15 +60,7 @@ class MaplibreNativeCArtifact(val installDir: File, val hostLibraryDirs: List<Fi
       else -> "libmaplibre-native-c.so"
     }
 
-  private fun targetIsMac(): Boolean = cargoBuildTarget()?.contains("apple-darwin") ?: isHostMac()
+  private fun targetIsMac(): Boolean = HostPlatform.current().isMac
 
-  private fun targetIsWindows(): Boolean =
-    cargoBuildTarget()?.contains("windows-msvc") ?: isHostWindows()
-
-  private fun cargoBuildTarget(): String? = System.getenv("CARGO_BUILD_TARGET")
-
-  private fun isHostMac(): Boolean = System.getProperty("os.name").lowercase().contains("mac")
-
-  private fun isHostWindows(): Boolean =
-    System.getProperty("os.name").lowercase().contains("windows")
+  private fun targetIsWindows(): Boolean = HostPlatform.current().isWindows
 }
