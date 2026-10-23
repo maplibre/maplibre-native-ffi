@@ -42,8 +42,17 @@ Future<void> main(List<String> arguments) async {
             output,
           );
 
+    // A download is unpacked under its pinned digest, so the pin file, which
+    // is already a dependency, covers it. Declaring the files unpacked during
+    // this build would read as a change and make the runner build again.
+    void dependOn(File file) {
+      if (localBuild != null) {
+        output.dependencies.add(file.absolute.uri);
+      }
+    }
+
     final library = _libraryFile(prefix, code.targetOS);
-    output.dependencies.add(library.absolute.uri);
+    dependOn(library);
     output.assets.code.add(
       CodeAsset(
         package: input.packageName,
@@ -57,7 +66,7 @@ Future<void> main(List<String> arguments) async {
     // them through it, resolved relative to the loader, so they have to be
     // declared as assets too.
     for (final sibling in _siblingLibraries(library, code.targetOS)) {
-      output.dependencies.add(sibling.absolute.uri);
+      dependOn(sibling);
       output.assets.code.add(
         CodeAsset(
           package: input.packageName,

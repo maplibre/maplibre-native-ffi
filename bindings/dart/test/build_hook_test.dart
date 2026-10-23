@@ -177,6 +177,12 @@ void main() {
         await File.fromUri(output.assets.code.single.file!).readAsString(),
         'android-arm64-egl',
       );
+      // The files that the build unpacked would read as changed during it.
+      expect(output.dependencies, [
+        File.fromUri(
+          temporary.uri.resolve('package/hook/native_release.json'),
+        ).absolute.uri,
+      ]);
 
       // A later build unpacks nothing and reaches no server.
       served.clear();
