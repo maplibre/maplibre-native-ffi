@@ -42,7 +42,7 @@
 "REND-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::AnOwnedTextureSessionRendersPixelsTheBindingReadsBack"
 "REND-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::ACallerDrivenSessionIsServicedFromAManagedThread"
 # The package smoke restores the packed NuGet packages and loads the library
-# through their runtime assets; ci/dotnet_snapshot.py runs it.
+# through their runtime assets; ci/dotnet_release.py runs it.
 "PLAT-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.PackageSmoke/Program.cs::LoadNativeLibrary"
 "PLAT-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ProcessExitTests.cs::AProcessExitsCleanlyWithLiveHandlesAndCallbacks"
 "PLAT-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/LeakReportTests.cs::UnreachableHandlesAreReclaimedAndReported"

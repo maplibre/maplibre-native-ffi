@@ -8,14 +8,19 @@
     <IsTrimmable>true</IsTrimmable>
     <PackageId>Maplibre.NativeFfi</PackageId>
     <Description>Low-level .NET bindings for the MapLibre Native C API.</Description>
+    <Authors>MapLibre</Authors>
     <PackageLicenseExpression>BSD-2-Clause</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/maplibre/maplibre-native-ffi</PackageProjectUrl>
     <RepositoryUrl>https://github.com/maplibre/maplibre-native-ffi</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <NoWarn>$(NoWarn);0649</NoWarn>
     <RootNamespace>Maplibre.NativeFfi</RootNamespace>
     <AssemblyName>Maplibre.NativeFfi</AssemblyName>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>Maplibre.NativeFfi.Tests</_Parameter1>

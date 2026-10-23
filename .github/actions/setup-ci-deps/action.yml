@@ -244,8 +244,7 @@ runs:
         path: ~/.ci-package-cache
         key:
           ${{ runner.os }}-${{ runner.arch }}-pkg-v2-${{
-          hashFiles('pnpm-lock.yaml', 'uv.lock', 'Directory.Packages.props',
-          'bindings/dotnet/.config/dotnet-tools.json') }}
+          hashFiles('pnpm-lock.yaml', 'uv.lock', 'Directory.Packages.props') }}
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-pkg-v2-
 

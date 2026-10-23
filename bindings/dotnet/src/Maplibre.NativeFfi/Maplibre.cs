@@ -21,10 +21,8 @@ public static unsafe partial class Maplibre
         CallbackException;
 
     /// <summary>
-    /// Loads the native library and checks its C ABI version. The library is the file that
-    /// <c>MAPLIBRE_NATIVE_FFI_LIBRARY_PATH</c> names, or else the one that .NET's native library
-    /// probing finds, such as a runtime package's, after its dependencies from the directories
-    /// that <c>MAPLIBRE_NATIVE_FFI_LIBRARY_DIRS</c> lists.
+    /// Loads the native library and checks its C ABI version. The library is the one that .NET's
+    /// native library probing finds, such as a runtime package's.
     /// </summary>
     public static void LoadNativeLibrary()
     {

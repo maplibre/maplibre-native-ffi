@@ -1,15 +1,8 @@
 [tools]
 "core:dotnet" = "{{vars.dotnet_version}}"
 
-[deps.dotnet-tools]
-auto = true
-dir = "../.."
-sources = ["bindings/dotnet/.config/dotnet-tools.json"]
-run = "dotnet tool restore --tool-manifest bindings/dotnet/.config/dotnet-tools.json --verbosity quiet"
-
 [tasks.api]
 description = "Generate DocFX HTML API reference for the .NET binding."
-# DocFX has its own tool manifest, so only this task restores it.
 run = '''
 rm -rf build/docfx build/docfx-api
 mkdir -p build
@@ -53,7 +46,7 @@ case "$usage_preset" in
     ;;
 esac
 if [[ "$usage_preset" == linux-musl-* ]]; then
-  exec python3 ci/dotnet_snapshot.py smoke-musl "$usage_preset"
+  exec python3 ci/dotnet_release.py smoke-musl "$usage_preset"
 fi
 
 MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \

@@ -118,23 +118,14 @@ dependencies {
 
 ### .NET
 
-<SnapshotOnly />
+Add the binding and the runtime for your backend from
+[NuGet](https://www.nuget.org/packages/Maplibre.NativeFfi). The runtime carries
+the native library for each Linux, macOS, Windows, and Android runtime
+identifier that its backend runs on.
 
-Add the snapshot feed, then the binding and the runtime for your backend.
-
-```xml title="nuget.config"
-<configuration>
-  <packageSources>
-    <add key="maplibre-snapshots" value="https://maplibre.github.io/maplibre-native-ffi/nuget/index.json" />
-  </packageSources>
-</configuration>
-```
-
-```xml title="MyApp.csproj"
-<ItemGroup>
-  <PackageReference Include="Maplibre.NativeFfi" />
-  <PackageReference Include="Maplibre.NativeFfi.Runtime.Vulkan" />
-</ItemGroup>
+```bash frame="terminal"
+dotnet add package Maplibre.NativeFfi
+dotnet add package Maplibre.NativeFfi.Runtime.Vulkan
 ```
 
 Take one runtime package:
@@ -142,6 +133,30 @@ Take one runtime package:
 - `Maplibre.NativeFfi.Runtime.OpenGL`
 - `Maplibre.NativeFfi.Runtime.Metal`
 - `Maplibre.NativeFfi.Runtime.Vulkan`
+
+For the snapshot channel, download the packages from the
+[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot)
+into a directory, and add that directory as a package source.
+
+```bash frame="terminal"
+gh release download unstable-native-snapshot --repo maplibre/maplibre-native-ffi --pattern '*.nupkg' --dir packages
+```
+
+```xml title="nuget.config"
+<configuration>
+  <packageSources>
+    <add key="maplibre-snapshot" value="packages" />
+  </packageSources>
+</configuration>
+```
+
+A snapshot's version is the next release's version with a `-dev` suffix, so
+take the newest prerelease of both packages.
+
+```bash frame="terminal"
+dotnet add package Maplibre.NativeFfi --prerelease
+dotnet add package Maplibre.NativeFfi.Runtime.Vulkan --prerelease
+```
 
 ### Dart
 

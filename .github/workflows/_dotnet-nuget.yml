@@ -1,0 +1,80 @@
+name: "↳ .NET NuGet"
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        description: Source commit named by the release tag
+        required: true
+        type: string
+      tag:
+        description: Release tag, whose GitHub release holds the native archives
+        required: true
+        type: string
+      version:
+        description: Package version
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: dotnet nuget push
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    # NuGet.org accepts an OIDC token from this repository when a trusted
+    # publishing policy names this environment and this file: NuGet.org matches
+    # the workflow that defines the job, not release.yml, which calls it.
+    environment:
+      name: nuget.org
+      url:
+        https://www.nuget.org/packages/Maplibre.NativeFfi/${{ inputs.version }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      MISE_NO_HOOKS: "1"
+      PUBLISH_TAG: ${{ inputs.tag }}
+      PUBLISH_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          ref: ${{ inputs.sha }}
+          persist-credentials: false
+      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        with:
+          cache: false
+          install_args: core:dotnet python
+      - name: Pack
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          gh release download "$PUBLISH_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern 'maplibre-native-c-*.tar.gz' \
+            --dir build/packages/native/dotnet-input
+          mise run --no-deps ci:pack-dotnet \
+            build/packages/native/dotnet-input build/packages/dotnet/nupkgs \
+            "$PUBLISH_VERSION"
+      - uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        id: login
+        with:
+          user: ${{ vars.NUGET_USER }}
+      # Skipping a version that NuGet.org already has lets a rerun after a
+      # partial push resume where it stopped.
+      - name: Push
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          mise exec --no-deps core:dotnet -- dotnet nuget push \
+            'build/packages/dotnet/nupkgs/*.nupkg' \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+          echo "### .NET $PUBLISH_VERSION" >> "$GITHUB_STEP_SUMMARY"

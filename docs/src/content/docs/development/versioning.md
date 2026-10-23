@@ -52,6 +52,12 @@ Central Portal, with snapshots enabled, and a Central Portal user token in the
 `MAVEN_CENTRAL_USERNAME` and `MAVEN_CENTRAL_PASSWORD` secrets. `GPG_PRIVATE_KEY`
 and `GPG_PASSPHRASE` hold the key that signs every release and snapshot file.
 
+NuGet.org trusted publishing can create a package, so .NET needs no first
+publish by hand. Add a trusted publishing policy for
+`maplibre/maplibre-native-ffi`, with the workflow `_dotnet-nuget.yml` and the
+`nuget.org` environment, and set the repository variable `NUGET_USER` to the
+NuGet.org account that owns the policy.
+
 ## Snapshots
 
 The Publish snapshots workflow runs daily and publishes every snapshot channel
@@ -63,4 +69,5 @@ with `docs_only` to republish only the docs site.
 pub.dev, crates.io, npm, PyPI, and NuGet.org keep every version that they
 publish, so they get no snapshot channel. The floating channels replace their
 contents on each publish: Maven Central snapshots for Kotlin, and the
-`unstable-native-snapshot` GitHub release for the C library and the Zig package.
+`unstable-native-snapshot` GitHub release for the C library, the Zig package,
+and the .NET packages.

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#MISE description="Pack the .NET packages from a directory of native archives."
+#MISE shell="bash"
+#MISE tools={ "core:dotnet" = "{{vars.dotnet_version}}", python = "{{vars.python_version}}" }
+#USAGE arg "<input>" help="Directory that holds the maplibre-native-c-<preset>.tar.gz archives"
+#USAGE arg "<output>" help="Directory to write the .nupkg files to"
+#USAGE arg "<version>" help="Package version"
+set -euo pipefail
+
+exec python ci/dotnet_release.py package "${usage_input?}" "${usage_output?}" "${usage_version?}"
