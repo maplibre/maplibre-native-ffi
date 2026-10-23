@@ -1,255 +1,131 @@
-# Rubberstamp (https://github.com/sargunv/rubberstamp) labels each new issue and
-# pull request from these groups. A label's meaning is its GitHub description
-# unless `describe` gives a longer one, and a group that already has a label
-# when the item opens keeps it.
+# Rubberstamp (https://github.com/sargunv/rubberstamp) labels new issues and
+# pull requests, and plans which CI units each pull request runs. A label means
+# its GitHub description unless `describe` overrides it, and a group that
+# already has a label keeps it.
 context: >-
-  This repository is a C API for MapLibre Native, the C++ map renderer vendored
-  as a git submodule with carried patches. Language bindings (Rust, Zig, Kotlin,
-  Swift, .NET, Go, Python, Dart, TypeScript) wrap the C API in idiomatic
-  interfaces, and small example apps use them. Mise defines tools and tasks,
-  CMake presets define native targets, and Gradle builds the Android and Kotlin
-  packages.
+  A C API for MapLibre Native, the C++ map renderer, which is vendored as a git
+  submodule with carried patches. Bindings for Dart, Go, Kotlin, .NET, Python,
+  Rust, Swift, TypeScript, and Zig wrap the C API, and example apps use them.
+  Mise defines tools and tasks, CMake builds the native library, and Gradle
+  builds the Kotlin packages.
 
 labels:
   context: >-
-    Maintainers label every issue and pull request so that they can find related
-    work later. Labels describe the subject of the work: what it changes, fixes,
-    or asks for. A file that a change touches only in passing, such as a docs
-    page or a test updated alongside the real change, does not make its area or
-    binding the subject. A label that names one binding, platform, or render
-    backend applies only when the work is specific to it, not when it applies to
-    every binding, platform, or backend alike.
+    Labels record what work is about so maintainers can find related work. A
+    binding, platform, or renderer label applies only to work specific to that
+    one, not to work several share alike. EGL and WGL are renderer subjects, not
+    platform ones.
   groups:
-    kind:
-      labels: [bug, feature, perf, chore, research]
-      min: 1
-      max: 1
+    kind: { labels: [bug, feature, perf, chore, research], min: 1, max: 1 }
     area:
       labels: ["area:*"]
       min: 1
-    binding:
-      labels: ["binding:*"]
-      rule: >-
-        Applies only when the work is specific to this binding: it concerns this
-        binding and not the others, or this binding differently from the rest. A
-        change that every binding, or several bindings alike, picks up does not
-        qualify.
-    platform:
-      labels: ["platform:*"]
-      rule: >-
-        Applies only when the work is specific to this platform: it concerns
-        behavior, code, builds, or packaging that differ on this platform. Work
-        that applies to every platform alike does not qualify.
-    renderer:
-      labels: ["renderer:*"]
-      rule: >-
-        Applies only when the work is specific to this render backend. Work that
-        applies to every backend alike does not qualify.
-    upstream:
-      labels: [upstream]
-    dependencies:
-      labels: [dependencies]
-  # Meanings longer than a GitHub label description allows.
+      rule:
+        A patch to MapLibre Native takes the area of the behavior it changes.
+    binding: { labels: ["binding:*"] }
+    platform: { labels: ["platform:*"] }
+    renderer: { labels: ["renderer:*"] }
+    upstream: { labels: [upstream] }
+    dependencies: { labels: [dependencies] }
   describe:
     bug: >-
-      Fixes or reports broken behavior: a crash, a wrong result, a failing build
-      or CI job, a violated API contract, or a regression.
+      Broken behavior: a crash, a wrong result, a failing build or CI job, a
+      violated contract, or a regression.
     feature: >-
-      Adds or changes a capability that users of the C API, a binding, an
-      example, or the tooling can use, including new API surface, new targets,
-      and new packaging.
+      A new or changed capability for users of the C API, a binding, an example,
+      or the tooling, including new targets and packages.
     perf: >-
-      Improves runtime speed, memory or resource use, binary size, or build and
-      CI time, without changing what the software does.
+      Faster or leaner runtime, smaller binaries, or faster builds and CI,
+      without changing behavior.
     chore: >-
-      Maintenance that adds no capability and fixes nothing broken: refactoring,
-      cleanup, tests, documentation, formatting, routine dependency updates, and
-      process changes.
+      Maintenance that adds nothing and fixes nothing: refactoring, cleanup,
+      tests, documentation, routine dependency updates, and process.
     research: >-
-      Investigates a question, evaluates a design, or builds a deliberate
-      prototype, where the outcome is knowledge or a decision rather than
-      shipped code.
-    "area:runtime": >-
-      The runtime: the owner thread, the run loop pump, wake sources, the
-      scheduler, runtime lifetime, thread-affinity rules, event delivery,
-      logging, and the runtime-wide resource loading: resource providers and
-      transforms, HTTP and network settings, the cache database, and offline
-      operations.
-    "area:map": >-
-      Maps and their content: map lifecycle and options, the camera and its
-      animations, styles and style expressions, sources, layers, images, text
-      and glyphs, feature state, and map events and observers.
-    "area:render": >-
-      Rendering: render sessions, render targets, surfaces, textures, readback,
-      frame pacing, and the OpenGL, Vulkan, Metal, and WebGPU backend adapters.
-    "area:query": >-
-      Queries: rendered feature queries, source feature queries, and geometry or
-      projection queries.
-    "area:plugins": >-
-      Layer plugins and custom render hooks that host code supplies.
-    "area:bindings": >-
-      The language bindings themselves: a binding's API shape, memory and thread
-      safety, code generation, native interop, or its tests. Exposing a new C
-      API capability through the bindings is about that capability's area, and
-      also about the bindings only when the binding layer needs its own design
-      or fixes.
-    "area:examples": >-
-      The demo apps in `examples/` (c-map, dotnet-map, go-map, rust-map,
-      swift-map, zig-map, zig-readback) and the hosts they run in.
-    "area:docs": >-
-      The documentation as the subject: the documentation site, the
-      specifications, public header comments, API reference generation,
-      snippets, and repository guidance such as AGENTS.md.
+      An investigation, design evaluation, or prototype whose outcome is a
+      decision rather than shipped code.
+    "area:api": >-
+      What hosts program against: the C declarations and their contracts, the
+      bindings with their runtimes, generated code, generator, and tests, and
+      the example apps. A capability belongs to core or rendering, and also to
+      api only when the interface design or the binding layer is the subject.
+    "area:core": >-
+      The library's behavior behind the API: the runtime, threads, wakes, and
+      event delivery; maps, the camera, styles, sources, layers, and feature
+      state; queries and projection; resource providers, cache, and offline; and
+      logging.
+    "area:rendering": >-
+      Turning a map into pixels: render sessions and drivers, targets, surfaces,
+      textures, readback, frame pacing, the OpenGL, Vulkan, Metal, and WebGPU
+      backends, and layer plugins.
+    "area:platform": >-
+      The OS services under `src/platform/` that MapLibre Native runs on: the
+      run loop, threads, HTTP and TLS, image decoding, locale and text, assets,
+      and log sinks.
     "area:tooling": >-
-      Build and development infrastructure: CMake, mise tasks and tools, Gradle
-      builds, CI workflows and planning, packaging, releases, formatters and
-      linters, and dependency management.
-    "area:upstream": >-
-      A patch to MapLibre Native that this repository carries ahead of upstream
-      under `patches/maplibre-native/`, or a change to the pinned
-      `third_party/maplibre-native` submodule commit. Work that only calls into
-      MapLibre Native, such as the C++ in `src/` that wraps it, does not
-      qualify.
-    "binding:kotlin": >-
-      The Kotlin binding and its runtime publications.
-    "binding:swift": >-
-      The Swift binding, or an example built with it such as swift-map.
-    "binding:rust": >-
-      The Rust binding, or an example built with it such as rust-map.
-    "binding:dotnet": >-
-      The .NET (C#) binding, or an example built with it such as dotnet-map.
-    "binding:python": >-
-      The Python binding, or an example built with it.
-    "binding:go": >-
-      The Go binding, or an example built with it such as go-map.
-    "binding:dart": >-
-      The Dart or Flutter binding, or an example built with it.
-    "binding:zig": >-
-      The Zig binding, or an example built with it such as zig-map or zig-
-      readback.
-    "binding:typescript": >-
-      A TypeScript binding, or an example built with it.
-    "binding:gobject": >-
-      The GObject binding, its introspection data, or its Vala API, or an
-      example built with it such as a GTK app.
-    "binding:arkts": >-
-      An ArkTS binding for OpenHarmony, or an example built with it.
-    "platform:linux": >-
-      Linux-specific behavior, builds, packaging, or reproduction.
-    "platform:macos": >-
-      macOS-specific behavior, builds, packaging, or reproduction.
-    "platform:windows": >-
-      Windows-specific behavior, builds, packaging, or reproduction.
-    "platform:android": >-
-      Android-specific behavior, builds, packaging, or reproduction.
-    "platform:ios": >-
-      iOS-specific behavior, builds, packaging, or reproduction, including the
-      other Apple mobile platforms such as iPadOS, tvOS, and visionOS.
-    "platform:ohos": >-
-      OpenHarmony-specific behavior, builds, packaging, or reproduction.
-    "platform:browser": >-
-      Browser-specific behavior, builds, packaging, or reproduction, such as the
-      Emscripten and WebAssembly targets.
-    "renderer:opengl": >-
-      The OpenGL or OpenGL ES render backend, with its EGL, WGL, or WebGL
-      context.
-    "renderer:vulkan": >-
-      The Vulkan render backend.
-    "renderer:metal": >-
-      The Metal render backend.
-    "renderer:webgpu": >-
-      The WebGPU render backend.
+      Building, checking, and shipping: CMake, mise, Gradle, CI and its runners,
+      packaging, publishing, releases, formatters, linters, and dependency
+      management.
+    "area:docs": >-
+      Documentation as the subject: the docs site, specifications, header
+      comments, API reference generation, and repository guidance such as
+      AGENTS.md. Updating docs to describe what a change ships doesn't count.
     upstream: >-
-      The work is in MapLibre Native's own code. For an issue, the cause of the
-      bug, or the missing capability, is in MapLibre Native rather than in this
-      repository. For a pull request, the diff adds or changes a patch under
-      `patches/maplibre-native/`, or moves the `third_party/maplibre-native`
-      submodule commit. The C++ in `src/` is this repository's code, even when
-      it calls, wraps, or works around MapLibre Native, so a pull request that
-      changes only that code does not qualify.
+      The work is in MapLibre Native's own code. A pull request qualifies when
+      it changes a patch under `patches/maplibre-native/` or moves the
+      `third_party/maplibre-native` submodule; the C++ in `src/` is ours even
+      where it wraps MapLibre Native. An issue qualifies when it says the engine
+      causes the bug or lacks the capability, or proposes the work upstream;
+      asking the C API to expose what the engine already has does not.
     dependencies: >-
-      Upgrading, adding, removing, or managing a dependency is the substantive
-      subject, such as a package, toolchain, or submodule version change.
+      A third-party dependency's version, addition, or removal is the subject.
+      Versioning or pinning this repository's own packages doesn't count.
 
-# Coverage units that CI selects from each pull request. Jev answers one
-# question per unit; a changed file matching one of a unit's `paths` selects it
-# regardless, and `*` also matches `/` in those patterns. `ci/workflow.toml`
-# maps each unit to its jobs.
+# `ci/workflow.toml` maps each unit to its jobs. A changed file matching a
+# unit's `paths` runs it regardless of the plan; `*` also matches `/`.
 ci:
-  # Only this workflow's successful runs count as units passing.
   workflow: .github/workflows/ci-coverage.yml
   context: >-
-    Every CI job installs the mise toolchain for its operating system, builds
-    the native library for one target with CMake, and runs that target's binding
-    tests and example builds against it. The Linux x64 jobs run the C API tests
-    and every binding's test suite, so they catch most platform-independent
-    problems. The other units catch what Linux x64 cannot: other compilers,
-    SDKs, operating system APIs, render backends, architectures, and packaging.
-
-    A change's size, or the number of bindings it touches, is not platform risk.
-    A change to shared C++ or to code every binding shares is covered by Linux
-    x64 unless it touches what only some platforms build or run: platform
-    directories and source sets (such as `androidMain` or `appleMain`),
-    Objective-C++ files, platform conditionals (`#if`, `cfg(target_os)`),
-    `cmake/platform/`, platform render backends, platform SDK setup, or platform
-    packaging. A test change matters only to units that run that suite and reach
-    that code path.
-
-    The workflows in `.github/workflows/` are generated from `ci/`, and every
-    job runs the shared setup action in `.github/actions/setup-ci-deps`. A
-    change to the generated job definitions puts every unit whose jobs it
-    changes at risk. A shared script, mise task, tool version, or setup step
-    that every job runs the same way is covered by Linux x64, except where an
-    operating system runs it differently; Windows uses an older mise without the
-    lockfile, Git Bash, and MSVC. A tool that a config lists only for some
-    operating systems puts those operating systems' units at risk when it is
-    added or changed. Release and publishing workflows do not run in pull
-    request CI. Package manifests and lockfiles feed the binding builds and
-    tests that use them.
-
-    Hygiene always runs. It checks formatting, lint, generated binding code, and
-    runs the unit tests for the CI tooling in `ci/`. Changes that only affect
-    those need no other coverage.
-
-    The main branch runs every unit after merge, so a pull request only needs
-    the coverage that a reviewer would expect its change to put at risk.
+    Each unit installs the mise toolchain, builds the native library for its
+    targets with CMake, and runs those targets' binding tests and example
+    builds. Linux x64 runs the C tests and every binding's suite, so it covers
+    platform-independent changes however large. Another unit matters only when a
+    change reaches what it alone builds or runs: platform source directories and
+    source sets such as `androidMain`, Objective-C++, platform conditionals,
+    `cmake/platform/`, render backends, SDK setup, or packaging. A test change
+    matters only to units that run that suite. The workflows are generated from
+    `ci/`, so changing a unit's generated jobs puts it at risk. Windows runs
+    shared scripts differently, with an older mise without the lockfile, Git
+    Bash, and MSVC, and a tool configured for only some operating systems puts
+    those at risk. Release workflows don't run on pull requests. Hygiene always
+    runs formatting, lint, generated-code checks, and the tests for `ci/`. Main
+    runs every unit after merge, so a pull request needs only the coverage a
+    reviewer would expect.
   units:
     docs:
       covers: >-
-        Builds the documentation site, a Node project using Astro and Starlight
-        with dependencies installed by pnpm. Hygiene formats the pages but does
-        not build the site, so any change to its pages, snippets, or
-        configuration needs it. Also generates each binding's API reference with
-        that binding's tools (Doxygen, Dokka, DocC, DocFX, dart doc, and others)
-        from the public C headers and binding sources, so changes to those
-        tools, their configuration, or the Node toolchain put it at risk.
+        Builds the Astro docs site, which hygiene only formats, and generates
+        each binding's API reference with its own tool (Doxygen, Dokka, DocC,
+        DocFX, dart doc, and others) from the C headers and binding sources.
       paths: ["docs/*"]
     linux-x64:
       covers: >-
-        Linux x64 with glibc, OpenGL (EGL) and Vulkan. Runs the C API tests, the
-        test suites of every binding (Rust, Zig, Kotlin JVM and Native, Swift,
-        .NET, Go, Python, TypeScript under Node, Bun, and Deno) and the Dart
-        build, and the example builds. This is the general correctness check for
-        native code, bindings, examples, and build logic shared by all
-        platforms.
+        Linux x64 glibc with OpenGL (EGL) and Vulkan. Runs the C tests, every
+        binding's suite, the Dart build, and the example builds: the general
+        check for shared native code, bindings, examples, and build logic.
     linux-arm64:
       covers: >-
-        Linux ARM64 with glibc, OpenGL (EGL) and Vulkan, on ARM runners. Runs
-        the same suites as Linux x64. Catches architecture-specific problems and
-        ARM runner toolchain differences. Architecture-neutral changes do not
-        need it.
+        Linux ARM64 glibc with OpenGL (EGL) and Vulkan, running Linux x64's
+        suites on ARM runners. Catches architecture and ARM toolchain problems.
     linux-musl:
       covers: >-
-        Linux with musl libc on x64 and ARM64. Builds the native library, checks
-        its musl ABI, and runs the Rust and .NET tests against it in Alpine.
-        Catches libc assumptions and musl packaging problems. Code that Linux
-        x64 already tests does not need it unless it depends on the libc.
+        Linux musl on x64 and ARM64. Builds the native library, checks its musl
+        ABI, and runs the Rust and .NET tests in Alpine. Catches libc
+        assumptions and musl packaging problems.
     macos:
       covers: >-
-        macOS ARM64 with Metal, Vulkan (MoltenVK), and OpenGL (ANGLE EGL). Runs
-        the C API tests and the desktop binding suites, including Swift. Catches
-        Apple Clang, Apple SDK, Metal, and macOS packaging problems.
-        Platform-independent code that Linux x64 already tests does not need it.
+        macOS ARM64 with Metal, Vulkan (MoltenVK), and OpenGL (ANGLE). Runs the
+        C tests and the desktop binding suites, including Swift. Catches Apple
+        Clang, Apple SDK, Metal, and macOS packaging problems.
       paths:
         - src/platform/apple/*
         - src/render/metal/*
@@ -260,12 +136,11 @@ ci:
         - examples/swift-map/*
     apple-mobile:
       covers: >-
-        iOS, iOS simulator, Mac Catalyst, tvOS, and tvOS simulator with Metal.
-        Builds the native library and the Kotlin, Swift, and Dart bindings for
-        each, builds the Swift example for iOS and the iOS simulator, runs tests
-        on the simulators, and packages the XCFramework. Catches mobile Apple
-        SDK, cross-compilation, and framework packaging problems.
-        Platform-independent code that Linux x64 already tests does not need it.
+        iOS, Mac Catalyst, and tvOS with Metal, on devices and simulators.
+        Builds the native library and the Kotlin, Swift, and Dart bindings,
+        builds the Swift example for iOS, runs simulator tests, and packages the
+        XCFramework. Catches mobile SDK, cross-compilation, and framework
+        packaging problems.
       paths:
         - src/platform/apple/*
         - src/render/metal/*
@@ -283,10 +158,8 @@ ci:
     windows:
       covers: >-
         Windows x64 and ARM64 with OpenGL (WGL) and Vulkan, built with MSVC.
-        Runs the C API tests and the desktop binding suites. Windows CI uses an
-        older mise release without the lockfile. Catches MSVC, Windows API, path
-        and filesystem, shell, and Windows toolchain installation problems.
-        Platform-independent code that Linux x64 already tests does not need it.
+        Runs the C tests and the desktop binding suites. Catches MSVC, Windows
+        API, path, shell, and toolchain installation problems.
       paths:
         - src/platform/windows/*
         - src/render/opengl/wgl_*
@@ -295,12 +168,11 @@ ci:
         - .github/actions/setup-windows-*
     android:
       covers: >-
-        Android on ARM, ARM64, and x64 with OpenGL ES (EGL) and Vulkan, built
-        with the NDK. The x64 jobs run the C API, Kotlin, Go, Rust, Zig, and
-        Python tests in the Android emulator; the ARM jobs only build. Also
-        builds the Dart binding and verifies multi-ABI packaging. Catches NDK,
-        Android API, JNI, emulator, and AAR packaging problems.
-        Platform-independent code that Linux x64 already tests does not need it.
+        Android on ARM, ARM64, and x64 with OpenGL ES and Vulkan, built with the
+        NDK. The x64 jobs run the C, Kotlin, Go, Rust, Zig, and Python tests in
+        the emulator; the ARM jobs only build. Also builds Dart and verifies
+        multi-ABI packaging. Catches NDK, Android API, JNI, emulator, and AAR
+        problems.
       paths:
         - src/platform/android/*
         - cmake/platform/android.cmake
@@ -310,21 +182,18 @@ ci:
         - .mise/tasks/kotlin/verify-android-multi-abi
     ohos:
       covers: >-
-        OpenHarmony on ARM64 and x64 with OpenGL ES (EGL) and Vulkan, built with
-        the OpenHarmony SDK. The x64 jobs run the C API, Rust, Go, and
-        TypeScript (ArkTS) tests in the Oniro emulator; the ARM64 jobs only
-        build. Catches OpenHarmony SDK and platform problems.
-        Platform-independent code that Linux x64 already tests does not need it.
+        OpenHarmony on ARM64 and x64 with OpenGL ES and Vulkan. The x64 jobs run
+        the C, Rust, Go, and TypeScript (ArkTS) tests in the Oniro emulator; the
+        ARM64 jobs only build. Catches OpenHarmony SDK and platform problems.
       paths:
         - cmake/platform/ohos.cmake
         - mise.ohos.*
         - tests/native/abi/platform/transport.c
     web:
       covers: >-
-        The browser, built with Emscripten for WebGL and WebGPU. Runs the C API
-        tests and the Rust and Kotlin/Wasm binding tests in a browser. Catches
-        Emscripten, wasm32, and browser rendering problems. Platform-independent
-        code that Linux x64 already tests does not need it.
+        The browser, built with Emscripten for WebGL and WebGPU. Runs the C,
+        Rust, and Kotlin/Wasm tests in a browser. Catches Emscripten, wasm32,
+        and browser rendering problems.
       paths:
         - src/platform/emscripten/*
         - src/render/webgpu/*
@@ -337,14 +206,11 @@ ci:
         - bindings/kotlin/karma.config.d/*
     maven:
       covers: >-
-        Assembles and verifies the Kotlin Maven repository from every native
-        target's artifacts. Selecting it runs every target. Catches Kotlin
-        publishing, Gradle publication, and multiplatform packaging problems.
-        Only changes to what the Kotlin Maven repository contains or how it is
-        assembled and verified need it: the published module set, POM metadata,
-        artifact contents, and the staging and verification tasks. Ordinary
-        Kotlin source and test changes, and native packaging for one platform,
-        are covered by the target units.
+        Assembles and verifies the Kotlin Maven repository from every target's
+        artifacts, so it runs every target. Only changes to what that repository
+        contains or how it is staged and verified need it: the module set, POM
+        metadata, and artifact contents. Ordinary Kotlin changes and one
+        platform's native packaging don't.
       paths:
         - .mise/tasks/kotlin/publish
         - .mise/tasks/kotlin/verify-staging
