@@ -51,4 +51,4 @@ with `docs_only` to republish only the docs site.
 pub.dev, crates.io, npm, PyPI, and NuGet.org keep every version that they
 publish, so they get no snapshot channel. The floating channels replace their
 contents on each publish: Maven Central snapshots for Kotlin, and the
-`unstable-native-snapshot` GitHub release for the C library.
+`unstable-native-snapshot` GitHub release for the C library and the Zig package.
