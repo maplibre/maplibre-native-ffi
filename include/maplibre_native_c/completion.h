@@ -35,8 +35,9 @@ typedef enum mln_command_disposition : uint32_t {
  * functions set disposition to MLN_COMMAND_DISPOSITION_COMMITTED and
  * generation to zero.
  *
- * A map command queues the runtime events it raises before its completion
- * runs, and those events carry the generation this result reports.
+ * A map command delivers the runtime events it raises before its completion
+ * runs: a callback handler has returned from them, or a queue handler's queue
+ * holds them. Those events carry the generation this result reports.
  */
 typedef struct mln_completion_result {
   uint32_t size;

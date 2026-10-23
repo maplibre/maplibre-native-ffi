@@ -6,16 +6,21 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
+import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapDebugOption
 import org.maplibre.nativeffi.generated.MapMode
+import org.maplibre.nativeffi.generated.RuntimeEventHandler
+import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.c.CompletionLayout
@@ -66,6 +71,26 @@ class CompletionTest {
       assertTrue(token != 0L, "the rejected call received a completion token")
       // Setup completions may still be releasing their state, so inspect only this call's root.
       assertNull(NativeRoots.get(token))
+    }
+  }
+
+  @Test
+  fun aCommandCompletesAfterItsEventsReachTheHandler() = runSuspendTest {
+    withMap {
+      val events = Channel<RuntimeEventType>(Channel.UNLIMITED)
+      runtime
+        .setEventHandler(
+          RuntimeEventHandler { batch -> batch.events.forEach { events.trySend(it.type) } },
+        )
+        .await()
+      val seenAtCompletion = CompletableDeferred<List<RuntimeEventType>>()
+      val style = map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray())
+      // The handler runs inside native's completion, after the callbacks for the command's events.
+      style.invokeOnCompletion {
+        seenAtCompletion.complete(generateSequence { events.tryReceive().getOrNull() }.toList())
+      }
+      style.await()
+      assertTrue(RuntimeEventType.MAP_STYLE_LOADED in seenAtCompletion.await())
     }
   }
 

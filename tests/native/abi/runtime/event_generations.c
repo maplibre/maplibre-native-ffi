@@ -1,5 +1,6 @@
-// The snapshot generation that every map event carries: a command's events are
-// queued before its completion with the generation it reports, a state event
+// The snapshot generation that every map event carries: a command's events
+// reach their handler before its completion with the generation it reports, in
+// queue mode and in callback mode, a state event
 // follows a snapshot that already includes its change, and one map's events
 // arrive in non-decreasing generation order.
 
@@ -19,12 +20,14 @@ typedef struct recorded_event {
 } recorded_event;
 
 // Drains from any thread: the test thread, a completion, or the runtime's
-// event wake. A spin lock serializes the drains and the test's reads.
+// event wake. With a callback handler, the runtime records each event instead,
+// and nothing drains. A spin lock serializes the records and the test's reads.
 typedef struct event_recorder {
   atomic_flag lock;
   mln_runtime runtime;
   _Atomic uint64_t map;
   bool read_snapshots;
+  bool callbacks;
   recorded_event events[2048];
   size_t count;
   bool overflowed;
@@ -48,6 +51,7 @@ static void recorder_reset(mln_runtime runtime, bool read_snapshots) {
   recorder.runtime = runtime;
   atomic_store(&recorder.map, MLN_HANDLE_NULL);
   recorder.read_snapshots = read_snapshots;
+  recorder.callbacks = false;
   recorder.count = 0;
   recorder.overflowed = false;
   recorder.drain_failed = false;
@@ -87,7 +91,7 @@ static void record_event(const mln_runtime_event* event) {
 // completion may call it; the recorder keeps a failure for the test to report.
 static void recorder_drain(void) {
   recorder_lock();
-  while (true) {
+  while (!recorder.callbacks) {
     mln_delivery_batch batch = MLN_HANDLE_NULL;
     mln_event_batch_view view = {.size = sizeof(view)};
     const mln_status drained =
@@ -105,6 +109,31 @@ static void recorder_drain(void) {
     mln_delivery_batch_release(batch);
   }
   recorder_unlock();
+}
+
+static void record_callback_events(
+  void* user_data, const mln_event_batch_view* events
+) {
+  (void)user_data;
+  recorder_lock();
+  for (size_t index = 0; index < events->event_count; index += 1) {
+    record_event((const mln_runtime_event*)((const char*)events->events +
+                                            (index * events->event_size)));
+  }
+  recorder_unlock();
+}
+
+// Replaces the runtime's queue handler with a callback that records each event.
+static void recorder_use_callbacks(mln_runtime runtime) {
+  recorder_lock();
+  recorder.callbacks = true;
+  recorder_unlock();
+  const mln_runtime_event_handler handler = {
+    .size = sizeof(handler), .callback = record_callback_events
+  };
+  MLN_TEST_AWAIT_OK(mln_runtime_set_event_handler(
+    runtime, &handler, &completion.descriptor, NULL
+  ));
 }
 
 static size_t recorder_count(void) {
@@ -137,7 +166,7 @@ static void assert_map_generations_never_decrease(mln_map map) {
 }
 
 // Forwards a command's completion after draining the queue into the recorder,
-// so the test sees what was queued when the completion ran.
+// so the test sees what reached the handler when the completion ran.
 typedef struct completion_probe {
   mln_completion inner;
   size_t count_at_completion;
@@ -167,7 +196,8 @@ typedef struct probed_result {
   mln_status status;
   uint32_t disposition;
   uint64_t generation;
-  // Recorder entries [start, end) are the events queued before the completion.
+  // Recorder entries [start, end) are the events that reached the handler
+  // before the completion.
   size_t start;
   size_t end;
 } probed_result;
@@ -239,14 +269,15 @@ static void assert_range_carries_generation(
   }
 }
 
-// A command's events are queued before its completion runs, all with the
-// generation the completion reports. Events raised before a command carry a
+// A command's events reach the handler before its completion runs, all with
+// the generation the completion reports. Events raised before a command carry a
 // lower generation.
-static void a_command_queues_its_events_before_it_completes(void) {
+static void assert_command_events_precede_completion(bool callbacks) {
   mln_runtime runtime = mln_test_create_runtime();
+  recorder_reset(runtime, false);
+  if (callbacks) recorder_use_callbacks(runtime);
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_fence(map));
-  recorder_reset(runtime, false);
   recorder_drain();
   const size_t creation_end = recorder_count();
 
@@ -276,11 +307,28 @@ static void a_command_queues_its_events_before_it_completes(void) {
 
   MLN_TEST_OK(mln_test_map_fence(map));
   recorder_drain();
+  // No callback runs once the clear completes, so the reads below are stable.
+  if (callbacks) {
+    MLN_TEST_AWAIT_OK(
+      mln_runtime_clear_event_handler(runtime, &completion.descriptor, NULL)
+    );
+  }
   assert_recorder_complete();
   assert_map_generations_never_decrease(map);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
+}
+
+// A queue holds a command's events when its completion runs.
+static void a_command_queues_its_events_before_it_completes(void) {
+  assert_command_events_precede_completion(false);
+}
+
+// An event callback has returned from a command's events when its completion
+// runs.
+static void a_command_calls_back_with_its_events_before_it_completes(void) {
+  assert_command_events_precede_completion(true);
 }
 
 // A command that runs and fails still publishes, and the failure event it
@@ -431,6 +479,7 @@ static void state_events_follow_a_snapshot_that_includes_them(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(a_command_queues_its_events_before_it_completes);
+  RUN_TEST(a_command_calls_back_with_its_events_before_it_completes);
   RUN_TEST(a_failed_command_reports_the_generation_of_its_events);
   RUN_TEST(state_events_follow_a_snapshot_that_includes_them);
 }
