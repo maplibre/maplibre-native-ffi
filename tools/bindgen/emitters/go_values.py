@@ -331,7 +331,7 @@ class Values:
         chunks = []
         for native, value in sorted(self.enums.items()):
             typename = public(native)
-            prefix = enum_member_prefix(key for key, _ in value.enum_values)
+            prefix = enum_member_prefix((key for key, _ in value.enum_values), native)
             constants = "\n".join(
                 doc(self.api, key, None)
                 + f"{typename}{name(key.removeprefix(prefix).lower())} {typename} = {typename}(C.{key})"

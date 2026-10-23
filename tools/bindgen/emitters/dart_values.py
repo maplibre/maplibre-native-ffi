@@ -989,7 +989,9 @@ class Values:
             documented.append((len(declarations), value.native))
             if value.kind == "enum":
                 public = public_name(value.native)
-                prefix = enum_member_prefix(name for name, _ in value.enum_values)
+                prefix = enum_member_prefix(
+                    (name for name, _ in value.enum_values), value.native
+                )
                 members = "\n".join(
                     f"{doc(self.bound, name, '  ')}  static const {identifier(name.removeprefix(prefix).lower())} = {public}.fromRawValue({number});"
                     for name, number in value.enum_values

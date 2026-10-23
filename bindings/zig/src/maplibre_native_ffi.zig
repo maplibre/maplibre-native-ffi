@@ -3975,7 +3975,7 @@ pub const SourceFeature = struct {
 /// See `mln_source_feature_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub const SourceFeatureField = struct {
-    id: bool = false,
+    source_layer_id: bool = false,
     unknown_bits: u32 = 0,
     pub const native_bits = [_]u32{1};
     const methods = marshal.FlagMethods(@This());

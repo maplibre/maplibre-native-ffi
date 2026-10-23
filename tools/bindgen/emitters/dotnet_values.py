@@ -122,7 +122,9 @@ class Values:
             return
         if plan.kind == "enum":
             self.enum_names.add(plan.native)
-            prefix = enum_member_prefix(name for name, _ in plan.enum_values)
+            prefix = enum_member_prefix(
+                (name for name, _ in plan.enum_values), plan.native
+            )
             members = [
                 pascal(name.removeprefix(prefix).lower())
                 for name, _ in plan.enum_values

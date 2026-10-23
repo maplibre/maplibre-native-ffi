@@ -238,7 +238,7 @@ class Values:
                 "unsigned long long": "UInt64",
             }.get(canonical, "UInt32"),
         )
-        prefix = enum_member_prefix(key for key, _ in value.enum_values)
+        prefix = enum_member_prefix((key for key, _ in value.enum_values), value.native)
         members = "\n".join(
             f"{doc(self.bound, key, '  ')}  public static let {identifier(camel(key.removeprefix(prefix).lower()))}: {public} = "
             + (

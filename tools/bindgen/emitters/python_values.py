@@ -509,7 +509,9 @@ class Values:
                         + f"    value: {self.type(field.value)}\n    _tag = {tag}\n\n    @classmethod\n    def _from_native(cls, raw):\n        return cls({self.facade_copy(field.value, 'raw')})\n"
                     )
         for name, plan in sorted(self.enums.items()):
-            prefix = enum_member_prefix(key for key, _ in plan.enum_values)
+            prefix = enum_member_prefix(
+                (key for key, _ in plan.enum_values), plan.native
+            )
             body = "\n".join(
                 f"    {key.removeprefix(prefix)} = {value}"
                 for key, value in plan.enum_values

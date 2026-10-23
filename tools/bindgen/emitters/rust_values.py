@@ -168,7 +168,7 @@ class Values:
             return "pub use maplibre_core::Status;\nimpl ToNative<i32> for Status { fn to_native(&self, _: &mut InputArena) -> Result<i32> { Ok(self.as_raw()) } }\nimpl FromNative<i32> for Status { unsafe fn from_native(raw: i32) -> Result<Self> { Ok(Self::from_raw(raw)) } }\n"
         public = pascal(value.native)
         raw = self.scalar(value) or "u32"
-        prefix = enum_member_prefix(key for key, _ in value.enum_values)
+        prefix = enum_member_prefix((key for key, _ in value.enum_values), value.native)
         if value.enum_kind == "bitmask":
             members = "\n".join(
                 f"{doc(self.bound, key, '    ')}    const {key.removeprefix(prefix)} = {number};"

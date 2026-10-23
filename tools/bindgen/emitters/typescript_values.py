@@ -218,7 +218,7 @@ def doc(bound: BoundApi, native: str, indent: str = "") -> str:
 def enum_members(value: ValuePlan) -> list[tuple[str, str, int]]:
     """(member, constant, number) for each enum constant."""
     names = [name for name, _ in value.enum_values]
-    prefix = enum_member_prefix(names)
+    prefix = enum_member_prefix(names, value.native)
     return [
         (identifier(name.removeprefix(prefix).lower()), name, number)
         for name, number in value.enum_values

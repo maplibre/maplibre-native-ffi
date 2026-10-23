@@ -1541,7 +1541,7 @@ public data class SourceFeatureField(public val rawValue: UInt) {
     (rawValue and other.rawValue) == other.rawValue
 
   public companion object {
-    public val ID: SourceFeatureField = SourceFeatureField(1u)
+    public val SOURCE_LAYER_ID: SourceFeatureField = SourceFeatureField(1u)
   }
 }
 

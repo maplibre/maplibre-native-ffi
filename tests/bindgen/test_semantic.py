@@ -12,6 +12,7 @@ from tools.bindgen.semantic import (
     DeliveryPlan,
     DisposeSupport,
     bind,
+    enum_member_prefix,
 )
 
 
@@ -49,6 +50,27 @@ mln_status read_values(values *out BIND("direction=out"), mln_diagnostic *out_di
                         "mask": "uint64_t",
                     },
                 )
+
+    def test_enum_members_drop_the_prefix_their_type_name_shares(self):
+        for native, constants, prefix in (
+            (
+                "mln_status",
+                ["MLN_STATUS_OK", "MLN_STATUS_INVALID_STATE"],
+                "MLN_STATUS_",
+            ),
+            (
+                "mln_rendered_feature_field",
+                ["MLN_RENDERED_FEATURE_SOURCE_ID", "MLN_RENDERED_FEATURE_STATE"],
+                "MLN_RENDERED_FEATURE_",
+            ),
+            (
+                "mln_source_feature_field",
+                ["MLN_SOURCE_FEATURE_SOURCE_LAYER_ID"],
+                "MLN_SOURCE_FEATURE_",
+            ),
+        ):
+            with self.subTest(native=native):
+                self.assertEqual(prefix, enum_member_prefix(constants, native))
 
     def test_view_scope_and_empty_union_have_verified_relationships(self):
         source = """

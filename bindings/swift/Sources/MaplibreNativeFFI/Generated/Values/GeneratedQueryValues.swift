@@ -378,7 +378,7 @@ public struct SourceFeatureField: OptionSet, NativeOpenValue, Equatable,
     self.rawValue = rawValue
   }
 
-  public static let id: SourceFeatureField = .init(rawValue: 1)
+  public static let sourceLayerId: SourceFeatureField = .init(rawValue: 1)
 }
 
 /// Optional fields for `mln_source_feature_query_options`.

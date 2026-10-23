@@ -363,7 +363,9 @@ class Values:
             public = name(value.native)
             if value.kind == "enum":
                 scalar = self.scalar(value)[0]
-                prefix = enum_member_prefix(n for n, _ in value.enum_values)
+                prefix = enum_member_prefix(
+                    (n for n, _ in value.enum_values), value.native
+                )
                 constants = [
                     f"{doc(self.bound, native, '    ')}    public val {native.removeprefix(prefix)}: {public} = {public}({literal(number, scalar)})"
                     for native, number in value.enum_values

@@ -5281,7 +5281,7 @@ native_flags! {
 /// See `mln_source_feature_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub struct SourceFeatureField: u32 {
-    const ID = 1;
+    const SOURCE_LAYER_ID = 1;
 }
 }
 

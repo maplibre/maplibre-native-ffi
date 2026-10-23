@@ -941,7 +941,7 @@ class SourceFeatureField(IntFlag):
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
     """
 
-    ID = 1
+    SOURCE_LAYER_ID = 1
 
 
 class SourceFeatureQueryOptionField(IntFlag):

@@ -3009,7 +3009,7 @@ export interface SourceFeature {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 export const SourceFeatureField = {
-  id: 1,
+  sourceLayerId: 1,
 } as const;
 /** A bitwise OR of SourceFeatureField flags. */
 export type SourceFeatureField = number;

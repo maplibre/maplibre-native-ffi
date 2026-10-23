@@ -1502,7 +1502,7 @@ func (value RuntimeEventType) String() string {
 type SourceFeatureField uint32
 
 const (
-	SourceFeatureFieldId SourceFeatureField = SourceFeatureField(C.MLN_SOURCE_FEATURE_SOURCE_LAYER_ID)
+	SourceFeatureFieldSourceLayerId SourceFeatureField = SourceFeatureField(C.MLN_SOURCE_FEATURE_SOURCE_LAYER_ID)
 )
 
 func (value SourceFeatureField) Has(flags SourceFeatureField) bool { return value&flags == flags }

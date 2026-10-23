@@ -1088,7 +1088,7 @@ def emit(api: Api | BoundApi) -> Emission:
         if enum.name not in enum_names:
             continue
         directory = directory_for(enum.location.path)
-        prefix = enum_member_prefix(value.name for value in enum.values)
+        prefix = enum_member_prefix((value.name for value in enum.values), enum.name)
         underlying = PRIMITIVES.get(enum.underlying_type.spelling)
         if underlying is None:
             underlying = {

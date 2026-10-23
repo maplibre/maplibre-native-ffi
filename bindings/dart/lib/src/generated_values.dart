@@ -1221,7 +1221,7 @@ final class RuntimeEventType extends _Enum {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 final class SourceFeatureField extends _Flags<SourceFeatureField> {
   const SourceFeatureField.fromRawValue(super.rawValue);
-  static const id = SourceFeatureField.fromRawValue(1);
+  static const sourceLayerId = SourceFeatureField.fromRawValue(1);
   @override
   SourceFeatureField _of(int rawValue) =>
       SourceFeatureField.fromRawValue(rawValue);

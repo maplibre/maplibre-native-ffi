@@ -449,11 +449,17 @@ def public_stem(native: str) -> str:
     return native.removeprefix("mln_")
 
 
-def enum_member_prefix(constants) -> str:
-    """The prefix that an enum's constants share, cut back to a whole word."""
+def enum_member_prefix(constants, native: str | None = None) -> str:
+    """The prefix that an enum's constants share, cut back to a whole word.
+
+    When native names the enum's type, the prefix is also one the type name
+    shares, so an enum with a single constant keeps that constant's last words.
+    """
     names = list(constants)
     if not names:
         return ""
+    if native is not None:
+        names.append(native.upper() + "_")
     # The lexically first and last names differ wherever any two names do.
     first, last = min(names), max(names)
     shared = next(
@@ -823,7 +829,8 @@ class Binder:
                             flag_value,
                             flag.removeprefix(
                                 enum_member_prefix(
-                                    name for name, _ in control.value.enum_values
+                                    (name for name, _ in control.value.enum_values),
+                                    control.value.native,
                                 )
                             ).lower(),
                         )

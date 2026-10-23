@@ -266,7 +266,7 @@ class Values:
                 "unsigned long long": "u64",
             }.get(canonical, "u32"),
         )
-        prefix = enum_member_prefix(key for key, _ in value.enum_values)
+        prefix = enum_member_prefix((key for key, _ in value.enum_values), value.native)
         if value.enum_kind == "bitmask":
             single = [
                 (identifier(key.removeprefix(prefix).lower()), number, key)

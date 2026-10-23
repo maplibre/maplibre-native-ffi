@@ -11,5 +11,5 @@ namespace Maplibre.NativeFfi;
 [Flags]
 public enum SourceFeatureField : uint
 {
-    Id = 1,
+    SourceLayerId = 1,
 }
