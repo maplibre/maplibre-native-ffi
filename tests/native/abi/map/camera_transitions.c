@@ -274,6 +274,7 @@ static void an_unobserved_animation_publishes_its_final_snapshot(void) {
   const uint64_t started = update_camera_generation(map, &ease);
   mln_map_snapshot initial = {.size = sizeof(initial)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &initial, NULL));
+  TEST_ASSERT_TRUE(initial.transition_in_progress);
 
   mln_render_frame_result result;
   do {
@@ -291,6 +292,7 @@ static void an_unobserved_animation_publishes_its_final_snapshot(void) {
   mln_map_snapshot snapshot = {.size = sizeof(snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 5.0, snapshot.view.camera.zoom);
+  TEST_ASSERT_FALSE(snapshot.transition_in_progress);
   TEST_ASSERT_GREATER_THAN_UINT64(started, snapshot.generation);
   TEST_ASSERT_GREATER_THAN_UINT64(
     initial.latest_render_update_generation,
@@ -440,8 +442,8 @@ static void cancel_transitions_commits_and_leaves_the_camera(void) {
 }
 
 // Cancelling an identity ends only the commands that carry it. Another
-// command keeps animating, and a later camera write that replaces it
-// completes it.
+// command keeps animating, and the map reports a transition until a later
+// camera write that replaces it completes it.
 static void cancel_camera_transition_ends_only_its_identity(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -478,6 +480,7 @@ static void cancel_camera_transition_ends_only_its_identity(void) {
     mln_test_transition_end_handler(&bearing);
   with_transition_id(&bearing_ease.animation, 7);
   update_camera(map, &bearing_ease);
+  TEST_ASSERT_TRUE(read_settled_snapshot(runtime, map).transition_in_progress);
 
   MLN_TEST_AWAIT_OK(mln_map_cancel_camera_transition(
     map, UINT64_MAX, &completion.descriptor, NULL
@@ -486,6 +489,7 @@ static void cancel_camera_transition_ends_only_its_identity(void) {
   assert_ended(&pitch, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED, "pitch");
   const mln_map_snapshot cancelled = read_settled_snapshot(runtime, map);
   TEST_ASSERT_TRUE(cancelled.view.camera.zoom < 18.0);
+  TEST_ASSERT_TRUE(cancelled.transition_in_progress);
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&bearing.calls));
 
   // An identity that no running command carries changes nothing.
@@ -507,6 +511,7 @@ static void cancel_camera_transition_ends_only_its_identity(void) {
   jump.camera.bearing = 45.0;
   update_camera(map, &jump);
   assert_ended(&bearing, MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED, "bearing");
+  TEST_ASSERT_FALSE(read_settled_snapshot(runtime, map).transition_in_progress);
 
   mln_completion rejected = mln_test_discard_completion();
   MLN_TEST_INVALID(

@@ -1368,6 +1368,11 @@ napi_value mln_ts_read_map_snapshot(
       ))
     return NULL;
   if (!mln_ts_set(
+        env, result, "transitionInProgress",
+        mln_ts_bool(env, source->transition_in_progress)
+      ))
+    return NULL;
+  if (!mln_ts_set(
         env, result, "eventMask",
         mln_ts_u64(env, (uint64_t)(source->event_mask))
       ))

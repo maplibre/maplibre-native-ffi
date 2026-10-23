@@ -1,0 +1,34 @@
+Reports whether any camera command is still animating, which a host needs
+once each command ends on its own. Needs 0015.
+Upstream: not proposed
+
+diff --git a/include/mln/map/map.hpp b/include/mln/map/map.hpp
+index 777c31eeaa07..052ede8bbbc5 100644
+--- a/include/mln/map/map.hpp
++++ b/include/mln/map/map.hpp
+@@ -72,6 +72,10 @@ public:
+     bool isRotating() const;
+     bool isScaling() const;
+     bool isPanning() const;
++    /// Whether any camera command is still animating. A command's
++    /// MapObserver::onCameraDidChange ends that command only, so this tells
++    /// whether the camera stopped once the last one ended.
++    bool inTransition() const;
+ 
+     // Camera
+     CameraOptions getCameraOptions(const std::optional<EdgeInsets>& = std::nullopt) const;
+diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
+index e4029bbe285a..4361df19b375 100644
+--- a/src/mln/map/map.cpp
++++ b/src/mln/map/map.cpp
+@@ -145,6 +145,10 @@ bool Map::isPanning() const {
+     return impl->transform.isPanning();
+ }
+ 
++bool Map::inTransition() const {
++    return impl->transform.inTransition();
++}
++
+ // MARK: -
+ 
+ CameraOptions Map::getCameraOptions(const std::optional<EdgeInsets>& padding) const {

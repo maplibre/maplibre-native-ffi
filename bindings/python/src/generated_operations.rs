@@ -853,6 +853,10 @@ fn generated_copy_mln_map_snapshot(
         "gesture_in_progress",
         generated_value(py, value.gesture_in_progress)?,
     )?;
+    dict.set_item(
+        "transition_in_progress",
+        generated_value(py, value.transition_in_progress)?,
+    )?;
     dict.set_item("event_mask", generated_value(py, value.event_mask)?)?;
     dict.set_item(
         "latest_render_update_generation",

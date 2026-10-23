@@ -2136,6 +2136,9 @@ class MapSnapshot:
     gesture_in_progress: bool
     """True while the map is inside a gesture."""
 
+    transition_in_progress: bool
+    """True while a camera command with a duration is still animating."""
+
     event_mask: RuntimeEventMask
 
     latest_render_update_generation: int
@@ -2164,6 +2167,7 @@ class MapSnapshot:
             fully_loaded=raw["fully_loaded"],
             rendering_stats_view_enabled=raw["rendering_stats_view_enabled"],
             gesture_in_progress=raw["gesture_in_progress"],
+            transition_in_progress=raw["transition_in_progress"],
             event_mask=RuntimeEventMask(raw["event_mask"]),
             latest_render_update_generation=raw["latest_render_update_generation"],
             tile=MapTileOptions._from_native(raw["tile"]),

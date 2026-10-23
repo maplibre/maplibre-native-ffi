@@ -3658,6 +3658,7 @@ final class MapSnapshot extends _Value {
     this.fullyLoaded = false,
     this.renderingStatsViewEnabled = false,
     this.gestureInProgress = false,
+    this.transitionInProgress = false,
     this.eventMask = const RuntimeEventMask.fromRawValue(0),
     required this.latestRenderUpdateGeneration,
     required this.tile,
@@ -3676,6 +3677,9 @@ final class MapSnapshot extends _Value {
 
   /// True while the map is inside a gesture.
   final bool gestureInProgress;
+
+  /// True while a camera command with a duration is still animating.
+  final bool transitionInProgress;
   final RuntimeEventMask eventMask;
 
   /// Generation of the latest render update the map published. A rendered frame
@@ -3697,6 +3701,7 @@ final class MapSnapshot extends _Value {
     fullyLoaded,
     renderingStatsViewEnabled,
     gestureInProgress,
+    transitionInProgress,
     eventMask,
     latestRenderUpdateGeneration,
     tile,

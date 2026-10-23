@@ -1625,6 +1625,8 @@ pub const MapSnapshot = struct {
     rendering_stats_view_enabled: bool = std.mem.zeroes(bool),
     /// True while the map is inside a gesture.
     gesture_in_progress: bool = std.mem.zeroes(bool),
+    /// True while a camera command with a duration is still animating.
+    transition_in_progress: bool = std.mem.zeroes(bool),
     event_mask: RuntimeEventMask = std.mem.zeroes(RuntimeEventMask),
     /// Generation of the latest render update the map published. A rendered
     /// frame at or past it draws map state that includes every command this
@@ -1644,6 +1646,7 @@ pub const MapSnapshot = struct {
             .fully_loaded = raw.fully_loaded,
             .rendering_stats_view_enabled = raw.rendering_stats_view_enabled,
             .gesture_in_progress = raw.gesture_in_progress,
+            .transition_in_progress = raw.transition_in_progress,
             .event_mask = RuntimeEventMask.fromNative(raw.event_mask),
             .latest_render_update_generation = raw.latest_render_update_generation,
             .tile = MapTileOptions.fromNative(raw.tile),

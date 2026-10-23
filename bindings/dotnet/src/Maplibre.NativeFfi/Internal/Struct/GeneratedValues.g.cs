@@ -971,6 +971,7 @@ internal static unsafe class GeneratedValues
             value.fully_loaded != 0,
             value.rendering_stats_view_enabled != 0,
             value.gesture_in_progress != 0,
+            value.transition_in_progress != 0,
             (RuntimeEventMask)value.event_mask,
             value.latest_render_update_generation,
             CopyMapTileOptions(value.tile),

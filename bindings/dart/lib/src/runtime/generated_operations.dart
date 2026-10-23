@@ -1963,6 +1963,7 @@ MapSnapshot _readMapSnapshot(raw.mln_map_snapshot source) => MapSnapshot(
   fullyLoaded: source.fully_loaded,
   renderingStatsViewEnabled: source.rendering_stats_view_enabled,
   gestureInProgress: source.gesture_in_progress,
+  transitionInProgress: source.transition_in_progress,
   eventMask: RuntimeEventMask.fromRawValue(source.event_mask),
   latestRenderUpdateGeneration: uint64FromNative(
     source.latest_render_update_generation,

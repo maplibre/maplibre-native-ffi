@@ -2129,6 +2129,8 @@ pub struct MapSnapshot {
     pub rendering_stats_view_enabled: bool,
     /// True while the map is inside a gesture.
     pub gesture_in_progress: bool,
+    /// True while a camera command with a duration is still animating.
+    pub transition_in_progress: bool,
     pub event_mask: RuntimeEventMask,
     /// Generation of the latest render update the map published. A rendered
     /// frame at or past it draws map state that includes every command this
@@ -2149,6 +2151,7 @@ impl MapSnapshot {
         fully_loaded: bool,
         rendering_stats_view_enabled: bool,
         gesture_in_progress: bool,
+        transition_in_progress: bool,
         event_mask: RuntimeEventMask,
         latest_render_update_generation: u64,
         tile: MapTileOptions,
@@ -2162,6 +2165,7 @@ impl MapSnapshot {
             fully_loaded,
             rendering_stats_view_enabled,
             gesture_in_progress,
+            transition_in_progress,
             event_mask,
             latest_render_update_generation,
             tile,
@@ -2179,6 +2183,7 @@ impl FromNative<sys::mln_map_snapshot> for MapSnapshot {
             fully_loaded: raw.fully_loaded,
             rendering_stats_view_enabled: raw.rendering_stats_view_enabled,
             gesture_in_progress: raw.gesture_in_progress,
+            transition_in_progress: raw.transition_in_progress,
             event_mask: unsafe { from_native(raw.event_mask) }?,
             latest_render_update_generation: raw.latest_render_update_generation,
             tile: unsafe { from_native(raw.tile) }?,

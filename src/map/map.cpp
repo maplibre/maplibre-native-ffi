@@ -2740,6 +2740,7 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
     const auto update_generation = live.frontend->latest_update_generation();
     const auto fully_loaded = live.map->isFullyLoaded();
     const auto gesture = live.map->isGestureInProgress();
+    const auto transition = live.map->inTransition();
     const auto refresh_camera = live.snapshot_camera_dirty;
     auto view = mln_map_view{};
     auto free_camera = mln_free_camera_options{};
@@ -2756,6 +2757,7 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
         live.event_state->mask.load(std::memory_order_relaxed);
       live.snapshot.fully_loaded = fully_loaded;
       live.snapshot.gesture_in_progress = gesture;
+      live.snapshot.transition_in_progress = transition;
       live.snapshot.latest_render_update_generation = update_generation;
       if (refresh_camera) {
         live.snapshot.view = view;
@@ -2774,6 +2776,7 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
     .fully_loaded = live.map->isFullyLoaded(),
     .rendering_stats_view_enabled = live.map->isRenderingStatsViewEnabled(),
     .gesture_in_progress = live.map->isGestureInProgress(),
+    .transition_in_progress = live.map->inTransition(),
     .event_mask = live.event_state->mask.load(std::memory_order_relaxed),
     .latest_render_update_generation =
       live.frontend->latest_update_generation(),

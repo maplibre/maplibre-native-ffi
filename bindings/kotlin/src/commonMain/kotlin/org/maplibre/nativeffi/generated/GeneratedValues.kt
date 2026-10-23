@@ -3857,6 +3857,8 @@ public data class MapSnapshot(
   public val renderingStatsViewEnabled: Boolean = false,
   /** True while the map is inside a gesture. */
   public val gestureInProgress: Boolean = false,
+  /** True while a camera command with a duration is still animating. */
+  public val transitionInProgress: Boolean = false,
   public val eventMask: RuntimeEventMask = RuntimeEventMask(0uL),
   /**
    * Generation of the latest render update the map published. A rendered frame at or past it draws

@@ -1104,6 +1104,10 @@ export interface MapSnapshot {
    * True while the map is inside a gesture.
    */
   readonly gestureInProgress: boolean;
+  /**
+   * True while a camera command with a duration is still animating.
+   */
+  readonly transitionInProgress: boolean;
   readonly eventMask: RuntimeEventMask;
   /**
    * Generation of the latest render update the map published. A rendered frame
