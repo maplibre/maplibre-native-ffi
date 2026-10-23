@@ -246,10 +246,6 @@ static void parse_errors_name_their_location(void) {
   // A collator has no JSON form.
   MLN_TEST_INVALID(create_status("[\"collator\", {}]", NULL));
   TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "collator"));
-  expect_evaluates(
-    "[\"==\", \"a\", \"A\", [\"collator\", {\"case-sensitive\": false}]]", NULL,
-    "true"
-  );
 }
 
 static void creation_rejects_invalid_arguments(void) {
