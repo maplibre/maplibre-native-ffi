@@ -141,8 +141,10 @@ jobs:
 
           replaced=build/packages/native/replaced-assets
           echo SHA256SUMS >"$replaced"
-          # The first snapshot finds no release.
-          if gh release view "$PUBLISH_TAG" >/dev/null 2>&1; then
+          # The first snapshot finds no release, and a publish that failed while
+          # replacing SHA256SUMS leaves none; either way no earlier list exists.
+          assets="$(gh release view "$PUBLISH_TAG" --json assets --jq '.assets[].name' 2>/dev/null || true)"
+          if grep -qxF SHA256SUMS <<<"$assets"; then
             gh release download "$PUBLISH_TAG" --pattern SHA256SUMS --output - |
               cut -d ' ' -f 3- >>"$replaced"
           fi
