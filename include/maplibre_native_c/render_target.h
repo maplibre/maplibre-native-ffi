@@ -325,7 +325,10 @@ typedef enum mln_opengl_client_api : uint32_t {
 
 /** WGL context fields shared by OpenGL render targets on Windows. */
 typedef struct mln_wgl_context_descriptor {
-  /** Borrowed HDC used to create the session context. Required. */
+  /**
+   * Borrowed HDC used to create the session context. Required. A dedicated
+   * owned texture makes its context current on this HDC from its core worker.
+   */
   void* device_context;
   /**
    * Borrowed HGLRC whose share group the session context joins. Required under
@@ -412,7 +415,7 @@ typedef struct mln_opengl_context_descriptor {
   uint32_t platform MLN_BINDING("enum=mln_opengl_context_platform");
   /**
    * Whether the session shares its driver thread and graphics objects with the
-   * host. A private EGL owned texture and a transferred WebGL canvas are
+   * host. A private EGL or WGL owned texture and a transferred WebGL canvas are
    * dedicated to their core worker.
    */
   uint32_t ownership MLN_BINDING("enum=mln_opengl_context_ownership");

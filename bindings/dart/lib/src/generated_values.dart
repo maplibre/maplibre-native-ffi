@@ -2956,7 +2956,8 @@ final class WglContextDescriptor extends _Value {
     this.getProcAddress = NativePointer.nullPointer,
   });
 
-  /// Borrowed HDC used to create the session context. Required.
+  /// Borrowed HDC used to create the session context. Required. A dedicated
+  /// owned texture makes its context current on this HDC from its core worker.
   final NativePointer deviceContext;
 
   /// Borrowed HGLRC whose share group the session context joins. Required under
@@ -3055,8 +3056,8 @@ final class OpenglContextDescriptor {
   });
 
   /// Whether the session shares its driver thread and graphics objects with the
-  /// host. A private EGL owned texture and a transferred WebGL canvas are
-  /// dedicated to their core worker.
+  /// host. A private EGL or WGL owned texture and a transferred WebGL canvas
+  /// are dedicated to their core worker.
   final OpenglContextOwnership ownership;
   final OpenglContextDescriptorData data;
 }
@@ -3179,8 +3180,9 @@ final class OpenglOwnedTextureDescriptor extends _Value {
   final LogicalExtent extent;
 
   /// Borrowed OpenGL context provider data. Shared ownership creates a context
-  /// whose texture frames the host can acquire. Dedicated EGL or transferred
-  /// WebGL ownership creates a private core-worker context for CPU readback.
+  /// whose texture frames the host can acquire. Dedicated EGL, WGL, or
+  /// transferred WebGL ownership creates a private core-worker context for CPU
+  /// readback.
   final OpenglContextDescriptor context;
 
   @override

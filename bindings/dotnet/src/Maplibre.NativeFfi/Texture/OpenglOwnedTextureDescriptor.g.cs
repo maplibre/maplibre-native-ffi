@@ -15,8 +15,9 @@ namespace Maplibre.NativeFfi;
 /// </param>
 /// <param name="Context">
 /// Borrowed OpenGL context provider data. Shared ownership creates a context
-/// whose texture frames the host can acquire. Dedicated EGL or transferred
-/// WebGL ownership creates a private core-worker context for CPU readback.
+/// whose texture frames the host can acquire. Dedicated EGL, WGL, or
+/// transferred WebGL ownership creates a private core-worker context for CPU
+/// readback.
 /// </param>
 public readonly partial record struct OpenglOwnedTextureDescriptor(
     LogicalExtent Extent,

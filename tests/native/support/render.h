@@ -174,12 +174,16 @@ bool mln_test_dedicated_egl_surface_is_current(
 bool mln_test_dedicated_egl_make_host_context_current(
   mln_test_render_fixture* fixture
 );
-// Attaches a private OpenGL owned texture target whose context and driver both
-// belong to the native core worker.
-bool mln_test_dedicated_egl_texture_create(
+#endif
+
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL) && !defined(MLN_FFI_TEST_OPENGL_WEBGL)
+// Attaches a private 64x64 OpenGL owned texture target whose context and
+// driver both belong to the native core worker. The EGL display and config, or
+// the WGL device context, come from tests/graphics.
+bool mln_test_dedicated_texture_create(
   mln_map map, mln_test_render_fixture* fixture
 );
-void mln_test_dedicated_egl_texture_destroy(mln_test_render_fixture* fixture);
+void mln_test_dedicated_texture_destroy(mln_test_render_fixture* fixture);
 #endif
 
 #ifdef __cplusplus

@@ -1,8 +1,10 @@
-// The dedicated EGL fixtures, whose sessions own their EGL context. The
-// display, config, and pbuffer come from tests/graphics; the session creates
-// the context itself.
+// The dedicated OpenGL fixtures, whose sessions own their EGL or WGL context.
+// The EGL display, config, and pbuffer, or the WGL device context, come from
+// tests/graphics; the session creates the context itself.
 
+#if defined(MLN_FFI_TEST_OPENGL_EGL)
 #include <EGL/egl.h>
+#endif
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,6 +31,14 @@ static void destroy_dedicated_state(dedicated_state* state) {
   free(state);
 }
 
+#if defined(MLN_FFI_TEST_OPENGL_EGL)
+#define DEDICATED_BACKEND MLN_TEST_GRAPHICS_BACKEND_EGL
+#define DEDICATED_PROVIDER "EGL"
+#else
+#define DEDICATED_BACKEND MLN_TEST_GRAPHICS_BACKEND_WGL
+#define DEDICATED_PROVIDER "WGL"
+#endif
+
 // Nothing becomes current here: naming dedicated ownership is what asks the
 // session to create its own context and keep it current.
 static dedicated_state* create_dedicated_state(bool with_surface) {
@@ -36,7 +46,7 @@ static dedicated_state* create_dedicated_state(bool with_surface) {
   if (state == NULL) {
     return NULL;
   }
-  state->graphics = mln_test_graphics_create(MLN_TEST_GRAPHICS_BACKEND_EGL);
+  state->graphics = mln_test_graphics_create(DEDICATED_BACKEND);
   if (
     state->graphics != NULL &&
     mln_test_graphics_get_context(state->graphics, &state->context) &&
@@ -47,7 +57,7 @@ static dedicated_state* create_dedicated_state(bool with_surface) {
     return state;
   }
   fprintf(
-    stderr, "the dedicated EGL fixture has no EGL objects: %s\n",
+    stderr, "the dedicated " DEDICATED_PROVIDER " fixture has no objects: %s\n",
     mln_test_graphics_last_error()
   );
   destroy_dedicated_state(state);
@@ -57,6 +67,19 @@ static dedicated_state* create_dedicated_state(bool with_surface) {
 static mln_opengl_context_descriptor dedicated_context(
   const dedicated_state* state
 ) {
+#if defined(MLN_FFI_TEST_OPENGL_WGL)
+  return (mln_opengl_context_descriptor){
+    .platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL,
+    .ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED,
+    .data = {
+      .wgl = {
+        .device_context = state->context.wgl_device_context,
+        .share_context = NULL,
+        .get_proc_address = NULL,
+      }
+    },
+  };
+#else
   return (mln_opengl_context_descriptor){
     .platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL,
     .ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED,
@@ -70,6 +93,7 @@ static mln_opengl_context_descriptor dedicated_context(
       }
     },
   };
+#endif
 }
 
 // Leaves `fixture` zeroed after a failed attach.
@@ -132,6 +156,7 @@ static void destroy_dedicated_fixture(mln_test_render_fixture* fixture) {
   *fixture = (mln_test_render_fixture){0};
 }
 
+#if defined(MLN_FFI_TEST_OPENGL_EGL)
 bool mln_test_dedicated_egl_surface_create(
   mln_map map, mln_test_render_fixture* fixture
 ) {
@@ -189,7 +214,9 @@ bool mln_test_dedicated_egl_make_host_context_current(
   return mln_test_graphics_make_current(state->graphics);
 }
 
-bool mln_test_dedicated_egl_texture_create(
+#endif
+
+bool mln_test_dedicated_texture_create(
   mln_map map, mln_test_render_fixture* fixture
 ) {
   dedicated_state* state = create_dedicated_state(false);
@@ -215,6 +242,6 @@ bool mln_test_dedicated_egl_texture_create(
   return finish_dedicated_attach(fixture, state, attach_status, &attach);
 }
 
-void mln_test_dedicated_egl_texture_destroy(mln_test_render_fixture* fixture) {
+void mln_test_dedicated_texture_destroy(mln_test_render_fixture* fixture) {
   destroy_dedicated_fixture(fixture);
 }

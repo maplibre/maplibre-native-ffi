@@ -116,15 +116,6 @@ static void owned_without_egl_display(void* call) {
   owned_of(call)->context.data.egl.display = NULL;
 }
 #endif
-#if defined(MLN_FFI_TEST_OPENGL_WGL)
-// A WGL owned texture borrows a window's device context, so it cannot hand
-// its graphics state to a core worker.
-static void dedicated_wgl_owned_texture(void* call) {
-  mln_opengl_owned_texture_descriptor* descriptor = owned_of(call);
-  descriptor->context.ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
-  descriptor->context.data.wgl.share_context = NULL;
-}
-#endif
 static void borrowed_without_texture(void* call) {
   mln_test_target_call* edited = call;
   edited->textures.opengl[0].texture = 0;
@@ -238,10 +229,6 @@ static void opengl_attach_rejects_malformed_calls(void) {
 #if !defined(MLN_FFI_TEST_OPENGL_WGL) && !defined(MLN_FFI_TEST_OPENGL_WEBGL)
     {"no EGL display", owned_without_egl_display, MLN_STATUS_INVALID_ARGUMENT,
      "EGL display and config must not be null"},
-#endif
-#if defined(MLN_FFI_TEST_OPENGL_WGL)
-    {"a dedicated WGL context", dedicated_wgl_owned_texture,
-     MLN_STATUS_UNSUPPORTED, "require EGL or a transferred WebGL canvas"},
 #endif
 #if !defined(MLN_FFI_TEST_BACKEND_OPENGL)
     {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,

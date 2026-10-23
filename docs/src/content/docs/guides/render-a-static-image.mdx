@@ -16,7 +16,7 @@ pixels back to the CPU.
 ## Request one image
 
 Create a static map, and attach an owned texture target at the image size. For
-CPU readback, use OpenGL on a private EGL context.
+CPU readback, use OpenGL on a private EGL or WGL context.
 
 <Code code={region(stillImage, "create")} lang="c" title="still-image.c" />
 

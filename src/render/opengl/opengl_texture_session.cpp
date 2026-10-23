@@ -401,6 +401,10 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
 
   void activate() override {
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+    if (dedicated()) {
+      activate_dedicated_wgl();
+      return;
+    }
     previous_device_context_ = wglGetCurrentDC();
     previous_render_context_ = wglGetCurrentContext();
     try {
@@ -445,6 +449,10 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
 
   void deactivate() override {
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+    // A dedicated context stays current between renders.
+    if (dedicated()) {
+      return;
+    }
     wglMakeCurrent(
       static_cast<HDC>(previous_device_context_),
       static_cast<HGLRC>(previous_render_context_)
@@ -460,6 +468,41 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
   }
 
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+  [[nodiscard]] auto dedicated() const -> bool {
+    return context_.ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
+  }
+
+  // Makes this session's context current and leaves it current. A render that
+  // finds it still current makes no WGL call. Another session or the host may
+  // have made its own context current on this thread since the last render, so
+  // this asks WGL instead of remembering.
+  void activate_dedicated_wgl() {
+    auto* const device_context =
+      static_cast<HDC>(context_.data.wgl.device_context);
+    if (
+      render_context_ != nullptr && wglGetCurrentContext() == render_context_ &&
+      wglGetCurrentDC() == device_context
+    ) {
+      return;
+    }
+    if (render_context_ == nullptr) {
+      create_wgl_context();
+    }
+    if (
+      wglMakeCurrent(device_context, static_cast<HGLRC>(render_context_)) == 0
+    ) {
+      throw std::runtime_error("Switching OpenGL WGL context failed");
+    }
+    // A context that fails validation must not stay current, or the next
+    // activation would find it current and skip validating it again.
+    try {
+      validate_wgl_context_support();
+    } catch (...) {
+      (void)wglMakeCurrent(nullptr, nullptr);
+      throw;
+    }
+  }
+
   void create_wgl_context() {
     auto* const device_context =
       static_cast<HDC>(context_.data.wgl.device_context);
@@ -483,6 +526,11 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
 
   void destroy_native_context() {
     if (render_context_ != nullptr) {
+      // Teardown leaves a dedicated context current on this thread, and WGL
+      // only retires it once nothing holds it.
+      if (dedicated() && wglGetCurrentContext() == render_context_) {
+        (void)wglMakeCurrent(nullptr, nullptr);
+      }
       wglDeleteContext(static_cast<HGLRC>(render_context_));
       render_context_ = nullptr;
     }

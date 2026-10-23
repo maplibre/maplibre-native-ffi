@@ -11,7 +11,7 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 /// <param name="Ownership">
 /// Whether the session shares its driver thread and graphics objects with the
-/// host. A private EGL owned texture and a transferred WebGL canvas are
+/// host. A private EGL or WGL owned texture and a transferred WebGL canvas are
 /// dedicated to their core worker.
 /// </param>
 public readonly partial record struct OpenglContextDescriptor(

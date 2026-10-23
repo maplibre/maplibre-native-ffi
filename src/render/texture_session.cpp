@@ -373,31 +373,6 @@ auto validate_vulkan_borrowed_texture_descriptor(
   return MLN_STATUS_OK;
 }
 
-// A shared owned target exposes frames to a host context. A private owned
-// target keeps every GL object on its core worker and exposes CPU readback
-// instead. EGL can create that worker-local context from a display and config;
-// transferred WebGL creates it from the canvas on the worker itself.
-auto validate_owned_texture_ownership(
-  const mln_opengl_context_descriptor& context
-) -> mln_status {
-  if (context.ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED) {
-    return MLN_STATUS_OK;
-  }
-  if (context.platform == MLN_OPENGL_CONTEXT_PLATFORM_EGL) {
-    return MLN_STATUS_OK;
-  }
-  if (
-    context.platform == MLN_OPENGL_CONTEXT_PLATFORM_WEBGL &&
-    context.data.webgl.kind == MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS
-  ) {
-    return MLN_STATUS_OK;
-  }
-  set_thread_error(
-    "dedicated OpenGL owned textures require EGL or a transferred WebGL canvas"
-  );
-  return MLN_STATUS_UNSUPPORTED;
-}
-
 // A borrowed target must share objects with the host context that owns its
 // texture. Dedicated ownership names no share group.
 auto validate_borrowed_texture_ownership(
@@ -430,12 +405,9 @@ auto validate_opengl_owned_texture_descriptor(
   if (extent_status != MLN_STATUS_OK) {
     return extent_status;
   }
-  const auto context_status =
-    validate_opengl_context(descriptor->context, require_supported_provider);
-  if (context_status != MLN_STATUS_OK) {
-    return context_status;
-  }
-  return validate_owned_texture_ownership(descriptor->context);
+  return validate_opengl_context(
+    descriptor->context, require_supported_provider
+  );
 }
 
 auto validate_opengl_borrowed_texture_descriptor(

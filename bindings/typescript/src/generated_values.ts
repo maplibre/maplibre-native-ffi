@@ -1618,7 +1618,7 @@ export type OpenglClientApi =
 export interface OpenglContextDescriptor {
   /**
    * Whether the session shares its driver thread and graphics objects with the
-   * host. A private EGL owned texture and a transferred WebGL canvas are
+   * host. A private EGL or WGL owned texture and a transferred WebGL canvas are
    * dedicated to their core worker.
    */
   ownership?: OpenglContextOwnership;
@@ -1717,8 +1717,9 @@ export interface OpenglOwnedTextureDescriptor {
   extent?: LogicalExtent;
   /**
    * Borrowed OpenGL context provider data. Shared ownership creates a context
-   * whose texture frames the host can acquire. Dedicated EGL or transferred
-   * WebGL ownership creates a private core-worker context for CPU readback.
+   * whose texture frames the host can acquire. Dedicated EGL, WGL, or
+   * transferred WebGL ownership creates a private core-worker context for CPU
+   * readback.
    */
   context?: OpenglContextDescriptor;
 }
@@ -4098,7 +4099,8 @@ export interface WebgpuTextureFrame {
  */
 export interface WglContextDescriptor {
   /**
-   * Borrowed HDC used to create the session context. Required.
+   * Borrowed HDC used to create the session context. Required. A dedicated
+   * owned texture makes its context current on this HDC from its core worker.
    */
   deviceContext?: bigint;
   /**

@@ -10,7 +10,8 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="DeviceContext">
-/// Borrowed HDC used to create the session context. Required.
+/// Borrowed HDC used to create the session context. Required. A dedicated owned
+/// texture makes its context current on this HDC from its core worker.
 /// </param>
 /// <param name="ShareContext">
 /// Borrowed HGLRC whose share group the session context joins. Required under

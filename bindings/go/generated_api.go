@@ -3784,7 +3784,7 @@ func DefaultOpenglBorrowedTextureDescriptor() OpenglBorrowedTextureDescriptor {
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type OpenglContextDescriptor struct {
 	// Whether the session shares its driver thread and graphics objects with the
-	// host. A private EGL owned texture and a transferred WebGL canvas are
+	// host. A private EGL or WGL owned texture and a transferred WebGL canvas are
 	// dedicated to their core worker.
 	Ownership OpenglContextOwnership
 	Data      OpenglContextDescriptorData
@@ -3838,8 +3838,8 @@ type OpenglOwnedTextureDescriptor struct {
 	// accepted and logged as a warning.
 	Extent LogicalExtent
 	// Borrowed OpenGL context provider data. Shared ownership creates a context
-	// whose texture frames the host can acquire. Dedicated EGL or transferred WebGL
-	// ownership creates a private core-worker context for CPU readback.
+	// whose texture frames the host can acquire. Dedicated EGL, WGL, or transferred
+	// WebGL ownership creates a private core-worker context for CPU readback.
 	Context OpenglContextDescriptor
 }
 
@@ -6062,7 +6062,8 @@ func copyWebgpuTextureFrame(raw C.mln_webgpu_texture_frame) WebgpuTextureFrame {
 // See mln_wgl_context_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type WglContextDescriptor struct {
-	// Borrowed HDC used to create the session context. Required.
+	// Borrowed HDC used to create the session context. Required. A dedicated owned
+	// texture makes its context current on this HDC from its core worker.
 	DeviceContext uintptr
 	// Borrowed HGLRC whose share group the session context joins. Required under
 	// shared ownership. A dedicated session joins no share group, so it must be

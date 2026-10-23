@@ -2283,8 +2283,8 @@ pub const OpenglClientApi = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const OpenglContextDescriptor = struct {
     /// Whether the session shares its driver thread and graphics objects with
-    /// the host. A private EGL owned texture and a transferred WebGL canvas are
-    /// dedicated to their core worker.
+    /// the host. A private EGL or WGL owned texture and a transferred WebGL
+    /// canvas are dedicated to their core worker.
     ownership: OpenglContextOwnership = std.mem.zeroes(OpenglContextOwnership),
     data: OpenglContextDescriptorData = .{ .unknown = 0 },
     pub fn toNative(self: OpenglContextDescriptor, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_opengl_context_descriptor {
@@ -2388,8 +2388,8 @@ pub const OpenglOwnedTextureDescriptor = struct {
     /// accepted and logged as a warning.
     extent: LogicalExtent,
     /// Borrowed OpenGL context provider data. Shared ownership creates a
-    /// context whose texture frames the host can acquire. Dedicated EGL or
-    /// transferred WebGL ownership creates a private core-worker context for
+    /// context whose texture frames the host can acquire. Dedicated EGL, WGL,
+    /// or transferred WebGL ownership creates a private core-worker context for
     /// CPU readback.
     context: OpenglContextDescriptor,
     pub fn toNative(self: OpenglOwnedTextureDescriptor, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_opengl_owned_texture_descriptor {
@@ -5157,7 +5157,9 @@ pub const WebgpuTextureFrame = struct {
 /// See `mln_wgl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const WglContextDescriptor = struct {
-    /// Borrowed HDC used to create the session context. Required.
+    /// Borrowed HDC used to create the session context. Required. A dedicated
+    /// owned texture makes its context current on this HDC from its core
+    /// worker.
     device_context: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     /// Borrowed HGLRC whose share group the session context joins. Required
     /// under shared ownership. A dedicated session joins no share group, so it

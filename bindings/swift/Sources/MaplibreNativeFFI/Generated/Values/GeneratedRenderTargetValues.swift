@@ -196,8 +196,8 @@ public struct OpenglClientApi: RawRepresentable, CustomStringConvertible,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
   /// Whether the session shares its driver thread and graphics objects with the
-  /// host. A private EGL owned texture and a transferred WebGL canvas are
-  /// dedicated to their core worker.
+  /// host. A private EGL or WGL owned texture and a transferred WebGL canvas
+  /// are dedicated to their core worker.
   public var ownership: OpenglContextOwnership
   public var data: OpenglContextDescriptorData
   public static var `default`: Self {
@@ -764,7 +764,8 @@ public struct WebgpuContextDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_wgl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct WglContextDescriptor: Equatable, Hashable, Sendable {
-  /// Borrowed HDC used to create the session context. Required.
+  /// Borrowed HDC used to create the session context. Required. A dedicated
+  /// owned texture makes its context current on this HDC from its core worker.
   public var deviceContext: NativePointer
   /// Borrowed HGLRC whose share group the session context joins. Required under
   /// shared ownership. A dedicated session joins no share group, so it must be

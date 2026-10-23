@@ -3108,7 +3108,10 @@ public data class MetalSurfaceDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public data class WglContextDescriptor(
-  /** Borrowed HDC used to create the session context. Required. */
+  /**
+   * Borrowed HDC used to create the session context. Required. A dedicated owned texture makes its
+   * context current on this HDC from its core worker.
+   */
   public val deviceContext: NativePointer,
   /**
    * Borrowed HGLRC whose share group the session context joins. Required under shared ownership. A
@@ -3204,7 +3207,7 @@ public sealed interface OpenglContextDescriptorData {
 public data class OpenglContextDescriptor(
   /**
    * Whether the session shares its driver thread and graphics objects with the host. A private EGL
-   * owned texture and a transferred WebGL canvas are dedicated to their core worker.
+   * or WGL owned texture and a transferred WebGL canvas are dedicated to their core worker.
    */
   public val ownership: OpenglContextOwnership = OpenglContextOwnership(0u),
   public val data: OpenglContextDescriptorData,
@@ -3269,7 +3272,7 @@ public data class OpenglOwnedTextureDescriptor(
   public val extent: LogicalExtent = OpenglOwnedTextureDescriptor.default.extent,
   /**
    * Borrowed OpenGL context provider data. Shared ownership creates a context whose texture frames
-   * the host can acquire. Dedicated EGL or transferred WebGL ownership creates a private
+   * the host can acquire. Dedicated EGL, WGL, or transferred WebGL ownership creates a private
    * core-worker context for CPU readback.
    */
   public val context: OpenglContextDescriptor = OpenglOwnedTextureDescriptor.default.context,

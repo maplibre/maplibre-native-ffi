@@ -317,8 +317,9 @@ public struct OpenglOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   /// accepted and logged as a warning.
   public var extent: LogicalExtent
   /// Borrowed OpenGL context provider data. Shared ownership creates a context
-  /// whose texture frames the host can acquire. Dedicated EGL or transferred
-  /// WebGL ownership creates a private core-worker context for CPU readback.
+  /// whose texture frames the host can acquire. Dedicated EGL, WGL, or
+  /// transferred WebGL ownership creates a private core-worker context for CPU
+  /// readback.
   public var context: OpenglContextDescriptor
   public static var `default`: Self {
     try! Self(raw: mln_opengl_owned_texture_descriptor_default())

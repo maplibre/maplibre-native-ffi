@@ -23,8 +23,8 @@ Metal and Vulkan support either driver. WebGPU requires the caller driver.
 
 ### OpenGL targets
 
-Existing EGL, WGL, and WebGL contexts use the caller driver. A private EGL owned
-texture target and a transferred `OffscreenCanvas` use a core worker.
+Existing EGL, WGL, and WebGL contexts use the caller driver. A private EGL or
+WGL owned texture target and a transferred `OffscreenCanvas` use a core worker.
 
 ### Shared Vulkan queues
 

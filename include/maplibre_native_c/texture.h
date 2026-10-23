@@ -241,8 +241,9 @@ typedef struct mln_opengl_owned_texture_descriptor {
   mln_logical_extent extent;
   /**
    * Borrowed OpenGL context provider data. Shared ownership creates a context
-   * whose texture frames the host can acquire. Dedicated EGL or transferred
-   * WebGL ownership creates a private core-worker context for CPU readback.
+   * whose texture frames the host can acquire. Dedicated EGL, WGL, or
+   * transferred WebGL ownership creates a private core-worker context for CPU
+   * readback.
    */
   mln_opengl_context_descriptor context;
 } mln_opengl_owned_texture_descriptor;
@@ -653,8 +654,8 @@ MLN_API mln_status mln_map_attach_vulkan_borrowed_texture(
  *
  * Shared WGL, EGL, and existing WebGL contexts require the caller driver and
  * grant frame acquisition, readback, and consumer synchronization. Dedicated
- * EGL and transferred WebGL contexts require the core-worker driver and grant
- * readback only with a ring depth of one.
+ * EGL, dedicated WGL, and transferred WebGL contexts require the core-worker
+ * driver and grant readback only with a ring depth of one.
  *
  * The host keeps every descriptor-named backend handle valid through completed
  * detach. In particular, it keeps an EGLDisplay initialized while its session
