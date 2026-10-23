@@ -18,6 +18,9 @@ namespace Maplibre.NativeFfi;
 /// <param name="GestureInProgress">
 /// True while the map is inside a gesture.
 /// </param>
+/// <param name="TransitionInProgress">
+/// True while a camera command with a duration is still animating.
+/// </param>
 /// <param name="LatestRenderUpdateGeneration">
 /// Generation of the latest render update the map published. A rendered frame
 /// at or past it draws map state that includes every command this snapshot
@@ -27,20 +30,17 @@ namespace Maplibre.NativeFfi;
 /// The map's camera, extent, projection mode, and viewport options.
 /// <c>mln_map_projection_create()</c> converts coordinates for this view.
 /// </param>
-/// <param name="TransitionInProgress">
-/// True while a camera command with a duration is still animating.
-/// </param>
 public readonly partial record struct MapSnapshot(
     MapDebugOption DebugOptions,
     ulong Generation,
     bool FullyLoaded,
     bool RenderingStatsViewEnabled,
     bool GestureInProgress,
+    bool TransitionInProgress,
     RuntimeEventMask EventMask,
     ulong LatestRenderUpdateGeneration,
     MapTileOptions Tile,
     BoundOptions Bounds,
     FreeCameraOptions FreeCamera,
-    MapView View,
-    bool TransitionInProgress
+    MapView View
 );

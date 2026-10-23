@@ -73,8 +73,10 @@ typedef struct mln_offline_region_status {
  * - MAP_CAMERA_WILL_CHANGE: code is an mln_camera_change_mode; payload NONE.
  * - MAP_CAMERA_IS_CHANGING: code is 0; payload NONE.
  * - MAP_CAMERA_DID_CHANGE: code is an mln_camera_change_mode; payload NONE.
- *   Each camera command reports its own, and other commands may still be
- *   animating; see mln_map_snapshot.transition_in_progress.
+ *   Each MapLibre transition reports its own as it ends, so a camera delta
+ *   that pans and also zooms, rotates, or pitches ends with two, and other
+ *   transitions may still be animating; see
+ *   mln_map_snapshot.transition_in_progress.
  * - MAP_STYLE_LOADED: code is 0; payload NONE.
  * - MAP_LOADING_STARTED: code is 0; payload NONE.
  * - MAP_LOADING_FINISHED: code is 0; payload NONE.

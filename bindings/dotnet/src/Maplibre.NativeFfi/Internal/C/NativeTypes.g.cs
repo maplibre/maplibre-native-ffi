@@ -363,13 +363,13 @@ internal unsafe struct mln_map_snapshot
     public byte fully_loaded;
     public byte rendering_stats_view_enabled;
     public byte gesture_in_progress;
+    public byte transition_in_progress;
     public ulong event_mask;
     public ulong latest_render_update_generation;
     public mln_map_tile_options tile;
     public mln_bound_options bounds;
     public mln_free_camera_options free_camera;
     public mln_map_view view;
-    public byte transition_in_progress;
 }
 
 internal unsafe struct mln_map_tile_options

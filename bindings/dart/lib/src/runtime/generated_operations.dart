@@ -1963,6 +1963,7 @@ MapSnapshot _readMapSnapshot(raw.mln_map_snapshot source) => MapSnapshot(
   fullyLoaded: source.fully_loaded,
   renderingStatsViewEnabled: source.rendering_stats_view_enabled,
   gestureInProgress: source.gesture_in_progress,
+  transitionInProgress: source.transition_in_progress,
   eventMask: RuntimeEventMask.fromRawValue(source.event_mask),
   latestRenderUpdateGeneration: uint64FromNative(
     source.latest_render_update_generation,
@@ -1971,7 +1972,6 @@ MapSnapshot _readMapSnapshot(raw.mln_map_snapshot source) => MapSnapshot(
   bounds: _readBoundOptions(source.bounds),
   freeCamera: _readFreeCameraOptions(source.free_camera),
   view: _readMapView(source.view),
-  transitionInProgress: source.transition_in_progress,
 );
 
 Pointer<raw.mln_image_stretch> _writeImageStretch(

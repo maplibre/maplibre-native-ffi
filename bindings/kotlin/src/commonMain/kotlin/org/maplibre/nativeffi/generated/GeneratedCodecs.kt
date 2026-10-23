@@ -1469,13 +1469,13 @@ internal fun readMapSnapshot(source: Long): MapSnapshot =
     fullyLoaded = readBool(source + 16),
     renderingStatsViewEnabled = readBool(source + 17),
     gestureInProgress = readBool(source + 18),
+    transitionInProgress = readBool(source + 19),
     eventMask = RuntimeEventMask(readU64(source + 24)),
     latestRenderUpdateGeneration = readU64(source + 32),
     tile = readMapTileOptions(source + 40),
     bounds = readBoundOptions(source + 96),
     freeCamera = readFreeCameraOptions(source + 168),
     view = readMapView(source + 232),
-    transitionInProgress = readBool(source + 464),
   )
 
 internal fun readStyleImageInfo(source: Long): StyleImageInfo {

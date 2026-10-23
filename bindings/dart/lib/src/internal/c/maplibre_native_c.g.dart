@@ -571,6 +571,8 @@ final class mln_map_snapshot extends Struct {
   external bool rendering_stats_view_enabled;
   @Bool()
   external bool gesture_in_progress;
+  @Bool()
+  external bool transition_in_progress;
   @Uint64()
   external int event_mask;
   @Uint64()
@@ -579,8 +581,6 @@ final class mln_map_snapshot extends Struct {
   external mln_bound_options bounds;
   external mln_free_camera_options free_camera;
   external mln_map_view view;
-  @Bool()
-  external bool transition_in_progress;
 }
 
 final class mln_map_tile_options extends Struct {

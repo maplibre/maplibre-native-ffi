@@ -3147,7 +3147,9 @@ type MapSnapshot struct {
 	RenderingStatsViewEnabled bool
 	// True while the map is inside a gesture.
 	GestureInProgress bool
-	EventMask         RuntimeEventMask
+	// True while a camera command with a duration is still animating.
+	TransitionInProgress bool
+	EventMask            RuntimeEventMask
 	// Generation of the latest render update the map published. A rendered frame at
 	// or past it draws map state that includes every command this snapshot
 	// observes, though animations and resource loads finish in later frames.
@@ -3158,8 +3160,6 @@ type MapSnapshot struct {
 	// The map's camera, extent, projection mode, and viewport options.
 	// mln_map_projection_create() converts coordinates for this view.
 	View MapView
-	// True while a camera command with a duration is still animating.
-	TransitionInProgress bool
 }
 
 func copyMapSnapshot(raw C.mln_map_snapshot) MapSnapshot {
@@ -3169,13 +3169,13 @@ func copyMapSnapshot(raw C.mln_map_snapshot) MapSnapshot {
 	result.FullyLoaded = bool(raw.fully_loaded)
 	result.RenderingStatsViewEnabled = bool(raw.rendering_stats_view_enabled)
 	result.GestureInProgress = bool(raw.gesture_in_progress)
+	result.TransitionInProgress = bool(raw.transition_in_progress)
 	result.EventMask = RuntimeEventMask(raw.event_mask)
 	result.LatestRenderUpdateGeneration = uint64(raw.latest_render_update_generation)
 	result.Tile = copyMapTileOptions(raw.tile)
 	result.Bounds = copyBoundOptions(raw.bounds)
 	result.FreeCamera = copyFreeCameraOptions(raw.free_camera)
 	result.View = copyMapView(raw.view)
-	result.TransitionInProgress = bool(raw.transition_in_progress)
 	return result
 }
 

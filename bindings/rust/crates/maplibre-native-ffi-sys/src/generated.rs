@@ -764,13 +764,13 @@ pub struct mln_map_snapshot {
     pub fully_loaded: bool,
     pub rendering_stats_view_enabled: bool,
     pub gesture_in_progress: bool,
+    pub transition_in_progress: bool,
     pub event_mask: u64,
     pub latest_render_update_generation: u64,
     pub tile: mln_map_tile_options,
     pub bounds: mln_bound_options,
     pub free_camera: mln_free_camera_options,
     pub view: mln_map_view,
-    pub transition_in_progress: bool,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

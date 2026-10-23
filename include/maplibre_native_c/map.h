@@ -1048,6 +1048,16 @@ typedef struct mln_map_snapshot {
    * MLN_GESTURE_PHASE_CANCEL clear it.
    */
   bool gesture_in_progress;
+  /**
+   * True while a camera command with a duration is still animating.
+   *
+   * Each MapLibre transition reports its own
+   * MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE as it ends, while others may keep
+   * the camera moving. The snapshot that the event's generation names reads
+   * false once the last transition has ended. A command without a duration
+   * never sets it.
+   */
+  bool transition_in_progress;
   uint64_t event_mask MLN_BINDING("enum=mln_runtime_event_mask");
   /**
    * Generation of the latest render update the map published. A rendered
@@ -1077,15 +1087,6 @@ typedef struct mln_map_snapshot {
    * mln_map_projection_create() converts coordinates for this view.
    */
   mln_map_view view;
-  /**
-   * True while a camera command with a duration is still animating.
-   *
-   * Each command reports its own MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE as its
-   * transitions end, while other commands may keep the camera moving. The
-   * snapshot that the event's generation names reads false once the last
-   * transition has ended. A command without a duration never sets it.
-   */
-  bool transition_in_progress;
 } mln_map_snapshot;
 
 /** Camera result borrowed for an ordered camera-query completion. */
