@@ -6,11 +6,15 @@
 //   makeCurrent(graphics) -> boolean
 //   destroy(graphics)
 //   nativeProbe(listener) -> { wake, lock, unlock, release, userData }
+//   turn(callback)
 //
 // A native probe stands for native code in the host, which JavaScript cannot
 // write: its function pointers and context fill a native registration. Each
 // call posts its name to listener on the JavaScript thread, and the release
 // posts "release" and ends the probe.
+//
+// turn() queues an empty async work item and calls callback when the event
+// loop completes it, which is the ArkTS bundle's setImmediate().
 
 #include <node_api.h>
 #include <pthread.h>
@@ -238,16 +242,77 @@ static napi_value native_probe(napi_env env, napi_callback_info info) {
   return object;
 }
 
+/** A turn's empty work item and the callback that its completion calls. */
+typedef struct turn_work {
+  napi_async_work work;
+  napi_ref callback;
+} turn_work;
+
+static void turn_execute(napi_env env, void* data) {
+  (void)env;
+  (void)data;
+}
+
+static void turn_complete(napi_env env, napi_status status, void* data) {
+  (void)status;
+  turn_work* turn = data;
+  napi_value callback = NULL;
+  napi_value global = NULL;
+  if (
+    napi_get_reference_value(env, turn->callback, &callback) == napi_ok &&
+    callback != NULL && napi_get_global(env, &global) == napi_ok
+  ) {
+    napi_call_function(env, global, callback, 0, NULL, NULL);
+  }
+  napi_delete_reference(env, turn->callback);
+  napi_delete_async_work(env, turn->work);
+  free(turn);
+}
+
+static napi_value turn(napi_env env, napi_callback_info info) {
+  size_t argc = 1;
+  napi_value argv[1] = {NULL};
+  napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
+  napi_valuetype type = napi_undefined;
+  if (
+    argc < 1 || napi_typeof(env, argv[0], &type) != napi_ok ||
+    type != napi_function
+  ) {
+    napi_throw_type_error(env, NULL, "expected a callback function");
+    return NULL;
+  }
+  turn_work* context = calloc(1, sizeof *context);
+  napi_value name = NULL;
+  napi_create_string_utf8(env, "turn", NAPI_AUTO_LENGTH, &name);
+  if (
+    context == NULL ||
+    napi_create_reference(env, argv[0], 1, &context->callback) != napi_ok ||
+    napi_create_async_work(
+      env, NULL, name, turn_execute, turn_complete, context, &context->work
+    ) != napi_ok ||
+    napi_queue_async_work(env, context->work) != napi_ok
+  ) {
+    if (context != NULL && context->work != NULL) {
+      napi_delete_async_work(env, context->work);
+    }
+    if (context != NULL && context->callback != NULL) {
+      napi_delete_reference(env, context->callback);
+    }
+    free(context);
+    napi_throw_error(env, NULL, "turn work could not be queued");
+  }
+  return NULL;
+}
+
 NAPI_MODULE_EXPORT napi_value
 napi_register_module_v1(napi_env env, napi_value exports) {
   const struct {
     const char* name;
     napi_callback function;
   } entries[] = {
-    {"create", create},
-    {"makeCurrent", make_current},
-    {"destroy", destroy},
-    {"nativeProbe", native_probe},
+    {"create", create},   {"makeCurrent", make_current},
+    {"destroy", destroy}, {"nativeProbe", native_probe},
+    {"turn", turn},
   };
   for (size_t index = 0; index < sizeof entries / sizeof entries[0]; index++) {
     napi_value function = NULL;

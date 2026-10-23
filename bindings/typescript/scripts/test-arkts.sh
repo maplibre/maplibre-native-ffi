@@ -87,6 +87,11 @@ deadline=${MLN_FFI_ARKTS_TIMEOUT:-2400}
     sleep 1
   done
   echo "error: the run took longer than $deadline seconds; stopping $bundle" >&2
+  # The application's thread stacks tell a blocked thread from an idle loop.
+  pid=$("${hdc[@]}" shell pidof "$bundle" | tr -d '\r') || true
+  if [[ -n $pid ]]; then
+    "${hdc[@]}" shell dumpcatcher -p "$pid" >&2 || true
+  fi
   "${hdc[@]}" shell aa force-stop "$bundle" >/dev/null 2>&1
 ) &
 "${hdc[@]}" shell aa test -b "$bundle" -m entry_test \
