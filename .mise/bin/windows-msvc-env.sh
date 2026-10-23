@@ -35,10 +35,16 @@ prefer_standalone_llvm() {
 original_path="$PATH"
 prefer_standalone_llvm || return 1
 
+# A shell started from one that already sourced this file, such as a nested
+# `mise run`, inherits the Visual Studio variables but not the PATH order. Git
+# Bash's login profile puts its own /usr/bin first, and with VCINSTALLDIR set
+# rustc takes the first link.exe on PATH, which there is coreutils' `link`. So
+# an inherited environment still replays the cache below to restore the order.
 current_vscmd_arch="${VSCMD_ARG_TGT_ARCH:-}"
+inherited_vs_environment=
 if [[ -n "${VCTOOLSINSTALLDIR:-${VCToolsInstallDir:-}}" &&
   "${current_vscmd_arch,,}" == "$msvc_arch" ]]; then
-  return 0
+  inherited_vs_environment=1
 fi
 
 vswhere='/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe'
@@ -107,6 +113,12 @@ fi
 # both are legitimately empty when this shell already has the entries VsDevCmd
 # would add.
 if [[ -z "$cache_complete" ]]; then
+  # Resolving inside an inherited environment, such as a Developer Prompt's,
+  # would cache only what VsDevCmd changed relative to it, which is nearly
+  # nothing. Keep that environment as it is instead.
+  if [[ -n "$inherited_vs_environment" ]]; then
+    return 0
+  fi
   vs_dev_cmd="${vs_install}\\Common7\\Tools\\VsDevCmd.bat"
   loader="$(mktemp "${TMPDIR:-/tmp}/mln-vsdev.XXXXXX.bat")"
   # `set` is what cmd.exe reports the status of, so a failed call has to stop the
@@ -200,4 +212,17 @@ EOF
   fi
 fi
 
-export PATH="${crt_path:+$crt_path:}$standalone_llvm_bin:${vs_path_prefix:+$vs_path_prefix:}$original_path${vs_path_suffix:+:$vs_path_suffix}"
+resolved_path="${crt_path:+$crt_path:}$standalone_llvm_bin:${vs_path_prefix:+$vs_path_prefix:}$original_path${vs_path_suffix:+:$vs_path_suffix}"
+
+# A nested shell's inherited PATH already holds these entries, so drop every
+# repeat to keep PATH from growing with each level. Only the first occurrence of
+# an entry decides a lookup, so this changes no resolution.
+IFS=: read -r -a path_entries <<< "$resolved_path"
+seen_entries=:
+deduplicated_path=
+for entry in "${path_entries[@]}"; do
+  [[ -n "$entry" && "$seen_entries" != *":$entry:"* ]] || continue
+  seen_entries+="$entry:"
+  deduplicated_path="${deduplicated_path:+$deduplicated_path:}$entry"
+done
+export PATH="$deduplicated_path"
