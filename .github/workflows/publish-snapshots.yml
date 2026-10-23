@@ -350,15 +350,13 @@ jobs:
       tag: unstable-native-snapshot
       version: ${{ needs.plan.outputs.native_snapshot_version }}
 
-  # The native publish removes every asset that it did not upload, including
-  # the previous packages, so these join the snapshot release after it.
   publish-dotnet:
     name: .NET snapshot
     needs:
       - plan
-      - publish-native
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
+    if: ${{ needs.plan.outputs.publish_packages == 'true' }}
     permissions:
       actions: read
       contents: write
@@ -383,13 +381,12 @@ jobs:
       - run: >-
           mise run --no-deps ci:pack-dotnet build/packages/native/dotnet-input
           build/packages/dotnet/nupkgs "$SNAPSHOT_VERSION"
-      - name: Upload the packages
+      - name: Replace the packages
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
-          gh release upload unstable-native-snapshot
-          build/packages/dotnet/nupkgs/*.nupkg --repo "$GITHUB_REPOSITORY"
-          --clobber
+          mise run --no-deps ci:replace-snapshot-packages '*.nupkg'
+          build/packages/dotnet/nupkgs/*.nupkg
 
   required:
     name: publishing-required

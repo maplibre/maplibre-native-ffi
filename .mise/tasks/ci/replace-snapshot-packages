@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#MISE description="Replace one binding's packages on the unstable-native-snapshot release."
+#MISE shell="bash"
+#USAGE arg "<pattern>" help="Glob that matches every asset name the binding owns on the release, such as '*.nupkg'"
+#USAGE arg "<packages>..." help="The binding's new packages"
+set -euo pipefail
+
+tag=unstable-native-snapshot
+pattern="${usage_pattern?}"
+read -r -a packages <<<"${usage_packages?}"
+
+names=()
+for package in "${packages[@]}"; do
+  name="${package##*/}"
+  # shellcheck disable=SC2254 # The pattern is a glob.
+  case "$name" in
+    $pattern) names+=("$name") ;;
+    *)
+      echo "$name does not match $pattern, so no publish would replace it" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# Each publisher replaces only the assets that it owns, after uploading their
+# successors, so a failed publish leaves the previous packages in place.
+gh release upload "$tag" "${packages[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+assets="$(
+  gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets \
+    --jq '.assets[].name'
+)"
+while IFS= read -r asset; do
+  # shellcheck disable=SC2254 # The pattern is a glob.
+  case "$asset" in
+    $pattern)
+      if ! printf '%s\n' "${names[@]}" | grep -qxF "$asset"; then
+        gh release delete-asset "$tag" "$asset" --repo "$GITHUB_REPOSITORY" --yes
+      fi
+      ;;
+  esac
+done <<<"$assets"

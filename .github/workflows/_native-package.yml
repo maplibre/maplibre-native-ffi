@@ -127,6 +127,23 @@ jobs:
               -f ref="refs/tags/${PUBLISH_TAG}" \
               -f sha="$PUBLISH_SHA" >/dev/null
           fi
+      # The snapshot release also holds the binding packages, which their own
+      # jobs replace. SHA256SUMS lists every other native asset, so the one on
+      # the release names the native assets that this publish replaces.
+      - name: Record the replaced snapshot assets
+        if: ${{ !inputs.release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          replaced=build/packages/native/replaced-assets
+          echo SHA256SUMS >"$replaced"
+          # The first snapshot finds no release.
+          if gh release view "$PUBLISH_TAG" >/dev/null 2>&1; then
+            gh release download "$PUBLISH_TAG" --pattern SHA256SUMS --output - |
+              cut -d ' ' -f 3- >>"$replaced"
+          fi
       # A tagged release remains a draft until every uploaded asset is verified.
       - name: Upload the release assets
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
@@ -156,7 +173,8 @@ jobs:
 
           release="$(gh release view "$PUBLISH_TAG" --json assets)"
           while IFS= read -r name; do
-            if [[ ! -f "build/packages/native/release/$name" ]]; then
+            if [[ ! -f "build/packages/native/release/$name" ]] &&
+              grep -qxF "$name" build/packages/native/replaced-assets; then
               gh release delete-asset "$PUBLISH_TAG" "$name" --yes
             fi
           done < <(jq -r '.assets[].name' <<<"$release")
@@ -183,13 +201,16 @@ jobs:
           assets=(build/packages/native/release/*.tar.gz)
           assets+=(build/packages/native/release/MaplibreNativeC.xcframework.zip)
           assets+=(build/packages/native/release/SHA256SUMS)
-          expected="$(printf '%s\n' "${assets[@]##*/}" | sort | jq -R . | jq -c -s .)"
-          actual="$(jq -c '[.assets[].name] | sort' <<<"$release")"
-          if [[ "$actual" != "$expected" ]]; then
-            echo "release assets do not match the prepared native package set" >&2
-            jq -n --argjson expected "$expected" --argjson actual "$actual" \
-              '{expected: $expected, actual: $actual}' >&2
-            exit 1
+          # The binding jobs own the snapshot release's other assets.
+          if [[ "$PUBLISH_CHANNEL" == release ]]; then
+            expected="$(printf '%s\n' "${assets[@]##*/}" | sort | jq -R . | jq -c -s .)"
+            actual="$(jq -c '[.assets[].name] | sort' <<<"$release")"
+            if [[ "$actual" != "$expected" ]]; then
+              echo "release assets do not match the prepared native package set" >&2
+              jq -n --argjson expected "$expected" --argjson actual "$actual" \
+                '{expected: $expected, actual: $actual}' >&2
+              exit 1
+            fi
           fi
 
           for asset in "${assets[@]}"; do
