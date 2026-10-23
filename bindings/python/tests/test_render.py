@@ -389,7 +389,9 @@ def test_a_caller_driven_session_is_serviced_from_a_python_thread(
         # The main thread blocks on frame wakes while the graphics thread
         # services the work, so neither holds the GIL across native calls.
         assert target.render_red().data[:4] == RED_PIXEL
-        assert target.serviced > 0
+    # A service call publishes its frame and readback before it returns, so
+    # the count is read once closing has stopped the graphics thread.
+    assert target.serviced > 0
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
