@@ -203,5 +203,26 @@ if ! grep -q '^ARCHS = arm64$' ios/Flutter/Debug.xcconfig; then
   printf '\nARCHS = arm64\n' >>ios/Flutter/Debug.xcconfig
 fi
 flutter pub get
-flutter test integration_test/binding_test.dart --device-id "$device" --timeout 10m
+# Flutter 3.47 can launch the app before it starts reading the simulator log,
+# miss the app's VM service address, and wait for it without limit
+# (flutter/flutter#181771). The bound turns that wait into a failure, and the
+# tool's verbose log and the app's own log show which step stalled.
+: >test-results.txt
+status=0
+perl -e 'alarm shift; exec @ARGV' 300 \
+  flutter test integration_test/binding_test.dart --device-id "$device" \
+  --timeout 2m --verbose --reporter silent \
+  --file-reporter expanded:test-results.txt >flutter-test.log 2>&1 || status=$?
+cat test-results.txt
+if [[ $status -ne 0 ]]; then
+  cat flutter-test.log
+fi
+if [[ $status -eq 142 ]]; then
+  echo "flutter test did not finish within 5 minutes. The app's Flutter log:" >&2
+  perl -e 'alarm shift; exec @ARGV' 60 \
+    xcrun simctl spawn "$device" log show --last 10m --style compact \
+    --predicate 'process == "Runner" AND senderImagePath ENDSWITH "/Flutter"' |
+    tail -n 20 >&2 || true
+fi
+exit "$status"
 '''
