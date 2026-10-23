@@ -22,7 +22,12 @@ export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:$
 source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
 rm -rf build/docc
 mkdir -p build
-swift package --scratch-path ".build/$usage_preset" \
+swift_args=(--scratch-path ".build/$usage_preset")
+# Swift Build, SwiftPM's default build system since 6.4, intermittently
+# segfaults on Linux while planning a build. Drop this once
+# https://github.com/swiftlang/swift-build/issues/1786 is fixed.
+case "$usage_preset" in linux-*) swift_args+=(--build-system native) ;; esac
+swift package "${swift_args[@]}" \
   --allow-writing-to-directory build/docc \
   generate-documentation \
   --target MaplibreNativeFFI \
@@ -73,6 +78,8 @@ case "$usage_preset" in
 esac
 swift_args=(--scratch-path ".build/$usage_preset")
 swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
+# Swift Build crashes on Linux; see the api task.
+case "$usage_preset" in linux-*) swift_args+=(--build-system native) ;; esac
 swift build --target MaplibreNativeFFI "${swift_args[@]}"
 '''
 
@@ -168,6 +175,8 @@ case "$usage_preset" in
 esac
 swift_args=(--scratch-path ".build/$usage_preset" -c "$usage_configuration")
 swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
+# Swift Build crashes on Linux; see the api task.
+case "$usage_preset" in linux-*) swift_args+=(--build-system native) ;; esac
 if [[ "$usage_configuration" == "release" ]]; then
   # The suite uses @testable import. Keep testing enabled while leaving the
   # optimizer on so ARC lifetime behavior matches a release consumer.
