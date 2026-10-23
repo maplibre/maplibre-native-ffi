@@ -32,16 +32,7 @@ set(MLN_NATIVE_BROWSER_SHARDS
 
 # Tags a test file can end its name with to build only on matching targets,
 # such as backend/dedicated_egl.c or platform/browser_http_emscripten.c.
-set(MLN_NATIVE_FILE_TAGS
-    metal
-    opengl
-    vulkan
-    webgpu
-    egl
-    wgl
-    webgl
-    emscripten
-    linux)
+set(MLN_NATIVE_FILE_TAGS metal opengl vulkan webgpu egl wgl webgl emscripten icu)
 
 function(mln_native_active_file_tags out_var)
   set(tags ${MLN_FFI_RENDER_BACKEND})
@@ -51,8 +42,10 @@ function(mln_native_active_file_tags out_var)
   if(EMSCRIPTEN)
     list(APPEND tags emscripten)
   endif()
-  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    list(APPEND tags linux)
+  # Linux and OpenHarmony evaluate locale expressions with ICU: ICU4X on Linux
+  # and the system's ICU4C on OpenHarmony.
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+    list(APPEND tags icu)
   endif()
   set(${out_var} ${tags} PARENT_SCOPE)
 endfunction()

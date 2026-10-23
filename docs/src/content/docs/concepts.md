@@ -67,6 +67,12 @@ lacks, uses the language of the first nonempty environment variable among
 `LC_ALL`, then `LC_COLLATE` for a collator or `LC_NUMERIC` for a number, then
 `LANG`. The `C` and `POSIX` locales use `en-US`.
 
+### Locale expressions on OpenHarmony
+
+On OpenHarmony, the `number-format`, `collator`, and `resolved-locale`
+expressions use the system's ICU and its locale data. An expression without a
+locale, or with a language that the data lacks, uses the system language.
+
 ## Render session
 
 A render session draws one map into one render target. A map has at most one

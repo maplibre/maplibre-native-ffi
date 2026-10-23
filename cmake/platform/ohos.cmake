@@ -19,7 +19,7 @@ function(mln_ffi_configure_platform_dependencies target)
      AND MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
     set(ohos_test_supported TRUE)
   endif()
-  foreach(library IN ITEMS image_source pixelmap hilog_ndk.z net_http uv z)
+  foreach(library IN ITEMS icu image_source pixelmap hilog_ndk.z net_http uv z)
     string(MAKE_C_IDENTIFIER "${library}" identifier)
     find_library(MLN_FFI_OHOS_${identifier}_LIBRARY NAMES "${library}" REQUIRED)
     target_link_libraries(
@@ -56,13 +56,7 @@ endfunction()
 function(mln_ffi_configure_platform target)
   include("${MLN_FFI_SOURCE_DIR}/vendor/icu.cmake")
 
-  set_source_files_properties(
-    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
-    PROPERTIES COMPILE_DEFINITIONS MBGL_USE_BUILTIN_ICU)
-
   set(MLN_FFI_VENDOR_OHOS_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/collator.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/bidi.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/local_glyph_rasterizer.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/i18n.cpp
@@ -77,6 +71,17 @@ function(mln_ffi_configure_platform target)
       ${MLN_FFI_SOURCE_DIR}/platform/ohos/src/logging_hilog.cpp)
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_OHOS_SOURCES})
+  mln_ffi_target_project_sources(${target}
+                                 ${PROJECT_SOURCE_DIR}/src/platform/ohos/i18n.cpp)
+
+  # Only Native's bidi and character classes use the ICU it vendors. Its headers
+  # rename every symbol for ICU 61, so they reach only those sources and do not
+  # shadow the system ICU that the locale expressions call.
+  set_source_files_properties(
+    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/bidi.cpp
+    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/i18n.cpp
+    PROPERTIES
+      COMPILE_OPTIONS "-isystem;${MLN_FFI_SOURCE_DIR}/vendor/icu/include")
 
   target_include_directories(
     ${target}
@@ -86,13 +91,11 @@ function(mln_ffi_configure_platform target)
   target_include_directories(
     ${target}
     SYSTEM
-    PRIVATE
-      ${MLN_FFI_SOURCE_DIR}/platform/default/include
-      ${MLN_FFI_SOURCE_DIR}/vendor/icu/include)
+    PRIVATE ${MLN_FFI_SOURCE_DIR}/platform/default/include)
 
   target_compile_definitions(${target} PRIVATE OHOS_PLATFORM)
 
   target_link_libraries(
     ${target}
-    PRIVATE mbgl-vendor-icu MLN_FFI::PlatformDependencies)
+    PRIVATE $<LINK_ONLY:mbgl-vendor-icu> MLN_FFI::PlatformDependencies)
 endfunction()
