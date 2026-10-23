@@ -212,6 +212,25 @@ def target_job(row: dict) -> dict:
                 name="Upload native artifact",
             )
         )
+    # The npm release publishes the addon that the TypeScript suite built
+    # against the packaged native artifact and tested, for each preset that
+    # bindings/typescript/scripts/pack.ts packs.
+    if preset.startswith(("linux-gnu-", "macos-")) and (
+        f"mise run //bindings/typescript:test {preset}"
+        in row.get("consumer_commands", [])
+    ):
+        steps.append(
+            action(
+                "actions/upload-artifact",
+                {
+                    "name": f"typescript-addon-{preset}-${{{{ github.sha }}}}",
+                    "path": f"bindings/typescript/native/build/{preset}/install",
+                    "if-no-files-found": "error",
+                    "retention-days": RETENTION,
+                },
+                name="Upload TypeScript addon",
+            )
+        )
     if suites:
         # A failed suite already fails the job. This step collects the verdict
         # at the end of the log, after the suites that kept running.

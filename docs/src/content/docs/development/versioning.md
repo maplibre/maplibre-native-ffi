@@ -26,9 +26,9 @@ A release has one tag, `vAPI_EPOCH.YYYYMM.REVISION`, on a commit on `main` that
 has passed CI. Every artifact of the release builds from that commit. The
 release workflow rejects a tag out of order or from another month.
 
-pub.dev and crates.io enable automated publishing only for a package that
+pub.dev, crates.io, and npm enable automated publishing only for a package that
 exists, so publish the first version of each package by hand, from a clean
-checkout of a published release tag.
+checkout of a published release tag or from the release run.
 
 - Dart: run `mise run //bindings/dart:prepare-release <tag>`, then
   `dart pub publish` from `bindings/dart`. On the package's admin page, enable
@@ -39,6 +39,12 @@ checkout of a published release tag.
   `maplibre-native-ffi-core`, and `maplibre-native-ffi`, in that order. In each
   crate's settings, add a trusted publisher for `maplibre/maplibre-native-ffi`,
   with the workflow `release.yml` and the `crates.io` environment.
+- TypeScript: the release run's TypeScript job uploads the packed packages as
+  the `npm-packages-<version>` artifact before it publishes. Download it and run
+  `npm publish --access public <tarball>` for each addon package, then each
+  backend package, then `@maplibre/native-ffi`. In each package's settings, add
+  a trusted publisher for `maplibre/maplibre-native-ffi`, with the workflow
+  `release.yml` and the `npm` environment.
 
 ## Snapshots
 

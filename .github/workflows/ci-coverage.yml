@@ -222,6 +222,13 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-linux-gnu-x64-egl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload TypeScript addon
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: typescript-addon-linux-gnu-x64-egl-${{ github.sha }}
+          path: bindings/typescript/native/build/linux-gnu-x64-egl/install
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
         if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure' || steps.suite-18.outcome == 'failure' || steps.suite-19.outcome == 'failure') }}
@@ -359,6 +366,13 @@ jobs:
         with:
           name: native-package-linux-gnu-x64-vulkan-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload TypeScript addon
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: typescript-addon-linux-gnu-x64-vulkan-${{ github.sha }}
+          path: bindings/typescript/native/build/linux-gnu-x64-vulkan/install
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
@@ -506,6 +520,13 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-linux-gnu-arm64-egl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload TypeScript addon
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: typescript-addon-linux-gnu-arm64-egl-${{ github.sha }}
+          path: bindings/typescript/native/build/linux-gnu-arm64-egl/install
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
         if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure' || steps.suite-18.outcome == 'failure' || steps.suite-19.outcome == 'failure') }}
@@ -638,6 +659,13 @@ jobs:
         with:
           name: native-package-linux-gnu-arm64-vulkan-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-linux-gnu-arm64-vulkan.tar.gz
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload TypeScript addon
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: typescript-addon-linux-gnu-arm64-vulkan-${{ github.sha }}
+          path: bindings/typescript/native/build/linux-gnu-arm64-vulkan/install
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
@@ -1122,6 +1150,13 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-macos-arm64-metal.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload TypeScript addon
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: typescript-addon-macos-arm64-metal-${{ github.sha }}
+          path: bindings/typescript/native/build/macos-arm64-metal/install
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
         if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure') }}
@@ -1253,6 +1288,13 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-macos-arm64-vulkan.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload TypeScript addon
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: typescript-addon-macos-arm64-vulkan-${{ github.sha }}
+          path: bindings/typescript/native/build/macos-arm64-vulkan/install
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
         if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure') }}
@@ -1372,6 +1414,13 @@ jobs:
         with:
           name: native-package-macos-arm64-egl-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-macos-arm64-egl.tar.gz
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload TypeScript addon
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: typescript-addon-macos-arm64-egl-${{ github.sha }}
+          path: bindings/typescript/native/build/macos-arm64-egl/install
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed

@@ -25,12 +25,11 @@ function isNotFound(error: unknown): boolean {
   return (error as { code?: unknown }).code === "MODULE_NOT_FOUND";
 }
 
-/** The manifest path of each named backend package that is installed. */
+/** The manifest path of each backend package that is installed. */
 function installedBackends(
   require: ReturnType<typeof createRequire>,
-  names: readonly string[],
 ): [string, string][] {
-  return names.flatMap((backend): [string, string][] => {
+  return BACKENDS.flatMap((backend): [string, string][] => {
     try {
       return [[backend, require.resolve(`${SCOPE}-${backend}/package.json`)]];
     } catch (error) {
@@ -43,10 +42,10 @@ function installedBackends(
 }
 
 /**
- * Loads the addon file that `MAPLIBRE_NATIVE_FFI_ADDON` names, relative to the
- * working directory, or the addon of the installed backend package.
- * `MAPLIBRE_NATIVE_FFI_BACKEND` chooses the backend when several are
- * installed.
+ * Loads the addon of the one installed backend package.
+ *
+ * `MAPLIBRE_NATIVE_FFI_ADDON` is for the binding's own suites: it names an
+ * addon file, relative to the working directory, to load instead.
  */
 export function loadAddon(): Addon {
   const require = createRequire(import.meta.url);
@@ -54,23 +53,17 @@ export function loadAddon(): Addon {
   if (path) {
     return require(resolve(path)) as Addon;
   }
-  const selected = process.env.MAPLIBRE_NATIVE_FFI_BACKEND;
-  if (selected && !BACKENDS.includes(selected)) {
-    throw new Error(
-      `MAPLIBRE_NATIVE_FFI_BACKEND is ${selected}; it names one of ${BACKENDS.join(", ")}`,
-    );
-  }
-  const candidates = selected ? [selected] : BACKENDS;
-  const installed = installedBackends(require, candidates);
+  const installed = installedBackends(require);
   if (installed.length === 0) {
-    const packages = candidates.map((backend) => `${SCOPE}-${backend}`);
+    const packages = BACKENDS.map((backend) => `${SCOPE}-${backend}`);
     throw new Error(
       `no MapLibre Native backend package is installed; install one of ${packages.join(", ")}`,
     );
   }
   if (installed.length > 1) {
+    const packages = installed.map(([backend]) => `${SCOPE}-${backend}`);
     throw new Error(
-      `${installed.map(([backend]) => `${SCOPE}-${backend}`).join(" and ")} are installed; set MAPLIBRE_NATIVE_FFI_BACKEND to the backend to load`,
+      `${packages.join(" and ")} are installed; install exactly one backend package`,
     );
   }
   const [backend, manifest] = installed[0]!;

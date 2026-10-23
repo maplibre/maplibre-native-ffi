@@ -1,7 +1,7 @@
 // Loading, collection, and process exit: how the binding meets its host.
 
 import assert from "node:assert/strict";
-import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
@@ -114,6 +114,57 @@ test(
       /^the second copy failed: another copy of the binding already uses the addon in this realm/m,
     );
     assert.match(result.stdout, /^the first copy still works$/m);
+  },
+  { needs: ["childProcess"] },
+);
+
+test(
+  "loading refuses no backend package and refuses several",
+  async () => {
+    // A copy of the sources resolves backend packages from a node_modules of
+    // its own, so the case controls which ones are installed.
+    const root = mkdtempSync(join(tmpdir(), "maplibre-native-ffi-"));
+    teardown(() => rmSync(root, { recursive: true, force: true }));
+    const source = fileURLToPath(new URL("../src", import.meta.url));
+    cpSync(source, join(root, "src"), { recursive: true });
+    writeFileSync(
+      join(root, "package.json"),
+      JSON.stringify({ type: "module" }),
+    );
+    writeFileSync(
+      join(root, "load.ts"),
+      [
+        'import { loadAddon } from "./src/internal/loader.ts";',
+        "try {",
+        "  loadAddon();",
+        '  console.log("loaded");',
+        "} catch (error) {",
+        "  console.log((error as Error).message);",
+        "}",
+      ].join("\n"),
+    );
+    async function load(): Promise<string> {
+      const result = await capabilities.childProcess!(join(root, "load.ts"), {
+        env: { MAPLIBRE_NATIVE_FFI_ADDON: undefined },
+      });
+      assert.equal(result.code, 0, result.stderr);
+      return result.stdout;
+    }
+
+    assert.match(
+      await load(),
+      /^no MapLibre Native backend package is installed; install one of /m,
+    );
+    for (const backend of ["opengl", "vulkan"]) {
+      const name = `@maplibre/native-ffi-${backend}`;
+      const directory = join(root, "node_modules", name);
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(join(directory, "package.json"), JSON.stringify({ name }));
+    }
+    assert.match(
+      await load(),
+      /^@maplibre\/native-ffi-opengl and @maplibre\/native-ffi-vulkan are installed; install exactly one backend package$/m,
+    );
   },
   { needs: ["childProcess"] },
 );

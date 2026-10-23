@@ -321,23 +321,26 @@ before you build.
 
 ### TypeScript
 
-<Aside type="caution" title="Build from source">
-  The TypeScript binding publishes no packages yet. Build it from a checkout of
-  this repository.
-</Aside>
+Add the package from [npm](https://www.npmjs.com/package/@maplibre/native-ffi)
+with exactly one backend package: `@maplibre/native-ffi-opengl`,
+`@maplibre/native-ffi-metal`, or `@maplibre/native-ffi-vulkan`.
 
-The binding runs on Node.js 24.11, Bun 1.4.3, Deno 2.9.7, and later, on Linux
-with glibc and on macOS. Pack it for your preset in the checkout, then install
-the tarballs, which contain the native library:
+```bash frame="terminal"
+npm install @maplibre/native-ffi @maplibre/native-ffi-vulkan
+```
+
+The backend package installs the C library for the host. The binding runs on
+Node.js 24.11, Bun 1.4.3, Deno 2.9.7, and later, on Linux with glibc and on
+macOS. Releases include macOS for arm64 alone. Deno imports the package as
+`npm:@maplibre/native-ffi` and needs `--allow-ffi --allow-read --allow-env`.
+
+npm has no snapshot channel. To try `main`, pack the packages for your preset
+in a checkout of this repository, then install the tarballs:
 
 ```bash frame="terminal"
 mise run //bindings/typescript:pack linux-gnu-x64-vulkan
 npm install path/to/maplibre-native-ffi/bindings/typescript/build/npm/*.tgz
 ```
-
-When several backend packages are installed, set `MAPLIBRE_NATIVE_FFI_BACKEND`
-to `opengl`, `metal`, or `vulkan`. Deno imports the package as
-`npm:@maplibre/native-ffi` and needs `--allow-ffi --allow-read --allow-env`.
 
 On OpenHarmony, build the library with
 `mise -E ohos run //bindings/typescript:build <preset>`, ship it with the SDK's
