@@ -76,7 +76,7 @@ import type {
 } from "./generated_values.ts";
 
 /** The digest of the C headers that this facade and its addon came from. */
-export const ABI_DIGEST = "d606e4bef68ded52";
+export const ABI_DIGEST = "85cc57ea880b7d3d";
 
 /** The index of each completion decoder in the addon's decoder table. */
 export const Decoder = {
@@ -91,14 +91,15 @@ export const Decoder = {
   offlineRegionInfoList: 8,
   offlineRegionInfoOptional: 9,
   offlineRegionStatus: 10,
-  queriedFeatureList: 11,
-  styleImageInfoOptional: 12,
-  styleLayerInfoList: 13,
-  styleLayerInfoOptional: 14,
-  styleSourceInfoList: 15,
-  styleSourceInfoOptional: 16,
-  styleTransitionOptions: 17,
-  textureReadbackResult: 18,
+  renderedFeatureList: 11,
+  sourceFeatureList: 12,
+  styleImageInfoOptional: 13,
+  styleLayerInfoList: 14,
+  styleLayerInfoOptional: 15,
+  styleSourceInfoList: 16,
+  styleSourceInfoOptional: 17,
+  styleTransitionOptions: 18,
+  textureReadbackResult: 19,
 } as const;
 
 /** The addon function of each generated operation, by C function name. */

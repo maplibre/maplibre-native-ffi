@@ -60,11 +60,24 @@ static bool feature_named(const mln_test_feature* feature, const char* name) {
 // Names the points a list holds, in the order west, east, as a bit mask.
 enum { WEST = 1U << 0U, EAST = 1U << 1U };
 
+// Names the style layers a list's hits came from as a bit mask.
+enum { CIRCLES = 1U << 0U, HALOS = 1U << 1U };
+
 static unsigned int named_points(const mln_test_feature_list* list) {
   unsigned int found = 0;
   for (size_t index = 0; index < list->count; index += 1) {
     found |= feature_named(&list->features[index], "west") ? WEST : 0U;
     found |= feature_named(&list->features[index], "east") ? EAST : 0U;
+  }
+  return found;
+}
+
+static unsigned int named_layers(const mln_test_feature_list* list) {
+  unsigned int found = 0;
+  for (size_t index = 0; index < list->count; index += 1) {
+    const char* layer = list->features[index].layer_id;
+    found |= strcmp(layer, "circles") == 0 ? CIRCLES : 0U;
+    found |= strcmp(layer, "halos") == 0 ? HALOS : 0U;
   }
   return found;
 }
@@ -80,6 +93,7 @@ typedef struct rendered_row {
   const char* filter;
   size_t count;
   unsigned int points;
+  unsigned int layers;
 } rendered_row;
 
 static void rendered_queries_select_by_geometry_layer_and_filter(void) {
@@ -99,7 +113,8 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
      NULL,
      NULL,
      2,
-     EAST},
+     EAST,
+     CIRCLES | HALOS},
     {"a layer ID narrows a hit to that layer",
      {.size = sizeof(mln_rendered_query_geometry),
       .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT,
@@ -107,7 +122,8 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
      "circles",
      NULL,
      1,
-     EAST},
+     EAST,
+     CIRCLES},
     {"a filter keeps the matching feature",
      {.size = sizeof(mln_rendered_query_geometry),
       .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
@@ -115,7 +131,8 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
      "circles",
      "[\"==\",[\"get\",\"kind\"],\"a\"]",
      1,
-     WEST},
+     WEST,
+     CIRCLES},
     {"a box past every edge is clipped to the viewport",
      {.size = sizeof(mln_rendered_query_geometry),
       .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
@@ -125,7 +142,8 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
      "circles",
      NULL,
      2,
-     WEST | EAST},
+     WEST | EAST,
+     CIRCLES},
     {"a box with swapped corners is normalized",
      {.size = sizeof(mln_rendered_query_geometry),
       .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
@@ -133,13 +151,15 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
      "circles",
      NULL,
      1,
-     EAST},
+     EAST,
+     CIRCLES},
     {"a box beyond the viewport finds nothing",
      {.size = sizeof(mln_rendered_query_geometry),
       .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
       .data = {.box = {.min = {.x = 100, .y = 0}, .max = {.x = 200, .y = 64}}}},
      NULL,
      NULL,
+     0,
      0,
      0},
     {"a line string through both circles hits both",
@@ -149,7 +169,8 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
      "circles",
      NULL,
      2,
-     WEST | EAST},
+     WEST | EAST,
+     CIRCLES},
   };
   for (size_t index = 0; index < sizeof(rows) / sizeof(rows[0]); index += 1) {
     const rendered_row* row = &rows[index];
@@ -173,6 +194,9 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
     TEST_ASSERT_EQUAL_UINT_MESSAGE(
       row->points, named_points(&list), row->label
     );
+    TEST_ASSERT_EQUAL_UINT_MESSAGE(
+      row->layers, named_layers(&list), row->label
+    );
     for (size_t hit = 0; hit < list.count; hit += 1) {
       TEST_ASSERT_EQUAL_STRING_MESSAGE(
         "points", list.features[hit].source_id, row->label
@@ -186,6 +210,53 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
   MLN_TEST_OK(source.status);
   TEST_ASSERT_EQUAL_size_t(2, source.count);
   TEST_ASSERT_EQUAL_UINT(WEST | EAST, named_points(&source));
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A location indicator at the center, drawn by a 16 x 16 top image. It has no
+// source, so its hit names only its layer.
+static const char indicator_style_json[] =
+  "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"puck\","
+  "\"type\":\"location-indicator\",\"layout\":{\"top-image\":\"dot\"},"
+  "\"paint\":{\"location\":[0,0,0]}}]}";
+
+static void location_indicator_hits_name_only_their_layer(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(indicator_style_json));
+  static uint8_t white[16 * 16 * 4];
+  memset(white, 0xff, sizeof(white));
+  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
+  image.width = 16;
+  image.height = 16;
+  image.stride = 16 * 4;
+  image.pixels = white;
+  image.byte_length = sizeof(white);
+  MLN_TEST_AWAIT_OK(mln_map_set_style_image(
+    map, MLN_BUFFER_LITERAL("dot"), &image, NULL, &completion.descriptor, NULL
+  ));
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  rendered_count wait = {.fixture = &fixture, .count = 1};
+  TEST_ASSERT_TRUE(mln_test_style_render_until(
+    &fixture, renders_count, &wait, "the location indicator to render"
+  ));
+
+  const mln_rendered_query_geometry center = {
+    .size = sizeof(mln_rendered_query_geometry),
+    .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT,
+    .data = {.point = {.x = 32, .y = 32}},
+  };
+  const mln_test_feature_list list =
+    mln_test_style_query_rendered_with(&fixture, &center, NULL);
+  MLN_TEST_OK(list.status);
+  TEST_ASSERT_EQUAL_size_t(1, list.count);
+  TEST_ASSERT_EQUAL_STRING("puck", list.features[0].layer_id);
+  TEST_ASSERT_EQUAL_STRING("", list.features[0].source_id);
+  TEST_ASSERT_EQUAL_STRING("", list.features[0].source_layer_id);
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
@@ -352,7 +423,6 @@ typedef struct source_row {
 } source_row;
 
 // A source query reads a vector source through the source layers it names.
-// Its results name the source but not the source layer.
 static void source_queries_read_the_named_source_layers(void) {
   static atomic_int fetches;
   atomic_store(&fetches, 0);
@@ -423,18 +493,10 @@ static void source_queries_read_the_named_source_layers(void) {
       mln_test_style_query_source_with(&fixture, "tiles", &query);
     MLN_TEST_OK_MESSAGE(list.status, row->label);
     TEST_ASSERT_EQUAL_size_t_MESSAGE(row->count, list.count, row->label);
-    for (size_t hit = 0; hit < list.count; hit += 1) {
-      TEST_ASSERT_EQUAL_STRING_MESSAGE(
-        "tiles", list.features[hit].source_id, row->label
+    for (size_t hit = 0; row->id != NULL && hit < list.count; hit += 1) {
+      TEST_ASSERT_NOT_NULL_MESSAGE(
+        strstr(list.features[hit].feature, row->id), row->label
       );
-      TEST_ASSERT_EQUAL_STRING_MESSAGE(
-        "", list.features[hit].source_layer_id, row->label
-      );
-      if (row->id != NULL) {
-        TEST_ASSERT_NOT_NULL_MESSAGE(
-          strstr(list.features[hit].feature, row->id), row->label
-        );
-      }
     }
   }
 
@@ -719,6 +781,7 @@ static void malformed_queries_are_rejected_at_submission(void) {
 MLN_TEST_GROUP {
   RUN_TEST(rendered_queries_select_by_geometry_layer_and_filter);
   RUN_TEST(source_queries_read_the_named_source_layers);
+  RUN_TEST(location_indicator_hits_name_only_their_layer);
   RUN_TEST(cluster_extensions_resolve_an_unsigned_cluster_id);
   RUN_TEST(malformed_queries_are_rejected_at_submission);
 }

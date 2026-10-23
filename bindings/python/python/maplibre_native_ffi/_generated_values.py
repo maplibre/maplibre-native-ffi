@@ -622,18 +622,6 @@ class ProjectionModeField(IntFlag):
     Y_SKEW = 4
 
 
-class QueriedFeatureField(IntFlag):
-    """Optional fields for `mln_queried_feature`.
-
-    See `mln_queried_feature_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-    """
-
-    SOURCE_ID = 1
-    SOURCE_LAYER_ID = 2
-    STATE = 4
-
-
 class RenderAbandonDisposition(UnknownIntEnum):
     """What abandon did with a session's graphics resources.
 
@@ -719,6 +707,18 @@ class RenderSessionState(UnknownIntEnum):
     DETACHED = 4
     TARGET_LOST = 5
     ABANDONED = 6
+
+
+class RenderedFeatureField(IntFlag):
+    """Optional fields for `mln_rendered_feature`.
+
+    See `mln_rendered_feature_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+    """
+
+    SOURCE_ID = 1
+    SOURCE_LAYER_ID = 2
+    STATE = 4
 
 
 class RenderedFeatureQueryOptionField(IntFlag):
@@ -3052,32 +3052,6 @@ class Quaternion:
 
 
 @dataclass(frozen=True, slots=True)
-class QueriedFeature:
-    """One query hit borrowed for a completion callback.
-
-    See `mln_queried_feature` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-    """
-
-    feature: bytes
-
-    source_id: str | None = None
-
-    source_layer_id: str | None = None
-
-    state: bytes | None = None
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            feature=raw["feature"],
-            source_id=raw["source_id"],
-            source_layer_id=raw["source_layer_id"],
-            state=raw["state"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class QueueLock:
     """Host lock on the graphics queue that a session shares with its host,
     copied by a successful attach.
@@ -3392,6 +3366,35 @@ class RenderSessionSnapshot:
             frame_generation=raw["frame_generation"],
             acquired_frame_count=raw["acquired_frame_count"],
             pending_changes=raw["pending_changes"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class RenderedFeature:
+    """One rendered-feature query hit borrowed for a completion callback.
+
+    See `mln_rendered_feature` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+    """
+
+    feature: bytes
+
+    layer_id: str
+
+    source_id: str | None = None
+
+    source_layer_id: str | None = None
+
+    state: bytes | None = None
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            feature=raw["feature"],
+            layer_id=raw["layer_id"],
+            source_id=raw["source_id"],
+            source_layer_id=raw["source_layer_id"],
+            state=raw["state"],
         )
 
 
@@ -3982,6 +3985,21 @@ class ScreenPoint:
     @classmethod
     def _from_native(cls, raw):
         return cls(x=raw["x"], y=raw["y"])
+
+
+@dataclass(frozen=True, slots=True)
+class SourceFeature:
+    """One source-feature query hit borrowed for a completion callback.
+
+    See `mln_source_feature` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+    """
+
+    feature: bytes
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(feature=raw["feature"])
 
 
 @dataclass(frozen=True, slots=True)

@@ -58,9 +58,9 @@ from ._generated_values import (
     PremultipliedRgba8Image,
     ProjectedMeters,
     ProjectionMode,
-    QueriedFeature,
     RenderAbandonResult,
     RenderBackendFlag,
+    RenderedFeature,
     RenderedFeatureQueryOptions,
     RenderedQueryGeometry,
     RenderFrameBatchView,
@@ -76,6 +76,7 @@ from ._generated_values import (
     RuntimeEventMask,
     RuntimeOptions,
     ScreenPoint,
+    SourceFeature,
     SourceFeatureQueryOptions,
     StyleImageInfo,
     StyleImageOptions,
@@ -1473,7 +1474,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         self,
         geometry: RenderedQueryGeometry,
         options: RenderedFeatureQueryOptions | None = None,
-    ) -> Future[tuple[QueriedFeature, ...]]:
+    ) -> Future[tuple[RenderedFeature, ...]]:
         """Starts a rendered-feature query against the session's latest driver
         state.
 
@@ -1482,12 +1483,12 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return map_future(
             self._native.query_rendered_features(geometry, options),
-            lambda value: tuple(QueriedFeature._from_native(item) for item in value),
+            lambda value: tuple(RenderedFeature._from_native(item) for item in value),
         )
 
     def query_source_features(
         self, source_id: str, options: SourceFeatureQueryOptions | None = None
-    ) -> Future[tuple[QueriedFeature, ...]]:
+    ) -> Future[tuple[SourceFeature, ...]]:
         """Starts a source-feature query against the session's latest driver
         state.
 
@@ -1496,7 +1497,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return map_future(
             self._native.query_source_features(source_id, options),
-            lambda value: tuple(QueriedFeature._from_native(item) for item in value),
+            lambda value: tuple(SourceFeature._from_native(item) for item in value),
         )
 
     def read_texture(self) -> Future[TextureReadbackResult]:

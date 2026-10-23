@@ -3,12 +3,13 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// One query hit borrowed for a completion callback.
+/// One rendered-feature query hit borrowed for a completion callback.
 ///
-/// See `mln_queried_feature` in the
+/// See `mln_rendered_feature` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-public struct QueriedFeature: Equatable, Hashable, Sendable {
+public struct RenderedFeature: Equatable, Hashable, Sendable {
   public var feature: Data
+  public var layerId: String
   public var sourceId: String?
   public var sourceLayerId: String?
   public var state: Data?
@@ -18,35 +19,41 @@ public struct QueriedFeature: Equatable, Hashable, Sendable {
 
   public init(
     feature: Data = Data(),
+    layerId: String = "",
     sourceId: String? = nil,
     sourceLayerId: String? = nil,
     state: Data? = nil
   ) {
     self.feature = feature
+    self.layerId = layerId
     self.sourceId = sourceId
     self.sourceLayerId = sourceLayerId
     self.state = state
   }
 
   init(
-    raw: mln_queried_feature,
+    raw: mln_rendered_feature,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
     feature = try NativeString.copyData(
       data: raw.feature.data,
       size: raw.feature.size
     )
-    sourceId = raw.fields & MLN_QUERIED_FEATURE_SOURCE_ID
+    layerId = try NativeString.copyUTF8(
+      data: raw.layer_id.data,
+      size: raw.layer_id.size
+    )
+    sourceId = raw.fields & MLN_RENDERED_FEATURE_SOURCE_ID
       .rawValue != 0 ? try NativeString.copyUTF8(
         data: raw.source_id.data,
         size: raw.source_id.size
       ) : nil
-    sourceLayerId = raw.fields & MLN_QUERIED_FEATURE_SOURCE_LAYER_ID
+    sourceLayerId = raw.fields & MLN_RENDERED_FEATURE_SOURCE_LAYER_ID
       .rawValue != 0 ? try NativeString.copyUTF8(
         data: raw.source_layer_id.data,
         size: raw.source_layer_id.size
       ) : nil
-    state = raw.fields & MLN_QUERIED_FEATURE_STATE
+    state = raw.fields & MLN_RENDERED_FEATURE_STATE
       .rawValue != 0 ? try NativeString.copyData(
         data: raw.state.data,
         size: raw.state.size
@@ -54,11 +61,11 @@ public struct QueriedFeature: Equatable, Hashable, Sendable {
   }
 }
 
-/// Optional fields for `mln_queried_feature`.
+/// Optional fields for `mln_rendered_feature`.
 ///
-/// See `mln_queried_feature_field` in the
+/// See `mln_rendered_feature_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-public struct QueriedFeatureField: OptionSet, NativeOpenValue, Equatable,
+public struct RenderedFeatureField: OptionSet, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
   public let rawValue: UInt32
@@ -66,9 +73,9 @@ public struct QueriedFeatureField: OptionSet, NativeOpenValue, Equatable,
     self.rawValue = rawValue
   }
 
-  public static let sourceId: QueriedFeatureField = .init(rawValue: 1)
-  public static let sourceLayerId: QueriedFeatureField = .init(rawValue: 2)
-  public static let state: QueriedFeatureField = .init(rawValue: 4)
+  public static let sourceId: RenderedFeatureField = .init(rawValue: 1)
+  public static let sourceLayerId: RenderedFeatureField = .init(rawValue: 2)
+  public static let state: RenderedFeatureField = .init(rawValue: 4)
 }
 
 /// Optional fields for `mln_rendered_feature_query_options`.
@@ -324,6 +331,31 @@ public struct ScreenLineString: Equatable, Hashable, Sendable {
     raw.points = arena.array(points.map { $0.nativeValue() })
     raw.point_count = try NativeInputArena.count(points.count)
     return raw
+  }
+}
+
+/// One source-feature query hit borrowed for a completion callback.
+///
+/// See `mln_source_feature` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+public struct SourceFeature: Equatable, Hashable, Sendable {
+  public var feature: Data
+  public static var `default`: Self {
+    Self()
+  }
+
+  public init(feature: Data = Data()) {
+    self.feature = feature
+  }
+
+  init(
+    raw: mln_source_feature,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    feature = try NativeString.copyData(
+      data: raw.feature.data,
+      size: raw.feature.size
+    )
   }
 }
 

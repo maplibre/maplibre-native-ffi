@@ -49,7 +49,6 @@ import type {
   PremultipliedRgba8Image,
   ProjectedMeters,
   ProjectionMode,
-  QueriedFeature,
   RenderAbandonResult,
   RenderBackendFlag,
   RenderFrameBatchView,
@@ -57,6 +56,7 @@ import type {
   RenderSessionAttachOptions,
   RenderSessionCapabilities,
   RenderSessionSnapshot,
+  RenderedFeature,
   RenderedFeatureQueryOptions,
   RenderedQueryGeometry,
   ResourceProvider,
@@ -68,6 +68,7 @@ import type {
   RuntimeEventMask,
   RuntimeOptions,
   ScreenPoint,
+  SourceFeature,
   SourceFeatureQueryOptions,
   StyleImageInfo,
   StyleImageOptions,
@@ -3703,9 +3704,9 @@ export class RenderSessionHandle extends Owner {
   queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options?: RenderedFeatureQueryOptions,
-  ): Promise<readonly QueriedFeature[]> {
-    return query<readonly QueriedFeature[]>(
-      Decoder.queriedFeatureList,
+  ): Promise<readonly RenderedFeature[]> {
+    return query<readonly RenderedFeature[]>(
+      Decoder.renderedFeatureList,
       (completion) =>
         native.mln_render_session_query_rendered_features(
           this.id,
@@ -3725,9 +3726,9 @@ export class RenderSessionHandle extends Owner {
   querySourceFeatures(
     sourceId: string,
     options?: SourceFeatureQueryOptions,
-  ): Promise<readonly QueriedFeature[]> {
-    return query<readonly QueriedFeature[]>(
-      Decoder.queriedFeatureList,
+  ): Promise<readonly SourceFeature[]> {
+    return query<readonly SourceFeature[]>(
+      Decoder.sourceFeatureList,
       (completion) =>
         native.mln_render_session_query_source_features(
           this.id,

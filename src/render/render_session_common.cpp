@@ -735,31 +735,42 @@ auto serialize_geojson_feature(const mln::Feature& feature) -> std::string {
   );
 }
 
-auto create_feature_query_result(
-  std::vector<mln::Feature> features,
-  const std::optional<std::string>& source_id,
-  std::shared_ptr<const mln::core::QueriedFeatureList>& out_result
+auto create_rendered_feature_result(
+  const std::vector<mln::Feature>& features,
+  std::shared_ptr<const mln::core::RenderedFeatureList>& out_result
 ) -> mln_status {
-  auto list = std::make_shared<mln::core::QueriedFeatureList>();
+  auto list = std::make_shared<mln::core::RenderedFeatureList>();
   list->features.reserve(features.size());
   for (const auto& feature : features) {
-    auto record = mln::core::QueriedFeatureRecord{};
+    auto record = mln::core::RenderedFeatureRecord{};
     record.feature = serialize_geojson_feature(feature);
-    const auto effective_source_id =
-      feature.source.empty() && source_id ? *source_id : feature.source;
-    if (!effective_source_id.empty()) {
-      record.source_id = effective_source_id;
-      record.fields |= MLN_QUERIED_FEATURE_SOURCE_ID;
+    record.layer_id = feature.layer;
+    if (!feature.source.empty()) {
+      record.source_id = feature.source;
+      record.fields |= MLN_RENDERED_FEATURE_SOURCE_ID;
     }
     if (!feature.sourceLayer.empty()) {
       record.source_layer_id = feature.sourceLayer;
-      record.fields |= MLN_QUERIED_FEATURE_SOURCE_LAYER_ID;
+      record.fields |= MLN_RENDERED_FEATURE_SOURCE_LAYER_ID;
     }
     if (!feature.state.empty()) {
       record.state = mln::core::serialize_json_value(mln::Value{feature.state});
-      record.fields |= MLN_QUERIED_FEATURE_STATE;
+      record.fields |= MLN_RENDERED_FEATURE_STATE;
     }
     list->features.push_back(std::move(record));
+  }
+  out_result = std::move(list);
+  return MLN_STATUS_OK;
+}
+
+auto create_source_feature_result(
+  const std::vector<mln::Feature>& features,
+  std::shared_ptr<const mln::core::SourceFeatureList>& out_result
+) -> mln_status {
+  auto list = std::make_shared<mln::core::SourceFeatureList>();
+  list->features.reserve(features.size());
+  for (const auto& feature : features) {
+    list->features.push_back(serialize_geojson_feature(feature));
   }
   out_result = std::move(list);
   return MLN_STATUS_OK;
@@ -2458,7 +2469,7 @@ auto destroy_render_session(
 auto render_session_query_rendered_features(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
   const mln_rendered_feature_query_options* options,
-  std::shared_ptr<const QueriedFeatureList>& out_result
+  std::shared_ptr<const RenderedFeatureList>& out_result
 ) -> mln_status {
   mln_render_session_object* live = nullptr;
   const auto status = validate_live_attached_render_session(session, live);
@@ -2540,15 +2551,13 @@ auto render_session_query_rendered_features(
       set_thread_error("rendered query geometry type is invalid");
       return MLN_STATUS_INVALID_ARGUMENT;
   }
-  return create_feature_query_result(
-    std::move(features), std::nullopt, out_result
-  );
+  return create_rendered_feature_result(features, out_result);
 }
 
 auto render_session_query_source_features(
   mln_render_session session, mln_buffer_view source_id,
   const mln_source_feature_query_options* options,
-  std::shared_ptr<const QueriedFeatureList>& out_result
+  std::shared_ptr<const SourceFeatureList>& out_result
 ) -> mln_status {
   mln_render_session_object* live = nullptr;
   const auto status = validate_live_attached_render_session(session, live);
@@ -2577,11 +2586,9 @@ auto render_session_query_source_features(
   auto native_source_id = string_from_view(source_id);
   auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mln::gfx::BackendScope{*backend};
-  auto features =
+  const auto features =
     live->renderer->querySourceFeatures(native_source_id, *native_options);
-  return create_feature_query_result(
-    std::move(features), native_source_id, out_result
-  );
+  return create_source_feature_result(features, out_result);
 }
 
 auto validate_feature_extension_query(

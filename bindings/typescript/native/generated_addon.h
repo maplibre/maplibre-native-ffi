@@ -18,7 +18,7 @@
 #include "maplibre_native_c/texture.h"
 #include "runtime.h"
 
-#define MLN_TS_ABI_DIGEST "d606e4bef68ded52"
+#define MLN_TS_ABI_DIGEST "85cc57ea880b7d3d"
 
 napi_value mln_ts_decode_buffer_view(
   napi_env env, const mln_completion_result* result
@@ -51,7 +51,10 @@ napi_value mln_ts_decode_offline_region_info_optional(
 napi_value mln_ts_decode_offline_region_status(
   napi_env env, const mln_completion_result* result
 );
-napi_value mln_ts_decode_queried_feature_list(
+napi_value mln_ts_decode_rendered_feature_list(
+  napi_env env, const mln_completion_result* result
+);
+napi_value mln_ts_decode_source_feature_list(
   napi_env env, const mln_completion_result* result
 );
 napi_value mln_ts_decode_style_image_info_optional(
@@ -265,9 +268,6 @@ napi_value mln_ts_read_projection_mode(
 napi_value mln_ts_read_quaternion(
   napi_env env, const mln_quaternion* source, size_t size
 );
-napi_value mln_ts_read_queried_feature(
-  napi_env env, const mln_queried_feature* source, size_t size
-);
 napi_value mln_ts_read_render_abandon_result(
   napi_env env, const mln_render_abandon_result* source, size_t size
 );
@@ -288,6 +288,9 @@ napi_value mln_ts_read_render_session_capabilities(
 );
 napi_value mln_ts_read_render_session_snapshot(
   napi_env env, const mln_render_session_snapshot* source, size_t size
+);
+napi_value mln_ts_read_rendered_feature(
+  napi_env env, const mln_rendered_feature* source, size_t size
 );
 napi_value mln_ts_read_rendered_feature_query_options(
   napi_env env, const mln_rendered_feature_query_options* source, size_t size
@@ -351,6 +354,9 @@ napi_value mln_ts_read_runtime_options(
 );
 napi_value mln_ts_read_screen_point(
   napi_env env, const mln_screen_point* source, size_t size
+);
+napi_value mln_ts_read_source_feature(
+  napi_env env, const mln_source_feature* source, size_t size
 );
 napi_value mln_ts_read_source_feature_query_options(
   napi_env env, const mln_source_feature_query_options* source, size_t size

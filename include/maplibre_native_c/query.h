@@ -114,31 +114,44 @@ typedef struct mln_source_feature_query_options {
   );
 } mln_source_feature_query_options;
 
-/** Optional fields for mln_queried_feature. */
-typedef enum MLN_BINDING("kind=bitmask") mln_queried_feature_field : uint32_t {
-  MLN_QUERIED_FEATURE_SOURCE_ID = 1U << 0U,
-  MLN_QUERIED_FEATURE_SOURCE_LAYER_ID = 1U << 1U,
-  MLN_QUERIED_FEATURE_STATE = 1U << 2U,
-} mln_queried_feature_field;
+/** Optional fields for mln_rendered_feature. */
+typedef enum MLN_BINDING("kind=bitmask") mln_rendered_feature_field : uint32_t {
+  MLN_RENDERED_FEATURE_SOURCE_ID = 1U << 0U,
+  MLN_RENDERED_FEATURE_SOURCE_LAYER_ID = 1U << 1U,
+  MLN_RENDERED_FEATURE_STATE = 1U << 2U,
+} mln_rendered_feature_field;
 
 /**
- * One query hit borrowed for a completion callback.
+ * One rendered-feature query hit borrowed for a completion callback.
  *
  * Every view is valid only for that callback; copy what the host keeps.
- * feature is one UTF-8 GeoJSON Feature. source_id, source_layer_id, and state
- * are present when the matching field bit is set. state is a UTF-8 JSON
- * object.
+ * feature is one UTF-8 GeoJSON Feature, and layer_id is the style layer that
+ * rendered it. A feature that several style layers render yields one hit per
+ * layer. source_id, source_layer_id, and state are present when the matching
+ * field bit is set; a layer without a source, such as a location indicator,
+ * has no source_id. state is a UTF-8 JSON object.
  */
-typedef struct mln_queried_feature {
-  uint32_t fields MLN_BINDING("enum=mln_queried_feature_field");
+typedef struct mln_rendered_feature {
+  uint32_t fields MLN_BINDING("enum=mln_rendered_feature_field");
   mln_buffer_view feature MLN_BINDING("encoding=json");
+  mln_buffer_view layer_id;
   mln_buffer_view source_id
-    MLN_BINDING("mask=fields;bit=MLN_QUERIED_FEATURE_SOURCE_ID");
+    MLN_BINDING("mask=fields;bit=MLN_RENDERED_FEATURE_SOURCE_ID");
   mln_buffer_view source_layer_id
-    MLN_BINDING("mask=fields;bit=MLN_QUERIED_FEATURE_SOURCE_LAYER_ID");
+    MLN_BINDING("mask=fields;bit=MLN_RENDERED_FEATURE_SOURCE_LAYER_ID");
   mln_buffer_view state
-    MLN_BINDING("encoding=json;mask=fields;bit=MLN_QUERIED_FEATURE_STATE");
-} mln_queried_feature;
+    MLN_BINDING("encoding=json;mask=fields;bit=MLN_RENDERED_FEATURE_STATE");
+} mln_rendered_feature;
+
+/**
+ * One source-feature query hit borrowed for a completion callback.
+ *
+ * feature is one UTF-8 GeoJSON Feature, valid only for that callback; copy it
+ * if the host keeps it.
+ */
+typedef struct mln_source_feature {
+  mln_buffer_view feature MLN_BINDING("encoding=json");
+} mln_source_feature;
 
 /** Returns default rendered feature query options. */
 MLN_API mln_rendered_feature_query_options
@@ -153,7 +166,7 @@ mln_source_feature_query_options_default(void) MLN_NOEXCEPT;
  *
  * The query reads the last frame that the session rendered, so render after a
  * camera or style change for a result that matches it. The completion borrows
- * value_count mln_queried_feature values, value_size bytes apart.
+ * value_count mln_rendered_feature values, value_size bytes apart.
  *
  * Box geometry is normalized and clipped to the viewport, so a box that
  * over-covers the viewport queries everything visible. A box that lies entirely
@@ -173,7 +186,7 @@ mln_source_feature_query_options_default(void) MLN_NOEXCEPT;
  *   before the query runs.
  * - MLN_STATUS_NATIVE_ERROR when the query fails.
  */
-MLN_BINDING("execution=query;result=mln_queried_feature;shape=array")
+MLN_BINDING("execution=query;result=mln_rendered_feature;shape=array")
 MLN_API mln_status mln_render_session_query_rendered_features(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
   const mln_rendered_feature_query_options* options
@@ -186,7 +199,7 @@ MLN_API mln_status mln_render_session_query_rendered_features(
  *
  * The query covers only the tiles that the source loaded for rendering, and a
  * source loads tiles only while a visible layer uses it. The completion borrows
- * value_count mln_queried_feature values, value_size bytes apart.
+ * value_count mln_source_feature values, value_size bytes apart.
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
@@ -201,7 +214,7 @@ MLN_API mln_status mln_render_session_query_rendered_features(
  *   before the query runs.
  * - MLN_STATUS_NATIVE_ERROR when the query fails.
  */
-MLN_BINDING("execution=query;result=mln_queried_feature;shape=array")
+MLN_BINDING("execution=query;result=mln_source_feature;shape=array")
 MLN_API mln_status mln_render_session_query_source_features(
   mln_render_session session, mln_buffer_view source_id,
   const mln_source_feature_query_options* options MLN_BINDING("nullable=true"),

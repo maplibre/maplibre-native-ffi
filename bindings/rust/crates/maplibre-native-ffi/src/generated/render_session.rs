@@ -215,7 +215,7 @@ impl RenderSessionHandle {
         &self,
         geometry: &RenderedQueryGeometry,
         options: Option<&RenderedFeatureQueryOptions>,
-    ) -> Result<NativeFuture<Vec<QueriedFeature>>> {
+    ) -> Result<NativeFuture<Vec<RenderedFeature>>> {
         let mut call = self.inner.call();
         let geometry = call.reference(&geometry)?;
         let options = call.optional_reference(options.as_ref())?;
@@ -229,7 +229,7 @@ impl RenderSessionHandle {
                     out_diagnostic,
                 )
             },
-            completion::list::<sys::mln_queried_feature, _>,
+            completion::list::<sys::mln_rendered_feature, _>,
         )
     }
 
@@ -241,7 +241,7 @@ impl RenderSessionHandle {
         &self,
         source_id: &str,
         options: Option<&SourceFeatureQueryOptions>,
-    ) -> Result<NativeFuture<Vec<QueriedFeature>>> {
+    ) -> Result<NativeFuture<Vec<SourceFeature>>> {
         let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let options = call.optional_reference(options.as_ref())?;
@@ -255,7 +255,7 @@ impl RenderSessionHandle {
                     out_diagnostic,
                 )
             },
-            completion::list::<sys::mln_queried_feature, _>,
+            completion::list::<sys::mln_source_feature, _>,
         )
     }
 

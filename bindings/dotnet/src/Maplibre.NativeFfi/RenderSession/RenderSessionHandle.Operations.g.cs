@@ -284,14 +284,14 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// See <c>mln_render_session_query_rendered_features</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<QueriedFeature[]> QueryRenderedFeaturesAsync(
+    public Task<RenderedFeature[]> QueryRenderedFeaturesAsync(
         RenderedQueryGeometry geometry,
         RenderedFeatureQueryOptions? options,
         CancellationToken cancellationToken = default
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.QueryArray<mln_queried_feature, QueriedFeature>(
+        return scope.QueryArray<mln_rendered_feature, RenderedFeature>(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_query_rendered_features(
                     Handle,
@@ -302,7 +302,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
                     completion,
                     diagnostic
                 ),
-            CopyQueriedFeature,
+            CopyRenderedFeature,
             cancellationToken
         );
     }
@@ -314,14 +314,14 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// See <c>mln_render_session_query_source_features</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<QueriedFeature[]> QuerySourceFeaturesAsync(
+    public Task<SourceFeature[]> QuerySourceFeaturesAsync(
         string sourceId,
         SourceFeatureQueryOptions? options,
         CancellationToken cancellationToken = default
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.QueryArray<mln_queried_feature, QueriedFeature>(
+        return scope.QueryArray<mln_source_feature, SourceFeature>(
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_query_source_features(
                     Handle,
@@ -332,7 +332,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
                     completion,
                     diagnostic
                 ),
-            CopyQueriedFeature,
+            CopySourceFeature,
             cancellationToken
         );
     }

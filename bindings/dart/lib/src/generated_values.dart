@@ -693,20 +693,6 @@ final class ProjectionModeField extends _Flags<ProjectionModeField> {
       ProjectionModeField.fromRawValue(rawValue);
 }
 
-/// Optional fields for `mln_queried_feature`.
-///
-/// See `mln_queried_feature_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-final class QueriedFeatureField extends _Flags<QueriedFeatureField> {
-  const QueriedFeatureField.fromRawValue(super.rawValue);
-  static const sourceId = QueriedFeatureField.fromRawValue(1);
-  static const sourceLayerId = QueriedFeatureField.fromRawValue(2);
-  static const state = QueriedFeatureField.fromRawValue(4);
-  @override
-  QueriedFeatureField _of(int rawValue) =>
-      QueriedFeatureField.fromRawValue(rawValue);
-}
-
 /// What abandon did with a session's graphics resources.
 ///
 /// See `mln_render_abandon_disposition` in the
@@ -853,6 +839,20 @@ final class RenderSessionState extends _Enum {
     6 => 'RenderSessionState.abandoned',
     _ => 'RenderSessionState($rawValue)',
   };
+}
+
+/// Optional fields for `mln_rendered_feature`.
+///
+/// See `mln_rendered_feature_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+final class RenderedFeatureField extends _Flags<RenderedFeatureField> {
+  const RenderedFeatureField.fromRawValue(super.rawValue);
+  static const sourceId = RenderedFeatureField.fromRawValue(1);
+  static const sourceLayerId = RenderedFeatureField.fromRawValue(2);
+  static const state = RenderedFeatureField.fromRawValue(4);
+  @override
+  RenderedFeatureField _of(int rawValue) =>
+      RenderedFeatureField.fromRawValue(rawValue);
 }
 
 /// Optional fields for `mln_rendered_feature_query_options`.
@@ -4279,13 +4279,14 @@ final class RenderedFeatureQueryOptions extends _Value {
   List<Object?> get _members => [layerIds, filter];
 }
 
-/// One query hit borrowed for a completion callback.
+/// One rendered-feature query hit borrowed for a completion callback.
 ///
-/// See `mln_queried_feature` in the
+/// See `mln_rendered_feature` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-final class QueriedFeature extends _Value {
-  QueriedFeature({
+final class RenderedFeature extends _Value {
+  RenderedFeature({
     Uint8List? feature,
+    required this.layerId,
     this.sourceId,
     this.sourceLayerId,
     Uint8List? state,
@@ -4296,12 +4297,19 @@ final class QueriedFeature extends _Value {
            ? null
            : Uint8List.fromList(state).asUnmodifiableView();
   final Uint8List feature;
+  final String layerId;
   final String? sourceId;
   final String? sourceLayerId;
   final Uint8List? state;
 
   @override
-  List<Object?> get _members => [feature, sourceId, sourceLayerId, state];
+  List<Object?> get _members => [
+    feature,
+    layerId,
+    sourceId,
+    sourceLayerId,
+    state,
+  ];
 }
 
 /// Options for source feature queries.
@@ -4325,6 +4333,21 @@ final class SourceFeatureQueryOptions extends _Value {
 
   @override
   List<Object?> get _members => [sourceLayerIds, filter];
+}
+
+/// One source-feature query hit borrowed for a completion callback.
+///
+/// See `mln_source_feature` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+final class SourceFeature extends _Value {
+  SourceFeature({Uint8List? feature})
+    : feature = Uint8List.fromList(
+        feature ?? const <int>[],
+      ).asUnmodifiableView();
+  final Uint8List feature;
+
+  @override
+  List<Object?> get _members => [feature];
 }
 
 /// CPU image readback metadata for a texture target frame.

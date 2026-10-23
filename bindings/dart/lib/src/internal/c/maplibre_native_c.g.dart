@@ -875,15 +875,6 @@ final class mln_quaternion extends Struct {
   external double w;
 }
 
-final class mln_queried_feature extends Struct {
-  @Uint32()
-  external int fields;
-  external mln_buffer_view feature;
-  external mln_buffer_view source_id;
-  external mln_buffer_view source_layer_id;
-  external mln_buffer_view state;
-}
-
 final class mln_queue_lock extends Struct {
   external mln_queue_lock_callback lock;
   external mln_queue_lock_callback unlock;
@@ -973,6 +964,16 @@ final class mln_render_session_snapshot extends Struct {
   external int acquired_frame_count;
   @Bool()
   external bool pending_changes;
+}
+
+final class mln_rendered_feature extends Struct {
+  @Uint32()
+  external int fields;
+  external mln_buffer_view feature;
+  external mln_buffer_view layer_id;
+  external mln_buffer_view source_id;
+  external mln_buffer_view source_layer_id;
+  external mln_buffer_view state;
 }
 
 final class mln_rendered_feature_query_options extends Struct {
@@ -1238,6 +1239,10 @@ final class mln_screen_point extends Struct {
   external double x;
   @Double()
   external double y;
+}
+
+final class mln_source_feature extends Struct {
+  external mln_buffer_view feature;
 }
 
 final class mln_source_feature_query_options extends Struct {
@@ -1806,11 +1811,6 @@ const MLN_PROJECTION_MODE_AXONOMETRIC = 1;
 const MLN_PROJECTION_MODE_X_SKEW = 2;
 const MLN_PROJECTION_MODE_Y_SKEW = 4;
 
-// mln_queried_feature_field
-const MLN_QUERIED_FEATURE_SOURCE_ID = 1;
-const MLN_QUERIED_FEATURE_SOURCE_LAYER_ID = 2;
-const MLN_QUERIED_FEATURE_STATE = 4;
-
 // mln_render_abandon_disposition
 const MLN_RENDER_ABANDON_DISPOSITION_CLEAN = 0;
 const MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED = 1;
@@ -1848,6 +1848,11 @@ const MLN_RENDER_SESSION_STATE_DETACHING = 3;
 const MLN_RENDER_SESSION_STATE_DETACHED = 4;
 const MLN_RENDER_SESSION_STATE_TARGET_LOST = 5;
 const MLN_RENDER_SESSION_STATE_ABANDONED = 6;
+
+// mln_rendered_feature_field
+const MLN_RENDERED_FEATURE_SOURCE_ID = 1;
+const MLN_RENDERED_FEATURE_SOURCE_LAYER_ID = 2;
+const MLN_RENDERED_FEATURE_STATE = 4;
 
 // mln_rendered_feature_query_option_field
 const MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS = 1;

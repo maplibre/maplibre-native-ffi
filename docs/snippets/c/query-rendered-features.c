@@ -14,10 +14,11 @@ static void read_query_result(
   (void)user_data;
   // #region read
   if (result->status != MLN_STATUS_OK || result->value_count == 0) return;
-  const mln_queried_feature* features = result->value;
-  const mln_queried_feature hit = features[0];
+  const mln_rendered_feature* features = result->value;
+  const mln_rendered_feature hit = features[0];
   (void)hit;
-  // Copy hit.feature and any identifier or state view you keep before return.
+  // hit.layer_id names the style layer that drew the feature. Copy hit.feature
+  // and any identifier or state view you keep before return.
   // #endregion read
 }
 

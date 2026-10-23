@@ -199,21 +199,22 @@ constexpr auto element_owns_handles(const mln_offline_region_status*) noexcept
 }
 template <bool Writing>
 auto capture_element(
-  [[maybe_unused]] Arena<Writing>& arena, const mln_queried_feature& source
-) -> mln_queried_feature {
+  [[maybe_unused]] Arena<Writing>& arena, const mln_rendered_feature& source
+) -> mln_rendered_feature {
   auto result = source;
   result.feature = buffer(arena, source.feature);
-  if ((source.fields & MLN_QUERIED_FEATURE_SOURCE_ID) != 0) {
+  result.layer_id = buffer(arena, source.layer_id);
+  if ((source.fields & MLN_RENDERED_FEATURE_SOURCE_ID) != 0) {
     result.source_id = buffer(arena, source.source_id);
   } else {
     result.source_id = {};
   }
-  if ((source.fields & MLN_QUERIED_FEATURE_SOURCE_LAYER_ID) != 0) {
+  if ((source.fields & MLN_RENDERED_FEATURE_SOURCE_LAYER_ID) != 0) {
     result.source_layer_id = buffer(arena, source.source_layer_id);
   } else {
     result.source_layer_id = {};
   }
-  if ((source.fields & MLN_QUERIED_FEATURE_STATE) != 0) {
+  if ((source.fields & MLN_RENDERED_FEATURE_STATE) != 0) {
     result.state = buffer(arena, source.state);
   } else {
     result.state = {};
@@ -221,9 +222,24 @@ auto capture_element(
   return result;
 }
 inline auto discard_element(
-  [[maybe_unused]] const mln_queried_feature& value
+  [[maybe_unused]] const mln_rendered_feature& value
 ) noexcept -> void {}
-constexpr auto element_owns_handles(const mln_queried_feature*) noexcept
+constexpr auto element_owns_handles(const mln_rendered_feature*) noexcept
+  -> bool {
+  return false;
+}
+template <bool Writing>
+auto capture_element(
+  [[maybe_unused]] Arena<Writing>& arena, const mln_source_feature& source
+) -> mln_source_feature {
+  auto result = source;
+  result.feature = buffer(arena, source.feature);
+  return result;
+}
+inline auto discard_element(
+  [[maybe_unused]] const mln_source_feature& value
+) noexcept -> void {}
+constexpr auto element_owns_handles(const mln_source_feature*) noexcept
   -> bool {
   return false;
 }

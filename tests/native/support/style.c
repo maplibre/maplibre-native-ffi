@@ -107,35 +107,56 @@ typedef struct feature_probe {
   mln_test_feature_list list;
 } feature_probe;
 
-static void copy_features(
+static void copy_rendered_features(
   void* user_data, const mln_completion_result* result
 ) {
   feature_probe* probe = user_data;
   probe->list.status = result->status;
   probe->list.count = result->value_count;
   probe->overflowed = result->value_count > MLN_TEST_FEATURE_CAPACITY;
-  const mln_queried_feature* features = result->value;
+  const mln_rendered_feature* features = result->value;
   bool fits = true;
   for (size_t index = 0;
        index < result->value_count && index < MLN_TEST_FEATURE_CAPACITY;
        index += 1) {
-    const mln_queried_feature* source = &features[index];
+    const mln_rendered_feature* source = &features[index];
     mln_test_feature* copy = &probe->list.features[index];
     fits &= copy_text(source->feature, copy->feature, sizeof(copy->feature));
-    if ((source->fields & MLN_QUERIED_FEATURE_SOURCE_ID) != 0) {
+    fits &= copy_text(source->layer_id, copy->layer_id, sizeof(copy->layer_id));
+    if ((source->fields & MLN_RENDERED_FEATURE_SOURCE_ID) != 0) {
       fits &=
         copy_text(source->source_id, copy->source_id, sizeof(copy->source_id));
     }
-    if ((source->fields & MLN_QUERIED_FEATURE_SOURCE_LAYER_ID) != 0) {
+    if ((source->fields & MLN_RENDERED_FEATURE_SOURCE_LAYER_ID) != 0) {
       fits &= copy_text(
         source->source_layer_id, copy->source_layer_id,
         sizeof(copy->source_layer_id)
       );
     }
-    copy->has_state = (source->fields & MLN_QUERIED_FEATURE_STATE) != 0;
+    copy->has_state = (source->fields & MLN_RENDERED_FEATURE_STATE) != 0;
     if (copy->has_state) {
       fits &= copy_text(source->state, copy->state, sizeof(copy->state));
     }
+  }
+  probe->overflowed |= !fits;
+  mln_test_flag_set(&probe->done);
+}
+
+static void copy_source_features(
+  void* user_data, const mln_completion_result* result
+) {
+  feature_probe* probe = user_data;
+  probe->list.status = result->status;
+  probe->list.count = result->value_count;
+  probe->overflowed = result->value_count > MLN_TEST_FEATURE_CAPACITY;
+  const mln_source_feature* features = result->value;
+  bool fits = true;
+  for (size_t index = 0;
+       index < result->value_count && index < MLN_TEST_FEATURE_CAPACITY;
+       index += 1) {
+    mln_test_feature* copy = &probe->list.features[index];
+    fits &=
+      copy_text(features[index].feature, copy->feature, sizeof(copy->feature));
   }
   probe->overflowed |= !fits;
   mln_test_flag_set(&probe->done);
@@ -145,14 +166,16 @@ static bool probe_done(void* context) {
   return atomic_load(&((feature_probe*)context)->done);
 }
 
-static feature_probe* new_feature_probe(mln_completion* out_completion) {
+static feature_probe* new_feature_probe(
+  mln_completion_callback callback, mln_completion* out_completion
+) {
   feature_probe* probe = calloc(1, sizeof(*probe));
   TEST_ASSERT_NOT_NULL(probe);
   atomic_init(&probe->done, false);
   probe->list.status = MLN_STATUS_INVALID_STATE;
   *out_completion = (mln_completion){
     .size = sizeof(mln_completion),
-    .callback = copy_features,
+    .callback = callback,
     .user_data = probe,
   };
   return probe;
@@ -196,7 +219,7 @@ mln_test_feature_list mln_test_style_query_rendered_with(
   const mln_rendered_feature_query_options* options
 ) {
   mln_completion completion;
-  feature_probe* probe = new_feature_probe(&completion);
+  feature_probe* probe = new_feature_probe(copy_rendered_features, &completion);
   const mln_status status = mln_render_session_query_rendered_features(
     fixture->session, geometry, options, &completion, MLN_TEST_DIAGNOSTIC
   );
@@ -229,7 +252,7 @@ mln_test_feature_list mln_test_style_query_source_with(
   const mln_source_feature_query_options* options
 ) {
   mln_completion completion;
-  feature_probe* probe = new_feature_probe(&completion);
+  feature_probe* probe = new_feature_probe(copy_source_features, &completion);
   const mln_status status = mln_render_session_query_source_features(
     fixture->session,
     (mln_buffer_view){.data = source_id, .size = strlen(source_id)}, options,

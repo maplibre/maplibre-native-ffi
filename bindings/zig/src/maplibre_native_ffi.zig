@@ -2614,41 +2614,6 @@ pub const Quaternion = struct {
     }
 };
 
-/// One query hit borrowed for a completion callback.
-///
-/// See `mln_queried_feature` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub const QueriedFeature = struct {
-    feature: []const u8 = &.{},
-    source_id: ?[]const u8 = null,
-    source_layer_id: ?[]const u8 = null,
-    state: ?[]const u8 = null,
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_queried_feature) status.Error!QueriedFeature {
-        return .{
-            .feature = try marshal.copyView(allocator, raw.feature),
-            .source_id = if (raw.fields & c.MLN_QUERIED_FEATURE_SOURCE_ID != 0) try marshal.copyView(allocator, raw.source_id) else null,
-            .source_layer_id = if (raw.fields & c.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID != 0) try marshal.copyView(allocator, raw.source_layer_id) else null,
-            .state = if (raw.fields & c.MLN_QUERIED_FEATURE_STATE != 0) try marshal.copyView(allocator, raw.state) else null,
-        };
-    }
-};
-
-/// Optional fields for `mln_queried_feature`.
-///
-/// See `mln_queried_feature_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub const QueriedFeatureField = struct {
-    source_id: bool = false,
-    source_layer_id: bool = false,
-    state: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-};
-
 /// Host lock on the graphics queue that a session shares with its host, copied
 /// by a successful attach.
 ///
@@ -3011,6 +2976,43 @@ pub const RenderSessionState = enum(u32) {
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
+/// One rendered-feature query hit borrowed for a completion callback.
+///
+/// See `mln_rendered_feature` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+pub const RenderedFeature = struct {
+    feature: []const u8 = &.{},
+    layer_id: []const u8 = &.{},
+    source_id: ?[]const u8 = null,
+    source_layer_id: ?[]const u8 = null,
+    state: ?[]const u8 = null,
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_rendered_feature) status.Error!RenderedFeature {
+        return .{
+            .feature = try marshal.copyView(allocator, raw.feature),
+            .layer_id = try marshal.copyView(allocator, raw.layer_id),
+            .source_id = if (raw.fields & c.MLN_RENDERED_FEATURE_SOURCE_ID != 0) try marshal.copyView(allocator, raw.source_id) else null,
+            .source_layer_id = if (raw.fields & c.MLN_RENDERED_FEATURE_SOURCE_LAYER_ID != 0) try marshal.copyView(allocator, raw.source_layer_id) else null,
+            .state = if (raw.fields & c.MLN_RENDERED_FEATURE_STATE != 0) try marshal.copyView(allocator, raw.state) else null,
+        };
+    }
+};
+
+/// Optional fields for `mln_rendered_feature`.
+///
+/// See `mln_rendered_feature_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+pub const RenderedFeatureField = struct {
+    source_id: bool = false,
+    source_layer_id: bool = false,
+    state: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{ 1, 2, 4 };
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
 };
 
 /// Optional fields for `mln_rendered_feature_query_options`.
@@ -3948,6 +3950,20 @@ pub const ScreenPoint = struct {
         return .{
             .x = raw.x,
             .y = raw.y,
+        };
+    }
+};
+
+/// One source-feature query hit borrowed for a completion callback.
+///
+/// See `mln_source_feature` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+pub const SourceFeature = struct {
+    feature: []const u8 = &.{},
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_source_feature) status.Error!SourceFeature {
+        return .{
+            .feature = try marshal.copyView(allocator, raw.feature),
         };
     }
 };
@@ -6503,16 +6519,16 @@ pub fn renderSessionQueryFeatureExtensions(allocator: std.mem.Allocator, session
 ///
 /// See `mln_render_session_query_rendered_features` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub fn renderSessionQueryRenderedFeatures(allocator: std.mem.Allocator, session: RenderSession, geometry: RenderedQueryGeometry, options: ?RenderedFeatureQueryOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const QueriedFeature)) {
-    return call.submit("mln_render_session_query_rendered_features", .handle, session, call.slice(QueriedFeature, c.mln_queried_feature), allocator, diagnostic, .{ geometry, options });
+pub fn renderSessionQueryRenderedFeatures(allocator: std.mem.Allocator, session: RenderSession, geometry: RenderedQueryGeometry, options: ?RenderedFeatureQueryOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const RenderedFeature)) {
+    return call.submit("mln_render_session_query_rendered_features", .handle, session, call.slice(RenderedFeature, c.mln_rendered_feature), allocator, diagnostic, .{ geometry, options });
 }
 
 /// Starts a source-feature query against the session's latest driver state.
 ///
 /// See `mln_render_session_query_source_features` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub fn renderSessionQuerySourceFeatures(allocator: std.mem.Allocator, session: RenderSession, source_id: []const u8, options: ?SourceFeatureQueryOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const QueriedFeature)) {
-    return call.submit("mln_render_session_query_source_features", .handle, session, call.slice(QueriedFeature, c.mln_queried_feature), allocator, diagnostic, .{ source_id, options });
+pub fn renderSessionQuerySourceFeatures(allocator: std.mem.Allocator, session: RenderSession, source_id: []const u8, options: ?SourceFeatureQueryOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const SourceFeature)) {
+    return call.submit("mln_render_session_query_source_features", .handle, session, call.slice(SourceFeature, c.mln_source_feature), allocator, diagnostic, .{ source_id, options });
 }
 
 /// Reads back the latest frame of the session's owned texture as premultiplied

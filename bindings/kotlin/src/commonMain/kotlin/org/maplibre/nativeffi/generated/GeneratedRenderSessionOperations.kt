@@ -178,7 +178,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
   public fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions? = null,
-  ): Deferred<List<QueriedFeature>> =
+  ): Deferred<List<RenderedFeature>> =
     nativeSubmit(
       this,
       binding,
@@ -187,9 +187,9 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
           CompletionBridge.valueSize(result),
-          w(36, 72),
+          w(44, 88),
         ) {
-          readQueriedFeature(it)
+          readRenderedFeature(it)
         }
       },
     ) {
@@ -213,7 +213,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
   public fun querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions? = null,
-  ): Deferred<List<QueriedFeature>> =
+  ): Deferred<List<SourceFeature>> =
     nativeSubmit(
       this,
       binding,
@@ -222,9 +222,9 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
           CompletionBridge.valueSize(result),
-          w(36, 72),
+          w(8, 16),
         ) {
-          readQueriedFeature(it)
+          readSourceFeature(it)
         }
       },
     ) {

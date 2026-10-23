@@ -1886,33 +1886,6 @@ export interface Quaternion {
 }
 
 /**
- * One query hit borrowed for a completion callback.
- *
- * See `mln_queried_feature` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-export interface QueriedFeature {
-  readonly feature: string;
-  readonly sourceId?: string;
-  readonly sourceLayerId?: string;
-  readonly state?: string;
-}
-
-/**
- * Optional fields for `mln_queried_feature`.
- *
- * See `mln_queried_feature_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-export const QueriedFeatureField = {
-  sourceId: 1,
-  sourceLayerId: 2,
-  state: 4,
-} as const;
-/** A bitwise OR of QueriedFeatureField flags. */
-export type QueriedFeatureField = number;
-
-/**
  * Host lock on the graphics queue that a session shares with its host, copied
  * by a successful attach.
  *
@@ -2279,6 +2252,34 @@ export const RenderSessionState = {
 export type RenderSessionState =
   | (typeof RenderSessionState)[keyof typeof RenderSessionState]
   | (number & {});
+
+/**
+ * One rendered-feature query hit borrowed for a completion callback.
+ *
+ * See `mln_rendered_feature` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
+export interface RenderedFeature {
+  readonly feature: string;
+  readonly layerId: string;
+  readonly sourceId?: string;
+  readonly sourceLayerId?: string;
+  readonly state?: string;
+}
+
+/**
+ * Optional fields for `mln_rendered_feature`.
+ *
+ * See `mln_rendered_feature_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
+export const RenderedFeatureField = {
+  sourceId: 1,
+  sourceLayerId: 2,
+  state: 4,
+} as const;
+/** A bitwise OR of RenderedFeatureField flags. */
+export type RenderedFeatureField = number;
 
 /**
  * Optional fields for `mln_rendered_feature_query_options`.
@@ -2987,6 +2988,16 @@ export interface ScreenLineString {
 export interface ScreenPoint {
   x?: number;
   y?: number;
+}
+
+/**
+ * One source-feature query hit borrowed for a completion callback.
+ *
+ * See `mln_source_feature` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
+export interface SourceFeature {
+  readonly feature: string;
 }
 
 /**

@@ -848,21 +848,6 @@ const (
 
 func (value ProjectionModeField) Has(flags ProjectionModeField) bool { return value&flags == flags }
 
-// QueriedFeatureField corresponds to mln_queried_feature_field. Optional fields
-// for mln_queried_feature.
-//
-// See mln_queried_feature_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-type QueriedFeatureField uint32
-
-const (
-	QueriedFeatureFieldSourceId      QueriedFeatureField = QueriedFeatureField(C.MLN_QUERIED_FEATURE_SOURCE_ID)
-	QueriedFeatureFieldSourceLayerId QueriedFeatureField = QueriedFeatureField(C.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID)
-	QueriedFeatureFieldState         QueriedFeatureField = QueriedFeatureField(C.MLN_QUERIED_FEATURE_STATE)
-)
-
-func (value QueriedFeatureField) Has(flags QueriedFeatureField) bool { return value&flags == flags }
-
 // RenderAbandonDisposition corresponds to mln_render_abandon_disposition. What
 // abandon did with a session's graphics resources.
 //
@@ -1041,6 +1026,21 @@ func (value RenderSessionState) String() string {
 	}
 	return fmt.Sprintf("RenderSessionState(%d)", value)
 }
+
+// RenderedFeatureField corresponds to mln_rendered_feature_field. Optional
+// fields for mln_rendered_feature.
+//
+// See mln_rendered_feature_field in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
+type RenderedFeatureField uint32
+
+const (
+	RenderedFeatureFieldSourceId      RenderedFeatureField = RenderedFeatureField(C.MLN_RENDERED_FEATURE_SOURCE_ID)
+	RenderedFeatureFieldSourceLayerId RenderedFeatureField = RenderedFeatureField(C.MLN_RENDERED_FEATURE_SOURCE_LAYER_ID)
+	RenderedFeatureFieldState         RenderedFeatureField = RenderedFeatureField(C.MLN_RENDERED_FEATURE_STATE)
+)
+
+func (value RenderedFeatureField) Has(flags RenderedFeatureField) bool { return value&flags == flags }
 
 // RenderedFeatureQueryOptionField corresponds to
 // mln_rendered_feature_query_option_field. Optional fields for
@@ -4077,27 +4077,6 @@ func nativeQuaternion(input Quaternion, arena *bindingArena) C.mln_quaternion {
 	return raw
 }
 
-// QueriedFeature corresponds to mln_queried_feature. One query hit borrowed for
-// a completion callback.
-//
-// See mln_queried_feature in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-type QueriedFeature struct {
-	Feature       []byte
-	SourceId      *string
-	SourceLayerId *string
-	State         *[]byte
-}
-
-func copyQueriedFeature(raw C.mln_queried_feature) QueriedFeature {
-	var result QueriedFeature
-	result.Feature = bindingBytes(raw.feature.data, uint64(raw.feature.size))
-	result.SourceId = bindingPresent(raw.fields&C.MLN_QUERIED_FEATURE_SOURCE_ID != 0, func() string { return bindingString(raw.source_id.data, uint64(raw.source_id.size)) })
-	result.SourceLayerId = bindingPresent(raw.fields&C.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID != 0, func() string { return bindingString(raw.source_layer_id.data, uint64(raw.source_layer_id.size)) })
-	result.State = bindingPresent(raw.fields&C.MLN_QUERIED_FEATURE_STATE != 0, func() []byte { return bindingBytes(raw.state.data, uint64(raw.state.size)) })
-	return result
-}
-
 // QueueLock corresponds to mln_queue_lock. Host lock on the graphics queue that
 // a session shares with its host, copied by a successful attach.
 //
@@ -4344,6 +4323,29 @@ func copyRenderSessionSnapshot(raw C.mln_render_session_snapshot) RenderSessionS
 	result.FrameGeneration = uint64(raw.frame_generation)
 	result.AcquiredFrameCount = uint32(raw.acquired_frame_count)
 	result.PendingChanges = bool(raw.pending_changes)
+	return result
+}
+
+// RenderedFeature corresponds to mln_rendered_feature. One rendered-feature
+// query hit borrowed for a completion callback.
+//
+// See mln_rendered_feature in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
+type RenderedFeature struct {
+	Feature       []byte
+	LayerId       string
+	SourceId      *string
+	SourceLayerId *string
+	State         *[]byte
+}
+
+func copyRenderedFeature(raw C.mln_rendered_feature) RenderedFeature {
+	var result RenderedFeature
+	result.Feature = bindingBytes(raw.feature.data, uint64(raw.feature.size))
+	result.LayerId = bindingString(raw.layer_id.data, uint64(raw.layer_id.size))
+	result.SourceId = bindingPresent(raw.fields&C.MLN_RENDERED_FEATURE_SOURCE_ID != 0, func() string { return bindingString(raw.source_id.data, uint64(raw.source_id.size)) })
+	result.SourceLayerId = bindingPresent(raw.fields&C.MLN_RENDERED_FEATURE_SOURCE_LAYER_ID != 0, func() string { return bindingString(raw.source_layer_id.data, uint64(raw.source_layer_id.size)) })
+	result.State = bindingPresent(raw.fields&C.MLN_RENDERED_FEATURE_STATE != 0, func() []byte { return bindingBytes(raw.state.data, uint64(raw.state.size)) })
 	return result
 }
 
@@ -4976,6 +4978,19 @@ func nativeScreenPoint(input ScreenPoint, arena *bindingArena) C.mln_screen_poin
 	raw.x = C.double(input.X)
 	raw.y = C.double(input.Y)
 	return raw
+}
+
+// SourceFeature corresponds to mln_source_feature. One source-feature query hit
+// borrowed for a completion callback.
+//
+// See mln_source_feature in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
+type SourceFeature struct{ Feature []byte }
+
+func copySourceFeature(raw C.mln_source_feature) SourceFeature {
+	var result SourceFeature
+	result.Feature = bindingBytes(raw.feature.data, uint64(raw.feature.size))
+	return result
 }
 
 // SourceFeatureQueryOptions corresponds to mln_source_feature_query_options.
@@ -8328,10 +8343,10 @@ func (receiver *RenderSessionHandle) QueryFeatureExtensions(sourceId string, fea
 //
 // See mln_render_session_query_rendered_features in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-func (receiver *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) (*Future[[]QueriedFeature], error) {
+func (receiver *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) (*Future[[]RenderedFeature], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_query_rendered_features(C.mln_render_session(raw), bindingStore(nativeRenderedQueryGeometry(geometry, arena), arena), bindingStoreOptional(options, arena, nativeRenderedFeatureQueryOptions), completion, diagnostic))
-	}, completionListOf(copyQueriedFeature), false)
+	}, completionListOf(copyRenderedFeature), false)
 }
 
 // QuerySourceFeatures starts a source-feature query against the session's
@@ -8339,10 +8354,10 @@ func (receiver *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQuer
 //
 // See mln_render_session_query_source_features in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-func (receiver *RenderSessionHandle) QuerySourceFeatures(sourceId string, options *SourceFeatureQueryOptions) (*Future[[]QueriedFeature], error) {
+func (receiver *RenderSessionHandle) QuerySourceFeatures(sourceId string, options *SourceFeatureQueryOptions) (*Future[[]SourceFeature], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_query_source_features(C.mln_render_session(raw), bindingView(sourceId, arena), bindingStoreOptional(options, arena, nativeSourceFeatureQueryOptions), completion, diagnostic))
-	}, completionListOf(copyQueriedFeature), false)
+	}, completionListOf(copySourceFeature), false)
 }
 
 // ReadTexture reads back the latest frame of the session's owned texture as

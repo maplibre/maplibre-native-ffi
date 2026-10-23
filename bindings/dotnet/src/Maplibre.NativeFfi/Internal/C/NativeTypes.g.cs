@@ -612,15 +612,6 @@ internal unsafe struct mln_quaternion
     public double w;
 }
 
-internal unsafe struct mln_queried_feature
-{
-    public mln_queried_feature_field fields;
-    public mln_buffer_view feature;
-    public mln_buffer_view source_id;
-    public mln_buffer_view source_layer_id;
-    public mln_buffer_view state;
-}
-
 internal unsafe struct mln_queue_lock
 {
     public delegate* unmanaged[Cdecl]<void*, void> @lock;
@@ -687,6 +678,16 @@ internal unsafe struct mln_render_session_snapshot
     public ulong frame_generation;
     public uint acquired_frame_count;
     public byte pending_changes;
+}
+
+internal unsafe struct mln_rendered_feature
+{
+    public mln_rendered_feature_field fields;
+    public mln_buffer_view feature;
+    public mln_buffer_view layer_id;
+    public mln_buffer_view source_id;
+    public mln_buffer_view source_layer_id;
+    public mln_buffer_view state;
 }
 
 internal unsafe struct mln_rendered_feature_query_options
@@ -916,6 +917,11 @@ internal unsafe struct mln_screen_point
 {
     public double x;
     public double y;
+}
+
+internal unsafe struct mln_source_feature
+{
+    public mln_buffer_view feature;
 }
 
 internal unsafe struct mln_source_feature_query_options
@@ -1473,13 +1479,6 @@ internal enum mln_projection_mode_field : uint
     MLN_PROJECTION_MODE_Y_SKEW = 4,
 }
 
-internal enum mln_queried_feature_field : uint
-{
-    MLN_QUERIED_FEATURE_SOURCE_ID = 1,
-    MLN_QUERIED_FEATURE_SOURCE_LAYER_ID = 2,
-    MLN_QUERIED_FEATURE_STATE = 4,
-}
-
 internal enum mln_render_abandon_disposition : uint
 {
     MLN_RENDER_ABANDON_DISPOSITION_CLEAN = 0,
@@ -1530,6 +1529,13 @@ internal enum mln_render_session_state : uint
     MLN_RENDER_SESSION_STATE_DETACHED = 4,
     MLN_RENDER_SESSION_STATE_TARGET_LOST = 5,
     MLN_RENDER_SESSION_STATE_ABANDONED = 6,
+}
+
+internal enum mln_rendered_feature_field : uint
+{
+    MLN_RENDERED_FEATURE_SOURCE_ID = 1,
+    MLN_RENDERED_FEATURE_SOURCE_LAYER_ID = 2,
+    MLN_RENDERED_FEATURE_STATE = 4,
 }
 
 internal enum mln_rendered_feature_query_option_field : uint

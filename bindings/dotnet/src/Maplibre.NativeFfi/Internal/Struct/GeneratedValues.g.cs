@@ -1588,26 +1588,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static QueriedFeature CopyQueriedFeature(mln_queried_feature value) =>
-        new()
-        {
-            FeatureStorage = new(ValueStructs.CopyBufferView(value.feature)),
-            SourceId = value.fields.HasFlag(MLN_QUERIED_FEATURE_SOURCE_ID)
-                ? RuntimeStructs.CopyUtf8((sbyte*)value.source_id.data, value.source_id.size)
-                : null,
-            SourceLayerId = value.fields.HasFlag(MLN_QUERIED_FEATURE_SOURCE_LAYER_ID)
-                ? RuntimeStructs.CopyUtf8(
-                    (sbyte*)value.source_layer_id.data,
-                    value.source_layer_id.size
-                )
-                : null,
-            StateStorage = ValueArray.Optional(
-                value.fields.HasFlag(MLN_QUERIED_FEATURE_STATE)
-                    ? ValueStructs.CopyBufferView(value.state)
-                    : null
-            ),
-        };
-
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokeQueueLockLock(void* user_data)
     {
@@ -1757,6 +1737,27 @@ internal static unsafe class GeneratedValues
             value.acquired_frame_count,
             value.pending_changes != 0
         );
+
+    internal static RenderedFeature CopyRenderedFeature(mln_rendered_feature value) =>
+        new()
+        {
+            FeatureStorage = new(ValueStructs.CopyBufferView(value.feature)),
+            LayerId = RuntimeStructs.CopyUtf8((sbyte*)value.layer_id.data, value.layer_id.size),
+            SourceId = value.fields.HasFlag(MLN_RENDERED_FEATURE_SOURCE_ID)
+                ? RuntimeStructs.CopyUtf8((sbyte*)value.source_id.data, value.source_id.size)
+                : null,
+            SourceLayerId = value.fields.HasFlag(MLN_RENDERED_FEATURE_SOURCE_LAYER_ID)
+                ? RuntimeStructs.CopyUtf8(
+                    (sbyte*)value.source_layer_id.data,
+                    value.source_layer_id.size
+                )
+                : null,
+            StateStorage = ValueArray.Optional(
+                value.fields.HasFlag(MLN_RENDERED_FEATURE_STATE)
+                    ? ValueStructs.CopyBufferView(value.state)
+                    : null
+            ),
+        };
 
     internal static RenderedFeatureQueryOptions CopyRenderedFeatureQueryOptions(
         mln_rendered_feature_query_options value
@@ -2248,6 +2249,12 @@ internal static unsafe class GeneratedValues
         native.y = value.Y;
         return native;
     }
+
+    internal static SourceFeature CopySourceFeature(mln_source_feature value) =>
+        default(SourceFeature) with
+        {
+            FeatureStorage = new(ValueStructs.CopyBufferView(value.feature)),
+        };
 
     internal static SourceFeatureQueryOptions CopySourceFeatureQueryOptions(
         mln_source_feature_query_options value

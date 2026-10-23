@@ -2405,17 +2405,18 @@ RenderedFeatureQueryOptions _readRenderedFeatureQueryOptions(
       : null,
 );
 
-QueriedFeature _readQueriedFeature(raw.mln_queried_feature source) =>
-    QueriedFeature(
+RenderedFeature _readRenderedFeature(raw.mln_rendered_feature source) =>
+    RenderedFeature(
       feature: _copyBufferView(source.feature),
-      sourceId: (source.fields & raw.MLN_QUERIED_FEATURE_SOURCE_ID) != 0
+      layerId: utf8.decode(_copyBufferView(source.layer_id)),
+      sourceId: (source.fields & raw.MLN_RENDERED_FEATURE_SOURCE_ID) != 0
           ? utf8.decode(_copyBufferView(source.source_id))
           : null,
       sourceLayerId:
-          (source.fields & raw.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID) != 0
+          (source.fields & raw.MLN_RENDERED_FEATURE_SOURCE_LAYER_ID) != 0
           ? utf8.decode(_copyBufferView(source.source_layer_id))
           : null,
-      state: (source.fields & raw.MLN_QUERIED_FEATURE_STATE) != 0
+      state: (source.fields & raw.MLN_RENDERED_FEATURE_STATE) != 0
           ? _copyBufferView(source.state)
           : null,
     );
@@ -2465,6 +2466,9 @@ SourceFeatureQueryOptions _readSourceFeatureQueryOptions(
       ? _copyBufferView(source.filter)
       : null,
 );
+
+SourceFeature _readSourceFeature(raw.mln_source_feature source) =>
+    SourceFeature(feature: _copyBufferView(source.feature));
 
 TextureImageInfo _readTextureImageInfo(raw.mln_texture_image_info source) =>
     TextureImageInfo(
@@ -3086,9 +3090,14 @@ final _resultOfflineRegionStatus = _CompletionValue(
     element.cast<raw.mln_offline_region_status>().ref,
   ),
 );
-final _resultQueriedFeature = _CompletionValue(
-  sizeOf<raw.mln_queried_feature>(),
-  (element) => _readQueriedFeature(element.cast<raw.mln_queried_feature>().ref),
+final _resultRenderedFeature = _CompletionValue(
+  sizeOf<raw.mln_rendered_feature>(),
+  (element) =>
+      _readRenderedFeature(element.cast<raw.mln_rendered_feature>().ref),
+);
+final _resultSourceFeature = _CompletionValue(
+  sizeOf<raw.mln_source_feature>(),
+  (element) => _readSourceFeature(element.cast<raw.mln_source_feature>().ref),
 );
 final _resultString = _CompletionValue(
   sizeOf<raw.mln_buffer_view>(),
@@ -6597,11 +6606,11 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// See `mln_render_session_query_rendered_features` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-  Future<List<QueriedFeature>> queryRenderedFeatures(
+  Future<List<RenderedFeature>> queryRenderedFeatures(
     RenderedQueryGeometry geometry, {
     RenderedFeatureQueryOptions? options,
   }) => _queryList(
-    _resultQueriedFeature,
+    _resultRenderedFeature,
     (arena, completion) => raw.mln_render_session_query_rendered_features(
       _handle.raw,
       _writeRenderedQueryGeometry(geometry, arena),
@@ -6617,11 +6626,11 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// See `mln_render_session_query_source_features` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-  Future<List<QueriedFeature>> querySourceFeatures(
+  Future<List<SourceFeature>> querySourceFeatures(
     String sourceId, {
     SourceFeatureQueryOptions? options,
   }) => _queryList(
-    _resultQueriedFeature,
+    _resultSourceFeature,
     (arena, completion) => raw.mln_render_session_query_source_features(
       _handle.raw,
       nativeStringView(sourceId, arena).value,

@@ -1111,27 +1111,32 @@ auto render_session_abandon_keeping_graphics(
 auto acquired_frame_dispose(mln_acquired_frame frame) -> mln_status;
 // Features a query copied out of the renderer. The completion borrows views of
 // these strings, so the list stays alive until the callback returns.
-struct QueriedFeatureRecord {
+struct RenderedFeatureRecord {
   std::string feature;
+  std::string layer_id;
   std::string source_id;
   std::string source_layer_id;
   std::string state;
   uint32_t fields = 0;
 };
 
-struct QueriedFeatureList {
-  std::vector<QueriedFeatureRecord> features;
+struct RenderedFeatureList {
+  std::vector<RenderedFeatureRecord> features;
+};
+
+struct SourceFeatureList {
+  std::vector<std::string> features;
 };
 
 auto render_session_query_rendered_features(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
   const mln_rendered_feature_query_options* options,
-  std::shared_ptr<const QueriedFeatureList>& out_result
+  std::shared_ptr<const RenderedFeatureList>& out_result
 ) -> mln_status;
 auto render_session_query_source_features(
   mln_render_session session, mln_buffer_view source_id,
   const mln_source_feature_query_options* options,
-  std::shared_ptr<const QueriedFeatureList>& out_result
+  std::shared_ptr<const SourceFeatureList>& out_result
 ) -> mln_status;
 auto render_session_query_feature_extensions(
   mln_render_session session, mln_buffer_view source_id,

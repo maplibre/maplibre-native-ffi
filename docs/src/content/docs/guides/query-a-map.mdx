@@ -29,7 +29,9 @@ land fills stay out of the result.
 
 <Code code={region(querySnippet, "query")} lang="c" title="query-rendered-features.c" />
 
-Each hit carries its feature as GeoJSON. Copy what you keep.
+Each hit carries its feature as GeoJSON and the ID of the style layer that drew
+it. A feature that several layers draw, such as a fill and its outline, yields
+one hit per layer. Copy what you keep.
 
 <Code code={region(querySnippet, "read")} lang="c" title="query-rendered-features.c" />
 

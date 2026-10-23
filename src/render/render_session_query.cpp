@@ -34,39 +34,46 @@ auto copy_view(mln_buffer_view view, std::string& out) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-// Keeps the copied query result alive through its completion callback.
-using OwnedQueriedFeatureList = std::shared_ptr<const QueriedFeatureList>;
+// Keep the copied query results alive through their completion callbacks.
+using OwnedRenderedFeatureList = std::shared_ptr<const RenderedFeatureList>;
+using OwnedSourceFeatureList = std::shared_ptr<const SourceFeatureList>;
 
-auto queried_feature_view(const QueriedFeatureRecord& record)
-  -> mln_queried_feature {
-  const auto view = [](const std::string& string) -> mln_buffer_view {
-    return {.data = string.data(), .size = string.size()};
-  };
-  auto feature = mln_queried_feature{
+auto string_view_of(const std::string& string) -> mln_buffer_view {
+  return {.data = string.data(), .size = string.size()};
+}
+
+auto rendered_feature_view(const RenderedFeatureRecord& record)
+  -> mln_rendered_feature {
+  auto feature = mln_rendered_feature{
     .fields = record.fields,
-    .feature = view(record.feature),
+    .feature = string_view_of(record.feature),
+    .layer_id = string_view_of(record.layer_id),
     .source_id = {},
     .source_layer_id = {},
     .state = {}
   };
-  if ((record.fields & MLN_QUERIED_FEATURE_SOURCE_ID) != 0) {
-    feature.source_id = view(record.source_id);
+  if ((record.fields & MLN_RENDERED_FEATURE_SOURCE_ID) != 0) {
+    feature.source_id = string_view_of(record.source_id);
   }
-  if ((record.fields & MLN_QUERIED_FEATURE_SOURCE_LAYER_ID) != 0) {
-    feature.source_layer_id = view(record.source_layer_id);
+  if ((record.fields & MLN_RENDERED_FEATURE_SOURCE_LAYER_ID) != 0) {
+    feature.source_layer_id = string_view_of(record.source_layer_id);
   }
-  if ((record.fields & MLN_QUERIED_FEATURE_STATE) != 0) {
-    feature.state = view(record.state);
+  if ((record.fields & MLN_RENDERED_FEATURE_STATE) != 0) {
+    feature.state = string_view_of(record.state);
   }
   return feature;
 }
 
-template <auto Function>
+auto source_feature_view(const std::string& feature) -> mln_source_feature {
+  return {.feature = string_view_of(feature)};
+}
+
+template <auto Function, class List, auto View>
 auto complete_feature_list(
   const std::shared_ptr<Completion>& completion, mln_status status,
   std::string diagnostic, std::any result
 ) -> void {
-  auto* list = std::any_cast<OwnedQueriedFeatureList>(&result);
+  auto* list = std::any_cast<std::shared_ptr<const List>>(&result);
   if (status != MLN_STATUS_OK || list == nullptr || *list == nullptr) {
     complete_failure(
       completion, status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
@@ -75,10 +82,10 @@ auto complete_feature_list(
     );
     return;
   }
-  auto features = std::vector<mln_queried_feature>{};
+  auto features = std::vector<decltype(View((*list)->features.front()))>{};
   features.reserve((*list)->features.size());
   for (const auto& record : (*list)->features) {
-    features.push_back(queried_feature_view(record));
+    features.push_back(View(record));
   }
   completion->resolve([list = std::move(*list), features = std::move(features)](
                         const CompletionSink& descriptor
@@ -300,7 +307,7 @@ auto render_session_query_rendered_features_start(
         };
         option_pointer = &copied_options->value;
       }
-      auto list = OwnedQueriedFeatureList{};
+      auto list = OwnedRenderedFeatureList{};
       const auto status = render_session_query_rendered_features(
         target.self, &copied_geometry, option_pointer, list
       );
@@ -308,7 +315,9 @@ auto render_session_query_rendered_features_start(
       return status;
     },
     completion,
-    complete_feature_list<&mln_render_session_query_rendered_features>
+    complete_feature_list<
+      &mln_render_session_query_rendered_features, RenderedFeatureList,
+      rendered_feature_view>
   );
 }
 
@@ -342,7 +351,7 @@ auto render_session_query_source_features_start(
         };
         option_pointer = &copied_options->value;
       }
-      auto list = OwnedQueriedFeatureList{};
+      auto list = OwnedSourceFeatureList{};
       const auto status = render_session_query_source_features(
         target.self, mln_buffer_view{source.data(), source.size()},
         option_pointer, list
@@ -350,7 +359,10 @@ auto render_session_query_source_features_start(
       if (status == MLN_STATUS_OK) result = std::move(list);
       return status;
     },
-    completion, complete_feature_list<&mln_render_session_query_source_features>
+    completion,
+    complete_feature_list<
+      &mln_render_session_query_source_features, SourceFeatureList,
+      source_feature_view>
   );
 }
 

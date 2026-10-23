@@ -41,11 +41,11 @@ public extension RenderSessionHandle {
   func queryRenderedFeatures(
     geometry bindingArg0: RenderedQueryGeometry,
     options bindingArg1: RenderedFeatureQueryOptions? = nil
-  ) async throws -> [QueriedFeature] {
+  ) async throws -> [RenderedFeature] {
     try await nativeStart(convert: { result in try NativeCompletion.values(
       result,
-      as: mln_queried_feature.self
-    ).map { try QueriedFeature(raw: $0) }
+      as: mln_rendered_feature.self
+    ).map { try RenderedFeature(raw: $0) }
     }) { raw, arena, completion, diagnostic in
       try mln_render_session_query_rendered_features(
         raw,
@@ -64,11 +64,11 @@ public extension RenderSessionHandle {
   func querySourceFeatures(
     sourceId bindingArg0: String,
     options bindingArg1: SourceFeatureQueryOptions? = nil
-  ) async throws -> [QueriedFeature] {
+  ) async throws -> [SourceFeature] {
     try await nativeStart(convert: { result in try NativeCompletion.values(
       result,
-      as: mln_queried_feature.self
-    ).map { try QueriedFeature(raw: $0) }
+      as: mln_source_feature.self
+    ).map { try SourceFeature(raw: $0) }
     }) { raw, arena, completion, diagnostic in
       try mln_render_session_query_source_features(
         raw,

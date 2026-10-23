@@ -4,7 +4,6 @@ import kotlin.test.assertEquals
 import org.maplibre.nativeffi.generated.CameraOptions
 import org.maplibre.nativeffi.generated.CameraUpdate
 import org.maplibre.nativeffi.generated.LatLng
-import org.maplibre.nativeffi.generated.QueriedFeature
 import org.maplibre.nativeffi.generated.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.generated.RenderedQueryGeometry
 import org.maplibre.nativeffi.generated.RenderedQueryGeometryData
@@ -48,7 +47,7 @@ internal suspend fun assertFilterSelects(
       complete(
         session.querySourceFeatures("point", SourceFeatureQueryOptions(filter = filter.encode())),
       )
-    assertEquals(ids, source.map { it.stringId() }.toSet(), "source query: $filter")
+    assertEquals(ids, source.map { it.feature.stringId() }.toSet(), "source query: $filter")
     val rendered =
       complete(
         session.queryRenderedFeatures(
@@ -63,7 +62,11 @@ internal suspend fun assertFilterSelects(
           RenderedFeatureQueryOptions(layerIds = listOf("cases")),
         ),
       )
-    assertEquals(ids, rendered.map { it.stringId() }.toSet(), "rendered layer filter: $filter")
+    assertEquals(
+      ids,
+      rendered.map { it.feature.stringId() }.toSet(),
+      "rendered layer filter: $filter",
+    )
   }
 }
 
@@ -74,5 +77,4 @@ private fun String.encode(): ByteArray = trimIndent().encodeToByteArray()
 private val STRING_ID = Regex("\"id\"\\s*:\\s*\"([^\"]*)\"")
 
 /** The feature's string id. The fixture's properties hold no member named id. */
-private fun QueriedFeature.stringId(): String? =
-  STRING_ID.find(feature.decodeToString())?.groupValues?.get(1)
+private fun ByteArray.stringId(): String? = STRING_ID.find(decodeToString())?.groupValues?.get(1)

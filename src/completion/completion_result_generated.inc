@@ -221,14 +221,14 @@ struct CompletionResult<&mln_render_session_query_feature_extensions> {
 template <>
 struct CompletionResult<&mln_render_session_query_rendered_features> {
   static constexpr bool has_value = true;
-  using type = mln_queried_feature;
+  using type = mln_rendered_feature;
   static constexpr bool array = true;
   static constexpr bool nullable = false;
 };
 template <>
 struct CompletionResult<&mln_render_session_query_source_features> {
   static constexpr bool has_value = true;
-  using type = mln_queried_feature;
+  using type = mln_source_feature;
   static constexpr bool array = true;
   static constexpr bool nullable = false;
 };

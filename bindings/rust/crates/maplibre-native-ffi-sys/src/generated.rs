@@ -191,10 +191,6 @@ pub type mln_projection_mode_field = u32;
 pub const MLN_PROJECTION_MODE_AXONOMETRIC: mln_projection_mode_field = 1;
 pub const MLN_PROJECTION_MODE_X_SKEW: mln_projection_mode_field = 2;
 pub const MLN_PROJECTION_MODE_Y_SKEW: mln_projection_mode_field = 4;
-pub type mln_queried_feature_field = u32;
-pub const MLN_QUERIED_FEATURE_SOURCE_ID: mln_queried_feature_field = 1;
-pub const MLN_QUERIED_FEATURE_SOURCE_LAYER_ID: mln_queried_feature_field = 2;
-pub const MLN_QUERIED_FEATURE_STATE: mln_queried_feature_field = 4;
 pub type mln_render_abandon_disposition = u32;
 pub const MLN_RENDER_ABANDON_DISPOSITION_CLEAN: mln_render_abandon_disposition = 0;
 pub const MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED: mln_render_abandon_disposition = 1;
@@ -226,6 +222,10 @@ pub const MLN_RENDER_SESSION_STATE_DETACHING: mln_render_session_state = 3;
 pub const MLN_RENDER_SESSION_STATE_DETACHED: mln_render_session_state = 4;
 pub const MLN_RENDER_SESSION_STATE_TARGET_LOST: mln_render_session_state = 5;
 pub const MLN_RENDER_SESSION_STATE_ABANDONED: mln_render_session_state = 6;
+pub type mln_rendered_feature_field = u32;
+pub const MLN_RENDERED_FEATURE_SOURCE_ID: mln_rendered_feature_field = 1;
+pub const MLN_RENDERED_FEATURE_SOURCE_LAYER_ID: mln_rendered_feature_field = 2;
+pub const MLN_RENDERED_FEATURE_STATE: mln_rendered_feature_field = 4;
 pub type mln_rendered_feature_query_option_field = u32;
 pub const MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS: mln_rendered_feature_query_option_field = 1;
 pub const MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER: mln_rendered_feature_query_option_field = 2;
@@ -1004,15 +1004,6 @@ pub struct mln_quaternion {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_queried_feature {
-    pub fields: u32,
-    pub feature: mln_buffer_view,
-    pub source_id: mln_buffer_view,
-    pub source_layer_id: mln_buffer_view,
-    pub state: mln_buffer_view,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct mln_queue_lock {
     pub lock: mln_queue_lock_callback,
     pub unlock: mln_queue_lock_callback,
@@ -1078,6 +1069,16 @@ pub struct mln_render_session_snapshot {
     pub frame_generation: u64,
     pub acquired_frame_count: u32,
     pub pending_changes: bool,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_rendered_feature {
+    pub fields: u32,
+    pub feature: mln_buffer_view,
+    pub layer_id: mln_buffer_view,
+    pub source_id: mln_buffer_view,
+    pub source_layer_id: mln_buffer_view,
+    pub state: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1280,6 +1281,11 @@ pub struct mln_screen_line_string {
 pub struct mln_screen_point {
     pub x: f64,
     pub y: f64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_source_feature {
+    pub feature: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

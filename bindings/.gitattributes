@@ -66,14 +66,15 @@
 /dotnet/src/Maplibre.NativeFfi/Map/Vec3.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/ViewportMode.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Projection/MapProjectionHandle.Operations.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Query/QueriedFeature.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Query/QueriedFeatureField.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Query/RenderedFeature.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Query/RenderedFeatureField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Query/RenderedFeatureQueryOptionField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Query/RenderedFeatureQueryOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Query/RenderedQueryGeometry.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Query/RenderedQueryGeometryType.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Query/ScreenBox.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Query/ScreenLineString.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Query/SourceFeature.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Query/SourceFeatureQueryOptionField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Query/SourceFeatureQueryOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/AcquiredFrameHandle.Operations.g.cs linguist-generated=true

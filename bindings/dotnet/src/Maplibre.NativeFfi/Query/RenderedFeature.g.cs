@@ -3,13 +3,13 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// One query hit borrowed for a completion callback.
+/// One rendered-feature query hit borrowed for a completion callback.
 /// </summary>
 /// <remarks>
-/// See <c>mln_queried_feature</c> in the <see
+/// See <c>mln_rendered_feature</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.
 /// </remarks>
-public sealed record QueriedFeature
+public sealed record RenderedFeature
 {
     public byte[] Feature
     {
@@ -17,6 +17,7 @@ public sealed record QueriedFeature
         set => FeatureStorage = ValueArray.Copy(value);
     }
     internal ValueArray<byte> FeatureStorage { get; set; }
+    public required string LayerId { get; set; }
     public string? SourceId { get; set; }
     public string? SourceLayerId { get; set; }
     public byte[]? State

@@ -14,10 +14,10 @@ static void read_features(
   (void)user_data;
   // #region read
   if (result->status != MLN_STATUS_OK || result->value_count == 0) return;
-  const mln_queried_feature* features = result->value;
-  const mln_queried_feature hit = features[0];
+  const mln_source_feature* features = result->value;
+  const mln_source_feature hit = features[0];
   (void)hit;
-  // Copy hit.feature and any identifier or state view you keep before return.
+  // Copy hit.feature before return if you keep it.
   // #endregion read
 }
 

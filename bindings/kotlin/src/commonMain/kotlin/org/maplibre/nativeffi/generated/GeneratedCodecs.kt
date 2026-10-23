@@ -1575,15 +1575,19 @@ internal fun readRenderSessionSnapshot(source: Long): RenderSessionSnapshot =
     pendingChanges = readBool(source + 60),
   )
 
-internal fun readQueriedFeature(source: Long): QueriedFeature {
+internal fun readRenderedFeature(source: Long): RenderedFeature {
   val fields = readU32(source)
-  return QueriedFeature(
+  return RenderedFeature(
     feature = readView(source + w(4, 8)),
-    sourceId = if ((fields and 1u) != 0u) readViewString(source + w(12, 24)) else null,
-    sourceLayerId = if ((fields and 2u) != 0u) readViewString(source + w(20, 40)) else null,
-    state = if ((fields and 4u) != 0u) readView(source + w(28, 56)) else null,
+    layerId = readViewString(source + w(12, 24)),
+    sourceId = if ((fields and 1u) != 0u) readViewString(source + w(20, 40)) else null,
+    sourceLayerId = if ((fields and 2u) != 0u) readViewString(source + w(28, 56)) else null,
+    state = if ((fields and 4u) != 0u) readView(source + w(36, 72)) else null,
   )
 }
+
+internal fun readSourceFeature(source: Long): SourceFeature =
+  SourceFeature(feature = readView(source))
 
 internal fun readTextureReadbackResult(source: Long): TextureReadbackResult =
   TextureReadbackResult(data = readView(source), info = readTextureImageInfo(source + w(8, 16)))

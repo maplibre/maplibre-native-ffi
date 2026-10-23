@@ -3554,54 +3554,6 @@ impl FromNative<sys::mln_quaternion> for Quaternion {
     }
 }
 
-/// One query hit borrowed for a completion callback.
-///
-/// See `mln_queried_feature` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct QueriedFeature {
-    pub feature: Vec<u8>,
-    pub source_id: Option<String>,
-    pub source_layer_id: Option<String>,
-    pub state: Option<Vec<u8>>,
-}
-impl FromNative<sys::mln_queried_feature> for QueriedFeature {
-    unsafe fn from_native(raw: sys::mln_queried_feature) -> Result<Self> {
-        Ok(Self {
-            feature: unsafe { from_native(raw.feature) }?,
-            source_id: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_QUERIED_FEATURE_SOURCE_ID,
-                    raw.source_id,
-                )
-            }?,
-            source_layer_id: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_QUERIED_FEATURE_SOURCE_LAYER_ID,
-                    raw.source_layer_id,
-                )
-            }?,
-            state: unsafe {
-                convert::present(raw.fields, sys::MLN_QUERIED_FEATURE_STATE, raw.state)
-            }?,
-        })
-    }
-}
-
-native_flags! {
-/// Optional fields for `mln_queried_feature`.
-///
-/// See `mln_queried_feature_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub struct QueriedFeatureField: u32 {
-    const SOURCE_ID = 1;
-    const SOURCE_LAYER_ID = 2;
-    const STATE = 4;
-}
-}
-
 /// Host lock on the graphics queue that a session shares with its host, copied
 /// by a successful attach.
 ///
@@ -4056,6 +4008,56 @@ pub enum RenderSessionState: u32 {
     TargetLost = 5,
     Abandoned = 6,
 } Unknown
+}
+
+/// One rendered-feature query hit borrowed for a completion callback.
+///
+/// See `mln_rendered_feature` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct RenderedFeature {
+    pub feature: Vec<u8>,
+    pub layer_id: String,
+    pub source_id: Option<String>,
+    pub source_layer_id: Option<String>,
+    pub state: Option<Vec<u8>>,
+}
+impl FromNative<sys::mln_rendered_feature> for RenderedFeature {
+    unsafe fn from_native(raw: sys::mln_rendered_feature) -> Result<Self> {
+        Ok(Self {
+            feature: unsafe { from_native(raw.feature) }?,
+            layer_id: unsafe { from_native(raw.layer_id) }?,
+            source_id: unsafe {
+                convert::present(
+                    raw.fields,
+                    sys::MLN_RENDERED_FEATURE_SOURCE_ID,
+                    raw.source_id,
+                )
+            }?,
+            source_layer_id: unsafe {
+                convert::present(
+                    raw.fields,
+                    sys::MLN_RENDERED_FEATURE_SOURCE_LAYER_ID,
+                    raw.source_layer_id,
+                )
+            }?,
+            state: unsafe {
+                convert::present(raw.fields, sys::MLN_RENDERED_FEATURE_STATE, raw.state)
+            }?,
+        })
+    }
+}
+
+native_flags! {
+/// Optional fields for `mln_rendered_feature`.
+///
+/// See `mln_rendered_feature_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+pub struct RenderedFeatureField: u32 {
+    const SOURCE_ID = 1;
+    const SOURCE_LAYER_ID = 2;
+    const STATE = 4;
+}
 }
 
 native_flags! {
@@ -5246,6 +5248,22 @@ impl ToNative<sys::mln_screen_point> for ScreenPoint {
 impl FromNative<sys::mln_screen_point> for ScreenPoint {
     unsafe fn from_native(raw: sys::mln_screen_point) -> Result<Self> {
         Ok(Self { x: raw.x, y: raw.y })
+    }
+}
+
+/// One source-feature query hit borrowed for a completion callback.
+///
+/// See `mln_source_feature` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct SourceFeature {
+    pub feature: Vec<u8>,
+}
+impl FromNative<sys::mln_source_feature> for SourceFeature {
+    unsafe fn from_native(raw: sys::mln_source_feature) -> Result<Self> {
+        Ok(Self {
+            feature: unsafe { from_native(raw.feature) }?,
+        })
     }
 }
 

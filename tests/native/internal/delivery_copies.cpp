@@ -115,16 +115,18 @@ void a_copy_clears_the_fields_its_presence_bits_mark_absent() {
     sizeof(mln_camera_options) - offsetof(mln_camera_options, center)
   ));
 
-  auto feature = mln_queried_feature{};
+  auto feature = mln_rendered_feature{};
   feature.feature = mln_buffer_view{"{}", 2};
+  feature.layer_id = mln_buffer_view{"layer", 5};
   feature.source_id = stale;
   feature.source_layer_id = stale;
   feature.state = stale;
   auto feature_copy = Copy{};
   copy_one(feature, feature_copy);
   const auto* copied_feature =
-    static_cast<const mln_queried_feature*>(feature_copy.value);
+    static_cast<const mln_rendered_feature*>(feature_copy.value);
   TEST_ASSERT_EQUAL_size_t(2, copied_feature->feature.size);
+  TEST_ASSERT_EQUAL_size_t(5, copied_feature->layer_id.size);
   TEST_ASSERT_EQUAL_size_t(0, copied_feature->source_id.size);
   TEST_ASSERT_EQUAL_size_t(0, copied_feature->source_layer_id.size);
   TEST_ASSERT_EQUAL_size_t(0, copied_feature->state.size);

@@ -1402,39 +1402,6 @@ fn generated_copy_mln_quaternion(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_queried_feature(
-    py: Python<'_>,
-    value: &sys::mln_queried_feature,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("feature", unsafe { generated_bytes(py, value.feature) }?)?;
-    dict.set_item(
-        "source_id",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_QUERIED_FEATURE_SOURCE_ID != 0,
-            || generated_text(py, value.source_id),
-        )?,
-    )?;
-    dict.set_item(
-        "source_layer_id",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_QUERIED_FEATURE_SOURCE_LAYER_ID != 0,
-            || generated_text(py, value.source_layer_id),
-        )?,
-    )?;
-    dict.set_item(
-        "state",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_QUERIED_FEATURE_STATE != 0,
-            || unsafe { generated_bytes(py, value.state) },
-        )?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
 unsafe extern "C" fn generated_callback_mln_queue_lock_lock(user_data: *mut std::ffi::c_void) {
     let outcome = generated_invoke(
         || (),
@@ -1578,6 +1545,40 @@ fn generated_copy_mln_render_session_snapshot(
     dict.set_item(
         "pending_changes",
         generated_value(py, value.pending_changes)?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_rendered_feature(
+    py: Python<'_>,
+    value: &sys::mln_rendered_feature,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("feature", unsafe { generated_bytes(py, value.feature) }?)?;
+    dict.set_item("layer_id", generated_text(py, value.layer_id)?)?;
+    dict.set_item(
+        "source_id",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_RENDERED_FEATURE_SOURCE_ID != 0,
+            || generated_text(py, value.source_id),
+        )?,
+    )?;
+    dict.set_item(
+        "source_layer_id",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_RENDERED_FEATURE_SOURCE_LAYER_ID != 0,
+            || generated_text(py, value.source_layer_id),
+        )?,
+    )?;
+    dict.set_item(
+        "state",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_RENDERED_FEATURE_STATE != 0,
+            || unsafe { generated_bytes(py, value.state) },
+        )?,
     )?;
     Ok(dict.into_any().unbind())
 }
@@ -1992,6 +1993,15 @@ fn generated_copy_mln_screen_point(
     let dict = PyDict::new(py);
     dict.set_item("x", generated_value(py, value.x)?)?;
     dict.set_item("y", generated_value(py, value.y)?)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_source_feature(
+    py: Python<'_>,
+    value: &sys::mln_source_feature,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("feature", unsafe { generated_bytes(py, value.feature) }?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -8441,8 +8451,8 @@ impl RenderSessionHandle {
         let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_values::<sys::mln_queried_feature>(result)? {
-                list.append(generated_copy_mln_queried_feature(py, &value)?)?;
+            for value in generated_completion_values::<sys::mln_rendered_feature>(result)? {
+                list.append(generated_copy_mln_rendered_feature(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -8478,8 +8488,8 @@ impl RenderSessionHandle {
         let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_values::<sys::mln_queried_feature>(result)? {
-                list.append(generated_copy_mln_queried_feature(py, &value)?)?;
+            for value in generated_completion_values::<sys::mln_source_feature>(result)? {
+                list.append(generated_copy_mln_source_feature(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };

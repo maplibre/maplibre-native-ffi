@@ -896,29 +896,6 @@ public data class ProjectionModeField(public val rawValue: UInt) {
 }
 
 /**
- * Optional fields for `mln_queried_feature`.
- *
- * See `mln_queried_feature_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-public data class QueriedFeatureField(public val rawValue: UInt) {
-  public infix fun or(other: QueriedFeatureField): QueriedFeatureField =
-    QueriedFeatureField(rawValue or other.rawValue)
-
-  public infix fun and(other: QueriedFeatureField): QueriedFeatureField =
-    QueriedFeatureField(rawValue and other.rawValue)
-
-  public operator fun contains(other: QueriedFeatureField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val SOURCE_ID: QueriedFeatureField = QueriedFeatureField(1u)
-    public val SOURCE_LAYER_ID: QueriedFeatureField = QueriedFeatureField(2u)
-    public val STATE: QueriedFeatureField = QueriedFeatureField(4u)
-  }
-}
-
-/**
  * What abandon did with a session's graphics resources.
  *
  * See `mln_render_abandon_disposition` in the
@@ -1097,6 +1074,29 @@ public data class RenderSessionState(public val rawValue: UInt) {
     public val DETACHED: RenderSessionState = RenderSessionState(4u)
     public val TARGET_LOST: RenderSessionState = RenderSessionState(5u)
     public val ABANDONED: RenderSessionState = RenderSessionState(6u)
+  }
+}
+
+/**
+ * Optional fields for `mln_rendered_feature`.
+ *
+ * See `mln_rendered_feature_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
+public data class RenderedFeatureField(public val rawValue: UInt) {
+  public infix fun or(other: RenderedFeatureField): RenderedFeatureField =
+    RenderedFeatureField(rawValue or other.rawValue)
+
+  public infix fun and(other: RenderedFeatureField): RenderedFeatureField =
+    RenderedFeatureField(rawValue and other.rawValue)
+
+  public operator fun contains(other: RenderedFeatureField): Boolean =
+    (rawValue and other.rawValue) == other.rawValue
+
+  public companion object {
+    public val SOURCE_ID: RenderedFeatureField = RenderedFeatureField(1u)
+    public val SOURCE_LAYER_ID: RenderedFeatureField = RenderedFeatureField(2u)
+    public val STATE: RenderedFeatureField = RenderedFeatureField(4u)
   }
 }
 
@@ -4118,22 +4118,42 @@ public data class RenderedQueryGeometry(
 )
 
 /**
- * One query hit borrowed for a completion callback.
+ * One rendered-feature query hit borrowed for a completion callback.
  *
- * See `mln_queried_feature` in the
+ * See `mln_rendered_feature` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
-public data class QueriedFeature(
+public data class RenderedFeature(
   public val feature: ByteArray = byteArrayOf(),
+  public val layerId: String = "",
   public val sourceId: String? = null,
   public val sourceLayerId: String? = null,
   public val state: ByteArray? = null,
 ) {
-  private fun contentFields(): Array<Any?> = arrayOf(feature, sourceId, sourceLayerId, state)
+  private fun contentFields(): Array<Any?> =
+    arrayOf(feature, layerId, sourceId, sourceLayerId, state)
 
   override fun equals(other: Any?): Boolean =
     this === other ||
-      other is QueriedFeature && contentFields().contentDeepEquals(other.contentFields())
+      other is RenderedFeature && contentFields().contentDeepEquals(other.contentFields())
+
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+}
+
+/**
+ * One source-feature query hit borrowed for a completion callback.
+ *
+ * See `mln_source_feature` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
+public data class SourceFeature(
+  public val feature: ByteArray = byteArrayOf(),
+) {
+  private fun contentFields(): Array<Any?> = arrayOf(feature)
+
+  override fun equals(other: Any?): Boolean =
+    this === other ||
+      other is SourceFeature && contentFields().contentDeepEquals(other.contentFields())
 
   override fun hashCode(): Int = contentFields().contentDeepHashCode()
 }

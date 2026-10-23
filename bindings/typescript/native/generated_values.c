@@ -205,11 +205,11 @@ napi_value mln_ts_decode_offline_region_status(
   );
 }
 
-napi_value mln_ts_decode_queried_feature_list(
+napi_value mln_ts_decode_rendered_feature_list(
   napi_env env, const mln_completion_result* result
 ) {
   size_t stride = result->value_size;
-  if (result->value_count > 0 && stride < sizeof(mln_queried_feature)) {
+  if (result->value_count > 0 && stride < sizeof(mln_rendered_feature)) {
     napi_throw_range_error(env, NULL, "native completion stride is too small");
     return NULL;
   }
@@ -219,8 +219,31 @@ napi_value mln_ts_decode_queried_feature_list(
     const char* value = (const char*)result->value + index * stride;
     if (!mln_ts_set_index(
           env, array, (uint32_t)index,
-          mln_ts_read_queried_feature(
-            env, &(*(const mln_queried_feature*)value), stride
+          mln_ts_read_rendered_feature(
+            env, &(*(const mln_rendered_feature*)value), stride
+          )
+        ))
+      return NULL;
+  }
+  return array;
+}
+
+napi_value mln_ts_decode_source_feature_list(
+  napi_env env, const mln_completion_result* result
+) {
+  size_t stride = result->value_size;
+  if (result->value_count > 0 && stride < sizeof(mln_source_feature)) {
+    napi_throw_range_error(env, NULL, "native completion stride is too small");
+    return NULL;
+  }
+  napi_value array = mln_ts_array(env, result->value_count);
+  if (array == NULL) return NULL;
+  for (size_t index = 0; index < result->value_count; index++) {
+    const char* value = (const char*)result->value + index * stride;
+    if (!mln_ts_set_index(
+          env, array, (uint32_t)index,
+          mln_ts_read_source_feature(
+            env, &(*(const mln_source_feature*)value), stride
           )
         ))
       return NULL;
@@ -2275,43 +2298,6 @@ napi_value mln_ts_read_quaternion(
   return result;
 }
 
-napi_value mln_ts_read_queried_feature(
-  napi_env env, const mln_queried_feature* source, size_t size
-) {
-  (void)size;
-  napi_value result = mln_ts_object(env);
-  if (result == NULL) return NULL;
-  if (!mln_ts_set(
-        env, result, "feature",
-        mln_ts_text(env, (source->feature).data, (source->feature).size)
-      ))
-    return NULL;
-  if ((source->fields & MLN_QUERIED_FEATURE_SOURCE_ID) != 0) {
-    if (!mln_ts_set(
-          env, result, "sourceId",
-          mln_ts_text(env, (source->source_id).data, (source->source_id).size)
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_QUERIED_FEATURE_SOURCE_LAYER_ID) != 0) {
-    if (!mln_ts_set(
-          env, result, "sourceLayerId",
-          mln_ts_text(
-            env, (source->source_layer_id).data, (source->source_layer_id).size
-          )
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_QUERIED_FEATURE_STATE) != 0) {
-    if (!mln_ts_set(
-          env, result, "state",
-          mln_ts_text(env, (source->state).data, (source->state).size)
-        ))
-      return NULL;
-  }
-  return result;
-}
-
 napi_value mln_ts_read_render_abandon_result(
   napi_env env, const mln_render_abandon_result* source, size_t size
 ) {
@@ -2500,6 +2486,48 @@ napi_value mln_ts_read_render_session_snapshot(
         env, result, "pendingChanges", mln_ts_bool(env, source->pending_changes)
       ))
     return NULL;
+  return result;
+}
+
+napi_value mln_ts_read_rendered_feature(
+  napi_env env, const mln_rendered_feature* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "feature",
+        mln_ts_text(env, (source->feature).data, (source->feature).size)
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "layerId",
+        mln_ts_text(env, (source->layer_id).data, (source->layer_id).size)
+      ))
+    return NULL;
+  if ((source->fields & MLN_RENDERED_FEATURE_SOURCE_ID) != 0) {
+    if (!mln_ts_set(
+          env, result, "sourceId",
+          mln_ts_text(env, (source->source_id).data, (source->source_id).size)
+        ))
+      return NULL;
+  }
+  if ((source->fields & MLN_RENDERED_FEATURE_SOURCE_LAYER_ID) != 0) {
+    if (!mln_ts_set(
+          env, result, "sourceLayerId",
+          mln_ts_text(
+            env, (source->source_layer_id).data, (source->source_layer_id).size
+          )
+        ))
+      return NULL;
+  }
+  if ((source->fields & MLN_RENDERED_FEATURE_STATE) != 0) {
+    if (!mln_ts_set(
+          env, result, "state",
+          mln_ts_text(env, (source->state).data, (source->state).size)
+        ))
+      return NULL;
+  }
   return result;
 }
 
@@ -3078,6 +3106,20 @@ napi_value mln_ts_read_screen_point(
   if (!mln_ts_set(env, result, "x", mln_ts_number(env, (double)(source->x))))
     return NULL;
   if (!mln_ts_set(env, result, "y", mln_ts_number(env, (double)(source->y))))
+    return NULL;
+  return result;
+}
+
+napi_value mln_ts_read_source_feature(
+  napi_env env, const mln_source_feature* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "feature",
+        mln_ts_text(env, (source->feature).data, (source->feature).size)
+      ))
     return NULL;
   return result;
 }
@@ -7721,7 +7763,8 @@ const mln_ts_decoder mln_ts_decoders[] = {
   mln_ts_decode_offline_region_info_list,
   mln_ts_decode_offline_region_info_optional,
   mln_ts_decode_offline_region_status,
-  mln_ts_decode_queried_feature_list,
+  mln_ts_decode_rendered_feature_list,
+  mln_ts_decode_source_feature_list,
   mln_ts_decode_style_image_info_optional,
   mln_ts_decode_style_layer_info_list,
   mln_ts_decode_style_layer_info_optional,
@@ -7730,4 +7773,4 @@ const mln_ts_decoder mln_ts_decoders[] = {
   mln_ts_decode_style_transition_options,
   mln_ts_decode_texture_readback_result,
 };
-const size_t mln_ts_decoder_count = 19;
+const size_t mln_ts_decoder_count = 20;
