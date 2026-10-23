@@ -28,9 +28,9 @@ fails to evaluate.
 <Code code={region(evaluateExpression, "inputs")} lang="c" title="evaluate-expression.c" />
 
 The result is JSON. A call reports the result's length whether or not the
-buffer held it, so a C host can ask for the length first and then fill a buffer
-of that size. The language bindings size the buffer themselves and return the
-JSON.
+buffer held it, without the NUL terminator, so a C host can ask for the length
+first and then fill a buffer one byte longer. The language bindings size the
+buffer themselves and return the JSON.
 
 <Code code={region(evaluateExpression, "evaluate")} lang="c" title="evaluate-expression.c" />
 
