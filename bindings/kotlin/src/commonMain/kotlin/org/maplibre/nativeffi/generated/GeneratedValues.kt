@@ -1525,6 +1525,27 @@ public data class RuntimeEventType(public val rawValue: UInt) {
 }
 
 /**
+ * Optional fields for `mln_source_feature`.
+ *
+ * See `mln_source_feature_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
+public data class SourceFeatureField(public val rawValue: UInt) {
+  public infix fun or(other: SourceFeatureField): SourceFeatureField =
+    SourceFeatureField(rawValue or other.rawValue)
+
+  public infix fun and(other: SourceFeatureField): SourceFeatureField =
+    SourceFeatureField(rawValue and other.rawValue)
+
+  public operator fun contains(other: SourceFeatureField): Boolean =
+    (rawValue and other.rawValue) == other.rawValue
+
+  public companion object {
+    public val ID: SourceFeatureField = SourceFeatureField(1u)
+  }
+}
+
+/**
  * Optional fields for `mln_source_feature_query_options`.
  *
  * See `mln_source_feature_query_option_field` in the
@@ -4151,8 +4172,9 @@ public data class RenderedFeature(
  */
 public data class SourceFeature(
   public val feature: ByteArray = byteArrayOf(),
+  public val sourceLayerId: String? = null,
 ) {
-  private fun contentFields(): Array<Any?> = arrayOf(feature)
+  private fun contentFields(): Array<Any?> = arrayOf(feature, sourceLayerId)
 
   override fun equals(other: Any?): Boolean =
     this === other ||

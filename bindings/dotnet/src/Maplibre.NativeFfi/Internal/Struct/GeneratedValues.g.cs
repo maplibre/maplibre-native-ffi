@@ -2251,9 +2251,15 @@ internal static unsafe class GeneratedValues
     }
 
     internal static SourceFeature CopySourceFeature(mln_source_feature value) =>
-        default(SourceFeature) with
+        new()
         {
             FeatureStorage = new(ValueStructs.CopyBufferView(value.feature)),
+            SourceLayerId = value.fields.HasFlag(MLN_SOURCE_FEATURE_SOURCE_LAYER_ID)
+                ? RuntimeStructs.CopyUtf8(
+                    (sbyte*)value.source_layer_id.data,
+                    value.source_layer_id.size
+                )
+                : null,
         };
 
     internal static SourceFeatureQueryOptions CopySourceFeatureQueryOptions(

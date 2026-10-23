@@ -222,7 +222,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
           CompletionBridge.valueSize(result),
-          w(8, 16),
+          w(20, 40),
         ) {
           readSourceFeature(it)
         }

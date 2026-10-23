@@ -234,6 +234,11 @@ auto capture_element(
 ) -> mln_source_feature {
   auto result = source;
   result.feature = buffer(arena, source.feature);
+  if ((source.fields & MLN_SOURCE_FEATURE_SOURCE_LAYER_ID) != 0) {
+    result.source_layer_id = buffer(arena, source.source_layer_id);
+  } else {
+    result.source_layer_id = {};
+  }
   return result;
 }
 inline auto discard_element(

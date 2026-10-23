@@ -64,8 +64,17 @@ auto rendered_feature_view(const RenderedFeatureRecord& record)
   return feature;
 }
 
-auto source_feature_view(const std::string& feature) -> mln_source_feature {
-  return {.feature = string_view_of(feature)};
+auto source_feature_view(const SourceFeatureRecord& record)
+  -> mln_source_feature {
+  auto feature = mln_source_feature{
+    .fields = record.fields,
+    .feature = string_view_of(record.feature),
+    .source_layer_id = {}
+  };
+  if ((record.fields & MLN_SOURCE_FEATURE_SOURCE_LAYER_ID) != 0) {
+    feature.source_layer_id = string_view_of(record.source_layer_id);
+  }
+  return feature;
 }
 
 template <auto Function, class List, auto View>

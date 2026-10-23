@@ -28,7 +28,8 @@ Name the source by its style source ID.
 
 <Code code={region(sourceFeatures, "query")} lang="c" title="query-source-features.c" />
 
-Copy what you keep.
+Each hit carries its feature as GeoJSON and, for a vector source, the source
+layer it came from, which a feature-state call needs. Copy what you keep.
 
 <Code code={region(sourceFeatures, "read")} lang="c" title="query-source-features.c" />
 

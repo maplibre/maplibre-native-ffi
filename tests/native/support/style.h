@@ -85,7 +85,8 @@ bool mln_test_style_render_until(
 
 // Copies of the features a query returned, each string null-terminated. A
 // query that returns more than MLN_TEST_FEATURE_CAPACITY features, or a string
-// longer than its buffer, fails the test. A source query fills only feature.
+// longer than its buffer, fails the test. A source query fills only feature
+// and source_layer_id.
 #define MLN_TEST_FEATURE_CAPACITY 8
 
 typedef struct mln_test_feature {

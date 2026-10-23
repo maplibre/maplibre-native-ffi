@@ -17,7 +17,8 @@ static void read_features(
   const mln_source_feature* features = result->value;
   const mln_source_feature hit = features[0];
   (void)hit;
-  // Copy hit.feature before return if you keep it.
+  // hit.source_layer_id names the source layer when the source has them. Copy
+  // hit.feature and any view you keep before return.
   // #endregion read
 }
 

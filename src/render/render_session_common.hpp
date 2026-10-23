@@ -1124,8 +1124,14 @@ struct RenderedFeatureList {
   std::vector<RenderedFeatureRecord> features;
 };
 
+struct SourceFeatureRecord {
+  std::string feature;
+  std::string source_layer_id;
+  uint32_t fields = 0;
+};
+
 struct SourceFeatureList {
-  std::vector<std::string> features;
+  std::vector<SourceFeatureRecord> features;
 };
 
 auto render_session_query_rendered_features(

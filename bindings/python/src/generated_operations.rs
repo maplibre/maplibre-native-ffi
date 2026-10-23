@@ -2002,6 +2002,14 @@ fn generated_copy_mln_source_feature(
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("feature", unsafe { generated_bytes(py, value.feature) }?)?;
+    dict.set_item(
+        "source_layer_id",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_SOURCE_FEATURE_SOURCE_LAYER_ID != 0,
+            || generated_text(py, value.source_layer_id),
+        )?,
+    )?;
     Ok(dict.into_any().unbind())
 }
 

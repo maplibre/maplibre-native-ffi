@@ -210,6 +210,10 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
   MLN_TEST_OK(source.status);
   TEST_ASSERT_EQUAL_size_t(2, source.count);
   TEST_ASSERT_EQUAL_UINT(WEST | EAST, named_points(&source));
+  // A GeoJSON source has no source layers to name.
+  for (size_t hit = 0; hit < source.count; hit += 1) {
+    TEST_ASSERT_EQUAL_STRING("", source.features[hit].source_layer_id);
+  }
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
@@ -422,7 +426,8 @@ typedef struct source_row {
   const char* id;
 } source_row;
 
-// A source query reads a vector source through the source layers it names.
+// A source query reads a vector source through the source layers it names,
+// and each hit names the source layer it came from.
 static void source_queries_read_the_named_source_layers(void) {
   static atomic_int fetches;
   atomic_store(&fetches, 0);
@@ -493,9 +498,16 @@ static void source_queries_read_the_named_source_layers(void) {
       mln_test_style_query_source_with(&fixture, "tiles", &query);
     MLN_TEST_OK_MESSAGE(list.status, row->label);
     TEST_ASSERT_EQUAL_size_t_MESSAGE(row->count, list.count, row->label);
-    for (size_t hit = 0; row->id != NULL && hit < list.count; hit += 1) {
-      TEST_ASSERT_NOT_NULL_MESSAGE(
-        strstr(list.features[hit].feature, row->id), row->label
+    for (size_t hit = 0; hit < list.count; hit += 1) {
+      const mln_test_feature* feature = &list.features[hit];
+      if (row->id != NULL) {
+        TEST_ASSERT_NOT_NULL_MESSAGE(
+          strstr(feature->feature, row->id), row->label
+        );
+      }
+      const bool in_points = strstr(feature->feature, "\"id\":1") != NULL;
+      TEST_ASSERT_EQUAL_STRING_MESSAGE(
+        in_points ? "points" : "labels", feature->source_layer_id, row->label
       );
     }
   }

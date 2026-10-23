@@ -9,17 +9,13 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_source_feature</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.
 /// </remarks>
-public readonly record struct SourceFeature
+public sealed record SourceFeature
 {
-    public SourceFeature(byte[] Feature)
-    {
-        this.Feature = Feature;
-    }
-
     public byte[] Feature
     {
         get => FeatureStorage.ToArray();
-        init => FeatureStorage = ValueArray.Copy(value);
+        set => FeatureStorage = ValueArray.Copy(value);
     }
-    internal ValueArray<byte> FeatureStorage { get; init; }
+    internal ValueArray<byte> FeatureStorage { get; set; }
+    public string? SourceLayerId { get; set; }
 }

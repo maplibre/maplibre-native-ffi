@@ -934,6 +934,16 @@ class RuntimeEventType(UnknownIntEnum):
     MAP_SOURCE_CHANGED = 23
 
 
+class SourceFeatureField(IntFlag):
+    """Optional fields for `mln_source_feature`.
+
+    See `mln_source_feature_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+    """
+
+    ID = 1
+
+
 class SourceFeatureQueryOptionField(IntFlag):
     """Optional fields for `mln_source_feature_query_options`.
 
@@ -3998,9 +4008,11 @@ class SourceFeature:
 
     feature: bytes
 
+    source_layer_id: str | None = None
+
     @classmethod
     def _from_native(cls, raw):
-        return cls(feature=raw["feature"])
+        return cls(feature=raw["feature"], source_layer_id=raw["source_layer_id"])
 
 
 @dataclass(frozen=True, slots=True)

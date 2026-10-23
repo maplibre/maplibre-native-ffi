@@ -1586,8 +1586,13 @@ internal fun readRenderedFeature(source: Long): RenderedFeature {
   )
 }
 
-internal fun readSourceFeature(source: Long): SourceFeature =
-  SourceFeature(feature = readView(source))
+internal fun readSourceFeature(source: Long): SourceFeature {
+  val fields = readU32(source)
+  return SourceFeature(
+    feature = readView(source + w(4, 8)),
+    sourceLayerId = if ((fields and 1u) != 0u) readViewString(source + w(12, 24)) else null,
+  )
+}
 
 internal fun readTextureReadbackResult(source: Long): TextureReadbackResult =
   TextureReadbackResult(data = readView(source), info = readTextureImageInfo(source + w(8, 16)))

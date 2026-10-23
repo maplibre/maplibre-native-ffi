@@ -340,12 +340,14 @@ public struct ScreenLineString: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct SourceFeature: Equatable, Hashable, Sendable {
   public var feature: Data
+  public var sourceLayerId: String?
   public static var `default`: Self {
     Self()
   }
 
-  public init(feature: Data = Data()) {
+  public init(feature: Data = Data(), sourceLayerId: String? = nil) {
     self.feature = feature
+    self.sourceLayerId = sourceLayerId
   }
 
   init(
@@ -356,7 +358,27 @@ public struct SourceFeature: Equatable, Hashable, Sendable {
       data: raw.feature.data,
       size: raw.feature.size
     )
+    sourceLayerId = raw.fields & MLN_SOURCE_FEATURE_SOURCE_LAYER_ID
+      .rawValue != 0 ? try NativeString.copyUTF8(
+        data: raw.source_layer_id.data,
+        size: raw.source_layer_id.size
+      ) : nil
   }
+}
+
+/// Optional fields for `mln_source_feature`.
+///
+/// See `mln_source_feature_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+public struct SourceFeatureField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let id: SourceFeatureField = .init(rawValue: 1)
 }
 
 /// Optional fields for `mln_source_feature_query_options`.

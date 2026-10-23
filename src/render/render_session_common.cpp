@@ -770,7 +770,13 @@ auto create_source_feature_result(
   auto list = std::make_shared<mln::core::SourceFeatureList>();
   list->features.reserve(features.size());
   for (const auto& feature : features) {
-    list->features.push_back(serialize_geojson_feature(feature));
+    auto record = mln::core::SourceFeatureRecord{};
+    record.feature = serialize_geojson_feature(feature);
+    if (!feature.sourceLayer.empty()) {
+      record.source_layer_id = feature.sourceLayer;
+      record.fields |= MLN_SOURCE_FEATURE_SOURCE_LAYER_ID;
+    }
+    list->features.push_back(std::move(record));
   }
   out_result = std::move(list);
   return MLN_STATUS_OK;

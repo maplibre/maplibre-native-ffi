@@ -2999,7 +2999,20 @@ export interface ScreenPoint {
  */
 export interface SourceFeature {
   readonly feature: string;
+  readonly sourceLayerId?: string;
 }
+
+/**
+ * Optional fields for `mln_source_feature`.
+ *
+ * See `mln_source_feature_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
+export const SourceFeatureField = {
+  id: 1,
+} as const;
+/** A bitwise OR of SourceFeatureField flags. */
+export type SourceFeatureField = number;
 
 /**
  * Optional fields for `mln_source_feature_query_options`.

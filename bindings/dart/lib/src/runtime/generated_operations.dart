@@ -2468,7 +2468,13 @@ SourceFeatureQueryOptions _readSourceFeatureQueryOptions(
 );
 
 SourceFeature _readSourceFeature(raw.mln_source_feature source) =>
-    SourceFeature(feature: _copyBufferView(source.feature));
+    SourceFeature(
+      feature: _copyBufferView(source.feature),
+      sourceLayerId:
+          (source.fields & raw.MLN_SOURCE_FEATURE_SOURCE_LAYER_ID) != 0
+          ? utf8.decode(_copyBufferView(source.source_layer_id))
+          : null,
+    );
 
 TextureImageInfo _readTextureImageInfo(raw.mln_texture_image_info source) =>
     TextureImageInfo(

@@ -1494,6 +1494,19 @@ func (value RuntimeEventType) String() string {
 	return fmt.Sprintf("RuntimeEventType(%d)", value)
 }
 
+// SourceFeatureField corresponds to mln_source_feature_field. Optional fields
+// for mln_source_feature.
+//
+// See mln_source_feature_field in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
+type SourceFeatureField uint32
+
+const (
+	SourceFeatureFieldId SourceFeatureField = SourceFeatureField(C.MLN_SOURCE_FEATURE_SOURCE_LAYER_ID)
+)
+
+func (value SourceFeatureField) Has(flags SourceFeatureField) bool { return value&flags == flags }
+
 // SourceFeatureQueryOptionField corresponds to
 // mln_source_feature_query_option_field. Optional fields for
 // mln_source_feature_query_options.
@@ -4985,11 +4998,15 @@ func nativeScreenPoint(input ScreenPoint, arena *bindingArena) C.mln_screen_poin
 //
 // See mln_source_feature in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-type SourceFeature struct{ Feature []byte }
+type SourceFeature struct {
+	Feature       []byte
+	SourceLayerId *string
+}
 
 func copySourceFeature(raw C.mln_source_feature) SourceFeature {
 	var result SourceFeature
 	result.Feature = bindingBytes(raw.feature.data, uint64(raw.feature.size))
+	result.SourceLayerId = bindingPresent(raw.fields&C.MLN_SOURCE_FEATURE_SOURCE_LAYER_ID != 0, func() string { return bindingString(raw.source_layer_id.data, uint64(raw.source_layer_id.size)) })
 	return result
 }
 

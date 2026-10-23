@@ -3121,6 +3121,15 @@ napi_value mln_ts_read_source_feature(
         mln_ts_text(env, (source->feature).data, (source->feature).size)
       ))
     return NULL;
+  if ((source->fields & MLN_SOURCE_FEATURE_SOURCE_LAYER_ID) != 0) {
+    if (!mln_ts_set(
+          env, result, "sourceLayerId",
+          mln_ts_text(
+            env, (source->source_layer_id).data, (source->source_layer_id).size
+          )
+        ))
+      return NULL;
+  }
   return result;
 }
 

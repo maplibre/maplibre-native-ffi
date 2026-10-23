@@ -1215,6 +1215,18 @@ final class RuntimeEventType extends _Enum {
   };
 }
 
+/// Optional fields for `mln_source_feature`.
+///
+/// See `mln_source_feature_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+final class SourceFeatureField extends _Flags<SourceFeatureField> {
+  const SourceFeatureField.fromRawValue(super.rawValue);
+  static const id = SourceFeatureField.fromRawValue(1);
+  @override
+  SourceFeatureField _of(int rawValue) =>
+      SourceFeatureField.fromRawValue(rawValue);
+}
+
 /// Optional fields for `mln_source_feature_query_options`.
 ///
 /// See `mln_source_feature_query_option_field` in the
@@ -4342,14 +4354,15 @@ final class SourceFeatureQueryOptions extends _Value {
 /// See `mln_source_feature` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 final class SourceFeature extends _Value {
-  SourceFeature({Uint8List? feature})
+  SourceFeature({Uint8List? feature, this.sourceLayerId})
     : feature = Uint8List.fromList(
         feature ?? const <int>[],
       ).asUnmodifiableView();
   final Uint8List feature;
+  final String? sourceLayerId;
 
   @override
-  List<Object?> get _members => [feature];
+  List<Object?> get _members => [feature, sourceLayerId];
 }
 
 /// CPU image readback metadata for a texture target frame.

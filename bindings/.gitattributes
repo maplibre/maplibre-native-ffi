@@ -75,6 +75,7 @@
 /dotnet/src/Maplibre.NativeFfi/Query/ScreenBox.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Query/ScreenLineString.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Query/SourceFeature.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Query/SourceFeatureField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Query/SourceFeatureQueryOptionField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Query/SourceFeatureQueryOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/AcquiredFrameHandle.Operations.g.cs linguist-generated=true

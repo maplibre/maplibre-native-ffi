@@ -76,6 +76,7 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/Query/ScreenBox.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Query/ScreenLineString.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Query/SourceFeature.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/Query/SourceFeatureField.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Query/SourceFeatureQueryOptionField.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Query/SourceFeatureQueryOptions.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/RenderSession/AcquiredFrameHandle.Operations.g.cs",

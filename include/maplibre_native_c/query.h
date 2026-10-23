@@ -143,14 +143,24 @@ typedef struct mln_rendered_feature {
     MLN_BINDING("encoding=json;mask=fields;bit=MLN_RENDERED_FEATURE_STATE");
 } mln_rendered_feature;
 
+/** Optional fields for mln_source_feature. */
+typedef enum MLN_BINDING("kind=bitmask") mln_source_feature_field : uint32_t {
+  MLN_SOURCE_FEATURE_SOURCE_LAYER_ID = 1U << 0U,
+} mln_source_feature_field;
+
 /**
  * One source-feature query hit borrowed for a completion callback.
  *
- * feature is one UTF-8 GeoJSON Feature, valid only for that callback; copy it
- * if the host keeps it.
+ * Every view is valid only for that callback; copy what the host keeps.
+ * feature is one UTF-8 GeoJSON Feature. source_layer_id names the vector source
+ * layer the feature came from, and is present when its field bit is set; a
+ * source without source layers, such as GeoJSON, has none.
  */
 typedef struct mln_source_feature {
+  uint32_t fields MLN_BINDING("enum=mln_source_feature_field");
   mln_buffer_view feature MLN_BINDING("encoding=json");
+  mln_buffer_view source_layer_id
+    MLN_BINDING("mask=fields;bit=MLN_SOURCE_FEATURE_SOURCE_LAYER_ID");
 } mln_source_feature;
 
 /** Returns default rendered feature query options. */

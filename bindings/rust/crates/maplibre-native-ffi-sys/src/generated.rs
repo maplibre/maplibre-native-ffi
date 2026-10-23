@@ -346,6 +346,8 @@ pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED: mln_runtime_event_typ
 pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR: mln_runtime_event_type = 20;
 pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: mln_runtime_event_type = 21;
 pub const MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED: mln_runtime_event_type = 23;
+pub type mln_source_feature_field = u32;
+pub const MLN_SOURCE_FEATURE_SOURCE_LAYER_ID: mln_source_feature_field = 1;
 pub type mln_source_feature_query_option_field = u32;
 pub const MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS: mln_source_feature_query_option_field =
     1;
@@ -1285,7 +1287,9 @@ pub struct mln_screen_point {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_source_feature {
+    pub fields: u32,
     pub feature: mln_buffer_view,
+    pub source_layer_id: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

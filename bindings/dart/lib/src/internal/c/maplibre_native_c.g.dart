@@ -1242,7 +1242,10 @@ final class mln_screen_point extends Struct {
 }
 
 final class mln_source_feature extends Struct {
+  @Uint32()
+  external int fields;
   external mln_buffer_view feature;
+  external mln_buffer_view source_layer_id;
 }
 
 final class mln_source_feature_query_options extends Struct {
@@ -1987,6 +1990,9 @@ const MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 19;
 const MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20;
 const MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21;
 const MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED = 23;
+
+// mln_source_feature_field
+const MLN_SOURCE_FEATURE_SOURCE_LAYER_ID = 1;
 
 // mln_source_feature_query_option_field
 const MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS = 1;

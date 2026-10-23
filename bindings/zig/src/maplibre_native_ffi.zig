@@ -3960,12 +3960,27 @@ pub const ScreenPoint = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub const SourceFeature = struct {
     feature: []const u8 = &.{},
+    source_layer_id: ?[]const u8 = null,
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_source_feature) status.Error!SourceFeature {
         return .{
             .feature = try marshal.copyView(allocator, raw.feature),
+            .source_layer_id = if (raw.fields & c.MLN_SOURCE_FEATURE_SOURCE_LAYER_ID != 0) try marshal.copyView(allocator, raw.source_layer_id) else null,
         };
     }
+};
+
+/// Optional fields for `mln_source_feature`.
+///
+/// See `mln_source_feature_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+pub const SourceFeatureField = struct {
+    id: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{1};
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
 };
 
 /// Optional fields for `mln_source_feature_query_options`.

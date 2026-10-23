@@ -154,9 +154,15 @@ static void copy_source_features(
   for (size_t index = 0;
        index < result->value_count && index < MLN_TEST_FEATURE_CAPACITY;
        index += 1) {
+    const mln_source_feature* source = &features[index];
     mln_test_feature* copy = &probe->list.features[index];
-    fits &=
-      copy_text(features[index].feature, copy->feature, sizeof(copy->feature));
+    fits &= copy_text(source->feature, copy->feature, sizeof(copy->feature));
+    if ((source->fields & MLN_SOURCE_FEATURE_SOURCE_LAYER_ID) != 0) {
+      fits &= copy_text(
+        source->source_layer_id, copy->source_layer_id,
+        sizeof(copy->source_layer_id)
+      );
+    }
   }
   probe->overflowed |= !fits;
   mln_test_flag_set(&probe->done);

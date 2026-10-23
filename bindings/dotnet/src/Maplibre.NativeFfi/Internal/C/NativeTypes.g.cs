@@ -921,7 +921,9 @@ internal unsafe struct mln_screen_point
 
 internal unsafe struct mln_source_feature
 {
+    public mln_source_feature_field fields;
     public mln_buffer_view feature;
+    public mln_buffer_view source_layer_id;
 }
 
 internal unsafe struct mln_source_feature_query_options
@@ -1704,6 +1706,11 @@ internal enum mln_runtime_event_type : uint
     MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20,
     MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21,
     MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED = 23,
+}
+
+internal enum mln_source_feature_field : uint
+{
+    MLN_SOURCE_FEATURE_SOURCE_LAYER_ID = 1,
 }
 
 internal enum mln_source_feature_query_option_field : uint

@@ -5258,13 +5258,31 @@ impl FromNative<sys::mln_screen_point> for ScreenPoint {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SourceFeature {
     pub feature: Vec<u8>,
+    pub source_layer_id: Option<String>,
 }
 impl FromNative<sys::mln_source_feature> for SourceFeature {
     unsafe fn from_native(raw: sys::mln_source_feature) -> Result<Self> {
         Ok(Self {
             feature: unsafe { from_native(raw.feature) }?,
+            source_layer_id: unsafe {
+                convert::present(
+                    raw.fields,
+                    sys::MLN_SOURCE_FEATURE_SOURCE_LAYER_ID,
+                    raw.source_layer_id,
+                )
+            }?,
         })
     }
+}
+
+native_flags! {
+/// Optional fields for `mln_source_feature`.
+///
+/// See `mln_source_feature_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+pub struct SourceFeatureField: u32 {
+    const ID = 1;
+}
 }
 
 native_flags! {
