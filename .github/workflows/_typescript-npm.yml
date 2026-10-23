@@ -22,7 +22,8 @@ permissions:
 jobs:
   publish:
     name: npm publish
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    # npm's trusted publishing and provenance accept only GitHub-hosted runners.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     # npm accepts an OIDC token from this repository when each package's
     # trusted publisher names this environment and release.yml, the workflow
@@ -41,7 +42,7 @@ jobs:
       PUBLISH_SHA: ${{ inputs.sha }}
       PUBLISH_VERSION: ${{ inputs.version }}
     steps:
-      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.sha }}
           persist-credentials: false
@@ -71,7 +72,7 @@ jobs:
             mv "$artifact" "bindings/typescript/native/build/$preset/install"
             presets+=("$preset")
           done
-          mise exec -- node bindings/typescript/scripts/pack.ts \
+          mise exec --no-deps core:node -- node bindings/typescript/scripts/pack.ts \
             --version "$PUBLISH_VERSION" build/npm "${presets[@]}"
       # npm accepts a trusted publisher only for a package that exists, so the
       # first release of a package publishes these tarballs by hand. A rerun
@@ -107,7 +108,7 @@ jobs:
                   exit 1
                   ;;
               esac
-              mise exec -- npm publish --provenance --access public "$tarball"
+              mise exec --no-deps core:node -- npm publish --provenance --access public "$tarball"
               echo "### $name $PUBLISH_VERSION" >> "$GITHUB_STEP_SUMMARY"
             done
           done
