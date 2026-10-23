@@ -118,7 +118,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ needs.source.outputs.sha }}
           TAG: bindings/go/${{ github.ref_name }}
+        # A rerun finds the tag that an earlier attempt created.
         run: |
+          existing="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.sha 2>/dev/null || true)"
+          if [[ "$existing" == "$SHA" ]]; then
+            exit 0
+          fi
           gh api "repos/$GITHUB_REPOSITORY/git/refs" \
             -f "ref=refs/tags/$TAG" -f "sha=$SHA"
 
