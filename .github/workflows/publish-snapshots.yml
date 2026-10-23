@@ -1,23 +1,16 @@
 name: Publish snapshots
-# A scheduled run has no inputs, so it names the full gated set it publishes.
-run-name: Snapshots · ${{ inputs.components || 'all' }}
+# The plan job finds the last full publish by this exact title, so a docs-only
+# run never counts as one.
+run-name: ${{ inputs.docs_only && 'Snapshots · docs' || 'Snapshots' }}
 on:
   schedule:
     - cron: "17 6 * * *"
   workflow_dispatch:
     inputs:
-      components:
-        description: What to publish
-        type: choice
-        default: all
-        # One entry per `[components.*]` table in ci/snapshots.toml.
-        options:
-          - all
-          - native
-          - kotlin
-          - python
-          - dotnet
-          - docs
+      docs_only:
+        description: Republish only the docs site
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -42,15 +35,13 @@ jobs:
       run_id: ${{ steps.source.outputs.run_id }}
       sha: ${{ steps.source.outputs.sha }}
       ci_run_url: ${{ steps.source.outputs.ci_run_url }}
+      base_version: ${{ steps.version.outputs.base }}
       kotlin_version: ${{ steps.version.outputs.kotlin }}
       native_snapshot_version: ${{ steps.version.outputs.native }}
       snapshot_version: ${{ steps.version.outputs.value }}
       dotnet_snapshot_version: ${{ steps.version.outputs.dotnet }}
-      publish_native: ${{ steps.plan.outputs.publish_native }}
-      publish_kotlin: ${{ steps.plan.outputs.publish_kotlin }}
-      publish_python: ${{ steps.plan.outputs.publish_python }}
-      publish_dotnet: ${{ steps.plan.outputs.publish_dotnet }}
-      publish_docs: ${{ steps.plan.outputs.publish_docs }}
+      publish_docs: ${{ steps.decide.outputs.docs }}
+      publish_packages: ${{ steps.decide.outputs.packages }}
     steps:
       - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
@@ -61,10 +52,46 @@ jobs:
         with:
           cache: false
           install_args: python
+      # A scheduled run skips a commit that a full publish already used, so it
+      # publishes only when main moved. A dispatch always publishes.
+      - name: Decide what to publish
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DOCS_ONLY: ${{ inputs.docs_only || false }}
+        run: |
+          set -euo pipefail
+
+          docs=true
+          packages=true
+          if [[ "$DOCS_ONLY" == true ]]; then
+            packages=false
+          fi
+          if [[ "$GITHUB_EVENT_NAME" == schedule ]]; then
+            published="$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow publish-snapshots.yml \
+              --branch main \
+              --status success \
+              --limit 50 \
+              --json headSha,displayTitle \
+              --jq '[.[] | select(.displayTitle == "Snapshots")][0].headSha // ""')"
+            if [[ "$published" == "$GITHUB_SHA" ]]; then
+              echo "a full publish already used $GITHUB_SHA; skipping"
+              docs=false
+              packages=false
+            fi
+          fi
+
+          {
+            echo "docs=$docs"
+            echo "packages=$packages"
+          } >> "$GITHUB_OUTPUT"
       # Publish the exact commit that passed main CI. A dispatch can overlap CI,
       # so wait for that run instead of selecting an older one.
       - name: Resolve the snapshot CI run
         id: source
+        if: ${{ steps.decide.outputs.docs == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -85,21 +112,18 @@ jobs:
             echo "run_id=$(jq -r '.run_id' <<<"$run")"
             echo "ci_run_url=$(jq -r '.url' <<<"$run")"
           } >> "$GITHUB_OUTPUT"
-      # Naming one component forces it; `all` publishes only changed scopes.
-      - name: Plan the publish
-        id: plan
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: >-
-          mise run --no-deps ci:snapshot-state plan --components "${{
-          inputs.components || 'all' }}" --force "${{ inputs.components != '' &&
-          inputs.components != 'all' }}"
-      # Minutes distinguish repeated runs on one day for pip and NuGet.
+      # Minutes distinguish repeated runs on one day for pip and NuGet. The
+      # base is the next release, so a version built on it sorts above every
+      # release.
       - name: Date the snapshot version
         id: version
+        if: ${{ steps.decide.outputs.docs == 'true' }}
         run: |
+          set -euo pipefail
+          base="$(mise run --no-deps ci:release-version --next)"
           stamp="$(date -u +%Y%m%d%H%M)"
           {
+            echo "base=$base"
             echo "value=0.1.0.dev$stamp"
             echo "dotnet=0.1.0-preview.$stamp"
             echo "kotlin=0.1.0-SNAPSHOT"
@@ -112,7 +136,7 @@ jobs:
       - plan
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
-    if: ${{ needs.plan.outputs.publish_dotnet == 'true' }}
+    if: ${{ needs.plan.outputs.publish_packages == 'true' }}
     permissions:
       actions: read
       contents: read
@@ -187,7 +211,7 @@ jobs:
       - plan
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
-    if: ${{ needs.plan.outputs.publish_python == 'true' }}
+    if: ${{ needs.plan.outputs.publish_packages == 'true' }}
     permissions:
       actions: read
       contents: read
@@ -301,9 +325,7 @@ jobs:
     if: >-
       ${{
         always() && needs.plan.result == 'success' &&
-        (needs.plan.outputs.publish_docs == 'true' ||
-         needs.plan.outputs.publish_python == 'true' ||
-         needs.plan.outputs.publish_dotnet == 'true')
+        needs.plan.outputs.publish_docs == 'true'
       }}
     permissions:
       actions: read
@@ -384,7 +406,7 @@ jobs:
     name: Kotlin snapshot
     needs:
       - plan
-    if: ${{ needs.plan.outputs.publish_kotlin == 'true' }}
+    if: ${{ needs.plan.outputs.publish_packages == 'true' }}
     permissions:
       actions: read
       contents: read
@@ -402,7 +424,7 @@ jobs:
     name: Native snapshot
     needs:
       - plan
-    if: ${{ needs.plan.outputs.publish_native == 'true' }}
+    if: ${{ needs.plan.outputs.publish_packages == 'true' }}
     permissions:
       actions: read
       contents: write
@@ -413,65 +435,6 @@ jobs:
       sha: ${{ needs.plan.outputs.sha }}
       tag: unstable-native-snapshot
       version: ${{ needs.plan.outputs.native_snapshot_version }}
-
-  record:
-    name: record
-    needs:
-      - plan
-      - deploy-docs
-      - dotnet-feed
-      - python-index
-      - publish-kotlin
-      - publish-native
-    # Only components that published get their state tag moved, so a failed or
-    # skipped component is retried by the next run.
-    if: ${{ !cancelled() && needs.plan.result == 'success' }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    env:
-      SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
-    steps:
-      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
-        with:
-          ref: ${{ env.SNAPSHOT_SHA }}
-          persist-credentials: false
-      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
-        with:
-          cache: false
-          install_args: python
-      - name: Record published components
-        env:
-          GH_TOKEN: ${{ github.token }}
-          DOCS_RESULT: ${{ needs.deploy-docs.result }}
-          KOTLIN_RESULT: ${{ needs.publish-kotlin.result }}
-          NATIVE_RESULT: ${{ needs.publish-native.result }}
-          PUBLISH_DOCS: ${{ needs.plan.outputs.publish_docs }}
-          PYTHON_RESULT: ${{ needs.python-index.result }}
-          DOTNET_RESULT: ${{ needs.dotnet-feed.result }}
-        run: |
-          set -euo pipefail
-
-          published=()
-          if [[ "$NATIVE_RESULT" == success ]]; then
-            published+=(native)
-          fi
-          if [[ "$KOTLIN_RESULT" == success ]]; then
-            published+=(kotlin)
-          fi
-          if [[ "$PUBLISH_DOCS" == true && "$DOCS_RESULT" == success ]]; then
-            published+=(docs)
-          fi
-          # Record feeds only when both staging and Pages succeeded.
-          if [[ "$PYTHON_RESULT" == success && "$DOCS_RESULT" == success ]]; then
-            published+=(python)
-          fi
-          if [[ "$DOTNET_RESULT" == success && "$DOCS_RESULT" == success ]]; then
-            published+=(dotnet)
-          fi
-
-          mise run --no-deps ci:snapshot-state record ${published[@]+"${published[@]}"}
 
   required:
     name: publishing-required
@@ -489,12 +452,11 @@ jobs:
       - deploy-docs
       - publish-kotlin
       - publish-native
-      - record
     steps:
       - name: Fail if required jobs failed
         if:
           ${{ contains(needs.*.result, 'failure') || contains(needs.*.result,
-          'cancelled') || needs.record.result != 'success' }}
+          'cancelled') }}
         run: |
           echo '${{ toJSON(needs) }}'
           exit 1

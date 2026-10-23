@@ -42,12 +42,13 @@ checkout of a published release tag.
 
 ## Snapshots
 
-The Publish snapshots workflow runs daily from the artifacts of the latest
-successful CI run on `main`. A component publishes when its inputs in
-`ci/snapshots.toml` changed since the commit that its
-`snapshot-state/<component>` tag names, and a successful publish moves the tag.
-Dispatch the workflow manually and name a component to republish it now.
+The Publish snapshots workflow runs daily and publishes every snapshot channel
+from the artifacts of the latest successful CI run on `main`. A scheduled run
+skips when `main` has not moved since the last run that published everything.
+Dispatch the workflow manually to publish now, or with `docs_only` to republish
+only the docs site.
 
-pub.dev, crates.io, and npm keep every version that they publish, so the Dart,
-Rust, and TypeScript bindings have no snapshot channel. The other channels keep
-only the latest snapshot.
+pub.dev, crates.io, npm, PyPI, and NuGet.org keep every version that they
+publish, so they get no snapshot channel. The floating channels replace their
+contents on each publish: Maven Central snapshots for Kotlin, and the
+`unstable-native-snapshot` GitHub release for the C library.

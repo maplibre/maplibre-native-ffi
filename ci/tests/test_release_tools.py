@@ -16,7 +16,7 @@ import zipfile
 from unittest import mock
 
 from native_package_release import XCFRAMEWORK_NAME, prepare_assets
-from release_version import require_current_month, validate_tag
+from release_version import next_release, require_current_month, validate_tag
 from zig_package import PACKAGE_NAME as ZIG_PACKAGE_NAME
 from zig_package import zig_hash
 
@@ -153,6 +153,29 @@ class ReleaseVersionTest(unittest.TestCase):
 
         with self.assertRaisesRegex(SystemExit, "expected vAPI_EPOCH"):
             validate_tag(tag, repository=self.repository, now=self.now)
+
+    def test_the_next_release_follows_this_months_latest_tag(self) -> None:
+        self.tag(f"core/v0.{self.month}.0")
+        self.tag(f"v0.{self.month}.1")
+
+        version = next_release(repository=self.repository, now=self.now)
+
+        self.assertEqual(str(version), f"0.{self.month}.2")
+
+    def test_the_next_release_starts_a_new_month_at_revision_zero(self) -> None:
+        previous = (self.now.replace(day=1) - datetime.timedelta(days=1)).strftime(
+            "%Y%m"
+        )
+        self.tag(f"v1.{previous}.3")
+
+        version = next_release(repository=self.repository, now=self.now)
+
+        self.assertEqual(str(version), f"1.{self.month}.0")
+
+    def test_the_first_release_is_revision_zero_of_epoch_zero(self) -> None:
+        version = next_release(repository=self.repository, now=self.now)
+
+        self.assertEqual(str(version), f"0.{self.month}.0")
 
 
 class NativePackageReleaseTest(unittest.TestCase):

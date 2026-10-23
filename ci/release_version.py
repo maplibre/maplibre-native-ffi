@@ -124,11 +124,37 @@ def validate_tag(
     return version, previous_tag
 
 
+def next_release(
+    *,
+    repository: pathlib.Path | None = None,
+    now: datetime.datetime | None = None,
+) -> ReleaseVersion:
+    """The version the next release would take, which snapshots build toward."""
+    current = now or datetime.datetime.now(datetime.UTC)
+    month = int(current.strftime("%Y%m"))
+    latest = max(
+        release_tags(repository=repository).values(),
+        default=ReleaseVersion(0, 0, 0),
+    )
+    if latest.month == month:
+        return ReleaseVersion(latest.epoch, month, latest.revision + 1)
+    return ReleaseVersion(latest.epoch, month, 0)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("tag")
+    request = parser.add_mutually_exclusive_group(required=True)
+    request.add_argument("tag", nargs="?", help="validate this release tag")
+    request.add_argument(
+        "--next",
+        action="store_true",
+        help="print the version the next release would take",
+    )
 
     args = parser.parse_args()
+    if args.next:
+        print(next_release())
+        return 0
     version, previous = validate_tag(args.tag)
     print(json.dumps({"previousTag": previous, "version": version}))
     return 0

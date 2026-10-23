@@ -26,11 +26,6 @@ steps {
     )
     check = "mise run ci:check-action-pins"
   }
-  // Whole-repository check: any added or removed file can break scope coverage,
-  // so this runs on every invocation rather than filtering on a glob.
-  ["snapshot-scopes"] {
-    check = "mise run ci:check-snapshot-scopes"
-  }
   // Whole-suite check: a header change can export a function that no C test
   // calls, and a test change can call one that tests/uncalled-exports.txt
   // still lists.

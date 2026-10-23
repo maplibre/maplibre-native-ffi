@@ -196,6 +196,32 @@ hooks:
       local_build: ../maplibre-native-ffi/build
 ```
 
+For the snapshot channel, depend on the package from Git at `main`. Download
+`maplibre-native-c-<preset>.tar.gz` for your target from the
+[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot),
+unpack it beside the pubspec, and name the unpacked prefix in `local_build`.
+
+```bash frame="terminal"
+curl -L https://github.com/maplibre/maplibre-native-ffi/releases/download/unstable-native-snapshot/maplibre-native-c-macos-arm64-metal.tar.gz | tar -xz
+```
+
+```yaml title="pubspec.yaml"
+dependencies:
+  maplibre_native_ffi:
+    git:
+      url: https://github.com/maplibre/maplibre-native-ffi
+      path: bindings/dart
+      ref: main
+
+hooks:
+  user_defines:
+    maplibre_native_ffi:
+      local_build: maplibre-native-c-macos-arm64-metal
+```
+
+The snapshot rebuilds `main` once a day. If `main` has moved past it, set `ref`
+to the release's commit.
+
 Each target uses Metal on Apple platforms, OpenGL on Android, and Vulkan
 elsewhere. Map an OS to a different backend in `backend`.
 
@@ -293,6 +319,30 @@ path dependency on the crate needs a local build.
 [env]
 MAPLIBRE_NATIVE_FFI_LOCAL_BUILD = { value = "../maplibre-native-ffi/build", relative = true }
 ```
+
+For the snapshot channel, depend on the crate from Git at `main`. Cargo also
+fetches the repository's submodules, which takes a while the first time.
+Download `maplibre-native-c-<preset>.tar.gz` for your target from the
+[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot),
+unpack it in the workspace, and name the unpacked prefix in
+`MAPLIBRE_NATIVE_FFI_LOCAL_BUILD`.
+
+```bash frame="terminal"
+curl -L https://github.com/maplibre/maplibre-native-ffi/releases/download/unstable-native-snapshot/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz | tar -xz
+```
+
+```toml title="Cargo.toml"
+[dependencies]
+maplibre-native-ffi = { git = "https://github.com/maplibre/maplibre-native-ffi", branch = "main" }
+```
+
+```toml title=".cargo/config.toml"
+[env]
+MAPLIBRE_NATIVE_FFI_LOCAL_BUILD = { value = "maplibre-native-c-linux-gnu-x64-vulkan", relative = true }
+```
+
+The snapshot rebuilds `main` once a day. If `main` has moved past it, replace
+`branch` with a `rev` that names the release's commit.
 
 To download through a mirror, set `MAPLIBRE_NATIVE_FFI_RELEASE_URL` to its base
 URL. The mirror serves each release tag as a directory that holds that
