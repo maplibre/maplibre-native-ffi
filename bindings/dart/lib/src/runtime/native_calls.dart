@@ -9,6 +9,35 @@ typedef _NativeStart =
 NativeCompletionStart _withArena(_NativeStart start) =>
     (completion) => withNativeArena((arena) => start(arena, completion));
 
+/// Makes a call that writes text into storage the caller sizes, and copies
+/// the text. A call reports the text's length whether or not it fit, and
+/// reports the same text for the same inputs, so a call that did not fit is
+/// made again with enough storage.
+final class _CallerSizedText {
+  Uint8List text = Uint8List(0);
+
+  int call(
+    Allocator arena,
+    int Function(Pointer<Char> storage, int capacity, Pointer<Size> length)
+    native,
+  ) {
+    final length = arena<Size>();
+    var capacity = 256;
+    while (true) {
+      final storage = arena<Char>(capacity);
+      final status = native(storage, capacity, length);
+      if (status != nativeStatusOk) return status;
+      if (length.value < capacity) {
+        text = Uint8List.fromList(
+          storage.cast<Uint8>().asTypedList(length.value),
+        );
+        return status;
+      }
+      capacity = length.value + 1;
+    }
+  }
+}
+
 final class _CompletionValue<T> {
   _CompletionValue(this.elementSize, this.read);
 

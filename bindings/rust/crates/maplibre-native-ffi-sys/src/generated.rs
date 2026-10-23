@@ -364,6 +364,29 @@ pub const MLN_STATUS_BUSY: mln_status = -7;
 pub const MLN_STATUS_TARGET_LOST: mln_status = -8;
 pub const MLN_STATUS_NOT_READY: mln_status = -9;
 pub const MLN_STATUS_NOT_FOUND: mln_status = -10;
+pub type mln_style_expression_input_field = u32;
+pub const MLN_STYLE_EXPRESSION_INPUT_ZOOM: mln_style_expression_input_field = 1;
+pub const MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER: mln_style_expression_input_field = 2;
+pub const MLN_STYLE_EXPRESSION_INPUT_ELEVATION: mln_style_expression_input_field = 4;
+pub const MLN_STYLE_EXPRESSION_INPUT_FEATURE: mln_style_expression_input_field = 8;
+pub const MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE: mln_style_expression_input_field = 16;
+pub const MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE: mln_style_expression_input_field = 32;
+pub const MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID: mln_style_expression_input_field = 64;
+pub type mln_style_expression_option_field = u32;
+pub const MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE: mln_style_expression_option_field = 1;
+pub type mln_style_expression_type_kind = u32;
+pub const MLN_STYLE_EXPRESSION_TYPE_VALUE: mln_style_expression_type_kind = 0;
+pub const MLN_STYLE_EXPRESSION_TYPE_NUMBER: mln_style_expression_type_kind = 1;
+pub const MLN_STYLE_EXPRESSION_TYPE_STRING: mln_style_expression_type_kind = 2;
+pub const MLN_STYLE_EXPRESSION_TYPE_BOOLEAN: mln_style_expression_type_kind = 3;
+pub const MLN_STYLE_EXPRESSION_TYPE_COLOR: mln_style_expression_type_kind = 4;
+pub const MLN_STYLE_EXPRESSION_TYPE_OBJECT: mln_style_expression_type_kind = 5;
+pub const MLN_STYLE_EXPRESSION_TYPE_FORMATTED: mln_style_expression_type_kind = 6;
+pub const MLN_STYLE_EXPRESSION_TYPE_IMAGE: mln_style_expression_type_kind = 7;
+pub const MLN_STYLE_EXPRESSION_TYPE_PADDING: mln_style_expression_type_kind = 8;
+pub const MLN_STYLE_EXPRESSION_TYPE_VARIABLE_ANCHOR_OFFSET_COLLECTION:
+    mln_style_expression_type_kind = 9;
+pub const MLN_STYLE_EXPRESSION_TYPE_ARRAY: mln_style_expression_type_kind = 10;
 pub type mln_style_image_info_field = u32;
 pub const MLN_STYLE_IMAGE_INFO_CONTENT: mln_style_image_info_field = 1;
 pub const MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH: mln_style_image_info_field = 2;
@@ -1302,6 +1325,42 @@ pub struct mln_source_feature_query_options {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_style_expression_info {
+    pub size: u32,
+    pub is_feature_constant: bool,
+    pub is_zoom_constant: bool,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_style_expression_inputs {
+    pub size: u32,
+    pub fields: u32,
+    pub zoom: f64,
+    pub color_ramp_parameter: f64,
+    pub elevation: f64,
+    pub feature: mln_buffer_view,
+    pub feature_state: mln_buffer_view,
+    pub global_state: mln_buffer_view,
+    pub canonical_tile_id: mln_canonical_tile_id,
+    pub available_images: *const mln_buffer_view,
+    pub available_image_count: usize,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_style_expression_options {
+    pub size: u32,
+    pub fields: u32,
+    pub expected_type: mln_style_expression_type,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_style_expression_type {
+    pub kind: u32,
+    pub item_kind: u32,
+    pub item_count: u32,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_style_image_info {
     pub width: u32,
     pub height: u32,
@@ -1632,6 +1691,9 @@ pub struct mln_runtime(pub u64);
 pub type mln_runtime_event_callback = Option<
     unsafe extern "C" fn(user_data: *mut std::ffi::c_void, events: *const mln_event_batch_view),
 >;
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct mln_style_expression(pub u64);
 pub type mln_user_data_release = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 pub type mln_vulkan_non_dispatchable_handle = u64;
 pub type mln_wake_callback = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
@@ -1645,7 +1707,8 @@ native_handles!(
     mln_render_session,
     mln_resource_request,
     mln_resource_transform_request,
-    mln_runtime
+    mln_runtime,
+    mln_style_expression
 );
 
 unsafe extern "C" {
@@ -2748,6 +2811,28 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_source_feature_query_options_default() -> mln_source_feature_query_options;
+    pub fn mln_style_expression_create(
+        expression: mln_buffer_view,
+        options: *const mln_style_expression_options,
+        out_expression: *mut mln_style_expression,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_style_expression_evaluate(
+        expression: mln_style_expression,
+        inputs: *const mln_style_expression_inputs,
+        out_json: *mut std::ffi::c_char,
+        json_capacity: usize,
+        out_json_length: *mut usize,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_style_expression_get_info(
+        expression: mln_style_expression,
+        out_info: *mut mln_style_expression_info,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_style_expression_inputs_default() -> mln_style_expression_inputs;
+    pub fn mln_style_expression_options_default() -> mln_style_expression_options;
+    pub fn mln_style_expression_release(expression: mln_style_expression);
     pub fn mln_style_image_options_default() -> mln_style_image_options;
     pub fn mln_style_transition_options_default() -> mln_style_transition_options;
     pub fn mln_supported_render_backend_mask() -> u32;

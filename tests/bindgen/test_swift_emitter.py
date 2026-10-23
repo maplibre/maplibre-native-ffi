@@ -27,6 +27,7 @@ class SwiftEmitterTests(unittest.TestCase):
         header = protocol_header(
             groups=(
                 "caller_sized_output",
+                "caller_sized_text",
                 "values",
                 "defaults",
                 "keywords",

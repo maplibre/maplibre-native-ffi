@@ -2309,6 +2309,143 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static StyleExpressionInfo CopyStyleExpressionInfo(mln_style_expression_info value) =>
+        new(value.is_feature_constant != 0, value.is_zoom_constant != 0);
+
+    internal static StyleExpressionInputs CopyStyleExpressionInputs(
+        mln_style_expression_inputs value
+    ) =>
+        new()
+        {
+            Zoom = value.fields.HasFlag(MLN_STYLE_EXPRESSION_INPUT_ZOOM) ? value.zoom : null,
+            ColorRampParameter = value.fields.HasFlag(
+                MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER
+            )
+                ? value.color_ramp_parameter
+                : null,
+            Elevation = value.fields.HasFlag(MLN_STYLE_EXPRESSION_INPUT_ELEVATION)
+                ? value.elevation
+                : null,
+            FeatureStorage = ValueArray.Optional(
+                value.fields.HasFlag(MLN_STYLE_EXPRESSION_INPUT_FEATURE)
+                    ? ValueStructs.CopyBufferView(value.feature)
+                    : null
+            ),
+            FeatureStateStorage = ValueArray.Optional(
+                value.fields.HasFlag(MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE)
+                    ? ValueStructs.CopyBufferView(value.feature_state)
+                    : null
+            ),
+            GlobalStateStorage = ValueArray.Optional(
+                value.fields.HasFlag(MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE)
+                    ? ValueStructs.CopyBufferView(value.global_state)
+                    : null
+            ),
+            CanonicalTileId = value.fields.HasFlag(MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID)
+                ? CopyCanonicalTileId(value.canonical_tile_id)
+                : null,
+            AvailableImagesStorage = new(
+                NativeCallScope.CopyArray<mln_buffer_view, string>(
+                    value.available_images,
+                    (nuint)(value.available_image_count),
+                    static item => RuntimeStructs.CopyUtf8((sbyte*)item.data, item.size)
+                )
+            ),
+        };
+
+    internal static mln_style_expression_inputs NativeStyleExpressionInputs(
+        StyleExpressionInputs value,
+        NativeCallScope scope
+    )
+    {
+        var native = NativeMethods.mln_style_expression_inputs_default();
+        native.fields = 0;
+        native.size = (uint)sizeof(mln_style_expression_inputs);
+        native.fields |= Put(value.Zoom, ref native.zoom, MLN_STYLE_EXPRESSION_INPUT_ZOOM);
+        native.fields |= Put(
+            value.ColorRampParameter,
+            ref native.color_ramp_parameter,
+            MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER
+        );
+        native.fields |= Put(
+            value.Elevation,
+            ref native.elevation,
+            MLN_STYLE_EXPRESSION_INPUT_ELEVATION
+        );
+        native.fields |= Put(
+            value.FeatureStorage?.Items,
+            ref native.feature,
+            MLN_STYLE_EXPRESSION_INPUT_FEATURE,
+            present => scope.Buffer(present)
+        );
+        native.fields |= Put(
+            value.FeatureStateStorage?.Items,
+            ref native.feature_state,
+            MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE,
+            present => scope.Buffer(present)
+        );
+        native.fields |= Put(
+            value.GlobalStateStorage?.Items,
+            ref native.global_state,
+            MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE,
+            present => scope.Buffer(present)
+        );
+        native.fields |= Put(
+            value.CanonicalTileId,
+            ref native.canonical_tile_id,
+            MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID,
+            NativeCanonicalTileId
+        );
+        native.available_images = scope.Array<mln_buffer_view, string>(
+            value.AvailableImagesStorage.Items,
+            item => scope.Utf8(item)
+        );
+        native.available_image_count = checked((nuint)value.AvailableImagesStorage.Items.Length);
+        return native;
+    }
+
+    internal static StyleExpressionOptions CopyStyleExpressionOptions(
+        mln_style_expression_options value
+    ) =>
+        new()
+        {
+            ExpectedType = value.fields.HasFlag(MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE)
+                ? CopyStyleExpressionType(value.expected_type)
+                : null,
+        };
+
+    internal static mln_style_expression_options NativeStyleExpressionOptions(
+        StyleExpressionOptions value
+    )
+    {
+        var native = NativeMethods.mln_style_expression_options_default();
+        native.fields = 0;
+        native.size = (uint)sizeof(mln_style_expression_options);
+        native.fields |= Put(
+            value.ExpectedType,
+            ref native.expected_type,
+            MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE,
+            NativeStyleExpressionType
+        );
+        return native;
+    }
+
+    internal static StyleExpressionType CopyStyleExpressionType(mln_style_expression_type value) =>
+        new(
+            (StyleExpressionTypeKind)value.kind,
+            (StyleExpressionTypeKind)value.item_kind,
+            value.item_count
+        );
+
+    internal static mln_style_expression_type NativeStyleExpressionType(StyleExpressionType value)
+    {
+        var native = new mln_style_expression_type();
+        native.kind = (uint)value.Kind;
+        native.item_kind = (uint)value.ItemKind;
+        native.item_count = value.ItemCount;
+        return native;
+    }
+
     internal static StyleImageInfo CopyStyleImageInfo(mln_style_image_info value) =>
         new()
         {

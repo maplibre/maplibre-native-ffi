@@ -18,6 +18,7 @@ from ._generated_operations import (
     plugin_get_register_function_v1,
     projected_meters_for_lat_lng,
     runtime_create,
+    style_expression_create,
     supported_render_backend_mask,
 )
 from ._generated_owners import (
@@ -31,6 +32,7 @@ from ._generated_owners import (
     ResourceRequestHandle,
     ResourceTransformRequestHandle,
     RuntimeHandle,
+    StyleExpressionHandle,
 )
 from ._generated_values import (
     AmbientCacheOperation,
@@ -199,6 +201,13 @@ from ._generated_values import (
     SourceFeatureQueryOptionField,
     SourceFeatureQueryOptions,
     Status,
+    StyleExpressionInfo,
+    StyleExpressionInputField,
+    StyleExpressionInputs,
+    StyleExpressionOptionField,
+    StyleExpressionOptions,
+    StyleExpressionType,
+    StyleExpressionTypeKind,
     StyleImageInfo,
     StyleImageInfoField,
     StyleImageOptionField,
@@ -422,6 +431,14 @@ __all__ = [
     "SourceFeatureQueryOptionField",
     "SourceFeatureQueryOptions",
     "Status",
+    "StyleExpressionHandle",
+    "StyleExpressionInfo",
+    "StyleExpressionInputField",
+    "StyleExpressionInputs",
+    "StyleExpressionOptionField",
+    "StyleExpressionOptions",
+    "StyleExpressionType",
+    "StyleExpressionTypeKind",
     "StyleImageInfo",
     "StyleImageInfoField",
     "StyleImageOptionField",
@@ -479,5 +496,6 @@ __all__ = [
     "plugin_get_register_function_v1",
     "projected_meters_for_lat_lng",
     "runtime_create",
+    "style_expression_create",
     "supported_render_backend_mask",
 ]

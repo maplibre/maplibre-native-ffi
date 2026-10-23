@@ -1616,6 +1616,97 @@ public data class Status(public val rawValue: Int) {
 }
 
 /**
+ * Fields present in `mln_style_expression_inputs`.
+ *
+ * See `mln_style_expression_input_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ */
+public data class StyleExpressionInputField(public val rawValue: UInt) {
+  public infix fun or(other: StyleExpressionInputField): StyleExpressionInputField =
+    StyleExpressionInputField(rawValue or other.rawValue)
+
+  public infix fun and(other: StyleExpressionInputField): StyleExpressionInputField =
+    StyleExpressionInputField(rawValue and other.rawValue)
+
+  public operator fun contains(other: StyleExpressionInputField): Boolean =
+    (rawValue and other.rawValue) == other.rawValue
+
+  public companion object {
+    public val ZOOM: StyleExpressionInputField = StyleExpressionInputField(1u)
+    public val COLOR_RAMP_PARAMETER: StyleExpressionInputField = StyleExpressionInputField(2u)
+    public val ELEVATION: StyleExpressionInputField = StyleExpressionInputField(4u)
+    public val FEATURE: StyleExpressionInputField = StyleExpressionInputField(8u)
+    public val FEATURE_STATE: StyleExpressionInputField = StyleExpressionInputField(16u)
+    public val GLOBAL_STATE: StyleExpressionInputField = StyleExpressionInputField(32u)
+    public val CANONICAL_TILE_ID: StyleExpressionInputField = StyleExpressionInputField(64u)
+  }
+}
+
+/**
+ * Fields present in `mln_style_expression_options`.
+ *
+ * See `mln_style_expression_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ */
+public data class StyleExpressionOptionField(public val rawValue: UInt) {
+  public infix fun or(other: StyleExpressionOptionField): StyleExpressionOptionField =
+    StyleExpressionOptionField(rawValue or other.rawValue)
+
+  public infix fun and(other: StyleExpressionOptionField): StyleExpressionOptionField =
+    StyleExpressionOptionField(rawValue and other.rawValue)
+
+  public operator fun contains(other: StyleExpressionOptionField): Boolean =
+    (rawValue and other.rawValue) == other.rawValue
+
+  public companion object {
+    /** expected_type is set. */
+    public val EXPECTED_TYPE: StyleExpressionOptionField = StyleExpressionOptionField(1u)
+  }
+}
+
+/**
+ * Style expression types that a parsed expression may be required to have.
+ *
+ * See `mln_style_expression_type_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ */
+public data class StyleExpressionTypeKind(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "VALUE"
+      1u -> "NUMBER"
+      2u -> "STRING"
+      3u -> "BOOLEAN"
+      4u -> "COLOR"
+      5u -> "OBJECT"
+      6u -> "FORMATTED"
+      7u -> "IMAGE"
+      8u -> "PADDING"
+      9u -> "VARIABLE_ANCHOR_OFFSET_COLLECTION"
+      10u -> "ARRAY"
+      else -> "StyleExpressionTypeKind($rawValue)"
+    }
+
+  public companion object {
+    /** Any value. */
+    public val VALUE: StyleExpressionTypeKind = StyleExpressionTypeKind(0u)
+    public val NUMBER: StyleExpressionTypeKind = StyleExpressionTypeKind(1u)
+    public val STRING: StyleExpressionTypeKind = StyleExpressionTypeKind(2u)
+    public val BOOLEAN: StyleExpressionTypeKind = StyleExpressionTypeKind(3u)
+    public val COLOR: StyleExpressionTypeKind = StyleExpressionTypeKind(4u)
+    public val OBJECT: StyleExpressionTypeKind = StyleExpressionTypeKind(5u)
+    public val FORMATTED: StyleExpressionTypeKind = StyleExpressionTypeKind(6u)
+    /** A resolved image, as the image expression returns. */
+    public val IMAGE: StyleExpressionTypeKind = StyleExpressionTypeKind(7u)
+    public val PADDING: StyleExpressionTypeKind = StyleExpressionTypeKind(8u)
+    public val VARIABLE_ANCHOR_OFFSET_COLLECTION: StyleExpressionTypeKind =
+      StyleExpressionTypeKind(9u)
+    /** An array whose items have item_kind, which is not itself an array. */
+    public val ARRAY: StyleExpressionTypeKind = StyleExpressionTypeKind(10u)
+  }
+}
+
+/**
  * Field mask values for `mln_style_image_info`.
  *
  * See `mln_style_image_info_field` in the
@@ -3500,6 +3591,100 @@ public data class SourceFeatureQueryOptions(
 }
 
 /**
+ * A style expression type.
+ *
+ * See `mln_style_expression_type` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ */
+public data class StyleExpressionType(
+  /** One of `mln_style_expression_type_kind`. */
+  public val kind: StyleExpressionTypeKind = StyleExpressionTypeKind(0u),
+  /** For an array, its items' kind; ignored for any other kind. */
+  public val itemKind: StyleExpressionTypeKind = StyleExpressionTypeKind(0u),
+  /** For an array, its fixed length, or zero for any length. */
+  public val itemCount: UInt = 0u,
+)
+
+/**
+ * Options for parsing a style expression.
+ *
+ * See `mln_style_expression_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ */
+public data class StyleExpressionOptions(
+  /**
+   * The type that the expression must produce. A string type coerces the result to a string, as a
+   * string layer property does; every other type asserts it. Without it, the expression keeps the
+   * type it infers.
+   */
+  public val expectedType: StyleExpressionType? = null,
+) {
+  public companion object {
+    internal val default: StyleExpressionOptions by lazy {
+      GeneratedApi.styleExpressionOptionsDefault()
+    }
+  }
+}
+
+/**
+ * What one evaluation reads.
+ *
+ * See `mln_style_expression_inputs` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ */
+public data class StyleExpressionInputs(
+  /** The value of the zoom expression. */
+  public val zoom: Double? = null,
+  /**
+   * The value of the heatmap-density and line-progress expressions, and of the elevation expression
+   * in a color-relief layer.
+   */
+  public val colorRampParameter: Double? = null,
+  /** The value of the elevation expression outside a color-relief layer. */
+  public val elevation: Double? = null,
+  /** One UTF-8 GeoJSON Feature that feature data expressions read. */
+  public val feature: ByteArray? = null,
+  /** A UTF-8 JSON object that the feature-state expression reads. */
+  public val featureState: ByteArray? = null,
+  /** A UTF-8 JSON object that the global-state expression reads. */
+  public val globalState: ByteArray? = null,
+  /**
+   * The tile that holds the feature, which the within and distance expressions need to place its
+   * geometry.
+   */
+  public val canonicalTileId: CanonicalTileId? = null,
+  /**
+   * The image IDs that the image expression reports as available. The expression reports any other
+   * ID as unavailable.
+   */
+  public val availableImages: List<String> = StyleExpressionInputs.default.availableImages,
+) {
+  private fun contentFields(): Array<Any?> =
+    arrayOf(
+      zoom,
+      colorRampParameter,
+      elevation,
+      feature,
+      featureState,
+      globalState,
+      canonicalTileId,
+      availableImages,
+    )
+
+  override fun equals(other: Any?): Boolean =
+    this === other ||
+      other is StyleExpressionInputs && contentFields().contentDeepEquals(other.contentFields())
+
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+
+  public companion object {
+    internal val default: StyleExpressionInputs by lazy {
+      GeneratedApi.styleExpressionInputsDefault()
+    }
+  }
+}
+
+/**
  * One stretchable interval along an image axis, in image pixels.
  *
  * See `mln_image_stretch` in the
@@ -4611,6 +4796,19 @@ public data class ResourceRequestInfo(
 
   override fun hashCode(): Int = contentFields().contentDeepHashCode()
 }
+
+/**
+ * What a parsed expression depends on.
+ *
+ * See `mln_style_expression_info` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ */
+public data class StyleExpressionInfo(
+  /** Whether the result is the same for every feature and feature state. */
+  public val isFeatureConstant: Boolean = false,
+  /** Whether the result is the same at every zoom. */
+  public val isZoomConstant: Boolean = false,
+)
 
 public data class RenderSessionAttachment(
   public val session: RenderSessionHandle,

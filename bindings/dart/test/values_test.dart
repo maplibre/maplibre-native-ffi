@@ -1,5 +1,6 @@
 // One representative per generated value shape, against the real library.
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
@@ -11,6 +12,24 @@ import 'support/fixture.dart';
 const _featureCollection = '{"type":"FeatureCollection","features":[]}';
 
 void main() {
+  test('caller-sized text returns a result longer than its first storage', () {
+    final zoom = styleExpressionCreate(
+      utf8.encode('["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]'),
+    );
+    addTearDown(zoom.close);
+    expect(
+      utf8.decode(zoom.evaluate(inputs: StyleExpressionInputs(zoom: 5))),
+      '50.0',
+    );
+
+    // The result outgrows the runtime's first storage, so the call runs
+    // again.
+    final text = '"${'a' * 1000}"';
+    final long = styleExpressionCreate(utf8.encode(text));
+    addTearDown(long.close);
+    expect(utf8.decode(long.evaluate()), text);
+  });
+
   test(
     'a synchronous call fills a caller-sized output array in input order',
     () async {

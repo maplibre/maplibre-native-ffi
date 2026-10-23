@@ -18,6 +18,7 @@ typedef mln_render_session = Uint64;
 typedef mln_resource_request = Uint64;
 typedef mln_resource_transform_request = Uint64;
 typedef mln_runtime = Uint64;
+typedef mln_style_expression = Uint64;
 
 typedef mln_camera_transition_end_callback =
     Pointer<NativeFunction<mln_camera_transition_end_callbackFunction>>;
@@ -1259,6 +1260,52 @@ final class mln_source_feature_query_options extends Struct {
   external mln_buffer_view filter;
 }
 
+final class mln_style_expression_info extends Struct {
+  @Uint32()
+  external int size;
+  @Bool()
+  external bool is_feature_constant;
+  @Bool()
+  external bool is_zoom_constant;
+}
+
+final class mln_style_expression_inputs extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int fields;
+  @Double()
+  external double zoom;
+  @Double()
+  external double color_ramp_parameter;
+  @Double()
+  external double elevation;
+  external mln_buffer_view feature;
+  external mln_buffer_view feature_state;
+  external mln_buffer_view global_state;
+  external mln_canonical_tile_id canonical_tile_id;
+  external Pointer<mln_buffer_view> available_images;
+  @Size()
+  external int available_image_count;
+}
+
+final class mln_style_expression_options extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int fields;
+  external mln_style_expression_type expected_type;
+}
+
+final class mln_style_expression_type extends Struct {
+  @Uint32()
+  external int kind;
+  @Uint32()
+  external int item_kind;
+  @Uint32()
+  external int item_count;
+}
+
 final class mln_style_image_info extends Struct {
   @Uint32()
   external int width;
@@ -2010,6 +2057,31 @@ const MLN_STATUS_BUSY = -7;
 const MLN_STATUS_TARGET_LOST = -8;
 const MLN_STATUS_NOT_READY = -9;
 const MLN_STATUS_NOT_FOUND = -10;
+
+// mln_style_expression_input_field
+const MLN_STYLE_EXPRESSION_INPUT_ZOOM = 1;
+const MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER = 2;
+const MLN_STYLE_EXPRESSION_INPUT_ELEVATION = 4;
+const MLN_STYLE_EXPRESSION_INPUT_FEATURE = 8;
+const MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE = 16;
+const MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE = 32;
+const MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID = 64;
+
+// mln_style_expression_option_field
+const MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE = 1;
+
+// mln_style_expression_type_kind
+const MLN_STYLE_EXPRESSION_TYPE_VALUE = 0;
+const MLN_STYLE_EXPRESSION_TYPE_NUMBER = 1;
+const MLN_STYLE_EXPRESSION_TYPE_STRING = 2;
+const MLN_STYLE_EXPRESSION_TYPE_BOOLEAN = 3;
+const MLN_STYLE_EXPRESSION_TYPE_COLOR = 4;
+const MLN_STYLE_EXPRESSION_TYPE_OBJECT = 5;
+const MLN_STYLE_EXPRESSION_TYPE_FORMATTED = 6;
+const MLN_STYLE_EXPRESSION_TYPE_IMAGE = 7;
+const MLN_STYLE_EXPRESSION_TYPE_PADDING = 8;
+const MLN_STYLE_EXPRESSION_TYPE_VARIABLE_ANCHOR_OFFSET_COLLECTION = 9;
+const MLN_STYLE_EXPRESSION_TYPE_ARRAY = 10;
 
 // mln_style_image_info_field
 const MLN_STYLE_IMAGE_INFO_CONTENT = 1;
@@ -4796,6 +4868,62 @@ external int mln_runtime_update_offline_region_metadata(
 @Native<mln_source_feature_query_options Function()>()
 external mln_source_feature_query_options
 mln_source_feature_query_options_default();
+
+@Native<
+  Int32 Function(
+    mln_buffer_view,
+    Pointer<mln_style_expression_options>,
+    Pointer<mln_style_expression>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_style_expression_create(
+  mln_buffer_view expression,
+  Pointer<mln_style_expression_options> options,
+  Pointer<mln_style_expression> out_expression,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_style_expression,
+    Pointer<mln_style_expression_inputs>,
+    Pointer<Char>,
+    Size,
+    Pointer<Size>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_style_expression_evaluate(
+  int expression,
+  Pointer<mln_style_expression_inputs> inputs,
+  Pointer<Char> out_json,
+  int json_capacity,
+  Pointer<Size> out_json_length,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_style_expression,
+    Pointer<mln_style_expression_info>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_style_expression_get_info(
+  int expression,
+  Pointer<mln_style_expression_info> out_info,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<mln_style_expression_inputs Function()>()
+external mln_style_expression_inputs mln_style_expression_inputs_default();
+
+@Native<mln_style_expression_options Function()>()
+external mln_style_expression_options mln_style_expression_options_default();
+
+@Native<Void Function(mln_style_expression)>()
+external void mln_style_expression_release(int expression);
 
 @Native<mln_style_image_options Function()>()
 external mln_style_image_options mln_style_image_options_default();

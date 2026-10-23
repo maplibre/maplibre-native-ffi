@@ -30,6 +30,8 @@ mod resource_transform_request;
 pub use resource_transform_request::*;
 mod runtime;
 pub use runtime::*;
+mod style_expression;
+pub use style_expression::*;
 mod global;
 pub use global::*;
 
@@ -51,3 +53,5 @@ static_assertions::assert_impl_all!(ResourceRequestHandle: Send, Sync);
 static_assertions::assert_impl_all!(ResourceTransformRequestHandle: Send, Sync);
 #[cfg(test)]
 static_assertions::assert_impl_all!(RuntimeHandle: Send, Sync);
+#[cfg(test)]
+static_assertions::assert_impl_all!(StyleExpressionHandle: Send, Sync);

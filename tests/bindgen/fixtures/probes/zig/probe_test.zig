@@ -118,3 +118,19 @@ test "generated caller-sized output arrays" {
     defer empty.deinit();
     try std.testing.expectEqual(@as(usize, 0), empty.value.len);
 }
+
+test "generated caller-sized text" {
+    const allocator = std.testing.allocator;
+    var empty = try api.probeZerosJson(allocator, 0, null);
+    defer empty.deinit();
+    try std.testing.expectEqualStrings("[]", empty.value);
+    var short = try api.probeZerosJson(allocator, 3, null);
+    defer short.deinit();
+    try std.testing.expectEqualStrings("[0,0,0]", short.value);
+    // Text longer than the call's first storage, which it fetches again.
+    var long = try api.probeZerosJson(allocator, 300, null);
+    defer long.deinit();
+    try std.testing.expectEqual(@as(usize, 601), long.value.len);
+    try std.testing.expect(std.mem.startsWith(u8, long.value, "[0,0,"));
+    try std.testing.expect(std.mem.endsWith(u8, long.value, ",0]"));
+}

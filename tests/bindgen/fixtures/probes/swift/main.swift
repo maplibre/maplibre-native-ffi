@@ -107,6 +107,20 @@ try ledger.close()
 try check(Maplibre.probeReadLevel() == nil, "absent level")
 try check(Maplibre.probeReadLevel() == 0.5, "published level")
 
+// Caller-sized text that fits the runtime's first storage, and text that
+// does not, which the runtime fetches again with enough storage.
+try check(Maplibre.probeZerosJson(count: 0) == Data("[]".utf8), "empty text")
+try check(
+  Maplibre.probeZerosJson(count: 3) == Data("[0,0,0]".utf8),
+  "short text"
+)
+let longText = try Maplibre.probeZerosJson(count: 300)
+try check(
+  longText.count == 601 && longText.prefix(5) == Data("[0,0,".utf8)
+    && longText.suffix(3) == Data(",0]".utf8),
+  "long text"
+)
+
 /// A caller-sized output array holds one element per input element, in input
 /// order.
 let batchPoints = [

@@ -113,7 +113,7 @@ def needs_read(plan):
         and any(
             copies_borrowed(element(p.value)) and element(p.value).kind != "handle"
             for p in plan.outputs
-            if not p.sized_by
+            if not p.sized_by and not p.result_length
         )
     )
 
@@ -161,9 +161,15 @@ def operation(plan, values, *, discard=False):
         and p.value.length != "nul"
         and not p.value.length.isdigit()
     }
+    # Caller-sized text passes its storage, capacity, and length to a closure
+    # that the runtime calls again when the text did not fit.
+    text = next((p for p in plan.outputs if p.result_length), None)
     signature, setup, arguments = [], [], {}
     for p in plan.inputs:
         if p.name == receiver_name:
+            continue
+        if text and p.name == text.value.length:
+            arguments[p.name] = labels[p.name]
             continue
         if p.name in counts:
             counted = counts[p.name]
@@ -191,9 +197,19 @@ def operation(plan, values, *, discard=False):
             arguments[receiver.name] = "&handle"
     outputs = []
     for p in plan.outputs:
+        local = labels[p.name]
+        if text and p.name == text.result_length:
+            arguments[p.name] = local
+            continue
+        if p is text:
+            if p.value.encoding != "json":
+                values.fail(p.value, "caller-sized text needs a text decoding")
+            setup.append(f"var {local} []byte")
+            arguments[p.name] = local
+            outputs.append((p, p.value, local))
+            continue
         value = element(p.value)
         values.require(value)
-        local = labels[p.name]
         if p.sized_by:
             # Native writes one element per input element into Go memory that
             # holds no Go pointers, which cgo lets a call borrow.
@@ -229,6 +245,10 @@ def operation(plan, values, *, discard=False):
 
     output_types, conversions, adoptions = [], [], []
     for p, value, local in outputs:
+        if p is text:
+            output_types.append("[]byte")
+            conversions.append(local)
+            continue
         output_types.append(values.type(value))
         if p.sized_by:
             copied = values.copy(value.element, "item")
@@ -307,6 +327,13 @@ def operation(plan, values, *, discard=False):
     call = native_call(
         plan.function, *(arguments[p.name] for p in plan.function.parameters)
     )
+    if text:
+        storage, capacity, length = (
+            labels[text.name],
+            labels[text.value.length],
+            labels[text.result_length],
+        )
+        call = f"bindingCallerSizedText(&{storage}, func({storage} *C.char, {capacity} C.size_t, {length} *C.size_t) int32 {{ return int32({call}) }})"
     products = ""
     if len(output_types) > 1:
         returned = name(plan.name.removeprefix("mln_")) + "Result"

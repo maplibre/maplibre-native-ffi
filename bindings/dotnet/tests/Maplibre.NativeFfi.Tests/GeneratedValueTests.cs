@@ -1,3 +1,4 @@
+using System.Text;
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Memory;
@@ -9,6 +10,21 @@ namespace Maplibre.NativeFfi.Tests;
 /// <summary>One representative of each generated value shape, crossing to native and back.</summary>
 public sealed class GeneratedValueTests
 {
+    [Fact]
+    public void CallerSizedTextReturnsResultsLongerThanItsFirstStorage()
+    {
+        using var zoom = StyleExpressionHandle.Create(
+            """["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"""u8.ToArray(),
+            null
+        );
+        Assert.Equal("50.0"u8.ToArray(), zoom.Evaluate(new StyleExpressionInputs { Zoom = 5 }));
+
+        // The result outgrows the call's first storage, so the call runs again.
+        var text = Encoding.UTF8.GetBytes($"\"{new string('a', 1000)}\"");
+        using var expression = StyleExpressionHandle.Create(text, null);
+        Assert.Equal(text, expression.Evaluate(null));
+    }
+
     [Fact]
     public async Task SynchronousCallsFillCallerSizedOutputsInInputOrder()
     {

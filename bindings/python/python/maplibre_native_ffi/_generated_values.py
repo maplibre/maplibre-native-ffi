@@ -975,6 +975,52 @@ class Status(UnknownIntEnum):
     NOT_FOUND = -10
 
 
+class StyleExpressionInputField(IntFlag):
+    """Fields present in `mln_style_expression_inputs`.
+
+    See `mln_style_expression_input_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+    """
+
+    ZOOM = 1
+    COLOR_RAMP_PARAMETER = 2
+    ELEVATION = 4
+    FEATURE = 8
+    FEATURE_STATE = 16
+    GLOBAL_STATE = 32
+    CANONICAL_TILE_ID = 64
+
+
+class StyleExpressionOptionField(IntFlag):
+    """Fields present in `mln_style_expression_options`.
+
+    See `mln_style_expression_option_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+    """
+
+    EXPECTED_TYPE = 1
+
+
+class StyleExpressionTypeKind(UnknownIntEnum):
+    """Style expression types that a parsed expression may be required to have.
+
+    See `mln_style_expression_type_kind` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+    """
+
+    VALUE = 0
+    NUMBER = 1
+    STRING = 2
+    BOOLEAN = 3
+    COLOR = 4
+    OBJECT = 5
+    FORMATTED = 6
+    IMAGE = 7
+    PADDING = 8
+    VARIABLE_ANCHOR_OFFSET_COLLECTION = 9
+    ARRAY = 10
+
+
 class StyleImageInfoField(IntFlag):
     """Field mask values for `mln_style_image_info`.
 
@@ -4045,6 +4091,143 @@ class SourceFeatureQueryOptions:
         from . import _native
 
         return cls._from_native(_native._default_source_feature_query_options())
+
+
+@dataclass(frozen=True, slots=True)
+class StyleExpressionInfo:
+    """What a parsed expression depends on.
+
+    See `mln_style_expression_info` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+    """
+
+    is_feature_constant: bool
+    """Whether the result is the same for every feature and feature state."""
+
+    is_zoom_constant: bool
+    """Whether the result is the same at every zoom."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            is_feature_constant=raw["is_feature_constant"],
+            is_zoom_constant=raw["is_zoom_constant"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class StyleExpressionInputs:
+    """What one evaluation reads.
+
+    See `mln_style_expression_inputs` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+    """
+
+    zoom: float | None = None
+    """The value of the zoom expression."""
+
+    color_ramp_parameter: float | None = None
+    """The value of the heatmap-density and line-progress expressions, and of
+    the elevation expression in a color-relief layer.
+    """
+
+    elevation: float | None = None
+    """The value of the elevation expression outside a color-relief layer."""
+
+    feature: bytes | None = None
+    """One UTF-8 GeoJSON Feature that feature data expressions read."""
+
+    feature_state: bytes | None = None
+    """A UTF-8 JSON object that the feature-state expression reads."""
+
+    global_state: bytes | None = None
+    """A UTF-8 JSON object that the global-state expression reads."""
+
+    canonical_tile_id: CanonicalTileId | None = None
+    """The tile that holds the feature, which the within and distance
+    expressions need to place its geometry.
+    """
+
+    available_images: tuple[str, ...] = field(
+        default_factory=lambda: StyleExpressionInputs.default().available_images
+    )
+    """The image IDs that the image expression reports as available. The
+    expression reports any other ID as unavailable.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            zoom=raw["zoom"],
+            color_ramp_parameter=raw["color_ramp_parameter"],
+            elevation=raw["elevation"],
+            feature=raw["feature"],
+            feature_state=raw["feature_state"],
+            global_state=raw["global_state"],
+            canonical_tile_id=_maybe(
+                CanonicalTileId._from_native, raw["canonical_tile_id"]
+            ),
+            available_images=tuple(item for item in raw["available_images"]),
+        )
+
+    @classmethod
+    def default(cls):
+        from . import _native
+
+        return cls._from_native(_native._default_style_expression_inputs())
+
+
+@dataclass(frozen=True, slots=True)
+class StyleExpressionOptions:
+    """Options for parsing a style expression.
+
+    See `mln_style_expression_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+    """
+
+    expected_type: StyleExpressionType | None = None
+    """The type that the expression must produce. A string type coerces the
+    result to a string, as a string layer property does; every other type
+    asserts it. Without it, the expression keeps the type it infers.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            expected_type=_maybe(StyleExpressionType._from_native, raw["expected_type"])
+        )
+
+    @classmethod
+    def default(cls):
+        from . import _native
+
+        return cls._from_native(_native._default_style_expression_options())
+
+
+@dataclass(frozen=True, slots=True)
+class StyleExpressionType:
+    """A style expression type.
+
+    See `mln_style_expression_type` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+    """
+
+    kind: StyleExpressionTypeKind
+    """One of `mln_style_expression_type_kind`."""
+
+    item_kind: StyleExpressionTypeKind
+    """For an array, its items' kind; ignored for any other kind."""
+
+    item_count: int
+    """For an array, its fixed length, or zero for any length."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            kind=StyleExpressionTypeKind(raw["kind"]),
+            item_kind=StyleExpressionTypeKind(raw["item_kind"]),
+            item_count=raw["item_count"],
+        )
 
 
 @dataclass(frozen=True, slots=True)

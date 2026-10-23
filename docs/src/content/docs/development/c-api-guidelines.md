@@ -41,6 +41,11 @@ Follow these rules, which keep the ABI open to growth:
 - An optional member has its own bit in the struct's `fields` mask.
 - Strings that the host passes in use `mln_buffer_view`, and strings that native
   returns use NUL-terminated `const char*`.
+- A synchronous function that returns text of a length the caller cannot know
+  writes it into a buffer the caller passes, reports its length whether or not
+  it fit, and returns the same text for the same inputs, so a binding can call
+  again with enough storage. Annotate it as `mln_style_expression_evaluate()`
+  does.
 - A handle output parameter must hold `MLN_HANDLE_NULL` on entry. Every other
   pointer is borrowed for the call, and a function that keeps an input copies
   it.

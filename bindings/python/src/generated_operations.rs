@@ -2045,6 +2045,121 @@ fn generated_copy_mln_source_feature_query_options(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_style_expression_info(
+    py: Python<'_>,
+    value: &sys::mln_style_expression_info,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "is_feature_constant",
+        generated_value(py, value.is_feature_constant)?,
+    )?;
+    dict.set_item(
+        "is_zoom_constant",
+        generated_value(py, value.is_zoom_constant)?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_style_expression_inputs(
+    py: Python<'_>,
+    value: &sys::mln_style_expression_inputs,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "zoom",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_EXPRESSION_INPUT_ZOOM != 0,
+            || generated_value(py, value.zoom),
+        )?,
+    )?;
+    dict.set_item(
+        "color_ramp_parameter",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER != 0,
+            || generated_value(py, value.color_ramp_parameter),
+        )?,
+    )?;
+    dict.set_item(
+        "elevation",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_EXPRESSION_INPUT_ELEVATION != 0,
+            || generated_value(py, value.elevation),
+        )?,
+    )?;
+    dict.set_item(
+        "feature",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_EXPRESSION_INPUT_FEATURE != 0,
+            || unsafe { generated_bytes(py, value.feature) },
+        )?,
+    )?;
+    dict.set_item(
+        "feature_state",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE != 0,
+            || unsafe { generated_bytes(py, value.feature_state) },
+        )?,
+    )?;
+    dict.set_item(
+        "global_state",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE != 0,
+            || unsafe { generated_bytes(py, value.global_state) },
+        )?,
+    )?;
+    dict.set_item(
+        "canonical_tile_id",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID != 0,
+            || generated_copy_mln_canonical_tile_id(py, &value.canonical_tile_id),
+        )?,
+    )?;
+    dict.set_item(
+        "available_images",
+        generated_list(
+            py,
+            unsafe { generated_slice(value.available_images, value.available_image_count)? },
+            |element| generated_text(py, *element),
+        )?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_style_expression_options(
+    py: Python<'_>,
+    value: &sys::mln_style_expression_options,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "expected_type",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE != 0,
+            || generated_copy_mln_style_expression_type(py, &value.expected_type),
+        )?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_style_expression_type(
+    py: Python<'_>,
+    value: &sys::mln_style_expression_type,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("kind", generated_value(py, value.kind)?)?;
+    dict.set_item("item_kind", generated_value(py, value.item_kind)?)?;
+    dict.set_item("item_count", generated_value(py, value.item_count)?)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_style_image_info(
     py: Python<'_>,
     value: &sys::mln_style_image_info,
@@ -4024,6 +4139,89 @@ fn generated_input_mln_source_feature_query_options<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_style_expression_inputs<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_style_expression_inputs> {
+    if value.is_none() {
+        return Ok(unsafe { sys::mln_style_expression_inputs_default() });
+    }
+    let mut raw: sys::mln_style_expression_inputs =
+        unsafe { sys::mln_style_expression_inputs_default() };
+    raw.size = std::mem::size_of::<sys::mln_style_expression_inputs>() as _;
+    raw.fields = 0;
+    if let Some(field) = generated_present(value, "zoom")? {
+        raw.zoom = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_ZOOM;
+    }
+    if let Some(field) = generated_present(value, "color_ramp_parameter")? {
+        raw.color_ramp_parameter = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER;
+    }
+    if let Some(field) = generated_present(value, "elevation")? {
+        raw.elevation = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_ELEVATION;
+    }
+    if let Some(field) = generated_present(value, "feature")? {
+        raw.feature = storage.buffer(field, false)?;
+        raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_FEATURE;
+    }
+    if let Some(field) = generated_present(value, "feature_state")? {
+        raw.feature_state = storage.buffer(field, false)?;
+        raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE;
+    }
+    if let Some(field) = generated_present(value, "global_state")? {
+        raw.global_state = storage.buffer(field, false)?;
+        raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE;
+    }
+    if let Some(field) = generated_present(value, "canonical_tile_id")? {
+        raw.canonical_tile_id = generated_input_mln_canonical_tile_id(&field, storage)?;
+        raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID;
+    }
+    raw.available_images = {
+        let items = generated_items(&value.getattr("available_images")?, |item| {
+            storage.buffer(item, true)
+        })?;
+        raw.available_image_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
+    Ok(raw)
+}
+
+fn generated_input_mln_style_expression_options<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_style_expression_options> {
+    if value.is_none() {
+        return Ok(unsafe { sys::mln_style_expression_options_default() });
+    }
+    let mut raw: sys::mln_style_expression_options =
+        unsafe { sys::mln_style_expression_options_default() };
+    raw.size = std::mem::size_of::<sys::mln_style_expression_options>() as _;
+    raw.fields = 0;
+    if let Some(field) = generated_present(value, "expected_type")? {
+        raw.expected_type = generated_input_mln_style_expression_type(&field, storage)?;
+        raw.fields |= sys::MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE;
+    }
+    Ok(raw)
+}
+
+fn generated_input_mln_style_expression_type<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_style_expression_type> {
+    let _ = storage;
+    let mut raw: sys::mln_style_expression_type = unsafe { std::mem::zeroed() };
+    raw.kind = value
+        .getattr("kind")?
+        .extract::<sys::mln_style_expression_type_kind>()?;
+    raw.item_kind = value
+        .getattr("item_kind")?
+        .extract::<sys::mln_style_expression_type_kind>()?;
+    raw.item_count = value.getattr("item_count")?.extract::<u32>()?;
+    Ok(raw)
+}
+
 fn generated_input_mln_style_image_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -4534,6 +4732,18 @@ fn _default_source_feature_query_options(py: Python<'_>) -> PyResult<Py<PyAny>> 
 }
 
 #[pyfunction]
+fn _default_style_expression_inputs(py: Python<'_>) -> PyResult<Py<PyAny>> {
+    let value = unsafe { sys::mln_style_expression_inputs_default() };
+    generated_copy_mln_style_expression_inputs(py, &value)
+}
+
+#[pyfunction]
+fn _default_style_expression_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
+    let value = unsafe { sys::mln_style_expression_options_default() };
+    generated_copy_mln_style_expression_options(py, &value)
+}
+
+#[pyfunction]
 fn _default_style_image_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
     let value = unsafe { sys::mln_style_image_options_default() };
     generated_copy_mln_style_image_options(py, &value)
@@ -4633,6 +4843,13 @@ unsafe extern "C" fn generated_dispose_mln_resource_transform_request(
 
 unsafe extern "C" fn generated_dispose_mln_runtime(handle: sys::mln_runtime) -> sys::mln_status {
     unsafe { sys::mln_runtime_dispose(handle, std::ptr::null_mut()) }
+}
+
+unsafe extern "C" fn generated_dispose_mln_style_expression(
+    handle: sys::mln_style_expression,
+) -> sys::mln_status {
+    unsafe { sys::mln_style_expression_release(handle) };
+    sys::MLN_STATUS_OK
 }
 
 #[pymethods]
@@ -9447,6 +9664,63 @@ impl RuntimeHandle {
         }
     }
 }
+
+#[pymethods]
+impl StyleExpressionHandle {
+    #[pyo3(signature = (inputs=None))]
+    fn evaluate(&self, py: Python<'_>, inputs: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let inputs = inputs.unwrap_or_else(|| py.None().into_bound(py));
+        let inputs_value = generated_maybe(&inputs, |inputs| {
+            generated_input_mln_style_expression_inputs(&inputs, storage)
+        })?;
+        let handle = self.input();
+        let mut out_json: Vec<u8> = Vec::new();
+        unsafe {
+            call.status(|diagnostic| {
+                generated_caller_sized_text(
+                    &mut out_json,
+                    |out_json, json_capacity, out_json_length| {
+                        sys::mln_style_expression_evaluate(
+                            handle,
+                            generated_pointer(&inputs_value),
+                            out_json,
+                            json_capacity,
+                            out_json_length,
+                            diagnostic,
+                        )
+                    },
+                )
+            })
+        }?;
+        Ok(PyBytes::new(py, &out_json).into_any().unbind())
+    }
+    #[pyo3(signature = ())]
+    fn get_info(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        let mut out_info: sys::mln_style_expression_info = unsafe { std::mem::zeroed() };
+        out_info.size = std::mem::size_of::<sys::mln_style_expression_info>() as _;
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_style_expression_get_info(handle, &mut out_info, diagnostic)
+            })
+        }?;
+        generated_copy_mln_style_expression_info(py, &out_info)
+    }
+    #[pyo3(signature = ())]
+    fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.run(|| sys::mln_style_expression_release(handle)) };
+        reservation.commit();
+        Ok(py.None())
+    }
+}
 generated_owner!(
     AcquiredFrameHandle,
     "_AcquiredFrameHandle",
@@ -9529,6 +9803,14 @@ generated_owner!(
     mln_runtime,
     Some(generated_dispose_mln_runtime),
     Some(generated_exit_release_mln_runtime),
+    false
+);
+generated_owner!(
+    StyleExpressionHandle,
+    "_StyleExpressionHandle",
+    mln_style_expression,
+    Some(generated_dispose_mln_style_expression),
+    None,
     false
 );
 #[pyfunction]
@@ -9742,6 +10024,34 @@ fn runtime_create(py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult
 }
 
 #[pyfunction]
+#[pyo3(signature = (expression, options=None))]
+fn style_expression_create(
+    py: Python<'_>,
+    expression: &Bound<'_, PyAny>,
+    options: Option<Bound<'_, PyAny>>,
+) -> PyResult<Py<PyAny>> {
+    let mut call = GeneratedCall::new(py);
+    let storage = &mut call.storage;
+    let expression_value = storage.buffer(expression.clone(), false)?;
+    let options = options.unwrap_or_else(|| py.None().into_bound(py));
+    let options_value = generated_maybe(&options, |options| {
+        generated_input_mln_style_expression_options(&options, storage)
+    })?;
+    let mut out_expression: sys::mln_style_expression = unsafe { std::mem::zeroed() };
+    unsafe {
+        call.status(|diagnostic| {
+            sys::mln_style_expression_create(
+                expression_value,
+                generated_pointer(&options_value),
+                &mut out_expression,
+                diagnostic,
+            )
+        })
+    }?;
+    unsafe { StyleExpressionHandle::adopt(py, out_expression, Vec::new()) }
+}
+
+#[pyfunction]
 #[pyo3(signature = ())]
 fn supported_render_backend_mask(py: Python<'_>) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py);
@@ -9760,6 +10070,7 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<ResourceRequestHandle>()?;
     module.add_class::<ResourceTransformRequestHandle>()?;
     module.add_class::<RuntimeHandle>()?;
+    module.add_class::<StyleExpressionHandle>()?;
     module.add_class::<HttpHeaderTransformResponseScope>()?;
     module.add_function(wrap_pyfunction!(_default_animation_options, module)?)?;
     module.add_function(wrap_pyfunction!(_default_bound_options, module)?)?;
@@ -9824,6 +10135,8 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
         _default_source_feature_query_options,
         module
     )?)?;
+    module.add_function(wrap_pyfunction!(_default_style_expression_inputs, module)?)?;
+    module.add_function(wrap_pyfunction!(_default_style_expression_options, module)?)?;
     module.add_function(wrap_pyfunction!(_default_style_image_options, module)?)?;
     module.add_function(wrap_pyfunction!(_default_style_transition_options, module)?)?;
     module.add_function(wrap_pyfunction!(
@@ -9868,6 +10181,7 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(plugin_get_register_function_v1, module)?)?;
     module.add_function(wrap_pyfunction!(projected_meters_for_lat_lng, module)?)?;
     module.add_function(wrap_pyfunction!(runtime_create, module)?)?;
+    module.add_function(wrap_pyfunction!(style_expression_create, module)?)?;
     module.add_function(wrap_pyfunction!(supported_render_backend_mask, module)?)?;
     Ok(())
 }

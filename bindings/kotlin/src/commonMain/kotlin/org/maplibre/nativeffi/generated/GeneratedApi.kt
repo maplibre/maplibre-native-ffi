@@ -587,6 +587,55 @@ public object GeneratedApi {
     }
 
   /**
+   * Parses a style expression.
+   *
+   * See `mln_style_expression_create` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+   */
+  public fun styleExpressionCreate(
+    expression: ByteArray,
+    options: StyleExpressionOptions? = null,
+  ): StyleExpressionHandle =
+    nativeCall(null, null) {
+      val out = allocate(8, 8)
+      check(
+        C.mln_style_expression_create(
+          view(expression),
+          options?.let { writeStyleExpressionOptions(it) } ?: 0L,
+          out,
+          diagnostic,
+        ),
+      )
+      adopt(out, GeneratedOwnerDisposal::styleExpression) { StyleExpressionHandle(it) }
+    }
+
+  /**
+   * Returns default style expression inputs, which set no input.
+   *
+   * See `mln_style_expression_inputs_default` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+   */
+  public fun styleExpressionInputsDefault(): StyleExpressionInputs =
+    nativeCall(null, null) {
+      val out = sized(w(80, 112), 8)
+      C.mln_style_expression_inputs_default(out)
+      readStyleExpressionInputs(out)
+    }
+
+  /**
+   * Returns default style expression options.
+   *
+   * See `mln_style_expression_options_default` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+   */
+  public fun styleExpressionOptionsDefault(): StyleExpressionOptions =
+    nativeCall(null, null) {
+      val out = sized(20, 4)
+      C.mln_style_expression_options_default(out)
+      readStyleExpressionOptions(out)
+    }
+
+  /**
    * Returns default runtime style image options.
    *
    * See `mln_style_image_options_default` in the

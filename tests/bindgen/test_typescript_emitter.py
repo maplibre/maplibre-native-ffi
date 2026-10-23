@@ -28,6 +28,7 @@ PROBE = FIXTURES / "probes/typescript"
 # results_stub.c implements.
 GROUPS = (
     "caller_sized_output",
+    "caller_sized_text",
     "values",
     "keywords",
     "defaults",

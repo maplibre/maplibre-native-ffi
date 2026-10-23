@@ -196,3 +196,24 @@ fn synchronous_calls_fill_caller_sized_outputs_in_input_order() {
     );
     projection.release().unwrap();
 }
+
+#[test]
+fn caller_sized_text_returns_results_longer_than_its_first_storage() {
+    let zoom = style_expression_create(
+        br#"["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"#,
+        None,
+    )
+    .unwrap();
+    let inputs = StyleExpressionInputs {
+        zoom: Some(5.0),
+        ..Default::default()
+    };
+    assert_eq!(zoom.evaluate(Some(&inputs)).unwrap(), b"50.0");
+    zoom.release().unwrap();
+
+    // The result outgrows the runtime's first storage, so the call runs again.
+    let text = format!("\"{}\"", "a".repeat(1000));
+    let long = style_expression_create(text.as_bytes(), None).unwrap();
+    assert_eq!(long.evaluate(None).unwrap(), text.into_bytes());
+    long.release().unwrap();
+}

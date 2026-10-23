@@ -195,6 +195,11 @@ class ParameterPlan:
     direction: str
     # The input array whose length sizes this caller-allocated output array.
     sized_by: str | None = None
+    # For caller-sized text, the output that reports the text's length; its
+    # capacity input is the value's length. A binding allocates the storage,
+    # passes its capacity, and calls again with enough when the reported
+    # length does not fit. Neither control parameter reaches host code.
+    result_length: str | None = None
 
 
 @dataclass(frozen=True)
@@ -663,6 +668,12 @@ class Binder:
             }
             child_name = type_name(pointee)
             if metadata.get("direction") == "out":
+                if "result_length" in metadata:
+                    return ValuePlan(
+                        kind="buffer",
+                        buffer_form="pointer",
+                        **{**common, "encoding": metadata.get("encoding", "utf8")},
+                    )
                 if pointee.kind != "pointer" and metadata.get("length") not in {
                     None,
                     "1",
@@ -923,6 +934,7 @@ class Binder:
                 )
                 if direction == "out" and value.kind == "array"
                 else None,
+                metadata.get("result_length"),
             )
 
             def validate_input_lifetime(item, parameter_name=parameter.name):

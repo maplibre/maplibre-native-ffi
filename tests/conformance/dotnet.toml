@@ -38,6 +38,7 @@
 "VAL-06" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/GeneratedValueTests.cs::ARecordBuiltFromItsParameterlessConstructorEqualsTheNativeDefault"
 "VAL-07" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CompletionTests.cs::AnArrayResultIsReadAtItsValueSize"
 "VAL-08" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/GeneratedValueTests.cs::SynchronousCallsFillCallerSizedOutputsInInputOrder"
+"VAL-09" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/GeneratedValueTests.cs::CallerSizedTextReturnsResultsLongerThanItsFirstStorage"
 "VIEW-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::ABorrowedFrameViewExpiresWithItsScope"
 "REND-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::AnOwnedTextureSessionRendersPixelsTheBindingReadsBack"
 "REND-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::ACallerDrivenSessionIsServicedFromAManagedThread"

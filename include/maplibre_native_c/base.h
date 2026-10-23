@@ -134,6 +134,11 @@ typedef uint64_t mln_geojson_source_data MLN_BINDING(
   "kind=handle;release=mln_geojson_source_data_release;"
   "dispose=mln_geojson_source_data_release"
 );
+/** A parsed style expression, immutable and independent of any map. */
+typedef uint64_t mln_style_expression MLN_BINDING(
+  "kind=handle;release=mln_style_expression_release;"
+  "dispose=mln_style_expression_release"
+);
 /** A standalone projection of one map view. */
 typedef uint64_t mln_map_projection MLN_BINDING(
   "kind=handle;release=mln_map_projection_release;"

@@ -40,4 +40,8 @@ internal object GeneratedOwnerDisposal {
   fun runtime(handle: Long) {
     NativeDiagnostics.check { diagnostic -> C.mln_runtime_dispose(handle, diagnostic) }
   }
+
+  fun styleExpression(handle: Long) {
+    C.mln_style_expression_release(handle)
+  }
 }

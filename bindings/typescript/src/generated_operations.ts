@@ -70,6 +70,9 @@ import type {
   ScreenPoint,
   SourceFeature,
   SourceFeatureQueryOptions,
+  StyleExpressionInfo,
+  StyleExpressionInputs,
+  StyleExpressionOptions,
   StyleImageInfo,
   StyleImageOptions,
   StyleLayerInfo,
@@ -592,6 +595,44 @@ export function runtimeOptionsDefault(): RuntimeOptions {
  */
 export function sourceFeatureQueryOptionsDefault(): SourceFeatureQueryOptions {
   return native.mln_source_feature_query_options_default();
+}
+
+/**
+ * Parses a style expression.
+ *
+ * See `mln_style_expression_create` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ */
+export function styleExpressionCreate(
+  expression: string,
+  options?: StyleExpressionOptions,
+): StyleExpressionHandle {
+  const handle = native.mln_style_expression_create(expression, options);
+  return adopt(
+    handle,
+    () => new StyleExpressionHandle(ADOPT, handle),
+    (disposed) => native.mln_style_expression_release(disposed, undefined),
+  );
+}
+
+/**
+ * Returns default style expression inputs, which set no input.
+ *
+ * See `mln_style_expression_inputs_default` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ */
+export function styleExpressionInputsDefault(): StyleExpressionInputs {
+  return native.mln_style_expression_inputs_default();
+}
+
+/**
+ * Returns default style expression options.
+ *
+ * See `mln_style_expression_options_default` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ */
+export function styleExpressionOptionsDefault(): StyleExpressionOptions {
+  return native.mln_style_expression_options_default();
 }
 
 /**
@@ -4542,6 +4583,66 @@ export class RuntimeHandle extends Owner {
   }
 }
 defineDisposers(RuntimeHandle, "close", "dispose");
+
+/**
+ * A parsed style expression, immutable and independent of any map.
+ *
+ * See `mln_style_expression` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
+export class StyleExpressionHandle extends Owner {
+  /**
+   * Created by the API, which passes a key that only it holds.
+   *
+   * @internal
+   */
+  constructor(key: AdoptKey, handle: bigint, registrations?: Registrations) {
+    super(key, handle, "StyleExpressionHandle", { registrations });
+  }
+  /**
+   * Calls `close()`, for `await using`.
+   * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
+   */
+  declare [Symbol.asyncDispose]: () => Promise<void>;
+  /**
+   * Calls `close()`, for `using`.
+   * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
+   */
+  declare [Symbol.dispose]: () => void;
+
+  /**
+   * Releases a style expression.
+   *
+   * See `mln_style_expression_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+   */
+  close(): void {
+    closeSync(this, (handle, token) =>
+      native.mln_style_expression_release(handle, token),
+    );
+  }
+
+  /**
+   * Evaluates a parsed expression and writes its result as UTF-8 JSON.
+   *
+   * See `mln_style_expression_evaluate` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+   */
+  evaluate(inputs?: StyleExpressionInputs): string {
+    return native.mln_style_expression_evaluate(this.id, inputs);
+  }
+
+  /**
+   * Copies what a parsed expression depends on into out_info.
+   *
+   * See `mln_style_expression_get_info` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+   */
+  getInfo(): StyleExpressionInfo {
+    return native.mln_style_expression_get_info(this.id);
+  }
+}
+defineDisposers(StyleExpressionHandle, undefined, "close");
 
 /** A new session and the completion of the attachment that created it. */
 export interface RenderSessionAttachment {

@@ -9,6 +9,7 @@ import {
   probeBatchPoints,
   probeBatchScores,
   probeHooksDefault,
+  probeZerosJson,
   probeReadLevel,
   probeRoundtrip,
   probeSettingsCheck,
@@ -36,6 +37,12 @@ assert.deepEqual(probeRoundtrip({ left: [], right: [] }), {
   right: [],
 });
 assert.deepEqual(probeRoundtrip({ right: [] }), { right: [] });
+
+// Caller-sized text that fits the addon's first storage, and text that does
+// not, which the addon fetches again with enough storage.
+assert.equal(probeZerosJson(0), "[]");
+assert.equal(probeZerosJson(3), "[0,0,0]");
+assert.equal(probeZerosJson(300), `[${Array(300).fill(0).join(",")}]`);
 
 // A caller-sized output array holds one element per input element, in input
 // order.

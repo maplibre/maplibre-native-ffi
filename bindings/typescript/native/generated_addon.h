@@ -14,11 +14,12 @@
 #include "maplibre_native_c/render_target.h"
 #include "maplibre_native_c/runtime.h"
 #include "maplibre_native_c/style.h"
+#include "maplibre_native_c/style_expression.h"
 #include "maplibre_native_c/surface.h"
 #include "maplibre_native_c/texture.h"
 #include "runtime.h"
 
-#define MLN_TS_ABI_DIGEST "3540c614a43f41de"
+#define MLN_TS_ABI_DIGEST "07ca730d8814b3be"
 
 napi_value mln_ts_decode_buffer_view(
   napi_env env, const mln_completion_result* result
@@ -364,6 +365,21 @@ napi_value mln_ts_read_source_feature_query_options(
 napi_value mln_ts_read_source_feature_query_options_source_layer_ids(
   napi_env env, const mln_source_feature_query_options* source
 );
+napi_value mln_ts_read_style_expression_info(
+  napi_env env, const mln_style_expression_info* source, size_t size
+);
+napi_value mln_ts_read_style_expression_inputs(
+  napi_env env, const mln_style_expression_inputs* source, size_t size
+);
+napi_value mln_ts_read_style_expression_inputs_available_images(
+  napi_env env, const mln_style_expression_inputs* source
+);
+napi_value mln_ts_read_style_expression_options(
+  napi_env env, const mln_style_expression_options* source, size_t size
+);
+napi_value mln_ts_read_style_expression_type(
+  napi_env env, const mln_style_expression_type* source, size_t size
+);
 napi_value mln_ts_read_style_image_info(
   napi_env env, const mln_style_image_info* source, size_t size
 );
@@ -707,6 +723,18 @@ bool mln_ts_write_screen_point(
 );
 bool mln_ts_write_source_feature_query_options(
   mln_ts_call* call, napi_value value, mln_source_feature_query_options* out,
+  const char* path
+);
+bool mln_ts_write_style_expression_inputs(
+  mln_ts_call* call, napi_value value, mln_style_expression_inputs* out,
+  const char* path
+);
+bool mln_ts_write_style_expression_options(
+  mln_ts_call* call, napi_value value, mln_style_expression_options* out,
+  const char* path
+);
+bool mln_ts_write_style_expression_type(
+  mln_ts_call* call, napi_value value, mln_style_expression_type* out,
   const char* path
 );
 bool mln_ts_write_style_image_options(

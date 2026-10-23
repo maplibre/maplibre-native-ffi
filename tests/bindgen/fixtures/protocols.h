@@ -12,7 +12,8 @@
 
 // Groups that declare fixed-width types include the standard headers.
 #if defined(MLN_PROTOCOL_CONVENTIONS) || defined(MLN_PROTOCOL_PLAN_NAMES) || \
-  defined(MLN_PROTOCOL_CALLER_SIZED_OUTPUT)
+  defined(MLN_PROTOCOL_CALLER_SIZED_OUTPUT) ||                               \
+  defined(MLN_PROTOCOL_CALLER_SIZED_TEXT)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
 #if defined(MLN_PROTOCOL_VALUES) || defined(MLN_PROTOCOL_KEYWORDS) ||    \
@@ -278,6 +279,20 @@ mln_status mln_probe_batch_scores(
   const mln_probe_batch_point* points BIND("length=point_count"),
   uint32_t point_count,
   double* out_scores BIND("direction=out;length=point_count"),
+  mln_diagnostic* out_diagnostic
+);
+#endif
+
+#ifdef MLN_PROTOCOL_CALLER_SIZED_TEXT
+// JSON text in storage that the caller sizes. Native reports the text's length
+// whether or not it fits, so a binding calls again with enough storage.
+mln_status mln_probe_zeros_json(
+  uint32_t count,
+  char* out_json BIND(
+    "direction=out;encoding=json;length=json_capacity;"
+    "result_length=out_json_length"
+  ),
+  size_t json_capacity, size_t* out_json_length BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
 #endif

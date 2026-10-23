@@ -1271,6 +1271,34 @@ internal actual object C {
     )
   private val mln_source_feature_query_options_default =
     Ffm.downcall("mln_source_feature_query_options_default", mln_source_feature_query_options)
+  private val mln_style_expression_create =
+    Ffm.downcall(
+      "mln_style_expression_create",
+      JAVA_INT,
+      mln_buffer_view,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_style_expression_evaluate =
+    Ffm.downcall(
+      "mln_style_expression_evaluate",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_style_expression_get_info =
+    Ffm.downcall("mln_style_expression_get_info", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_style_expression_inputs_default =
+    Ffm.downcall("mln_style_expression_inputs_default", mln_style_expression_inputs)
+  private val mln_style_expression_options_default =
+    Ffm.downcall("mln_style_expression_options_default", mln_style_expression_options)
+  private val mln_style_expression_release =
+    Ffm.downcall("mln_style_expression_release", null, JAVA_LONG)
   private val mln_style_image_options_default =
     Ffm.downcall("mln_style_image_options_default", mln_style_image_options)
   private val mln_style_transition_options_default =
@@ -3272,6 +3300,57 @@ internal actual object C {
     ) as MemorySegment
   }
 
+  actual fun mln_style_expression_create(
+    expression: Long,
+    options: Long,
+    outExpression: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_style_expression_create.invokeExact(
+      Ffm.value(expression, mln_buffer_view),
+      options,
+      outExpression,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_style_expression_evaluate(
+    expression: Long,
+    inputs: Long,
+    outJson: Long,
+    jsonCapacity: Long,
+    outJsonLength: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_style_expression_evaluate.invokeExact(
+      expression,
+      inputs,
+      outJson,
+      jsonCapacity,
+      outJsonLength,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_style_expression_get_info(
+    expression: Long,
+    outInfo: Long,
+    outDiagnostic: Long,
+  ): Int = mln_style_expression_get_info.invokeExact(expression, outInfo, outDiagnostic) as Int
+
+  actual fun mln_style_expression_inputs_default(returned: Long) {
+    mln_style_expression_inputs_default.invokeExact(Ffm.into(returned, mln_style_expression_inputs))
+      as MemorySegment
+  }
+
+  actual fun mln_style_expression_options_default(returned: Long) {
+    mln_style_expression_options_default.invokeExact(
+      Ffm.into(returned, mln_style_expression_options),
+    ) as MemorySegment
+  }
+
+  actual fun mln_style_expression_release(expression: Long) {
+    mln_style_expression_release.invoke(expression)
+  }
+
   actual fun mln_style_image_options_default(returned: Long) {
     mln_style_image_options_default.invokeExact(Ffm.into(returned, mln_style_image_options))
       as MemorySegment
@@ -3693,6 +3772,33 @@ internal val mln_source_feature_query_options: GroupLayout =
     ADDRESS.withName("source_layer_ids"),
     JAVA_LONG.withName("source_layer_id_count"),
     mln_buffer_view.withName("filter"),
+  )
+internal val mln_style_expression_inputs: GroupLayout =
+  Ffm.struct(
+    JAVA_INT.withName("size"),
+    JAVA_INT.withName("fields"),
+    JAVA_DOUBLE.withName("zoom"),
+    JAVA_DOUBLE.withName("color_ramp_parameter"),
+    JAVA_DOUBLE.withName("elevation"),
+    mln_buffer_view.withName("feature"),
+    mln_buffer_view.withName("feature_state"),
+    mln_buffer_view.withName("global_state"),
+    mln_canonical_tile_id.withName("canonical_tile_id"),
+    Ffm.pad(4),
+    ADDRESS.withName("available_images"),
+    JAVA_LONG.withName("available_image_count"),
+  )
+internal val mln_style_expression_type: GroupLayout =
+  Ffm.struct(
+    JAVA_INT.withName("kind"),
+    JAVA_INT.withName("item_kind"),
+    JAVA_INT.withName("item_count"),
+  )
+internal val mln_style_expression_options: GroupLayout =
+  Ffm.struct(
+    JAVA_INT.withName("size"),
+    JAVA_INT.withName("fields"),
+    mln_style_expression_type.withName("expected_type"),
   )
 internal val mln_image_content: GroupLayout =
   Ffm.struct(

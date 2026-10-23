@@ -114,7 +114,7 @@ def needs_read(plan):
         and any(
             copies_borrowed(output.value.unwrapped)
             for output in plan.outputs
-            if not output.sized_by
+            if not output.sized_by and not output.result_length
         )
     )
 
@@ -146,7 +146,7 @@ def signature(plan, values):
         p.value.length
         for p in plan.inputs
         if p.value.kind in {"array", "buffer"} and p.value.length
-    }
+    } | {p.value.length for p in plan.outputs if p.result_length}
     inputs = [
         p for p in plan.inputs if p.name != plan.receiver and p.name not in lengths
     ]
@@ -163,7 +163,9 @@ def signature(plan, values):
         if plan.outputs
         else plan.result
     )
-    if len(plan.outputs) > 1:
+    if any(p.result_length for p in plan.outputs):
+        result_type, result = "ByteArray", None
+    elif len(plan.outputs) > 1:
         result_type = outputs_signature(plan, values)
         result = None
     elif result:
@@ -384,6 +386,9 @@ def operation(plan, values, native, *, discard=False):
         raise Unsupported(f"blocks={plan.blocks} needs one owned output")
     if plan.consumes:
         return lifecycle(plan, values, native)
+    text = next((p for p in plan.outputs if p.result_length), None)
+    if text:
+        return caller_sized_text(plan, values, native, text)
     if len(plan.outputs) > 1:
         return multiple_outputs(plan, values, native)
     if plan.view:
@@ -436,6 +441,46 @@ def immediate(plan, values, native):
         setup.append(native.checked(plan.function, arguments))
     if decoded:
         setup.append(decoded)
+    helper = call_helper(plan)
+    body = encodings(plan) + "; ".join(setup)
+    return f"  public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
+
+
+def caller_sized_text(plan, values, native, text):
+    """Text that native writes into storage the call sizes.
+
+    The call starts with storage of a guessed size and calls again with
+    enough storage while the reported length does not fit.
+    """
+    if text.value.encoding != "json" or plan.completion:
+        raise Unsupported("caller-sized text needs a text decoding")
+    method, params, _inputs, _result, result_type = signature(plan, values)
+    inputs = dict(
+        zip((p.name for p in plan.inputs), call_arguments(plan, values), strict=True)
+    )
+    length = next(p for p in plan.outputs if p.name == text.result_length)
+    carriers = {
+        text.name: "textStorage",
+        text.value.length: "textCapacity.toLong()",
+        text.result_length: "textLength",
+    }
+    arguments = [
+        carriers.get(p.name) or inputs[p.name] for p in plan.function.parameters
+    ]
+    call = native.checked(plan.function, arguments)
+    written = values.decode(length.value.unwrapped, "textLength")
+    grow = (
+        f"textCapacity = {written} + 1uL; "
+        f"textStorage = allocate(textCapacity.toLong(), 1); {call}"
+    )
+    setup = [
+        "var textCapacity = 256uL",
+        f"val textLength = {values.storage(length.value.unwrapped.ctype)}",
+        "var textStorage = allocate(textCapacity.toLong(), 1)",
+        call,
+        f"while ({written} >= textCapacity) {{ {grow} }}",
+        f"readBytes(textStorage, {written})",
+    ]
     helper = call_helper(plan)
     body = encodings(plan) + "; ".join(setup)
     return f"  public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"

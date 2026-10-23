@@ -110,6 +110,15 @@ pub const Runtime = owner.Handle("mln_runtime", struct {
         try status.call(c.mln_runtime_dispose, .{raw}, null);
     }
 }.dispose);
+/// A parsed style expression, immutable and independent of any map.
+///
+/// See `mln_style_expression` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+pub const StyleExpression = owner.Handle("mln_style_expression", struct {
+    fn dispose(raw: u64) status.Error!void {
+        c.mln_style_expression_release(raw);
+    }
+}.dispose);
 pub const AmbientCacheOperation = enum(u32) {
     clear = 4,
     invalidate = 3,
@@ -4071,6 +4080,201 @@ pub const Status = enum(i32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
+/// What a parsed expression depends on.
+///
+/// See `mln_style_expression_info` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub const StyleExpressionInfo = struct {
+    /// Whether the result is the same for every feature and feature state.
+    is_feature_constant: bool = std.mem.zeroes(bool),
+    /// Whether the result is the same at every zoom.
+    is_zoom_constant: bool = std.mem.zeroes(bool),
+    pub fn fromNative(raw: c.mln_style_expression_info) StyleExpressionInfo {
+        return .{
+            .is_feature_constant = raw.is_feature_constant,
+            .is_zoom_constant = raw.is_zoom_constant,
+        };
+    }
+};
+
+/// Fields present in `mln_style_expression_inputs`.
+///
+/// See `mln_style_expression_input_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub const StyleExpressionInputField = struct {
+    zoom: bool = false,
+    color_ramp_parameter: bool = false,
+    elevation: bool = false,
+    feature: bool = false,
+    feature_state: bool = false,
+    global_state: bool = false,
+    canonical_tile_id: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64 };
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+};
+
+/// What one evaluation reads.
+///
+/// See `mln_style_expression_inputs` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub const StyleExpressionInputs = struct {
+    /// The value of the zoom expression.
+    zoom: ?f64 = null,
+    /// The value of the heatmap-density and line-progress expressions, and of
+    /// the elevation expression in a color-relief layer.
+    color_ramp_parameter: ?f64 = null,
+    /// The value of the elevation expression outside a color-relief layer.
+    elevation: ?f64 = null,
+    /// One UTF-8 GeoJSON Feature that feature data expressions read.
+    feature: ?[]const u8 = null,
+    /// A UTF-8 JSON object that the feature-state expression reads.
+    feature_state: ?[]const u8 = null,
+    /// A UTF-8 JSON object that the global-state expression reads.
+    global_state: ?[]const u8 = null,
+    /// The tile that holds the feature, which the within and distance
+    /// expressions need to place its geometry.
+    canonical_tile_id: ?CanonicalTileId = null,
+    /// The image IDs that the image expression reports as available. The
+    /// expression reports any other ID as unavailable.
+    available_images: []const []const u8,
+    pub fn toNative(self: StyleExpressionInputs, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_expression_inputs {
+        _ = roots;
+        var raw = c.mln_style_expression_inputs_default();
+        raw.fields = 0;
+        raw.size = @sizeOf(c.mln_style_expression_inputs);
+        marshal.present(&raw.fields, c.MLN_STYLE_EXPRESSION_INPUT_ZOOM, &raw.zoom, self.zoom);
+        marshal.present(&raw.fields, c.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER, &raw.color_ramp_parameter, self.color_ramp_parameter);
+        marshal.present(&raw.fields, c.MLN_STYLE_EXPRESSION_INPUT_ELEVATION, &raw.elevation, self.elevation);
+        if (self.feature) |item| {
+            raw.fields |= c.MLN_STYLE_EXPRESSION_INPUT_FEATURE;
+            raw.feature = marshal.view(item);
+        }
+        if (self.feature_state) |item| {
+            raw.fields |= c.MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE;
+            raw.feature_state = marshal.view(item);
+        }
+        if (self.global_state) |item| {
+            raw.fields |= c.MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE;
+            raw.global_state = marshal.view(item);
+        }
+        marshal.present(&raw.fields, c.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID, &raw.canonical_tile_id, self.canonical_tile_id);
+        raw.available_images = blk: {
+            const items = try allocator.alloc(c.mln_buffer_view, self.available_images.len);
+            for (self.available_images, 0..) |array_item_0, index| items[index] = marshal.view(array_item_0);
+            break :blk items.ptr;
+        };
+        raw.available_image_count = std.math.cast(@TypeOf(raw.available_image_count), self.available_images.len) orelse return error.InvalidArgument;
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_expression_inputs) status.Error!StyleExpressionInputs {
+        return .{
+            .zoom = if (raw.fields & c.MLN_STYLE_EXPRESSION_INPUT_ZOOM != 0) raw.zoom else null,
+            .color_ramp_parameter = if (raw.fields & c.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER != 0) raw.color_ramp_parameter else null,
+            .elevation = if (raw.fields & c.MLN_STYLE_EXPRESSION_INPUT_ELEVATION != 0) raw.elevation else null,
+            .feature = if (raw.fields & c.MLN_STYLE_EXPRESSION_INPUT_FEATURE != 0) try marshal.copyView(allocator, raw.feature) else null,
+            .feature_state = if (raw.fields & c.MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE != 0) try marshal.copyView(allocator, raw.feature_state) else null,
+            .global_state = if (raw.fields & c.MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE != 0) try marshal.copyView(allocator, raw.global_state) else null,
+            .canonical_tile_id = if (raw.fields & c.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID != 0) CanonicalTileId.fromNative(raw.canonical_tile_id) else null,
+            .available_images = blk: {
+                const copied = try allocator.alloc([]const u8, raw.available_image_count);
+                for (try marshal.nativeSlice(c.mln_buffer_view, raw.available_images, raw.available_image_count), 0..) |item, index| copied[index] = try marshal.copyView(allocator, item);
+                break :blk copied;
+            },
+        };
+    }
+};
+
+/// Fields present in `mln_style_expression_options`.
+///
+/// See `mln_style_expression_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub const StyleExpressionOptionField = struct {
+    /// expected_type is set.
+    expected_type: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{1};
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+};
+
+/// Options for parsing a style expression.
+///
+/// See `mln_style_expression_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub const StyleExpressionOptions = struct {
+    /// The type that the expression must produce. A string type coerces the
+    /// result to a string, as a string layer property does; every other type
+    /// asserts it. Without it, the expression keeps the type it infers.
+    expected_type: ?StyleExpressionType = null,
+    pub fn toNative(self: StyleExpressionOptions) c.mln_style_expression_options {
+        var raw = c.mln_style_expression_options_default();
+        raw.fields = 0;
+        marshal.present(&raw.fields, c.MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE, &raw.expected_type, self.expected_type);
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_style_expression_options) StyleExpressionOptions {
+        return .{
+            .expected_type = if (raw.fields & c.MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE != 0) StyleExpressionType.fromNative(raw.expected_type) else null,
+        };
+    }
+};
+
+/// A style expression type.
+///
+/// See `mln_style_expression_type` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub const StyleExpressionType = struct {
+    /// One of `mln_style_expression_type_kind`.
+    kind: StyleExpressionTypeKind = std.mem.zeroes(StyleExpressionTypeKind),
+    /// For an array, its items' kind; ignored for any other kind.
+    item_kind: StyleExpressionTypeKind = std.mem.zeroes(StyleExpressionTypeKind),
+    /// For an array, its fixed length, or zero for any length.
+    item_count: u32 = std.mem.zeroes(u32),
+    pub fn toNative(self: StyleExpressionType) c.mln_style_expression_type {
+        var raw = std.mem.zeroes(c.mln_style_expression_type);
+        raw.kind = self.kind.toNative();
+        raw.item_kind = self.item_kind.toNative();
+        raw.item_count = self.item_count;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_style_expression_type) StyleExpressionType {
+        return .{
+            .kind = StyleExpressionTypeKind.fromNative(raw.kind),
+            .item_kind = StyleExpressionTypeKind.fromNative(raw.item_kind),
+            .item_count = raw.item_count,
+        };
+    }
+};
+
+/// Style expression types that a parsed expression may be required to have.
+///
+/// See `mln_style_expression_type_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub const StyleExpressionTypeKind = enum(u32) {
+    /// An array whose items have item_kind, which is not itself an array.
+    array = 10,
+    variable_anchor_offset_collection = 9,
+    padding = 8,
+    /// A resolved image, as the image expression returns.
+    image = 7,
+    formatted = 6,
+    object = 5,
+    color = 4,
+    boolean = 3,
+    string = 2,
+    number = 1,
+    /// Any value.
+    value = 0,
+    _,
+    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
+    pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
 /// One complete runtime style image, borrowed for a completion callback.
 ///
 /// See `mln_style_image_info` in the
@@ -6972,6 +7176,54 @@ pub fn runtimeUpdateOfflineRegionMetadata(allocator: std.mem.Allocator, runtime:
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub fn sourceFeatureQueryOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(SourceFeatureQueryOptions) {
     return call.direct("mln_source_feature_query_options_default", .none, {}, OwnedValue(SourceFeatureQueryOptions), allocator, .{});
+}
+
+/// Parses a style expression.
+///
+/// See `mln_style_expression_create` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub fn styleExpressionCreate(allocator: std.mem.Allocator, expression: []const u8, options: ?StyleExpressionOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!StyleExpression {
+    return call.invoke("mln_style_expression_create", .none, {}, allocator, diagnostic, .{ expression, options, call.adopt(StyleExpression) });
+}
+
+/// Evaluates a parsed expression and writes its result as UTF-8 JSON.
+///
+/// See `mln_style_expression_evaluate` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub fn styleExpressionEvaluate(allocator: std.mem.Allocator, expression: StyleExpression, inputs: ?StyleExpressionInputs, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue([]const u8) {
+    return call.invoke("mln_style_expression_evaluate", .handle, expression, allocator, diagnostic, .{ inputs, call.text(), call.textCapacity(), call.textLength() });
+}
+
+/// Copies what a parsed expression depends on into out_info.
+///
+/// See `mln_style_expression_get_info` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub fn styleExpressionGetInfo(expression: StyleExpression, diagnostic: ?*diagnostics.Diagnostic) status.Error!StyleExpressionInfo {
+    return call.invoke("mln_style_expression_get_info", .handle, expression, null, diagnostic, .{call.sizedOut(StyleExpressionInfo)});
+}
+
+/// Returns default style expression inputs, which set no input.
+///
+/// See `mln_style_expression_inputs_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub fn styleExpressionInputsDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(StyleExpressionInputs) {
+    return call.direct("mln_style_expression_inputs_default", .none, {}, OwnedValue(StyleExpressionInputs), allocator, .{});
+}
+
+/// Returns default style expression options.
+///
+/// See `mln_style_expression_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub fn styleExpressionOptionsDefault() status.Error!StyleExpressionOptions {
+    return call.direct("mln_style_expression_options_default", .none, {}, StyleExpressionOptions, null, .{});
+}
+
+/// Releases a style expression.
+///
+/// See `mln_style_expression_release` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub fn styleExpressionRelease(expression: StyleExpression) status.Error!void {
+    return call.direct("mln_style_expression_release", .handle, expression, void, null, .{});
 }
 
 /// Returns default runtime style image options.

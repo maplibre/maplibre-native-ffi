@@ -134,6 +134,7 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/c_api/projection.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/query.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/style.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/style_expression.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/network.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/plugin.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/render_session.cpp
@@ -169,6 +170,7 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/resources/resource_loader.cpp
       ${PROJECT_SOURCE_DIR}/src/resources/resource_transform.cpp
       ${PROJECT_SOURCE_DIR}/src/resources/url_rules.cpp
+      ${PROJECT_SOURCE_DIR}/src/style/style_expression.cpp
       ${PROJECT_SOURCE_DIR}/src/style/style_value.cpp
       ${PROJECT_SOURCE_DIR}/src/runtime/runtime.cpp
       ${PROJECT_SOURCE_DIR}/src/testing/sync_point.cpp)

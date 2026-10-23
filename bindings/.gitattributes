@@ -188,6 +188,14 @@
 /dotnet/src/Maplibre.NativeFfi/Style/StyleTransitionOptionField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/StyleTransitionOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/StyleVectorTileEncoding.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/StyleExpression/StyleExpressionHandle.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/StyleExpression/StyleExpressionInfo.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/StyleExpression/StyleExpressionInputField.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/StyleExpression/StyleExpressionInputs.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/StyleExpression/StyleExpressionOptionField.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/StyleExpression/StyleExpressionOptions.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/StyleExpression/StyleExpressionType.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/StyleExpression/StyleExpressionTypeKind.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Surface/MetalSurfaceDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Surface/OpenglSurfaceDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Surface/VulkanSurfaceDescriptor.g.cs linguist-generated=true
@@ -235,6 +243,7 @@
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedResourceRequestOperations.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedResourceTransformRequestOperations.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedRuntimeOperations.kt linguist-generated=true
+/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedStyleExpressionOperations.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedValues.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeojsonSourceDataHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/MapHandle.kt linguist-generated=true
@@ -244,6 +253,7 @@
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/ResourceRequestHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/ResourceTransformRequestHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/RuntimeHandle.kt linguist-generated=true
+/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/generated/StyleExpressionHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/C.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/RuntimeLayouts.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/Upcalls.kt linguist-generated=true
@@ -282,6 +292,7 @@
 /rust/crates/maplibre-native-ffi/src/generated/resource_request.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/resource_transform_request.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/runtime.rs linguist-generated=true
+/rust/crates/maplibre-native-ffi/src/generated/style_expression.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/values.rs linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/GeneratedAttachments.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/GeneratedOwners.swift linguist-generated=true
@@ -308,6 +319,8 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRuntimeResourceRequestOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRuntimeResourceTransformRequestOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRuntimeRuntimeOperations.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedStyleExpressionGlobalsOperations.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedStyleExpressionStyleExpressionOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedStyleGeojsonSourceDataOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedStyleGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedStyleMapOperations.swift linguist-generated=true
@@ -326,6 +339,7 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedRenderSessionValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedRenderTargetValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedRuntimeValues.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedStyleExpressionValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedStyleValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedSurfaceValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedTextureValues.swift linguist-generated=true

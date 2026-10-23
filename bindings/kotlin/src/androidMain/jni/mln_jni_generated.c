@@ -2424,6 +2424,70 @@ static void mln_source_feature_query_options_default_jni(
   mln_source_feature_query_options_default_critical(returned);
 }
 
+static jint mln_style_expression_create_jni(
+  JNIEnv* env, jclass type, jlong expression, jlong options,
+  jlong out_expression, jlong out_diagnostic
+) {
+  return (jint)mln_style_expression_create(
+    MLN_JNI_RECORD(mln_buffer_view, expression),
+    MLN_JNI_POINTER(const mln_style_expression_options*, options),
+    MLN_JNI_POINTER(mln_style_expression*, out_expression),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_style_expression_evaluate_jni(
+  JNIEnv* env, jclass type, jlong expression, jlong inputs, jlong out_json,
+  jlong json_capacity, jlong out_json_length, jlong out_diagnostic
+) {
+  return (jint)mln_style_expression_evaluate(
+    (mln_style_expression)expression,
+    MLN_JNI_POINTER(const mln_style_expression_inputs*, inputs),
+    MLN_JNI_POINTER(char*, out_json), (size_t)json_capacity,
+    MLN_JNI_POINTER(size_t*, out_json_length),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_style_expression_get_info_jni(
+  JNIEnv* env, jclass type, jlong expression, jlong out_info,
+  jlong out_diagnostic
+) {
+  return (jint)mln_style_expression_get_info(
+    (mln_style_expression)expression,
+    MLN_JNI_POINTER(mln_style_expression_info*, out_info),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static void mln_style_expression_inputs_default_critical(jlong returned) {
+  *MLN_JNI_POINTER(mln_style_expression_inputs*, returned) =
+    mln_style_expression_inputs_default();
+}
+
+static void mln_style_expression_inputs_default_jni(
+  JNIEnv* env, jclass type, jlong returned
+) {
+  mln_style_expression_inputs_default_critical(returned);
+}
+
+static void mln_style_expression_options_default_critical(jlong returned) {
+  *MLN_JNI_POINTER(mln_style_expression_options*, returned) =
+    mln_style_expression_options_default();
+}
+
+static void mln_style_expression_options_default_jni(
+  JNIEnv* env, jclass type, jlong returned
+) {
+  mln_style_expression_options_default_critical(returned);
+}
+
+static void mln_style_expression_release_jni(
+  JNIEnv* env, jclass type, jlong expression
+) {
+  mln_style_expression_release((mln_style_expression)expression);
+}
+
 static void mln_style_image_options_default_critical(jlong returned) {
   *MLN_JNI_POINTER(mln_style_image_options*, returned) =
     mln_style_image_options_default();
@@ -2919,6 +2983,18 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_runtime_update_offline_region_metadata_jni},
   {"mln_source_feature_query_options_default", "(J)V",
    (void*)mln_source_feature_query_options_default_jni},
+  {"mln_style_expression_create", "(JJJJ)I",
+   (void*)mln_style_expression_create_jni},
+  {"mln_style_expression_evaluate", "(JJJJJJ)I",
+   (void*)mln_style_expression_evaluate_jni},
+  {"mln_style_expression_get_info", "(JJJ)I",
+   (void*)mln_style_expression_get_info_jni},
+  {"mln_style_expression_inputs_default", "(J)V",
+   (void*)mln_style_expression_inputs_default_jni},
+  {"mln_style_expression_options_default", "(J)V",
+   (void*)mln_style_expression_options_default_jni},
+  {"mln_style_expression_release", "(J)V",
+   (void*)mln_style_expression_release_jni},
   {"mln_style_image_options_default", "(J)V",
    (void*)mln_style_image_options_default_jni},
   {"mln_style_transition_options_default", "(J)V",
@@ -3343,6 +3419,18 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_runtime_update_offline_region_metadata_jni},
   {"mln_source_feature_query_options_default", "(J)V",
    (void*)mln_source_feature_query_options_default_critical},
+  {"mln_style_expression_create", "(JJJJ)I",
+   (void*)mln_style_expression_create_jni},
+  {"mln_style_expression_evaluate", "(JJJJJJ)I",
+   (void*)mln_style_expression_evaluate_jni},
+  {"mln_style_expression_get_info", "(JJJ)I",
+   (void*)mln_style_expression_get_info_jni},
+  {"mln_style_expression_inputs_default", "(J)V",
+   (void*)mln_style_expression_inputs_default_critical},
+  {"mln_style_expression_options_default", "(J)V",
+   (void*)mln_style_expression_options_default_critical},
+  {"mln_style_expression_release", "(J)V",
+   (void*)mln_style_expression_release_jni},
   {"mln_style_image_options_default", "(J)V",
    (void*)mln_style_image_options_default_critical},
   {"mln_style_transition_options_default", "(J)V",

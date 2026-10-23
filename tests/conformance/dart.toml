@@ -48,6 +48,7 @@
 "VAL-06" = "bindings/dart/test/values_test.dart::a record built from its constructor defaults equals the native default"
 "VAL-07" = "bindings/dart/test/internal_support_test.dart::an array completion is read at its value_size"
 "VAL-08" = "bindings/dart/test/values_test.dart::a synchronous call fills a caller-sized output array in input order"
+"VAL-09" = "bindings/dart/test/values_test.dart::caller-sized text returns a result longer than its first storage"
 # An OpenGL session exposes frames only from a context that it shares with the
 # host, which only a caller-driven session can drive, so the test skips on EGL
 # and WGL builds; Metal and Vulkan builds cover it.

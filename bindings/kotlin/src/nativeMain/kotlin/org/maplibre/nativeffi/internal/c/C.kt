@@ -2416,6 +2416,63 @@ internal actual object C {
       .place(returned.toCPointer()!!)
   }
 
+  actual fun mln_style_expression_create(
+    expression: Long,
+    options: Long,
+    outExpression: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_style_expression_create(
+      expression.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
+      options.toCPointer(),
+      outExpression.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_style_expression_evaluate(
+    expression: Long,
+    inputs: Long,
+    outJson: Long,
+    jsonCapacity: Long,
+    outJsonLength: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_style_expression_evaluate(
+      expression.toULong(),
+      inputs.toCPointer(),
+      outJson.toCPointer(),
+      jsonCapacity.convert(),
+      outJsonLength.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_style_expression_get_info(
+    expression: Long,
+    outInfo: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_style_expression_get_info(
+      expression.toULong(),
+      outInfo.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_style_expression_inputs_default(returned: Long) {
+    org.maplibre.nativeffi.internal.cinterop
+      .mln_style_expression_inputs_default()
+      .place(returned.toCPointer()!!)
+  }
+
+  actual fun mln_style_expression_options_default(returned: Long) {
+    org.maplibre.nativeffi.internal.cinterop
+      .mln_style_expression_options_default()
+      .place(returned.toCPointer()!!)
+  }
+
+  actual fun mln_style_expression_release(expression: Long) {
+    org.maplibre.nativeffi.internal.cinterop.mln_style_expression_release(expression.toULong())
+  }
+
   actual fun mln_style_image_options_default(returned: Long) {
     org.maplibre.nativeffi.internal.cinterop
       .mln_style_image_options_default()

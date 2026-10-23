@@ -1946,6 +1946,54 @@ internal actual object C {
     mln_kw_mln_source_feature_query_options_default(word(returned))
   }
 
+  actual fun mln_style_expression_create(
+    expression: Long,
+    options: Long,
+    outExpression: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_style_expression_create(
+      word(expression),
+      word(options),
+      word(outExpression),
+      word(outDiagnostic),
+    )
+
+  actual fun mln_style_expression_evaluate(
+    expression: Long,
+    inputs: Long,
+    outJson: Long,
+    jsonCapacity: Long,
+    outJsonLength: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_style_expression_evaluate(
+      expression,
+      word(inputs),
+      word(outJson),
+      word(jsonCapacity),
+      word(outJsonLength),
+      word(outDiagnostic),
+    )
+
+  actual fun mln_style_expression_get_info(
+    expression: Long,
+    outInfo: Long,
+    outDiagnostic: Long,
+  ): Int = mln_kw_mln_style_expression_get_info(expression, word(outInfo), word(outDiagnostic))
+
+  actual fun mln_style_expression_inputs_default(returned: Long) {
+    mln_kw_mln_style_expression_inputs_default(word(returned))
+  }
+
+  actual fun mln_style_expression_options_default(returned: Long) {
+    mln_kw_mln_style_expression_options_default(word(returned))
+  }
+
+  actual fun mln_style_expression_release(expression: Long) {
+    mln_kw_mln_style_expression_release(expression)
+  }
+
   actual fun mln_style_image_options_default(returned: Long) {
     mln_kw_mln_style_image_options_default(word(returned))
   }
@@ -3428,6 +3476,41 @@ private fun mln_kw_mln_source_feature_query_options_default(p0: Int): Unit =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_source_feature_query_options_default(p0)",
   )
+
+private fun mln_kw_mln_style_expression_create(p0: Int, p1: Int, p2: Int, p3: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_style_expression_create(p0, p1, p2, p3)",
+  )
+
+private fun mln_kw_mln_style_expression_evaluate(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+  p4: Int,
+  p5: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_style_expression_evaluate(p0, p1, p2, p3, p4, p5)",
+  )
+
+private fun mln_kw_mln_style_expression_get_info(p0: Long, p1: Int, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_style_expression_get_info(p0, p1, p2)",
+  )
+
+private fun mln_kw_mln_style_expression_inputs_default(p0: Int): Unit =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_style_expression_inputs_default(p0)",
+  )
+
+private fun mln_kw_mln_style_expression_options_default(p0: Int): Unit =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_style_expression_options_default(p0)",
+  )
+
+private fun mln_kw_mln_style_expression_release(p0: Long): Unit =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_style_expression_release(p0)")
 
 private fun mln_kw_mln_style_image_options_default(p0: Int): Unit =
   js(

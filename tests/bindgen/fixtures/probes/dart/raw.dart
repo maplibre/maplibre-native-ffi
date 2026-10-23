@@ -5,8 +5,8 @@
 import 'dart:ffi';
 import 'dart:io';
 
-import 'maplibre_native_c.g.dart' hide mln_keyword_combine, mln_probe_batch_points, mln_probe_batch_scores, mln_probe_hooks_default, mln_probe_read_level, mln_probe_roundtrip, mln_probe_settings_check, mln_probe_settings_default;
-export 'maplibre_native_c.g.dart' hide mln_keyword_combine, mln_probe_batch_points, mln_probe_batch_scores, mln_probe_hooks_default, mln_probe_read_level, mln_probe_roundtrip, mln_probe_settings_check, mln_probe_settings_default;
+import 'maplibre_native_c.g.dart' hide mln_keyword_combine, mln_probe_batch_points, mln_probe_batch_scores, mln_probe_hooks_default, mln_probe_read_level, mln_probe_roundtrip, mln_probe_settings_check, mln_probe_settings_default, mln_probe_zeros_json;
+export 'maplibre_native_c.g.dart' hide mln_keyword_combine, mln_probe_batch_points, mln_probe_batch_scores, mln_probe_hooks_default, mln_probe_read_level, mln_probe_roundtrip, mln_probe_settings_check, mln_probe_settings_default, mln_probe_zeros_json;
 
 final _library = DynamicLibrary.open(Platform.environment['MLN_PROBE_LIBRARY']!);
 
@@ -52,3 +52,9 @@ final mln_probe_batch_scores = _library.lookupFunction<
         Pointer<mln_diagnostic>),
     int Function(Pointer<mln_probe_batch_point>, int, Pointer<Double>,
         Pointer<mln_diagnostic>)>('mln_probe_batch_scores');
+
+final mln_probe_zeros_json = _library.lookupFunction<
+    Int32 Function(Uint32, Pointer<Char>, Size, Pointer<Size>,
+        Pointer<mln_diagnostic>),
+    int Function(int, Pointer<Char>, int, Pointer<Size>,
+        Pointer<mln_diagnostic>)>('mln_probe_zeros_json');

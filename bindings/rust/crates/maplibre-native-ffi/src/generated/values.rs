@@ -5370,6 +5370,287 @@ impl FromNative<i32> for Status {
     }
 }
 
+/// What a parsed expression depends on.
+///
+/// See `mln_style_expression_info` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct StyleExpressionInfo {
+    /// Whether the result is the same for every feature and feature state.
+    pub is_feature_constant: bool,
+    /// Whether the result is the same at every zoom.
+    pub is_zoom_constant: bool,
+}
+impl StyleExpressionInfo {
+    pub const fn new(is_feature_constant: bool, is_zoom_constant: bool) -> Self {
+        Self {
+            is_feature_constant,
+            is_zoom_constant,
+        }
+    }
+}
+impl FromNative<sys::mln_style_expression_info> for StyleExpressionInfo {
+    unsafe fn from_native(raw: sys::mln_style_expression_info) -> Result<Self> {
+        Ok(Self {
+            is_feature_constant: raw.is_feature_constant,
+            is_zoom_constant: raw.is_zoom_constant,
+        })
+    }
+}
+
+native_flags! {
+/// Fields present in `mln_style_expression_inputs`.
+///
+/// See `mln_style_expression_input_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub struct StyleExpressionInputField: u32 {
+    const ZOOM = 1;
+    const COLOR_RAMP_PARAMETER = 2;
+    const ELEVATION = 4;
+    const FEATURE = 8;
+    const FEATURE_STATE = 16;
+    const GLOBAL_STATE = 32;
+    const CANONICAL_TILE_ID = 64;
+}
+}
+
+/// What one evaluation reads.
+///
+/// See `mln_style_expression_inputs` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+#[derive(Debug, Clone, PartialEq)]
+pub struct StyleExpressionInputs {
+    /// The value of the zoom expression.
+    pub zoom: Option<f64>,
+    /// The value of the heatmap-density and line-progress expressions, and of
+    /// the elevation expression in a color-relief layer.
+    pub color_ramp_parameter: Option<f64>,
+    /// The value of the elevation expression outside a color-relief layer.
+    pub elevation: Option<f64>,
+    /// One UTF-8 GeoJSON Feature that feature data expressions read.
+    pub feature: Option<Vec<u8>>,
+    /// A UTF-8 JSON object that the feature-state expression reads.
+    pub feature_state: Option<Vec<u8>>,
+    /// A UTF-8 JSON object that the global-state expression reads.
+    pub global_state: Option<Vec<u8>>,
+    /// The tile that holds the feature, which the within and distance
+    /// expressions need to place its geometry.
+    pub canonical_tile_id: Option<CanonicalTileId>,
+    /// The image IDs that the image expression reports as available. The
+    /// expression reports any other ID as unavailable.
+    pub available_images: Vec<String>,
+}
+impl Default for StyleExpressionInputs {
+    fn default() -> Self {
+        convert::native_default(unsafe { sys::mln_style_expression_inputs_default() })
+    }
+}
+impl ToNative<sys::mln_style_expression_inputs> for StyleExpressionInputs {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_style_expression_inputs> {
+        let mut raw: sys::mln_style_expression_inputs =
+            unsafe { sys::mln_style_expression_inputs_default() };
+        raw.size = std::mem::size_of::<sys::mln_style_expression_inputs>() as _;
+        raw.fields = 0;
+        if let Some(item) = &self.zoom {
+            raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_ZOOM;
+            raw.zoom = *item;
+        }
+        if let Some(item) = &self.color_ramp_parameter {
+            raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER;
+            raw.color_ramp_parameter = *item;
+        }
+        if let Some(item) = &self.elevation {
+            raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_ELEVATION;
+            raw.elevation = *item;
+        }
+        if let Some(item) = &self.feature {
+            raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_FEATURE;
+            raw.feature = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.feature_state {
+            raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE;
+            raw.feature_state = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.global_state {
+            raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE;
+            raw.global_state = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.canonical_tile_id {
+            raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID;
+            raw.canonical_tile_id = to_native(&*item, arena)?;
+        }
+        raw.available_images = convert::array(&self.available_images, arena)?;
+        raw.available_image_count = convert::count(self.available_images.len())?;
+        Ok(raw)
+    }
+}
+impl FromNative<sys::mln_style_expression_inputs> for StyleExpressionInputs {
+    unsafe fn from_native(raw: sys::mln_style_expression_inputs) -> Result<Self> {
+        Ok(Self {
+            zoom: (raw.fields & sys::MLN_STYLE_EXPRESSION_INPUT_ZOOM != 0).then_some(raw.zoom),
+            color_ramp_parameter: (raw.fields
+                & sys::MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER
+                != 0)
+                .then_some(raw.color_ramp_parameter),
+            elevation: (raw.fields & sys::MLN_STYLE_EXPRESSION_INPUT_ELEVATION != 0)
+                .then_some(raw.elevation),
+            feature: unsafe {
+                convert::present(
+                    raw.fields,
+                    sys::MLN_STYLE_EXPRESSION_INPUT_FEATURE,
+                    raw.feature,
+                )
+            }?,
+            feature_state: unsafe {
+                convert::present(
+                    raw.fields,
+                    sys::MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE,
+                    raw.feature_state,
+                )
+            }?,
+            global_state: unsafe {
+                convert::present(
+                    raw.fields,
+                    sys::MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE,
+                    raw.global_state,
+                )
+            }?,
+            canonical_tile_id: unsafe {
+                convert::present(
+                    raw.fields,
+                    sys::MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID,
+                    raw.canonical_tile_id,
+                )
+            }?,
+            available_images: unsafe {
+                convert::copy_array(raw.available_images, raw.available_image_count)
+            }?,
+        })
+    }
+}
+
+native_flags! {
+/// Fields present in `mln_style_expression_options`.
+///
+/// See `mln_style_expression_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub struct StyleExpressionOptionField: u32 {
+    /// expected_type is set.
+    const EXPECTED_TYPE = 1;
+}
+}
+
+/// Options for parsing a style expression.
+///
+/// See `mln_style_expression_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StyleExpressionOptions {
+    /// The type that the expression must produce. A string type coerces the
+    /// result to a string, as a string layer property does; every other type
+    /// asserts it. Without it, the expression keeps the type it infers.
+    pub expected_type: Option<StyleExpressionType>,
+}
+impl Default for StyleExpressionOptions {
+    fn default() -> Self {
+        convert::native_default(unsafe { sys::mln_style_expression_options_default() })
+    }
+}
+impl ToNative<sys::mln_style_expression_options> for StyleExpressionOptions {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_style_expression_options> {
+        let mut raw: sys::mln_style_expression_options =
+            unsafe { sys::mln_style_expression_options_default() };
+        raw.size = std::mem::size_of::<sys::mln_style_expression_options>() as _;
+        raw.fields = 0;
+        if let Some(item) = &self.expected_type {
+            raw.fields |= sys::MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE;
+            raw.expected_type = to_native(&*item, arena)?;
+        }
+        Ok(raw)
+    }
+}
+impl FromNative<sys::mln_style_expression_options> for StyleExpressionOptions {
+    unsafe fn from_native(raw: sys::mln_style_expression_options) -> Result<Self> {
+        Ok(Self {
+            expected_type: unsafe {
+                convert::present(
+                    raw.fields,
+                    sys::MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE,
+                    raw.expected_type,
+                )
+            }?,
+        })
+    }
+}
+
+/// A style expression type.
+///
+/// See `mln_style_expression_type` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct StyleExpressionType {
+    /// One of `mln_style_expression_type_kind`.
+    pub kind: StyleExpressionTypeKind,
+    /// For an array, its items' kind; ignored for any other kind.
+    pub item_kind: StyleExpressionTypeKind,
+    /// For an array, its fixed length, or zero for any length.
+    pub item_count: u32,
+}
+impl StyleExpressionType {
+    pub const fn new(
+        kind: StyleExpressionTypeKind,
+        item_kind: StyleExpressionTypeKind,
+        item_count: u32,
+    ) -> Self {
+        Self {
+            kind,
+            item_kind,
+            item_count,
+        }
+    }
+}
+impl ToNative<sys::mln_style_expression_type> for StyleExpressionType {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_style_expression_type> {
+        let mut raw: sys::mln_style_expression_type = unsafe { std::mem::zeroed() };
+        raw.kind = to_native(&self.kind, arena)?;
+        raw.item_kind = to_native(&self.item_kind, arena)?;
+        raw.item_count = self.item_count;
+        Ok(raw)
+    }
+}
+impl FromNative<sys::mln_style_expression_type> for StyleExpressionType {
+    unsafe fn from_native(raw: sys::mln_style_expression_type) -> Result<Self> {
+        Ok(Self {
+            kind: unsafe { from_native(raw.kind) }?,
+            item_kind: unsafe { from_native(raw.item_kind) }?,
+            item_count: raw.item_count,
+        })
+    }
+}
+
+native_enum! {
+/// Style expression types that a parsed expression may be required to have.
+///
+/// See `mln_style_expression_type_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub enum StyleExpressionTypeKind: u32 {
+    /// Any value.
+    Value = 0,
+    Number = 1,
+    String = 2,
+    Boolean = 3,
+    Color = 4,
+    Object = 5,
+    Formatted = 6,
+    /// A resolved image, as the image expression returns.
+    Image = 7,
+    Padding = 8,
+    VariableAnchorOffsetCollection = 9,
+    /// An array whose items have item_kind, which is not itself an array.
+    Array = 10,
+} Unknown
+}
+
 /// One complete runtime style image, borrowed for a completion callback.
 ///
 /// See `mln_style_image_info` in the

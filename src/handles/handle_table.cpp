@@ -59,6 +59,8 @@ auto handle_kind_name(std::uint8_t kind) noexcept -> const char* {
       return "mln_delivery_queue";
     case HandleKind::DeliveryBatch:
       return "mln_delivery_batch";
+    case HandleKind::StyleExpression:
+      return "mln_style_expression";
   }
   return nullptr;
 }

@@ -8,6 +8,7 @@
 #include "resources/custom_resource_provider.hpp"
 #include "resources/resource_transform.hpp"
 #include "runtime/runtime.hpp"
+#include "style/style_expression.hpp"
 
 namespace mln::delivery {
 
@@ -43,6 +44,9 @@ auto dispose_owner(core::HandleKind kind, std::uint64_t handle) noexcept
         return MLN_STATUS_OK;
       case core::HandleKind::Runtime:
         return core::dispose_runtime(handle);
+      case core::HandleKind::StyleExpression:
+        core::style_expression_release(handle);
+        return MLN_STATUS_OK;
     }
     return MLN_STATUS_INVALID_ARGUMENT;
   };

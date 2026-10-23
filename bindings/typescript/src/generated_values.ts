@@ -3097,6 +3097,169 @@ export const Status = {
 export type Status = (typeof Status)[keyof typeof Status] | (number & {});
 
 /**
+ * What a parsed expression depends on.
+ *
+ * See `mln_style_expression_info` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ */
+export interface StyleExpressionInfo {
+  /**
+   * Whether the result is the same for every feature and feature state.
+   */
+  readonly isFeatureConstant: boolean;
+  /**
+   * Whether the result is the same at every zoom.
+   */
+  readonly isZoomConstant: boolean;
+}
+
+/**
+ * Fields present in `mln_style_expression_inputs`.
+ *
+ * See `mln_style_expression_input_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ */
+export const StyleExpressionInputField = {
+  zoom: 1,
+  colorRampParameter: 2,
+  elevation: 4,
+  feature: 8,
+  featureState: 16,
+  globalState: 32,
+  canonicalTileId: 64,
+} as const;
+/** A bitwise OR of StyleExpressionInputField flags. */
+export type StyleExpressionInputField = number;
+
+/**
+ * What one evaluation reads.
+ *
+ * See `mln_style_expression_inputs` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ */
+export interface StyleExpressionInputs {
+  /**
+   * The value of the zoom expression.
+   */
+  zoom?: number;
+  /**
+   * The value of the heatmap-density and line-progress expressions, and of the
+   * elevation expression in a color-relief layer.
+   */
+  colorRampParameter?: number;
+  /**
+   * The value of the elevation expression outside a color-relief layer.
+   */
+  elevation?: number;
+  /**
+   * One UTF-8 GeoJSON Feature that feature data expressions read.
+   */
+  feature?: string;
+  /**
+   * A UTF-8 JSON object that the feature-state expression reads.
+   */
+  featureState?: string;
+  /**
+   * A UTF-8 JSON object that the global-state expression reads.
+   */
+  globalState?: string;
+  /**
+   * The tile that holds the feature, which the within and distance expressions
+   * need to place its geometry.
+   */
+  canonicalTileId?: CanonicalTileId;
+  /**
+   * The image IDs that the image expression reports as available. The
+   * expression reports any other ID as unavailable.
+   */
+  availableImages?: readonly string[];
+}
+
+/**
+ * Fields present in `mln_style_expression_options`.
+ *
+ * See `mln_style_expression_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ */
+export const StyleExpressionOptionField = {
+  /**
+   * expected_type is set.
+   */
+  expectedType: 1,
+} as const;
+/** A bitwise OR of StyleExpressionOptionField flags. */
+export type StyleExpressionOptionField = number;
+
+/**
+ * Options for parsing a style expression.
+ *
+ * See `mln_style_expression_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ */
+export interface StyleExpressionOptions {
+  /**
+   * The type that the expression must produce. A string type coerces the result
+   * to a string, as a string layer property does; every other type asserts it.
+   * Without it, the expression keeps the type it infers.
+   */
+  expectedType?: StyleExpressionType;
+}
+
+/**
+ * A style expression type.
+ *
+ * See `mln_style_expression_type` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ */
+export interface StyleExpressionType {
+  /**
+   * One of `mln_style_expression_type_kind`.
+   */
+  kind?: StyleExpressionTypeKind;
+  /**
+   * For an array, its items' kind; ignored for any other kind.
+   */
+  itemKind?: StyleExpressionTypeKind;
+  /**
+   * For an array, its fixed length, or zero for any length.
+   */
+  itemCount?: number;
+}
+
+/**
+ * Style expression types that a parsed expression may be required to have.
+ *
+ * See `mln_style_expression_type_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ */
+export const StyleExpressionTypeKind = {
+  /**
+   * Any value.
+   */
+  value: 0,
+  number: 1,
+  string: 2,
+  boolean: 3,
+  color: 4,
+  object: 5,
+  formatted: 6,
+  /**
+   * A resolved image, as the image expression returns.
+   */
+  image: 7,
+  padding: 8,
+  variableAnchorOffsetCollection: 9,
+  /**
+   * An array whose items have item_kind, which is not itself an array.
+   */
+  array: 10,
+} as const;
+/** One of the StyleExpressionTypeKind values, or a value this binding does not know. */
+export type StyleExpressionTypeKind =
+  | (typeof StyleExpressionTypeKind)[keyof typeof StyleExpressionTypeKind]
+  | (number & {});
+
+/**
  * One complete runtime style image, borrowed for a completion callback.
  *
  * See `mln_style_image_info` in the

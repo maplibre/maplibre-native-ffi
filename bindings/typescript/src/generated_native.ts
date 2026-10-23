@@ -63,6 +63,9 @@ import type {
   RuntimeOptions,
   ScreenPoint,
   SourceFeatureQueryOptions,
+  StyleExpressionInfo,
+  StyleExpressionInputs,
+  StyleExpressionOptions,
   StyleImageOptions,
   StyleTransitionOptions,
   VulkanBorrowedTextureDescriptor,
@@ -76,7 +79,7 @@ import type {
 } from "./generated_values.ts";
 
 /** The digest of the C headers that this facade and its addon came from. */
-export const ABI_DIGEST = "3540c614a43f41de";
+export const ABI_DIGEST = "07ca730d8814b3be";
 
 /** The index of each completion decoder in the addon's decoder table. */
 export const Decoder = {
@@ -860,6 +863,21 @@ export interface NativeOperations {
     completion: number,
   ): void;
   mln_source_feature_query_options_default(): SourceFeatureQueryOptions;
+  mln_style_expression_create(
+    expression: string,
+    options: StyleExpressionOptions | undefined,
+  ): bigint;
+  mln_style_expression_evaluate(
+    expression: bigint,
+    inputs: StyleExpressionInputs | undefined,
+  ): string;
+  mln_style_expression_get_info(expression: bigint): StyleExpressionInfo;
+  mln_style_expression_inputs_default(): StyleExpressionInputs;
+  mln_style_expression_options_default(): StyleExpressionOptions;
+  mln_style_expression_release(
+    expression: bigint,
+    token: object | undefined,
+  ): void;
   mln_style_image_options_default(): StyleImageOptions;
   mln_style_transition_options_default(): StyleTransitionOptions;
   mln_supported_render_backend_mask(): RenderBackendFlag;

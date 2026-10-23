@@ -195,6 +195,11 @@ def operation(
     counts = {
         p.value.length for p in plan.inputs if p.value.kind in {"array", "buffer"}
     }
+    # Caller-sized text passes its storage, capacity, and length to a closure
+    # that the runtime calls again when the text did not fit.
+    text = next((p for p in plan.outputs if p.result_length), None)
+    if text:
+        counts.add(text.value.length)
     used_names = set(LOCAL_NAMES) | {p.name for p in plan.inputs}
     for parameter in plan.inputs:
         if (receiver and parameter.name == receiver.name) or parameter.name in counts:
@@ -314,7 +319,7 @@ def operation(
         and any(
             borrows_memory(output.value)
             for output in plan.outputs
-            if not output.sized_by
+            if not output.sized_by and not output.result_length
         )
     ):
         setup += [
@@ -332,6 +337,16 @@ def operation(
     outputs = []
     product = None
     for output in plan.outputs:
+        if text and output.name == text.result_length:
+            continue
+        if output is text:
+            if text.value.encoding != "json":
+                raise unsupported(function, "caller-sized text needs a text decoding")
+            setup.append(f"        let mut {output.name}: Vec<u8> = Vec::new();")
+            for control in (output.name, output.value.length, output.result_length):
+                arguments[control] = control
+            outputs.append((output.name, output.value))
+            continue
         value = output.value.unwrapped
         if value is None:
             raise unsupported(function, "output requires an element value")
@@ -386,6 +401,8 @@ def operation(
         outputs.append((output.name, value))
 
     def copy_output(output, value):
+        if text and output == text.name:
+            return f"PyBytes::new(py, &{output}).into_any().unbind()"
         if any(p.name == output and p.sized_by for p in plan.outputs):
             copied = values.copy(value.element, "*element")
             return f"generated_list(py, &{output}, |element| {ok(copied)})?"
@@ -519,6 +536,8 @@ def operation(
                     expression = f"map_future({expression}, lambda value: {converted})"
     else:
         call = native_call(function, [arguments[p.name] for p in function.parameters])
+        if text:
+            call = f"generated_caller_sized_text(&mut {text.name}, |{text.name}, {text.value.length}, {text.result_length}| {call})"
         status = plan.status
         absence = plan.absence
         body = setup + [

@@ -75,7 +75,9 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "blocks",
     }
 )
-PARAMETER_KEYS = COMMON_KEYS | frozenset({"direction", "length", "enum", "kind"})
+PARAMETER_KEYS = COMMON_KEYS | frozenset(
+    {"direction", "length", "enum", "kind", "result_length"}
+)
 FIELD_KEYS = COMMON_KEYS | frozenset(
     {
         "length",
@@ -482,6 +484,79 @@ def value_metadata_errors(
     return errors
 
 
+def caller_sized_text_errors(function, parameter, parameters, context) -> list[str]:
+    """A caller-sized text output fills storage that a binding allocates.
+
+    The binding passes the storage's capacity in the input that `length`
+    names, and native reports the text's length, without its terminator, in
+    the output that `result_length` names, whether or not the text fit. A
+    binding that passed too little storage calls again with enough, so the
+    function must report the same text for the same inputs. The capacity and
+    the reported length belong to the binding, so neither counts anything
+    else, and every input the host passes precedes the text.
+    """
+    errors = []
+    metadata = parameter.metadata
+    pointee = parameter.type.pointee
+    if (
+        metadata.get("direction") != "out"
+        or pointee is None
+        or pointee.kind not in TEXT_POINTEE_KINDS
+        or pointee.const
+    ):
+        errors.append(f"{context}: result_length requires a mutable character output")
+    if metadata.get("encoding", "utf8") not in {"utf8", "json"}:
+        errors.append(f"{context}: result_length requires text encoding")
+    if has_completion(function) or not is_status(function.return_type):
+        errors.append(
+            f"{context}: result_length requires an immediate function that returns a status"
+        )
+    capacity = parameters.get(metadata.get("length", ""))
+    if (
+        capacity is None
+        or capacity.metadata.get("direction", "in") != "in"
+        or capacity.type.kind == "pointer"
+        or capacity.type.canonical
+        not in {"unsigned long", "unsigned long long", "unsigned int"}
+    ):
+        errors.append(
+            f"{context}: result_length requires length to name an unsigned capacity input"
+        )
+    written = parameters.get(metadata["result_length"])
+    if (
+        written is None
+        or written.metadata.get("direction") != "out"
+        or written.type.kind != "pointer"
+        or written.type.pointee is None
+        or capacity is None
+        or written.type.pointee.canonical != capacity.type.canonical
+    ):
+        errors.append(
+            f"{context}: result_length must name an output of the capacity's type"
+        )
+    controls = {metadata.get("length"), metadata["result_length"]}
+    if any(
+        other is not parameter
+        and (
+            other.metadata.get("length") in controls
+            or other.metadata.get("result_length") in controls
+        )
+        for other in function.parameters
+    ):
+        errors.append(
+            f"{context}: a caller-sized text output owns its capacity and length"
+        )
+    later = function.parameters[function.parameters.index(parameter) + 1 :]
+    if any(
+        other.metadata.get("direction", "in") == "in"
+        and other.name not in controls
+        and not is_completion(other.type)
+        for other in later
+    ):
+        errors.append(f"{context}: a caller-sized text output must follow every input")
+    return errors
+
+
 def validate(api: Api) -> None:
     """Reject incomplete or contradictory execution and result contracts.
 
@@ -698,6 +773,11 @@ def validate(api: Api) -> None:
                 and parameter.metadata["length"] != "1"
             ):
                 errors.append(f"{pcontext}: length names an absent parameter")
+            if "result_length" in parameter.metadata:
+                errors.extend(
+                    caller_sized_text_errors(function, parameter, parameters, pcontext)
+                )
+                continue
             # A caller-sized output array takes one element per element of an
             # input array, so its count must be an input that counts exactly
             # one other array, an input one. A binding sizes the output from

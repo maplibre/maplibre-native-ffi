@@ -25,6 +25,7 @@ class ZigEmitterTests(unittest.TestCase):
         header = protocol_header(
             groups=(
                 "caller_sized_output",
+                "caller_sized_text",
                 "values",
                 "keywords",
                 "defaults",

@@ -132,12 +132,26 @@ def operation(
         and value.length != "nul"
         and not value.length.isdigit()
     }
+    # Caller-sized text passes its storage, capacity, and length to a closure
+    # that the runtime calls again when the text did not fit.
+    text = next((p for p in plan.outputs if p.result_length), None)
+    text_arguments = (
+        {
+            text.name: "bindingTextStorage",
+            text.value.length: "bindingTextCapacity",
+            text.result_length: "bindingTextLength",
+        }
+        if text
+        else {}
+    )
     output_names = {parameter.name for parameter in plan.outputs}
     for parameter_index, param in enumerate(params):
         local = f"bindingArg{parameter_index}"
         label = identifier(camel(param.name)) + " " + local
         value_plan = input_plans.get(param.name)
-        if param.name in lengths:
+        if param.name in text_arguments:
+            arguments.append(text_arguments[param.name])
+        elif param.name in lengths:
             arguments.append(f"try NativeInputArena.count({lengths[param.name]})")
         elif param.name in output_names:
             outputs.append(param)
@@ -384,6 +398,13 @@ def operation(
             )
         output_plans = {parameter.name: parameter.value for parameter in plan.outputs}
         capture, storage, types = [], [], []
+        if text:
+            if text.value.encoding != "json" or outputs:
+                raise unsupported(function, "caller-sized text needs a text decoding")
+            storage.append("  var bindingText = Data()")
+            types.append("Data")
+            capture.append("bindingText")
+            call = f"try NativeString.callerSized(&bindingText) {{ bindingTextStorage, bindingTextCapacity, bindingTextLength in {call} }}"
         for index, output in enumerate(outputs):
             value = output_plans[output.name]
             output_plan = next(p for p in plan.outputs if p.name == output.name)
@@ -462,7 +483,7 @@ def operation(
         invoke = (
             f"nativeInvoke({target}{absent}) {{ raw, arena, diagnostic in {call} }}"
         )
-        if not outputs:
+        if not types:
             return (
                 f"""{doc_comment}{signature} throws {{
   try {invoke}

@@ -1,0 +1,43 @@
+Evaluates an expression against a GeoJSON feature together with feature
+state, global state, elevation, and the other inputs of an EvaluationContext,
+which the public Feature overloads leave out. Standalone expression evaluation
+needs it.
+Upstream: not proposed
+
+diff --git a/include/mln/style/expression/expression.hpp b/include/mln/style/expression/expression.hpp
+index 21f6a71..9eb413a 100644
+--- a/include/mln/style/expression/expression.hpp
++++ b/include/mln/style/expression/expression.hpp
+@@ -272,6 +272,10 @@ public:
+                               const std::set<std::string>& availableImages,
+                               const CanonicalTileID& canonical) const;
+     EvaluationResult evaluate(std::optional<mln::Value> accumulated, const Feature& feature) const;
++    /// Evaluates against a GeoJSON feature and every other input of params.
++    /// When params names a canonical tile, the feature's geometry is placed in
++    /// that tile, as the within and distance expressions need.
++    EvaluationResult evaluate(const Feature& feature, EvaluationContext params) const;
+ 
+     /**
+      * Statically analyze the expression, attempting to enumerate possible
+diff --git a/src/mln/style/expression/expression.cpp b/src/mln/style/expression/expression.cpp
+index 4083c7f..f1443b2 100644
+--- a/src/mln/style/expression/expression.cpp
++++ b/src/mln/style/expression/expression.cpp
+@@ -148,6 +148,17 @@ EvaluationResult Expression::evaluate(std::optional<mln::Value> accumulated, con
+     return this->evaluate(EvaluationContext(std::move(accumulated), &f));
+ }
+ 
++EvaluationResult Expression::evaluate(const Feature& feature, EvaluationContext params) const {
++    std::optional<GeoJSONFeature> f;
++    if (params.canonical) {
++        f.emplace(feature, *params.canonical);
++    } else {
++        f.emplace(feature);
++    }
++    params.feature = &*f;
++    return this->evaluate(params);
++}
++
+ } // namespace expression
+ } // namespace style
+ } // namespace mln

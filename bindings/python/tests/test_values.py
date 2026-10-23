@@ -166,3 +166,21 @@ def test_synchronous_calls_fill_caller_sized_outputs_in_input_order(
         assert projection.lat_lngs_for_pixels_unwrapped(()) == ()
     finally:
         projection.close()
+
+
+def test_caller_sized_text_returns_results_longer_than_its_first_storage() -> None:
+    zoom = mln.style_expression_create(
+        b'["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]'
+    )
+    try:
+        assert zoom.evaluate(mln.StyleExpressionInputs(zoom=5.0)) == b"50.0"
+    finally:
+        zoom.close()
+
+    # The result outgrows the runtime's first storage, so the call runs again.
+    text = b'"' + b"a" * 1000 + b'"'
+    long = mln.style_expression_create(text)
+    try:
+        assert long.evaluate() == text
+    finally:
+        long.close()

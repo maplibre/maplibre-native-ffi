@@ -87,6 +87,7 @@ def operation_contract(plan: OperationPlan) -> str | None:
             and not (value.length == "nul" and value.encoding == "utf8")
             and planned.direction != "in"
             and not planned.sized_by
+            and not planned.result_length
         ):
             return f"parameter {parameter.name} requires counted-buffer conversion"
     return None
@@ -386,10 +387,41 @@ def emit_operation(
         and parameter.value.length not in {None, "nul"}
     }
     outputs_by_name = {parameter.name: parameter for parameter in plan.outputs}
+    # Caller-sized text starts in scope memory of a guessed size, and the call
+    # runs again with enough memory when the text did not fit.
+    text = next((p for p in plan.outputs if p.result_length), None)
+    if text and (text.value.encoding != "json" or asynchronous):
+        raise Unsupported("caller-sized text needs a text decoding")
+    text_storage, text_capacity, text_length = (
+        (camel(text.name), camel(text.value.length), camel(text.result_length))
+        if text
+        else (None, None, None)
+    )
     for parameter in function.parameters:
         if parameter.name == (plan.receiver or plan.scoped_receiver):
             continue
         name = camel(parameter.name)
+        if text and parameter.name == text.name:
+            scoped = True
+            prologue += [
+                f"nuint {text_capacity} = 256;",
+                f"nuint {text_length} = 0;",
+                f"var {name} = scope.OutputArray<sbyte>((int){text_capacity});",
+            ]
+            args.append(name)
+            outputs.append(
+                (
+                    "byte[]",
+                    f"new ReadOnlySpan<byte>({name}, checked((int){text_length})).ToArray()",
+                )
+            )
+            continue
+        if text and parameter.name == text.value.length:
+            args.append(name)
+            continue
+        if text and parameter.name == text.result_length:
+            args.append(f"&{name}")
+            continue
         if parameter.name in counts:
             counted = input_plans[counts[parameter.name]]
             size = (
@@ -783,6 +815,16 @@ def emit_operation(
         if plan.absence:
             raise Unsupported("absence requires an owned handle output")
         body = prologue + [checked_call(function, arguments)]
+        if text:
+            body = prologue + [
+                "while (true)",
+                "{",
+                f"    {checked_call(function, arguments)}",
+                f"    if ({text_length} < {text_capacity}) break;",
+                f"    {text_capacity} = {text_length} + 1;",
+                f"    {text_storage} = scope.OutputArray<sbyte>(checked((int){text_capacity}));",
+                "}",
+            ]
         if scoped:
             accept = "scope.Accept();"
             # A rejected registration stores nothing, so the scope releases it.

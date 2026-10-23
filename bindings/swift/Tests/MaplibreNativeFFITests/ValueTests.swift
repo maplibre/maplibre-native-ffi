@@ -147,3 +147,19 @@ import Testing
     #expect(try projection.latLngsForPixelsUnwrapped(points: []).isEmpty)
   }
 }
+
+@Test func callerSizedTextReturnsResultsLongerThanItsFirstStorage() throws {
+  let zoom = try Maplibre.styleExpressionCreate(
+    expression: Data(#"["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"#
+      .utf8)
+  )
+  #expect(try zoom.evaluate(inputs: StyleExpressionInputs(zoom: 5)) ==
+    Data("50.0".utf8))
+  try zoom.close()
+
+  // The result outgrows the runtime's first storage, so the call runs again.
+  let text = Data(("\"" + String(repeating: "a", count: 1000) + "\"").utf8)
+  let long = try Maplibre.styleExpressionCreate(expression: text)
+  #expect(try long.evaluate() == text)
+  try long.close()
+}

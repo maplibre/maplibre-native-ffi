@@ -11,6 +11,7 @@ from ._generated_operations import (
     _ResourceRequestHandleOperations,
     _ResourceTransformRequestHandleOperations,
     _RuntimeHandleOperations,
+    _StyleExpressionHandleOperations,
 )
 from ._lifecycle import NativeHandleMixin
 
@@ -204,6 +205,27 @@ class RuntimeHandle(_RuntimeHandleOperations, NativeHandleMixin):
     """
 
     _handle_name = "RuntimeHandle"
+    _parent: NativeHandleMixin | None
+
+    def __init__(self):
+        raise TypeError("native handles are returned by their owning operations")
+
+    @classmethod
+    def _from_native(cls, native, parent=None):
+        owner = cls.__new__(cls)
+        owner._native = native
+        owner._parent = parent
+        return owner
+
+
+class StyleExpressionHandle(_StyleExpressionHandleOperations, NativeHandleMixin):
+    """A parsed style expression, immutable and independent of any map.
+
+    See `mln_style_expression` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
+    _handle_name = "StyleExpressionHandle"
     _parent: NativeHandleMixin | None
 
     def __init__(self):

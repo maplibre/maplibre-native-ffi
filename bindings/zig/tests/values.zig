@@ -185,3 +185,22 @@ test "synchronous calls fill caller-sized outputs in input order" {
     defer empty_unwrapped.deinit();
     try testing.expectEqual(@as(usize, 0), empty_unwrapped.value.len);
 }
+
+test "caller-sized text returns results longer than its first storage" {
+    const zoom = try maplibre.styleExpressionCreate(testing.allocator, "[\"interpolate\", [\"linear\"], [\"zoom\"], 0, 0, 10, 100]", null, null);
+    defer maplibre.styleExpressionRelease(zoom) catch unreachable;
+    var level = try maplibre.styleExpressionEvaluate(testing.allocator, zoom, .{ .zoom = 5, .available_images = &.{} }, null);
+    defer level.deinit();
+    try testing.expectEqualStrings("50.0", level.value);
+
+    // The result outgrows the call's first storage, so the call runs again.
+    var text: [1002]u8 = undefined;
+    @memset(&text, 'a');
+    text[0] = '"';
+    text[text.len - 1] = '"';
+    const long = try maplibre.styleExpressionCreate(testing.allocator, &text, null, null);
+    defer maplibre.styleExpressionRelease(long) catch unreachable;
+    var result = try maplibre.styleExpressionEvaluate(testing.allocator, long, null, null);
+    defer result.deinit();
+    try testing.expectEqualStrings(&text, result.value);
+}

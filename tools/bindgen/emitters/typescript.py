@@ -165,6 +165,11 @@ def lower_function(
             lowered.arguments.append("token")
             index += 1
     returned: list[tuple[str, object]] = []
+    # Caller-sized text starts in call memory of a guessed size, and the call
+    # runs again with enough memory when the text did not fit.
+    text = next((p for p in plan.outputs if p.result_length), None)
+    if text and text.value.encoding != "json":
+        raise Unsupported("caller-sized text needs a text decoding")
 
     def output_count(name):
         sized_by = outputs[name].sized_by
@@ -180,6 +185,20 @@ def lower_function(
             continue
         if parameter.name in counts:
             args.append(f"({parameter.type.spelling})count_{counts[parameter.name]}")
+            continue
+        if text and parameter.name == text.name:
+            locals_.append(f"char* {local} = NULL;")
+            body.append(f"{local} = mln_ts_allocate(call, arg_{text.value.length});")
+            body.append(f"if ({local} == NULL) goto done;")
+            args.append(local)
+            continue
+        if text and parameter.name == text.value.length:
+            locals_.append(f"size_t {local} = 256;")
+            args.append(local)
+            continue
+        if text and parameter.name == text.result_length:
+            locals_.append(f"size_t {local} = 0;")
+            args.append(f"&{local}")
             continue
         if parameter.name in outputs:
             value = outputs[parameter.name].value
@@ -458,7 +477,23 @@ def lower_function(
         body.append("diagnostic.size = sizeof diagnostic;")
         body.append("diagnostic.message[0] = '\\0';")
     result_value = None
-    if status:
+    if status and text:
+        storage, capacity, length = (
+            f"arg_{text.name}",
+            f"arg_{text.value.length}",
+            f"arg_{text.result_length}",
+        )
+        locals_.append("mln_status status;")
+        body += [
+            "for (;;) {",
+            f"  status = {function.name}({call_arguments});",
+            f"  if (status != MLN_STATUS_OK || {length} < {capacity}) break;",
+            f"  {capacity} = {length} + 1;",
+            f"  {storage} = mln_ts_allocate(call, {capacity});",
+            f"  if ({storage} == NULL) goto done;",
+            "}",
+        ]
+    elif status:
         locals_.append("mln_status status;")
         body.append(f"status = {function.name}({call_arguments});")
     elif function.return_type.kind == "void":
@@ -498,6 +533,13 @@ def lower_function(
         if lowered.shape != "attach":
             lowered.shape = "owned"
             lowered.returns = owner_class(lowered.owned.handle)
+    elif text:
+        if returned:
+            raise Unsupported("caller-sized text requires no other output")
+        body.append(
+            f"call->result = mln_ts_text(env, arg_{text.name}, arg_{text.result_length});"
+        )
+        lowered.native_result = lowered.returns = "string"
     elif len(returned) > 1:
         members = []
         body.append("call->result = mln_ts_object(env);")

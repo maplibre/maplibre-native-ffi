@@ -1295,6 +1295,81 @@ final class Status extends _Enum {
   };
 }
 
+/// Fields present in `mln_style_expression_inputs`.
+///
+/// See `mln_style_expression_input_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+final class StyleExpressionInputField
+    extends _Flags<StyleExpressionInputField> {
+  const StyleExpressionInputField.fromRawValue(super.rawValue);
+  static const zoom = StyleExpressionInputField.fromRawValue(1);
+  static const colorRampParameter = StyleExpressionInputField.fromRawValue(2);
+  static const elevation = StyleExpressionInputField.fromRawValue(4);
+  static const feature = StyleExpressionInputField.fromRawValue(8);
+  static const featureState = StyleExpressionInputField.fromRawValue(16);
+  static const globalState = StyleExpressionInputField.fromRawValue(32);
+  static const canonicalTileId = StyleExpressionInputField.fromRawValue(64);
+  @override
+  StyleExpressionInputField _of(int rawValue) =>
+      StyleExpressionInputField.fromRawValue(rawValue);
+}
+
+/// Fields present in `mln_style_expression_options`.
+///
+/// See `mln_style_expression_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+final class StyleExpressionOptionField
+    extends _Flags<StyleExpressionOptionField> {
+  const StyleExpressionOptionField.fromRawValue(super.rawValue);
+
+  /// expected_type is set.
+  static const expectedType = StyleExpressionOptionField.fromRawValue(1);
+  @override
+  StyleExpressionOptionField _of(int rawValue) =>
+      StyleExpressionOptionField.fromRawValue(rawValue);
+}
+
+/// Style expression types that a parsed expression may be required to have.
+///
+/// See `mln_style_expression_type_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+final class StyleExpressionTypeKind extends _Enum {
+  const StyleExpressionTypeKind.fromRawValue(super.rawValue);
+
+  /// Any value.
+  static const value = StyleExpressionTypeKind.fromRawValue(0);
+  static const number = StyleExpressionTypeKind.fromRawValue(1);
+  static const string = StyleExpressionTypeKind.fromRawValue(2);
+  static const boolean = StyleExpressionTypeKind.fromRawValue(3);
+  static const color = StyleExpressionTypeKind.fromRawValue(4);
+  static const object = StyleExpressionTypeKind.fromRawValue(5);
+  static const formatted = StyleExpressionTypeKind.fromRawValue(6);
+
+  /// A resolved image, as the image expression returns.
+  static const image = StyleExpressionTypeKind.fromRawValue(7);
+  static const padding = StyleExpressionTypeKind.fromRawValue(8);
+  static const variableAnchorOffsetCollection =
+      StyleExpressionTypeKind.fromRawValue(9);
+
+  /// An array whose items have item_kind, which is not itself an array.
+  static const array = StyleExpressionTypeKind.fromRawValue(10);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'StyleExpressionTypeKind.value',
+    1 => 'StyleExpressionTypeKind.number',
+    2 => 'StyleExpressionTypeKind.string',
+    3 => 'StyleExpressionTypeKind.boolean',
+    4 => 'StyleExpressionTypeKind.color',
+    5 => 'StyleExpressionTypeKind.object',
+    6 => 'StyleExpressionTypeKind.formatted',
+    7 => 'StyleExpressionTypeKind.image',
+    8 => 'StyleExpressionTypeKind.padding',
+    9 => 'StyleExpressionTypeKind.variableAnchorOffsetCollection',
+    10 => 'StyleExpressionTypeKind.array',
+    _ => 'StyleExpressionTypeKind($rawValue)',
+  };
+}
+
 /// Field mask values for `mln_style_image_info`.
 ///
 /// See `mln_style_image_info_field` in the
@@ -5093,4 +5168,131 @@ final class ResourceTransform {
 
   /// Required in callback mode; null in queue mode.
   final ResourceTransformCallback callback;
+}
+
+/// A style expression type.
+///
+/// See `mln_style_expression_type` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+final class StyleExpressionType extends _Value {
+  const StyleExpressionType({
+    this.kind = const StyleExpressionTypeKind.fromRawValue(0),
+    this.itemKind = const StyleExpressionTypeKind.fromRawValue(0),
+    this.itemCount = 0,
+  });
+
+  /// One of `mln_style_expression_type_kind`.
+  final StyleExpressionTypeKind kind;
+
+  /// For an array, its items' kind; ignored for any other kind.
+  final StyleExpressionTypeKind itemKind;
+
+  /// For an array, its fixed length, or zero for any length.
+  final int itemCount;
+
+  @override
+  List<Object?> get _members => [kind, itemKind, itemCount];
+}
+
+/// Options for parsing a style expression.
+///
+/// See `mln_style_expression_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+final class StyleExpressionOptions extends _Value {
+  StyleExpressionOptions({this.expectedType});
+
+  /// The type that the expression must produce. A string type coerces the
+  /// result to a string, as a string layer property does; every other type
+  /// asserts it. Without it, the expression keeps the type it infers.
+  final StyleExpressionType? expectedType;
+
+  @override
+  List<Object?> get _members => [expectedType];
+}
+
+/// What one evaluation reads.
+///
+/// See `mln_style_expression_inputs` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+final class StyleExpressionInputs extends _Value {
+  StyleExpressionInputs({
+    this.zoom,
+    this.colorRampParameter,
+    this.elevation,
+    Uint8List? feature,
+    Uint8List? featureState,
+    Uint8List? globalState,
+    this.canonicalTileId,
+    List<String>? availableImages,
+  }) : feature = feature == null
+           ? null
+           : Uint8List.fromList(feature).asUnmodifiableView(),
+       featureState = featureState == null
+           ? null
+           : Uint8List.fromList(featureState).asUnmodifiableView(),
+       globalState = globalState == null
+           ? null
+           : Uint8List.fromList(globalState).asUnmodifiableView(),
+       availableImages = List.unmodifiable(
+         availableImages ?? styleExpressionInputsDefault().availableImages,
+       );
+
+  /// The value of the zoom expression.
+  final double? zoom;
+
+  /// The value of the heatmap-density and line-progress expressions, and of the
+  /// elevation expression in a color-relief layer.
+  final double? colorRampParameter;
+
+  /// The value of the elevation expression outside a color-relief layer.
+  final double? elevation;
+
+  /// One UTF-8 GeoJSON Feature that feature data expressions read.
+  final Uint8List? feature;
+
+  /// A UTF-8 JSON object that the feature-state expression reads.
+  final Uint8List? featureState;
+
+  /// A UTF-8 JSON object that the global-state expression reads.
+  final Uint8List? globalState;
+
+  /// The tile that holds the feature, which the within and distance expressions
+  /// need to place its geometry.
+  final CanonicalTileId? canonicalTileId;
+
+  /// The image IDs that the image expression reports as available. The
+  /// expression reports any other ID as unavailable.
+  final List<String> availableImages;
+
+  @override
+  List<Object?> get _members => [
+    zoom,
+    colorRampParameter,
+    elevation,
+    feature,
+    featureState,
+    globalState,
+    canonicalTileId,
+    availableImages,
+  ];
+}
+
+/// What a parsed expression depends on.
+///
+/// See `mln_style_expression_info` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+final class StyleExpressionInfo extends _Value {
+  const StyleExpressionInfo({
+    this.isFeatureConstant = false,
+    this.isZoomConstant = false,
+  });
+
+  /// Whether the result is the same for every feature and feature state.
+  final bool isFeatureConstant;
+
+  /// Whether the result is the same at every zoom.
+  final bool isZoomConstant;
+
+  @override
+  List<Object?> get _members => [isFeatureConstant, isZoomConstant];
 }

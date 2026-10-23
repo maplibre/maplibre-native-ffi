@@ -73,6 +73,31 @@ void _check(int status) {
   throw NativeFailure(status, utf8.decode(message));
 }
 
+final class _CallerSizedText {
+  Uint8List text = Uint8List(0);
+
+  int call(
+    Allocator arena,
+    int Function(Pointer<Char> storage, int capacity, Pointer<Size> length)
+    native,
+  ) {
+    final length = arena<Size>();
+    var capacity = 256;
+    while (true) {
+      final storage = arena<Char>(capacity);
+      final status = native(storage, capacity, length);
+      if (status != 0) return status;
+      if (length.value < capacity) {
+        text = Uint8List.fromList(
+          storage.cast<Uint8>().asTypedList(length.value),
+        );
+        return status;
+      }
+      capacity = length.value + 1;
+    }
+  }
+}
+
 bool _present(int status, int absent) {
   if (status == absent) return false;
   _check(status);

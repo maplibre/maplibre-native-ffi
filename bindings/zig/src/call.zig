@@ -52,6 +52,48 @@ fn OutputArray(comptime T: type) type {
     };
 }
 
+/// Receives text that native writes into storage the call sizes. The call
+/// passes the storage's capacity to the `textCapacity` argument and reads the
+/// text's length, which native reports whether or not the text fit, from the
+/// `textLength` argument. Native reports the same text for the same inputs, so
+/// a call that did not fit is made again with enough storage.
+pub fn text() Text {
+    return .{};
+}
+
+const Text = struct {
+    pub const Value = marshal.OwnedValue([]const u8);
+    pub const output = true;
+    pub const caller_sized_text = true;
+};
+
+pub fn textCapacity() TextCapacity {
+    return .{};
+}
+
+const TextCapacity = struct {
+    pub const text_capacity = true;
+};
+
+pub fn textLength() TextLength {
+    return .{};
+}
+
+const TextLength = struct {
+    pub const text_length = true;
+};
+
+fn marks(comptime T: type, comptime marker: []const u8) bool {
+    return @typeInfo(T) == .@"struct" and @hasDecl(T, marker);
+}
+
+fn hasText(comptime Args: type) bool {
+    for (argumentTypes(Args)) |Field| {
+        if (marks(Field, "caller_sized_text")) return true;
+    }
+    return false;
+}
+
 /// Receives a native handle and adopts it as `T`.
 pub fn adopt(comptime T: type) Output(T, false) {
     return .{};
@@ -97,7 +139,9 @@ fn Held(comptime function: anytype, comptime offset: usize, comptime Args: type)
     var types: [fields.len]type = undefined;
     for (fields, 0..) |Field, index| {
         types[index] = if (isOutput(Field))
-            if (@hasDecl(Field, "array_element"))
+            if (marks(Field, "caller_sized_text"))
+                void
+            else if (@hasDecl(Field, "array_element"))
                 []@typeInfo(Param(function, offset + index)).pointer.child
             else
                 @typeInfo(Param(function, offset + index)).pointer.child
@@ -125,6 +169,8 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
         arena: if (Allocator == std.mem.Allocator) std.heap.ArenaAllocator else void,
         roots: callback.Roots = .{},
         held: Held(function, offset, Args) = undefined,
+        text_storage: []u8 = &.{},
+        text_length: usize = 0,
 
         fn begin(receiver: ReceiverType, allocator: Allocator) Error!Self {
             if (access == .scoped) try callback.checkScoped(@intFromPtr(receiver.native));
@@ -155,6 +201,10 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
                 const input = args[index];
                 if (comptime isHandle(Field)) {
                     native[offset + index] = input.raw;
+                } else if (comptime marks(Field, "caller_sized_text") or marks(Field, "text_capacity")) {
+                    // Set below, once the text has storage.
+                } else if (comptime marks(Field, "text_length")) {
+                    native[offset + index] = &self.text_length;
                 } else if (comptime isOutput(Field)) {
                     if (comptime @hasDecl(Field, "array_element")) {
                         const Element = @typeInfo(Parameter).pointer.child;
@@ -173,7 +223,29 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
                     native[offset + index] = try self.encode(Parameter, input);
                 }
             }
+            if (comptime hasText(Args)) {
+                self.text_storage = try self.inputAllocator().alloc(u8, 256);
+                self.passText(&native);
+            }
             return native;
+        }
+
+        /// Passes the text's storage and its capacity to the native call.
+        fn passText(self: *Self, native: *NativeArgs) void {
+            inline for (fields, 0..) |Field, index| {
+                if (comptime marks(Field, "caller_sized_text")) native[offset + index] = @ptrCast(self.text_storage.ptr);
+                if (comptime marks(Field, "text_capacity")) native[offset + index] = self.text_storage.len;
+            }
+        }
+
+        /// Makes the call again with enough storage while the text did not fit.
+        fn fitText(self: *Self, native: *NativeArgs, diagnostic: ?*Diagnostic) Error!void {
+            if (comptime !hasText(Args)) return;
+            while (self.text_length >= self.text_storage.len) {
+                self.text_storage = try self.inputAllocator().alloc(u8, self.text_length + 1);
+                self.passText(native);
+                try status.call(function, native.*, diagnostic);
+            }
         }
 
         fn encode(self: *Self, comptime Target: type, input: anytype) Error!Target {
@@ -237,6 +309,12 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
         fn output(self: *Self, comptime index: usize, allocator: Allocator) Error!fields[index].Value {
             const Step = fields[index];
             if (comptime marshal.decodeAllocates(Step.Value) and Allocator != std.mem.Allocator) @compileError(name ++ ": an output needs an allocator parameter");
+            if (comptime marks(Step, "caller_sized_text")) {
+                var arena = std.heap.ArenaAllocator.init(allocator);
+                errdefer arena.deinit();
+                const bytes = try arena.allocator().dupe(u8, self.text_storage[0..self.text_length]);
+                return .{ .arena = arena, .value = bytes };
+            }
             if (comptime @hasDecl(Step, "array_element")) {
                 var arena = std.heap.ArenaAllocator.init(allocator);
                 errdefer arena.deinit();
@@ -284,8 +362,9 @@ fn invokeInner(
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
     var op = try Op.begin(receiver, allocator);
     defer op.end();
-    const native = try op.arguments(args);
+    var native = try op.arguments(args);
     try status.call(@field(c, name), native, diagnostic);
+    try op.fitText(&native, diagnostic);
     op.roots.accept();
     return op.outputs(allocator);
 }

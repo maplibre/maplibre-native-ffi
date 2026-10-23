@@ -6749,6 +6749,165 @@ static napi_value mln_ts_export_mln_source_feature_query_options_default(
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_style_expression_create(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_buffer_view arg_expression = {0};
+  mln_style_expression_options arg_options;
+  const void* present_options = NULL;
+  mln_style_expression arg_out_expression = MLN_HANDLE_NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  if (!mln_ts_read_text_view(
+        call, call->argv[0], &arg_expression, "expression"
+      ))
+    goto done;
+  if (!mln_ts_is_absent(call, call->argv[1])) {
+    arg_options = mln_style_expression_options_default();
+    if (!mln_ts_read_record(call, call->argv[1], "options")) goto done;
+    if (!mln_ts_write_style_expression_options(
+          call, call->argv[1], &arg_options, "options"
+        ))
+      goto done;
+    present_options = &arg_options;
+  }
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_style_expression_create(
+    arg_expression, present_options, &arg_out_expression, &diagnostic
+  );
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_expression);
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_style_expression_evaluate(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_style_expression arg_expression = 0;
+  mln_style_expression_inputs arg_inputs;
+  const void* present_inputs = NULL;
+  char* arg_out_json = NULL;
+  size_t arg_json_capacity = 256;
+  size_t arg_out_json_length = 0;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "expression")) goto done;
+    arg_expression = (mln_style_expression)number;
+  }
+  if (!mln_ts_is_absent(call, call->argv[1])) {
+    arg_inputs = mln_style_expression_inputs_default();
+    if (!mln_ts_read_record(call, call->argv[1], "inputs")) goto done;
+    if (!mln_ts_write_style_expression_inputs(
+          call, call->argv[1], &arg_inputs, "inputs"
+        ))
+      goto done;
+    present_inputs = &arg_inputs;
+  }
+  arg_out_json = mln_ts_allocate(call, arg_json_capacity);
+  if (arg_out_json == NULL) goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  for (;;) {
+    status = mln_style_expression_evaluate(
+      arg_expression, present_inputs, arg_out_json, arg_json_capacity,
+      &arg_out_json_length, &diagnostic
+    );
+    if (status != MLN_STATUS_OK || arg_out_json_length < arg_json_capacity)
+      break;
+    arg_json_capacity = arg_out_json_length + 1;
+    arg_out_json = mln_ts_allocate(call, arg_json_capacity);
+    if (arg_out_json == NULL) goto done;
+  }
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_text(env, arg_out_json, arg_out_json_length);
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_style_expression_get_info(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_style_expression arg_expression = 0;
+  mln_style_expression_info arg_out_info;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "expression")) goto done;
+    arg_expression = (mln_style_expression)number;
+  }
+  memset(&arg_out_info, 0, sizeof arg_out_info);
+  arg_out_info.size = sizeof arg_out_info;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_style_expression_get_info(arg_expression, &arg_out_info, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_read_style_expression_info(
+    env, &(arg_out_info), sizeof(arg_out_info)
+  );
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_style_expression_inputs_default(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_style_expression_inputs result;
+  if (!mln_ts_begin(call, env, info, 0)) return NULL;
+  result = mln_style_expression_inputs_default();
+  call->result =
+    mln_ts_read_style_expression_inputs(env, &(result), sizeof(result));
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_style_expression_options_default(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_style_expression_options result;
+  if (!mln_ts_begin(call, env, info, 0)) return NULL;
+  result = mln_style_expression_options_default();
+  call->result =
+    mln_ts_read_style_expression_options(env, &(result), sizeof(result));
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_style_expression_release(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_style_expression arg_expression = 0;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "expression")) goto done;
+    arg_expression = (mln_style_expression)number;
+  }
+  if (!mln_ts_read_owner(call, call->argv[1])) goto done;
+  mln_style_expression_release(arg_expression);
+  mln_ts_consume(call);
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_style_image_options_default(
   napi_env env, napi_callback_info info
 ) {
@@ -7251,6 +7410,16 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_runtime_update_offline_region_metadata},
   {"mln_source_feature_query_options_default",
    mln_ts_export_mln_source_feature_query_options_default},
+  {"mln_style_expression_create", mln_ts_export_mln_style_expression_create},
+  {"mln_style_expression_evaluate",
+   mln_ts_export_mln_style_expression_evaluate},
+  {"mln_style_expression_get_info",
+   mln_ts_export_mln_style_expression_get_info},
+  {"mln_style_expression_inputs_default",
+   mln_ts_export_mln_style_expression_inputs_default},
+  {"mln_style_expression_options_default",
+   mln_ts_export_mln_style_expression_options_default},
+  {"mln_style_expression_release", mln_ts_export_mln_style_expression_release},
   {"mln_style_image_options_default",
    mln_ts_export_mln_style_image_options_default},
   {"mln_style_transition_options_default",

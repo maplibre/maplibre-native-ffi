@@ -514,6 +514,45 @@ pub fn source_feature_query_options_default() -> Result<SourceFeatureQueryOption
     Ok(unsafe { from_native(value) }?)
 }
 
+/// Parses a style expression.
+///
+/// See `mln_style_expression_create` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub fn style_expression_create(
+    expression: &[u8],
+    options: Option<&StyleExpressionOptions>,
+) -> Result<StyleExpressionHandle> {
+    let mut call = Call::global();
+    maplibre_core::validate_abi_version()?;
+    let mut out_expression = sys::mln_style_expression(0);
+    let expression = call.input(&expression)?;
+    let options = call.optional_reference(options.as_ref())?;
+    call.status(|_, out_diagnostic| unsafe {
+        sys::mln_style_expression_create(expression, options, &mut out_expression, out_diagnostic)
+    })?;
+    Ok(StyleExpressionHandle::adopt(out_expression, None)?)
+}
+
+/// Returns default style expression inputs, which set no input.
+///
+/// See `mln_style_expression_inputs_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub fn style_expression_inputs_default() -> Result<StyleExpressionInputs> {
+    let mut call = Call::global();
+    let value = call.run(|_| unsafe { sys::mln_style_expression_inputs_default() });
+    Ok(unsafe { from_native(value) }?)
+}
+
+/// Returns default style expression options.
+///
+/// See `mln_style_expression_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+pub fn style_expression_options_default() -> Result<StyleExpressionOptions> {
+    let mut call = Call::global();
+    let value = call.run(|_| unsafe { sys::mln_style_expression_options_default() });
+    Ok(unsafe { from_native(value) }?)
+}
+
 /// Returns default runtime style image options.
 ///
 /// See `mln_style_image_options_default` in the

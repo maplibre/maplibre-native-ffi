@@ -78,6 +78,9 @@ from ._generated_values import (
     ScreenPoint,
     SourceFeature,
     SourceFeatureQueryOptions,
+    StyleExpressionInfo,
+    StyleExpressionInputs,
+    StyleExpressionOptions,
     StyleImageInfo,
     StyleImageOptions,
     StyleLayerInfo,
@@ -103,6 +106,7 @@ if TYPE_CHECKING:
         RenderFrameBatchHandle,
         RenderSessionHandle,
         RuntimeHandle,
+        StyleExpressionHandle,
     )
 
 
@@ -1952,6 +1956,34 @@ class _RuntimeHandleOperations(GeneratedOperations):
         )
 
 
+class _StyleExpressionHandleOperations(GeneratedOperations):
+    _native: _native._StyleExpressionHandle
+
+    def evaluate(self, inputs: StyleExpressionInputs | None = None) -> bytes:
+        """Evaluates a parsed expression and writes its result as UTF-8 JSON.
+
+        See `mln_style_expression_evaluate` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+        """
+        return self._native.evaluate(inputs)
+
+    def get_info(self) -> StyleExpressionInfo:
+        """Copies what a parsed expression depends on into out_info.
+
+        See `mln_style_expression_get_info` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+        """
+        return StyleExpressionInfo._from_native(self._native.get_info())
+
+    def close(self) -> None:
+        """Releases a style expression.
+
+        See `mln_style_expression_release` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+        """
+        return self._native.close()
+
+
 def android_init(jni_env: int, context: int) -> None:
     """Initializes Android platform services.
 
@@ -2104,6 +2136,21 @@ def runtime_create(options: RuntimeOptions | None = None) -> RuntimeHandle:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
     return _adopt_value(_native.runtime_create(options), "RuntimeHandle", None)
+
+
+def style_expression_create(
+    expression: bytes, options: StyleExpressionOptions | None = None
+) -> StyleExpressionHandle:
+    """Parses a style expression.
+
+    See `mln_style_expression_create` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+    """
+    return _adopt_value(
+        _native.style_expression_create(expression, options),
+        "StyleExpressionHandle",
+        None,
+    )
 
 
 def supported_render_backend_mask() -> RenderBackendFlag:

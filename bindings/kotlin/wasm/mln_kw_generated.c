@@ -1990,6 +1990,52 @@ void mln_kw_mln_source_feature_query_options_default(uintptr_t returned) {
     mln_source_feature_query_options_default();
 }
 
+int32_t mln_kw_mln_style_expression_create(
+  uintptr_t expression, uintptr_t options, uintptr_t out_expression,
+  uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_style_expression_create(
+    *(const mln_buffer_view*)(uintptr_t)expression,
+    (const mln_style_expression_options*)options,
+    (mln_style_expression*)out_expression, (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_style_expression_evaluate(
+  int64_t expression, uintptr_t inputs, uintptr_t out_json,
+  uint32_t json_capacity, uintptr_t out_json_length, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_style_expression_evaluate(
+    (mln_style_expression)expression,
+    (const mln_style_expression_inputs*)inputs, (char*)out_json,
+    (size_t)json_capacity, (size_t*)out_json_length,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_style_expression_get_info(
+  int64_t expression, uintptr_t out_info, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_style_expression_get_info(
+    (mln_style_expression)expression, (mln_style_expression_info*)out_info,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
+void mln_kw_mln_style_expression_inputs_default(uintptr_t returned) {
+  *(mln_style_expression_inputs*)returned =
+    mln_style_expression_inputs_default();
+}
+
+void mln_kw_mln_style_expression_options_default(uintptr_t returned) {
+  *(mln_style_expression_options*)returned =
+    mln_style_expression_options_default();
+}
+
+void mln_kw_mln_style_expression_release(int64_t expression) {
+  mln_style_expression_release((mln_style_expression)expression);
+}
+
 void mln_kw_mln_style_image_options_default(uintptr_t returned) {
   *(mln_style_image_options*)returned = mln_style_image_options_default();
 }

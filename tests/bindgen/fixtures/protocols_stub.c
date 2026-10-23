@@ -5,6 +5,7 @@
  * header it generated bindings from, and links it into the probe program.
  */
 #define MLN_PROTOCOL_CALLER_SIZED_OUTPUT
+#define MLN_PROTOCOL_CALLER_SIZED_TEXT
 #define MLN_PROTOCOL_VALUES
 #define MLN_PROTOCOL_KEYWORDS
 #define MLN_PROTOCOL_DEFAULTS
@@ -198,5 +199,29 @@ mln_status mln_probe_batch_scores(
   for (size_t index = 0; index < point_count; ++index) {
     out_scores[index] = points[index].x + points[index].y;
   }
+  return MLN_STATUS_OK;
+}
+
+// Writes a JSON array of `count` zeros when it fits, and reports its length
+// either way, so a long array makes a binding call again with more storage.
+mln_status mln_probe_zeros_json(
+  uint32_t count, char* out_json, size_t json_capacity, size_t* out_json_length,
+  mln_diagnostic* out_diagnostic
+) {
+  if (out_json_length == NULL || (out_json == NULL && json_capacity != 0)) {
+    return fail(out_diagnostic, "missing text storage");
+  }
+  const size_t length = count == 0 ? 2 : 2 * (size_t)count + 1;
+  *out_json_length = length;
+  if (json_capacity <= length) {
+    return MLN_STATUS_OK;
+  }
+  out_json[0] = '[';
+  for (size_t index = 0; index < count; ++index) {
+    out_json[1 + 2 * index] = '0';
+    out_json[2 + 2 * index] = ',';
+  }
+  out_json[length - 1] = ']';
+  out_json[length] = 0;
   return MLN_STATUS_OK;
 }

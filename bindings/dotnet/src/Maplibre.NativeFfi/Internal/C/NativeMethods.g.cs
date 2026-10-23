@@ -1542,6 +1542,40 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_source_feature_query_options mln_source_feature_query_options_default();
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_style_expression_create(
+        mln_buffer_view expression,
+        mln_style_expression_options* options,
+        MlnStyleExpression* out_expression,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_style_expression_evaluate(
+        MlnStyleExpression expression,
+        mln_style_expression_inputs* inputs,
+        sbyte* out_json,
+        nuint json_capacity,
+        nuint* out_json_length,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_style_expression_get_info(
+        MlnStyleExpression expression,
+        mln_style_expression_info* out_info,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_style_expression_inputs mln_style_expression_inputs_default();
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_style_expression_options mln_style_expression_options_default();
+
+    [LibraryImport(LibraryName)]
+    internal static partial void mln_style_expression_release(MlnStyleExpression expression);
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_style_image_options mln_style_image_options_default();
 
     [LibraryImport(LibraryName)]

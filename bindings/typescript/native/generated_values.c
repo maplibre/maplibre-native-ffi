@@ -3180,6 +3180,155 @@ napi_value mln_ts_read_source_feature_query_options_source_layer_ids(
   return result;
 }
 
+napi_value mln_ts_read_style_expression_info(
+  napi_env env, const mln_style_expression_info* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "isFeatureConstant",
+        mln_ts_bool(env, source->is_feature_constant)
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "isZoomConstant",
+        mln_ts_bool(env, source->is_zoom_constant)
+      ))
+    return NULL;
+  return result;
+}
+
+napi_value mln_ts_read_style_expression_inputs(
+  napi_env env, const mln_style_expression_inputs* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if ((source->fields & MLN_STYLE_EXPRESSION_INPUT_ZOOM) != 0) {
+    if (!mln_ts_set(
+          env, result, "zoom", mln_ts_number(env, (double)(source->zoom))
+        ))
+      return NULL;
+  }
+  if ((source->fields & MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER) != 0) {
+    if (!mln_ts_set(
+          env, result, "colorRampParameter",
+          mln_ts_number(env, (double)(source->color_ramp_parameter))
+        ))
+      return NULL;
+  }
+  if ((source->fields & MLN_STYLE_EXPRESSION_INPUT_ELEVATION) != 0) {
+    if (!mln_ts_set(
+          env, result, "elevation",
+          mln_ts_number(env, (double)(source->elevation))
+        ))
+      return NULL;
+  }
+  if ((source->fields & MLN_STYLE_EXPRESSION_INPUT_FEATURE) != 0) {
+    if (!mln_ts_set(
+          env, result, "feature",
+          mln_ts_text(env, (source->feature).data, (source->feature).size)
+        ))
+      return NULL;
+  }
+  if ((source->fields & MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE) != 0) {
+    if (!mln_ts_set(
+          env, result, "featureState",
+          mln_ts_text(
+            env, (source->feature_state).data, (source->feature_state).size
+          )
+        ))
+      return NULL;
+  }
+  if ((source->fields & MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE) != 0) {
+    if (!mln_ts_set(
+          env, result, "globalState",
+          mln_ts_text(
+            env, (source->global_state).data, (source->global_state).size
+          )
+        ))
+      return NULL;
+  }
+  if ((source->fields & MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID) != 0) {
+    if (!mln_ts_set(
+          env, result, "canonicalTileId",
+          mln_ts_read_canonical_tile_id(
+            env, &(source->canonical_tile_id), sizeof(source->canonical_tile_id)
+          )
+        ))
+      return NULL;
+  }
+  if (!mln_ts_set(
+        env, result, "availableImages",
+        mln_ts_read_style_expression_inputs_available_images(env, source)
+      ))
+    return NULL;
+  return result;
+}
+
+napi_value mln_ts_read_style_expression_inputs_available_images(
+  napi_env env, const mln_style_expression_inputs* source
+) {
+  size_t count = (size_t)source->available_image_count;
+  size_t stride = sizeof(mln_buffer_view);
+  if (count > 0 && stride < sizeof(mln_buffer_view)) {
+    napi_throw_range_error(env, NULL, "native record stride is too small");
+    return NULL;
+  }
+  napi_value result = mln_ts_array(env, count);
+  if (result == NULL) return NULL;
+  for (size_t index = 0; index < count; index++) {
+    const mln_buffer_view* item =
+      (const mln_buffer_view*)((const char*)source->available_images +
+                               index * stride);
+    napi_value element = mln_ts_text(env, ((*item)).data, ((*item)).size);
+    if (element == NULL) return NULL;
+    if (!mln_ts_set_index(env, result, (uint32_t)index, element)) return NULL;
+  }
+  return result;
+}
+
+napi_value mln_ts_read_style_expression_options(
+  napi_env env, const mln_style_expression_options* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if ((source->fields & MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE) != 0) {
+    if (!mln_ts_set(
+          env, result, "expectedType",
+          mln_ts_read_style_expression_type(
+            env, &(source->expected_type), sizeof(source->expected_type)
+          )
+        ))
+      return NULL;
+  }
+  return result;
+}
+
+napi_value mln_ts_read_style_expression_type(
+  napi_env env, const mln_style_expression_type* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "kind", mln_ts_number(env, (double)(source->kind))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "itemKind", mln_ts_number(env, (double)(source->item_kind))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "itemCount",
+        mln_ts_number(env, (double)(source->item_count))
+      ))
+    return NULL;
+  return result;
+}
+
 napi_value mln_ts_read_style_image_info(
   napi_env env, const mln_style_image_info* source, size_t size
 ) {
@@ -7011,6 +7160,151 @@ bool mln_ts_write_source_feature_query_options(
   if (!mln_ts_is_absent(call, member)) {
     if (!mln_ts_read_text_view(call, member, &out->filter, child)) return false;
     out->fields |= MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
+  }
+  return true;
+}
+
+bool mln_ts_write_style_expression_inputs(
+  mln_ts_call* call, napi_value value, mln_style_expression_inputs* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "zoom", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "zoom");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->zoom = (double)number;
+    }
+    out->fields |= MLN_STYLE_EXPRESSION_INPUT_ZOOM;
+  }
+  if (!mln_ts_member(call, value, "colorRampParameter", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "colorRampParameter");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->color_ramp_parameter = (double)number;
+    }
+    out->fields |= MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER;
+  }
+  if (!mln_ts_member(call, value, "elevation", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "elevation");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->elevation = (double)number;
+    }
+    out->fields |= MLN_STYLE_EXPRESSION_INPUT_ELEVATION;
+  }
+  if (!mln_ts_member(call, value, "feature", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "feature");
+  if (!mln_ts_is_absent(call, member)) {
+    if (!mln_ts_read_text_view(call, member, &out->feature, child))
+      return false;
+    out->fields |= MLN_STYLE_EXPRESSION_INPUT_FEATURE;
+  }
+  if (!mln_ts_member(call, value, "featureState", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "featureState");
+  if (!mln_ts_is_absent(call, member)) {
+    if (!mln_ts_read_text_view(call, member, &out->feature_state, child))
+      return false;
+    out->fields |= MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE;
+  }
+  if (!mln_ts_member(call, value, "globalState", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "globalState");
+  if (!mln_ts_is_absent(call, member)) {
+    if (!mln_ts_read_text_view(call, member, &out->global_state, child))
+      return false;
+    out->fields |= MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE;
+  }
+  if (!mln_ts_member(call, value, "canonicalTileId", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "canonicalTileId");
+  if (!mln_ts_is_absent(call, member)) {
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_canonical_tile_id(
+          call, member, &out->canonical_tile_id, child
+        ))
+      return false;
+    out->fields |= MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID;
+  }
+  if (!mln_ts_member(call, value, "availableImages", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "availableImages");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      mln_buffer_view* items = NULL;
+      size_t count = 0;
+      if (!mln_ts_write_list_buffer_view(
+            call, member, UINT32_MAX, &items, &count, child
+          ))
+        return false;
+      out->available_images = items;
+      out->available_image_count = (size_t)count;
+    }
+  }
+  return true;
+}
+
+bool mln_ts_write_style_expression_options(
+  mln_ts_call* call, napi_value value, mln_style_expression_options* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "expectedType", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "expectedType");
+  if (!mln_ts_is_absent(call, member)) {
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_style_expression_type(
+          call, member, &out->expected_type, child
+        ))
+      return false;
+    out->fields |= MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE;
+  }
+  return true;
+}
+
+bool mln_ts_write_style_expression_type(
+  mln_ts_call* call, napi_value value, mln_style_expression_type* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "kind", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "kind");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->kind = (uint32_t)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "itemKind", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "itemKind");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->item_kind = (uint32_t)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "itemCount", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "itemCount");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->item_count = (uint32_t)number;
+    }
   }
   return true;
 }

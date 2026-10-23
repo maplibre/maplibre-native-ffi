@@ -13,6 +13,7 @@ import {
   mapProjectionCreate,
   runtimeCreate,
   Status,
+  styleExpressionCreate,
 } from "../src/index.ts";
 import { expectCommitted, openRuntime, utf8 } from "./support/fixture.ts";
 import { bounded, callbackArrival, test } from "./support/harness.ts";
@@ -179,4 +180,16 @@ test("a synchronous call fills a caller-sized output array in input order", asyn
   } finally {
     projection.close();
   }
+});
+
+test("caller-sized text returns a result longer than its first storage", () => {
+  using zoom = styleExpressionCreate(
+    '["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]',
+  );
+  assert.equal(zoom.evaluate({ zoom: 5 }), "50.0");
+
+  // The result outgrows the addon's first storage, so the call runs again.
+  const text = `"${"a".repeat(1000)}"`;
+  using long = styleExpressionCreate(text);
+  assert.equal(long.evaluate(), text);
 });

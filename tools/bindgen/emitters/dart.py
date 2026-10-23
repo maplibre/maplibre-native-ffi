@@ -116,6 +116,18 @@ def lower_function(
         and p.value.buffer_form != "view"
         and p.value.length not in {None, "1", "nul"}
     }
+    # Caller-sized text passes its storage, capacity, and length to a closure
+    # that the runtime calls again when the text did not fit.
+    text = next((p for p in plan.outputs if p.result_length), None)
+    text_arguments = (
+        {
+            text.name: "textStorage",
+            text.value.length: "textCapacity",
+            text.result_length: "textLength",
+        }
+        if text
+        else {}
+    )
     attach_output = None
     signature, optional, setup, args, returns = (
         [],
@@ -141,6 +153,14 @@ def lower_function(
             or local == "raw"
         ):
             local += "Value"
+        if parameter.name in text_arguments:
+            if parameter.name == text.name:
+                if text.value.encoding != "json" or plan.completion:
+                    raise Unsupported("caller-sized text needs a text decoding")
+                setup.append("final text = _CallerSizedText();")
+                returns.append(("Uint8List", "text.text"))
+            args.append(text_arguments[parameter.name])
+            continue
         if parameter.name in counts:
             args.append(
                 f"bytes{camel(counts[parameter.name])}.size"
@@ -268,6 +288,8 @@ def lower_function(
     if optional:
         signature.append("{" + ", ".join(optional) + "}")
     call = native_call(function, args)
+    if text:
+        call = f"text.call(arena, (textStorage, textCapacity, textLength) => {call})"
     # The receiver roots the callbacks it registers, an adopted owner roots
     # those of its call, and the isolate roots a global call's.
     roots = (

@@ -1585,6 +1585,95 @@ func (value Status) String() string {
 
 func (value Status) Error() string { return value.String() }
 
+// StyleExpressionInputField corresponds to mln_style_expression_input_field.
+// Fields present in mln_style_expression_inputs.
+//
+// See mln_style_expression_input_field in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
+type StyleExpressionInputField uint32
+
+const (
+	StyleExpressionInputFieldZoom               StyleExpressionInputField = StyleExpressionInputField(C.MLN_STYLE_EXPRESSION_INPUT_ZOOM)
+	StyleExpressionInputFieldColorRampParameter StyleExpressionInputField = StyleExpressionInputField(C.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER)
+	StyleExpressionInputFieldElevation          StyleExpressionInputField = StyleExpressionInputField(C.MLN_STYLE_EXPRESSION_INPUT_ELEVATION)
+	StyleExpressionInputFieldFeature            StyleExpressionInputField = StyleExpressionInputField(C.MLN_STYLE_EXPRESSION_INPUT_FEATURE)
+	StyleExpressionInputFieldFeatureState       StyleExpressionInputField = StyleExpressionInputField(C.MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE)
+	StyleExpressionInputFieldGlobalState        StyleExpressionInputField = StyleExpressionInputField(C.MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE)
+	StyleExpressionInputFieldCanonicalTileId    StyleExpressionInputField = StyleExpressionInputField(C.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID)
+)
+
+func (value StyleExpressionInputField) Has(flags StyleExpressionInputField) bool {
+	return value&flags == flags
+}
+
+// StyleExpressionOptionField corresponds to mln_style_expression_option_field.
+// Fields present in mln_style_expression_options.
+//
+// See mln_style_expression_option_field in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
+type StyleExpressionOptionField uint32
+
+const (
+	// expected_type is set.
+	StyleExpressionOptionFieldExpectedType StyleExpressionOptionField = StyleExpressionOptionField(C.MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE)
+)
+
+func (value StyleExpressionOptionField) Has(flags StyleExpressionOptionField) bool {
+	return value&flags == flags
+}
+
+// StyleExpressionTypeKind corresponds to mln_style_expression_type_kind. Style
+// expression types that a parsed expression may be required to have.
+//
+// See mln_style_expression_type_kind in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
+type StyleExpressionTypeKind uint32
+
+const (
+	// Any value.
+	StyleExpressionTypeKindValue     StyleExpressionTypeKind = StyleExpressionTypeKind(C.MLN_STYLE_EXPRESSION_TYPE_VALUE)
+	StyleExpressionTypeKindNumber    StyleExpressionTypeKind = StyleExpressionTypeKind(C.MLN_STYLE_EXPRESSION_TYPE_NUMBER)
+	StyleExpressionTypeKindString    StyleExpressionTypeKind = StyleExpressionTypeKind(C.MLN_STYLE_EXPRESSION_TYPE_STRING)
+	StyleExpressionTypeKindBoolean   StyleExpressionTypeKind = StyleExpressionTypeKind(C.MLN_STYLE_EXPRESSION_TYPE_BOOLEAN)
+	StyleExpressionTypeKindColor     StyleExpressionTypeKind = StyleExpressionTypeKind(C.MLN_STYLE_EXPRESSION_TYPE_COLOR)
+	StyleExpressionTypeKindObject    StyleExpressionTypeKind = StyleExpressionTypeKind(C.MLN_STYLE_EXPRESSION_TYPE_OBJECT)
+	StyleExpressionTypeKindFormatted StyleExpressionTypeKind = StyleExpressionTypeKind(C.MLN_STYLE_EXPRESSION_TYPE_FORMATTED)
+	// A resolved image, as the image expression returns.
+	StyleExpressionTypeKindImage                          StyleExpressionTypeKind = StyleExpressionTypeKind(C.MLN_STYLE_EXPRESSION_TYPE_IMAGE)
+	StyleExpressionTypeKindPadding                        StyleExpressionTypeKind = StyleExpressionTypeKind(C.MLN_STYLE_EXPRESSION_TYPE_PADDING)
+	StyleExpressionTypeKindVariableAnchorOffsetCollection StyleExpressionTypeKind = StyleExpressionTypeKind(C.MLN_STYLE_EXPRESSION_TYPE_VARIABLE_ANCHOR_OFFSET_COLLECTION)
+	// An array whose items have item_kind, which is not itself an array.
+	StyleExpressionTypeKindArray StyleExpressionTypeKind = StyleExpressionTypeKind(C.MLN_STYLE_EXPRESSION_TYPE_ARRAY)
+)
+
+func (value StyleExpressionTypeKind) String() string {
+	switch value {
+	case 0:
+		return "StyleExpressionTypeKindValue"
+	case 1:
+		return "StyleExpressionTypeKindNumber"
+	case 2:
+		return "StyleExpressionTypeKindString"
+	case 3:
+		return "StyleExpressionTypeKindBoolean"
+	case 4:
+		return "StyleExpressionTypeKindColor"
+	case 5:
+		return "StyleExpressionTypeKindObject"
+	case 6:
+		return "StyleExpressionTypeKindFormatted"
+	case 7:
+		return "StyleExpressionTypeKindImage"
+	case 8:
+		return "StyleExpressionTypeKindPadding"
+	case 9:
+		return "StyleExpressionTypeKindVariableAnchorOffsetCollection"
+	case 10:
+		return "StyleExpressionTypeKindArray"
+	}
+	return fmt.Sprintf("StyleExpressionTypeKind(%d)", value)
+}
+
 // StyleImageInfoField corresponds to mln_style_image_info_field. Field mask
 // values for mln_style_image_info.
 //
@@ -5065,6 +5154,168 @@ func DefaultSourceFeatureQueryOptions() SourceFeatureQueryOptions {
 	return copySourceFeatureQueryOptions(C.mln_source_feature_query_options_default())
 }
 
+// StyleExpressionInfo corresponds to mln_style_expression_info. What a parsed
+// expression depends on.
+//
+// See mln_style_expression_info in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
+type StyleExpressionInfo struct {
+	// Whether the result is the same for every feature and feature state.
+	IsFeatureConstant bool
+	// Whether the result is the same at every zoom.
+	IsZoomConstant bool
+}
+
+func copyStyleExpressionInfo(raw C.mln_style_expression_info) StyleExpressionInfo {
+	var result StyleExpressionInfo
+	result.IsFeatureConstant = bool(raw.is_feature_constant)
+	result.IsZoomConstant = bool(raw.is_zoom_constant)
+	return result
+}
+
+// StyleExpressionInputs corresponds to mln_style_expression_inputs. What one
+// evaluation reads.
+//
+// See mln_style_expression_inputs in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
+type StyleExpressionInputs struct {
+	// The value of the zoom expression.
+	Zoom *float64
+	// The value of the heatmap-density and line-progress expressions, and of the
+	// elevation expression in a color-relief layer.
+	ColorRampParameter *float64
+	// The value of the elevation expression outside a color-relief layer.
+	Elevation *float64
+	// One UTF-8 GeoJSON Feature that feature data expressions read.
+	Feature *[]byte
+	// A UTF-8 JSON object that the feature-state expression reads.
+	FeatureState *[]byte
+	// A UTF-8 JSON object that the global-state expression reads.
+	GlobalState *[]byte
+	// The tile that holds the feature, which the within and distance expressions
+	// need to place its geometry.
+	CanonicalTileId *CanonicalTileId
+	// The image IDs that the image expression reports as available. The expression
+	// reports any other ID as unavailable.
+	AvailableImages []string
+}
+
+func copyStyleExpressionInputs(raw C.mln_style_expression_inputs) StyleExpressionInputs {
+	var result StyleExpressionInputs
+	result.Zoom = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_ZOOM != 0, func() float64 { return float64(raw.zoom) })
+	result.ColorRampParameter = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER != 0, func() float64 { return float64(raw.color_ramp_parameter) })
+	result.Elevation = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_ELEVATION != 0, func() float64 { return float64(raw.elevation) })
+	result.Feature = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_FEATURE != 0, func() []byte { return bindingBytes(raw.feature.data, uint64(raw.feature.size)) })
+	result.FeatureState = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE != 0, func() []byte { return bindingBytes(raw.feature_state.data, uint64(raw.feature_state.size)) })
+	result.GlobalState = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE != 0, func() []byte { return bindingBytes(raw.global_state.data, uint64(raw.global_state.size)) })
+	result.CanonicalTileId = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID != 0, func() CanonicalTileId { return copyCanonicalTileId(raw.canonical_tile_id) })
+	result.AvailableImages = func() []string {
+		length := bindingLength(uint64(raw.available_image_count))
+		result := make([]string, length)
+		for i := range result {
+			item := *(*C.mln_buffer_view)(bindingElement(unsafe.Pointer(raw.available_images), i, uint64(unsafe.Sizeof(*raw.available_images)), unsafe.Sizeof(*raw.available_images), unsafe.Alignof(*raw.available_images)))
+			result[i] = bindingString(item.data, uint64(item.size))
+		}
+		return result
+	}()
+	return result
+}
+
+func nativeStyleExpressionInputs(input StyleExpressionInputs, arena *bindingArena) C.mln_style_expression_inputs {
+	raw := C.mln_style_expression_inputs_default()
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.fields = 0
+	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_INPUT_ZOOM, &raw.zoom, input.Zoom, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER, &raw.color_ramp_parameter, input.ColorRampParameter, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_INPUT_ELEVATION, &raw.elevation, input.Elevation, arena, bindingNumber[float64, C.double])
+	if input.Feature != nil {
+		raw.feature = C.mln_buffer_view{data: arena.bytes((*input.Feature)), size: C.size_t(len((*input.Feature)))}
+		raw.fields |= C.MLN_STYLE_EXPRESSION_INPUT_FEATURE
+	}
+	if input.FeatureState != nil {
+		raw.feature_state = C.mln_buffer_view{data: arena.bytes((*input.FeatureState)), size: C.size_t(len((*input.FeatureState)))}
+		raw.fields |= C.MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE
+	}
+	if input.GlobalState != nil {
+		raw.global_state = C.mln_buffer_view{data: arena.bytes((*input.GlobalState)), size: C.size_t(len((*input.GlobalState)))}
+		raw.fields |= C.MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE
+	}
+	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID, &raw.canonical_tile_id, input.CanonicalTileId, arena, nativeCanonicalTileId)
+	{
+		raw.available_images = (*C.mln_buffer_view)(arena.array(len(input.AvailableImages), unsafe.Sizeof(*raw.available_images)))
+		items := unsafe.Slice(raw.available_images, len(input.AvailableImages))
+		raw.available_image_count = bindingCountLike(raw.available_image_count, len(input.AvailableImages))
+		for i, item := range input.AvailableImages {
+			items[i] = C.mln_buffer_view{data: arena.bytes([]byte(item)), size: C.size_t(len(item))}
+		}
+	}
+	return raw
+}
+
+func DefaultStyleExpressionInputs() StyleExpressionInputs {
+	return copyStyleExpressionInputs(C.mln_style_expression_inputs_default())
+}
+
+// StyleExpressionOptions corresponds to mln_style_expression_options. Options
+// for parsing a style expression.
+//
+// See mln_style_expression_options in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
+type StyleExpressionOptions struct {
+	// The type that the expression must produce. A string type coerces the result
+	// to a string, as a string layer property does; every other type asserts it.
+	// Without it, the expression keeps the type it infers.
+	ExpectedType *StyleExpressionType
+}
+
+func copyStyleExpressionOptions(raw C.mln_style_expression_options) StyleExpressionOptions {
+	var result StyleExpressionOptions
+	result.ExpectedType = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE != 0, func() StyleExpressionType { return copyStyleExpressionType(raw.expected_type) })
+	return result
+}
+
+func nativeStyleExpressionOptions(input StyleExpressionOptions, arena *bindingArena) C.mln_style_expression_options {
+	raw := C.mln_style_expression_options_default()
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.fields = 0
+	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE, &raw.expected_type, input.ExpectedType, arena, nativeStyleExpressionType)
+	return raw
+}
+
+func DefaultStyleExpressionOptions() StyleExpressionOptions {
+	return copyStyleExpressionOptions(C.mln_style_expression_options_default())
+}
+
+// StyleExpressionType corresponds to mln_style_expression_type. A style
+// expression type.
+//
+// See mln_style_expression_type in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
+type StyleExpressionType struct {
+	// One of mln_style_expression_type_kind.
+	Kind StyleExpressionTypeKind
+	// For an array, its items' kind; ignored for any other kind.
+	ItemKind StyleExpressionTypeKind
+	// For an array, its fixed length, or zero for any length.
+	ItemCount uint32
+}
+
+func copyStyleExpressionType(raw C.mln_style_expression_type) StyleExpressionType {
+	var result StyleExpressionType
+	result.Kind = StyleExpressionTypeKind(raw.kind)
+	result.ItemKind = StyleExpressionTypeKind(raw.item_kind)
+	result.ItemCount = uint32(raw.item_count)
+	return result
+}
+
+func nativeStyleExpressionType(input StyleExpressionType, arena *bindingArena) C.mln_style_expression_type {
+	raw := C.mln_style_expression_type{}
+	raw.kind = C.uint32_t(input.Kind)
+	raw.item_kind = C.uint32_t(input.ItemKind)
+	raw.item_count = C.uint32_t(input.ItemCount)
+	return raw
+}
+
 // StyleImageInfo corresponds to mln_style_image_info. One complete runtime
 // style image, borrowed for a completion callback.
 //
@@ -6707,6 +6958,26 @@ func adoptRuntimeHandle(raw uint64, parent any) *RuntimeHandle {
 
 // owner returns the handle's owner state, or nil for a nil handle.
 func (handle *RuntimeHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
+}
+
+// StyleExpressionHandle corresponds to mln_style_expression. A parsed style
+// expression, immutable and independent of any map.
+//
+// See mln_style_expression in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
+type StyleExpressionHandle struct{ *bindingOwner }
+
+func adoptStyleExpressionHandle(raw uint64, parent any) *StyleExpressionHandle {
+	owner := &StyleExpressionHandle{bindingAdopt(raw, parent, "StyleExpressionHandle", false, func(raw uint64) { C.mln_style_expression_release(C.mln_style_expression(raw)) })}
+	return owner
+}
+
+// owner returns the handle's owner state, or nil for a nil handle.
+func (handle *StyleExpressionHandle) owner() *bindingOwner {
 	if handle == nil {
 		return nil
 	}
@@ -8890,6 +9161,61 @@ func (receiver *RuntimeHandle) UpdateOfflineRegionMetadata(regionId int64, metad
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_update_offline_region_metadata(C.mln_runtime(raw), C.mln_offline_region_id(regionId), (*C.uint8_t)(arena.bytes(metadata)), bindingCount[C.size_t](len(metadata)), completion, diagnostic))
 	}, completionOf(copyOfflineRegionInfo), false)
+}
+
+// StyleExpressionCreate parses a style expression.
+//
+// See mln_style_expression_create in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
+func StyleExpressionCreate(expression []byte, options *StyleExpressionOptions) (*StyleExpressionHandle, error) {
+	var outExpression C.mln_style_expression
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_style_expression_create(bindingView(expression, arena), bindingStoreOptional(options, arena, nativeStyleExpressionOptions), &outExpression, diagnostic))
+	}, func(arena *bindingArena) *StyleExpressionHandle {
+		adopted := adoptStyleExpressionHandle(uint64(outExpression), nil)
+		return adopted
+	})
+}
+
+// Evaluate evaluates a parsed expression and writes its result as UTF-8 JSON.
+//
+// See mln_style_expression_evaluate in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
+func (receiver *StyleExpressionHandle) Evaluate(inputs *StyleExpressionInputs) ([]byte, error) {
+	var outJson []byte
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(bindingCallerSizedText(&outJson, func(outJson *C.char, jsonCapacity C.size_t, outJsonLength *C.size_t) int32 {
+			return int32(C.mln_style_expression_evaluate(C.mln_style_expression(raw), bindingStoreOptional(inputs, arena, nativeStyleExpressionInputs), outJson, jsonCapacity, outJsonLength, diagnostic))
+		}))
+	}, func(arena *bindingArena) []byte {
+		return outJson
+	})
+}
+
+// GetInfo copies what a parsed expression depends on into out_info.
+//
+// See mln_style_expression_get_info in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
+func (receiver *StyleExpressionHandle) GetInfo() (StyleExpressionInfo, error) {
+	var outInfo C.mln_style_expression_info
+	outInfo.size = C.uint32_t(unsafe.Sizeof(outInfo))
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_style_expression_get_info(C.mln_style_expression(raw), &outInfo, diagnostic))
+	}, func(arena *bindingArena) StyleExpressionInfo {
+		return copyStyleExpressionInfo(outInfo)
+	})
+}
+
+// Close releases a style expression.
+//
+// See mln_style_expression_release in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
+func (receiver *StyleExpressionHandle) Close() error {
+	_, err := bindingDirect(bindingConsuming(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
+		C.mln_style_expression_release(C.mln_style_expression(raw))
+		return struct{}{}
+	})
+	return err
 }
 
 // SupportedRenderBackendMask reports the render backends available in this

@@ -244,7 +244,9 @@ def reads_receiver(plan: OperationPlan) -> bool:
         and not plan.view
         and plan.execution == "immediate"
         and any(
-            borrowed(output.value) for output in plan.outputs if not output.sized_by
+            borrowed(output.value)
+            for output in plan.outputs
+            if not output.sized_by and not output.result_length
         )
     )
 
@@ -349,12 +351,26 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
                 else f"{source}.len()"
             )
 
+    # Caller-sized text passes its storage, capacity, and length to a closure
+    # that the runtime calls again when the text did not fit.
+    text = next((p for p in plan.outputs if p.result_length), None)
+    text_parameters = (
+        {text.name, text.value.length, text.result_length} if text else set()
+    )
+
     for parameter in parameters:
         native, local = ctype(parameter.type), names[parameter.name]
         pointee = parameter.type.pointee
         parameter_plan = input_plans.get(parameter.name)
         value_plan = parameter_plan.value if parameter_plan else None
-        if parameter.name in lengths:
+        if parameter.name in text_parameters:
+            args.append(local)
+            if parameter.name == text.name:
+                if text.value.encoding != "json":
+                    raise Unsupported("caller-sized text needs a text decoding")
+                prelude.append(f"let mut {local} = Vec::new();")
+                outputs.append(("Vec<u8>", local))
+        elif parameter.name in lengths:
             # Counts precede the conversions, which shadow their slices.
             prelude.append(f"let {local} = convert::count({lengths[parameter.name]})?;")
             args.append(local)
@@ -574,7 +590,15 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         closure = f"|{closure}, out_diagnostic|"
     else:
         closure = f"|{closure}|"
-    native = f"unsafe {{ {native_call(function, args, diagnostic='out_diagnostic')} }}"
+    native = native_call(function, args, diagnostic="out_diagnostic")
+    if text:
+        storage, capacity, length = (
+            names[text.name],
+            names[text.value.length],
+            names[text.result_length],
+        )
+        native = f"convert::caller_sized_text(&mut {storage}, |{storage}, {capacity}, {length}| {native})"
+    native = f"unsafe {{ {native} }}"
     public = (
         outputs[0][0]
         if len(outputs) == 1

@@ -3068,6 +3068,146 @@ _NativeRegistration<raw.mln_resource_transform> _prepareResourceTransform(
   }
 }
 
+Pointer<raw.mln_style_expression_type> _writeStyleExpressionType(
+  StyleExpressionType value,
+  Allocator arena, {
+  Pointer<raw.mln_style_expression_type>? into,
+}) {
+  final result = into ?? arena<raw.mln_style_expression_type>();
+  result.ref.kind = value.kind.rawValue;
+  result.ref.item_kind = value.itemKind.rawValue;
+  result.ref.item_count = _nativeInteger(value.itemCount, 0, 4294967295);
+  return result;
+}
+
+StyleExpressionType _readStyleExpressionType(
+  raw.mln_style_expression_type source,
+) => StyleExpressionType(
+  kind: StyleExpressionTypeKind.fromRawValue(source.kind),
+  itemKind: StyleExpressionTypeKind.fromRawValue(source.item_kind),
+  itemCount: source.item_count,
+);
+
+Pointer<raw.mln_style_expression_options> _writeStyleExpressionOptions(
+  StyleExpressionOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_style_expression_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_style_expression_options>();
+  result.ref = raw.mln_style_expression_options_default();
+  if (value.expectedType != null) {
+    result.ref.fields |= raw.MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE;
+    result.ref.expected_type = _writeStyleExpressionType(
+      value.expectedType!,
+      arena,
+    ).ref;
+  }
+  return result;
+}
+
+StyleExpressionOptions _readStyleExpressionOptions(
+  raw.mln_style_expression_options source,
+) => StyleExpressionOptions(
+  expectedType:
+      (source.fields & raw.MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE) != 0
+      ? _readStyleExpressionType(source.expected_type)
+      : null,
+);
+
+Pointer<raw.mln_style_expression_inputs> _writeStyleExpressionInputs(
+  StyleExpressionInputs value,
+  Allocator arena, {
+  Pointer<raw.mln_style_expression_inputs>? into,
+}) {
+  final result = into ?? arena<raw.mln_style_expression_inputs>();
+  result.ref = raw.mln_style_expression_inputs_default();
+  if (value.zoom != null) {
+    result.ref.fields |= raw.MLN_STYLE_EXPRESSION_INPUT_ZOOM;
+    result.ref.zoom = value.zoom!;
+  }
+  if (value.colorRampParameter != null) {
+    result.ref.fields |= raw.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER;
+    result.ref.color_ramp_parameter = value.colorRampParameter!;
+  }
+  if (value.elevation != null) {
+    result.ref.fields |= raw.MLN_STYLE_EXPRESSION_INPUT_ELEVATION;
+    result.ref.elevation = value.elevation!;
+  }
+  if (value.feature != null) {
+    result.ref.fields |= raw.MLN_STYLE_EXPRESSION_INPUT_FEATURE;
+    result.ref.feature = nativeBufferView(value.feature!, arena);
+  }
+  if (value.featureState != null) {
+    result.ref.fields |= raw.MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE;
+    result.ref.feature_state = nativeBufferView(value.featureState!, arena);
+  }
+  if (value.globalState != null) {
+    result.ref.fields |= raw.MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE;
+    result.ref.global_state = nativeBufferView(value.globalState!, arena);
+  }
+  if (value.canonicalTileId != null) {
+    result.ref.fields |= raw.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID;
+    result.ref.canonical_tile_id = _writeCanonicalTileId(
+      value.canonicalTileId!,
+      arena,
+    ).ref;
+  }
+  result.ref.available_images = arena<raw.mln_buffer_view>(
+    value.availableImages.isEmpty ? 1 : value.availableImages.length,
+  );
+  result.ref.available_image_count = value.availableImages.length;
+  for (var index = 0; index < value.availableImages.length; index++) {
+    result.ref.available_images[index] = nativeStringView(
+      value.availableImages[index],
+      arena,
+    ).value;
+  }
+  return result;
+}
+
+StyleExpressionInputs _readStyleExpressionInputs(
+  raw.mln_style_expression_inputs source,
+) => StyleExpressionInputs(
+  zoom: (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_ZOOM) != 0
+      ? source.zoom
+      : null,
+  colorRampParameter:
+      (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER) != 0
+      ? source.color_ramp_parameter
+      : null,
+  elevation: (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_ELEVATION) != 0
+      ? source.elevation
+      : null,
+  feature: (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_FEATURE) != 0
+      ? _copyBufferView(source.feature)
+      : null,
+  featureState:
+      (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE) != 0
+      ? _copyBufferView(source.feature_state)
+      : null,
+  globalState:
+      (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE) != 0
+      ? _copyBufferView(source.global_state)
+      : null,
+  canonicalTileId:
+      (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID) != 0
+      ? _readCanonicalTileId(source.canonical_tile_id)
+      : null,
+  availableImages: List<String>.unmodifiable(
+    List.generate(
+      source.available_image_count,
+      (index) => utf8.decode(_copyBufferView(source.available_images[index])),
+    ),
+  ),
+);
+
+StyleExpressionInfo _readStyleExpressionInfo(
+  raw.mln_style_expression_info source,
+) => StyleExpressionInfo(
+  isFeatureConstant: source.is_feature_constant,
+  isZoomConstant: source.is_zoom_constant,
+);
+
 final _resultCameraOptions = _CompletionValue(
   sizeOf<raw.mln_camera_options>(),
   (element) => _readCameraOptions(element.cast<raw.mln_camera_options>().ref),
@@ -3684,6 +3824,53 @@ SourceFeatureQueryOptions sourceFeatureQueryOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_source_feature_query_options_default();
   return _readSourceFeatureQueryOptions(nativeResult);
+}
+
+/// Parses a style expression.
+///
+/// See `mln_style_expression_create` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+StyleExpressionHandle styleExpressionCreate(
+  Uint8List expression, {
+  StyleExpressionOptions? options,
+}) => withNativeArena((arena) {
+  ensureAbiVersion();
+  final outExpression = arena<Uint64>();
+  _check(
+    raw.mln_style_expression_create(
+      nativeBufferView(expression, arena),
+      options == null ? nullptr : _writeStyleExpressionOptions(options, arena),
+      outExpression,
+      nativeDiagnostic,
+    ),
+  );
+  return _adoptOwned(
+    outExpression.value,
+    () => StyleExpressionHandle._(NativeStyleExpression(outExpression.value)),
+    (handle) {
+      raw.mln_style_expression_release(handle);
+    },
+  );
+});
+
+/// Returns default style expression inputs, which set no input.
+///
+/// See `mln_style_expression_inputs_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+StyleExpressionInputs styleExpressionInputsDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_style_expression_inputs_default();
+  return _readStyleExpressionInputs(nativeResult);
+}
+
+/// Returns default style expression options.
+///
+/// See `mln_style_expression_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+StyleExpressionOptions styleExpressionOptionsDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_style_expression_options_default();
+  return _readStyleExpressionOptions(nativeResult);
 }
 
 /// Returns default runtime style image options.
@@ -7387,6 +7574,76 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
       completion,
       nativeDiagnostic,
     );
+  });
+}
+
+/// Issued `mln_style_expression` handle id.
+extension type const NativeStyleExpression(int raw) implements NativeHandle {}
+
+/// Owner of one native `mln_style_expression` handle.
+///
+/// A parsed style expression, immutable and independent of any map.
+///
+/// See `mln_style_expression` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+final class StyleExpressionHandle implements Finalizable {
+  StyleExpressionHandle._(NativeStyleExpression handle)
+    : _state = NativeHandleState(handle, 'StyleExpressionHandle');
+  final NativeHandleState<NativeStyleExpression> _state;
+  NativeStyleExpression get _handle => _state.handle;
+
+  /// The native handle id, which runtime events report as their source.
+  ///
+  /// It stays readable after close, so events drained later still match
+  /// this handle.
+  BigInt get id => uint64FromNative(_state.handleId);
+
+  /// Evaluates a parsed expression and writes its result as UTF-8 JSON.
+  ///
+  /// See `mln_style_expression_evaluate` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+  Uint8List evaluate({StyleExpressionInputs? inputs}) =>
+      withNativeArena((arena) {
+        final text = _CallerSizedText();
+        _check(
+          text.call(
+            arena,
+            (textStorage, textCapacity, textLength) =>
+                raw.mln_style_expression_evaluate(
+                  _handle.raw,
+                  inputs == null
+                      ? nullptr
+                      : _writeStyleExpressionInputs(inputs, arena),
+                  textStorage,
+                  textCapacity,
+                  textLength,
+                  nativeDiagnostic,
+                ),
+          ),
+        );
+        return text.text;
+      });
+
+  /// Copies what a parsed expression depends on into out_info.
+  ///
+  /// See `mln_style_expression_get_info` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+  StyleExpressionInfo getInfo() => withNativeArena((arena) {
+    final outInfo = arena<raw.mln_style_expression_info>();
+    outInfo.ref.size = sizeOf<raw.mln_style_expression_info>();
+    _check(
+      raw.mln_style_expression_get_info(_handle.raw, outInfo, nativeDiagnostic),
+    );
+    return _readStyleExpressionInfo(outInfo.ref);
+  });
+
+  /// Releases a style expression.
+  ///
+  /// See `mln_style_expression_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+  void close() => _state.close((handle) {
+    raw.mln_style_expression_release(handle.raw);
+    return nativeStatusOk;
   });
 }
 

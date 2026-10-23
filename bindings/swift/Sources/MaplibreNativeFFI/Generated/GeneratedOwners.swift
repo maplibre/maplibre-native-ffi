@@ -250,6 +250,32 @@ public final class RuntimeHandle: @unchecked Sendable, NativeReceiver {
   }
 }
 
+struct NativeStyleExpressionHandle: NativeHandle {
+  let raw: UInt64; func disposeAbandoned()
+    -> Bool
+  {
+    mln_style_expression_release(raw); return true
+  }
+}
+
+/// A parsed style expression, immutable and independent of any map.
+///
+/// See `mln_style_expression` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+public final class StyleExpressionHandle: @unchecked Sendable, NativeReceiver {
+  let handle: NativeHandleState<NativeStyleExpressionHandle>
+  init(adopting raw: mln_style_expression) throws {
+    handle = try NativeHandleState(
+      typeName: "StyleExpressionHandle",
+      handle: NativeStyleExpressionHandle(raw: raw)
+    )
+  }
+
+  public var id: UInt64 {
+    handle.value.raw
+  }
+}
+
 public struct MapHandleDiscarding { let owner: MapHandle }
 public extension MapHandle {
   var discarding: MapHandleDiscarding {

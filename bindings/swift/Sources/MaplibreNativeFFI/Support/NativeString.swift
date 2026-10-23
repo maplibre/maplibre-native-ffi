@@ -14,6 +14,30 @@ enum NativeString {
     return Data(bytes: data, count: size)
   }
 
+  /// Makes a call that writes text into storage the caller sizes, and copies
+  /// the text into `text`. A call reports the text's length whether or not
+  /// it fit, and reports the same text for the same inputs, so a call that
+  /// did not fit is made again with enough storage.
+  static func callerSized(
+    _ text: inout Data,
+    _ call: (UnsafeMutablePointer<CChar>, Int, UnsafeMutablePointer<Int>) throws
+      -> mln_status
+  ) rethrows -> mln_status {
+    var storage = [CChar](repeating: 0, count: 256)
+    while true {
+      var length = 0
+      let status = try storage.withUnsafeMutableBufferPointer {
+        try call($0.baseAddress!, $0.count, &length)
+      }
+      guard status == MLN_STATUS_OK else { return status }
+      if length < storage.count {
+        text = storage.withUnsafeBytes { Data($0.prefix(length)) }
+        return status
+      }
+      storage = [CChar](repeating: 0, count: length + 1)
+    }
+  }
+
   static func copyUTF8(data: UnsafeRawPointer?, size: Int) throws -> String {
     try copyCUTF8(
       data: data?.assumingMemoryBound(to: CChar.self),

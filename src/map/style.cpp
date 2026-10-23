@@ -382,26 +382,6 @@ auto to_native_custom_mvt_vector_source_options(
 
 namespace mln::core {
 
-auto validate_canonical_tile_id(mln_canonical_tile_id tile_id) -> mln_status {
-  if (tile_id.z > 32U) {
-    mln::core::set_thread_error("tile_id.z must be within [0, 32]");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto coordinate_limit = uint64_t{1} << tile_id.z;
-  if (tile_id.x >= coordinate_limit || tile_id.y >= coordinate_limit) {
-    mln::core::set_thread_error("tile_id x and y must be within zoom bounds");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto to_native_canonical_tile_id(mln_canonical_tile_id tile_id)
-  -> mln::CanonicalTileID {
-  return mln::CanonicalTileID{
-    static_cast<uint8_t>(tile_id.z), tile_id.x, tile_id.y
-  };
-}
-
 auto validate_source_can_be_added(
   mln::style::Style& style, const std::string& source_id
 ) -> mln_status {

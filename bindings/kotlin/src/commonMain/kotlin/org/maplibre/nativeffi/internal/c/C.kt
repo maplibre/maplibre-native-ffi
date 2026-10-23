@@ -1046,6 +1046,30 @@ internal expect object C {
 
   fun mln_source_feature_query_options_default(returned: Long): Unit
 
+  fun mln_style_expression_create(
+    expression: Long,
+    options: Long,
+    outExpression: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_style_expression_evaluate(
+    expression: Long,
+    inputs: Long,
+    outJson: Long,
+    jsonCapacity: Long,
+    outJsonLength: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_style_expression_get_info(expression: Long, outInfo: Long, outDiagnostic: Long): Int
+
+  fun mln_style_expression_inputs_default(returned: Long): Unit
+
+  fun mln_style_expression_options_default(returned: Long): Unit
+
+  fun mln_style_expression_release(expression: Long): Unit
+
   fun mln_style_image_options_default(returned: Long): Unit
 
   fun mln_style_transition_options_default(returned: Long): Unit

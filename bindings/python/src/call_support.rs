@@ -337,6 +337,30 @@ unsafe fn generated_bytes(py: Python<'_>, view: sys::mln_buffer_view) -> PyResul
     Ok(PyBytes::new(py, bytes).into_any().unbind())
 }
 
+/// Makes a call that writes text into storage the caller sizes, and copies
+/// the text into `text`. A call reports the text's length whether or not it
+/// fit, and reports the same text for the same inputs, so a call that did not
+/// fit is made again with enough storage.
+fn generated_caller_sized_text(
+    text: &mut Vec<u8>,
+    mut call: impl FnMut(*mut c_char, usize, *mut usize) -> sys::mln_status,
+) -> sys::mln_status {
+    let mut storage = vec![0u8; 256];
+    loop {
+        let mut length = 0;
+        let status = call(storage.as_mut_ptr().cast(), storage.len(), &mut length);
+        if status != sys::MLN_STATUS_OK {
+            return status;
+        }
+        if length < storage.len() {
+            storage.truncate(length);
+            *text = storage;
+            return status;
+        }
+        storage = vec![0; length + 1];
+    }
+}
+
 /// Copies a terminated UTF-8 string, which is `None` when null and `optional`.
 ///
 /// # Safety

@@ -25,6 +25,8 @@ internal readonly record struct MlnResourceTransformRequest(ulong Value) : IMlnH
 
 internal readonly record struct MlnRuntime(ulong Value) : IMlnHandle;
 
+internal readonly record struct MlnStyleExpression(ulong Value) : IMlnHandle;
+
 internal unsafe struct mln_animation_options
 {
     public mln_animation_option_field fields;
@@ -935,6 +937,42 @@ internal unsafe struct mln_source_feature_query_options
     public mln_buffer_view filter;
 }
 
+internal unsafe struct mln_style_expression_info
+{
+    public uint size;
+    public byte is_feature_constant;
+    public byte is_zoom_constant;
+}
+
+internal unsafe struct mln_style_expression_inputs
+{
+    public uint size;
+    public mln_style_expression_input_field fields;
+    public double zoom;
+    public double color_ramp_parameter;
+    public double elevation;
+    public mln_buffer_view feature;
+    public mln_buffer_view feature_state;
+    public mln_buffer_view global_state;
+    public mln_canonical_tile_id canonical_tile_id;
+    public mln_buffer_view* available_images;
+    public nuint available_image_count;
+}
+
+internal unsafe struct mln_style_expression_options
+{
+    public uint size;
+    public mln_style_expression_option_field fields;
+    public mln_style_expression_type expected_type;
+}
+
+internal unsafe struct mln_style_expression_type
+{
+    public uint kind;
+    public uint item_kind;
+    public uint item_count;
+}
+
 internal unsafe struct mln_style_image_info
 {
     public uint width;
@@ -1732,6 +1770,37 @@ internal enum mln_status : int
     MLN_STATUS_TARGET_LOST = -8,
     MLN_STATUS_NOT_READY = -9,
     MLN_STATUS_NOT_FOUND = -10,
+}
+
+internal enum mln_style_expression_input_field : uint
+{
+    MLN_STYLE_EXPRESSION_INPUT_ZOOM = 1,
+    MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER = 2,
+    MLN_STYLE_EXPRESSION_INPUT_ELEVATION = 4,
+    MLN_STYLE_EXPRESSION_INPUT_FEATURE = 8,
+    MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE = 16,
+    MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE = 32,
+    MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID = 64,
+}
+
+internal enum mln_style_expression_option_field : uint
+{
+    MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE = 1,
+}
+
+internal enum mln_style_expression_type_kind : uint
+{
+    MLN_STYLE_EXPRESSION_TYPE_VALUE = 0,
+    MLN_STYLE_EXPRESSION_TYPE_NUMBER = 1,
+    MLN_STYLE_EXPRESSION_TYPE_STRING = 2,
+    MLN_STYLE_EXPRESSION_TYPE_BOOLEAN = 3,
+    MLN_STYLE_EXPRESSION_TYPE_COLOR = 4,
+    MLN_STYLE_EXPRESSION_TYPE_OBJECT = 5,
+    MLN_STYLE_EXPRESSION_TYPE_FORMATTED = 6,
+    MLN_STYLE_EXPRESSION_TYPE_IMAGE = 7,
+    MLN_STYLE_EXPRESSION_TYPE_PADDING = 8,
+    MLN_STYLE_EXPRESSION_TYPE_VARIABLE_ANCHOR_OFFSET_COLLECTION = 9,
+    MLN_STYLE_EXPRESSION_TYPE_ARRAY = 10,
 }
 
 internal enum mln_style_image_info_field : uint

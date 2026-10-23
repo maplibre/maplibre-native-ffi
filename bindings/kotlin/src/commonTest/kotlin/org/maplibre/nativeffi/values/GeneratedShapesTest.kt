@@ -26,6 +26,7 @@ import org.maplibre.nativeffi.generated.RenderedQueryGeometry
 import org.maplibre.nativeffi.generated.RenderedQueryGeometryData
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.Status
+import org.maplibre.nativeffi.generated.StyleExpressionInputs
 import org.maplibre.nativeffi.generated.StyleImageOptions
 import org.maplibre.nativeffi.generated.writeRenderedQueryGeometry
 import org.maplibre.nativeffi.internal.memory.NativeArena
@@ -39,6 +40,22 @@ import org.maplibre.nativeffi.withMap
  * common code over each platform's native memory, so every target runs this file.
  */
 class GeneratedShapesTest {
+  @Test
+  fun callerSizedTextReturnsResultsLongerThanItsFirstStorage() {
+    GeneratedApi.styleExpressionCreate(
+        """["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]""".encodeToByteArray(),
+      )
+      .use { zoom ->
+        assertEquals("50.0", zoom.evaluate(StyleExpressionInputs(zoom = 5.0)).decodeToString())
+      }
+
+    // The result outgrows the call's first storage, so the call runs again.
+    val text = "\"" + "a".repeat(1000) + "\""
+    GeneratedApi.styleExpressionCreate(text.encodeToByteArray()).use { long ->
+      assertEquals(text, long.evaluate().decodeToString())
+    }
+  }
+
   @Test
   fun synchronousCallsFillCallerSizedOutputsInInputOrder() = runSuspendTest {
     withMap {

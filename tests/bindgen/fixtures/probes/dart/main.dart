@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'values.dart';
@@ -31,6 +32,15 @@ void main() {
         absent.left == null &&
         absent.right.isEmpty,
     'absent fields',
+  );
+
+  // Caller-sized text that fits the runtime's first storage, and text that
+  // does not, which the runtime fetches again with enough storage.
+  check(utf8.decode(probeZerosJson(0)) == '[]', 'empty text');
+  check(utf8.decode(probeZerosJson(3)) == '[0,0,0]', 'short text');
+  check(
+    utf8.decode(probeZerosJson(300)) == '[${List.filled(300, 0).join(',')}]',
+    'long text',
   );
 
   // A caller-sized output array holds one element per input element, in

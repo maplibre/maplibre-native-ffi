@@ -1,5 +1,6 @@
 """Header mutations must drive emitter changes and explicit coverage failures."""
 
+import re
 import unittest
 
 from support import parse, protocol_groups, real_api
@@ -62,6 +63,41 @@ class GenerationTests(unittest.TestCase):
             with self.subTest(emitter=emitter.__name__):
                 self.assertEqual(emitter.coverage(bound)["unsupported"], {})
                 self.rendered(emitter, bound)
+
+    def test_caller_sized_text_hides_its_capacity_and_length(self):
+        api = parse(groups=("caller_sized_text",))
+        validate(api)
+        bound = compile_api(api)
+        (plan,) = bound.operations
+        text = next(p for p in plan.outputs if p.result_length)
+        self.assertEqual(text.name, "out_json")
+        self.assertEqual(text.result_length, "out_json_length")
+        self.assertEqual(text.value.kind, "buffer")
+        self.assertEqual(text.value.length, "json_capacity")
+        self.assertEqual(text.value.encoding, "json")
+        for emitter in EMITTERS:
+            with self.subTest(emitter=emitter.__name__):
+                self.assertEqual(emitter.coverage(bound)["unsupported"], {})
+                self.rendered(emitter, bound)
+
+    def test_caller_sized_text_rejects_an_unsound_contract(self):
+        text = 'char *out_json BIND("direction=out;encoding=json;length=capacity;result_length=out_length")'
+        length = 'unsigned long *out_length BIND("direction=out")'
+        cases = {
+            "mutable character output": f'const char *out_json BIND("encoding=json;length=capacity;result_length=out_length"), unsigned long capacity, {length}',
+            "text encoding": f'char *out_json BIND("direction=out;encoding=bytes;length=capacity;result_length=out_length"), unsigned long capacity, {length}',
+            "unsigned capacity input": f"{text}, int capacity, {length}",
+            "output of the capacity's type": f'{text}, unsigned long capacity, unsigned *out_length BIND("direction=out")',
+            "follow every input": f"{text}, unsigned long capacity, {length}, unsigned later",
+        }
+        for error, parameters in cases.items():
+            with (
+                self.subTest(error=error),
+                self.assertRaisesRegex(ModelError, re.escape(error)),
+            ):
+                self.parse(
+                    f"mln_status mln_probe_text({parameters}, mln_diagnostic *out_diagnostic);"
+                )
 
     def test_output_array_requires_a_counted_input_array(self):
         with self.assertRaisesRegex(ModelError, "output array length"):

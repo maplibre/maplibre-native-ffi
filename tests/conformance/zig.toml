@@ -42,6 +42,7 @@
 "VAL-06" = "bindings/zig/tests/values.zig::native record defaults round trip through generated conversion"
 "VAL-07" = "bindings/zig/src/call.zig::an array completion is read at its value_size"
 "VAL-08" = "bindings/zig/tests/values.zig::synchronous calls fill caller-sized outputs in input order"
+"VAL-09" = "bindings/zig/tests/values.zig::caller-sized text returns results longer than its first storage"
 "VIEW-01" = "bindings/zig/tests/rendering.zig::a scoped frame view holds its frame until the scope returns"
 "REND-01" = "bindings/zig/tests/rendering.zig::an owned-texture session renders a frame that reads back as pixels"
 "REND-02" = "bindings/zig/tests/rendering.zig::a caller-driven session is serviced from a thread the test spawns"

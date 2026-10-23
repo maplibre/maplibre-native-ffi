@@ -47,6 +47,7 @@
 "VAL-06" = "A record built from its constructor defaults equals the native default"
 "VAL-07" = "An array completion is read at the result's value_size stride, and a stride narrower than the element is rejected"
 "VAL-08" = "A synchronous call fills a caller-sized output array in input order"
+"VAL-09" = "A synchronous call returns caller-sized text longer than the binding's first storage for it"
 
 # Views and rendering
 "VIEW-01" = "A borrowed view expires with its scope, and its owner refuses to close while it is borrowed"

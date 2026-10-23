@@ -116,6 +116,19 @@ internal fun NativeArena.putRuntimeOptions(target: Long, value: RuntimeOptions) 
 internal fun NativeArena.writeRuntimeOptions(value: RuntimeOptions): Long =
   allocate(w(20, 40), w(4, 8)).also { putRuntimeOptions(it, value) }
 
+internal fun NativeArena.putStyleExpressionOptions(target: Long, value: StyleExpressionOptions) {
+  writeU32(target, 20.toUInt())
+  var fields = 0u
+  value.expectedType?.let {
+    fields = fields or 1u
+    putStyleExpressionType(target + 8, it)
+  }
+  writeU32(target + 4, fields)
+}
+
+internal fun NativeArena.writeStyleExpressionOptions(value: StyleExpressionOptions): Long =
+  allocate(20, 4).also { putStyleExpressionOptions(it, value) }
+
 internal fun NativeCall.putCustomGeometrySourceOptions(
   target: Long,
   value: CustomGeometrySourceOptions,
@@ -944,6 +957,51 @@ internal fun NativeCall.putResourceTransform(target: Long, value: ResourceTransf
 internal fun NativeCall.writeResourceTransform(value: ResourceTransform): Long =
   allocate(w(24, 40), 8).also { putResourceTransform(it, value) }
 
+internal fun NativeArena.putStyleExpressionInputs(target: Long, value: StyleExpressionInputs) {
+  writeU32(target, w(80, 112).toUInt())
+  var fields = 0u
+  value.zoom?.let {
+    fields = fields or 1u
+    writeF64(target + 8, it)
+  }
+  value.colorRampParameter?.let {
+    fields = fields or 2u
+    writeF64(target + 16, it)
+  }
+  value.elevation?.let {
+    fields = fields or 4u
+    writeF64(target + 24, it)
+  }
+  value.feature?.let {
+    fields = fields or 8u
+    putView(target + 32, it)
+  }
+  value.featureState?.let {
+    fields = fields or 16u
+    putView(target + w(40, 48), it)
+  }
+  value.globalState?.let {
+    fields = fields or 32u
+    putView(target + w(48, 64), it)
+  }
+  value.canonicalTileId?.let {
+    fields = fields or 64u
+    putCanonicalTileId(target + w(56, 80), it)
+  }
+  writeAddress(
+    target + w(68, 96),
+    array(value.availableImages, 2 * NativeMemory.addressSize, NativeMemory.addressSize) { at, item
+      ->
+      putView(at, item)
+    },
+  )
+  writeSize(target + w(72, 104), value.availableImages.size.toULong())
+  writeU32(target + 4, fields)
+}
+
+internal fun NativeArena.writeStyleExpressionInputs(value: StyleExpressionInputs): Long =
+  allocate(w(80, 112), 8).also { putStyleExpressionInputs(it, value) }
+
 internal fun NativeArena.putHttpHeaderRule(target: Long, value: HttpHeaderRule) {
   writeU32(target, value.kinds.rawValue)
   writeU32(target + 4, value.flags.rawValue)
@@ -1367,6 +1425,34 @@ internal fun readSourceFeatureQueryOptions(source: Long): SourceFeatureQueryOpti
   )
 }
 
+internal fun readStyleExpressionInputs(source: Long): StyleExpressionInputs {
+  val fields = readU32(source + 4)
+  return StyleExpressionInputs(
+    zoom = if ((fields and 1u) != 0u) readF64(source + 8) else null,
+    colorRampParameter = if ((fields and 2u) != 0u) readF64(source + 16) else null,
+    elevation = if ((fields and 4u) != 0u) readF64(source + 24) else null,
+    feature = if ((fields and 8u) != 0u) readView(source + 32) else null,
+    featureState = if ((fields and 16u) != 0u) readView(source + w(40, 48)) else null,
+    globalState = if ((fields and 32u) != 0u) readView(source + w(48, 64)) else null,
+    canonicalTileId = if ((fields and 64u) != 0u) readCanonicalTileId(source + w(56, 80)) else null,
+    availableImages =
+      readArray(
+        readAddress(source + w(68, 96)),
+        readSize(source + w(72, 104)),
+        2 * NativeMemory.addressSize.toLong(),
+      ) { item ->
+        readViewString(item)
+      },
+  )
+}
+
+internal fun readStyleExpressionOptions(source: Long): StyleExpressionOptions {
+  val fields = readU32(source + 4)
+  return StyleExpressionOptions(
+    expectedType = if ((fields and 1u) != 0u) readStyleExpressionType(source + 8) else null,
+  )
+}
+
 internal fun readStyleImageOptions(source: Long): StyleImageOptions {
   val fields = readU32(source + 4)
   return StyleImageOptions(
@@ -1617,6 +1703,12 @@ internal fun readOfflineRegionStatus(source: Long): OfflineRegionStatus =
     complete = readBool(source + 57),
   )
 
+internal fun readStyleExpressionInfo(source: Long): StyleExpressionInfo =
+  StyleExpressionInfo(
+    isFeatureConstant = readBool(source + 4),
+    isZoomConstant = readBool(source + 5),
+  )
+
 internal fun readResourceRequestInfo(source: Long): ResourceRequestInfo {
   val fields = readU32(source + 4)
   return ResourceRequestInfo(
@@ -1634,6 +1726,15 @@ internal fun readResourceRequestInfo(source: Long): ResourceRequestInfo {
     priorData = readBytes(readAddress(source + w(76, 88)), readSize(source + w(80, 96))),
   )
 }
+
+internal fun NativeArena.putStyleExpressionType(target: Long, value: StyleExpressionType) {
+  writeU32(target, value.kind.rawValue)
+  writeU32(target + 4, value.itemKind.rawValue)
+  writeU32(target + 8, value.itemCount)
+}
+
+internal fun NativeArena.writeStyleExpressionType(value: StyleExpressionType): Long =
+  allocate(12, 4).also { putStyleExpressionType(it, value) }
 
 internal fun NativeCall.putAnimationOptions(target: Long, value: AnimationOptions) {
   var fields = 0u
@@ -1963,6 +2064,13 @@ internal fun readOpenglContextDescriptor(source: Long): OpenglContextDescriptor 
 
 internal fun readOpenglBorrowedTexture(source: Long): OpenglBorrowedTexture =
   OpenglBorrowedTexture(texture = readU32(source))
+
+internal fun readStyleExpressionType(source: Long): StyleExpressionType =
+  StyleExpressionType(
+    kind = StyleExpressionTypeKind(readU32(source)),
+    itemKind = StyleExpressionTypeKind(readU32(source + 4)),
+    itemCount = readU32(source + 8),
+  )
 
 internal fun readImageStretch(source: Long): ImageStretch =
   ImageStretch(from = readF32(source), to = readF32(source + 4))

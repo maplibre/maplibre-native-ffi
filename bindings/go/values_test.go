@@ -3,6 +3,7 @@ package maplibre
 import (
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -140,5 +141,36 @@ func TestSynchronousCallsFillCallerSizedOutputsInInputOrder(t *testing.T) {
 	emptyCoordinates, err := projection.LatLngsForPixels(nil)
 	if err != nil || len(emptyCoordinates) != 0 {
 		t.Fatalf("empty coordinates: %+v, %v", emptyCoordinates, err)
+	}
+}
+
+func TestCallerSizedTextReturnsResultsLongerThanItsFirstStorage(t *testing.T) {
+	zoom, err := StyleExpressionCreate([]byte(`["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]`), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zoom.Close()
+	level := 5.0
+	got, err := zoom.Evaluate(&StyleExpressionInputs{Zoom: &level})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "50.0" {
+		t.Fatalf("zoom result = %s, want 50.0", got)
+	}
+
+	// The result outgrows the runtime's first storage, so the call runs again.
+	text := `"` + strings.Repeat("a", 1000) + `"`
+	long, err := StyleExpressionCreate([]byte(text), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer long.Close()
+	got, err = long.Evaluate(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != text {
+		t.Fatalf("long result has %d bytes, want %d", len(got), len(text))
 	}
 }
