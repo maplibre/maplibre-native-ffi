@@ -72,6 +72,26 @@ static mln_style_expression_inputs feature_inputs(const char* feature) {
   return inputs;
 }
 
+// An image serializes as an object whose member order the C API leaves open.
+static void expect_image(
+  const mln_style_expression_inputs* inputs, const char* id,
+  const char* availability
+) {
+  char json[128];
+  snprintf(json, sizeof(json), "[\"image\", \"%s\"]", id);
+  const mln_style_expression expression = create(json);
+  size_t length = 0;
+  MLN_TEST_OK(mln_style_expression_evaluate(
+    expression, inputs, json, sizeof(json), &length, MLN_TEST_DIAGNOSTIC
+  ));
+  mln_style_expression_release(expression);
+  char name[64];
+  snprintf(name, sizeof(name), "\"name\":\"%s\"", id);
+  TEST_ASSERT_NOT_NULL_MESSAGE(strstr(json, name), json);
+  TEST_ASSERT_NOT_NULL_MESSAGE(strstr(json, availability), json);
+  TEST_ASSERT_EQUAL_size_t(strlen(name) + strlen(availability) + 3, length);
+}
+
 static void constants_evaluate_without_inputs(void) {
   expect_evaluates("[\"+\", 1, 2]", NULL, "3.0");
   expect_evaluates("\"text\"", NULL, "\"text\"");
@@ -125,14 +145,8 @@ static void each_input_reaches_the_expression_that_reads_it(void) {
   inputs = mln_style_expression_inputs_default();
   inputs.available_images = images;
   inputs.available_image_count = 1;
-  expect_evaluates(
-    "[\"image\", \"monument-15\"]", &inputs,
-    "{\"available\":true,\"name\":\"monument-15\"}"
-  );
-  expect_evaluates(
-    "[\"image\", \"missing\"]", &inputs,
-    "{\"available\":false,\"name\":\"missing\"}"
-  );
+  expect_image(&inputs, "monument-15", "\"available\":true");
+  expect_image(&inputs, "missing", "\"available\":false");
 }
 
 // The within expression places the feature in the tile that the inputs name,
