@@ -343,8 +343,17 @@ fn linkMaplibreNativeC(b: *std.Build, module: *std.Build.Module, options: BuildO
     if (target.result.os.tag == .windows) {
         module.addObjectFile(prefix.path(b, "lib/maplibre-native-c.lib"));
     } else {
-        module.addLibraryPath(prefix.path(b, "lib"));
-        module.addRPath(prefix.path(b, "lib"));
+        const lib_dir = prefix.path(b, "lib");
+        module.addLibraryPath(lib_dir);
+        // An installed executable finds the library that its build installs
+        // into lib/.
+        module.addRPathSpecial(if (target.result.os.tag.isDarwin()) "@loader_path/../lib" else "$ORIGIN/../lib");
+        // An executable run from the build tree finds it where the build
+        // linked it. Zig gives a fetched package's path relative to the
+        // working directory, which a run-time search path cannot be.
+        const cwd = std.process.currentPathAlloc(b.graph.io, b.allocator) catch |err|
+            std.debug.panic("failed to read the working directory: {t}", .{err});
+        module.addRPath(.{ .cwd_relative = b.pathResolve(&.{ cwd, configurePath(b, lib_dir) }) });
         module.linkSystemLibrary("maplibre-native-c", .{ .use_pkg_config = .no });
     }
     addPlatformSystemPaths(b, module, target, options.system_root);
@@ -549,8 +558,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     linkMaplibreNativeC(b, maplibre_native_ffi, options);
-    // A Windows executable finds the library on PATH or beside itself, so its
-    // build installs bin/maplibre-native-c.dll from here.
+    // An installed executable finds the library beside itself on Windows and
+    // in ../lib elsewhere, so its build installs the library from here.
     b.addNamedLazyPath("prefix", native.prefix);
 
     // The published package carries neither the tests nor the headers that

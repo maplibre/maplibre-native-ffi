@@ -365,13 +365,29 @@ The build downloads the C library for the target. Each target uses Metal on
 macOS, OpenGL on Android and OpenHarmony, and Vulkan elsewhere. Pass `.backend`
 as `.opengl`, `.metal`, or `.vulkan` to choose another. Windows needs the `msvc`
 ABI, which Zig doesn't choose by default, so build with
-`-Dtarget=x86_64-windows-msvc` or `-Dtarget=aarch64-windows-msvc`. An executable
-there needs `maplibre-native-c.dll` beside it:
+`-Dtarget=x86_64-windows-msvc` or `-Dtarget=aarch64-windows-msvc`.
+
+An executable that `zig build run` runs finds the library in Zig's package
+directory. An installed executable finds it beside itself on Windows and in
+`../lib` elsewhere, so install it from the package's `prefix`:
 
 ```zig title="build.zig"
-const dll = maplibre.namedLazyPath("prefix").path(b, "bin/maplibre-native-c.dll");
-b.getInstallStep().dependOn(&b.addInstallBinFile(dll, "maplibre-native-c.dll").step);
+const library = switch (target.result.os.tag) {
+    .windows => "bin/maplibre-native-c.dll",
+    .macos => "lib/libmaplibre-native-c.dylib",
+    else => "lib/libmaplibre-native-c.so",
+};
+const prefix = maplibre.namedLazyPath("prefix");
+b.getInstallStep().dependOn(&b.addInstallFile(prefix.path(b, library), library).step);
 ```
+
+Zig has no libc for Android, so an Android build uses the NDK's. Pass the
+dependency `.@"system-root"` as the NDK's `sysroot` directory and
+`.@"target-libc"` as a libc file in the format that `zig libc` prints. The file
+names `sysroot/usr/include` and its target subdirectory as the include
+directories, and `sysroot/usr/lib/<target>/<API level>` as both `crt_dir` and
+`cc_dir`. Call `setLibCFile` with the same file on each artifact that imports
+the module. An app ships `libmaplibre-native-c.so` in its `lib/<abi>` directory.
 
 The [snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot)
 publishes the same package from `main`. Run the same `zig fetch --save` again
