@@ -40,13 +40,12 @@ function(mln_ffi_configure_platform target)
   include(mln_ffi_rust)
   include("${MLN_FFI_SOURCE_DIR}/vendor/icu.cmake")
 
-  # The browser reuses MapLibre's default text and locale support. It does not
-  # reuse the default run loop, timer, async task, or thread sources: those are
-  # built on libuv, whose event loop has no browser backing. src/platform/
-  # emscripten supplies them instead.
+  # The browser reuses MapLibre's default text support. It does not reuse the
+  # default locale services, which carry no locale data, or the default run
+  # loop, timer, async task, or thread sources: those are built on libuv, whose
+  # event loop has no browser backing. src/platform/emscripten supplies them
+  # instead.
   set(MLN_FFI_VENDOR_EMSCRIPTEN_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/collator.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/bidi.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/local_glyph_rasterizer.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/i18n.cpp
@@ -56,6 +55,7 @@ function(mln_ffi_configure_platform target)
 
   set(MLN_FFI_EMSCRIPTEN_SOURCES
       ${PROJECT_SOURCE_DIR}/src/platform/emscripten/http_file_source.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/emscripten/i18n.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/emscripten/thread.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/run_loop/async_task.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/run_loop/run_loop.cpp
@@ -64,10 +64,6 @@ function(mln_ffi_configure_platform target)
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_EMSCRIPTEN_SOURCES})
   mln_ffi_target_project_sources(${target} ${MLN_FFI_EMSCRIPTEN_SOURCES})
-
-  set_source_files_properties(
-    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
-    PROPERTIES COMPILE_DEFINITIONS MBGL_USE_BUILTIN_ICU)
 
   target_include_directories(
     ${target}
