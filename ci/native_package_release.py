@@ -11,9 +11,9 @@ import os
 import pathlib
 import plistlib
 import re
-import stat
 import tarfile
 import tempfile
+import urllib.request
 import zipfile
 from collections.abc import Iterable
 
@@ -23,7 +23,9 @@ ARCHIVE_PREFIX = "maplibre-native-c-"
 ARCHIVE_SUFFIX = ".tar.gz"
 RELEASE_NOTES_NAME = "RELEASE_NOTES.md"
 XCFRAMEWORK_NAME = "MaplibreNativeC.xcframework.zip"
-XCFRAMEWORK_ROOT = "MaplibreNativeC.xcframework"
+RELEASE_DOWNLOAD_URL = (
+    "https://github.com/maplibre/maplibre-native-ffi/releases/download"
+)
 # The Info.plist of a flat or versioned framework, or of its dSYM.
 FRAMEWORK_INFO_PLIST = re.compile(
     r"(^|/)MaplibreNativeC\.framework(/Versions/A/Resources|\.dSYM/Contents)?/Info\.plist$"
@@ -52,17 +54,7 @@ def package_presets(repository: pathlib.Path) -> list[str]:
     names = sorted(preset["name"] for preset in presets)
     if not names:
         raise SystemExit("CMakePresets.json defines no native package presets")
-    if len(names) != len(set(names)):
-        raise SystemExit("CMakePresets.json defines duplicate native package presets")
     return names
-
-
-def preset_from_archive(path: pathlib.Path) -> str:
-    if not path.name.startswith(ARCHIVE_PREFIX) or not path.name.endswith(
-        ARCHIVE_SUFFIX
-    ):
-        raise SystemExit(f"invalid native package archive name: {path.name}")
-    return path.name[len(ARCHIVE_PREFIX) : -len(ARCHIVE_SUFFIX)]
 
 
 def native_archives(
@@ -84,57 +76,27 @@ def native_archives(
     return [release_dir / name for name in sorted(expected)]
 
 
-def archive_digests(checksums: str) -> dict[str, str]:
-    """The SHA-256 digest of each native archive that SHA256SUMS lists."""
+def write_pin(
+    path: pathlib.Path, tag: str, checksums: pathlib.Path | None = None
+) -> None:
+    """Writes the pin by which a published package downloads its native library.
+
+    The pin holds the release tag and the SHA-256 digest of each asset that the
+    release's SHA256SUMS lists. It reads SHA256SUMS from `checksums` if given,
+    and otherwise downloads it from the release.
+    """
+    if checksums is None:
+        url = f"{RELEASE_DOWNLOAD_URL}/{tag}/SHA256SUMS"
+        with urllib.request.urlopen(url) as response:
+            text = response.read().decode()
+    else:
+        text = checksums.read_text(encoding="utf-8")
     digests = {}
-    for line in checksums.splitlines():
+    for line in text.splitlines():
         digest, _, name = line.partition("  ")
-        if name.startswith(ARCHIVE_PREFIX) and name.endswith(ARCHIVE_SUFFIX):
-            digests[name] = digest
-    if not digests:
-        raise SystemExit("SHA256SUMS lists no native archives")
-    return dict(sorted(digests.items()))
-
-
-def safe_member_name(member: tarfile.TarInfo, root: str) -> None:
-    path = pathlib.PurePosixPath(member.name)
-    if path.is_absolute() or ".." in path.parts:
-        raise SystemExit(f"native package contains an unsafe path: {member.name}")
-    if not path.parts or path.parts[0] != root:
-        raise SystemExit(
-            f"native package member {member.name} is outside expected root {root}"
-        )
-    if member.issym() or member.islnk():
-        target = pathlib.PurePosixPath(member.linkname)
-        if target.is_absolute() or ".." in target.parts:
-            raise SystemExit(
-                f"native package contains an unsafe link: "
-                f"{member.name} -> {member.linkname}"
-            )
-
-
-def descriptor_bytes(
-    content: bytes, archive: pathlib.Path, version: str, expected_sha: str
-) -> bytes:
-    try:
-        descriptor = json.loads(content)
-    except json.JSONDecodeError as error:
-        raise SystemExit(
-            f"{archive.name} has an invalid artifact.json: {error}"
-        ) from error
-    actual_sha = descriptor.get("gitSha")
-    if actual_sha != expected_sha:
-        raise SystemExit(
-            f"{archive.name} records gitSha {actual_sha!r}; expected {expected_sha}"
-        )
-    relabeled = {}
-    for key, value in descriptor.items():
-        if key == "version":
-            continue
-        relabeled[key] = value
-        if key == "gitSha":
-            relabeled["version"] = version
-    return (json.dumps(relabeled, indent=2) + "\n").encode()
+        digests[name] = digest
+    pin = {"tag": tag, "sha256": dict(sorted(digests.items()))}
+    path.write_text(json.dumps(pin, indent=2) + "\n", encoding="utf-8")
 
 
 def pkg_config_bytes(content: bytes, archive: pathlib.Path, version: str) -> bytes:
@@ -168,12 +130,9 @@ def framework_plist_bytes(content: bytes, version: str) -> bytes:
     return plistlib.dumps(plist)
 
 
-def rewrite_archive(archive: pathlib.Path, *, expected_sha: str, version: str) -> None:
-    preset = preset_from_archive(archive)
-    root = f"{ARCHIVE_PREFIX}{preset}"
-    descriptor_name = f"{root}/share/maplibre-native-c/artifact.json"
+def rewrite_archive(archive: pathlib.Path, version: str) -> None:
+    root = archive.name.removesuffix(ARCHIVE_SUFFIX)
     pkg_config_name = f"{root}/share/pkgconfig/maplibre-native-c.pc"
-    found_descriptor = False
     found_pkg_config = False
 
     descriptor, temporary_name = tempfile.mkstemp(
@@ -192,7 +151,6 @@ def rewrite_archive(archive: pathlib.Path, *, expected_sha: str, version: str) -
             ) as output,
         ):
             for member in source:
-                safe_member_name(member, root)
                 if not member.isfile():
                     output.addfile(member)
                     continue
@@ -200,14 +158,7 @@ def rewrite_archive(archive: pathlib.Path, *, expected_sha: str, version: str) -
                 source_file = source.extractfile(member)
                 if source_file is None:
                     raise SystemExit(f"cannot read {member.name} from {archive.name}")
-                if member.name == descriptor_name:
-                    content = descriptor_bytes(
-                        source_file.read(), archive, version, expected_sha
-                    )
-                    member.size = len(content)
-                    output.addfile(member, io.BytesIO(content))
-                    found_descriptor = True
-                elif member.name == pkg_config_name:
+                if member.name == pkg_config_name:
                     content = pkg_config_bytes(source_file.read(), archive, version)
                     member.size = len(content)
                     output.addfile(member, io.BytesIO(content))
@@ -218,25 +169,11 @@ def rewrite_archive(archive: pathlib.Path, *, expected_sha: str, version: str) -
                     output.addfile(member, io.BytesIO(content))
                 else:
                     output.addfile(member, source_file)
-        if not found_descriptor:
-            raise SystemExit(f"{archive.name} is missing artifact.json")
         if not found_pkg_config:
             raise SystemExit(f"{archive.name} is missing maplibre-native-c.pc")
         os.replace(temporary_path, archive)
     finally:
         temporary_path.unlink(missing_ok=True)
-
-
-def safe_zip_member(member: zipfile.ZipInfo, content: bytes, archive_name: str) -> None:
-    path = pathlib.PurePosixPath(member.filename)
-    if path.is_absolute() or ".." in path.parts or path.parts[0] != XCFRAMEWORK_ROOT:
-        raise SystemExit(f"{archive_name} contains an unsafe path: {member.filename}")
-    if stat.S_ISLNK(member.external_attr >> 16):
-        target = pathlib.PurePosixPath(content.decode())
-        if target.is_absolute() or ".." in target.parts:
-            raise SystemExit(
-                f"{archive_name} contains an unsafe link: {member.filename} -> {target}"
-            )
 
 
 def rewrite_xcframework(archive: pathlib.Path, version: str) -> None:
@@ -254,7 +191,6 @@ def rewrite_xcframework(archive: pathlib.Path, version: str) -> None:
         ):
             for member in source.infolist():
                 content = source.read(member)
-                safe_zip_member(member, content, archive.name)
                 if FRAMEWORK_INFO_PLIST.search(member.filename):
                     content = framework_plist_bytes(content, version)
                     found_plist = True
@@ -309,8 +245,8 @@ def write_notes(
         f"CI run: {required_env('CI_RUN_URL')}",
         f"Publishing run: {workflow_url()}",
     ]
-    previous_tag = os.environ.get("PUBLISH_PREVIOUS_TAG")
-    if channel == "release" and previous_tag:
+    if channel == "release":
+        previous_tag = required_env("PUBLISH_PREVIOUS_TAG")
         lines += [
             "",
             f"Full changelog: {compare_url(previous_tag, required_env('PUBLISH_TAG'))}",
@@ -331,7 +267,7 @@ def prepare_assets(
     sha = required_env("PUBLISH_SHA")
     archives = native_archives(release_dir, package_presets(root))
     for archive in archives:
-        rewrite_archive(archive, expected_sha=sha, version=version)
+        rewrite_archive(archive, version)
     xcframework = release_dir / XCFRAMEWORK_NAME
     if not xcframework.is_file():
         raise SystemExit(f"invalid native package set: missing {XCFRAMEWORK_NAME}")

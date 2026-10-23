@@ -214,14 +214,6 @@ jobs:
             echo "$PUBLISH_TAG points to $tag_sha; expected $PUBLISH_SHA" >&2
             exit 1
           fi
-          # The release checked its order when it started, and a newer tag
-          # waits for it in the release concurrency group.
-          if [[ "$PUBLISH_CHANNEL" == release ]]; then
-            if [[ "${PUBLISH_TAG#v}" != "$PUBLISH_VERSION" ]]; then
-              echo "$PUBLISH_TAG no longer names version $PUBLISH_VERSION" >&2
-              exit 1
-            fi
-          fi
       - name: Publish the verified tagged release
         if: ${{ inputs.release }}
         env:

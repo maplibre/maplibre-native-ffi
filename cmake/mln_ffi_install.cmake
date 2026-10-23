@@ -1,27 +1,5 @@
 include(GNUInstallDirs)
 
-# Records the commit an artifact was built from. Set MLN_FFI_GIT_SHA to skip
-# discovery outside a checkout. This runs at configure time, so a build tree
-# keeps the old commit until it is reconfigured.
-function(mln_ffi_resolve_git_sha)
-  if(MLN_FFI_GIT_SHA)
-    return()
-  endif()
-  find_package(Git QUIET)
-  if(GIT_FOUND)
-    execute_process(
-      COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD
-      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-      OUTPUT_VARIABLE git_sha OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET
-      RESULT_VARIABLE git_result)
-    if(git_result EQUAL 0 AND git_sha)
-      set(MLN_FFI_GIT_SHA "${git_sha}" PARENT_SCOPE)
-      return()
-    endif()
-  endif()
-  set(MLN_FFI_GIT_SHA "unknown" PARENT_SCOPE)
-endfunction()
-
 function(mln_ffi_install_zig_libc)
   get_target_property(MLN_FFI_ZIG_LIBC_SYSROOT mln_ffi_platform_dependencies
                       MLN_FFI_ZIG_LIBC_SYSROOT)
@@ -281,7 +259,6 @@ function(mln_ffi_install_c_api_library target)
                       MLN_FFI_ZIG_TARGET)
   get_target_property(MLN_FFI_TARGET_PLATFORM mln_ffi_platform_dependencies
                       MLN_FFI_TARGET_PLATFORM)
-  mln_ffi_resolve_git_sha()
   mln_ffi_install_emscripten_options()
   mln_ffi_static_link_metadata(MLN_FFI_STATIC_LINK_LIBRARIES
                                MLN_FFI_STATIC_LINK_FRAMEWORKS)
@@ -320,9 +297,7 @@ function(mln_ffi_install_c_api_library target)
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
   # binding_support.h is binding-internal support that bindings in this
   # repository read from the source tree. Keep this exclusion in sync with the
-  # Apple framework's in cmake/mln_ffi_apple_framework.cmake, with the
-  # header-skew checks in bindings/dart/hook/build.dart and
-  # bindings/rust/crates/maplibre-native-ffi-sys/build.rs, and with EXCLUDE in
+  # Apple framework's in cmake/mln_ffi_apple_framework.cmake and with EXCLUDE in
   # docs/doxygen/Doxyfile.
   install(
     DIRECTORY "${PROJECT_SOURCE_DIR}/include/maplibre_native_c"

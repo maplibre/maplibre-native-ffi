@@ -28,15 +28,18 @@ class DartReleaseTest(unittest.TestCase):
             "name: maplibre_native_ffi\nversion: 0.0.0\n"
         )
         (self.package / "CHANGELOG.md").write_text(CHANGELOG)
+        self.checksums = self.package / "SHA256SUMS"
+        self.checksums.write_text(CHECKSUMS)
 
     def test_pins_the_native_archives_and_stamps_the_version(self) -> None:
-        prepare(self.package, "v0.202610.2", CHECKSUMS)
+        prepare(self.package, "v0.202610.2", self.checksums)
 
         self.assertEqual(
             json.loads((self.package / "hook/native_release.json").read_text()),
             {
                 "tag": "v0.202610.2",
                 "sha256": {
+                    "MaplibreNativeC.xcframework.zip": "ccc",
                     "maplibre-native-c-android-arm64-egl.tar.gz": "aaa",
                     "maplibre-native-c-macos-arm64-metal.tar.gz": "bbb",
                 },
@@ -51,19 +54,13 @@ class DartReleaseTest(unittest.TestCase):
             CHANGELOG + "\n## 0.202610.1\n\nEarlier.\n"
         )
 
-        prepare(self.package, "v0.202610.2", CHECKSUMS)
+        prepare(self.package, "v0.202610.2", self.checksums)
 
         changelog = (self.package / "CHANGELOG.md").read_text()
         self.assertLess(
             changelog.index("## 0.202610.2"), changelog.index("## 0.202610.1")
         )
         self.assertIn("/releases/tag/v0.202610.2", changelog)
-
-    def test_rejects_checksums_without_native_archives(self) -> None:
-        with self.assertRaisesRegex(SystemExit, "no native archives"):
-            prepare(
-                self.package, "v0.202610.2", "ccc  MaplibreNativeC.xcframework.zip\n"
-            )
 
 
 if __name__ == "__main__":

@@ -118,13 +118,7 @@ fi
 description = "Pin a release's native archives in the sys crate and stamp the crate versions, before publishing."
 usage = 'arg "<tag>" help="The release tag, such as v0.202610.2"'
 dir = "../.."
-run = '''
-checksums="$(mktemp)"
-trap 'rm -f "$checksums"' EXIT
-curl --fail --location --silent --show-error --retry 3 --output "$checksums" \
-  "https://github.com/maplibre/maplibre-native-ffi/releases/download/$usage_tag/SHA256SUMS"
-python3 ci/rust_release.py . "$usage_tag" "$checksums"
-'''
+run = 'python3 ci/rust_release.py . "$usage_tag"'
 
 [tasks."test:package"]
 description = "Package the crates as a release prepares them, and test the sys crate against this build's native archive."
@@ -149,7 +143,7 @@ git ls-files -z --cached --others --exclude-standard -- \
 ln -s "$MISE_MONOREPO_ROOT/build/dependencies" "$workspace/build/dependencies"
 printf '%s  %s\n' "$(shasum -a 256 "$archive" | cut -d ' ' -f 1)" "$(basename "$archive")" \
   >"$scratch/SHA256SUMS"
-python3 ci/rust_release.py "$workspace" "$tag" "$scratch/SHA256SUMS"
+python3 ci/rust_release.py "$workspace" "$tag" --checksums "$scratch/SHA256SUMS"
 cargo package --manifest-path "$workspace/Cargo.toml" --no-verify \
   --target-dir "$scratch/target" \
   -p maplibre-native-ffi-sys \

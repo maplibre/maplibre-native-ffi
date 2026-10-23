@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""Prepares the Rust crates for publication from a release's SHA256SUMS."""
+"""Prepares the Rust crates for publication at a release tag."""
 
 from __future__ import annotations
 
 import argparse
-import json
 import pathlib
 import re
 
-from native_package_release import archive_digests
+from native_package_release import write_pin
 from release_version import parse_tag
 
 SYS_CRATE = pathlib.Path("bindings/rust/crates/maplibre-native-ffi-sys")
@@ -22,13 +21,12 @@ def substitute(path: pathlib.Path, pattern: str, replacement: str, count: int) -
     path.write_text(text, encoding="utf-8")
 
 
-def prepare(workspace: pathlib.Path, tag: str, checksums: str) -> None:
+def prepare(
+    workspace: pathlib.Path, tag: str, checksums: pathlib.Path | None = None
+) -> None:
     _, version = parse_tag(tag)
 
-    pin = {"tag": tag, "sha256": archive_digests(checksums)}
-    (workspace / PIN_PATH).write_text(
-        json.dumps(pin, indent=2) + "\n", encoding="utf-8"
-    )
+    write_pin(workspace / PIN_PATH, tag, checksums)
 
     # The workspace version, then each published crate's requirement on the
     # others, which ship in lockstep.
@@ -55,9 +53,13 @@ def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("workspace", type=pathlib.Path)
     parser.add_argument("tag")
-    parser.add_argument("checksums", type=pathlib.Path)
+    parser.add_argument(
+        "--checksums",
+        type=pathlib.Path,
+        help="A SHA256SUMS to pin, rather than the release's",
+    )
     args = parser.parse_args(arguments)
-    prepare(args.workspace, args.tag, args.checksums.read_text())
+    prepare(args.workspace, args.tag, args.checksums)
     return 0
 
 

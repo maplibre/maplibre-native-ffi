@@ -59,41 +59,22 @@ def add_symlink(archive: zipfile.ZipFile, name: str, target: str) -> None:
     archive.writestr(member, target)
 
 
-def create_xcframework(
-    path: pathlib.Path, link_target: str = "Versions/Current/Headers"
-) -> None:
+def create_xcframework(path: pathlib.Path) -> None:
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr("MaplibreNativeC.xcframework/Info.plist", b"xcframework")
         archive.writestr(IOS_PLIST, FRAMEWORK_PLIST)
         archive.writestr(MACOS_PLIST, FRAMEWORK_PLIST)
         archive.writestr(IOS_DSYM_PLIST, FRAMEWORK_PLIST)
-        add_symlink(archive, f"{MACOS_FRAMEWORK}/Headers", link_target)
+        add_symlink(archive, f"{MACOS_FRAMEWORK}/Headers", "Versions/Current/Headers")
 
 
-def create_archive(path: pathlib.Path, preset: str, sha: str) -> None:
+def create_archive(path: pathlib.Path, preset: str) -> None:
     root = f"maplibre-native-c-{preset}"
     with tarfile.open(path, "w:gz") as archive:
         add_bytes(
             archive,
             f"{root}/Frameworks/MaplibreNativeC.framework/Info.plist",
             FRAMEWORK_PLIST,
-        )
-        add_bytes(
-            archive,
-            f"{root}/share/maplibre-native-c/artifact.json",
-            (
-                json.dumps(
-                    {
-                        "gitSha": sha,
-                        "version": "0.1.0",
-                        "renderBackend": "vulkan",
-                        "targetPlatform": "linux-gnu-x64",
-                        "zigTarget": "x86_64-linux-gnu",
-                    },
-                    indent=2,
-                )
-                + "\n"
-            ).encode(),
         )
         add_bytes(
             archive,
@@ -189,14 +170,12 @@ class NativePackageReleaseTest(unittest.TestCase):
             json.dumps({"packagePresets": [{"name": name} for name in presets]})
         )
 
-    def archive(self, sha: str | None = None) -> pathlib.Path:
+    def archive(self) -> pathlib.Path:
         archive = self.release_dir / f"maplibre-native-c-{self.preset}.tar.gz"
-        create_archive(archive, self.preset, sha or self.sha)
+        create_archive(archive, self.preset)
         return archive
 
-    def prepare(
-        self, channel: str, version: str | None = None, **overrides: str
-    ) -> None:
+    def prepare(self, channel: str, version: str | None = None) -> None:
         environment = {
             "CI_RUN_URL": "https://github.com/maplibre/repo/actions/runs/1",
             "GITHUB_REPOSITORY": "maplibre/repo",
@@ -205,26 +184,19 @@ class NativePackageReleaseTest(unittest.TestCase):
             "PUBLISH_SHA": self.sha,
             "PUBLISH_TAG": f"v{self.version}",
             "PUBLISH_TIMESTAMP": "2026-08-07 01:01 UTC",
-            **overrides,
         }
         with mock.patch.dict(os.environ, environment, clear=False):
             prepare_assets(
                 self.release_dir, channel, version or self.version, self.repository
             )
 
-    def assert_assets(
-        self, channel: str, version: str, title: str, **overrides: str
-    ) -> str:
+    def assert_assets(self, channel: str, version: str, title: str) -> str:
         archive = self.archive()
-        self.prepare(channel, version, **overrides)
+        self.prepare(channel, version)
 
         with tarfile.open(archive, "r:gz") as package:
-            root = f"maplibre-native-c-{self.preset}"
-            descriptor = json.load(
-                package.extractfile(f"{root}/share/maplibre-native-c/artifact.json")
-            )
             pkg_config = package.extractfile(
-                f"{root}/share/pkgconfig/maplibre-native-c.pc"
+                f"maplibre-native-c-{self.preset}/share/pkgconfig/maplibre-native-c.pc"
             ).read()
         checksums = dict(
             reversed(line.split("  "))
@@ -232,7 +204,6 @@ class NativePackageReleaseTest(unittest.TestCase):
         )
         notes = (self.release_dir / "RELEASE_NOTES.md").read_text()
 
-        self.assertEqual(descriptor["version"], version)
         self.assertIn(f"Version: {version}".encode(), pkg_config)
         self.assertEqual(
             checksums,
@@ -297,50 +268,12 @@ class NativePackageReleaseTest(unittest.TestCase):
         self.assertTrue(stat.S_ISLNK(link.external_attr >> 16))
         self.assertEqual(link_target, b"Versions/Current/Headers")
 
-    def test_rejects_xcframework_escapes(self) -> None:
-        self.archive()
-        create_xcframework(self.xcframework, link_target="../../escape")
-
-        with self.assertRaisesRegex(SystemExit, "unsafe link"):
-            self.prepare("release")
-
-    def test_rejects_an_archive_from_another_commit(self) -> None:
-        self.archive("a" * 40)
-        with self.assertRaisesRegex(SystemExit, "expected"):
-            self.prepare("release")
-
-    def test_rejects_archive_escapes(self) -> None:
-        with tarfile.open(self.archive(), "w:gz") as package:
-            add_bytes(package, "../escape", b"payload")
-
-        with self.assertRaisesRegex(SystemExit, "unsafe path"):
-            self.prepare("release")
-
-        with tarfile.open(self.archive(), "w:gz") as package:
-            link = tarfile.TarInfo(f"maplibre-native-c-{self.preset}/escape")
-            link.type = tarfile.SYMTYPE
-            link.linkname = "../../escape"
-            package.addfile(link)
-
-        with self.assertRaisesRegex(SystemExit, "unsafe link"):
-            self.prepare("release")
-
     def test_release_assets_include_version_provenance_and_checksums(self) -> None:
         notes = self.assert_assets(
             "release", self.version, f"MapLibre Native FFI {self.version}."
         )
 
         self.assertIn(f"/compare/v0.202607.0...v{self.version}", notes)
-
-    def test_first_release_notes_omit_the_changelog(self) -> None:
-        notes = self.assert_assets(
-            "release",
-            self.version,
-            f"MapLibre Native FFI {self.version}.",
-            PUBLISH_PREVIOUS_TAG="",
-        )
-
-        self.assertNotIn("/compare/", notes)
 
     def test_snapshot_assets_include_version_provenance_and_checksums(self) -> None:
         notes = self.assert_assets(

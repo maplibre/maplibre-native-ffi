@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
-"""Prepares the Dart package for publication from a release's SHA256SUMS."""
+"""Prepares the Dart package for publication at a release tag."""
 
 from __future__ import annotations
 
 import argparse
-import json
 import pathlib
 import re
 
-from native_package_release import archive_digests
+from native_package_release import write_pin
 from release_version import parse_tag
 
 PIN_PATH = pathlib.Path("hook/native_release.json")
 RELEASES_URL = "https://github.com/maplibre/maplibre-native-ffi/releases/tag"
 
 
-def prepare(package: pathlib.Path, tag: str, checksums: str) -> None:
+def prepare(
+    package: pathlib.Path, tag: str, checksums: pathlib.Path | None = None
+) -> None:
     _, version = parse_tag(tag)
 
-    pin = {"tag": tag, "sha256": archive_digests(checksums)}
-    (package / PIN_PATH).write_text(json.dumps(pin, indent=2) + "\n", encoding="utf-8")
+    write_pin(package / PIN_PATH, tag, checksums)
 
     pubspec = package / "pubspec.yaml"
     text, count = re.subn(
@@ -44,9 +44,13 @@ def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("package", type=pathlib.Path)
     parser.add_argument("tag")
-    parser.add_argument("checksums", type=pathlib.Path)
+    parser.add_argument(
+        "--checksums",
+        type=pathlib.Path,
+        help="A SHA256SUMS to pin, rather than the release's",
+    )
     args = parser.parse_args(arguments)
-    prepare(args.package, args.tag, args.checksums.read_text())
+    prepare(args.package, args.tag, args.checksums)
     return 0
 
 
