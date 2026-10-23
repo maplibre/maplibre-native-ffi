@@ -24,7 +24,8 @@ or a binding increments it.
 
 A release has one tag, `vAPI_EPOCH.YYYYMM.REVISION`, on a commit on `main` that
 has passed CI. Every artifact of the release builds from that commit. The
-release workflow rejects a tag out of order or from another month.
+release workflow rejects a tag out of order or from another month. It then tags
+the same commit `bindings/go/<tag>`, the tag Go resolves the module from.
 
 pub.dev, crates.io, and npm enable automated publishing only for a package that
 exists, so publish the first version of each package by hand, from a clean

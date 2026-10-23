@@ -222,14 +222,26 @@ hooks:
 
 ### Go
 
-<SnapshotOnly />
+Add the module at the release's version.
+
+```bash frame="terminal"
+go get github.com/maplibre/maplibre-native-ffi/bindings/go@v{{version}}
+```
+
+cgo finds the C library through pkg-config. Unpack the release's
+[C library](#build-against-a-prefix) for your preset, then export
+`PKG_CONFIG_PATH` before you build.
+
+```bash frame="terminal"
+export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
+```
+
+For the snapshot channel, take the module from `main` and the C library from the
+[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot).
 
 ```bash frame="terminal"
 go get github.com/maplibre/maplibre-native-ffi/bindings/go@main
 ```
-
-Install the [C library](#build-against-a-prefix), then export `PKG_CONFIG_PATH`
-before you build. cgo reads it.
 
 ### Python
 

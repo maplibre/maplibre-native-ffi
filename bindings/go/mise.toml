@@ -6,29 +6,17 @@
 description = "Generate doc2go HTML API reference for the Go binding."
 extends = "ffi:preset"
 run = '''
+source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$usage_preset"
+export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
 rm -rf build/doc2go
 mkdir -p build
 # Document the public maplibre package only; omit ./... so internal/
 # packages are not published under the docs site.
-PKG_CONFIG_PATH="$MISE_MONOREPO_ROOT/build/$usage_preset/install/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
-  GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache" \
-  doc2go \
-    -out build/doc2go \
-    -home github.com/maplibre/maplibre-native-ffi/bindings/go \
-    -pagefind=false \
-    .
-'''
-run_windows = '''
-rm -rf build/doc2go
-mkdir -p build
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
-PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
-  doc2go \
-    -out build/doc2go \
-    -home github.com/maplibre/maplibre-native-ffi/bindings/go \
-    -pagefind=false \
-    .
+doc2go \
+  -out build/doc2go \
+  -home github.com/maplibre/maplibre-native-ffi/bindings/go \
+  -pagefind=false \
+  .
 '''
 
 [tasks.build]
@@ -47,14 +35,6 @@ fi
 # Go's test cache cannot see the native library, so always rerun the suite.
 exec go test -count=1 -tags "$go_test_tags" ./...
 '''
-run_windows = '''
-source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$usage_preset"
-export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
-source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset"
-export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
-# Go's test cache cannot see the native library, so always rerun the suite.
-go test -count=1 -tags "$go_test_tags" ./...
-'''
 
 [tasks.test]
 extends = "ffi:preset"
@@ -70,17 +50,6 @@ esac
 source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$usage_preset"
 export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
 source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset"
-# Go's test cache cannot see the native library, so always rerun the suite.
-go test -count=1 -tags "$go_test_tags" ./...
-go vet -tags "$go_test_tags" ./...
-'''
-# A Vulkan preset builds the render tests on Windows. A WGL preset builds none,
-# because the Go wrapper of tests/graphics has no WGL context.
-run_windows = '''
-source "$MISE_MONOREPO_ROOT/scripts/go-native-env.sh" "$usage_preset"
-export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
-source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset"
-export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 # Go's test cache cannot see the native library, so always rerun the suite.
 go test -count=1 -tags "$go_test_tags" ./...
 go vet -tags "$go_test_tags" ./...

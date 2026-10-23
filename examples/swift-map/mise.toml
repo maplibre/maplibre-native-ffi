@@ -1,8 +1,7 @@
 [tasks.build]
 extends = "ffi:preset"
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/scripts/native-env.sh" "$usage_preset"
 swift_args=(--product swift-map --scratch-path ".build/$usage_preset")
 swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
 swift build "${swift_args[@]}"
@@ -30,8 +29,7 @@ exec ".build/$usage_preset/debug/swift-map" "$usage_render_target"
 [tasks."build:ios-simulator"]
 depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/ios-simulator-arm64-metal/install"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/scripts/native-env.sh" "ios-simulator-arm64-metal"
 swift build \
   --product swift-map-ios \
   --scratch-path .build/ios-simulator \
@@ -42,8 +40,7 @@ swift build \
 [tasks."build:ios"]
 depends = [{ task = "//:build", args = ["ios-arm64-metal"] }]
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/ios-arm64-metal/install"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/scripts/native-env.sh" "ios-arm64-metal"
 swift build \
   --product swift-map-ios \
   --scratch-path .build/ios \

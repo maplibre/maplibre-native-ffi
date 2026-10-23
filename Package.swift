@@ -45,21 +45,7 @@ let targets: [Target] = [
     // An async operation runs on its caller's executor until it first
     // suspends, which is after it submits to native, so operations that one
     // actor starts in order reach native in that order.
-    swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")],
-    linkerSettings: [
-      .linkedLibrary("c++", .when(platforms: [.iOS, .tvOS])),
-      .linkedLibrary("objc", .when(platforms: [.iOS, .tvOS])),
-      .linkedLibrary("sqlite3", .when(platforms: [.iOS, .tvOS])),
-      .linkedLibrary("z", .when(platforms: [.iOS, .tvOS])),
-      .linkedFramework("CoreFoundation", .when(platforms: [.iOS, .tvOS])),
-      .linkedFramework("CoreGraphics", .when(platforms: [.iOS, .tvOS])),
-      .linkedFramework("CoreText", .when(platforms: [.iOS, .tvOS])),
-      .linkedFramework("Foundation", .when(platforms: [.iOS, .tvOS])),
-      .linkedFramework("ImageIO", .when(platforms: [.iOS, .tvOS])),
-      .linkedFramework("Metal", .when(platforms: [.iOS, .tvOS])),
-      .linkedFramework("MetalKit", .when(platforms: [.iOS, .tvOS])),
-      .linkedFramework("QuartzCore", .when(platforms: [.iOS, .tvOS])),
-    ]
+    swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
   ),
   .target(
     name: "MaplibreNativeFFITestCases",

@@ -17,8 +17,7 @@ description = "Generate DocC HTML API reference for the Swift binding."
 dir = "../.."
 extends = "ffi:preset"
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/scripts/native-env.sh" "$usage_preset"
 source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
 rm -rf build/docc
 mkdir -p build
@@ -40,8 +39,7 @@ swift package "${swift_args[@]}" \
 dir = "../.."
 extends = "ffi:preset"
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/scripts/native-env.sh" "$usage_preset"
 source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
 case "$usage_preset" in
   ios-arm64-metal)
@@ -107,8 +105,7 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 # bundle and spawns it on a simulator, a Mac Catalyst preset builds the same
 # executable and runs it on the host, and host presets run in process.
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/scripts/native-env.sh" "$usage_preset"
 source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
 case "$usage_preset" in
   ios-simulator-*)

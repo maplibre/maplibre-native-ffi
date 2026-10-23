@@ -101,11 +101,33 @@ jobs:
       sha: ${{ needs.source.outputs.sha }}
       version: ${{ needs.source.outputs.version }}
 
+  # Go resolves a module in a subdirectory from tags prefixed with its path.
+  # The module path carries no major version suffix, so an epoch of 2 or more
+  # needs the path to end in /vN first.
+  go:
+    name: Go
+    needs:
+      - source
+      - native
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.source.outputs.sha }}
+          TAG: bindings/go/${{ github.ref_name }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f "ref=refs/tags/$TAG" -f "sha=$SHA"
+
   # The docs quote the latest release, so republish them after it publishes.
   docs:
     name: Docs
     needs:
       - dart
+      - go
       - kotlin
       - rust
       - typescript
