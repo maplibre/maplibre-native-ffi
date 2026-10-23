@@ -74,12 +74,14 @@ jobs:
           mise exec -- node bindings/typescript/scripts/pack.ts \
             --version "$PUBLISH_VERSION" build/npm "${presets[@]}"
       # npm accepts a trusted publisher only for a package that exists, so the
-      # first release of a package publishes these tarballs by hand.
+      # first release of a package publishes these tarballs by hand. A rerun
+      # replaces the previous attempt's tarballs.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: npm-packages-${{ inputs.version }}
           path: build/npm/*.tgz
           if-no-files-found: error
+          overwrite: true
       # Addons, then backends, then the facade, so every package's pins resolve
       # once it publishes. A version that npm already has is skipped, so a rerun
       # after a partial publish resumes where it stopped. npm attests the
