@@ -22,7 +22,7 @@ run = "zig build --fetch=needed"
 extends = "ffi:preset"
 run = '''
 zig build \
-  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Dlocal-build="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 '''
 
@@ -34,7 +34,7 @@ extends = "ffi:preset"
 run = '''
 mkdir -p zig-out
 MLN_EXAMPLE_SMOKE=1 zig build run \
-  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Dlocal-build="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
   -- zig-out/zig-readback-smoke.ppm
 '''
@@ -43,7 +43,7 @@ mkdir -p zig-out
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 MLN_EXAMPLE_SMOKE=1 zig build run \
-  -Dnative-install-dir="$native_install_dir" \
+  -Dlocal-build="$native_install_dir" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
   -- zig-out/zig-readback-smoke.ppm
 '''
@@ -53,7 +53,7 @@ extends = "ffi:preset"
 run = '''
 mkdir -p zig-out
 zig build run \
-  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Dlocal-build="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
   -- zig-out/zig-readback.ppm
 '''
@@ -62,7 +62,7 @@ mkdir -p zig-out
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 zig build run \
-  -Dnative-install-dir="$native_install_dir" \
+  -Dlocal-build="$native_install_dir" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
   -- zig-out/zig-readback.ppm
 '''

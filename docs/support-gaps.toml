@@ -197,4 +197,4 @@ reason = "Link the installed archives through an `emcc` final link, and add brow
 language = "zig"
 platform = "ios-maccatalyst"
 status = "path-known"
-reason = "Zig targets `aarch64-maccatalyst-none`, but `scripts/zig-cross-env.sh` rejects Catalyst presets. Add the SDK and link integration."
+reason = "Zig targets `aarch64-maccatalyst-none`, but `build.zig` rejects Catalyst artifacts. Add the SDK and link integration."

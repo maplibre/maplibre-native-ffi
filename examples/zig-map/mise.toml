@@ -22,7 +22,7 @@ run = "zig build --fetch=needed"
 extends = "ffi:preset"
 run = '''
 zig build \
-  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Dlocal-build="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 '''
 
@@ -36,7 +36,7 @@ extends = "ffi:preset"
 run = '''
 set -euo pipefail
 zig build \
-  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Dlocal-build="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 # Native-surface mode needs a window surface, including on a headless host.
 runner=()
@@ -52,7 +52,7 @@ set -euo pipefail
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 zig build \
-  -Dnative-install-dir="$native_install_dir" \
+  -Dlocal-build="$native_install_dir" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 for mode in owned-texture borrowed-texture native-surface; do
   MLN_EXAMPLE_SMOKE=1 ./zig-out/bin/zig-map.exe "$mode"
@@ -63,7 +63,7 @@ done
 extends = "ffi:example-run"
 run = '''
 zig build run \
-  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Dlocal-build="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
   -- "$usage_render_target"
 '''
@@ -71,7 +71,7 @@ run_windows = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 zig build run \
-  -Dnative-install-dir="$native_install_dir" \
+  -Dlocal-build="$native_install_dir" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
   -- "$usage_render_target"
 '''

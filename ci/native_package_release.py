@@ -18,6 +18,8 @@ import zipfile
 from collections.abc import Iterable
 
 from release_version import parse_version
+from zig_package import PACKAGE_NAME as ZIG_PACKAGE_NAME
+from zig_package import write_package as write_zig_package
 
 ARCHIVE_PREFIX = "maplibre-native-c-"
 ARCHIVE_SUFFIX = ".tar.gz"
@@ -63,7 +65,9 @@ def native_archives(
     expected = {
         f"{ARCHIVE_PREFIX}{preset}{ARCHIVE_SUFFIX}" for preset in sorted(presets)
     }
-    actual = {path.name for path in release_dir.glob(f"*{ARCHIVE_SUFFIX}")}
+    actual = {
+        path.name for path in release_dir.glob(f"{ARCHIVE_PREFIX}*{ARCHIVE_SUFFIX}")
+    }
     missing = sorted(expected - actual)
     unexpected = sorted(actual - expected)
     if missing or unexpected:
@@ -272,8 +276,22 @@ def prepare_assets(
     if not xcframework.is_file():
         raise SystemExit(f"invalid native package set: missing {XCFRAMEWORK_NAME}")
     rewrite_xcframework(xcframework, version)
+    tag = required_env("PUBLISH_TAG")
+    zig_package = release_dir / ZIG_PACKAGE_NAME
+    write_zig_package(
+        zig_package,
+        root,
+        version,
+        {
+            archive.name.removeprefix(ARCHIVE_PREFIX).removesuffix(ARCHIVE_SUFFIX): (
+                f"{RELEASE_DOWNLOAD_URL}/{tag}/{archive.name}",
+                archive,
+            )
+            for archive in archives
+        },
+    )
     write_notes(release_dir, channel, sha, version)
-    write_checksums(release_dir, [*archives, xcframework])
+    write_checksums(release_dir, [*archives, xcframework, zig_package])
 
 
 def main(arguments: list[str] | None = None) -> int:

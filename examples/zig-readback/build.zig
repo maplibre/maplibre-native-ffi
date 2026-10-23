@@ -2,13 +2,11 @@ const std = @import("std");
 const maplibre_build = @import("maplibre_native_ffi");
 
 const BuildOptions = struct {
-    target: std.Build.ResolvedTarget,
+    native: maplibre_build.Native,
     optimize: std.builtin.OptimizeMode,
-    native_install_dir: std.Build.LazyPath,
     include_dirs: []const std.Build.LazyPath,
     dependency_include_dirs: []const std.Build.LazyPath,
     dependency_library_dirs: []const std.Build.LazyPath,
-    render_backend: maplibre_build.RenderBackend,
     system_root: ?std.Build.LazyPath,
 };
 
@@ -24,27 +22,84 @@ fn appendIncludeDir(
 }
 
 fn needsSdl(options: BuildOptions) bool {
-    return options.render_backend == .opengl and options.target.result.os.tag == .windows;
+    return options.native.backend == .opengl and options.native.target.result.os.tag == .windows;
 }
 
 fn sdlLibrary(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     const sdl = b.dependency("sdl", .{
-        .target = options.target,
+        .target = options.native.target,
         .optimize = options.optimize,
     });
     return sdl.artifact("SDL3");
 }
 
+fn sdlTranslateCMacros(target: std.Build.ResolvedTarget) []const maplibre_build.CMacro {
+    if (target.result.os.tag != .windows or target.result.abi != .msvc) return &.{};
+    if (target.result.cpu.arch == .aarch64) {
+        return &.{
+            .{ .name = "SIZE_MAX", .value = "((size_t)-1)" },
+            // Zig translate-c does not define __clang__, so Windows ARM64 UCRT
+            // wchar.h selects NEON intrinsics without importing arm_neon.h.
+            .{ .name = "_M_CEE", .value = "1" },
+            .{ .name = "__clrcall", .value = "__cdecl" },
+            .{ .name = "SDL_SINT64_C(c)", .value = "c##LL" },
+            .{ .name = "SDL_UINT64_C(c)", .value = "c##ULL" },
+        };
+    }
+    return &.{
+        .{ .name = "SIZE_MAX", .value = "((size_t)-1)" },
+        .{ .name = "SDL_SINT64_C(c)", .value = "c##LL" },
+        .{ .name = "SDL_UINT64_C(c)", .value = "c##ULL" },
+    };
+}
+
 fn maplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module {
-    return maplibre_build.maplibreNativeModule(b, .{
-        .target = options.target,
+    return b.dependency("maplibre_native_ffi", .{
+        .target = options.native.target,
         .optimize = options.optimize,
-        .native_install_dir = options.native_install_dir,
-        .render_backend = options.render_backend,
-        .dependency_include_dirs = options.dependency_include_dirs,
-        .dependency_library_dirs = options.dependency_library_dirs,
+        .@"local-build" = options.native.prefix,
+        .backend = options.native.backend,
+        .@"dependency-include-dir" = options.dependency_include_dirs,
+        .@"system-root" = options.system_root,
+    }).module("maplibre_native_ffi");
+}
+
+fn vulkanBindingsHeader(b: *std.Build) std.Build.LazyPath {
+    const header = b.addWriteFiles();
+    return header.add("vulkan_bindings.h", "#include <vulkan/vulkan.h>\n");
+}
+
+fn eglBindingsHeader(b: *std.Build) std.Build.LazyPath {
+    const header = b.addWriteFiles();
+    return header.add("egl_bindings.h",
+        \\#define EGL_EGLEXT_PROTOTYPES 1
+        \\#include <EGL/egl.h>
+        \\#include <EGL/eglext.h>
+        \\#if __has_include(<EGL/eglext_angle.h>)
+        \\#include <EGL/eglext_angle.h>
+        \\#endif
+        \\
+    );
+}
+
+/// Imports the render backend's C API as `vulkan` or `egl`.
+fn addRenderBackendTranslateC(b: *std.Build, module: *std.Build.Module, options: BuildOptions) void {
+    const target = options.native.target;
+    const name: []const u8, const header: std.Build.LazyPath = switch (options.native.backend) {
+        .vulkan => .{ "vulkan", vulkanBindingsHeader(b) },
+        .opengl => if (target.result.os.tag == .linux or target.result.os.tag == .macos)
+            .{ "egl", eglBindingsHeader(b) }
+        else
+            return,
+        .metal => return,
+    };
+    module.addImport(name, maplibre_build.translateCModule(b, .{
+        .root_source_file = header,
+        .target = target,
+        .optimize = options.optimize,
+        .include_dirs = options.include_dirs,
         .system_root = options.system_root,
-    });
+    }));
 }
 
 fn addSdlTranslateC(b: *std.Build, module: *std.Build.Module, options: BuildOptions) void {
@@ -52,13 +107,63 @@ fn addSdlTranslateC(b: *std.Build, module: *std.Build.Module, options: BuildOpti
     const sdl = sdlLibrary(b, options);
     module.addImport("sdl", maplibre_build.translateCModule(b, .{
         .root_source_file = b.path("sdl_bindings.h"),
-        .target = options.target,
+        .target = options.native.target,
         .optimize = options.optimize,
         .include_dirs = appendIncludeDir(b, options.include_dirs, sdl.getEmittedIncludeTree()),
-        .c_macros = maplibre_build.sdlTranslateCMacros(options.target),
+        .c_macros = sdlTranslateCMacros(options.native.target),
         .system_root = options.system_root,
     }));
     module.linkLibrary(sdl);
+}
+
+fn addDependencyLibraryPaths(module: *std.Build.Module, dependency_library_dirs: []const std.Build.LazyPath) void {
+    for (dependency_library_dirs) |dependency_library_dir| {
+        module.addLibraryPath(dependency_library_dir);
+        module.addRPath(dependency_library_dir);
+    }
+}
+
+/// Finds the Vulkan loader on macOS and Windows, which have no system copy.
+fn addNativeVulkanSdkPath(b: *std.Build, module: *std.Build.Module, options: BuildOptions) void {
+    const target = options.native.target;
+    if (options.dependency_library_dirs.len != 0) return;
+    if (target.result.os.tag != .windows and target.result.os.tag != .macos) return;
+    const library_dir = if (target.result.os.tag == .macos)
+        b.graph.environ_map.get("MLN_FFI_VULKAN_LOADER_DIR") orelse
+            if (b.graph.environ_map.get("VULKAN_SDK")) |sdk| b.pathJoin(&.{ sdk, "lib" }) else return
+    else if (b.graph.environ_map.get("VULKAN_SDK")) |sdk|
+        b.pathJoin(&.{ sdk, "Lib" })
+    else
+        @panic("native Windows Vulkan builds require VULKAN_SDK");
+    module.addLibraryPath(.{ .cwd_relative = library_dir });
+    module.addRPath(.{ .cwd_relative = library_dir });
+}
+
+/// Links the render backend's graphics libraries, which the example calls
+/// itself.
+fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: BuildOptions) void {
+    const target = options.native.target;
+    maplibre_build.addPlatformSystemPaths(b, module, target, options.system_root);
+    switch (options.native.backend) {
+        .metal => {
+            module.linkFramework("Metal", .{});
+            module.linkFramework("QuartzCore", .{});
+        },
+        .opengl => switch (target.result.os.tag) {
+            .linux, .macos => {
+                addDependencyLibraryPaths(module, options.dependency_library_dirs);
+                module.linkSystemLibrary("EGL", .{});
+                module.linkSystemLibrary("GLESv2", .{});
+            },
+            .windows => module.linkSystemLibrary("opengl32", .{}),
+            else => unreachable,
+        },
+        .vulkan => {
+            addNativeVulkanSdkPath(b, module, options);
+            addDependencyLibraryPaths(module, options.dependency_library_dirs);
+            module.linkSystemLibrary(if (target.result.os.tag == .windows) "vulkan-1" else "vulkan", .{});
+        },
+    }
 }
 
 fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
@@ -66,47 +171,30 @@ fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Comp
         .name = "zig-readback",
         .root_module = b.createModule(.{
             .root_source_file = b.path("main.zig"),
-            .target = options.target,
+            .target = options.native.target,
             .optimize = options.optimize,
         }),
     });
 
-    maplibre_build.addRenderBackendOptions(b, example.root_module, options.render_backend);
-    maplibre_build.addIncludePaths(example.root_module, options.include_dirs);
-    maplibre_build.addRenderBackendTranslateC(b, example.root_module, .{
-        .target = options.target,
-        .optimize = options.optimize,
-        .include_dirs = options.include_dirs,
-        .render_backend = options.render_backend,
-        .system_root = options.system_root,
-    });
+    maplibre_build.addRenderBackendOptions(b, example.root_module, options.native.backend);
+    addRenderBackendTranslateC(b, example.root_module, options);
     addSdlTranslateC(b, example.root_module, options);
     example.root_module.addImport("maplibre_native_ffi", maplibreNativeModule(b, options));
-    maplibre_build.linkRenderBackend(b, example.root_module, .{
-        .target = options.target,
-        .render_backend = options.render_backend,
-        .dependency_library_dirs = options.dependency_library_dirs,
-        .system_root = options.system_root,
-    });
+    linkRenderBackend(b, example.root_module, options);
     b.installArtifact(example);
     return example;
 }
 
 pub fn build(b: *std.Build) void {
-    const native_install_dir = maplibre_build.nativeInstallDirPath(b);
-    const target = maplibre_build.nativeTarget(b, native_install_dir);
-    const render_backend = maplibre_build.renderBackend(b, native_install_dir);
-    const system_root = maplibre_build.maybeSystemRootPath(b);
-    const dependency_include_dirs = maplibre_build.dependencyIncludeDirs(b);
+    const native = maplibre_build.localNative(b);
+    const dependency_include_dirs = b.option([]const std.Build.LazyPath, "dependency-include-dir", "Additional local dependency include directory") orelse &.{};
     const options = BuildOptions{
-        .target = target,
+        .native = native,
         .optimize = b.standardOptimizeOption(.{}),
-        .native_install_dir = native_install_dir,
-        .include_dirs = maplibre_build.installedIncludeDirs(b, native_install_dir, dependency_include_dirs),
+        .include_dirs = appendIncludeDir(b, dependency_include_dirs, native.prefix.path(b, "include")),
         .dependency_include_dirs = dependency_include_dirs,
-        .dependency_library_dirs = maplibre_build.dependencyLibraryDirs(b),
-        .render_backend = render_backend,
-        .system_root = system_root,
+        .dependency_library_dirs = b.option([]const std.Build.LazyPath, "dependency-library-dir", "Additional local dependency library directory") orelse &.{},
+        .system_root = b.option(std.Build.LazyPath, "system-root", "Target platform SDK or sysroot"),
     };
 
     const readback = addReadbackExample(b, options);

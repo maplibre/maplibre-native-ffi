@@ -7,17 +7,6 @@
 zig_cross_args=()
 
 case "$1" in
-  ios-maccatalyst-*)
-    echo "Zig has no Mac Catalyst target; the Zig binding leaves $1 out." >&2
-    exit 2
-    ;;
-  ios-* | tvos-*)
-    echo "The Zig binding does not support iOS or tvOS targets, including simulators: $1" >&2
-    exit 2
-    ;;
-esac
-
-case "$1" in
   android-*)
     native_install_dir="$MISE_MONOREPO_ROOT/build/$1/install"
     descriptor="$native_install_dir/share/maplibre-native-c/artifact.json"
@@ -74,7 +63,6 @@ case "$1" in
     mv "$zig_libc_tmp" "$zig_libc"
     zig_cross_args=(
       -Dsystem-root="$ndk_sysroot"
-      -Ddependency-library-dir="$zig_crt_dir"
       -Dtarget-libc="$zig_libc"
     )
     ;;

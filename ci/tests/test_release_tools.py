@@ -17,6 +17,10 @@ from unittest import mock
 
 from native_package_release import XCFRAMEWORK_NAME, prepare_assets
 from release_version import require_current_month, validate_tag
+from zig_package import PACKAGE_NAME as ZIG_PACKAGE_NAME
+from zig_package import zig_hash
+
+REPOSITORY = pathlib.Path(__file__).resolve().parents[2]
 
 
 def run_git(repository: pathlib.Path, *arguments: str) -> None:
@@ -164,6 +168,17 @@ class NativePackageReleaseTest(unittest.TestCase):
         self.write_presets(self.preset)
         self.xcframework = self.release_dir / XCFRAMEWORK_NAME
         create_xcframework(self.xcframework)
+        self.write_zig_sources()
+
+    def write_zig_sources(self) -> None:
+        manifest = (REPOSITORY / "build.zig.zon").read_text()
+        (self.repository / "build.zig.zon").write_text(manifest)
+        (self.repository / "build.zig").write_text("// build\n")
+        (self.repository / "LICENSE").write_text("license\n")
+        (self.repository / "README.md").write_text("not packaged\n")
+        sources = self.repository / "bindings/zig/src"
+        sources.mkdir(parents=True)
+        (sources / "maplibre_native_ffi.zig").write_text("// binding\n")
 
     def write_presets(self, *presets: str) -> None:
         (self.repository / "CMakePresets.json").write_text(
@@ -209,7 +224,11 @@ class NativePackageReleaseTest(unittest.TestCase):
             checksums,
             {
                 path.name: hashlib.sha256(path.read_bytes()).hexdigest()
-                for path in (archive, self.xcframework)
+                for path in (
+                    archive,
+                    self.xcframework,
+                    self.release_dir / ZIG_PACKAGE_NAME,
+                )
             },
         )
         self.assertIn(title, notes)
@@ -283,6 +302,49 @@ class NativePackageReleaseTest(unittest.TestCase):
         )
 
         self.assertNotIn("/compare/", notes)
+
+    def test_zig_package_declares_each_native_archive_lazily(self) -> None:
+        archive = self.archive()
+        self.prepare("release")
+
+        with tarfile.open(self.release_dir / ZIG_PACKAGE_NAME, "r:gz") as package:
+            names = package.getnames()
+            manifest = (
+                package.extractfile("maplibre-native-ffi-zig/build.zig.zon")
+                .read()
+                .decode()
+            )
+
+        self.assertEqual(
+            names,
+            [
+                "maplibre-native-ffi-zig/LICENSE",
+                "maplibre-native-ffi-zig/bindings/zig/src/maplibre_native_ffi.zig",
+                "maplibre-native-ffi-zig/build.zig",
+                "maplibre-native-ffi-zig/build.zig.zon",
+            ],
+        )
+        self.assertIn(f'.version = "{self.version}",', manifest)
+        self.assertIn(
+            f'        .@"{self.preset}" = .{{\n'
+            '            .url = "https://github.com/maplibre/maplibre-native-ffi/'
+            f'releases/download/v{self.version}/{archive.name}",\n'
+            f'            .hash = "{zig_hash(archive)}",\n'
+            "            .lazy = true,\n"
+            "        },\n",
+            manifest,
+        )
+
+    def test_zig_fetches_the_zig_package(self) -> None:
+        self.archive()
+        self.prepare("snapshot", "0.0.0-dev.202608070101")
+
+        package_hash = zig_hash(self.release_dir / ZIG_PACKAGE_NAME)
+
+        self.assertTrue(
+            package_hash.startswith("maplibre_native_ffi-0.0.0-dev.202608070101-"),
+            package_hash,
+        )
 
 
 if __name__ == "__main__":

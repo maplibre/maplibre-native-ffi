@@ -1,21 +1,11 @@
-// This manifest sits at the repository root rather than beside the sources it
-// describes, because Zig resolves a package from the repository root. Source
-// and test paths therefore name their locations under bindings/zig/ explicitly.
+// This build script serves both the repository and the package that each
+// release publishes. The package holds this file and bindings/zig/src at the
+// same paths, with a build.zig.zon that declares each native archive of the
+// release as a lazy dependency. A checkout declares none, so it builds against
+// -Dlocal-build.
 
-const builtin = @import("builtin");
 const std = @import("std");
 const Translator = @import("translate_c").Translator;
-
-const BuildOptions = struct {
-    target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
-    native_install_dir: std.Build.LazyPath,
-    include_dirs: []const std.Build.LazyPath,
-    dependency_library_dirs: []const std.Build.LazyPath,
-    render_backend: RenderBackend,
-    system_root: ?std.Build.LazyPath,
-    libc_file: ?std.Build.LazyPath,
-};
 
 pub const RenderBackend = enum {
     metal,
@@ -29,173 +19,217 @@ const ArtifactDescriptor = struct {
     zigTarget: []const u8,
 };
 
+const descriptor_sub_path = "share/maplibre-native-c/artifact.json";
+
+/// A native install prefix and the target and render backend it serves.
+pub const Native = struct {
+    prefix: std.Build.LazyPath,
+    target: std.Build.ResolvedTarget,
+    backend: RenderBackend,
+};
+
+const BuildOptions = struct {
+    native: Native,
+    optimize: std.builtin.OptimizeMode,
+    include_dirs: []const std.Build.LazyPath,
+    system_root: ?std.Build.LazyPath,
+    libc_file: ?std.Build.LazyPath,
+};
+
 fn parseRenderBackend(value: []const u8) RenderBackend {
     return std.meta.stringToEnum(RenderBackend, value) orelse
         std.debug.panic("unsupported render backend: {s}", .{value});
 }
 
-fn cwdRelativePath(path: std.Build.LazyPath) []const u8 {
+/// The filesystem path of a path option, which configuration reads before any
+/// step runs.
+fn configurePath(b: *std.Build, path: std.Build.LazyPath) []const u8 {
     return switch (path) {
         .cwd_relative => |p| p,
-        else => std.debug.panic("expected a concrete filesystem path, got {f}", .{path}),
+        .src_path => |p| p.owner.root.joinString(b.allocator, p.sub_path) catch @panic("OOM"),
+        .dependency => |p| p.dependency.builder.root.joinString(b.allocator, p.sub_path) catch @panic("OOM"),
+        else => std.debug.panic("expected a path to an existing directory, got {f}", .{path}),
     };
 }
 
-fn installPath(b: *std.Build, install_dir: std.Build.LazyPath, sub_path: []const u8) std.Build.LazyPath {
-    return install_dir.path(b, sub_path);
-}
-
-fn installedArtifactDescriptor(b: *std.Build, install_dir: std.Build.LazyPath) ArtifactDescriptor {
-    const descriptor_path = b.pathJoin(&.{ cwdRelativePath(install_dir), "share", "maplibre-native-c", "artifact.json" });
-    const descriptor = std.Io.Dir.cwd().readFileAlloc(b.graph.io, descriptor_path, b.allocator, .limited(4096)) catch
-        std.debug.panic("failed to read native artifact descriptor: {s}", .{descriptor_path});
-    const parsed = std.json.parseFromSlice(
-        ArtifactDescriptor,
-        b.allocator,
-        descriptor,
-        .{ .ignore_unknown_fields = true },
-    ) catch std.debug.panic("invalid native artifact descriptor: {s}", .{descriptor_path});
+/// Reads the artifact descriptor of the prefix at `prefix`, or returns null if
+/// it has none.
+fn readDescriptor(b: *std.Build, prefix: []const u8) ?ArtifactDescriptor {
+    const path = b.pathJoin(&.{ prefix, descriptor_sub_path });
+    const contents = std.Io.Dir.cwd().readFileAlloc(b.graph.io, path, b.allocator, .limited(4096)) catch |err| switch (err) {
+        error.FileNotFound, error.NotDir => return null,
+        else => std.debug.panic("failed to read {s}: {t}", .{ path, err }),
+    };
+    b.dependOnFileContents(.{ .cwd_relative = path });
+    const parsed = std.json.parseFromSlice(ArtifactDescriptor, b.allocator, contents, .{ .ignore_unknown_fields = true }) catch
+        std.debug.panic("invalid native artifact descriptor: {s}", .{path});
     return parsed.value;
 }
 
-fn withInstallIncludeDir(b: *std.Build, install_dir: std.Build.LazyPath, dependency_include_dirs: []const std.Build.LazyPath) []const std.Build.LazyPath {
-    const include_dirs = b.allocator.alloc(std.Build.LazyPath, dependency_include_dirs.len + 1) catch @panic("out of memory");
-    include_dirs[0] = installPath(b, install_dir, "include");
-    @memcpy(include_dirs[1..], dependency_include_dirs);
-    return include_dirs;
+/// The target option, which defaults to the target of an install prefix's
+/// artifact when it differs from the host.
+fn targetOption(b: *std.Build, descriptor: ?ArtifactDescriptor) std.Build.ResolvedTarget {
+    const artifact = descriptor orelse return b.standardTargetOptions(.{});
+    if (artifact.zigTarget.len == 0) std.debug.panic("the native artifact targets a platform Zig cannot build for: {s}", .{artifact.targetPlatform});
+    const artifact_query = std.Target.Query.parse(.{ .arch_os_abi = artifact.zigTarget }) catch
+        std.debug.panic("invalid Zig target in native artifact descriptor: {s}", .{artifact.zigTarget});
+    const artifact_target = b.resolveTargetQuery(artifact_query).result;
+    const host = b.graph.host.result;
+    const native_host = artifact_target.cpu.arch == host.cpu.arch and
+        artifact_target.os.tag == host.os.tag and
+        artifact_target.abi == host.abi;
+    return b.standardTargetOptions(.{ .default_target = if (native_host) .{} else artifact_query });
 }
 
-fn nativeRuntimeDir(b: *std.Build, install_dir: std.Build.LazyPath, target: std.Build.ResolvedTarget) std.Build.LazyPath {
-    return installPath(b, install_dir, if (target.result.os.tag == .windows) "bin" else "lib");
-}
-
-pub const LinkOptions = struct {
-    target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
-    include_dirs: []const std.Build.LazyPath,
-    native_install_dir: std.Build.LazyPath,
-    render_backend: RenderBackend,
-    dependency_library_dirs: []const std.Build.LazyPath,
-    system_root: ?std.Build.LazyPath,
-    /// Whether to link the render backend's graphics libraries, such as EGL
-    /// and GLESv2, for a consumer that calls them itself. maplibre-native-c
-    /// loads them at run time and needs no link.
-    link_render_backend: bool = true,
-    libc_file: ?std.Build.LazyPath = null,
-};
-
-pub const DependencyOptions = struct {
-    target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
-    native_install_dir: std.Build.LazyPath,
-    render_backend: RenderBackend,
-    dependency_include_dirs: []const std.Build.LazyPath = &.{},
-    dependency_library_dirs: []const std.Build.LazyPath = &.{},
-    system_root: ?std.Build.LazyPath = null,
-    libc_file: ?std.Build.LazyPath = null,
-};
-
-pub const RenderBackendLinkOptions = struct {
-    target: std.Build.ResolvedTarget,
-    render_backend: RenderBackend,
-    dependency_library_dirs: []const std.Build.LazyPath = &.{},
-    system_root: ?std.Build.LazyPath = null,
-};
-
-pub fn renderBackend(b: *std.Build, install_dir: std.Build.LazyPath) RenderBackend {
-    if (b.option([]const u8, "render-backend", "Override the installed native render backend")) |value| {
-        return parseRenderBackend(value);
+/// Names the platform half of the preset serving `target`, as the artifact
+/// descriptor's `targetPlatform` spells it.
+fn targetPlatform(b: *std.Build, target: std.Target) []const u8 {
+    switch (target.os.tag) {
+        .ios, .tvos => @panic("The Zig binding does not support iOS or tvOS targets, including simulators"),
+        .emscripten => @panic("The Zig binding does not support Emscripten"),
+        else => {},
     }
-
-    return parseRenderBackend(installedArtifactDescriptor(b, install_dir).renderBackend);
+    const arch = switch (target.cpu.arch) {
+        .x86_64 => "x64",
+        .aarch64 => "arm64",
+        else => @tagName(target.cpu.arch),
+    };
+    const platform = switch (target.os.tag) {
+        .linux => if (target.abi.isAndroid())
+            b.fmt("android-{s}", .{arch})
+        else if (target.abi.isOpenHarmony())
+            b.fmt("ohos-{s}", .{arch})
+        else if (target.abi == .gnu or target.abi == .musl)
+            b.fmt("linux-{t}-{s}", .{ target.abi, arch })
+        else
+            null,
+        .macos => b.fmt("macos-{s}", .{arch}),
+        .windows => if (target.abi == .msvc) b.fmt("windows-{s}", .{arch}) else null,
+        else => null,
+    };
+    return platform orelse std.debug.panic("MapLibre Native builds for no platform matching {t}-{t}-{t}", .{
+        target.cpu.arch,
+        target.os.tag,
+        target.abi,
+    });
 }
 
-pub fn nativeTarget(b: *std.Build, install_dir: std.Build.LazyPath) std.Build.ResolvedTarget {
-    const descriptor = installedArtifactDescriptor(b, install_dir);
-    if (descriptor.zigTarget.len == 0) std.debug.panic("the native artifact targets a platform Zig cannot build for: {s}", .{descriptor.targetPlatform});
-    const artifact_query = std.Target.Query.parse(.{ .arch_os_abi = descriptor.zigTarget }) catch
-        std.debug.panic("invalid Zig target in native artifact descriptor: {s}", .{descriptor.zigTarget});
-    const artifact_target = b.resolveTargetQuery(artifact_query);
-    const host_target = b.graph.host.result;
-    const default_target: std.Target.Query = if (artifact_target.result.cpu.arch == host_target.cpu.arch and
-        artifact_target.result.os.tag == host_target.os.tag and
-        artifact_target.result.abi == host_target.abi)
-        .{}
+/// Metal on Apple platforms, OpenGL on Android and OpenHarmony, and Vulkan
+/// elsewhere.
+fn defaultBackend(target: std.Target) RenderBackend {
+    if (target.os.tag.isDarwin()) return .metal;
+    if (target.abi.isAndroid() or target.abi.isOpenHarmony()) return .opengl;
+    return .vulkan;
+}
+
+/// The backend half of a preset name, which spells OpenGL by its context
+/// provider.
+fn backendSuffix(backend: RenderBackend, target: std.Target) []const u8 {
+    return switch (backend) {
+        .opengl => if (target.os.tag == .windows) "wgl" else "egl",
+        else => @tagName(backend),
+    };
+}
+
+/// Resolves a local build, which is either an install prefix or a CMake build
+/// root holding an install for each preset.
+fn localPrefix(
+    b: *std.Build,
+    directory: []const u8,
+    platform: []const u8,
+    backend: ?RenderBackend,
+    preset: []const u8,
+) []const u8 {
+    if (readDescriptor(b, directory)) |descriptor| {
+        // A prefix serves one platform, so a build for several targets names a
+        // build root instead. Only a selected backend can conflict; without
+        // one, the prefix's own backend serves.
+        if (!std.mem.eql(u8, descriptor.targetPlatform, platform) or
+            (backend != null and backend.? != parseRenderBackend(descriptor.renderBackend)))
+        {
+            std.debug.panic("-Dlocal-build names an install prefix built for {s} {s}, which cannot serve {s}{s}", .{
+                descriptor.targetPlatform,
+                descriptor.renderBackend,
+                platform,
+                if (backend) |selected| b.fmt(" {t}", .{selected}) else "",
+            });
+        }
+        return directory;
+    }
+    const prefix = b.pathJoin(&.{ directory, preset, "install" });
+    if (readDescriptor(b, prefix) == null) {
+        std.debug.panic("-Dlocal-build names {s}, which is neither an install prefix nor a build root holding {s}", .{ directory, preset });
+    }
+    return prefix;
+}
+
+/// The release archive for `preset`, which the published package declares as
+/// a lazy dependency. Zig fetches it when a build first asks for it.
+fn publishedPrefix(b: *std.Build, preset: []const u8) std.Build.LazyPath {
+    for (b.available_deps) |dep| {
+        if (std.mem.eql(u8, dep[0], preset)) break;
+    } else std.debug.panic(
+        "maplibre_native_ffi declares no native archive for {s}. Only the package from a release downloads the native library; otherwise pass -Dlocal-build.",
+        .{preset},
+    );
+    return b.dependency(preset, .{}).path("");
+}
+
+/// Declares the -Dtarget, -Dbackend, and -Dlocal-build options and resolves
+/// the native library they select: from the local build if one is named, and
+/// otherwise from the release that the package was published with.
+fn resolveNative(b: *std.Build, local_build: ?std.Build.LazyPath) Native {
+    const local_dir = if (local_build) |path| configurePath(b, path) else null;
+    if (local_dir) |dir| {
+        // A relative path would reach the run-time search path as written.
+        if (!std.fs.path.isAbsolute(dir)) std.debug.panic("-Dlocal-build must be an absolute path; found {s}", .{dir});
+    }
+    const target = targetOption(b, if (local_dir) |dir| readDescriptor(b, dir) else null);
+    const selected_backend = b.option(
+        RenderBackend,
+        "backend",
+        "Render backend. Defaults to Metal on Apple platforms, OpenGL on Android and OpenHarmony, and Vulkan elsewhere.",
+    );
+    const platform = targetPlatform(b, target.result);
+    const preset = b.fmt("{s}-{s}", .{
+        platform,
+        backendSuffix(selected_backend orelse defaultBackend(target.result), target.result),
+    });
+
+    const prefix: std.Build.LazyPath = if (local_dir) |dir|
+        .{ .cwd_relative = localPrefix(b, dir, platform, selected_backend, preset) }
     else
-        artifact_query;
-    return b.standardTargetOptions(.{ .default_target = default_target });
+        publishedPrefix(b, preset);
+    const prefix_dir = configurePath(b, prefix);
+    const descriptor = readDescriptor(b, prefix_dir) orelse
+        std.debug.panic("the native prefix has no artifact descriptor: {s}", .{prefix_dir});
+    return .{
+        .prefix = prefix,
+        .target = target,
+        .backend = parseRenderBackend(descriptor.renderBackend),
+    };
 }
 
-pub fn includeDirs(b: *std.Build) []const std.Build.LazyPath {
-    return withInstallIncludeDir(b, nativeInstallDirPath(b), dependencyIncludeDirs(b));
+/// Resolves the native library from a required -Dlocal-build, for a build in
+/// this repository that depends on this package by path.
+pub fn localNative(b: *std.Build) Native {
+    const local_build = localBuildOption(b) orelse
+        @panic("missing required -Dlocal-build=<install prefix or build root>");
+    return resolveNative(b, local_build);
 }
 
-pub fn installedIncludeDirs(b: *std.Build, install_dir: std.Build.LazyPath, dependency_include_dirs: []const std.Build.LazyPath) []const std.Build.LazyPath {
-    return withInstallIncludeDir(b, install_dir, dependency_include_dirs);
-}
-
-pub fn nativeInstallDirPath(b: *std.Build) std.Build.LazyPath {
-    return b.option(std.Build.LazyPath, "native-install-dir", "CMake install prefix for maplibre-native-c") orelse
-        @panic("missing required -Dnative-install-dir=<path-to-cmake-install-prefix>");
-}
-
-pub fn maybeNativeInstallDirPath(b: *std.Build) ?std.Build.LazyPath {
-    return b.option(std.Build.LazyPath, "native-install-dir", "CMake install prefix for maplibre-native-c");
-}
-
-pub fn dependencyIncludeDirs(b: *std.Build) []const std.Build.LazyPath {
-    return b.option([]const std.Build.LazyPath, "dependency-include-dir", "Additional local dependency include directory") orelse &.{};
-}
-
-pub fn dependencyLibraryDirs(b: *std.Build) []const std.Build.LazyPath {
-    return b.option([]const std.Build.LazyPath, "dependency-library-dir", "Additional local dependency library directory") orelse &.{};
-}
-
-pub fn maybeSystemRootPath(b: *std.Build) ?std.Build.LazyPath {
-    return b.option(std.Build.LazyPath, "system-root", "Target platform SDK or sysroot");
-}
-
-fn takeTargetLibCPath(b: *std.Build) ?std.Build.LazyPath {
-    // Target executables use this installation; host tools use the host libc.
-    return b.option(std.Build.LazyPath, "target-libc", "Target libc installation file");
-}
-
-pub fn addIncludePaths(module: *std.Build.Module, include_dirs: []const std.Build.LazyPath) void {
-    for (include_dirs) |include_dir| {
-        module.addIncludePath(include_dir);
-    }
-}
-
-fn addTranslateCIncludePaths(translate_c: *const Translator, include_dirs: []const std.Build.LazyPath) void {
-    for (include_dirs) |include_dir| {
-        translate_c.addIncludePath(include_dir);
-    }
+fn localBuildOption(b: *std.Build) ?std.Build.LazyPath {
+    return b.option(
+        std.Build.LazyPath,
+        "local-build",
+        "Absolute path to a local native install prefix, or to a CMake build root holding <preset>/install",
+    );
 }
 
 pub const CMacro = struct {
     name: []const u8,
     value: ?[]const u8 = null,
 };
-
-pub fn sdlTranslateCMacros(target: std.Build.ResolvedTarget) []const CMacro {
-    if (target.result.os.tag != .windows or target.result.abi != .msvc) return &.{};
-    if (target.result.cpu.arch == .aarch64) {
-        return &.{
-            .{ .name = "SIZE_MAX", .value = "((size_t)-1)" },
-            // Zig translate-c does not define __clang__, so Windows ARM64 UCRT
-            // wchar.h selects NEON intrinsics without importing arm_neon.h.
-            .{ .name = "_M_CEE", .value = "1" },
-            .{ .name = "__clrcall", .value = "__cdecl" },
-            .{ .name = "SDL_SINT64_C(c)", .value = "c##LL" },
-            .{ .name = "SDL_UINT64_C(c)", .value = "c##ULL" },
-        };
-    }
-    return &.{
-        .{ .name = "SIZE_MAX", .value = "((size_t)-1)" },
-        .{ .name = "SDL_SINT64_C(c)", .value = "c##LL" },
-        .{ .name = "SDL_UINT64_C(c)", .value = "c##ULL" },
-    };
-}
 
 pub const TranslateCModuleOptions = struct {
     root_source_file: std.Build.LazyPath,
@@ -215,7 +249,9 @@ pub fn translateCModule(b: *std.Build, options: TranslateCModuleOptions) *std.Bu
         .optimize = options.optimize,
         .libc_file = options.libc_file,
     });
-    addTranslateCIncludePaths(&translator, options.include_dirs);
+    for (options.include_dirs) |include_dir| {
+        translator.addIncludePath(include_dir);
+    }
     addPlatformSystemHeaderPaths(b, &translator, options.target, options.system_root);
     if (options.target.result.abi.isAndroid()) {
         // Zig's C translator needs the API level from the resolved Android target.
@@ -238,77 +274,6 @@ fn maplibreNativeCHeader(b: *std.Build) std.Build.LazyPath {
     );
 }
 
-fn vulkanBindingsHeader(b: *std.Build) std.Build.LazyPath {
-    const header = b.addWriteFiles();
-    return header.add("vulkan_bindings.h", "#include <vulkan/vulkan.h>\n");
-}
-
-fn eglBindingsHeader(b: *std.Build) std.Build.LazyPath {
-    const header = b.addWriteFiles();
-    return header.add("egl_bindings.h",
-        \\#define EGL_EGLEXT_PROTOTYPES 1
-        \\#include <EGL/egl.h>
-        \\#include <EGL/eglext.h>
-        \\#if __has_include(<EGL/eglext_angle.h>)
-        \\#include <EGL/eglext_angle.h>
-        \\#endif
-        \\
-    );
-}
-
-pub const RenderBackendTranslateCOptions = struct {
-    target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
-    include_dirs: []const std.Build.LazyPath,
-    render_backend: RenderBackend,
-    system_root: ?std.Build.LazyPath = null,
-    libc_file: ?std.Build.LazyPath = null,
-};
-
-pub fn addRenderBackendTranslateC(b: *std.Build, module: *std.Build.Module, options: RenderBackendTranslateCOptions) void {
-    if (options.render_backend == .vulkan) {
-        module.addImport("vulkan", translateCModule(b, .{
-            .root_source_file = vulkanBindingsHeader(b),
-            .target = options.target,
-            .optimize = options.optimize,
-            .include_dirs = options.include_dirs,
-            .system_root = options.system_root,
-            .libc_file = options.libc_file,
-        }));
-    }
-    if (options.render_backend == .opengl and (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)) {
-        module.addImport("egl", translateCModule(b, .{
-            .root_source_file = eglBindingsHeader(b),
-            .target = options.target,
-            .optimize = options.optimize,
-            .include_dirs = options.include_dirs,
-            .system_root = options.system_root,
-            .libc_file = options.libc_file,
-        }));
-    }
-}
-
-fn addDependencyLibraryPaths(module: *std.Build.Module, dependency_library_dirs: []const std.Build.LazyPath) void {
-    for (dependency_library_dirs) |dependency_library_dir| {
-        module.addLibraryPath(dependency_library_dir);
-        module.addRPath(dependency_library_dir);
-    }
-}
-
-fn addNativeVulkanSdkPath(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget, dependency_library_dirs: []const std.Build.LazyPath) void {
-    if (dependency_library_dirs.len != 0) return;
-    if (target.result.os.tag != .windows and target.result.os.tag != .macos) return;
-    const library_dir = if (target.result.os.tag == .macos)
-        b.graph.environ_map.get("MLN_FFI_VULKAN_LOADER_DIR") orelse
-            if (b.graph.environ_map.get("VULKAN_SDK")) |sdk| b.pathJoin(&.{ sdk, "lib" }) else return
-    else if (b.graph.environ_map.get("VULKAN_SDK")) |sdk|
-        b.pathJoin(&.{ sdk, "Lib" })
-    else
-        @panic("native Windows Vulkan builds require VULKAN_SDK");
-    module.addLibraryPath(.{ .cwd_relative = library_dir });
-    module.addRPath(.{ .cwd_relative = library_dir });
-}
-
 fn addPlatformSystemHeaderPaths(b: *std.Build, destination: anytype, target: std.Build.ResolvedTarget, system_root: ?std.Build.LazyPath) void {
     if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
     const root = system_root orelse return;
@@ -323,7 +288,7 @@ pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: 
     addPlatformSystemHeaderPaths(b, module, target, system_root);
     if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
     // Android's libraries live under a target- and API-specific directory that
-    // the binding tasks pass as a dependency library directory.
+    // the target libc installation names.
     if (target.result.abi == .android) return;
     const root = system_root orelse return;
 
@@ -335,25 +300,6 @@ pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: 
     }
 }
 
-fn addLibraryPaths(module: *std.Build.Module, library_dirs: []const std.Build.LazyPath) void {
-    for (library_dirs) |library_dir| {
-        module.addLibraryPath(library_dir);
-    }
-}
-
-fn addRPaths(module: *std.Build.Module, library_dirs: []const std.Build.LazyPath) void {
-    for (library_dirs) |library_dir| {
-        module.addRPath(library_dir);
-    }
-}
-
-pub fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
-    return switch (target.result.os.tag) {
-        .windows => "vulkan-1",
-        else => "vulkan",
-    };
-}
-
 pub fn addRenderBackendOptions(b: *std.Build, module: *std.Build.Module, backend: RenderBackend) void {
     const build_options = b.addOptions();
     build_options.addOption(bool, "supports_metal", backend == .metal);
@@ -362,172 +308,46 @@ pub fn addRenderBackendOptions(b: *std.Build, module: *std.Build.Module, backend
     module.addOptions("build_options", build_options);
 }
 
-pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: RenderBackendLinkOptions) void {
-    addPlatformSystemPaths(b, module, options.target, options.system_root);
-
-    switch (options.render_backend) {
-        .metal => {
-            module.linkFramework("Metal", .{});
-            module.linkFramework("QuartzCore", .{});
-        },
-        .opengl => switch (options.target.result.os.tag) {
-            .linux => {
-                addDependencyLibraryPaths(module, options.dependency_library_dirs);
-                module.linkSystemLibrary("EGL", .{});
-                module.linkSystemLibrary("GLESv2", .{});
-            },
-            .macos => {
-                addDependencyLibraryPaths(module, options.dependency_library_dirs);
-                module.linkSystemLibrary("EGL", .{});
-                module.linkSystemLibrary("GLESv2", .{});
-            },
-            .windows => module.linkSystemLibrary("opengl32", .{}),
-            else => unreachable,
-        },
-        .vulkan => {
-            addNativeVulkanSdkPath(b, module, options.target, options.dependency_library_dirs);
-            addDependencyLibraryPaths(module, options.dependency_library_dirs);
-            module.linkSystemLibrary(vulkanLibraryName(options.target), .{});
-        },
-    }
-}
-
-fn dependencyArgs(options: DependencyOptions) struct {
+/// Imports the C declarations as `maplibre_native_c`, without linking
+/// maplibre-native-c.
+fn addMaplibreNativeIncludes(
+    b: *std.Build,
+    module: *std.Build.Module,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    @"native-install-dir": std.Build.LazyPath,
-    @"render-backend": []const u8,
-    @"dependency-include-dir": []const std.Build.LazyPath,
-    @"dependency-library-dir": []const std.Build.LazyPath,
-    @"system-root": ?std.Build.LazyPath,
-    @"target-libc": ?std.Build.LazyPath,
-} {
-    return .{
-        .target = options.target,
-        .optimize = options.optimize,
-        .@"native-install-dir" = options.native_install_dir,
-        .@"render-backend" = @tagName(options.render_backend),
-        .@"dependency-include-dir" = options.dependency_include_dirs,
-        .@"dependency-library-dir" = options.dependency_library_dirs,
-        .@"system-root" = options.system_root,
-        .@"target-libc" = options.libc_file,
-    };
-}
-
-pub fn dependency(b: *std.Build, options: DependencyOptions) *std.Build.Dependency {
-    return b.dependencyFromBuildZig(@This(), dependencyArgs(options));
-}
-
-pub fn maplibreNativeModule(b: *std.Build, options: DependencyOptions) *std.Build.Module {
-    return dependency(b, options).module("maplibre_native_ffi");
-}
-
-fn repoLinkOptions(options: BuildOptions) LinkOptions {
-    return .{
-        .target = options.target,
-        .optimize = options.optimize,
-        .include_dirs = options.include_dirs,
-        .native_install_dir = options.native_install_dir,
-        .render_backend = options.render_backend,
-        .dependency_library_dirs = options.dependency_library_dirs,
-        .system_root = options.system_root,
-        .libc_file = options.libc_file,
-    };
-}
-
-pub const IncludeOptions = struct {
     include_dirs: []const std.Build.LazyPath,
-    target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
-    system_root: ?std.Build.LazyPath = null,
-    libc_file: ?std.Build.LazyPath = null,
-};
-
-/// Configures the raw C declarations without linking maplibre-native-c.
-pub fn addMaplibreNativeIncludes(b: *std.Build, module_: *std.Build.Module, options: IncludeOptions) void {
-    addIncludePaths(module_, options.include_dirs);
-    module_.link_libc = true;
-    module_.addImport("maplibre_native_c", translateCModule(b, .{
+    system_root: ?std.Build.LazyPath,
+    libc_file: ?std.Build.LazyPath,
+) void {
+    for (include_dirs) |include_dir| {
+        module.addIncludePath(include_dir);
+    }
+    module.link_libc = true;
+    module.addImport("maplibre_native_c", translateCModule(b, .{
         .root_source_file = maplibreNativeCHeader(b),
-        .target = options.target,
-        .optimize = options.optimize,
-        .include_dirs = options.include_dirs,
-        .system_root = options.system_root,
-        .libc_file = options.libc_file,
+        .target = target,
+        .optimize = optimize,
+        .include_dirs = include_dirs,
+        .system_root = system_root,
+        .libc_file = libc_file,
     }));
 }
 
-/// Links a Zig module to the MapLibre Native C library and its backend-specific dependencies.
-///
-/// Callers provide all filesystem paths explicitly so the helper works both from this
-/// package and from external consumers with a different build root layout.
-pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: LinkOptions) void {
-    if (options.target.result.os.tag == .emscripten) {
-        @panic("Emscripten consumers must link the installed archives with emcc");
-    }
-    addMaplibreNativeIncludes(b, module_, .{
-        .include_dirs = options.include_dirs,
-        .target = options.target,
-        .optimize = options.optimize,
-        .system_root = options.system_root,
-        .libc_file = options.libc_file,
-    });
-    const link_dirs = &.{installPath(b, options.native_install_dir, "lib")};
-    const runtime_library_dirs = &.{nativeRuntimeDir(b, options.native_install_dir, options.target)};
-    if (options.target.result.os.tag == .windows) {
-        module_.addObjectFile(installPath(b, options.native_install_dir, "lib/maplibre-native-c.lib"));
+/// Links a module to maplibre-native-c alone. The library loads its render
+/// backend's graphics libraries at run time, so a module that calls them
+/// itself links them.
+fn linkMaplibreNativeC(b: *std.Build, module: *std.Build.Module, options: BuildOptions) void {
+    const target = options.native.target;
+    const prefix = options.native.prefix;
+    addMaplibreNativeIncludes(b, module, target, options.optimize, options.include_dirs, options.system_root, options.libc_file);
+    if (target.result.os.tag == .windows) {
+        module.addObjectFile(prefix.path(b, "lib/maplibre-native-c.lib"));
     } else {
-        addLibraryPaths(module_, link_dirs);
-        addRPaths(module_, runtime_library_dirs);
-        module_.linkSystemLibrary("maplibre-native-c", .{ .use_pkg_config = .no });
+        module.addLibraryPath(prefix.path(b, "lib"));
+        module.addRPath(prefix.path(b, "lib"));
+        module.linkSystemLibrary("maplibre-native-c", .{ .use_pkg_config = .no });
     }
-    if (!options.link_render_backend) return addPlatformSystemPaths(b, module_, options.target, options.system_root);
-    linkRenderBackend(b, module_, .{
-        .target = options.target,
-        .render_backend = options.render_backend,
-        .dependency_library_dirs = options.dependency_library_dirs,
-        .system_root = options.system_root,
-    });
-}
-
-/// Test executables link no graphics library themselves: tests/graphics loads
-/// the one each backend uses at run time, and a second copy linked beside it,
-/// such as ANGLE's EGL on macOS, would hand the session a context from another
-/// instance of the library.
-fn testLinkOptions(options: BuildOptions) LinkOptions {
-    var link_options = repoLinkOptions(options);
-    link_options.link_render_backend = false;
-    return link_options;
-}
-
-/// The binding module that the test executables import, linked like
-/// `testLinkOptions`.
-fn addTestBindingModule(b: *std.Build, options: BuildOptions) *std.Build.Module {
-    const module_ = b.createModule(.{
-        .root_source_file = b.path("bindings/zig/src/maplibre_native_ffi.zig"),
-        .target = options.target,
-        .optimize = options.optimize,
-    });
-    linkMaplibreNativeC(b, module_, testLinkOptions(options));
-    return module_;
-}
-
-fn addMaplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module {
-    const maplibre_native_ffi = b.addModule("maplibre_native_ffi", .{
-        .root_source_file = b.path("bindings/zig/src/maplibre_native_ffi.zig"),
-        .target = options.target,
-        .optimize = options.optimize,
-    });
-    linkMaplibreNativeC(b, maplibre_native_ffi, repoLinkOptions(options));
-    return maplibre_native_ffi;
-}
-
-fn defaultDocIncludeDirs(b: *std.Build) []const std.Build.LazyPath {
-    // The plugin header includes MapLibre Native's mln/plugin/plugin_api.h.
-    const include_dirs = b.allocator.alloc(std.Build.LazyPath, 2) catch @panic("out of memory");
-    include_dirs[0] = b.path("include");
-    include_dirs[1] = b.path("third_party/maplibre-native/include");
-    return include_dirs;
+    addPlatformSystemPaths(b, module, target, options.system_root);
 }
 
 fn addMaplibreNativeDocs(
@@ -542,12 +362,7 @@ fn addMaplibreNativeDocs(
         .target = target,
         .optimize = optimize,
     });
-    addMaplibreNativeIncludes(b, docs_module, .{
-        .include_dirs = include_dirs,
-        .target = target,
-        .optimize = optimize,
-        .libc_file = libc_file,
-    });
+    addMaplibreNativeIncludes(b, docs_module, target, optimize, include_dirs, null, libc_file);
 
     const doc_compile = b.addObject(.{
         .name = "maplibre_native_ffi_docs",
@@ -567,12 +382,12 @@ fn addTestCompile(b: *std.Build, options: BuildOptions, root_source_file: std.Bu
     const tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = root_source_file,
-            .target = options.target,
+            .target = options.native.target,
             .optimize = options.optimize,
         }),
     });
     tests.setLibCFile(options.libc_file);
-    linkMaplibreNativeC(b, tests.root_module, testLinkOptions(options));
+    linkMaplibreNativeC(b, tests.root_module, options);
     return tests;
 }
 
@@ -584,14 +399,14 @@ fn addTestGraphics(b: *std.Build, module: *std.Build.Module, options: BuildOptio
     module.addIncludePath(include_dir);
     module.addImport("mln_test_graphics", translateCModule(b, .{
         .root_source_file = b.path("tests/graphics/include/mln_test_graphics.h"),
-        .target = options.target,
+        .target = options.native.target,
         .optimize = options.optimize,
         .include_dirs = &.{include_dir},
         .system_root = options.system_root,
         .libc_file = options.libc_file,
     }));
-    if (options.target.result.os.tag == .windows) {
-        module.addObjectFile(installPath(b, options.native_install_dir, "lib/mln_test_graphics.lib"));
+    if (options.native.target.result.os.tag == .windows) {
+        module.addObjectFile(options.native.prefix.path(b, "lib/mln_test_graphics.lib"));
     } else {
         module.linkSystemLibrary("mln_test_graphics", .{ .use_pkg_config = .no });
     }
@@ -605,12 +420,12 @@ fn addShutdownProbe(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *
         .name = "zig-shutdown-probe",
         .root_module = b.createModule(.{
             .root_source_file = b.path("bindings/zig/tests/shutdown_probe.zig"),
-            .target = options.target,
+            .target = options.native.target,
             .optimize = options.optimize,
         }),
     });
     probe.setLibCFile(options.libc_file);
-    linkMaplibreNativeC(b, probe.root_module, testLinkOptions(options));
+    linkMaplibreNativeC(b, probe.root_module, options);
     probe.root_module.addImport("maplibre_native_ffi", maplibre_native_ffi);
     return probe;
 }
@@ -619,19 +434,18 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *s
     const tests = addTestCompile(b, options, b.path("bindings/zig/tests/main.zig"));
     tests.root_module.addImport("maplibre_native_ffi", maplibre_native_ffi);
     addTestGraphics(b, tests.root_module, options);
-    addRenderBackendOptions(b, tests.root_module, options.render_backend);
+    addRenderBackendOptions(b, tests.root_module, options.native.backend);
     return tests;
 }
 
 fn addAndroidTestRunStep(
     b: *std.Build,
     tests: []const *std.Build.Step.Compile,
-    target: std.Build.ResolvedTarget,
-    native_install_dir: std.Build.LazyPath,
+    native: Native,
     android_runner: std.Build.LazyPath,
     emulator_api: ?[]const u8,
 ) *std.Build.Step.Run {
-    const abi = switch (target.result.cpu.arch) {
+    const abi = switch (native.target.result.cpu.arch) {
         .aarch64 => "arm64-v8a",
         .x86_64 => "x86_64",
         else => @panic("Android test runner supports ARM64 and x64 targets only"),
@@ -639,9 +453,9 @@ fn addAndroidTestRunStep(
     const run_tests = b.addSystemCommand(&.{"bash"});
     run_tests.addFileArg(android_runner);
     run_tests.addArgs(&.{ "180", abi });
-    run_tests.addFileArg(installPath(b, native_install_dir, "lib/libmaplibre-native-c.so"));
+    run_tests.addFileArg(native.prefix.path(b, "lib/libmaplibre-native-c.so"));
     run_tests.addArg("--library");
-    run_tests.addFileArg(installPath(b, native_install_dir, "lib/libmln_test_graphics.so"));
+    run_tests.addFileArg(native.prefix.path(b, "lib/libmln_test_graphics.so"));
     if (emulator_api) |api| {
         run_tests.addArgs(&.{ "--api", api });
     }
@@ -652,53 +466,7 @@ fn addAndroidTestRunStep(
     return run_tests;
 }
 
-pub fn build(b: *std.Build) void {
-    const native_install_dir = maybeNativeInstallDirPath(b);
-    const libc_file = takeTargetLibCPath(b);
-    const target = if (native_install_dir) |install_dir|
-        nativeTarget(b, install_dir)
-    else
-        b.standardTargetOptions(.{});
-    switch (target.result.os.tag) {
-        .ios, .tvos => @panic("The Zig binding does not support iOS or tvOS targets, including simulators"),
-        else => {},
-    }
-    const optimize = b.standardOptimizeOption(.{});
-
-    const include_dirs_from_cli = b.option(
-        []const std.Build.LazyPath,
-        "include-dir",
-        "Include directory. Repeat for project, dependency, and backend headers.",
-    );
-
-    addMaplibreNativeDocs(
-        b,
-        target,
-        optimize,
-        include_dirs_from_cli orelse defaultDocIncludeDirs(b),
-        libc_file,
-    );
-
-    const required_native_install_dir = native_install_dir orelse return;
-    const dependency_include_dirs = dependencyIncludeDirs(b);
-    const dependency_library_dirs = dependencyLibraryDirs(b);
-    const system_root = maybeSystemRootPath(b);
-
-    const backend = renderBackend(b, required_native_install_dir);
-    const options = BuildOptions{
-        .target = target,
-        .optimize = optimize,
-        .native_install_dir = required_native_install_dir,
-        .include_dirs = installedIncludeDirs(b, required_native_install_dir, dependency_include_dirs),
-        .dependency_library_dirs = dependency_library_dirs,
-        .render_backend = backend,
-        .system_root = system_root,
-        .libc_file = libc_file,
-    };
-
-    _ = addMaplibreNativeModule(b, options);
-    const test_binding_module = addTestBindingModule(b, options);
-
+fn addTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *std.Build.Module) void {
     // The hand-written runtime modules' inline tests build and run on their
     // own, from one root that reaches each module once.
     const test_sources = [_]std.Build.LazyPath{
@@ -707,8 +475,8 @@ pub fn build(b: *std.Build) void {
 
     const test_step = b.step("test", "Run Zig binding tests");
 
-    const binding_tests = addBindingTests(b, options, test_binding_module);
-    const shutdown_probe = addShutdownProbe(b, options, test_binding_module);
+    const binding_tests = addBindingTests(b, options, maplibre_native_ffi);
+    const shutdown_probe = addShutdownProbe(b, options, maplibre_native_ffi);
     var test_compiles: [test_sources.len + 2]*std.Build.Step.Compile = undefined;
     test_compiles[0] = binding_tests;
     test_compiles[1] = shutdown_probe;
@@ -721,17 +489,17 @@ pub fn build(b: *std.Build) void {
         b.default_step.dependOn(&tests.step);
     }
 
-    if (options.target.result.abi == .android and options.target.result.cpu.arch == .arm) {
+    const target = options.native.target.result;
+    if (target.abi == .android and target.cpu.arch == .arm) {
         const unsupported = b.addFail("The Android emulator runs ARM64 and x64 guests; build this target without the test step.");
         test_step.dependOn(&unsupported.step);
-    } else if (options.target.result.abi == .android) {
+    } else if (target.abi == .android) {
         const run_tests = addAndroidTestRunStep(
             b,
             &test_compiles,
-            options.target,
-            options.native_install_dir,
+            options.native,
             b.path("scripts/run-android-emulator-test.sh"),
-            if (options.target.result.cpu.arch == .x86_64 and options.render_backend == .opengl) "26" else null,
+            if (target.cpu.arch == .x86_64 and options.native.backend == .opengl) "26" else null,
         );
         test_step.dependOn(&run_tests.step);
     } else {
@@ -740,4 +508,54 @@ pub fn build(b: *std.Build) void {
             test_step.dependOn(&run_tests.step);
         }
     }
+}
+
+pub fn build(b: *std.Build) void {
+    const optimize = b.standardOptimizeOption(.{});
+    // Target executables use this installation; host tools use the host libc.
+    const libc_file = b.option(std.Build.LazyPath, "target-libc", "Target libc installation file");
+    const system_root = b.option(std.Build.LazyPath, "system-root", "Target platform SDK or sysroot");
+    const dependency_include_dirs = b.option([]const std.Build.LazyPath, "dependency-include-dir", "Additional local dependency include directory") orelse &.{};
+    const local_build = localBuildOption(b);
+    // The documentation reads the checkout's headers, so it needs no native
+    // library.
+    const doc_include_dirs = b.pathList(&.{
+        "include",
+        // The plugin header includes MapLibre Native's mln/plugin/plugin_api.h.
+        "third_party/maplibre-native/include",
+    });
+
+    // A checkout without a local build has no native library to link.
+    if (local_build == null and b.isRoot()) {
+        addMaplibreNativeDocs(b, b.standardTargetOptions(.{}), optimize, doc_include_dirs, libc_file);
+        return;
+    }
+
+    const native = resolveNative(b, local_build);
+    const include_dirs = b.allocator.alloc(std.Build.LazyPath, dependency_include_dirs.len + 1) catch @panic("OOM");
+    include_dirs[0] = native.prefix.path(b, "include");
+    @memcpy(include_dirs[1..], dependency_include_dirs);
+    const options = BuildOptions{
+        .native = native,
+        .optimize = optimize,
+        .include_dirs = include_dirs,
+        .system_root = system_root,
+        .libc_file = libc_file,
+    };
+
+    const maplibre_native_ffi = b.addModule("maplibre_native_ffi", .{
+        .root_source_file = b.path("bindings/zig/src/maplibre_native_ffi.zig"),
+        .target = native.target,
+        .optimize = optimize,
+    });
+    linkMaplibreNativeC(b, maplibre_native_ffi, options);
+    // A Windows executable finds the library on PATH or beside itself, so its
+    // build installs bin/maplibre-native-c.dll from here.
+    b.addNamedLazyPath("prefix", native.prefix);
+
+    // The published package carries neither the tests nor the headers that
+    // the documentation reads.
+    if (!b.isRoot()) return;
+    addMaplibreNativeDocs(b, native.target, optimize, doc_include_dirs, libc_file);
+    addTests(b, options, maplibre_native_ffi);
 }

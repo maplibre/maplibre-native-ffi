@@ -346,16 +346,51 @@ On OpenHarmony, build the library with
 
 ### Zig
 
-<SnapshotOnly />
-
-The Zig binding does not support iOS or tvOS, including their simulators.
+Add the package from a release. The Zig binding does not support iOS, tvOS, or
+Emscripten.
 
 ```bash frame="terminal"
-zig fetch --save git+https://github.com/maplibre/maplibre-native-ffi
+zig fetch --save https://github.com/maplibre/maplibre-native-ffi/releases/download/v{{version}}/maplibre-native-ffi-zig.tar.gz
 ```
 
-Install the [C library](#build-against-a-prefix), then pass
-`-Dnative-install-dir=<prefix>` when you build.
+```zig title="build.zig"
+const maplibre = b.dependency("maplibre_native_ffi", .{
+    .target = target,
+    .optimize = optimize,
+});
+exe.root_module.addImport("maplibre_native_ffi", maplibre.module("maplibre_native_ffi"));
+```
+
+The build downloads the C library for the target. Each target uses Metal on
+macOS, OpenGL on Android and OpenHarmony, and Vulkan elsewhere. Pass `.backend` as `.opengl`,
+`.metal`, or `.vulkan` to choose another. Windows targets use the `msvc` ABI,
+and an executable there needs `maplibre-native-c.dll` beside it:
+
+```zig title="build.zig"
+const dll = maplibre.namedLazyPath("prefix").path(b, "bin/maplibre-native-c.dll");
+b.getInstallStep().dependOn(&b.addInstallBinFile(dll, "maplibre-native-c.dll").step);
+```
+
+The [snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot)
+publishes the same package from `main`. Run the same `zig fetch --save` again
+to move to the latest snapshot.
+
+```bash frame="terminal"
+zig fetch --save https://github.com/maplibre/maplibre-native-ffi/releases/download/unstable-native-snapshot/maplibre-native-ffi-zig.tar.gz
+```
+
+To build against your own copy of the [C library](#build-against-a-prefix),
+pass the dependency a `local-build` path. Name an install prefix, or a build
+directory that holds `<preset>/install` for each target. A path from the command
+line must be absolute. A Git dependency on the repository needs a local build.
+
+```zig title="build.zig"
+const maplibre = b.dependency("maplibre_native_ffi", .{
+    .target = target,
+    .optimize = optimize,
+    .@"local-build" = b.option(std.Build.LazyPath, "local-build", "MapLibre Native C library build"),
+});
+```
 
 ## Platforms
 
