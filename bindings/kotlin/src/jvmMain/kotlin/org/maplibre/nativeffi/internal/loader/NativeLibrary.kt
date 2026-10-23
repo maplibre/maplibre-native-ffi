@@ -15,10 +15,6 @@ import java.util.Optional
 /** Finds and loads the native library and its runtime dependencies. */
 internal object NativeLibrary {
   const val LIBRARY_NAME: String = "maplibre-native-c"
-  const val LIBRARY_PATH_PROPERTY: String = "org.maplibre.nativeffi.library.path"
-  const val LIBRARY_PATH_ENV: String = "MAPLIBRE_NATIVE_FFI_LIBRARY_PATH"
-  const val LIBRARY_DIRS_PROPERTY: String = "org.maplibre.nativeffi.library.dirs"
-  const val LIBRARY_DIRS_ENV: String = "MAPLIBRE_NATIVE_FFI_LIBRARY_DIRS"
   private const val RESOURCE_ROOT: String = "META-INF/maplibre-native-ffi"
   private const val SHARED_ROOT_CLAIM_PROPERTY: String = "org.maplibre.nativeffi.extraction.shared"
 
@@ -50,20 +46,10 @@ internal object NativeLibrary {
         return
       }
 
-      val configuredPath =
-        configuredPath(LIBRARY_PATH_PROPERTY, System.getProperty(LIBRARY_PATH_PROPERTY))
-          ?: configuredPath(LIBRARY_PATH_ENV, System.getenv(LIBRARY_PATH_ENV))
-
-      if (configuredPath != null) {
-        loadPath(configuredPath.path, configuredPath.source)
-        return
-      }
-
       try {
         if (loadClasspathRuntime()) {
           return
         }
-        loadRuntimeDependencies(configuredRuntimeDependencyDirs())
         System.loadLibrary(LIBRARY_NAME)
         loadedLibrary = LoadedLibrary(null, "java.library.path")
       } catch (error: UnsatisfiedLinkError) {
@@ -83,7 +69,15 @@ internal object NativeLibrary {
         return
       }
 
-      loadPath(libraryPath, "explicit path")
+      val absolutePath = libraryPath.toAbsolutePath().normalize()
+      if (!Files.isRegularFile(absolutePath)) {
+        throw UnsatisfiedLinkError("Native library is not a regular file: $absolutePath")
+      }
+
+      // Windows looks for a library's dependencies on its search path, not beside the library.
+      loadRuntimeDependencies(absolutePath.parent)
+      System.load(absolutePath.toString())
+      loadedLibrary = LoadedLibrary(absolutePath, "explicit path")
     }
   }
 
@@ -92,21 +86,6 @@ internal object NativeLibrary {
   fun loadedPath(): Optional<Path> = Optional.ofNullable(loadedLibrary?.path)
 
   fun loadedSource(): Optional<String> = Optional.ofNullable(loadedLibrary?.source)
-
-  private fun loadPath(libraryPath: Path, source: String) {
-    val absolutePath = libraryPath.toAbsolutePath().normalize()
-    if (!Files.isRegularFile(absolutePath)) {
-      throw UnsatisfiedLinkError("Native library from $source is not a regular file: $absolutePath")
-    }
-
-    loadRuntimeDependenciesForPath(absolutePath)
-    System.load(absolutePath.toString())
-    loadedLibrary = LoadedLibrary(absolutePath, source)
-  }
-
-  private fun loadRuntimeDependenciesForPath(libraryPath: Path) {
-    loadRuntimeDependencies(listOfNotNull(libraryPath.parent) + configuredRuntimeDependencyDirs())
-  }
 
   private fun loadClasspathRuntime(): Boolean {
     val classifier = nativeClassifier()
@@ -158,7 +137,6 @@ internal object NativeLibrary {
     val extracted = resources.associateWith { resource ->
       extractResource(resource, extractionDirectory)
     }
-    loadRuntimeDependencies(configuredRuntimeDependencyDirs())
     resources.dropLast(1).forEach { resource ->
       System.load(extracted.getValue(resource).toString())
     }
@@ -259,27 +237,25 @@ internal object NativeLibrary {
     return if (separator >= 0) externalForm.substring(0, separator) else externalForm
   }
 
-  private fun loadRuntimeDependencies(directories: Iterable<Path>) {
-    directories.forEach { directory ->
-      runtimeDependencyFileNames().forEach { fileName ->
-        val path = directory.resolve(fileName).toAbsolutePath().normalize()
-        if (!Files.isRegularFile(path)) {
-          return@forEach
-        }
-        val canonicalPath = path.toRealPath()
-        if (!loadedRuntimeDependencies.add(canonicalPath)) {
-          return@forEach
-        }
+  private fun loadRuntimeDependencies(directory: Path) {
+    runtimeDependencyFileNames().forEach { fileName ->
+      val path = directory.resolve(fileName)
+      if (!Files.isRegularFile(path)) {
+        return@forEach
+      }
+      val canonicalPath = path.toRealPath()
+      if (!loadedRuntimeDependencies.add(canonicalPath)) {
+        return@forEach
+      }
 
-        try {
-          System.load(canonicalPath.toString())
-        } catch (error: UnsatisfiedLinkError) {
-          loadedRuntimeDependencies.remove(canonicalPath)
-          throw UnsatisfiedLinkError(
-              "Unable to load MapLibre native runtime dependency from $canonicalPath",
-            )
-            .also { it.addSuppressed(error) }
-        }
+      try {
+        System.load(canonicalPath.toString())
+      } catch (error: UnsatisfiedLinkError) {
+        loadedRuntimeDependencies.remove(canonicalPath)
+        throw UnsatisfiedLinkError(
+            "Unable to load MapLibre native runtime dependency from $canonicalPath",
+          )
+          .also { it.addSuppressed(error) }
       }
     }
   }
@@ -287,29 +263,13 @@ internal object NativeLibrary {
   private fun loadFailure(cause: UnsatisfiedLinkError): UnsatisfiedLinkError {
     val error =
       UnsatisfiedLinkError(
-        "Unable to load native library $LIBRARY_NAME. Set $LIBRARY_PATH_PROPERTY or " +
-          "$LIBRARY_PATH_ENV to an exact library file path, or make the library available on " +
-          "the classpath or java.library.path. Set $LIBRARY_DIRS_PROPERTY or $LIBRARY_DIRS_ENV when host " +
-          "runtime dependency directories are needed.",
+        "Unable to load native library $LIBRARY_NAME. Add a MapLibre native runtime JAR to " +
+          "the classpath, put the library on java.library.path, or load it from an exact path " +
+          "with Maplibre.loadNativeLibrary(Path).",
       )
     error.addSuppressed(cause)
     return error
   }
-
-  private fun configuredPath(source: String, value: String?): ConfiguredPath? =
-    value?.takeUnless { it.isBlank() }?.let { ConfiguredPath(Path.of(it), source) }
-
-  private fun configuredRuntimeDependencyDirs(): List<Path> =
-    configuredPathList(System.getProperty(LIBRARY_DIRS_PROPERTY))
-      ?: configuredPathList(System.getenv(LIBRARY_DIRS_ENV))
-      ?: emptyList()
-
-  private fun configuredPathList(value: String?): List<Path>? =
-    value
-      ?.takeUnless { it.isBlank() }
-      ?.split(System.getProperty("path.separator"))
-      ?.filter { it.isNotBlank() }
-      ?.map { Path.of(it) }
 
   private fun runtimeDependencyFileNames(): List<String> {
     val osName = System.getProperty("os.name").lowercase()
@@ -344,8 +304,6 @@ internal object NativeLibrary {
         throw UnsatisfiedLinkError("Unsupported native runtime platform: $osName/$architecture")
     }
   }
-
-  private data class ConfiguredPath(val path: Path, val source: String)
 
   private data class LoadedLibrary(val path: Path?, val source: String)
 

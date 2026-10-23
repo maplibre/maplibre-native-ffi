@@ -42,6 +42,6 @@ export ANDROID_SERIAL
 exec ./gradlew \
   -Pmaplibre.android.backend="$backend" \
   -Pmaplibre.android.abis="$abi" \
-  -Pmaplibre.android.prebuiltBuildRoot=build \
+  -Pmaplibre.localBuild=build \
   -Pmaplibre.android.testMinify=true \
   :bindings:kotlin:connectedAndroidDeviceTest

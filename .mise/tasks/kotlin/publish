@@ -6,8 +6,9 @@
 set -euo pipefail
 
 input_root="${MISE_MONOREPO_ROOT}/build/packages/native/maven-input"
-install_root="${MISE_MONOREPO_ROOT}/build/packages/kotlin/install"
+build_root="${MISE_MONOREPO_ROOT}/build/packages/kotlin/local-build"
 staging_base="${MISE_MONOREPO_ROOT}/build/packages/kotlin"
+repository=MavenStagingRepository
 
 usage() {
   echo "usage: $(basename "$0") stage <linux|apple> [version]" >&2
@@ -17,7 +18,7 @@ usage() {
 extract_preset() {
   local preset="$1"
   local archive
-  local destination="${install_root}/${preset}"
+  local destination="${build_root}/${preset}/install"
   archive="$(find "$input_root" -type f -name "maplibre-native-c-${preset}.tar.gz" -print -quit)"
   if [[ -z "$archive" ]]; then
     echo "Missing native package for ${preset} under ${input_root}" >&2
@@ -73,235 +74,43 @@ prepare_native_inputs() {
       ;;
   esac
 
-  rm -rf "$install_root"
+  rm -rf "$build_root"
   for preset in "${presets[@]}"; do
     extract_preset "$preset"
   done
 }
 
-publication_task() {
-  echo "${1}:publish${2}PublicationTo${3}"
-}
+publication_tasks=()
 
-publish_tasks() {
+# Adds the tasks that publish each named publication of a project.
+add_publications() {
   local project="$1"
-  local repository="$2"
-  shift 2
-
-  local tasks=()
-  while [[ "$1" != "--" ]]; do
-    tasks+=("$(publication_task "$project" "$1" "$repository")")
-    shift
-  done
   shift
-
-  ./gradlew "${tasks[@]}" "$@"
-}
-
-publish_linux_leaves() {
-  local repository="$1"
-  shift
-  local common=(
-    -Pmaplibre.android.prebuiltInstallRoot="$install_root"
-  )
-  # A runtime publication runs cinterop only for its own Kotlin/Native target,
-  # because the runtimes' gradle.properties disable cinterop commonization, so
-  # each invocation names the install dirs of the targets it publishes.
-  local opengl_android=(
-    -Pmaplibre.runtime.opengl.androidNativeArm32.installDir="$install_root/android-arm-egl"
-    -Pmaplibre.runtime.opengl.androidNativeArm64.installDir="$install_root/android-arm64-egl"
-    -Pmaplibre.runtime.opengl.androidNativeX64.installDir="$install_root/android-x64-egl"
-  )
-  local vulkan_android=(
-    -Pmaplibre.runtime.vulkan.androidNativeArm32.installDir="$install_root/android-arm-vulkan"
-    -Pmaplibre.runtime.vulkan.androidNativeArm64.installDir="$install_root/android-arm64-vulkan"
-    -Pmaplibre.runtime.vulkan.androidNativeX64.installDir="$install_root/android-x64-vulkan"
-  )
-
-  publish_tasks \
-    :bindings:kotlin \
-    "$repository" \
-    Android AndroidNativeArm32 AndroidNativeArm64 AndroidNativeX64 -- \
-    "$@" \
-    "${common[@]}" \
-    -Pmaplibre.android.abis=armeabi-v7a,arm64-v8a,x86_64
-
-  publish_tasks \
-    :bindings:kotlin:runtimes:opengl \
-    "$repository" \
-    Android AndroidNativeArm32 AndroidNativeArm64 AndroidNativeX64 -- \
-    "$@" \
-    "${common[@]}" \
-    "${opengl_android[@]}" \
-    -Pmaplibre.android.abis=armeabi-v7a,arm64-v8a,x86_64 \
-    -Pmaplibre.android.backend=opengl
-
-  publish_tasks \
-    :bindings:kotlin:runtimes:vulkan \
-    "$repository" \
-    Android AndroidNativeArm32 AndroidNativeArm64 AndroidNativeX64 -- \
-    "$@" \
-    "${common[@]}" \
-    "${vulkan_android[@]}" \
-    -Pmaplibre.android.abis=armeabi-v7a,arm64-v8a,x86_64 \
-    -Pmaplibre.android.backend=vulkan
-
-  publish_tasks \
-    :bindings:kotlin \
-    "$repository" \
-    LinuxX64 -- \
-    "$@"
-
-  publish_tasks \
-    :bindings:kotlin \
-    "$repository" \
-    LinuxArm64 -- \
-    "$@" \
-    -Pkotlin.native.enableKlibsCrossCompilation=true \
-    -PmaplibreNativeCInstallDir="$install_root/linux-gnu-arm64-egl"
-
-  publish_tasks \
-    :bindings:kotlin:runtimes:opengl \
-    "$repository" \
-    LinuxX64 -- \
-    "$@" \
-    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-gnu-x64-egl"
-
-  publish_tasks \
-    :bindings:kotlin:runtimes:opengl \
-    "$repository" \
-    LinuxArm64 -- \
-    "$@" \
-    -Pkotlin.native.enableKlibsCrossCompilation=true \
-    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-gnu-arm64-egl"
-
-  publish_tasks \
-    :bindings:kotlin:runtimes:vulkan \
-    "$repository" \
-    LinuxX64 -- \
-    "$@" \
-    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-gnu-x64-vulkan"
-
-  publish_tasks \
-    :bindings:kotlin:runtimes:vulkan \
-    "$repository" \
-    LinuxArm64 -- \
-    "$@" \
-    -Pkotlin.native.enableKlibsCrossCompilation=true \
-    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-gnu-arm64-vulkan"
-
-  # linuxTest links libEGL from the host. The x64 Maven staging job
-  # cross-compiles linuxArm64 KLIBs above; ARM CI links and runs the tests
-  # natively on ubuntu-24.04-arm.
-  if [[ "$(uname -s)" == Linux && "$(uname -m)" == aarch64 ]]; then
-    ./gradlew \
-      -Pkotlin.native.enableKlibsCrossCompilation=true \
-      -PmaplibreNativeCInstallDir="$install_root/linux-gnu-arm64-egl" \
-      :bindings:kotlin:linkDebugTestLinuxArm64
-  fi
-}
-
-publish_apple_leaves() {
-  local repository="$1"
-  shift
-  # As in publish_linux_leaves, each invocation names the install dirs of the
-  # targets and JVM classifiers it publishes.
-  local opengl=(
-    -Pmaplibre.runtime.opengl.macosArm64.installDir="$install_root/macos-arm64-egl"
-    -Pmaplibre.runtime.opengl.jvm.natives-linux-x64.installDir="$install_root/linux-gnu-x64-egl"
-    -Pmaplibre.runtime.opengl.jvm.natives-linux-arm64.installDir="$install_root/linux-gnu-arm64-egl"
-    -Pmaplibre.runtime.opengl.jvm.natives-macos-arm64.installDir="$install_root/macos-arm64-egl"
-    -Pmaplibre.runtime.opengl.jvm.natives-windows-x64.installDir="$install_root/windows-x64-wgl"
-    -Pmaplibre.runtime.opengl.jvm.natives-windows-arm64.installDir="$install_root/windows-arm64-wgl"
-  )
-  local vulkan=(
-    -Pmaplibre.runtime.vulkan.macosArm64.installDir="$install_root/macos-arm64-vulkan"
-    -Pmaplibre.runtime.vulkan.jvm.natives-linux-x64.installDir="$install_root/linux-gnu-x64-vulkan"
-    -Pmaplibre.runtime.vulkan.jvm.natives-linux-arm64.installDir="$install_root/linux-gnu-arm64-vulkan"
-    -Pmaplibre.runtime.vulkan.jvm.natives-macos-arm64.installDir="$install_root/macos-arm64-vulkan"
-    -Pmaplibre.runtime.vulkan.jvm.natives-windows-x64.installDir="$install_root/windows-x64-vulkan"
-    -Pmaplibre.runtime.vulkan.jvm.natives-windows-arm64.installDir="$install_root/windows-arm64-vulkan"
-  )
-  local metal=(
-    -Pmaplibre.runtime.metal.iosArm64.installDir="$install_root/ios-arm64-metal"
-    -Pmaplibre.runtime.metal.iosSimulatorArm64.installDir="$install_root/ios-simulator-arm64-metal"
-    -Pmaplibre.runtime.metal.tvosArm64.installDir="$install_root/tvos-arm64-metal"
-    -Pmaplibre.runtime.metal.tvosSimulatorArm64.installDir="$install_root/tvos-simulator-arm64-metal"
-    -Pmaplibre.runtime.metal.macosArm64.installDir="$install_root/macos-arm64-metal"
-    -Pmaplibre.runtime.metal.jvm.natives-macos-arm64.installDir="$install_root/macos-arm64-metal"
-  )
-
-  publish_tasks \
-    :bindings:kotlin \
-    "$repository" \
-    Jvm MacosArm64 IosArm64 IosSimulatorArm64 TvosArm64 TvosSimulatorArm64 -- \
-    "$@"
-
-  publish_tasks \
-    :bindings:kotlin:runtimes:opengl \
-    "$repository" \
-    Jvm MacosArm64 -- \
-    "$@" \
-    "${opengl[@]}"
-
-  publish_tasks \
-    :bindings:kotlin:runtimes:vulkan \
-    "$repository" \
-    Jvm MacosArm64 -- \
-    "$@" \
-    "${vulkan[@]}"
-
-  publish_tasks \
-    :bindings:kotlin:runtimes:metal \
-    "$repository" \
-    Jvm MacosArm64 IosArm64 IosSimulatorArm64 TvosArm64 TvosSimulatorArm64 -- \
-    "$@" \
-    "${metal[@]}"
-}
-
-publish_apple_roots() {
-  local repository="$1"
-  shift
-  # Root modules take no native install dirs: the runtime roots run no cinterop,
-  # and the binding's cinterop reads only the public headers.
-  local project
-  for project in \
-    :bindings:kotlin \
-    :bindings:kotlin:runtimes:opengl \
-    :bindings:kotlin:runtimes:vulkan \
-    :bindings:kotlin:runtimes:metal; do
-    publish_tasks "$project" "$repository" KotlinMultiplatform -- "$@"
+  local publication
+  for publication in "$@"; do
+    publication_tasks+=("${project}:publish${publication}PublicationTo${repository}")
   done
 }
 
-publish_leaf_partition() {
-  local partition="$1"
-  local repository="$2"
-  shift 2
-
-  case "$partition" in
-    linux)
-      publish_linux_leaves "$repository" "$@"
-      ;;
-    apple)
-      publish_apple_leaves "$repository" "$@"
-      ;;
-    *)
-      usage
-      return 2
-      ;;
-  esac
+publish_linux() {
+  local android_native=(AndroidNativeArm32 AndroidNativeArm64 AndroidNativeX64)
+  local linux=(LinuxX64 LinuxArm64)
+  add_publications :bindings:kotlin Android "${android_native[@]}" "${linux[@]}"
+  add_publications :bindings:kotlin:runtimes:opengl Android "${android_native[@]}" "${linux[@]}"
+  add_publications :bindings:kotlin:runtimes:vulkan "${android_native[@]}" "${linux[@]}"
+  ./gradlew "$@" -Pkotlin.native.enableKlibsCrossCompilation=true "${publication_tasks[@]}"
+  # One run packages the Android libraries of one backend.
+  ./gradlew "$@" -Pmaplibre.android.backend=vulkan \
+    ":bindings:kotlin:runtimes:vulkan:publishAndroidPublicationTo${repository}"
 }
 
-publish_partition() {
-  local partition="$1"
-  local repository="$2"
-  shift 2
-
-  publish_leaf_partition "$partition" "$repository" "$@"
-  if [[ "$partition" == "apple" ]]; then
-    publish_apple_roots "$repository" "$@"
-  fi
+publish_apple() {
+  local apple=(MacosArm64 IosArm64 IosSimulatorArm64 TvosArm64 TvosSimulatorArm64)
+  add_publications :bindings:kotlin KotlinMultiplatform Jvm "${apple[@]}"
+  add_publications :bindings:kotlin:runtimes:opengl KotlinMultiplatform Jvm MacosArm64
+  add_publications :bindings:kotlin:runtimes:vulkan KotlinMultiplatform Jvm MacosArm64
+  add_publications :bindings:kotlin:runtimes:metal KotlinMultiplatform Jvm "${apple[@]}"
+  ./gradlew "$@" "${publication_tasks[@]}"
 }
 
 operation="${1:-}"
@@ -333,10 +142,9 @@ case "$operation" in
     if [[ -n "$version" ]]; then
       release_version_args=("-Pmaplibre.maven.version=$version")
     fi
-    publish_partition \
-      "$partition" \
-      MavenStagingRepository \
+    "publish_${partition}" \
       "${release_version_args[@]}" \
+      -Pmaplibre.localBuild="$build_root" \
       -Pmaplibre.maven.localRepository="$staging_root"
     ;;
   verify)

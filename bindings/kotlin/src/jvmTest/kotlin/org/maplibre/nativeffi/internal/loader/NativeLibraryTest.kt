@@ -19,24 +19,33 @@ import org.maplibre.nativeffi.runChildJvm
 @OptIn(ExperimentalPathApi::class)
 class NativeLibraryTest {
   @Test
-  fun theLibraryLoadsFromTheConfiguredPath() {
+  fun theLibraryLoadsFromJavaLibraryPath() {
     Maplibre.loadNativeLibrary()
-    val configured = Path.of(System.getProperty(NativeLibrary.LIBRARY_PATH_PROPERTY))
-    assertEquals(configured.toAbsolutePath().normalize(), NativeLibrary.loadedPath().get())
-    assertEquals(NativeLibrary.LIBRARY_PATH_PROPERTY, NativeLibrary.loadedSource().get())
+    assertEquals("java.library.path", NativeLibrary.loadedSource().get())
     assertEquals(Maplibre.EXPECTED_C_ABI_VERSION.toUInt(), GeneratedApi.cVersion())
   }
 
   @Test
-  fun aConfiguredPathWithNoLibraryFailsNamingItsSourceAndPath() {
+  fun aLibraryPathWithNoLibraryFailsNamingTheWaysToLoadOne() {
+    val empty = createTempDirectory("native-library-test")
+    try {
+      val child =
+        runChildJvm(
+          MissingLibraryProbe::class,
+          properties = mapOf("java.library.path" to empty.toString()),
+        )
+      assertEquals(0, child.exitCode, child.output)
+      assertTrue(child.output.contains("java.library.path"), child.output)
+    } finally {
+      empty.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun anExactPathWithNoLibraryFailsNamingThePath() {
     val missing = Path.of("build", "missing-maplibre-native-c").toAbsolutePath().normalize()
-    val child =
-      runChildJvm(
-        MissingLibraryProbe::class,
-        properties = mapOf(NativeLibrary.LIBRARY_PATH_PROPERTY to missing.toString()),
-      )
+    val child = runChildJvm(MissingLibraryProbe::class, arguments = listOf(missing.toString()))
     assertEquals(0, child.exitCode, child.output)
-    assertTrue(child.output.contains(NativeLibrary.LIBRARY_PATH_PROPERTY), child.output)
     assertTrue(child.output.contains(missing.toString()), child.output)
   }
 
@@ -81,12 +90,16 @@ class NativeLibraryTest {
     Files.getFileStore(directory).supportsFileAttributeView("posix")
 }
 
-/** Loads the library in a fresh JVM, and prints the failure it expects. */
+/**
+ * Loads the library in a fresh JVM, from the exact path in its argument if it has one, and prints
+ * the failure it expects.
+ */
 object MissingLibraryProbe {
   @JvmStatic
   fun main(args: Array<String>) {
     try {
-      NativeLibrary.load()
+      val path = args.singleOrNull()
+      if (path != null) NativeLibrary.load(Path.of(path)) else NativeLibrary.load()
     } catch (error: UnsatisfiedLinkError) {
       println(error.message)
       return

@@ -6,6 +6,10 @@ import org.gradle.api.tasks.bundling.Zip
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.catalogVersionInt
+import org.maplibre.nativeffi.gradle.localBuild
+import org.maplibre.nativeffi.gradle.localBuildPrefix
+import org.maplibre.nativeffi.gradle.nativePreset
+import org.maplibre.nativeffi.gradle.registerLocalBuildVerification
 import org.maplibre.nativeffi.gradle.requiredEnvironmentVariable
 
 val hostPlatform = HostPlatform.current()
@@ -55,17 +59,6 @@ val packagedAndroidRuntimeLibs = layout.buildDirectory.dir("generated/jniLibs/ru
 @Suppress("UNCHECKED_CAST")
 val packagedAndroidBindingLibs =
   extensions.extraProperties["maplibreAndroidBindingLibsDirectory"] as Provider<Directory>
-// Maven staging extracts each Android preset's native package here, one directory per preset.
-val prebuiltAndroidInstallRoot =
-  providers.gradleProperty("maplibre.android.prebuiltInstallRoot").map(rootProject::file)
-// Target CI round-trips packages into each CMake preset's install directory.
-val prebuiltAndroidBuildRoot =
-  providers.gradleProperty("maplibre.android.prebuiltBuildRoot").map(rootProject::file)
-
-check(!(prebuiltAndroidInstallRoot.isPresent && prebuiltAndroidBuildRoot.isPresent)) {
-  "Configure only one of maplibre.android.prebuiltInstallRoot and maplibre.android.prebuiltBuildRoot"
-}
-
 val packageAndroidRuntimeLibraries =
   tasks.register("packageAndroidRuntimeLibraries") {
     group = "build"
@@ -95,46 +88,33 @@ tasks.withType<Zip>().configureEach {
 }
 
 androidTargets.forEach { target ->
-  val targetRoot = layout.buildDirectory.dir("android-native/$androidBackend/${target.cargoTarget}")
-  val cmakePreset = target.cmakePreset(androidBackend)
-  val configuredInstallDir =
-    prebuiltAndroidBuildRoot
-      .map { it.resolve(cmakePreset).resolve("install") }
-      .orElse(prebuiltAndroidInstallRoot.map { it.resolve(cmakePreset) })
+  val verifyLocalBuild =
+    registerLocalBuildVerification(
+      "verifyAndroid${target.taskSuffix}LocalBuild",
+      target.targetPlatform,
+      androidBackend,
+    )
+  packageAndroidRuntimeLibraries.configure { dependsOn(verifyLocalBuild) }
+  packageAndroidBindingLibraries.configure { dependsOn(verifyLocalBuild) }
   val installDir =
-    rootProject.layout
-      .dir(configuredInstallDir)
-      .orElse(rootProject.layout.projectDirectory.dir("build/$cmakePreset/install"))
-      .get()
+    localBuild?.let { localBuildPrefix(it, nativePreset(target.targetPlatform, androidBackend)) }
+      ?: return@forEach
+  val targetRoot = layout.buildDirectory.dir("android-native/$androidBackend/${target.cargoTarget}")
   val runtimePackageDir = packagedAndroidRuntimeLibs.map {
     it.dir("$androidBackend/${target.cargoTarget}")
   }
   val bindingPackageDir = packagedAndroidBindingLibs.map { it.dir(target.cargoTarget) }
-  val nativeLibrary = installDir.file("lib/libmaplibre-native-c.so")
+  val nativeLibrary = installDir.resolve("lib/libmaplibre-native-c.so")
   val jniLibrary = targetRoot.map { it.file("jni/libmaplibre-native-ffi-jni.so") }
   val ndkCompiler = androidNdkPrebuilt.map {
     it.file("bin/${target.ndkCompilerName(androidApiLevel)}${hostPlatform.androidNdkCommandSuffix}")
   }
 
-  val buildNative =
-    tasks.register<Exec>("buildMaplibreNativeCAndroid${target.taskSuffix}") {
-      group = "build"
-      description = "Builds and installs MapLibre Native C for Android ${target.ndkAbi}."
-      dependsOn(androidSdkPackages)
-      doNotTrackState("CMake owns native incremental build state")
-      workingDir(repositoryRoot)
-      // The task supplies the JDK and Kotlin compiler that build the TLS helper dex.
-      executable("mise")
-      args("run", "//:_android-workflow", cmakePreset)
-      environment("ANDROID_HOME", androidSdkDirectory.get().asFile.absolutePath)
-      enabled = !configuredInstallDir.isPresent
-    }
-
   val buildJni =
     tasks.register<Exec>("buildAndroidJni${target.taskSuffix}") {
       group = "build"
       description = "Builds the Android ${target.ndkAbi} JNI shim."
-      dependsOn(androidSdkPackages, buildNative)
+      dependsOn(androidSdkPackages, verifyLocalBuild)
       inputs.dir(jniSources).withPropertyName("jniSources")
       inputs.dir(checkedInCHeaders).withPropertyName("maplibreNativeCHeaders")
       inputs.file(nativeLibrary).withPropertyName("maplibreNativeCLibrary")
@@ -155,7 +135,7 @@ androidTargets.forEach { target ->
         "-I${jniSources.asFile}",
         jniSources.file("mln_jni.c").asFile,
         jniSources.file("mln_jni_generated.c").asFile,
-        "-L${installDir.dir("lib").asFile}",
+        "-L${installDir.resolve("lib")}",
         "-lmaplibre-native-c",
         "-llog",
         // Android 15 devices may use 16 KB pages.
@@ -168,7 +148,7 @@ androidTargets.forEach { target ->
   val packageRuntimeTarget =
     tasks.register<Sync>("packageAndroidRuntimeLibraries${target.taskSuffix}") {
       description = "Packages the Android ${target.ndkAbi} MapLibre C library."
-      dependsOn(buildNative)
+      dependsOn(verifyLocalBuild)
       into(runtimePackageDir)
       from(nativeLibrary) { into(target.ndkAbi) }
     }

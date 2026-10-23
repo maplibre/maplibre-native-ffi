@@ -1718,7 +1718,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/kotlin:android-build opengl armeabi-v7a --prebuilt
+        run: mise run //bindings/kotlin:android-build opengl armeabi-v7a
       - id: suite-3
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -1789,7 +1789,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/kotlin:android-build vulkan armeabi-v7a --prebuilt
+        run: mise run //bindings/kotlin:android-build vulkan armeabi-v7a
       - id: suite-3
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -1860,7 +1860,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/kotlin:android-build opengl arm64-v8a --prebuilt
+        run: mise run //bindings/kotlin:android-build opengl arm64-v8a
       - id: suite-3
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -1931,7 +1931,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/kotlin:android-build vulkan arm64-v8a --prebuilt
+        run: mise run //bindings/kotlin:android-build vulkan arm64-v8a
       - id: suite-3
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:

@@ -4,7 +4,6 @@ enum class AndroidTarget(
   val cargoTarget: String,
   val kotlinNativeTarget: String,
   val targetPlatform: String,
-  val cmakeArchitecture: String,
   val ndkAbi: String,
   val ndkTargetTriple: String,
   val taskSuffix: String,
@@ -13,7 +12,6 @@ enum class AndroidTarget(
     cargoTarget = "armv7-linux-androideabi",
     kotlinNativeTarget = "androidNativeArm32",
     targetPlatform = "android-arm",
-    cmakeArchitecture = "arm",
     ndkAbi = "armeabi-v7a",
     ndkTargetTriple = "armv7a-linux-androideabi",
     taskSuffix = "Arm32",
@@ -22,7 +20,6 @@ enum class AndroidTarget(
     cargoTarget = "aarch64-linux-android",
     kotlinNativeTarget = "androidNativeArm64",
     targetPlatform = "android-arm64",
-    cmakeArchitecture = "arm64",
     ndkAbi = "arm64-v8a",
     ndkTargetTriple = "aarch64-linux-android",
     taskSuffix = "Arm64",
@@ -31,7 +28,6 @@ enum class AndroidTarget(
     cargoTarget = "x86_64-linux-android",
     kotlinNativeTarget = "androidNativeX64",
     targetPlatform = "android-x64",
-    cmakeArchitecture = "x64",
     ndkAbi = "x86_64",
     ndkTargetTriple = "x86_64-linux-android",
     taskSuffix = "X86_64",
@@ -39,9 +35,6 @@ enum class AndroidTarget(
 
   /** The NDK C compiler driver for this ABI at [apiLevel]. */
   fun ndkCompilerName(apiLevel: Int): String = "$ndkTargetTriple$apiLevel-clang"
-
-  fun cmakePreset(backend: String): String =
-    "android-$cmakeArchitecture-${if (backend == "opengl") "egl" else "vulkan"}"
 
   companion object {
     const val DEFAULT_BACKEND = "opengl"

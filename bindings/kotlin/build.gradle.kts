@@ -16,6 +16,12 @@ import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 import org.maplibre.nativeffi.gradle.canonicalizeKmpRootMetadata
+import org.maplibre.nativeffi.gradle.defaultBackend
+import org.maplibre.nativeffi.gradle.kotlinNativeTargetPlatform
+import org.maplibre.nativeffi.gradle.localBuild
+import org.maplibre.nativeffi.gradle.localBuildPrefix
+import org.maplibre.nativeffi.gradle.nativePreset
+import org.maplibre.nativeffi.gradle.registerLocalBuildVerification
 
 plugins {
   id("org.jetbrains.kotlin.multiplatform")
@@ -24,10 +30,18 @@ plugins {
   alias(libs.plugins.dokka)
 }
 
-apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
-
 val hostPlatform = HostPlatform.current()
-val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
+
+/**
+ * The C library that a test of [targetPlatform] links or loads: the local build itself when it is
+ * an install prefix, or else its preset for the platform's default backend.
+ */
+fun testedNativeC(targetPlatform: String): MaplibreNativeCArtifact? = localBuild?.let { root ->
+  MaplibreNativeCArtifact(
+    localBuildPrefix(root, nativePreset(targetPlatform, defaultBackend(targetPlatform))),
+  )
+}
+
 val checkedInCHeaders = rootProject.layout.projectDirectory.dir("include")
 // plugin.h includes upstream's mln/plugin/plugin_api.h from the submodule.
 val upstreamPluginHeaders =
@@ -123,15 +137,26 @@ kotlin {
   }
 
   targets.withType<KotlinNativeTarget>().configureEach {
-    binaries.all {
-      linkerOpts(maplibreNativeC.linkDirs.map { "-L$it" })
-      linkerOpts(maplibreNativeC.linkLibraries.map { "-l$it" })
-      if (hostPlatform.isMac || hostPlatform.isLinux) {
-        linkerOpts(maplibreNativeC.runtimeLinkLibraryDirs.map { "-Wl,-rpath,$it" })
+    val targetPlatform = kotlinNativeTargetPlatform(name)
+    testedNativeC(targetPlatform)?.let { maplibreNativeC ->
+      binaries.all {
+        linkerOpts("-L${maplibreNativeC.linkDir}")
+        linkerOpts(maplibreNativeC.linkLibraries.map { "-l$it" })
+        if (hostPlatform.isMac || hostPlatform.isLinux) {
+          linkerOpts("-Wl,-rpath,${maplibreNativeC.runtimeLibraryDir}")
+        }
+        if (hostPlatform.isMac) {
+          linkerOpts(maplibreNativeC.frameworks.flatMap { listOf("-framework", it) })
+        }
       }
-      if (hostPlatform.isMac) {
-        linkerOpts(maplibreNativeC.frameworks.flatMap { listOf("-framework", it) })
-      }
+    }
+    val verifyLocalBuild =
+      registerLocalBuildVerification(
+        "verify${name.replaceFirstChar(Char::uppercaseChar)}LocalBuild",
+        targetPlatform,
+      )
+    binaries.withType<TestExecutable>().configureEach {
+      linkTaskProvider.configure { dependsOn(verifyLocalBuild) }
     }
 
     // Kotlin tests compile against a klib. macOS CI compiles the generated
@@ -366,7 +391,8 @@ tasks.configureEach {
   if (name == "mergeAndroidMainJniLibFolders") dependsOn("packageAndroidBindingLibraries")
 }
 
-val hostNativeInstallConfigured = providers.gradleProperty("maplibreNativeCInstallDir").isPresent
+val verifyJvmLocalBuild =
+  registerLocalBuildVerification("verifyJvmLocalBuild", hostPlatform.targetPlatform)
 
 class TestClasspathArguments(@get:Classpath val classpath: FileCollection) :
   CommandLineArgumentProvider {
@@ -378,21 +404,14 @@ tasks.named<Test>("jvmTest") {
   timeout.set(Duration.ofMinutes(5))
   jvmArgs("--enable-native-access=ALL-UNNAMED")
   jvmArgumentProviders.add(TestClasspathArguments(classpath))
-  systemProperty("org.maplibre.nativeffi.library.path", maplibreNativeC.libraryPath.absolutePath)
-  systemProperty(
-    "org.maplibre.nativeffi.test.graphics.library",
-    maplibreNativeC.testGraphicsLibraryPath.absolutePath,
-  )
-  systemProperty(
-    "org.maplibre.nativeffi.library.dirs",
-    maplibreNativeC.loaderLibraryDirs.joinToString(File.pathSeparator) { it.absolutePath },
-  )
-  if (hostNativeInstallConfigured) {
-    inputs.file(maplibreNativeC.libraryPath).withPropertyName("maplibreNativeCLibrary")
-    inputs
-      .files(maplibreNativeC.loaderLibraryDirs)
-      .withPropertyName("maplibreNativeCLoaderLibraryDirs")
-    inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
+  dependsOn(verifyJvmLocalBuild)
+  testedNativeC(hostPlatform.targetPlatform)?.let { maplibreNativeC ->
+    systemProperty("java.library.path", maplibreNativeC.runtimeLibraryDir.absolutePath)
+    systemProperty(
+      "org.maplibre.nativeffi.test.graphics.library",
+      maplibreNativeC.testGraphicsLibraryPath.absolutePath,
+    )
+    inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstall")
   }
   testLogging { exceptionFormat = TestExceptionFormat.FULL }
 }

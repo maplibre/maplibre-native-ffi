@@ -91,6 +91,6 @@
 "VIEW-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aBorrowedFrameViewExpiresWithItsBlockAndHoldsOffItsRelease"
 "REND-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::anOwnedTextureFrameReadsBackAsPixels"
 "REND-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aCallerDrivenSessionIsServicedFromTheGraphicsThread"
-"PLAT-01" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/internal/loader/NativeLibraryTest.kt::theLibraryLoadsFromTheConfiguredPath"
+"PLAT-01" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/internal/loader/NativeLibraryTest.kt::theLibraryLoadsFromJavaLibraryPath"
 "PLAT-02" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/log/LogProcessExitTest.kt::jvmExitsWithLiveHandlesAndCallbacks"
 "PLAT-03" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/resource/ResourceRequestHandleJvmTest.kt::anUnreachableRequestIsReleasedNatively"

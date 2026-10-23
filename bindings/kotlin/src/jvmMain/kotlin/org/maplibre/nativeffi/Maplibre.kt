@@ -11,19 +11,17 @@ public actual object Maplibre {
     org.maplibre.nativeffi.internal.loader.EXPECTED_C_ABI_VERSION
 
   /**
-   * Loads the native library from the first of these that is set or present:
-   * 1. the file that the `org.maplibre.nativeffi.library.path` system property or the
-   *    `MAPLIBRE_NATIVE_FFI_LIBRARY_PATH` environment variable names;
-   * 2. a runtime JAR on the classpath;
-   * 3. `System.loadLibrary("maplibre-native-c")`, after the library's dependencies from the
-   *    directories that `org.maplibre.nativeffi.library.dirs` or `MAPLIBRE_NATIVE_FFI_LIBRARY_DIRS`
-   *    lists.
+   * Loads the native library from a runtime JAR on the classpath, or else with
+   * `System.loadLibrary("maplibre-native-c")`, which searches `java.library.path`.
    */
   public actual fun loadNativeLibrary() {
     NativeAccess.ensureLoaded()
   }
 
-  /** Loads the native library from an exact file path. */
+  /**
+   * Loads the native library from an exact file path, after the graphics libraries that sit beside
+   * it.
+   */
   public fun loadNativeLibrary(libraryPath: Path) {
     NativeAccess.load(libraryPath)
   }

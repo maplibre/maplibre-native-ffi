@@ -50,7 +50,7 @@ case "$usage_preset" in
     exit 2
     ;;
 esac
-gradle_args=(-PmaplibreNativeCInstallDir="build/$usage_preset/install")
+gradle_args=(-Pmaplibre.localBuild="build/$usage_preset/install")
 # Kotlin/Native has no Linux arm64 host toolchain, so this target only builds
 # through KLIB cross-compilation from a Linux x64 host.
 if [[ "$kotlin_target" == "linuxArm64" ]]; then
@@ -67,9 +67,6 @@ fi
 # builds for a preset whose backend has a matching runtime publication.
 if [[ -n "$runtime_backend" ]]; then
   tasks+=(":bindings:kotlin:runtimes:${runtime_backend}:${kotlin_target}Klib")
-  gradle_args+=(
-    "-Pmaplibre.runtime.${runtime_backend}.${kotlin_target}.installDir=build/$usage_preset/install"
-  )
 fi
 ./gradlew "${gradle_args[@]}" "${tasks[@]}"
 '''
@@ -116,16 +113,13 @@ case "$usage_preset" in
     exit 2
     ;;
 esac
-./gradlew \
-  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
-  :bindings:kotlin:jvmTest
+./gradlew -Pmaplibre.localBuild="build/$usage_preset/install" :bindings:kotlin:jvmTest
 '''
 
 [tasks."test:native"]
 extends = "ffi:preset"
 dir = "../.."
 run = '''
-gradle_args=()
 gradle_tasks=()
 case "$usage_preset" in
   linux-gnu-x64-*) kotlin_target=linuxX64 ;;
@@ -135,9 +129,6 @@ case "$usage_preset" in
     ;;
   ios-simulator-arm64-metal)
     kotlin_target=iosSimulatorArm64
-    gradle_args+=(
-      "-Pmaplibre.runtime.metal.$kotlin_target.installDir=build/$usage_preset/install"
-    )
     gradle_tasks+=(":bindings:kotlin:runtimes:metal:${kotlin_target}Klib")
     mise run //:ios-simulator:boot
     export MLN_FFI_IOS_SIMULATOR_DEVICE_ID=$(
@@ -150,9 +141,6 @@ case "$usage_preset" in
     ;;
   tvos-simulator-arm64-metal)
     kotlin_target=tvosSimulatorArm64
-    gradle_args+=(
-      "-Pmaplibre.runtime.metal.$kotlin_target.installDir=build/$usage_preset/install"
-    )
     gradle_tasks+=(":bindings:kotlin:runtimes:metal:${kotlin_target}Klib")
     mise run //:tvos-simulator:boot
     export MLN_FFI_IOS_SIMULATOR_DEVICE_ID=$(
@@ -176,11 +164,8 @@ case "$usage_preset" in
     exit 2
     ;;
 esac
-gradle_args+=("-PmaplibreNativeCInstallDir=build/$usage_preset/install")
 gradle_tasks+=(":bindings:kotlin:${kotlin_target}Test")
-./gradlew \
-  "${gradle_args[@]}" \
-  "${gradle_tasks[@]}"
+./gradlew -Pmaplibre.localBuild="build/$usage_preset/install" "${gradle_tasks[@]}"
 '''
 
 [tasks.wasm-module]
@@ -294,14 +279,13 @@ case "$usage_preset" in
   tvos-simulator-arm64-metal) kotlin_target=tvosSimulatorArm64 ;;
 esac
 ./gradlew \
-  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
-  -Pmaplibre.runtime.metal.$kotlin_target.installDir="build/$usage_preset/install" \
+  -Pmaplibre.localBuild="build/$usage_preset/install" \
   ":bindings:kotlin:${kotlin_target}Klib" \
   ":bindings:kotlin:runtimes:metal:${kotlin_target}Klib"
 '''
 
 [tasks."android-build"]
-description = "Build the Kotlin Android binding."
+description = "Build the Kotlin Android binding from the presets built under build/."
 usage = '''
 arg "[backend]" default="opengl" {
   choices "opengl" "vulkan"
@@ -309,7 +293,6 @@ arg "[backend]" default="opengl" {
 arg "[abis]" default="auto" {
   choices "auto" "armeabi-v7a" "arm64-v8a" "x86_64" "arm64-v8a,x86_64" "armeabi-v7a,arm64-v8a,x86_64"
 }
-flag "--prebuilt" help="Use native packages installed under build/"
 '''
 dir = "../.."
 run = '''
@@ -320,14 +303,11 @@ if [[ "$abis" == auto ]]; then
     abis=armeabi-v7a,arm64-v8a,x86_64
   fi
 fi
-gradle_args=(
-  -Pmaplibre.android.backend="$usage_backend"
-  -Pmaplibre.android.abis="$abis"
-)
-if [[ "$usage_prebuilt" == "true" ]]; then
-  gradle_args+=(-Pmaplibre.android.prebuiltBuildRoot=build)
-fi
-./gradlew "${gradle_args[@]}" :bindings:kotlin:androidBuild
+./gradlew \
+  -Pmaplibre.localBuild=build \
+  -Pmaplibre.android.backend="$usage_backend" \
+  -Pmaplibre.android.abis="$abis" \
+  :bindings:kotlin:androidBuild
 '''
 
 [tasks."compile-android"]

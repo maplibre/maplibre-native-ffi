@@ -27,6 +27,10 @@ class HostPlatform private constructor(osName: String, arch: String) {
         else -> throw IllegalStateException("Unsupported MapLibre native platform: $osName/$arch")
       }
 
+  /** The native target platform that the JVM on this host loads. */
+  val targetPlatform: String
+    get() = JVM_TARGET_PLATFORMS.getValue(maplibreNativeClassifier)
+
   val androidNdkPrebuiltTag: String
     get() =
       when {
@@ -44,6 +48,16 @@ class HostPlatform private constructor(osName: String, arch: String) {
     get() = if (isWindows) ".cmd" else ""
 
   companion object {
+    /** The native target platform of each JVM runtime JAR classifier. */
+    val JVM_TARGET_PLATFORMS: Map<String, String> =
+      linkedMapOf(
+        "natives-linux-x64" to "linux-gnu-x64",
+        "natives-linux-arm64" to "linux-gnu-arm64",
+        "natives-macos-arm64" to "macos-arm64",
+        "natives-windows-x64" to "windows-x64",
+        "natives-windows-arm64" to "windows-arm64",
+      )
+
     fun current(): HostPlatform =
       HostPlatform(
         System.getProperty("os.name").lowercase(),

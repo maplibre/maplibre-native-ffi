@@ -49,11 +49,9 @@ internal fun runChildJvm(
   }
 }
 
-/** The library system properties this JVM runs with, for a child that loads the same library. */
+/** The library path this JVM runs with, for a child that loads the same library. */
 internal fun libraryProperties(): Map<String, String> =
-  listOf("org.maplibre.nativeffi.library.path", "org.maplibre.nativeffi.library.dirs")
-    .mapNotNull { name -> System.getProperty(name)?.let { name to it } }
-    .toMap()
+  mapOf("java.library.path" to System.getProperty("java.library.path"))
 
 /** The tests/graphics system property this JVM runs with, for a child that renders. */
 internal fun graphicsProperties(): Map<String, String> =

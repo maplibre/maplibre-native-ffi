@@ -1,7 +1,6 @@
 import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
 import java.io.File
-import org.gradle.api.provider.Provider
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
 import org.gradle.api.tasks.bundling.Zip
@@ -11,37 +10,23 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.tasks.CInteropProcess
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
-import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 import org.maplibre.nativeffi.gradle.MaplibreRuntimeBackend
 import org.maplibre.nativeffi.gradle.MaplibreRuntimeConvention
 import org.maplibre.nativeffi.gradle.VerifyAndroidRuntimeBackend
-import org.maplibre.nativeffi.gradle.VerifyMaplibreRuntimeInstall
 import org.maplibre.nativeffi.gradle.canonicalizeKmpRootMetadata
 import org.maplibre.nativeffi.gradle.catalogVersionInt
 import org.maplibre.nativeffi.gradle.embedMaplibreLicenseBundle
+import org.maplibre.nativeffi.gradle.kotlinNativeTargetPlatform
+import org.maplibre.nativeffi.gradle.localBuild
+import org.maplibre.nativeffi.gradle.localBuildPrefix
+import org.maplibre.nativeffi.gradle.nativePreset
+import org.maplibre.nativeffi.gradle.registerLocalBuildVerification
 import org.maplibre.nativeffi.gradle.requiredEnvironmentVariable
 
 data class NativeTargetConfiguration(
   val definitionFileName: String,
-  val targetPlatform: String,
   val staticLibraries: List<String> = listOf("libmaplibre-native-c.a"),
 )
-
-data class JvmRuntimeInstall(
-  val classifier: String,
-  val propertyName: String,
-  val installDirectory: File,
-  val explicitlyConfigured: Boolean,
-)
-
-val jvmTargetPlatforms =
-  linkedMapOf(
-    "natives-linux-x64" to "linux-gnu-x64",
-    "natives-linux-arm64" to "linux-gnu-arm64",
-    "natives-macos-arm64" to "macos-arm64",
-    "natives-windows-x64" to "windows-x64",
-    "natives-windows-arm64" to "windows-arm64",
-  )
 
 fun String.capitalized(): String = replaceFirstChar(Char::uppercaseChar)
 
@@ -58,7 +43,6 @@ fun nativeTargets(backend: MaplibreRuntimeBackend): Map<String, NativeTargetConf
             target.kotlinNativeTarget,
             NativeTargetConfiguration(
               "android-${backend.id}.def",
-              target.targetPlatform,
               listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
             ),
           )
@@ -67,7 +51,6 @@ fun nativeTargets(backend: MaplibreRuntimeBackend): Map<String, NativeTargetConf
           "linuxArm64",
           NativeTargetConfiguration(
             "linux-${backend.id}.def",
-            "linux-gnu-arm64",
             listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
           ),
         )
@@ -75,103 +58,59 @@ fun nativeTargets(backend: MaplibreRuntimeBackend): Map<String, NativeTargetConf
           "linuxX64",
           NativeTargetConfiguration(
             "linux-${backend.id}.def",
-            "linux-gnu-x64",
             listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
           ),
         )
-        put("macosArm64", NativeTargetConfiguration("macos-${backend.id}.def", "macos-arm64"))
+        put("macosArm64", NativeTargetConfiguration("macos-${backend.id}.def"))
       }
 
     MaplibreRuntimeBackend.METAL ->
       mapOf(
-        "iosArm64" to NativeTargetConfiguration("ios-metal.def", "ios-arm64"),
-        "iosSimulatorArm64" to NativeTargetConfiguration("ios-metal.def", "ios-simulator-arm64"),
-        "tvosArm64" to NativeTargetConfiguration("ios-metal.def", "tvos-arm64"),
-        "tvosSimulatorArm64" to NativeTargetConfiguration("ios-metal.def", "tvos-simulator-arm64"),
-        "macosArm64" to NativeTargetConfiguration("macos-metal.def", "macos-arm64"),
+        "iosArm64" to NativeTargetConfiguration("ios-metal.def"),
+        "iosSimulatorArm64" to NativeTargetConfiguration("ios-metal.def"),
+        "tvosArm64" to NativeTargetConfiguration("ios-metal.def"),
+        "tvosSimulatorArm64" to NativeTargetConfiguration("ios-metal.def"),
+        "macosArm64" to NativeTargetConfiguration("macos-metal.def"),
       )
   }
 
-fun registerRuntimeInstallVerification(
-  taskName: String,
-  installDirectory: Provider<File>,
-  installPropertyName: String,
-  explicitlyConfigured: Boolean,
-  requireExplicitInput: Boolean,
-  backend: String,
-  targetPlatform: String,
-) =
-  tasks.register<VerifyMaplibreRuntimeInstall>(taskName) {
-    installDirectoryPath.set(installDirectory.map(File::getAbsolutePath))
-    this.installPropertyName.set(installPropertyName)
-    this.explicitlyConfigured.set(explicitlyConfigured)
-    this.requireExplicitInput.set(requireExplicitInput)
-    expectedBackend.set(backend)
-    expectedTargetPlatform.set(targetPlatform)
-  }
+/** The install prefix in the local build that serves [targetPlatform] with [backend]. */
+fun runtimeInstall(targetPlatform: String, backend: String): File? = localBuild?.let {
+  localBuildPrefix(it, nativePreset(targetPlatform, backend))
+}
 
-fun configureJvmRuntimeArtifacts(
-  backend: String,
-  classifierTargetPlatforms: Map<String, String>,
-  maplibreNativeC: MaplibreNativeCArtifact,
-) {
-  val hostClassifier = HostPlatform.current().maplibreNativeClassifier
-  val configuredInstalls = classifierTargetPlatforms.mapNotNull { (classifier, _) ->
-    val propertyName = "maplibre.runtime.$backend.jvm.$classifier.installDir"
-    providers.gradleProperty(propertyName).orNull?.let {
-      JvmRuntimeInstall(classifier, propertyName, rootProject.file(it), true)
-    }
-  }
-  val runtimeInstalls = configuredInstalls.ifEmpty {
-    if (hostClassifier in classifierTargetPlatforms) {
-      listOf(
-        JvmRuntimeInstall(
-          hostClassifier,
-          "maplibre.runtime.$backend.jvm.$hostClassifier.installDir",
-          maplibreNativeC.installDir,
-          false,
-        ),
-      )
-    } else {
-      emptyList()
-    }
-  }
-
-  val runtimeJars = runtimeInstalls.map { runtimeInstall ->
-    val taskSuffix = runtimeInstall.classifier.taskSuffix()
-    val verifyRuntime =
-      registerRuntimeInstallVerification(
-        taskName = "verifyJvm${taskSuffix}RuntimeArtifact",
-        installDirectory = providers.provider { runtimeInstall.installDirectory },
-        installPropertyName = runtimeInstall.propertyName,
-        explicitlyConfigured = runtimeInstall.explicitlyConfigured,
-        requireExplicitInput = false,
-        backend = backend,
-        targetPlatform = classifierTargetPlatforms.getValue(runtimeInstall.classifier),
-      )
+fun configureJvmRuntimeArtifacts(backend: String, classifiers: Collection<String>) {
+  val runtimeJars = classifiers.map { classifier ->
+    val targetPlatform = HostPlatform.JVM_TARGET_PLATFORMS.getValue(classifier)
+    val taskSuffix = classifier.taskSuffix()
+    val verifyLocalBuild =
+      registerLocalBuildVerification("verifyJvm${taskSuffix}LocalBuild", targetPlatform, backend)
+    val install = runtimeInstall(targetPlatform, backend)
 
     tasks.register<Jar>("jvm${taskSuffix}RuntimeJar") {
       group = "build"
-      description = "Packages the $backend native runtime for ${runtimeInstall.classifier}."
-      dependsOn(verifyRuntime)
-      archiveClassifier.set(runtimeInstall.classifier)
+      description = "Packages the $backend native runtime for $classifier."
+      dependsOn(verifyLocalBuild)
+      archiveClassifier.set(classifier)
       destinationDirectory.set(layout.buildDirectory.dir("libs"))
 
-      val resourcePath = "META-INF/maplibre-native-ffi/${runtimeInstall.classifier}"
-      // A build tree's install also holds the test graphics fixtures, which the
-      // runtime leaves out.
-      from(runtimeInstall.installDirectory.resolve("lib")) {
-        include("*.so", "*.so.*", "*.dylib")
-        exclude("*mln_test_graphics*")
-        into(resourcePath)
-      }
-      from(runtimeInstall.installDirectory.resolve("bin")) {
-        include("*.dll")
-        exclude("*mln_test_graphics*")
-        into(resourcePath)
-      }
-      from(runtimeInstall.installDirectory.resolve("share/maplibre-native-c/licenses")) {
-        into("META-INF/licenses/maplibre-native-c")
+      if (install != null) {
+        val resourcePath = "META-INF/maplibre-native-ffi/$classifier"
+        // A build tree's install also holds the test graphics fixtures, which the
+        // runtime leaves out.
+        from(install.resolve("lib")) {
+          include("*.so", "*.so.*", "*.dylib")
+          exclude("*mln_test_graphics*")
+          into(resourcePath)
+        }
+        from(install.resolve("bin")) {
+          include("*.dll")
+          exclude("*mln_test_graphics*")
+          into(resourcePath)
+        }
+        from(install.resolve("share/maplibre-native-c/licenses")) {
+          into("META-INF/licenses/maplibre-native-c")
+        }
       }
       from(rootProject.file("LICENSE")) { into("META-INF") }
     }
@@ -196,52 +135,18 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
       expectedBackend.set(backend.id)
     }
 
+  // The binding project checks the local build of each ABI before it packages the libraries.
   tasks.configureEach {
     if (name == "preAndroidMainBuild" || name == "mergeAndroidMainJniLibFolders") {
       dependsOn(verifyBackend, ":bindings:kotlin:packageAndroidRuntimeLibraries")
     }
   }
 
-  val prebuiltInstallRoot = providers.gradleProperty("maplibre.android.prebuiltInstallRoot")
-  val prebuiltBuildRoot = providers.gradleProperty("maplibre.android.prebuiltBuildRoot")
-  check(!(prebuiltInstallRoot.isPresent && prebuiltBuildRoot.isPresent)) {
-    "Configure only one of maplibre.android.prebuiltInstallRoot and maplibre.android.prebuiltBuildRoot"
-  }
-  val verifyPublicationInputs =
-    tasks.register("verifyAndroidRuntimePublicationInputs") { dependsOn(verifyBackend) }
   val androidTargets =
     AndroidTarget.parseAbis(
       providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS),
     )
-  val selectedInstalls = mutableListOf<File>()
-  androidTargets.forEach { target ->
-    val preset = target.cmakePreset(backend.id)
-    val propertyName =
-      if (prebuiltBuildRoot.isPresent) {
-        "maplibre.android.prebuiltBuildRoot"
-      } else {
-        "maplibre.android.prebuiltInstallRoot"
-      }
-    val selectedInstall =
-      prebuiltBuildRoot
-        .map { rootProject.file(it).resolve(preset).resolve("install") }
-        .orElse(prebuiltInstallRoot.map { rootProject.file(it).resolve(preset) })
-        .getOrElse(rootProject.file("build/$preset/install"))
-    selectedInstalls.add(selectedInstall)
-    val verifyInput =
-      registerRuntimeInstallVerification(
-        taskName = "verifyAndroid${target.taskSuffix}RuntimePublicationInput",
-        installDirectory = providers.provider { selectedInstall },
-        installPropertyName = propertyName,
-        explicitlyConfigured = prebuiltInstallRoot.isPresent || prebuiltBuildRoot.isPresent,
-        requireExplicitInput = true,
-        backend = backend.id,
-        targetPlatform = target.targetPlatform,
-      )
-    verifyPublicationInputs.configure { dependsOn(verifyInput) }
-  }
-
-  val referenceInstall = selectedInstalls.first()
+  val referenceInstall = runtimeInstall(androidTargets.first().targetPlatform, backend.id) ?: return
   // Resolve the NOTICE from the SDK Gradle selected, which is the same SDK whose
   // NDK supplies the statically linked libc++. Reading ANDROID_HOME directly
   // would pair the library with a notice from a different NDK whenever
@@ -323,12 +228,6 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
       from(generatePrefabPackage) { into("prefab") }
     }
   }
-
-  tasks.configureEach {
-    if (name.startsWith("publishAndroidPublicationTo")) {
-      dependsOn(verifyPublicationInputs)
-    }
-  }
 }
 
 val runtime = extensions.getByType<MaplibreRuntimeConvention>()
@@ -338,17 +237,14 @@ val mavenGroup = providers.gradleProperty("maplibre.maven.group").get()
 val mavenVersion = providers.gradleProperty("maplibre.maven.version").get()
 val mavenArtifact = "maplibre-native-ffi-runtime-${backend.id}"
 
-apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
-
-val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
 val runtimeInteropDirectory =
   rootProject.layout.projectDirectory.dir("bindings/kotlin/runtimes/common")
 val configuredNativeTargets = nativeTargets(backend)
-val configuredJvmTargetPlatforms =
+val jvmClassifiers =
   if (backend == MaplibreRuntimeBackend.METAL) {
-    jvmTargetPlatforms.filterKeys { it == "natives-macos-arm64" }
+    listOf("natives-macos-arm64")
   } else {
-    jvmTargetPlatforms
+    HostPlatform.JVM_TARGET_PLATFORMS.keys
   }
 
 extensions.configure<KotlinMultiplatformExtension> {
@@ -361,13 +257,14 @@ extensions.configure<KotlinMultiplatformExtension> {
       requireNotNull(configuredNativeTargets[name]) {
         "Unsupported ${backend.displayName} Kotlin/Native runtime target: $name"
       }
-    val nativeTargetName = name
-    val installPropertyName = "maplibre.runtime.$runtimeBackend.$nativeTargetName.installDir"
-    val configuredInstall = providers.gradleProperty(installPropertyName)
-    val runtimeInstallDir =
-      configuredInstall.map(rootProject::file).getOrElse(maplibreNativeC.installDir)
-    val runtimeArchives =
-      targetConfiguration.staticLibraries.map { runtimeInstallDir.resolve("lib/$it") }
+    val targetPlatform = kotlinNativeTargetPlatform(name)
+    val verifyLocalBuild =
+      registerLocalBuildVerification(
+        "verify${name.capitalized()}LocalBuild",
+        targetPlatform,
+        runtimeBackend,
+      )
+    val runtimeInstallDir = runtimeInstall(targetPlatform, runtimeBackend)
     val staticLibraryOptions =
       targetConfiguration.staticLibraries.flatMap { listOf("-staticLibrary", it) }.toTypedArray()
 
@@ -376,39 +273,29 @@ extensions.configure<KotlinMultiplatformExtension> {
         defFile(runtimeInteropDirectory.file(targetConfiguration.definitionFileName))
         includeDirs.headerFilterOnly(runtimeInteropDirectory.asFile)
         compilerOpts("-I${runtimeInteropDirectory.asFile}")
-        extraOpts(
-          "-libraryPath",
-          runtimeInstallDir.resolve("lib").absolutePath,
-          *staticLibraryOptions,
-        )
+        if (runtimeInstallDir != null) {
+          extraOpts(
+            "-libraryPath",
+            runtimeInstallDir.resolve("lib").absolutePath,
+            *staticLibraryOptions,
+          )
+        }
       }
 
-    val runtimeLicenseDirectory = runtimeInstallDir.resolve("share/maplibre-native-c/licenses")
     tasks.named<CInteropProcess>(runtimeInterop.interopProcessingTaskName) {
-      // Track archives that cinterop receives through -staticLibrary.
-      inputs.files(runtimeArchives).withPropertyName("maplibreNativeCArchives")
-      embedMaplibreLicenseBundle(runtimeLicenseDirectory)
-    }
-
-    val verifyPublicationInput =
-      registerRuntimeInstallVerification(
-        taskName = "verify${nativeTargetName.capitalized()}RuntimePublicationInput",
-        installDirectory = providers.provider { runtimeInstallDir },
-        installPropertyName = installPropertyName,
-        explicitlyConfigured = configuredInstall.isPresent,
-        requireExplicitInput = true,
-        backend = runtimeBackend,
-        targetPlatform = targetConfiguration.targetPlatform,
-      )
-    tasks.configureEach {
-      if (name.startsWith("publish${nativeTargetName.capitalized()}PublicationTo")) {
-        dependsOn(verifyPublicationInput)
+      dependsOn(verifyLocalBuild)
+      if (runtimeInstallDir != null) {
+        // Track archives that cinterop receives through -staticLibrary.
+        inputs
+          .files(targetConfiguration.staticLibraries.map { runtimeInstallDir.resolve("lib/$it") })
+          .withPropertyName("maplibreNativeCArchives")
+        embedMaplibreLicenseBundle(runtimeInstallDir.resolve("share/maplibre-native-c/licenses"))
       }
     }
   }
 }
 
-configureJvmRuntimeArtifacts(runtimeBackend, configuredJvmTargetPlatforms, maplibreNativeC)
+configureJvmRuntimeArtifacts(runtimeBackend, jvmClassifiers)
 
 if (backend != MaplibreRuntimeBackend.METAL) {
   configureAndroidRuntimePublication(backend)

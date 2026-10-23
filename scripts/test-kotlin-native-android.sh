@@ -14,7 +14,7 @@ mise run //:android-sdk-packages --native-only
 # Kotlin's bundled Android toolchain contains an Intel-only macOS linker.
 toolchain=$("$MISE_MONOREPO_ROOT/scripts/android-ndk-prebuilt.sh")
 ./gradlew \
-  -PmaplibreNativeCInstallDir="build/$preset/install" \
+  -Pmaplibre.localBuild="build/$preset/install" \
   -Pmaplibre.android.nativeTestToolchain="$toolchain" \
   ":bindings:kotlin:linkDebugTest${target/androidNative/AndroidNative}"
 runner_args=(300 "$abi" "build/$preset/install/lib/libmaplibre-native-c.so")

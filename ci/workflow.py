@@ -174,7 +174,7 @@ def android_commands(preset: str, abi: str) -> list[str]:
     else:
         commands = [
             f"mise run //bindings/kotlin:build {preset}",
-            f"mise run //bindings/kotlin:android-build {arguments} --prebuilt",
+            f"mise run //bindings/kotlin:android-build {arguments}",
             f"mise run //bindings/go:build {preset}",
             f"mise run //bindings/rust:build {preset}",
             f"mise run //bindings/zig:build {preset}",

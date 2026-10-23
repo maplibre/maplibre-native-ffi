@@ -3,35 +3,25 @@ package org.maplibre.nativeffi.gradle
 import groovy.json.JsonSlurper
 import java.io.File
 
-class MaplibreNativeCArtifact(val installDir: File, val hostLibraryDirs: List<File>) {
-  val libraryPath: File
-    get() = runtimeLibraryDir.resolve(libraryFileName())
+/** The C library in one install prefix, as this host's linker and JVM see it. */
+class MaplibreNativeCArtifact(val installDir: File) {
+  /** The directory that holds the shared libraries. */
+  val runtimeLibraryDir: File
+    get() = installDir.resolve(if (HostPlatform.current().isWindows) "bin" else "lib")
 
   /** The tests/graphics library that a test build installs beside the C library. */
   val testGraphicsLibraryPath: File
     get() =
       runtimeLibraryDir.resolve(
         when {
-          targetIsWindows() -> "mln_test_graphics.dll"
-          targetIsMac() -> "libmln_test_graphics.dylib"
+          HostPlatform.current().isWindows -> "mln_test_graphics.dll"
+          HostPlatform.current().isMac -> "libmln_test_graphics.dylib"
           else -> "libmln_test_graphics.so"
         },
       )
 
-  val includeDirs: List<File>
-    get() = listOf(installDir.resolve("include"))
-
-  val linkDirs: List<File>
-    get() = listOf(installDir.resolve("lib"))
-
-  val runtimeLibraryDirs: List<File>
-    get() = listOf(runtimeLibraryDir)
-
-  val loaderLibraryDirs: List<File>
-    get() = runtimeLibraryDirs + hostLibraryDirs
-
-  val runtimeLinkLibraryDirs: List<File>
-    get() = runtimeLibraryDirs + hostLibraryDirs
+  val linkDir: File
+    get() = installDir.resolve("lib")
 
   val linkLibraries: List<String>
     get() = listOf("maplibre-native-c") + artifactStringList("staticLinkLibraries")
@@ -40,7 +30,7 @@ class MaplibreNativeCArtifact(val installDir: File, val hostLibraryDirs: List<Fi
     get() = artifactStringList("staticLinkFrameworks")
 
   private val artifactMetadata: Map<*, *> by lazy {
-    val descriptor = installDir.resolve("share/maplibre-native-c/artifact.json")
+    val descriptor = installDir.resolve(NATIVE_DESCRIPTOR_PATH)
     if (descriptor.isFile) JsonSlurper().parse(descriptor) as Map<*, *> else emptyMap<Any, Any>()
   }
 
@@ -49,18 +39,4 @@ class MaplibreNativeCArtifact(val installDir: File, val hostLibraryDirs: List<Fi
       require(value is String) { "$name in the native artifact descriptor must contain strings" }
       value
     } ?: emptyList()
-
-  private val runtimeLibraryDir: File
-    get() = installDir.resolve(if (targetIsWindows()) "bin" else "lib")
-
-  private fun libraryFileName(): String =
-    when {
-      targetIsWindows() -> "maplibre-native-c.dll"
-      targetIsMac() -> "libmaplibre-native-c.dylib"
-      else -> "libmaplibre-native-c.so"
-    }
-
-  private fun targetIsMac(): Boolean = HostPlatform.current().isMac
-
-  private fun targetIsWindows(): Boolean = HostPlatform.current().isWindows
 }
