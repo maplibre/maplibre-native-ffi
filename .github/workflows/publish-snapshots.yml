@@ -35,7 +35,6 @@ jobs:
       run_id: ${{ steps.source.outputs.run_id }}
       sha: ${{ steps.source.outputs.sha }}
       ci_run_url: ${{ steps.source.outputs.ci_run_url }}
-      base_version: ${{ steps.version.outputs.base }}
       kotlin_version: ${{ steps.version.outputs.kotlin }}
       native_snapshot_version: ${{ steps.version.outputs.native }}
       snapshot_version: ${{ steps.version.outputs.value }}
