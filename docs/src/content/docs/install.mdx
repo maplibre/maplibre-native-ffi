@@ -362,9 +362,11 @@ exe.root_module.addImport("maplibre_native_ffi", maplibre.module("maplibre_nativ
 ```
 
 The build downloads the C library for the target. Each target uses Metal on
-macOS, OpenGL on Android and OpenHarmony, and Vulkan elsewhere. Pass `.backend` as `.opengl`,
-`.metal`, or `.vulkan` to choose another. Windows targets use the `msvc` ABI,
-and an executable there needs `maplibre-native-c.dll` beside it:
+macOS, OpenGL on Android and OpenHarmony, and Vulkan elsewhere. Pass `.backend`
+as `.opengl`, `.metal`, or `.vulkan` to choose another. Windows needs the `msvc`
+ABI, which Zig doesn't choose by default, so build with
+`-Dtarget=x86_64-windows-msvc` or `-Dtarget=aarch64-windows-msvc`. An executable
+there needs `maplibre-native-c.dll` beside it:
 
 ```zig title="build.zig"
 const dll = maplibre.namedLazyPath("prefix").path(b, "bin/maplibre-native-c.dll");
