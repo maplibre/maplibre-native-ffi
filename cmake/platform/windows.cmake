@@ -74,8 +74,6 @@ function(mln_ffi_configure_platform target)
   include("${MLN_FFI_SOURCE_DIR}/vendor/icu.cmake")
 
   set(MLN_FFI_VENDOR_WINDOWS_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/collator.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/bidi.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/local_glyph_rasterizer.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/i18n.cpp
@@ -89,15 +87,12 @@ function(mln_ffi_configure_platform target)
 
   set(MLN_FFI_WINDOWS_SOURCES
       ${PROJECT_SOURCE_DIR}/src/platform/rust/http_file_source.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/rust/i18n.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/windows/logging_debugger.cpp)
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_WINDOWS_SOURCES})
   mln_ffi_target_project_sources(${target} ${MLN_FFI_WINDOWS_SOURCES})
-
-  set_source_files_properties(
-    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
-    PROPERTIES COMPILE_DEFINITIONS MBGL_USE_BUILTIN_ICU)
 
   target_include_directories(
     ${target}
