@@ -70,8 +70,8 @@ lacks, uses the language of the first nonempty environment variable among
 ### Locale expressions on OpenHarmony
 
 On OpenHarmony, the `number-format`, `collator`, and `resolved-locale`
-expressions use the system's ICU and its locale data. An expression without a
-locale, or with a language that the data lacks, uses the system language.
+expressions use the system's locale data. An expression without a locale, or
+with a language that the data lacks, uses the system language.
 
 ## Render session
 

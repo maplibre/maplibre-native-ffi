@@ -7,6 +7,7 @@
 // ArkTS runtime and the image decoders this library links do, so a process
 // that loads only libicu.so would fail every lookup.
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -271,8 +272,16 @@ auto formatNumber(
   std::optional<uint8_t> minFractionDigits,
   std::optional<uint8_t> maxFractionDigits
 ) -> std::string {
-  // ICU reads the first three characters of a longer code.
-  if (!currency.empty() && currency.size() != 3) {
+  // ICU takes any three invariant characters as a code, and the first three of
+  // a longer one.
+  const auto letter = [](char character) -> bool {
+    return (character >= 'A' && character <= 'Z') ||
+           (character >= 'a' && character <= 'z');
+  };
+  if (
+    !currency.empty() &&
+    (currency.size() != 3 || !std::ranges::all_of(currency, letter))
+  ) {
     throw util::LocaleException("Currency is not an ISO 4217 code");
   }
   const auto id = resolve(localeId);

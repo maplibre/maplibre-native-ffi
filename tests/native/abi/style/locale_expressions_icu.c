@@ -31,7 +31,7 @@ static void open_map(locale_map* map) {
     MLN_BUFFER_LITERAL(
       "{\"version\":8,\"sources\":{\"point\":{\"type\":\"geojson\",\"data\":{"
       "\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":"
-      "[0,0]},\"properties\":{\"currency\":\"US\"}}}},\"layers\":[{\"id\":"
+      "[0,0]},\"properties\":{\"currency\":\"US$\"}}}},\"layers\":[{\"id\":"
       "\"point\",\"type\":\"circle\",\"source\":\"point\"}]}"
     )
   );
