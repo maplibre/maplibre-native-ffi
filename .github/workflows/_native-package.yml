@@ -129,7 +129,9 @@ jobs:
           fi
       # The snapshot release also holds the binding packages, which their own
       # jobs replace. SHA256SUMS lists every other native asset, so the one on
-      # the release names the native assets that this publish replaces.
+      # the release names the native assets that this publish replaces. It
+      # uploads last, so a publish that fails before then leaves that list for
+      # its rerun.
       - name: Record the replaced snapshot assets
         if: ${{ !inputs.release }}
         env:
@@ -163,7 +165,6 @@ jobs:
           files: |
             build/packages/native/release/*.tar.gz
             build/packages/native/release/MaplibreNativeC.xcframework.zip
-            build/packages/native/release/SHA256SUMS
       - name: Remove stale snapshot assets
         if: ${{ !inputs.release }}
         env:
@@ -178,6 +179,12 @@ jobs:
               gh release delete-asset "$PUBLISH_TAG" "$name" --yes
             fi
           done < <(jq -r '.assets[].name' <<<"$release")
+      - name: Upload the checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release upload "$PUBLISH_TAG"
+          build/packages/native/release/SHA256SUMS --clobber
       - name: Verify the release assets
         env:
           EXPECTED_DRAFT: ${{ inputs.release }}

@@ -23,8 +23,15 @@ for package in "${packages[@]}"; do
 done
 
 # Each publisher replaces only the assets that it owns, after uploading their
-# successors, so a failed publish leaves the previous packages in place.
-gh release upload "$tag" "${packages[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+# successors, so a failed publish leaves the previous packages in place. A
+# failed upload withdraws whatever of this run it published, because a partial
+# set beside the previous one would let a restore mix the two.
+if ! gh release upload "$tag" "${packages[@]}" --repo "$GITHUB_REPOSITORY" --clobber; then
+  for name in "${names[@]}"; do
+    gh release delete-asset "$tag" "$name" --repo "$GITHUB_REPOSITORY" --yes || true
+  done
+  exit 1
+fi
 assets="$(
   gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets \
     --jq '.assets[].name'
