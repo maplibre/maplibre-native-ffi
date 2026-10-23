@@ -248,7 +248,8 @@ fn supported(id: &str) -> bool {
 }
 
 /// The ICU locale ID of the user's locale, or `en_US` when CLDR does not know
-/// its language.
+/// its language. An alternate sort order that CLDR also defines becomes the
+/// locale's collation.
 fn user_locale() -> String {
     let mut name = [0; LOCALE_NAME_MAX_LENGTH];
     // SAFETY: `name` has `LOCALE_NAME_MAX_LENGTH` writable UTF-16 units.
@@ -259,15 +260,23 @@ fn user_locale() -> String {
         .saturating_sub(1);
     let name = String::from_utf16_lossy(&name[..length]);
     // An alternate sort order follows an underscore, as in `de-DE_phoneb`.
-    let tag = name.split('_').next().unwrap_or_default();
-    locale_id(tag)
+    let (tag, sort) = name.split_once('_').unwrap_or((&name, ""));
+    let collation = match sort {
+        "phoneb" => "-u-co-phonebk",
+        "pronun" => "-u-co-zhuyin",
+        "radstr" => "-u-co-unihan",
+        "stroke" => "-u-co-stroke",
+        "tradnl" => "-u-co-trad",
+        _ => "",
+    };
+    locale_id(&format!("{tag}{collation}"))
         .filter(|id| supported(id))
         .unwrap_or_else(|| "en_US".to_owned())
 }
 
 /// Resolves a requested language tag to an ICU locale ID. An empty or
-/// unsupported tag takes the user's locale, keeping the requested Unicode
-/// extensions.
+/// unsupported tag takes the user's locale with the requested Unicode
+/// extensions, which replace any of the user's.
 fn resolve_locale(requested: &[u8]) -> String {
     let id = str::from_utf8(requested)
         .ok()
@@ -276,11 +285,17 @@ fn resolve_locale(requested: &[u8]) -> String {
     if supported(&id) {
         return id;
     }
-    let user = user_locale();
-    match id.split_once('@') {
-        Some((_, keywords)) => format!("{user}@{keywords}"),
-        None => user,
+    let mut user = user_locale();
+    let keywords = id.split_once('@').map_or("", |(_, keywords)| keywords);
+    for (name, value) in keywords
+        .split(';')
+        .filter_map(|keyword| keyword.split_once('='))
+    {
+        if let Ok(name) = c_string(name) {
+            user = with_keyword(&user, &name, value).unwrap_or(user);
+        }
     }
+    user
 }
 
 /// The value of a keyword in an ICU locale ID, such as `phonebook` for
