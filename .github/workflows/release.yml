@@ -141,6 +141,68 @@ jobs:
       tag: ${{ github.ref_name }}
       version: ${{ needs.source.outputs.version }}
 
+  python-wheels:
+    name: Python wheels
+    needs:
+      - source
+    permissions:
+      actions: read
+      contents: read
+    uses: ./.github/workflows/_python-wheels.yml
+    with:
+      run_id: ${{ needs.source.outputs.run_id }}
+      sha: ${{ needs.source.outputs.sha }}
+      version: ${{ needs.source.outputs.version }}
+
+  # PyPI's trusted publishing does not support reusable workflows, so the
+  # upload runs here, in the workflow that each project's publisher names. PyPI
+  # holds one pending publisher per workflow and environment, so each
+  # distribution publishes from an environment of its own.
+  python:
+    name: Python / ${{ matrix.distribution }}
+    needs:
+      - source
+      - native
+      - python-wheels
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distribution: maplibre-native-ffi
+            environment: pypi
+          - distribution: maplibre-native-ffi-runtime-opengl
+            environment: pypi-runtime-opengl
+          - distribution: maplibre-native-ffi-runtime-metal
+            environment: pypi-runtime-metal
+          - distribution: maplibre-native-ffi-runtime-vulkan
+            environment: pypi-runtime-vulkan
+    environment:
+      name: ${{ matrix.environment }}
+      url:
+        https://pypi.org/project/${{ matrix.distribution }}/${{
+        needs.source.outputs.version }}/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: python-wheel-*-${{ needs.source.outputs.sha }}
+          path: wheels
+          merge-multiple: true
+      - name: Select the distribution's wheels
+        env:
+          DISTRIBUTION: ${{ matrix.distribution }}
+        run: |
+          set -euo pipefail
+          mkdir dist
+          mv "wheels/${DISTRIBUTION//-/_}"-[0-9]*.whl dist/
+      # Skipping what PyPI already has lets a rerun resume a partial upload.
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          skip-existing: true
+
   # The docs quote the latest release, so republish them after it publishes.
   docs:
     name: Docs
@@ -149,6 +211,7 @@ jobs:
       - dotnet
       - go
       - kotlin
+      - python
       - rust
       - typescript
     runs-on: blacksmith-4vcpu-ubuntu-2404

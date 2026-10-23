@@ -1,0 +1,31 @@
+[build-system]
+requires = ["maturin>=1.15.0,<2"]
+build-backend = "maturin"
+
+# The release workflow stamps the version, the pin on the API distribution, and
+# the license files of the native library that the wheel embeds.
+[project]
+name = "maplibre-native-ffi-runtime-opengl"
+version = "0.0.0"
+description = "OpenGL runtime for the maplibre-native-ffi Python binding"
+requires-python = ">=3.14"
+license = "BSD-2-Clause"
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
+  "Programming Language :: Rust",
+]
+dependencies = ["maplibre-native-ffi==0.0.0"]
+
+[project.urls]
+Homepage = "https://maplibre.org/maplibre-native-ffi/"
+Documentation = "https://maplibre.org/maplibre-native-ffi/reference/python/"
+Repository = "https://github.com/maplibre/maplibre-native-ffi"
+Issues = "https://github.com/maplibre/maplibre-native-ffi/issues"
+
+[tool.maturin]
+manifest-path = "../../Cargo.toml"
+module-name = "maplibre_native_ffi_runtime_opengl._native"
+python-source = "python"
+features = ["pyo3/extension-module"]

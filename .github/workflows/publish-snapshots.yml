@@ -37,7 +37,7 @@ jobs:
       ci_run_url: ${{ steps.source.outputs.ci_run_url }}
       kotlin_version: ${{ steps.version.outputs.kotlin }}
       native_snapshot_version: ${{ steps.version.outputs.native }}
-      snapshot_version: ${{ steps.version.outputs.value }}
+      python_snapshot_version: ${{ steps.version.outputs.python }}
       dotnet_snapshot_version: ${{ steps.version.outputs.dotnet }}
       publish_docs: ${{ steps.decide.outputs.docs }}
       publish_packages: ${{ steps.decide.outputs.packages }}
@@ -123,133 +123,19 @@ jobs:
           stamp="$(date -u +%Y%m%d%H%M)"
           {
             echo "base=$base"
-            echo "value=0.1.0.dev$stamp"
+            echo "python=$base.dev$stamp"
             echo "dotnet=$base-dev.$stamp"
             echo "kotlin=0.1.0-SNAPSHOT"
             echo "native=0.0.0-dev.$stamp"
           } >> "$GITHUB_OUTPUT"
 
-  stage-python:
-    name: Python wheel / ${{ matrix.backend }}
-    needs:
-      - plan
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 120
-    if: ${{ needs.plan.outputs.publish_packages == 'true' }}
-    permissions:
-      actions: read
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - backend: vulkan
-            preset: linux-gnu-x64-vulkan
-            runner: blacksmith-4vcpu-ubuntu-2404
-          - backend: opengl
-            preset: linux-gnu-x64-egl
-            runner: blacksmith-4vcpu-ubuntu-2404
-          - backend: metal
-            preset: macos-arm64-metal
-            runner: blacksmith-6vcpu-macos-26
-            macos_deployment_target: "14.3"
-    env:
-      SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
-      SNAPSHOT_VERSION: ${{ needs.plan.outputs.snapshot_version }}
-    steps:
-      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
-        with:
-          ref: ${{ env.SNAPSHOT_SHA }}
-          persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
-        with:
-          target: ${{ matrix.preset }}
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          github-token: ${{ github.token }}
-          run-id: ${{ needs.plan.outputs.run_id }}
-          name: native-package-${{ matrix.preset }}-${{ env.SNAPSHOT_SHA }}
-          path: build/packages/native/python-input
-      - name: Install packaged native artifact
-        run: >-
-          mise run install-native-package ${{ matrix.preset }}
-          build/packages/native/python-input/maplibre-native-c-${{ matrix.preset
-          }}.tar.gz
-      # The native artifact is built for macOS 14.3, and maturin derives the
-      # wheel's platform tag from this variable. Left unset, the tag would
-      # promise older releases a dylib they cannot load.
-      - run: mise run //bindings/python:build ${{ matrix.preset }}
-        env:
-          MISE_TASK_SKIP: "//:build"
-          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macos_deployment_target }}
-      - name: Prepare backend wheel
-        shell: bash
-        run: |
-          set -euo pipefail
-          wheels=(target/wheels/*.whl)
-          if [[ "${#wheels[@]}" -ne 1 ]]; then
-            echo "expected one wheel, found ${#wheels[@]}" >&2
-            exit 1
-          fi
-          mise run --no-deps ci:prepare-python-snapshot relabel \
-            "${wheels[0]}" build/packages/python/wheels \
-            "${{ matrix.backend }}" "$SNAPSHOT_VERSION"
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: python-wheel-${{ matrix.backend }}-${{ env.SNAPSHOT_SHA }}
-          path: build/packages/python/wheels/*.whl
-          if-no-files-found: error
-          retention-days: 1
-
-  python-index:
-    name: Python package index
-    needs:
-      - plan
-      - stage-python
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 15
-    permissions:
-      actions: read
-      contents: read
-    env:
-      SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
-    steps:
-      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
-        with:
-          ref: ${{ env.SNAPSHOT_SHA }}
-          persist-credentials: false
-      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
-        with:
-          cache: false
-          install_args: python
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          pattern: python-wheel-*-${{ env.SNAPSHOT_SHA }}
-          path: build/packages/python/wheels
-          merge-multiple: true
-      - run: >-
-          mise run --no-deps ci:prepare-python-snapshot index
-          build/packages/python/wheels build/packages/python/simple
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: python-simple-index-${{ env.SNAPSHOT_SHA }}
-          path: build/packages/python/simple
-          if-no-files-found: error
-          retention-days: 1
-
   docs-pages:
     name: Docs Pages
     needs:
       - plan
-      - python-index
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 60
-    # Preserve the live Python index when its staging fails.
-    if: >-
-      ${{
-        always() && needs.plan.result == 'success' &&
-        needs.plan.outputs.publish_docs == 'true'
-      }}
+    if: ${{ needs.plan.outputs.publish_docs == 'true' }}
     permissions:
       actions: read
       contents: read
@@ -284,16 +170,6 @@ jobs:
       - run: mise run //docs:build
         env:
           MISE_TASK_SKIP: "//:build"
-      - if: ${{ needs.python-index.result == 'success' }}
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: python-simple-index-${{ env.SNAPSHOT_SHA }}
-          path: docs/dist/simple
-      - if: ${{ needs.python-index.result != 'success' }}
-        run: >-
-          mise run --no-deps ci:prepare-python-snapshot mirror
-          https://maplibre.github.io/maplibre-native-ffi/simple/
-          docs/dist/simple
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: docs/dist
@@ -302,8 +178,6 @@ jobs:
     name: Deploy Docs Pages
     needs:
       - docs-pages
-    # Deploy a site that preserved a failed Python index.
-    if: ${{ !cancelled() && needs.docs-pages.result == 'success' }}
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
     permissions:
@@ -388,6 +262,52 @@ jobs:
           mise run --no-deps ci:replace-snapshot-packages '*.nupkg'
           build/packages/dotnet/nupkgs/*.nupkg
 
+  python-wheels:
+    name: Python wheels
+    needs:
+      - plan
+    if: ${{ needs.plan.outputs.publish_packages == 'true' }}
+    permissions:
+      actions: read
+      contents: read
+    uses: ./.github/workflows/_python-wheels.yml
+    with:
+      run_id: ${{ needs.plan.outputs.run_id }}
+      sha: ${{ needs.plan.outputs.sha }}
+      version: ${{ needs.plan.outputs.python_snapshot_version }}
+
+  publish-python:
+    name: Python snapshot
+    needs:
+      - plan
+      - python-wheels
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
+    steps:
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          ref: ${{ env.SNAPSHOT_SHA }}
+          persist-credentials: false
+      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        with:
+          cache: false
+          install_args: python
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: python-wheel-*-${{ env.SNAPSHOT_SHA }}
+          path: build/packages/python/wheels
+          merge-multiple: true
+      - name: Replace the wheels
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          mise run --no-deps ci:replace-snapshot-packages '*.whl'
+          build/packages/python/wheels/*.whl
+
   required:
     name: publishing-required
     runs-on: blacksmith-2vcpu-ubuntu-2404
@@ -397,8 +317,8 @@ jobs:
     needs:
       - plan
       - docs-pages
-      - stage-python
-      - python-index
+      - python-wheels
+      - publish-python
       - publish-dotnet
       - deploy-docs
       - publish-kotlin

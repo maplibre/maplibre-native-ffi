@@ -45,6 +45,6 @@
 "VIEW-01" = "bindings/python/tests/test_render.py::test_a_frame_view_holds_its_owners_until_its_scope_ends"
 "REND-01" = "bindings/python/tests/test_render.py::test_an_owned_texture_renders_pixels_the_binding_reads_back"
 "REND-02" = "bindings/python/tests/test_render.py::test_a_caller_driven_session_is_serviced_from_a_python_thread"
-"PLAT-01" = "bindings/python/tests/test_loader.py::test_the_package_loads_its_extension_and_finds_native_directories_once"
+"PLAT-01" = "bindings/python/tests/test_package.py::test_the_package_loads_the_extension_of_its_runtime"
 "PLAT-02" = "bindings/python/tests/test_lifecycle.py::test_interpreter_shutdown_with_live_handles_and_callbacks_exits_cleanly"
 "PLAT-03" = "bindings/python/tests/test_lifecycle.py::test_cyclic_gc_reclaims_a_request_and_the_callback_that_closes_it"

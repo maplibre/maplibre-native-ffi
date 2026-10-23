@@ -539,10 +539,6 @@ run = "pnpm dlx actions-up"
 description = "Prepare native package snapshot or tagged release assets."
 run = 'python3 ci/native_package_release.py "$@"'
 
-[tasks."ci:prepare-python-snapshot"]
-description = "Relabel a backend wheel or generate the Python snapshot index."
-run = 'python3 ci/python_snapshot.py "$@"'
-
 [tasks."ci:release-version"]
 description = "Validate a release tag, or print the next release version."
 run = 'python3 ci/release_version.py "$@"'

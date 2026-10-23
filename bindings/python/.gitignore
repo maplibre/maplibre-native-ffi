@@ -1,4 +1,6 @@
 .venv/
 dist/
-python/maplibre_native_ffi/_native*.so
-python/maplibre_native_ffi/_native*.pyd
+# Written by the release workflow, and kept in the wheels by `license-files`.
+/LICENSE
+/runtimes/*/LICENSE
+/runtimes/*/licenses/

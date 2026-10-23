@@ -257,32 +257,63 @@ go get github.com/maplibre/maplibre-native-ffi/bindings/go@main
 
 ### Python
 
-<SnapshotOnly />
+Install the binding and the runtime for your backend from
+[PyPI](https://pypi.org/project/maplibre-native-ffi/). The runtime holds the
+binding's native extension, with the C library linked in.
 
-Depend on the distribution for your backend and resolve it from the snapshot
-index. The wheels contain the native library.
+```bash frame="terminal"
+pip install maplibre-native-ffi maplibre-native-ffi-runtime-vulkan
+```
+
+Take one runtime distribution. Importing `maplibre_native_ffi` raises
+`ImportError` unless exactly one is installed.
+
+- `maplibre-native-ffi-runtime-opengl`
+- `maplibre-native-ffi-runtime-metal`
+- `maplibre-native-ffi-runtime-vulkan`
+
+The wheels serve Python 3.14 and later. The OpenGL and Vulkan runtimes serve
+Linux with glibc and Windows, for x64 and arm64, and macOS 14.3 and later for
+arm64. The Metal runtime serves macOS alone. To choose the runtime by platform,
+add an environment marker to each:
 
 ```toml title="pyproject.toml"
 [project]
-dependencies = ["maplibre-native-ffi-vulkan"]
+dependencies = [
+  "maplibre-native-ffi",
+  "maplibre-native-ffi-runtime-metal; sys_platform == 'darwin'",
+  "maplibre-native-ffi-runtime-opengl; sys_platform != 'darwin'",
+]
+```
+
+For the snapshot channel, install both distributions from the
+[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot).
+A snapshot's version is a development release of the next release, so pip
+takes it only with `--pre`.
+
+```bash frame="terminal"
+pip install --pre maplibre-native-ffi maplibre-native-ffi-runtime-vulkan --find-links https://github.com/maplibre/maplibre-native-ffi/releases/expanded_assets/unstable-native-snapshot
+```
+
+With uv, name the snapshot release as a flat index for both distributions:
+
+```toml title="pyproject.toml"
+[project]
+dependencies = ["maplibre-native-ffi", "maplibre-native-ffi-runtime-vulkan"]
 
 [[tool.uv.index]]
 name = "maplibre-snapshots"
-url = "https://maplibre.github.io/maplibre-native-ffi/simple/"
+url = "https://github.com/maplibre/maplibre-native-ffi/releases/expanded_assets/unstable-native-snapshot"
+format = "flat"
 explicit = true
 
 [tool.uv.sources]
-maplibre-native-ffi-vulkan = { index = "maplibre-snapshots" }
+maplibre-native-ffi = { index = "maplibre-snapshots" }
+maplibre-native-ffi-runtime-vulkan = { index = "maplibre-snapshots" }
 ```
 
-This configuration uses uv, and resolves only this package from the snapshot
-index.
-
-Take one distribution:
-
-- `maplibre-native-ffi-opengl`
-- `maplibre-native-ffi-metal`
-- `maplibre-native-ffi-vulkan`
+The snapshot release holds only the latest wheels, so a lockfile that names an
+older snapshot fails to install once the snapshot moves on.
 
 ### Rust
 

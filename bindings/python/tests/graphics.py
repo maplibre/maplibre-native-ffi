@@ -55,6 +55,14 @@ def _library_path() -> Path:
 
 @cache
 def _library() -> ctypes.CDLL:
+    # Python searches only registered directories for a DLL's dependencies. A
+    # runner can keep the Vulkan loader that the library links outside of them.
+    if sys.platform == "win32":
+        for directory in os.environ.get(
+            "MAPLIBRE_NATIVE_C_RUNTIME_LIBRARY_DIRS", ""
+        ).split(os.pathsep):
+            if directory:
+                os.add_dll_directory(directory)
     library = ctypes.CDLL(str(_library_path()))
     library.mln_test_graphics_last_error.restype = ctypes.c_char_p
     library.mln_test_graphics_create.argtypes = (ctypes.c_uint32,)

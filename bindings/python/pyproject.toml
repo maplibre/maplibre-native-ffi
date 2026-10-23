@@ -1,31 +1,34 @@
 [build-system]
-requires = ["maturin>=1.15.0,<2"]
-build-backend = "maturin"
+requires = ["uv_build>=0.13.1,<0.14"]
+build-backend = "uv_build"
 
+# This distribution holds the Python modules alone. A runtime distribution under
+# runtimes/ holds the native extension for one backend. The release workflow
+# stamps the version and the license file.
 [project]
 name = "maplibre-native-ffi"
 version = "0.0.0"
 description = "Low-level Python bindings for MapLibre Native FFI"
+readme = "README.md"
 requires-python = ">=3.14"
 license = "BSD-2-Clause"
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: 3.15",
-  "Programming Language :: Rust",
 ]
 dependencies = []
 
+[project.urls]
+Homepage = "https://maplibre.org/maplibre-native-ffi/"
+Documentation = "https://maplibre.org/maplibre-native-ffi/reference/python/"
+Repository = "https://github.com/maplibre/maplibre-native-ffi"
+Issues = "https://github.com/maplibre/maplibre-native-ffi/issues"
+
 [dependency-groups]
-dev = [
-  "maturin>=1.15.0,<2 ; sys_platform != 'linux'",
-  "maturin>=1.15.0,<2 ; sys_platform == 'linux'",
-  "pytest>=9,<10",
-]
+dev = ["maturin>=1.15.0,<2", "pytest>=9,<10"]
 docs = ["pdoc>=16,<17"]
 android = ["cibuildwheel>=4.3.1,<5"]
 
-[tool.maturin]
-module-name = "maplibre_native_ffi._native"
-python-source = "python"
-features = ["pyo3/extension-module"]
+[tool.uv.build-backend]
+module-root = "python"

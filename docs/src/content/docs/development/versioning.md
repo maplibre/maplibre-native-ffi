@@ -58,6 +58,19 @@ publish by hand. Add a trusted publishing policy for
 `nuget.org` environment, and set the repository variable `NUGET_USER` to the
 NuGet.org account that owns the policy.
 
+PyPI lets a pending trusted publisher create a project, so the release workflow
+publishes every Python version, the first included. PyPI holds one pending
+publisher per workflow and environment, so each distribution needs a trusted
+publisher for `maplibre/maplibre-native-ffi`, with the workflow `release.yml`
+and an environment of its own:
+
+| Distribution                         | Environment           |
+| ------------------------------------ | --------------------- |
+| `maplibre-native-ffi`                | `pypi`                |
+| `maplibre-native-ffi-runtime-opengl` | `pypi-runtime-opengl` |
+| `maplibre-native-ffi-runtime-metal`  | `pypi-runtime-metal`  |
+| `maplibre-native-ffi-runtime-vulkan` | `pypi-runtime-vulkan` |
+
 ## Snapshots
 
 The Publish snapshots workflow runs daily and publishes every snapshot channel
@@ -70,4 +83,4 @@ pub.dev, crates.io, npm, PyPI, and NuGet.org keep every version that they
 publish, so they get no snapshot channel. The floating channels replace their
 contents on each publish: Maven Central snapshots for Kotlin, and the
 `unstable-native-snapshot` GitHub release for the C library, the Zig package,
-and the .NET packages.
+the .NET packages, and the Python wheels.
