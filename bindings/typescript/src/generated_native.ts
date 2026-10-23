@@ -76,7 +76,7 @@ import type {
 } from "./generated_values.ts";
 
 /** The digest of the C headers that this facade and its addon came from. */
-export const ABI_DIGEST = "d606e4bef68ded52";
+export const ABI_DIGEST = "781c64590ac2ac88";
 
 /** The index of each completion decoder in the addon's decoder table. */
 export const Decoder = {

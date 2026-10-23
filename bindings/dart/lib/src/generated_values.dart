@@ -3658,13 +3658,13 @@ final class MapSnapshot extends _Value {
     this.fullyLoaded = false,
     this.renderingStatsViewEnabled = false,
     this.gestureInProgress = false,
-    this.transitionInProgress = false,
     this.eventMask = const RuntimeEventMask.fromRawValue(0),
     required this.latestRenderUpdateGeneration,
     required this.tile,
     required this.bounds,
     required this.freeCamera,
     required this.view,
+    this.transitionInProgress = false,
   });
 
   /// Debug overlay mask of `mln_map_debug_option` values.
@@ -3677,9 +3677,6 @@ final class MapSnapshot extends _Value {
 
   /// True while the map is inside a gesture.
   final bool gestureInProgress;
-
-  /// True while a camera command with a duration is still animating.
-  final bool transitionInProgress;
   final RuntimeEventMask eventMask;
 
   /// Generation of the latest render update the map published. A rendered frame
@@ -3694,6 +3691,9 @@ final class MapSnapshot extends _Value {
   /// `mln_map_projection_create()` converts coordinates for this view.
   final MapView view;
 
+  /// True while a camera command with a duration is still animating.
+  final bool transitionInProgress;
+
   @override
   List<Object?> get _members => [
     debugOptions,
@@ -3701,13 +3701,13 @@ final class MapSnapshot extends _Value {
     fullyLoaded,
     renderingStatsViewEnabled,
     gestureInProgress,
-    transitionInProgress,
     eventMask,
     latestRenderUpdateGeneration,
     tile,
     bounds,
     freeCamera,
     view,
+    transitionInProgress,
   ];
 }
 

@@ -1179,8 +1179,6 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   public var renderingStatsViewEnabled: Bool
   /// True while the map is inside a gesture.
   public var gestureInProgress: Bool
-  /// True while a camera command with a duration is still animating.
-  public var transitionInProgress: Bool
   public var eventMask: RuntimeEventMask
   /// Generation of the latest render update the map published. A rendered frame
   /// at or past it draws map state that includes every command this snapshot
@@ -1192,6 +1190,8 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   /// The map's camera, extent, projection mode, and viewport options.
   /// `mln_map_projection_create()` converts coordinates for this view.
   public var view: MapView
+  /// True while a camera command with a duration is still animating.
+  public var transitionInProgress: Bool
   public static var `default`: Self {
     Self(raw: mln_map_snapshot())
   }
@@ -1203,27 +1203,27 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     renderingStatsViewEnabled: Bool = MapSnapshot.default
       .renderingStatsViewEnabled,
     gestureInProgress: Bool = MapSnapshot.default.gestureInProgress,
-    transitionInProgress: Bool = MapSnapshot.default.transitionInProgress,
     eventMask: RuntimeEventMask = MapSnapshot.default.eventMask,
     latestRenderUpdateGeneration: UInt64 = MapSnapshot.default
       .latestRenderUpdateGeneration,
     tile: MapTileOptions = MapSnapshot.default.tile,
     bounds: BoundOptions = MapSnapshot.default.bounds,
     freeCamera: FreeCameraOptions = MapSnapshot.default.freeCamera,
-    view: MapView = MapSnapshot.default.view
+    view: MapView = MapSnapshot.default.view,
+    transitionInProgress: Bool = MapSnapshot.default.transitionInProgress
   ) {
     self.debugOptions = debugOptions
     self.generation = generation
     self.fullyLoaded = fullyLoaded
     self.renderingStatsViewEnabled = renderingStatsViewEnabled
     self.gestureInProgress = gestureInProgress
-    self.transitionInProgress = transitionInProgress
     self.eventMask = eventMask
     self.latestRenderUpdateGeneration = latestRenderUpdateGeneration
     self.tile = tile
     self.bounds = bounds
     self.freeCamera = freeCamera
     self.view = view
+    self.transitionInProgress = transitionInProgress
   }
 
   init(raw: mln_map_snapshot) {
@@ -1232,13 +1232,13 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     fullyLoaded = raw.fully_loaded
     renderingStatsViewEnabled = raw.rendering_stats_view_enabled
     gestureInProgress = raw.gesture_in_progress
-    transitionInProgress = raw.transition_in_progress
     eventMask = RuntimeEventMask(rawValue: raw.event_mask)
     latestRenderUpdateGeneration = raw.latest_render_update_generation
     tile = MapTileOptions(raw: raw.tile)
     bounds = BoundOptions(raw: raw.bounds)
     freeCamera = FreeCameraOptions(raw: raw.free_camera)
     view = MapView(raw: raw.view)
+    transitionInProgress = raw.transition_in_progress
   }
 }
 

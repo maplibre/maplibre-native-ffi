@@ -2776,7 +2776,6 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
     .fully_loaded = live.map->isFullyLoaded(),
     .rendering_stats_view_enabled = live.map->isRenderingStatsViewEnabled(),
     .gesture_in_progress = live.map->isGestureInProgress(),
-    .transition_in_progress = live.map->inTransition(),
     .event_mask = live.event_state->mask.load(std::memory_order_relaxed),
     .latest_render_update_generation =
       live.frontend->latest_update_generation(),
@@ -2797,7 +2796,8 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
     .free_camera = from_native_free_camera(live.map->getFreeCameraOptions()),
     .view = map_view_from_transform(
       live.map->getTransformState(), live.logical_extent.scale_factor
-    )
+    ),
+    .transition_in_progress = live.map->inTransition(),
   };
   const auto generation = snapshot.generation;
   {
