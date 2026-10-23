@@ -106,12 +106,16 @@ jobs:
           }}.tar.gz
       - name: Version and license the packages
         run: >-
-          mise run //bindings/python:prepare-release ${{ inputs.version }} ${{
-          matrix.preset }}
+          mise run --no-deps //bindings/python:prepare-release ${{
+          inputs.version }} ${{ matrix.preset }}
       # The native artifact is built for macOS 14.3, and maturin derives the
       # wheel's platform tag from this variable. Left unset, the tag would
-      # promise older releases a dylib they cannot load.
-      - run: mise run //bindings/python:build-runtime ${{ matrix.preset }}
+      # promise older releases a dylib they cannot load. The stamped version no
+      # longer matches uv.lock, so nothing after the stamp may run the uv
+      # dependency provider.
+      - run:
+          mise run --no-deps //bindings/python:build-runtime ${{ matrix.preset
+          }}
         env:
           MISE_TASK_SKIP: "//:build"
           MACOSX_DEPLOYMENT_TARGET: "14.3"
