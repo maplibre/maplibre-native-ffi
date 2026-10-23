@@ -1,0 +1,153 @@
+Treats an empty image name as no image, as the style spec's reference
+implementation does, so an icon-image or *-pattern that evaluates to "" is
+neither requested nor reported missing
+(https://github.com/maplibre/maplibre-native-ffi/issues/819).
+Upstream: not proposed
+
+diff --git a/src/mln/layout/pattern_layout.hpp b/src/mln/layout/pattern_layout.hpp
+index 14cfa79e78b7..732f1741e38f 100644
+--- a/src/mln/layout/pattern_layout.hpp
++++ b/src/mln/layout/pattern_layout.hpp
+@@ -100,6 +100,12 @@ public:
+           retainFeaturesById(parameters.retainFeaturesById) {
+         assert(!group.empty());
+         auto leaderLayerProperties = staticImmutableCast<LayerPropertiesType>(group.front());
++        // An empty image name means no pattern, so it is neither requested nor reported missing.
++        const auto addPatternDependency = [&](const std::string& imageID) {
++            if (!imageID.empty()) {
++                layoutParameters.imageDependencies.emplace(imageID, ImageType::Pattern);
++            }
++        };
+         PropertyEvaluationParameters evaluationParameters(zoom);
+         evaluationParameters.globalState = parameters.globalState;
+         layout = leaderLayerProperties->layerImpl().layout.evaluate(evaluationParameters);
+@@ -118,8 +124,8 @@ public:
+                 hasPattern = true;
+             } else if (!constantPattern.to.id().empty()) {
+                 hasPattern = true;
+-                layoutParameters.imageDependencies.emplace(constantPattern.to.id(), ImageType::Pattern);
+-                layoutParameters.imageDependencies.emplace(constantPattern.from.id(), ImageType::Pattern);
++                addPatternDependency(constantPattern.to.id());
++                addPatternDependency(constantPattern.from.id());
+             }
+             layerPropertiesMap.emplace(layerId, layerProperties);
+         }
+@@ -162,9 +168,9 @@ public:
+                                                                       parameters.tileID.canonical,
+                                                                       PatternPropertyType::defaultValue());
+ 
+-                            layoutParameters.imageDependencies.emplace(min.to.id(), ImageType::Pattern);
+-                            layoutParameters.imageDependencies.emplace(mid.to.id(), ImageType::Pattern);
+-                            layoutParameters.imageDependencies.emplace(max.to.id(), ImageType::Pattern);
++                            addPatternDependency(min.to.id());
++                            addPatternDependency(mid.to.id());
++                            addPatternDependency(max.to.id());
+                             patternDependencyMap.emplace(layerId,
+                                                          PatternDependency{min.to.id(), mid.to.id(), max.to.id()});
+                         }
+diff --git a/src/mln/layout/symbol_layout.cpp b/src/mln/layout/symbol_layout.cpp
+index 0793bb2a8291..1127b61eaebe 100644
+--- a/src/mln/layout/symbol_layout.cpp
++++ b/src/mln/layout/symbol_layout.cpp
+@@ -316,8 +316,12 @@ SymbolLayout::SymbolLayout(const BucketParameters& parameters,
+         }
+ 
+         if (hasIcon) {
+-            ft.icon = layout->evaluate<IconImage>(zoom, ft, layoutParameters.availableImages, canonicalID);
+-            layoutParameters.imageDependencies.emplace(ft.icon->id(), ImageType::Icon);
++            auto icon = layout->evaluate<IconImage>(zoom, ft, layoutParameters.availableImages, canonicalID);
++            // An empty image name means no icon, so it is neither requested nor reported missing.
++            if (!icon.empty()) {
++                layoutParameters.imageDependencies.emplace(icon.id(), ImageType::Icon);
++                ft.icon = std::move(icon);
++            }
+         }
+ 
+         if (ft.formattedText || ft.icon) {
+diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
+index 721452d9c3ea..5c6681aaa9b8 100644
+--- a/test/map/map.test.cpp
++++ b/test/map/map.test.cpp
+@@ -1240,6 +1240,57 @@ TEST(Map, NoHangOnMissingImage) {
+     test.frontend.render(test.map);
+ }
+ 
++TEST(Map, EmptyImageNameIsNoImage) {
++    MapTest<> test;
++    test.fileSource->glyphsResponse = [](const Resource&) {
++        Response response;
++        response.data = std::make_shared<std::string>(util::read_file("test/fixtures/resources/glyphs.pbf"));
++        return response;
++    };
++    std::vector<std::string> missing;
++    test.observer.styleImageMissingCallback = [&](const std::string& id) {
++        missing.push_back(id);
++    };
++
++    // A style says "no image" with an empty name. A name that depends only on zoom
++    // is already constant per tile, so these depend on feature data.
++    test.map.getStyle().loadJSON(R"STYLE({
++      "version": 8,
++      "glyphs": "https://example.com/{fontstack}/{range}.pbf",
++      "sources": {
++        "polygon": {"type": "geojson", "data": {"type": "Feature", "properties": {"pattern": ""},
++          "geometry": {"type": "Polygon", "coordinates": [[[-10, -10], [10, -10], [10, 10], [-10, 10], [-10, -10]]]}}},
++        "point": {"type": "geojson", "data": {"type": "Feature", "properties": {"icon": "dot"},
++          "geometry": {"type": "Point", "coordinates": [0, 0]}}}
++      },
++      "layers": [{
++        "id": "fill",
++        "type": "fill",
++        "source": "polygon",
++        "paint": {"fill-pattern": ["get", "pattern"]}
++      }, {
++        "id": "symbol",
++        "type": "symbol",
++        "source": "point",
++        "layout": {
++          "icon-image": ["step", ["zoom"], ["get", "icon"], 8, ""],
++          "text-field": "Town",
++          "text-font": ["Open Sans Regular"]
++        }
++      }]
++    })STYLE");
++    test.map.jumpTo(CameraOptions().withCenter(LatLng{0, 0}).withZoom(10));
++    test.frontend.render(test.map);
++
++    EXPECT_THAT(missing, testing::IsEmpty());
++    // The symbol still places its text without an icon.
++    RenderedQueryOptions options;
++    options.layerIDs = {{"symbol"}};
++    const auto size = test.frontend.getSize();
++    const ScreenBox box{{0, 0}, {static_cast<double>(size.width), static_cast<double>(size.height)}};
++    EXPECT_EQ(test.frontend.getRenderer()->queryRenderedFeatures(box, options).size(), 1u);
++}
++
+ TEST(Map, PrefetchDeltaOverride) {
+     MapTest<> test{1, MapMode::Continuous};
+ 
+diff --git a/test/src/mln/test/stub_map_observer.hpp b/test/src/mln/test/stub_map_observer.hpp
+index 86c4431466bc..e522f2ea9644 100644
+--- a/test/src/mln/test/stub_map_observer.hpp
++++ b/test/src/mln/test/stub_map_observer.hpp
+@@ -88,6 +88,12 @@ public:
+         }
+     }
+ 
++    void onStyleImageMissing(const std::string& id) final {
++        if (styleImageMissingCallback) {
++            styleImageMissingCallback(id);
++        }
++    }
++
+     void onTileAction(TileOperation op, const OverscaledTileID& id, const std::string& sourceID) final {
+         if (onTileActionCallback) {
+             onTileActionCallback(op, id, sourceID);
+@@ -107,6 +113,7 @@ public:
+     std::function<void(const FontStack&, const GlyphRange&)> onGlyphsLoadedCallback;
+     std::function<void(const FontStack&, const GlyphRange&, std::exception_ptr)> onGlyphsErrorCallback;
+     std::function<void(const FontStack&, const GlyphRange&)> onGlyphsRequestedCallback;
++    std::function<void(const std::string&)> styleImageMissingCallback;
+     std::function<void(TileOperation, const OverscaledTileID&, const std::string&)> onTileActionCallback;
+ };
+ 
