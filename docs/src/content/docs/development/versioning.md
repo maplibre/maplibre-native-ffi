@@ -43,10 +43,10 @@ checkout of a published release tag.
 ## Snapshots
 
 The Publish snapshots workflow runs daily and publishes every snapshot channel
-from the artifacts of the latest successful CI run on `main`. A scheduled run
-skips when `main` has not moved since the last run that published everything.
-Dispatch the workflow manually to publish now, or with `docs_only` to republish
-only the docs site.
+from the head of `main`, using the artifacts of its CI run once that run
+succeeds. A scheduled run skips when `main` has not moved since the last run
+that published everything. Dispatch the workflow manually to publish now, or
+with `docs_only` to republish only the docs site.
 
 pub.dev, crates.io, npm, PyPI, and NuGet.org keep every version that they
 publish, so they get no snapshot channel. The floating channels replace their

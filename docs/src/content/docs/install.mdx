@@ -220,7 +220,7 @@ hooks:
 ```
 
 The snapshot rebuilds `main` once a day. If `main` has moved past it, set `ref`
-to the release's commit.
+to the commit that the release names.
 
 Each target uses Metal on Apple platforms, OpenGL on Android, and Vulkan
 elsewhere. Map an OS to a different backend in `backend`.
@@ -342,7 +342,7 @@ MAPLIBRE_NATIVE_FFI_LOCAL_BUILD = { value = "maplibre-native-c-linux-gnu-x64-vul
 ```
 
 The snapshot rebuilds `main` once a day. If `main` has moved past it, replace
-`branch` with a `rev` that names the release's commit.
+`branch` with a `rev` set to the commit that the release names.
 
 To download through a mirror, set `MAPLIBRE_NATIVE_FFI_RELEASE_URL` to its base
 URL. The mirror serves each release tag as a directory that holds that
