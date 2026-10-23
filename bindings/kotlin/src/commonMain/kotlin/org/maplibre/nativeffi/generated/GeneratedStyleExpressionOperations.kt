@@ -17,28 +17,28 @@ public abstract class GeneratedStyleExpressionOperations internal constructor() 
    */
   public fun evaluate(inputs: StyleExpressionInputs? = null): ByteArray =
     nativeCall(this, binding) {
-      var textCapacity = 256uL
+      var textCapacity = 256L
       val textLength = allocate(w(4, 8), w(4, 8))
-      var textStorage = allocate(textCapacity.toLong(), 1)
+      var textStorage = allocate(textCapacity, 1)
       check(
         C.mln_style_expression_evaluate(
           handle,
           inputs?.let { writeStyleExpressionInputs(it) } ?: 0L,
           textStorage,
-          textCapacity.toLong(),
+          textCapacity,
           textLength,
           diagnostic,
         ),
       )
-      while (readSize(textLength) >= textCapacity) {
-        textCapacity = readSize(textLength) + 1uL
-        textStorage = allocate(textCapacity.toLong(), 1)
+      while (readSize(textLength).toLong() >= textCapacity) {
+        textCapacity = readSize(textLength).toLong() + 1
+        textStorage = allocate(textCapacity, 1)
         check(
           C.mln_style_expression_evaluate(
             handle,
             inputs?.let { writeStyleExpressionInputs(it) } ?: 0L,
             textStorage,
-            textCapacity.toLong(),
+            textCapacity,
             textLength,
             diagnostic,
           ),

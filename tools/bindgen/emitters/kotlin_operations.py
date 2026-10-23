@@ -461,7 +461,7 @@ def caller_sized_text(plan, values, native, text):
     length = next(p for p in plan.outputs if p.name == text.result_length)
     carriers = {
         text.name: "textStorage",
-        text.value.length: "textCapacity.toLong()",
+        text.value.length: "textCapacity",
         text.result_length: "textLength",
     }
     arguments = [
@@ -469,16 +469,18 @@ def caller_sized_text(plan, values, native, text):
     ]
     call = native.checked(plan.function, arguments)
     written = values.decode(length.value.unwrapped, "textLength")
+    # The capacity stays a signed Long: comparing two ULongs needs
+    # Long.compareUnsigned, which Android adds above the binding's API floor.
     grow = (
-        f"textCapacity = {written} + 1uL; "
-        f"textStorage = allocate(textCapacity.toLong(), 1); {call}"
+        f"textCapacity = {written}.toLong() + 1; "
+        f"textStorage = allocate(textCapacity, 1); {call}"
     )
     setup = [
-        "var textCapacity = 256uL",
+        "var textCapacity = 256L",
         f"val textLength = {values.storage(length.value.unwrapped.ctype)}",
-        "var textStorage = allocate(textCapacity.toLong(), 1)",
+        "var textStorage = allocate(textCapacity, 1)",
         call,
-        f"while ({written} >= textCapacity) {{ {grow} }}",
+        f"while ({written}.toLong() >= textCapacity) {{ {grow} }}",
         f"readBytes(textStorage, {written})",
     ]
     helper = call_helper(plan)
