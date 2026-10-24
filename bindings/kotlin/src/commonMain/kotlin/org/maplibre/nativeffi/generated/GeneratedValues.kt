@@ -3,8 +3,10 @@ package org.maplibre.nativeffi.generated
 
 import org.maplibre.nativeffi.internal.callback.NativeRegistration
 import org.maplibre.nativeffi.internal.lifecycle.ViewScope
+import org.maplibre.nativeffi.internal.values.flagLabel
 import org.maplibre.nativeffi.render.NativePointer
 
+/** Later versions may add values; an unknown one keeps its `rawValue`. */
 public data class AmbientCacheOperation(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
@@ -25,6 +27,8 @@ public data class AmbientCacheOperation(public val rawValue: UInt) {
 
 /**
  * Camera change kinds reported by camera will-change and did-change events.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_camera_change_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -47,6 +51,8 @@ public data class CameraChangeMode(public val rawValue: UInt) {
 
 /**
  * How the transitions of one camera command ended.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_camera_transition_outcome` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -77,6 +83,8 @@ public data class CameraTransitionOutcome(public val rawValue: UInt) {
 /**
  * Camera transition behavior for `mln_camera_update`.
  *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
  * See `mln_camera_update_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
@@ -98,6 +106,8 @@ public data class CameraUpdateMode(public val rawValue: UInt) {
 
 /**
  * Terminal dispositions reported by command completions.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_command_disposition` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/completion_8h.html).
@@ -123,6 +133,8 @@ public data class CommandDisposition(public val rawValue: UInt) {
 /**
  * Map constraint modes used by `mln_map_viewport_options`.
  *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
  * See `mln_constrain_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
@@ -147,6 +159,8 @@ public data class ConstrainMode(public val rawValue: UInt) {
 /**
  * Frame-demand policy bits.
  *
+ * Later versions may add flags; unknown bits keep their place in `rawValue`.
+ *
  * See `mln_frame_demand_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
@@ -160,7 +174,16 @@ public data class FrameDemandFlag(public val rawValue: UInt) {
   public operator fun contains(other: FrameDemandFlag): Boolean =
     (rawValue and other.rawValue) == other.rawValue
 
+  override fun toString(): String =
+    flagLabel(
+      rawValue.toULong(),
+      "NONE",
+      listOf(1uL to "IF_NEEDED", 2uL to "PRESENT", 4uL to "WAIT_FOR_UPDATE"),
+    )
+
   public companion object {
+    /** No flags. */
+    public val NONE: FrameDemandFlag = FrameDemandFlag(0u)
     /** Render only when a newer map update exists. */
     public val IF_NEEDED: FrameDemandFlag = FrameDemandFlag(1u)
     /**
@@ -187,6 +210,8 @@ public data class FrameDemandFlag(public val rawValue: UInt) {
 
 /**
  * Gesture boundary carried atomically with a camera update or delta.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_gesture_phase` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -222,6 +247,8 @@ public data class GesturePhase(public val rawValue: UInt) {
 /**
  * Synchronization payload kind for acquired texture frames.
  *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
  * See `mln_gpu_sync_kind` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
@@ -249,6 +276,8 @@ public data class GpuSyncKind(public val rawValue: UInt) {
 
 /**
  * Log event categories emitted by MapLibre Native.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_log_event` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -300,6 +329,8 @@ public data class LogEvent(public val rawValue: UInt) {
 /**
  * Log severity values emitted by MapLibre Native.
  *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
  * See `mln_log_severity` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
@@ -322,6 +353,8 @@ public data class LogSeverity(public val rawValue: UInt) {
 /**
  * Bitmask values for log severities dispatched asynchronously.
  *
+ * Later versions may add flags; unknown bits keep their place in `rawValue`.
+ *
  * See `mln_log_severity_mask` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
@@ -335,7 +368,12 @@ public data class LogSeverityMask(public val rawValue: UInt) {
   public operator fun contains(other: LogSeverityMask): Boolean =
     (rawValue and other.rawValue) == other.rawValue
 
+  override fun toString(): String =
+    flagLabel(rawValue.toULong(), "NONE", listOf(2uL to "INFO", 4uL to "WARNING", 8uL to "ERROR"))
+
   public companion object {
+    /** No flags. */
+    public val NONE: LogSeverityMask = LogSeverityMask(0u)
     public val INFO: LogSeverityMask = LogSeverityMask(2u)
     public val WARNING: LogSeverityMask = LogSeverityMask(4u)
     public val ERROR: LogSeverityMask = LogSeverityMask(8u)
@@ -346,6 +384,8 @@ public data class LogSeverityMask(public val rawValue: UInt) {
 
 /**
  * Debug overlay mask values for `mln_map_set_debug_options()`.
+ *
+ * Later versions may add flags; unknown bits keep their place in `rawValue`.
  *
  * See `mln_map_debug_option` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -360,7 +400,24 @@ public data class MapDebugOption(public val rawValue: UInt) {
   public operator fun contains(other: MapDebugOption): Boolean =
     (rawValue and other.rawValue) == other.rawValue
 
+  override fun toString(): String =
+    flagLabel(
+      rawValue.toULong(),
+      "NONE",
+      listOf(
+        2uL to "TILE_BORDERS",
+        4uL to "PARSE_STATUS",
+        8uL to "TIMESTAMPS",
+        16uL to "COLLISION",
+        32uL to "OVERDRAW",
+        64uL to "STENCIL_CLIP",
+        128uL to "DEPTH_BUFFER",
+      ),
+    )
+
   public companion object {
+    /** No flags. */
+    public val NONE: MapDebugOption = MapDebugOption(0u)
     public val TILE_BORDERS: MapDebugOption = MapDebugOption(2u)
     public val PARSE_STATUS: MapDebugOption = MapDebugOption(4u)
     public val TIMESTAMPS: MapDebugOption = MapDebugOption(8u)
@@ -373,6 +430,8 @@ public data class MapDebugOption(public val rawValue: UInt) {
 
 /**
  * Map rendering modes used when creating a map.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_map_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -396,6 +455,7 @@ public data class MapMode(public val rawValue: UInt) {
   }
 }
 
+/** Later versions may add values; an unknown one keeps its `rawValue`. */
 public data class NetworkStatus(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
@@ -412,6 +472,8 @@ public data class NetworkStatus(public val rawValue: UInt) {
 
 /**
  * Map north orientation values used by `mln_map_viewport_options`.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_north_orientation` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -434,6 +496,7 @@ public data class NorthOrientation(public val rawValue: UInt) {
   }
 }
 
+/** Later versions may add values; an unknown one keeps its `rawValue`. */
 public data class OfflineRegionDownloadState(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
@@ -450,6 +513,8 @@ public data class OfflineRegionDownloadState(public val rawValue: UInt) {
 
 /**
  * OpenGL client API a dedicated EGL session creates its context for.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_opengl_client_api` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -476,6 +541,8 @@ public data class OpenglClientApi(public val rawValue: UInt) {
 /**
  * How a session's OpenGL context relates to its driver thread and host graphics state.
  *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
  * See `mln_opengl_context_ownership` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
@@ -498,6 +565,8 @@ public data class OpenglContextOwnership(public val rawValue: UInt) {
 /**
  * OpenGL context providers supported by this build.
  *
+ * Later versions may add flags; unknown bits keep their place in `rawValue`.
+ *
  * See `mln_opengl_context_provider_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
@@ -511,7 +580,12 @@ public data class OpenglContextProviderFlag(public val rawValue: UInt) {
   public operator fun contains(other: OpenglContextProviderFlag): Boolean =
     (rawValue and other.rawValue) == other.rawValue
 
+  override fun toString(): String =
+    flagLabel(rawValue.toULong(), "NONE", listOf(1uL to "WGL", 2uL to "EGL", 4uL to "WEBGL"))
+
   public companion object {
+    /** No flags. */
+    public val NONE: OpenglContextProviderFlag = OpenglContextProviderFlag(0u)
     public val WGL: OpenglContextProviderFlag = OpenglContextProviderFlag(1u)
     public val EGL: OpenglContextProviderFlag = OpenglContextProviderFlag(2u)
     /** Browser WebGL context imported into an Emscripten module. */
@@ -521,6 +595,8 @@ public data class OpenglContextProviderFlag(public val rawValue: UInt) {
 
 /**
  * What abandon did with a session's graphics resources.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_render_abandon_disposition` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -544,6 +620,8 @@ public data class RenderAbandonDisposition(public val rawValue: UInt) {
 /**
  * Render backend support flags reported by this native library build.
  *
+ * Later versions may add flags; unknown bits keep their place in `rawValue`.
+ *
  * See `mln_render_backend_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
@@ -557,7 +635,16 @@ public data class RenderBackendFlag(public val rawValue: UInt) {
   public operator fun contains(other: RenderBackendFlag): Boolean =
     (rawValue and other.rawValue) == other.rawValue
 
+  override fun toString(): String =
+    flagLabel(
+      rawValue.toULong(),
+      "NONE",
+      listOf(1uL to "METAL", 2uL to "VULKAN", 4uL to "OPENGL", 8uL to "WEBGPU"),
+    )
+
   public companion object {
+    /** No flags. */
+    public val NONE: RenderBackendFlag = RenderBackendFlag(0u)
     public val METAL: RenderBackendFlag = RenderBackendFlag(1u)
     public val VULKAN: RenderBackendFlag = RenderBackendFlag(2u)
     public val OPENGL: RenderBackendFlag = RenderBackendFlag(4u)
@@ -567,6 +654,8 @@ public data class RenderBackendFlag(public val rawValue: UInt) {
 
 /**
  * Execution placement for one render session.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_render_driver_kind` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -595,6 +684,8 @@ public data class RenderDriverKind(public val rawValue: UInt) {
 /**
  * Render modes reported by render observer events.
  *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
  * See `mln_render_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
@@ -614,6 +705,8 @@ public data class RenderMode(public val rawValue: UInt) {
 
 /**
  * Terminal disposition of one accepted frame demand.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_render_result` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -652,6 +745,8 @@ public data class RenderResult(public val rawValue: UInt) {
 /**
  * Optional render-session capabilities.
  *
+ * Later versions may add flags; unknown bits keep their place in `rawValue`.
+ *
  * See `mln_render_session_capability_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
@@ -665,7 +760,21 @@ public data class RenderSessionCapabilityFlag(public val rawValue: UInt) {
   public operator fun contains(other: RenderSessionCapabilityFlag): Boolean =
     (rawValue and other.rawValue) == other.rawValue
 
+  override fun toString(): String =
+    flagLabel(
+      rawValue.toULong(),
+      "NONE",
+      listOf(
+        1uL to "FRAME_ACQUISITION",
+        2uL to "READBACK",
+        4uL to "CONSUMER_SYNC",
+        8uL to "PRESENTATION",
+      ),
+    )
+
   public companion object {
+    /** No flags. */
+    public val NONE: RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(0u)
     public val FRAME_ACQUISITION: RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(1u)
     public val READBACK: RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(2u)
     public val CONSUMER_SYNC: RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(4u)
@@ -675,6 +784,8 @@ public data class RenderSessionCapabilityFlag(public val rawValue: UInt) {
 
 /**
  * Render-session lifecycle visible in snapshots.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_render_session_state` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -706,6 +817,7 @@ public data class RenderSessionState(public val rawValue: UInt) {
   }
 }
 
+/** Later versions may add values; an unknown one keeps its `rawValue`. */
 public data class ResourceErrorReason(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
@@ -728,6 +840,7 @@ public data class ResourceErrorReason(public val rawValue: UInt) {
   }
 }
 
+/** Later versions may add values; an unknown one keeps its `rawValue`. */
 public data class ResourceKind(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
@@ -759,6 +872,8 @@ public data class ResourceKind(public val rawValue: UInt) {
  * Registration requires at least one known bit. `MLN_RESOURCE_KIND_MASK_ALL` selects every resource
  * kind.
  *
+ * Later versions may add flags; unknown bits keep their place in `rawValue`.
+ *
  * See `mln_resource_kind_mask` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
@@ -772,7 +887,25 @@ public data class ResourceKindMask(public val rawValue: UInt) {
   public operator fun contains(other: ResourceKindMask): Boolean =
     (rawValue and other.rawValue) == other.rawValue
 
+  override fun toString(): String =
+    flagLabel(
+      rawValue.toULong(),
+      "NONE",
+      listOf(
+        1uL to "UNKNOWN",
+        2uL to "STYLE",
+        4uL to "SOURCE",
+        8uL to "TILE",
+        16uL to "GLYPHS",
+        32uL to "SPRITE_IMAGE",
+        64uL to "SPRITE_JSON",
+        128uL to "IMAGE",
+      ),
+    )
+
   public companion object {
+    /** No flags. */
+    public val NONE: ResourceKindMask = ResourceKindMask(0u)
     public val UNKNOWN: ResourceKindMask = ResourceKindMask(1u)
     public val STYLE: ResourceKindMask = ResourceKindMask(2u)
     public val SOURCE: ResourceKindMask = ResourceKindMask(4u)
@@ -785,6 +918,7 @@ public data class ResourceKindMask(public val rawValue: UInt) {
   }
 }
 
+/** Later versions may add values; an unknown one keeps its `rawValue`. */
 public data class ResourceLoadingMethod(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
@@ -801,6 +935,7 @@ public data class ResourceLoadingMethod(public val rawValue: UInt) {
   }
 }
 
+/** Later versions may add values; an unknown one keeps its `rawValue`. */
 public data class ResourcePriority(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
@@ -815,6 +950,7 @@ public data class ResourcePriority(public val rawValue: UInt) {
   }
 }
 
+/** Later versions may add values; an unknown one keeps its `rawValue`. */
 public data class ResourceProviderDecision(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
@@ -831,6 +967,8 @@ public data class ResourceProviderDecision(public val rawValue: UInt) {
 
 /**
  * How a resource provider answered a request.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_resource_response_status` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -853,6 +991,7 @@ public data class ResourceResponseStatus(public val rawValue: UInt) {
   }
 }
 
+/** Later versions may add values; an unknown one keeps its `rawValue`. */
 public data class ResourceStoragePolicy(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
@@ -867,6 +1006,7 @@ public data class ResourceStoragePolicy(public val rawValue: UInt) {
   }
 }
 
+/** Later versions may add values; an unknown one keeps its `rawValue`. */
 public data class ResourceUsage(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
@@ -884,6 +1024,8 @@ public data class ResourceUsage(public val rawValue: UInt) {
 /**
  * Bit values for the map and runtime event subscription masks.
  *
+ * Later versions may add flags; unknown bits keep their place in `rawValue`.
+ *
  * See `mln_runtime_event_mask` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
@@ -896,6 +1038,33 @@ public data class RuntimeEventMask(public val rawValue: ULong) {
 
   public operator fun contains(other: RuntimeEventMask): Boolean =
     (rawValue and other.rawValue) == other.rawValue
+
+  override fun toString(): String =
+    flagLabel(
+      rawValue.toULong(),
+      "NONE",
+      listOf(
+        2uL to "MAP_CAMERA_WILL_CHANGE",
+        4uL to "MAP_CAMERA_IS_CHANGING",
+        8uL to "MAP_CAMERA_DID_CHANGE",
+        16uL to "MAP_STYLE_LOADED",
+        32uL to "MAP_LOADING_STARTED",
+        64uL to "MAP_LOADING_FINISHED",
+        128uL to "MAP_LOADING_FAILED",
+        256uL to "MAP_IDLE",
+        1024uL to "MAP_RENDER_ERROR",
+        8192uL to "MAP_RENDER_FRAME_STARTED",
+        16384uL to "MAP_RENDER_FRAME_FINISHED",
+        32768uL to "MAP_RENDER_MAP_STARTED",
+        65536uL to "MAP_RENDER_MAP_FINISHED",
+        131072uL to "MAP_STYLE_IMAGE_MISSING",
+        262144uL to "MAP_TILE_ACTION",
+        524288uL to "OFFLINE_REGION_STATUS_CHANGED",
+        1048576uL to "OFFLINE_REGION_RESPONSE_ERROR",
+        2097152uL to "OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED",
+        8388608uL to "MAP_SOURCE_CHANGED",
+      ),
+    )
 
   public companion object {
     /** Selects no event type. */
@@ -932,6 +1101,8 @@ public data class RuntimeEventMask(public val rawValue: ULong) {
 /**
  * Source kinds used by `mln_runtime_event.source_type`.
  *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
  * See `mln_runtime_event_source_type` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
@@ -951,6 +1122,8 @@ public data class RuntimeEventSourceType(public val rawValue: UInt) {
 
 /**
  * Runtime event types carried by `mln_runtime_event.type`.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_runtime_event_type` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1006,6 +1179,8 @@ public data class RuntimeEventType(public val rawValue: UInt) {
 /**
  * Status values returned by status-returning functions.
  *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
  * See `mln_status` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
@@ -1054,6 +1229,8 @@ public data class Status(public val rawValue: Int) {
 /**
  * Style expression types that a parsed expression may be required to have.
  *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
  * See `mln_style_expression_type_kind` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
  */
@@ -1096,6 +1273,8 @@ public data class StyleExpressionTypeKind(public val rawValue: UInt) {
 /**
  * How a stretchable image fits text along one axis.
  *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
  * See `mln_style_image_text_fit` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
@@ -1118,6 +1297,8 @@ public data class StyleImageTextFit(public val rawValue: UInt) {
 /**
  * Layer visibility values used by the visibility setter and layer info.
  *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
  * See `mln_style_layer_visibility` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
@@ -1138,6 +1319,8 @@ public data class StyleLayerVisibility(public val rawValue: UInt) {
 /**
  * DEM raster encoding values.
  *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
  * See `mln_style_raster_dem_encoding` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
@@ -1157,6 +1340,8 @@ public data class StyleRasterDemEncoding(public val rawValue: UInt) {
 
 /**
  * Style source type values returned by source metadata queries.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_style_source_type` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1194,6 +1379,8 @@ public data class StyleSourceType(public val rawValue: UInt) {
 /**
  * Tile URL coordinate scheme values.
  *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
  * See `mln_style_tile_scheme` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
@@ -1213,6 +1400,8 @@ public data class StyleTileScheme(public val rawValue: UInt) {
 
 /**
  * Vector tile encoding values.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_style_vector_tile_encoding` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1234,6 +1423,8 @@ public data class StyleVectorTileEncoding(public val rawValue: UInt) {
 /**
  * Tile LOD algorithms used by `mln_map_tile_options`.
  *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
  * See `mln_tile_lod_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
@@ -1253,6 +1444,8 @@ public data class TileLodMode(public val rawValue: UInt) {
 
 /**
  * Tile operations reported by tile observer events.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_tile_operation` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1288,6 +1481,8 @@ public data class TileOperation(public val rawValue: UInt) {
 /**
  * How a rule or route compares its url against a request URL.
  *
+ * Later versions may add flags; unknown bits keep their place in `rawValue`.
+ *
  * See `mln_url_match_flags` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
@@ -1301,6 +1496,8 @@ public data class UrlMatchFlags(public val rawValue: UInt) {
   public operator fun contains(other: UrlMatchFlags): Boolean =
     (rawValue and other.rawValue) == other.rawValue
 
+  override fun toString(): String = flagLabel(rawValue.toULong(), "EXACT", listOf(1uL to "GLOB"))
+
   public companion object {
     public val EXACT: UrlMatchFlags = UrlMatchFlags(0u)
     /** Reads url as a glob pattern. */
@@ -1310,6 +1507,8 @@ public data class UrlMatchFlags(public val rawValue: UInt) {
 
 /**
  * Viewport orientation modes used by `mln_map_viewport_options`.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_viewport_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1330,6 +1529,8 @@ public data class ViewportMode(public val rawValue: UInt) {
 
 /**
  * WebGL context placement.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_webgl_context_kind` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -1746,7 +1947,7 @@ public data class MapView(
  */
 public data class RenderFrameResult(
   /** One `mln_render_result` value. */
-  public val disposition: RenderResult = RenderResult(0u),
+  public val disposition: RenderResult = RenderResult.RENDERED,
   public val token: ULong = 0uL,
   /**
    * Generation of the map render update the demand evaluated. When disposition is
@@ -2023,7 +2224,7 @@ public data class UnitBezier(
  */
 public data class CameraTransitionEnd(
   /** One of `mln_camera_transition_outcome`. */
-  public val outcome: CameraTransitionOutcome = CameraTransitionOutcome(0u),
+  public val outcome: CameraTransitionOutcome = CameraTransitionOutcome.COMPLETED,
   /**
    * Generation of the published snapshot that shows the camera where the transitions left it. The
    * map events of the change that ended them carry this generation and are queued before the
@@ -2539,7 +2740,7 @@ public data class EglContextDescriptor(
    * Client API the session creates its context for. Required under dedicated ownership. A shared
    * session queries share_context for it, so this is ignored there.
    */
-  public val clientApi: OpenglClientApi = OpenglClientApi(0u),
+  public val clientApi: OpenglClientApi = OpenglClientApi.UNSPECIFIED,
   /** Optional eglGetProcAddress-compatible function for the host loader. */
   public val getProcAddress: NativePointer,
 )
@@ -2552,7 +2753,7 @@ public data class EglContextDescriptor(
  */
 public data class WebglContextDescriptor(
   /** One `mln_webgl_context_kind` value. */
-  public val kind: WebglContextKind = WebglContextKind(0u),
+  public val kind: WebglContextKind = WebglContextKind.EXISTING,
   /** Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive. */
   public val context: Int = 0,
   /**
@@ -2597,7 +2798,7 @@ public data class OpenglContextDescriptor(
    * Whether the session shares its driver thread and graphics objects with the host. A private EGL
    * or WGL owned texture and a transferred WebGL canvas are dedicated to their core worker.
    */
-  public val ownership: OpenglContextOwnership = OpenglContextOwnership(0u),
+  public val ownership: OpenglContextOwnership = OpenglContextOwnership.SHARED,
   public val data: OpenglContextDescriptorData,
 )
 
@@ -2874,9 +3075,9 @@ public data class SourceFeatureQueryOptions(
  */
 public data class StyleExpressionType(
   /** One of `mln_style_expression_type_kind`. */
-  public val kind: StyleExpressionTypeKind = StyleExpressionTypeKind(0u),
+  public val kind: StyleExpressionTypeKind = StyleExpressionTypeKind.VALUE,
   /** For an array, its items' kind; ignored for any other kind. */
-  public val itemKind: StyleExpressionTypeKind = StyleExpressionTypeKind(0u),
+  public val itemKind: StyleExpressionTypeKind = StyleExpressionTypeKind.VALUE,
   /** For an array, its fixed length, or zero for any length. */
   public val itemCount: UInt = 0u,
 )
@@ -3335,7 +3536,7 @@ public data class FeatureStateSelector(
  */
 public data class MapSnapshot(
   /** Debug overlay mask of `mln_map_debug_option` values. */
-  public val debugOptions: MapDebugOption,
+  public val debugOptions: MapDebugOption = MapDebugOption.NONE,
   public val generation: ULong = 0uL,
   /** True once every requested style and tile resource finished loading. */
   public val fullyLoaded: Boolean = false,
@@ -3344,7 +3545,7 @@ public data class MapSnapshot(
   public val gestureInProgress: Boolean = false,
   /** True while a camera command with a duration is still animating. */
   public val transitionInProgress: Boolean = false,
-  public val eventMask: RuntimeEventMask = RuntimeEventMask(0uL),
+  public val eventMask: RuntimeEventMask = RuntimeEventMask.NONE,
   /**
    * Generation of the latest render update the map published. A rendered frame at or past it draws
    * map state that includes every command this snapshot observes, though animations and resource
@@ -3430,7 +3631,7 @@ public data class StyleLayerInfo(
   /** Highest zoom at which the layer draws; INFINITY with no upper bound. */
   public val maxZoom: Double = 0.0,
   /** One of `mln_style_layer_visibility`. */
-  public val visibility: StyleLayerVisibility = StyleLayerVisibility(0u),
+  public val visibility: StyleLayerVisibility = StyleLayerVisibility.VISIBLE,
 )
 
 /**
@@ -3447,7 +3648,7 @@ public data class StyleSourceTileInfo(
   /** Highest zoom level the TileJSON provides tiles for. */
   public val maxZoom: Double = 0.0,
   /** One of `mln_style_tile_scheme`. */
-  public val scheme: StyleTileScheme = StyleTileScheme(0u),
+  public val scheme: StyleTileScheme = StyleTileScheme.XYZ,
 )
 
 /**
@@ -3460,7 +3661,7 @@ public data class StyleSourceInfo(
   /** Source ID. */
   public val id: String = "",
   /** One of `mln_style_source_type`. */
-  public val type: StyleSourceType = StyleSourceType(0u),
+  public val type: StyleSourceType = StyleSourceType.UNKNOWN,
   /** Whether the source is marked volatile. */
   public val isVolatile: Boolean = false,
   /** Attribution string, when the source sets one. It may be empty. */
@@ -3492,7 +3693,7 @@ public data class RenderFrameBatchView(
 
 public data class RenderAbandonResult(
   /** One `mln_render_abandon_disposition` value. */
-  public val disposition: RenderAbandonDisposition = RenderAbandonDisposition(0u),
+  public val disposition: RenderAbandonDisposition = RenderAbandonDisposition.CLEAN,
   /** Backend resource groups intentionally retained until process exit. */
   public val quarantinedResourceCount: UInt = 0u,
 )
@@ -3505,14 +3706,14 @@ public data class RenderAbandonResult(
  */
 public data class RenderSessionCapabilities(
   /** One `mln_render_driver_kind` value. */
-  public val driver: RenderDriverKind,
+  public val driver: RenderDriverKind = RenderDriverKind(0u),
   /**
    * Granted texture ring depth: the slot count of a session-owned ring, or the texture count of a
    * borrowed one. Zero for a surface.
    */
   public val textureRingDepth: UInt = 0u,
   /** A bitwise OR of `mln_render_session_capability_flag` values. */
-  public val flags: RenderSessionCapabilityFlag,
+  public val flags: RenderSessionCapabilityFlag = RenderSessionCapabilityFlag.NONE,
 )
 
 /**
@@ -3523,7 +3724,7 @@ public data class RenderSessionCapabilities(
  */
 public data class RenderSessionSnapshot(
   /** One `mln_render_session_state` value. */
-  public val state: RenderSessionState,
+  public val state: RenderSessionState = RenderSessionState(0u),
   /** Logical extent applied by the driver. */
   public val extent: LogicalExtent = LogicalExtent(),
   /**
@@ -3688,8 +3889,8 @@ public data class TextureReadbackResult(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class ResourceResponse(
-  public val status: ResourceResponseStatus = ResourceResponseStatus(0u),
-  public val errorReason: ResourceErrorReason = ResourceErrorReason(0u),
+  public val status: ResourceResponseStatus = ResourceResponseStatus.OK,
+  public val errorReason: ResourceErrorReason = ResourceErrorReason.NONE,
   /** Response bytes. May be null only when byte_count is 0. */
   public val bytes: ByteArray = byteArrayOf(),
   public val errorMessage: String? = null,
@@ -3827,7 +4028,7 @@ public data class OfflineRegionInfo(
  */
 public data class OfflineRegionStatus(
   /** One of `mln_offline_region_download_state`. */
-  public val downloadState: OfflineRegionDownloadState = OfflineRegionDownloadState(0u),
+  public val downloadState: OfflineRegionDownloadState = OfflineRegionDownloadState.INACTIVE,
   public val completedResourceCount: ULong = 0uL,
   public val completedResourceSize: ULong = 0uL,
   public val completedTileCount: ULong = 0uL,
@@ -3865,7 +4066,7 @@ public data class RenderingStats(
  */
 public data class RuntimeEventRenderFrame(
   /** One of `mln_render_mode`. */
-  public val mode: RenderMode = RenderMode(0u),
+  public val mode: RenderMode = RenderMode.PARTIAL,
   /** Whether MapLibre needs another frame after this one. */
   public val needsRepaint: Boolean = false,
   /** Whether symbol placement changed during this frame. */
@@ -3881,7 +4082,7 @@ public data class RuntimeEventRenderFrame(
  */
 public data class RuntimeEventRenderMap(
   /** One of `mln_render_mode`. */
-  public val mode: RenderMode = RenderMode(0u),
+  public val mode: RenderMode = RenderMode.PARTIAL,
 )
 
 /**
@@ -3906,7 +4107,7 @@ public data class TileId(
  */
 public data class RuntimeEventTileAction(
   /** One of `mln_tile_operation`. */
-  public val operation: TileOperation = TileOperation(0u),
+  public val operation: TileOperation = TileOperation.REQUESTED_FROM_CACHE,
   public val tileId: TileId = TileId(),
 )
 
@@ -3930,7 +4131,7 @@ public data class RuntimeEventOfflineRegionStatus(
 public data class RuntimeEventOfflineRegionResponseError(
   public val regionId: Long = 0L,
   /** One of `mln_resource_error_reason`. */
-  public val reason: ResourceErrorReason = ResourceErrorReason(0u),
+  public val reason: ResourceErrorReason = ResourceErrorReason.NONE,
 )
 
 /**
@@ -3989,9 +4190,9 @@ public sealed interface RuntimeEventPayload {
  */
 public data class RuntimeEvent(
   /** One of `mln_runtime_event_type`. */
-  public val type: RuntimeEventType,
+  public val type: RuntimeEventType = RuntimeEventType(0u),
   /** One of `mln_runtime_event_source_type`. */
-  public val sourceType: RuntimeEventSourceType = RuntimeEventSourceType(0u),
+  public val sourceType: RuntimeEventSourceType = RuntimeEventSourceType.RUNTIME,
   /** Source handle selected by source_type: an `mln_runtime` or an `mln_map`. */
   public val source: ULong = 0uL,
   /**
@@ -4004,7 +4205,7 @@ public data class RuntimeEvent(
   /** Borrowed UTF-8 message bytes, empty when this event carries no message. */
   public val message: String = "",
   /** Typed payload selected by payload_type. */
-  public val payload: RuntimeEventPayload,
+  public val payload: RuntimeEventPayload = RuntimeEventPayload.None,
 )
 
 /**
@@ -4039,11 +4240,11 @@ public data class ResourceRequestInfo(
    * API key.
    */
   public val resolvedUrl: String? = null,
-  public val kind: ResourceKind = ResourceKind(0u),
-  public val loadingMethod: ResourceLoadingMethod = ResourceLoadingMethod(0u),
-  public val priority: ResourcePriority = ResourcePriority(0u),
-  public val usage: ResourceUsage = ResourceUsage(0u),
-  public val storagePolicy: ResourceStoragePolicy = ResourceStoragePolicy(0u),
+  public val kind: ResourceKind = ResourceKind.UNKNOWN,
+  public val loadingMethod: ResourceLoadingMethod = ResourceLoadingMethod.ALL,
+  public val priority: ResourcePriority = ResourcePriority.REGULAR,
+  public val usage: ResourceUsage = ResourceUsage.ONLINE,
+  public val storagePolicy: ResourceStoragePolicy = ResourceStoragePolicy.PERMANENT,
   public val range: ResourceRange? = null,
   public val priorModifiedUnixMs: Long? = null,
   public val priorExpiresUnixMs: Long? = null,
