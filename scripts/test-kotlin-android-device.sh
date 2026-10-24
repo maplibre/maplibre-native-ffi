@@ -27,17 +27,17 @@ case "$preset" in
 esac
 
 mise run //:android-sdk-packages
-# An explicit serial selects a connected device. Otherwise the emulator that
-# matches the preset boots, and Gradle tests on it alone rather than on every
-# connected device.
-if [[ -z "${ANDROID_SERIAL:-}" ]]; then
-  emulator_args=("$abi")
-  if [[ "$preset" == android-x64-egl ]]; then
-    emulator_args+=(--api 26)
-  fi
-  mise run //:android-emulator:boot "${emulator_args[@]}"
+# An explicit serial selects a connected device. Otherwise the shared emulator
+# that matches the preset boots, and Gradle tests on it alone rather than on
+# every connected device.
+api=$MLN_FFI_ANDROID_EMULATOR_API
+if [[ "$preset" == android-x64-egl ]]; then
+  api=26
 fi
-ANDROID_SERIAL=$("$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh")
+if [[ -z "${ANDROID_SERIAL:-}" ]]; then
+  mise run //:android-emulator:boot "$abi" --api "$api"
+fi
+ANDROID_SERIAL=$("$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh" "$abi" "$api")
 export ANDROID_SERIAL
 exec ./gradlew \
   -Pmaplibre.android.backend="$backend" \

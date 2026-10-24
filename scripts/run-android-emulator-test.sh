@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Runs native test executables on ANDROID_SERIAL or on the emulator that
-# boot-android-emulator.sh starts.
+# Runs native test executables on ANDROID_SERIAL or on the shared emulator for
+# the ABI and API level, which boot-android-emulator.sh boots when it is not
+# running yet.
 # Every executable runs and reports its own exit status; the first failure
 # stops the batch.
 set -euo pipefail
@@ -46,7 +47,9 @@ fi
 test_executables=("$@")
 
 timeout_scale=${MLN_TEST_TIMEOUT_SCALE:-3}
-remote_dir=/data/local/tmp/maplibre-native-ffi
+# Other sessions may be running tests on the same shared emulator, so each run
+# has a directory of its own and removes it when it ends.
+remote_dir=/data/local/tmp/maplibre-native-ffi-$$
 fixture_dir=${MLN_FFI_TEST_FIXTURE_DIR:-}
 adb="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}/platform-tools/adb"
 
@@ -69,24 +72,22 @@ if [[ -n "$fixture_dir" && ! -d "$fixture_dir" ]]; then
   exit 2
 fi
 
-# Says whether the emulator that boot-android-emulator.sh started at the serial
-# still runs, and if it exited, prints the tail of its log, which holds the
-# reason the emulator gives.
+# Says whether the emulator at the serial still runs, and if it exited, prints
+# the tail of the log that boot-android-emulator.sh started it with, which holds
+# the reason the emulator gives. A device that is no emulator reports nothing.
 report_emulator_state() {
-  local serial_file state_dir pid
-  for serial_file in "$MISE_MONOREPO_ROOT"/build/android-emulator/*/serial; do
-    state_dir=${serial_file%/serial}
-    [[ -f "$state_dir/emulator.pid" && "$(<"$serial_file")" == "$serial" ]] ||
-      continue
-    pid=$(<"$state_dir/emulator.pid")
-    if kill -0 "$pid" 2>/dev/null; then
-      echo "The Android emulator at $serial is still running." >&2
-    else
-      echo "The Android emulator at $serial exited. The end of its log:" >&2
-      tail -50 "$state_dir/emulator.log" >&2
+  local log_dir=${TMPDIR:-/tmp}
+  [[ -n "$avd_name" ]] || return 0
+  if [[ "$(perl -e 'alarm shift; exec @ARGV' 30 "$adb" -s "$serial" emu avd name 2>/dev/null |
+    sed -n 's/\r$//;1p')" == "$avd_name" ]]; then
+    echo "The Android emulator at $serial is still running." >&2
+  else
+    echo "The Android emulator at $serial exited." >&2
+    if [[ -f "${log_dir%/}/android-emulator-$avd_name.log" ]]; then
+      echo "The end of its log:" >&2
+      tail -50 "${log_dir%/}/android-emulator-$avd_name.log" >&2
     fi
-    return
-  done
+  fi
 }
 
 # Prints what the device logged before a failure: adbd's and init's lines, which
@@ -122,11 +123,11 @@ run_adb() {
   exit "$status"
 }
 
-# An explicit serial selects a connected device; only this checkout's emulator
-# can be booted automatically.
+# An explicit serial selects a connected device. Otherwise the shared emulator
+# for the ABI and API level runs the tests, booted first if it is not running.
 serial_script="$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh"
-serial=$("$serial_script") || serial=
 if [[ -n "${ANDROID_SERIAL:-}" ]]; then
+  serial=$ANDROID_SERIAL
   device_abi=$(run_adb "the ABI query" shell getprop ro.product.cpu.abi | tr -d '\r')
   device_api=$(run_adb "the API level query" shell getprop ro.build.version.sdk | tr -d '\r')
   if [[ "$device_abi" != "$abi" ]] ||
@@ -134,21 +135,27 @@ if [[ -n "${ANDROID_SERIAL:-}" ]]; then
     echo "Android device $serial has ABI $device_abi and API $device_api; expected $abi ${emulator_api:+at API $emulator_api}." >&2
     exit 2
   fi
-elif [[ -n "$emulator_api" || -z "$serial" ]] ||
-  ! "$adb" -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null |
-  tr -d '\r' | grep -qx "$abi"; then
-  emulator_args=("$abi")
-  if [[ -n "$emulator_api" ]]; then
-    emulator_args+=(--api "$emulator_api")
+else
+  emulator_api=${emulator_api:-${MLN_FFI_ANDROID_EMULATOR_API:?MLN_FFI_ANDROID_EMULATOR_API must name the default emulator API level}}
+  if ! serial=$("$serial_script" "$abi" "$emulator_api"); then
+    mise run //:android-emulator:boot "$abi" --api "$emulator_api"
+    serial=$("$serial_script" "$abi" "$emulator_api")
   fi
-  mise run //:android-emulator:boot "${emulator_args[@]}"
-  serial=$("$serial_script")
 fi
+# Names the emulator's AVD, so a failure can report on the emulator; a device
+# that is no emulator has none.
+avd_name=$("$adb" -s "$serial" emu avd name 2>/dev/null | sed -n 's/\r$//;1p') || avd_name=
+
+remove_remote_dir() {
+  perl -e 'alarm shift; exec @ARGV' 30 \
+    "$adb" -s "$serial" shell "rm -rf '$remote_dir'" >/dev/null 2>&1 || true
+}
+trap remove_remote_dir EXIT
 
 # The shell user may execute what it owns under /data/local/tmp. The Android
 # build links the C++ runtime statically, so the C API library pushed beside the
 # executable is the only one it loads from here.
-run_adb "the shell that prepares $remote_dir" shell "rm -rf '$remote_dir' && mkdir -p '$remote_dir/tmp'"
+run_adb "the shell that prepares $remote_dir" shell "mkdir -p '$remote_dir/tmp'"
 run_adb "the push of $(basename "$native_library")" push "$native_library" "$remote_dir/libmaplibre-native-c.so" >/dev/null
 for library in ${extra_libraries[@]+"${extra_libraries[@]}"}; do
   run_adb "the push of $(basename "$library")" push "$library" "$remote_dir/$(basename "$library")" >/dev/null

@@ -10,14 +10,14 @@ case "$preset" in
 esac
 
 mise run //:android-sdk-packages
-if [[ -z "${ANDROID_SERIAL:-}" ]]; then
-  emulator_args=("$abi")
-  if [[ "$preset" == android-x64-egl ]]; then
-    emulator_args+=(--api 26)
-  fi
-  mise run //:android-emulator:boot "${emulator_args[@]}"
+api=$MLN_FFI_ANDROID_EMULATOR_API
+if [[ "$preset" == android-x64-egl ]]; then
+  api=26
 fi
-serial=$("$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh")
+if [[ -z "${ANDROID_SERIAL:-}" ]]; then
+  mise run //:android-emulator:boot "$abi" --api "$api"
+fi
+serial=$("$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh" "$abi" "$api")
 # adb can briefly report an already booted emulator offline while its server starts.
 perl -e 'alarm shift; exec @ARGV' 30 \
   "$ANDROID_HOME/platform-tools/adb" -s "$serial" wait-for-device

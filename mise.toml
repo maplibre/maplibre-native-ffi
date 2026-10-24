@@ -152,6 +152,9 @@ sccache = "{{vars.sccache_version}}"
 MLN_FFI_ANDROID_BUILD_TOOLS_VERSION = "{{vars.android_build_tools_version}}"
 MLN_FFI_ANDROID_CMAKE_VERSION = "{{vars.android_cmake_version}}"
 MLN_FFI_ANDROID_NDK_VERSION = "{{vars.android_ndk_version}}"
+# The API level of the shared emulator that Android device tasks look for when
+# they name none.
+MLN_FFI_ANDROID_EMULATOR_API = "{{vars.android_system_image_api}}"
 # Kotlin Gradle installs the wasm target's npm packages with its own Yarn 1,
 # which refuses to run under this repository's package.json because that names
 # pnpm as the package manager.
@@ -477,7 +480,7 @@ bash .mise/bin/sync-android-packages "$usage_sdk_root" "{{vars.java_version}}" "
 '''
 
 [tasks."android-emulator:boot"]
-description = "Boot the Android emulator and wait until it is ready."
+description = "Boot the shared Android emulator for an ABI and API level, or reuse it, and wait until it is ready."
 usage = '''
 arg "[abi]" default="x86_64" {
   choices "arm64-v8a" "x86_64"
@@ -496,8 +499,14 @@ run = '''
 '''
 
 [tasks."android-emulator:stop"]
-description = "Stop the Android emulator started by mise."
-run = '"$MISE_MONOREPO_ROOT/scripts/stop-android-emulator.sh"'
+description = "Stop the shared Android emulator for an ABI and API level, which any session on the machine may be using."
+usage = '''
+arg "[abi]" default="x86_64" {
+  choices "arm64-v8a" "x86_64"
+}
+flag "--api <api>" default="{{vars.android_system_image_api}}"
+'''
+run = '"$MISE_MONOREPO_ROOT/scripts/stop-android-emulator.sh" "$usage_api" "$usage_abi"'
 
 [tasks."ohos-emulator:boot"]
 description = "Boot the OpenHarmony emulator and wait until it is ready."

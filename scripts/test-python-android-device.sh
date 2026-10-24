@@ -42,17 +42,14 @@ if [[ ! -d "$native_install_dir" ]]; then
 fi
 
 mise run //:android-sdk-packages
-if [[ -z "${ANDROID_SERIAL:-}" && "$preset" == android-x64-egl ]]; then
-  # CPython 3.14's x86_64 Android runtime uses the legacy open syscall during
-  # mimalloc initialization. API 26 rejects that syscall before Python can
-  # load the wheel, so replace the Goldfish regression device with the default
-  # emulator used by this binding's suite.
-  mise run //:android-emulator:stop
-fi
+# CPython 3.14's x86_64 Android runtime uses the legacy open syscall during
+# mimalloc initialization. API 26 rejects that syscall before Python can load
+# the wheel, so even the EGL target, whose other suites run on API 26, tests on
+# the default emulator.
 if [[ -z "${ANDROID_SERIAL:-}" ]]; then
   mise run //:android-emulator:boot "$abi"
 fi
-serial=$("$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh")
+serial=$("$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh" "$abi")
 export ANDROID_SERIAL="$serial"
 
 # cibuildwheel pins its own NDK and removes other NDK versions from the SDK it

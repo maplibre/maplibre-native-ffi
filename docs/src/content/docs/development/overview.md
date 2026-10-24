@@ -42,7 +42,12 @@ preset, because CMake caches the compiler path.
 
 `mise run test` boots an Android or OpenHarmony emulator on demand and leaves it
 running. An emulator boots in minutes under KVM on Linux, and takes an hour or
-more in software everywhere else.
+more in software everywhere else. Every checkout on a machine shares one Android
+emulator per API level and ABI: the AVD `api-<level>-<abi>`, such as
+`api-36-arm64-v8a`, in the default AVD home. A task reuses the one that is
+running, whoever started it, and creates the AVD if it is missing. Since another
+session may be using it, no task stops it; run
+`mise run //:android-emulator:stop <abi> --api <level>` when none is.
 
 ## Debug on a CI runner
 
