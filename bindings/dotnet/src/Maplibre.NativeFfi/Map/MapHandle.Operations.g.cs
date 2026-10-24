@@ -1333,7 +1333,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         return teardown;
     }
 
-    public ValueTask DisposeAsync() => new(CloseAsync());
+    public ValueTask DisposeAsync() => state.Close() ? new(teardown) : default;
 
     private mln_status StartRelease(MlnMap handle, mln_diagnostic* _)
     {

@@ -21,6 +21,7 @@ import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.holdThreadUntil
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.runtime.awaitCommitted
+import org.maplibre.nativeffi.runtime.use
 import org.maplibre.nativeffi.smallMapOptions
 
 /** How the generated owners close and keep their parents. */
@@ -38,6 +39,13 @@ class HandleLifecycleTest {
     // Native refuses a released handle, whether to release it again or to use it.
     assertFailsWithStatus(Status.INVALID_STATE) { runtime.release() }
     assertFailsWithStatus(Status.INVALID_STATE) { runtime.clearResourceTransform() }
+  }
+
+  @Test
+  fun useLeavesAnOwnerThatItsBlockReleased() = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+      runtime.release().awaitWithin("the runtime teardown")
+    }
   }
 
   @Test

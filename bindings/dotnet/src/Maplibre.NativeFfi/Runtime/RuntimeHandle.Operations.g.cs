@@ -363,7 +363,7 @@ public sealed unsafe partial class RuntimeHandle
         return teardown;
     }
 
-    public ValueTask DisposeAsync() => new(CloseAsync());
+    public ValueTask DisposeAsync() => state.Close() ? new(teardown) : default;
 
     private mln_status StartRelease(MlnRuntime handle, mln_diagnostic* _)
     {

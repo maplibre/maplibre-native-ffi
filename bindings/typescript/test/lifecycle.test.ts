@@ -41,6 +41,24 @@ test("repeated asynchronous release reaches native", async () => {
   await assert.rejects(map.setStyleJson(emptyStyle()), isInvalidState);
 });
 
+test(
+  "a disposer after an explicit close or dispose does nothing",
+  async () => {
+    const fixture = await openRuntime();
+
+    const closed = await fixture.openMap();
+    await bounded(closed.close(), "map close");
+    await closed[Symbol.asyncDispose]();
+    closed[Symbol.dispose]();
+
+    const disposed = runtimeCreate();
+    disposed.dispose();
+    await disposed[Symbol.asyncDispose]();
+    await disposed[Symbol.asyncDispose]();
+  },
+  { needs: ["disposers"] },
+);
+
 test("a refused close leaves the handle usable for a later close", async () => {
   const runtime = runtimeCreate();
   const map = await bounded(runtime.createMap(), "map creation");

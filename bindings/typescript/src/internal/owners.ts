@@ -200,8 +200,11 @@ export function defineDisposers(
   };
   const asyncMethod = asyncClose ?? syncClose;
   // An async disposer returns a Promise even when it falls back to close().
+  // Like the synchronous one, it leaves a released owner as it is.
   define(symbols.asyncDispose, asyncMethod, async function () {
-    await this[asyncMethod!]!();
+    if (!stateOf(this as unknown as Owner).released) {
+      await this[asyncMethod!]!();
+    }
   });
   define(symbols.dispose, syncClose, function () {
     return this[syncClose!]!();

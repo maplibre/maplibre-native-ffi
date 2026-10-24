@@ -12,12 +12,18 @@ public interface AsyncReleasable {
    * the owner live for a retry. A release after native accepted one reports the handle released.
    */
   public fun release(): Deferred<Unit>
+
+  /** Whether a release or dispose has ended the handle. */
+  public val isClosed: Boolean
 }
 
-/** Runs [block] and suspends until this owner's native release has finished. */
+/**
+ * Runs [block] and suspends until this owner's native release has finished. An owner that [block]
+ * already closed is left as it is.
+ */
 public suspend inline fun <T : AsyncReleasable, R> T.use(block: suspend (T) -> R): R =
   try {
     block(this)
   } finally {
-    withContext(NonCancellable) { release().await() }
+    if (!isClosed) withContext(NonCancellable) { release().await() }
   }

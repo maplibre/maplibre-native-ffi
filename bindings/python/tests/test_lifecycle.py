@@ -38,6 +38,13 @@ def test_closing_twice_is_safe_and_a_closed_handle_refuses_use() -> None:
     data.close()
 
 
+def test_leaving_a_block_after_an_explicit_close_does_nothing() -> None:
+    with mln.runtime_create() as runtime:
+        with result(runtime.create_map()) as map_handle:
+            result(map_handle.close())
+        result(runtime.close())
+
+
 def test_a_handle_id_names_its_events_and_outlives_close(
     harness: Harness, map_handle: mln.MapHandle
 ) -> None:

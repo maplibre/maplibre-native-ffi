@@ -136,21 +136,22 @@ internal sealed unsafe class NativeHandleState<T>
         GC.SuppressFinalize(this);
     }
 
-    internal void Close(bool idempotent = true) => Release(destroy, idempotent);
+    internal bool Close(bool idempotent = true) => Release(destroy, idempotent);
 
     internal void Retire() => Release(disposeAbandoned ?? destroy);
 
     private static MaplibreException InUse() =>
         new(global::Maplibre.NativeFfi.Status.InvalidState, "Batch is in use");
 
-    internal void Release(StatusDestroy<T> release, bool idempotent = true)
+    // Returns whether this call ended the handle, rather than finding it closed.
+    internal bool Release(StatusDestroy<T> release, bool idempotent = true)
     {
         lock (gate)
         {
             if (protectsCopies && (readers != 0 || releasing))
                 throw InUse();
             if (idempotent && closed)
-                return;
+                return false;
             releasing = protectsCopies;
         }
         try
@@ -160,6 +161,7 @@ internal sealed unsafe class NativeHandleState<T>
             lock (gate)
                 closed = true;
             GC.SuppressFinalize(this);
+            return true;
         }
         finally
         {

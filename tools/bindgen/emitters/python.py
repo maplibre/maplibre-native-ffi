@@ -140,10 +140,12 @@ def owned_native(value, expression, callbacks=False):
 
 
 def operation(
-    plan: OperationPlan, values: Values, *, discard=False
+    plan: OperationPlan, values: Values, *, discard=False, exit=False
 ) -> tuple[str, str, str, str, str | None]:
+    """Lower one operation. `exit` lowers a handle's scoped release as the
+    private `_exit` that `__exit__` calls, which skips a released handle."""
     function = plan.function
-    if plan.role == "support":
+    if plan.role == "support" and not exit:
         raise unsupported(
             function, "support operation is consumed by the value/runtime compiler"
         )
@@ -179,7 +181,9 @@ def operation(
         name += "_"
     if not safe_identifier(name):
         raise unsupported(function, f"method identifier {name!r} is not safe")
-    if name in OWNER_MEMBERS and not release:
+    if exit:
+        name = "_exit"
+    elif name in OWNER_MEMBERS and not release:
         raise unsupported(
             function, f"method identifier {name!r} collides with an owner member"
         )
@@ -304,7 +308,7 @@ def operation(
             f"        let handle = self.scope.pointer(self.native)? as *mut sys::{native_owner};"
         )
     elif plan.consumes or abandon:
-        idempotent = "false" if plan.completion else "true"
+        idempotent = "false" if plan.completion and not exit else "true"
         setup += [
             f"        let Some({'mut ' if plan.consumes else ''}reservation) = self.reserve({idempotent})? else {{ return Ok(py.None()); }};",
             "        let mut handle = reservation.handle();"
@@ -801,8 +805,17 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     errors.update(
         {name: "\n".join(reasons) for name, reasons in bound.unsupported.items()}
     )
+    exits = {
+        handle.scoped_release
+        for handle in bound.handles.values()
+        if handle.native in OWNERS
+    }
     for plan in bound.operations:
         function = plan.function
+        if plan.name in exits:
+            owner, native, _, stub, _ = operation(plan, values, exit=True)
+            rust[owner].append(native)
+            stubs[owner].append(stub)
         saved_values = (
             dict(values.records),
             dict(values.inputs),

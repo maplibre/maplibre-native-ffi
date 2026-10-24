@@ -4933,6 +4933,29 @@ impl AcquiredFrameHandle {
         generated_copy_mln_webgpu_texture_frame(py, &out_frame)
     }
     #[pyo3(signature = (consumer_completion=None))]
+    fn _exit(
+        &self,
+        py: Python<'_>,
+        consumer_completion: Option<Bound<'_, PyAny>>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let consumer_completion = consumer_completion.unwrap_or_else(|| py.None().into_bound(py));
+        let consumer_completion_value =
+            generated_input_mln_gpu_sync(&consumer_completion.clone(), storage)?;
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_acquired_frame_release(handle, &consumer_completion_value, diagnostic)
+            })
+        }?;
+        reservation.commit();
+        Ok(py.None())
+    }
+    #[pyo3(signature = (consumer_completion=None))]
     fn close(
         &self,
         py: Python<'_>,
@@ -4959,6 +4982,17 @@ impl AcquiredFrameHandle {
 
 #[pymethods]
 impl GeojsonSourceDataHandle {
+    #[pyo3(signature = ())]
+    fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.run(|| sys::mln_geojson_source_data_release(handle)) };
+        reservation.commit();
+        Ok(py.None())
+    }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
@@ -6838,6 +6872,23 @@ impl MapHandle {
         }
     }
     #[pyo3(signature = ())]
+    fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        let convert = py_none;
+        let future = unsafe {
+            call.complete(
+                |completion, diagnostic| sys::mln_map_release(handle, completion, diagnostic),
+                convert,
+            )
+        }?;
+        reservation.commit();
+        Ok(future)
+    }
+    #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let Some(mut reservation) = self.reserve(false)? else {
@@ -8484,6 +8535,17 @@ impl MapProjectionHandle {
         })
     }
     #[pyo3(signature = ())]
+    fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.status(|diagnostic| sys::mln_map_projection_release(handle, diagnostic)) }?;
+        reservation.commit();
+        Ok(py.None())
+    }
+    #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let Some(mut reservation) = self.reserve(true)? else {
@@ -8525,6 +8587,17 @@ impl RenderFrameBatchHandle {
             })
         }?;
         generated_copy_mln_render_frame_batch_view(py, &out_view)
+    }
+    #[pyo3(signature = ())]
+    fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.run(|| sys::mln_render_frame_batch_release(handle)) };
+        reservation.commit();
+        Ok(py.None())
     }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -8613,6 +8686,17 @@ impl RenderSessionHandle {
                 convert,
             )
         }
+    }
+    #[pyo3(signature = ())]
+    fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.status(|diagnostic| sys::mln_render_session_dispose(handle, diagnostic)) }?;
+        reservation.commit();
+        Ok(py.None())
     }
     #[pyo3(signature = ())]
     fn drain_frame_results(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -9143,6 +9227,17 @@ impl ResourceRequestHandle {
         Ok(py.None())
     }
     #[pyo3(signature = ())]
+    fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.run(|| sys::mln_resource_request_release(handle)) };
+        reservation.commit();
+        Ok(py.None())
+    }
+    #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let Some(mut reservation) = self.reserve(true)? else {
@@ -9198,6 +9293,17 @@ impl ResourceTransformRequestHandle {
                 sys::mln_resource_transform_request_complete(handle, url_value, diagnostic)
             })
         }?;
+        Ok(py.None())
+    }
+    #[pyo3(signature = ())]
+    fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.run(|| sys::mln_resource_transform_request_release(handle)) };
+        reservation.commit();
         Ok(py.None())
     }
     #[pyo3(signature = ())]
@@ -9464,6 +9570,23 @@ impl RuntimeHandle {
                 convert,
             )
         }
+    }
+    #[pyo3(signature = ())]
+    fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        let convert = py_none;
+        let future = unsafe {
+            call.complete(
+                |completion, diagnostic| sys::mln_runtime_release(handle, completion, diagnostic),
+                convert,
+            )
+        }?;
+        reservation.commit();
+        Ok(future)
     }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -9762,6 +9885,17 @@ impl StyleExpressionHandle {
             })
         }?;
         generated_copy_mln_style_expression_info(py, &out_info)
+    }
+    #[pyo3(signature = ())]
+    fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.run(|| sys::mln_style_expression_release(handle)) };
+        reservation.commit();
+        Ok(py.None())
     }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {

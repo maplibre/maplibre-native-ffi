@@ -114,9 +114,15 @@ if ("transfer" in ArrayBuffer.prototype) {
   );
 }
 
+// Nor does it define the explicit resource management symbols, so owners
+// define no disposers there.
+if ("asyncDispose" in Symbol) {
+  throw new Error("this ArkTS has Symbol.asyncDispose; declare disposers");
+}
+
 export const capabilities: Capabilities = {
   host: "arkts",
-  unavailable: ["childProcess", "processExit", "bufferTransfer"],
+  unavailable: ["childProcess", "processExit", "bufferTransfer", "disposers"],
   httpOrigin,
   realmSpawn,
   forcedGc: () => ArkTools.forceFullGC(),

@@ -22,4 +22,7 @@ internal constructor(
    */
   public val id: ULong
     get() = binding.handle.toULong()
+
+  public override val isClosed: Boolean
+    get() = binding.isReleased
 }

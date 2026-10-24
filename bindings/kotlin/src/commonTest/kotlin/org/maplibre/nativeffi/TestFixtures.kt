@@ -50,22 +50,6 @@ internal const val EMPTY_STYLE_JSON: String = """{"version":8,"sources":{},"laye
  */
 internal expect fun runSuspendTest(block: suspend CoroutineScope.() -> Unit): TestResult
 
-/** Whether a release of this owner has ended its handle. */
-private val AsyncReleasable.isReleased: Boolean
-  get() =
-    when (this) {
-      is RuntimeHandle ->
-        try {
-          getEventMask()
-          false
-        } catch (error: MaplibreException) {
-          if (error.status != Status.INVALID_STATE) throw error
-          true
-        }
-      is MapHandle -> isClosed
-      else -> false
-    }
-
 /** Asserts that [block] fails with [status], and returns the failure. */
 internal inline fun assertFailsWithStatus(status: Status, block: () -> Unit): MaplibreException =
   assertFailsWith<MaplibreException> { block() }.also { assertEquals(status, it.status) }
@@ -253,7 +237,7 @@ internal suspend fun <T> runThenRelease(owners: List<AsyncReleasable>, block: su
     }
   withContext(NonCancellable) {
     for (owner in owners) {
-      if (owner.isReleased) continue
+      if (owner.isClosed) continue
       try {
         owner.release().awaitWithin("the release of $owner")
       } catch (error: Throwable) {

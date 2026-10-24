@@ -350,7 +350,9 @@ def emit_operation(
                     "public Task CloseAsync()",
                     ["state.Close(idempotent: false);", "return teardown;"],
                 )
-                + "\n    public ValueTask DisposeAsync() => new(CloseAsync());\n\n"
+                # A scope that exits after an explicit close or dispose does
+                # nothing, as .NET requires of a repeated dispose.
+                + "\n    public ValueTask DisposeAsync() => state.Close() ? new(teardown) : default;\n\n"
                 + method(
                     f"private mln_status StartRelease({native_type} handle, mln_diagnostic* _)",
                     [

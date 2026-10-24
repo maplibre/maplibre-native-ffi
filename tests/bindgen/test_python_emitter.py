@@ -7,7 +7,7 @@ import typing
 import unittest
 from unittest.mock import MagicMock, patch
 
-from support import parse
+from support import parse, real_api
 
 from tools.bindgen.emitters import python
 from tools.bindgen.schema import validate
@@ -173,6 +173,26 @@ mln_status mln_host_id(mln_host host, bool *out BIND("direction=out"), mln_diagn
         # The release alone becomes close.
         self.assertEqual(result["generated"], ["mln_host_destroy"])
         self.assertIn("owner member", result["unsupported"]["mln_host_id"])
+
+    def test_scoped_exit_disposes_a_session_and_skips_a_closed_handle(self):
+        native = python.generate(real_api())["src/generated_operations.rs"]
+
+        def method(owner, name):
+            block = native.split(f"\nimpl {owner} {{\n", 1)[1].split("\n}\n", 1)[0]
+            return block.split(f"fn {name}(", 1)[1].split("#[pyo3", 1)[0]
+
+        # A session's release refuses an attached session, so its scope
+        # disposes it; its explicit close stays a release.
+        self.assertIn(
+            "mln_render_session_dispose", method("RenderSessionHandle", "_exit")
+        )
+        self.assertIn(
+            "mln_render_session_release", method("RenderSessionHandle", "close")
+        )
+        # A scope that exits after an explicit asynchronous close does nothing,
+        # while a repeated explicit close still reaches native.
+        self.assertIn("self.reserve(true)", method("MapHandle", "_exit"))
+        self.assertIn("self.reserve(false)", method("MapHandle", "close"))
 
     def test_tagged_union_wrapper_keeps_payload_record_and_unknown_tag(self):
         api = self.parse(groups=("tagged_union",))

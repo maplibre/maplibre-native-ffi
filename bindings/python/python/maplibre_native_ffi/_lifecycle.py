@@ -31,7 +31,9 @@ class NativeHandleMixin:
 
         A handle whose release reports asynchronous teardown returns a future
         here. Leaving the ``with`` block discards it, so a host that must
-        observe teardown calls ``close`` itself and waits.
+        observe teardown calls ``close`` itself and waits. Leaving the block
+        after an explicit close does nothing. A render session's block disposes
+        the session instead, because its release refuses an attached session.
         """
         return self._native.close()
 
@@ -44,7 +46,7 @@ class NativeHandleMixin:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        self.close()
+        self._native._exit()
 
     def __del__(self) -> None:
         # Finalizers cannot report warning-delivery failures, including during

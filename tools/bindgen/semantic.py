@@ -62,6 +62,15 @@ class HandlePlan:
         """The handle's public name: its operation prefix without `mln_`."""
         return public_stem(self.native)
 
+    @property
+    def scoped_release(self) -> str:
+        """The operation that scoped cleanup, such as `use` or `with`, calls.
+
+        A handle with an abandon operation releases only after detach or
+        abandon, so its scope disposes it instead, which accepts any state.
+        """
+        return self.dispose if self.abandon and self.dispose else self.release
+
 
 @dataclass(frozen=True)
 class OwnedOutputPlan:

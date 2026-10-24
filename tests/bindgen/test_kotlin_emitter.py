@@ -153,6 +153,19 @@ class KotlinLayoutTests(unittest.TestCase):
                 ROOT,
             )
 
+    def test_auto_closeable_disposes_a_handle_that_releases_only_after_abandon(self):
+        owners = kotlin.generate(real_api())
+        owner = "src/commonMain/kotlin/org/maplibre/nativeffi/generated/{}.kt"
+        # A session's release refuses an attached session, so `use` disposes it.
+        self.assertIn(
+            "override fun close() { dispose() }",
+            owners[owner.format("RenderSessionHandle")],
+        )
+        self.assertIn(
+            "override fun close() { release() }",
+            owners[owner.format("AcquiredFrameHandle")],
+        )
+
     def test_split_registrations_take_a_form_per_target(self):
         _functions, _unsupported, bodies, split, values, _native = kotlin.lowered(
             real_api()

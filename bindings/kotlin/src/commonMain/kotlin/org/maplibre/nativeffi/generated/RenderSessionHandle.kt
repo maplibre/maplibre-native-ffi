@@ -28,6 +28,6 @@ internal constructor(
     get() = binding.isReleased
 
   public override fun close() {
-    release()
+    dispose()
   }
 }

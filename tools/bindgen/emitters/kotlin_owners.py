@@ -34,10 +34,11 @@ def state_type(native, plans):
 
 
 def release(bound, native, plans):
-    """Map the release plan onto AutoCloseable or AsyncReleasable, when a host can call it bare."""
+    """Map the scoped release onto AutoCloseable or AsyncReleasable, when a host can call it bare."""
     handle = bound.handles[native]
     plan = next(
-        (p for p in plans if p.name == handle.release and receives(p, native)), None
+        (p for p in plans if p.name == handle.scoped_release and receives(p, native)),
+        None,
     )
     if plan is None:
         return None
@@ -97,7 +98,11 @@ def owner(bound, native, plans):
             "  public val id: ULong get() = binding.handle.toULong()"
         ),
     ]
-    if native in {"mln_map", "mln_render_session"}:
+    if closes and closes.interface == ASYNC_RELEASABLE:
+        body.append(
+            "  public override val isClosed: Boolean get() = binding.isReleased"
+        )
+    elif native == "mln_render_session":
         body.append("  public val isClosed: Boolean get() = binding.isReleased")
     if closes and not closes.inherited:
         body.append(

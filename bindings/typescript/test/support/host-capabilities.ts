@@ -20,7 +20,8 @@ export type Capability =
   | "forcedGc"
   | "childProcess"
   | "processExit"
-  | "bufferTransfer";
+  | "bufferTransfer"
+  | "disposers";
 
 export interface ChildResult {
   readonly code: number | null;
@@ -85,6 +86,8 @@ export interface Capabilities {
    * `ArrayBuffer.prototype.transfer` does, which detaches the old one.
    */
   readonly bufferTransfer?: (buffer: ArrayBuffer, length: number) => void;
+  /** The host defines `Symbol.dispose` and `Symbol.asyncDispose`. */
+  readonly disposers?: true;
   /** Loads the test-only addon over tests/graphics. */
   readonly testGraphics: () => unknown;
   /** Keeps a timer from holding the event loop open. */
@@ -300,6 +303,7 @@ export const capabilities: Capabilities = {
   childProcess,
   processExit: (code) => process.exit(code),
   bufferTransfer: (buffer, length) => void buffer.transfer(length),
+  disposers: true,
   testGraphics: () => {
     const path = process.env.MAPLIBRE_NATIVE_FFI_TEST_GRAPHICS;
     if (!path) {

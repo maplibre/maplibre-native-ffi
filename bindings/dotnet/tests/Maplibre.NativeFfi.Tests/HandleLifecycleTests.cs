@@ -27,15 +27,9 @@ public sealed class HandleLifecycleTests
                 })
                 .Status
         );
-        Assert.Equal(
-            Status.InvalidState,
-            Assert
-                .Throws<MaplibreException>(() =>
-                {
-                    _ = map.DisposeAsync();
-                })
-                .Status
-        );
+        // A scope that exits after an explicit close does nothing.
+        await map.DisposeAsync();
+        await map.DisposeAsync();
         map.Dispose();
         map.Dispose();
 
@@ -51,6 +45,10 @@ public sealed class HandleLifecycleTests
         );
         runtime.Dispose();
         runtime.Dispose();
+
+        var disposed = RuntimeHandle.Create(RuntimeOptions.Default);
+        disposed.Dispose();
+        await disposed.DisposeAsync();
     }
 
     [Fact]

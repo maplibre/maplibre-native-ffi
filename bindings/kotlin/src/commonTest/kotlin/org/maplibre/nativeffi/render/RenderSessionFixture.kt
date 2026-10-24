@@ -222,7 +222,10 @@ internal suspend fun <T> MapFixture.withRenderSession(
   }
 }
 
-/** Leaves a session closed: an attached session is abandoned rather than leaked. */
+/**
+ * Leaves a session closed. An attached session is abandoned first, so its graphics objects are gone
+ * before the fixture's device is, where a close alone would only schedule their destruction.
+ */
 internal fun RenderSessionHandle.abandonAndClose() {
   if (isClosed) return
   val state = getSnapshot().state
