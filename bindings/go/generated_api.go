@@ -8077,7 +8077,7 @@ func (receiver *RenderSessionHandle) Detach() (*Future[struct{}], error) {
 func (receiver *RenderSessionHandle) Close() (*Future[struct{}], error) {
 	return bindingStart(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_dispose(C.mln_render_session(raw), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // DrainFrameResults drains every currently queued terminal frame result into an
