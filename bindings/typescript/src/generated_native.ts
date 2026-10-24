@@ -79,7 +79,7 @@ import type {
 } from "./generated_values.ts";
 
 /** The digest of the C headers that this facade and its addon came from. */
-export const ABI_DIGEST = "d831974474435625";
+export const ABI_DIGEST = "65b6a643054275b6";
 
 /** The index of each completion decoder in the addon's decoder table. */
 export const Decoder = {
@@ -748,10 +748,14 @@ export interface NativeOperations {
   mln_rendered_feature_query_options_default(): RenderedFeatureQueryOptions;
   mln_resource_request_complete(
     handle: bigint,
+    token: object | undefined,
     response: ResourceResponse | undefined,
   ): void;
   mln_resource_request_is_cancelled(handle: bigint): boolean;
-  mln_resource_request_pass_through(handle: bigint): void;
+  mln_resource_request_pass_through(
+    handle: bigint,
+    token: object | undefined,
+  ): void;
   mln_resource_request_release(handle: bigint, token: object | undefined): void;
   mln_resource_request_set_cancel_callback(
     handle: bigint,

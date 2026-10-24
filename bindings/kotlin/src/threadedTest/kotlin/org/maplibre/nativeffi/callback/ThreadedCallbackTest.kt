@@ -6,18 +6,15 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlinx.coroutines.CompletableDeferred
 import org.maplibre.nativeffi.awaitWithin
-import org.maplibre.nativeffi.deny
+import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.HttpHeaderTransform
 import org.maplibre.nativeffi.generated.HttpHeaderTransformResponse
 import org.maplibre.nativeffi.generated.LogEvent
 import org.maplibre.nativeffi.generated.LogHandler
-import org.maplibre.nativeffi.generated.ResourceProvider
-import org.maplibre.nativeffi.generated.ResourceProviderDecision
 import org.maplibre.nativeffi.generated.logSetCallback
 import org.maplibre.nativeffi.generated.setHeader
 import org.maplibre.nativeffi.generated.setHttpHeaderTransform
-import org.maplibre.nativeffi.generated.setResourceProvider
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.runOnBackgroundThread
 import org.maplibre.nativeffi.runSuspendTest
@@ -98,16 +95,11 @@ class ThreadedCallbackTest {
   }
 
   /** Passes [url] through to native loading, and denies every other request. */
-  private fun passingThrough(url: String) =
-    ResourceProvider(
-      callback = { request, handle ->
-        if (request.requestedUrl == url) ResourceProviderDecision.PASS_THROUGH
-        else {
-          handle.deny()
-          ResourceProviderDecision.HANDLE
-        }
-      },
-    )
+  private fun passingThrough(url: String) = denyingProvider { request, handle ->
+    if (request.requestedUrl != url) return@denyingProvider false
+    handle.passThrough()
+    true
+  }
 
   private companion object {
     // A loopback port that nothing serves, so the request fails without leaving the machine.

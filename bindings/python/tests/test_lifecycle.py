@@ -199,7 +199,7 @@ import maplibre_native_ffi as m
 
 runtime = m.runtime_create()
 runtime.set_resource_provider(
-    m.ResourceProvider(callback=lambda request, handle: m.ResourceProviderDecision.HANDLE)
+    m.ResourceProvider(callback=lambda request, handle: None)
 ).result(10)
 m.log_set_callback(m.LogHandler(lambda severity, event, code, message: 1))
 live = runtime.create_map().map

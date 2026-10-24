@@ -16,14 +16,13 @@ static const char credentialed_unsupported_scheme_style_url[] =
 static const char inline_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
-static uint32_t pass_through_provider(
+static void pass_through_provider(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
   (void)user_data;
   (void)request;
-  (void)handle;
-  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+  mln_test_request_pass_through(handle);
 }
 
 static void count_runtime_callback_release(void* user_data) {
@@ -160,17 +159,15 @@ static void submit_provider_from_thread(void* user_data) {
   );
 }
 
-static uint32_t recording_resource_provider(
+static void recording_resource_provider(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
   (void)request;
-  (void)handle;
   provider_request_probe* probe = user_data;
   mln_test_flag_set(&probe->entered);
-  // An unknown decision becomes a handled provider error, which keeps the
-  // request off the network.
-  return UINT32_MAX;
+  // Releasing the request unanswered fails it, which keeps it off the network.
+  mln_resource_request_release(handle);
 }
 
 static void resource_provider_command_copies_cross_thread_descriptor(void) {
@@ -206,7 +203,7 @@ static void resource_provider_command_copies_cross_thread_descriptor(void) {
     mln_test_await_loading_failure(runtime, map, message, sizeof(message))
   );
   TEST_ASSERT_TRUE(atomic_load(&probe.entered));
-  TEST_ASSERT_NOT_NULL(strstr(message, "unknown decision"));
+  TEST_ASSERT_NOT_NULL(strstr(message, "released without a response"));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -216,7 +213,7 @@ typedef struct dropped_request_probe {
   _Atomic mln_resource_request handle;
 } dropped_request_probe;
 
-static uint32_t claim_and_drop_resource_provider(
+static void claim_and_drop_resource_provider(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
@@ -227,7 +224,6 @@ static uint32_t claim_and_drop_resource_provider(
   if (atomic_load(&probe->release_inline)) {
     mln_resource_request_release(handle);
   }
-  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 
 static bool dropped_request_claimed(void* context) {
@@ -278,27 +274,16 @@ static void releasing_a_claimed_request_without_a_response_fails_it(void) {
   expect_dropped_request_fails(false);
 }
 
-// The same holds when the provider releases the handle inside its callback
-// before answering HANDLE.
-static void releasing_a_request_inside_its_callback_then_claiming_fails_it(
-  void
-) {
+// The same holds when the provider releases the handle inside its callback.
+static void releasing_a_request_inside_its_callback_fails_it(void) {
   expect_dropped_request_fails(true);
 }
 
-static uint32_t release_then_unknown_decision_provider(
-  void* user_data, const mln_resource_request_info* request,
-  mln_resource_request handle
-) {
-  (void)user_data;
-  (void)request;
-  mln_resource_request_release(handle);
-  return UINT32_MAX;
-}
+static atomic_int completed_handle_reuse = MLN_STATUS_OK;
 
-// Completes its request inline, then returns PASS_THROUGH, as a binding does
-// whose host answered without claiming the handle.
-static uint32_t complete_then_pass_through(
+// Completes its request inline, then tries to answer it again through the
+// consumed handle.
+static void complete_inline(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
@@ -306,42 +291,29 @@ static uint32_t complete_then_pass_through(
   (void)request;
   const mln_resource_response response =
     mln_test_text_response(inline_style_json);
-  MLN_TEST_OK(mln_resource_request_complete(handle, &response, NULL));
-  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+  if (mln_resource_request_complete(handle, &response, NULL) != MLN_STATUS_OK) {
+    mln_resource_request_release(handle);
+    return;
+  }
+  atomic_store(
+    &completed_handle_reuse, mln_resource_request_pass_through(handle, NULL)
+  );
 }
 
-// A request completed during its decision is answered whatever the decision
-// says, so native loading never fetches its unsupported scheme.
-static void a_request_completed_while_deciding_is_answered(void) {
+// Completing a request consumes its handle, so the style loads from the inline
+// answer and a later call through the handle finds it gone.
+static void a_request_completed_inside_its_callback_consumes_its_handle(void) {
+  atomic_store(&completed_handle_reuse, MLN_STATUS_OK);
   mln_runtime runtime = mln_test_create_runtime();
   const mln_resource_provider provider = {
     .size = sizeof(mln_resource_provider),
-    .callback = complete_then_pass_through,
+    .callback = complete_inline,
   };
   MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_set_style_url(map, "custom://completed.json"));
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-static void releasing_a_request_before_an_unknown_decision_fails_it(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  const mln_resource_provider provider = {
-    .size = sizeof(mln_resource_provider),
-    .callback = release_then_unknown_decision_provider,
-  };
-  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
-  mln_map map = mln_test_create_map(runtime);
-  MLN_TEST_OK(
-    mln_test_map_set_style_url(map, "custom://unknown-decision.json")
-  );
-  char message[512];
-  TEST_ASSERT_TRUE(
-    mln_test_await_loading_failure(runtime, map, message, sizeof(message))
-  );
-  TEST_ASSERT_NOT_NULL(strstr(message, "unknown decision"));
+  MLN_TEST_INVALID_STATE(atomic_load(&completed_handle_reuse));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -467,50 +439,6 @@ static void unsupported_style_url_names_declining_provider(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-typedef struct inline_release_provider_state {
-  atomic_bool callback_finished;
-  atomic_int completion_status;
-} inline_release_provider_state;
-
-static uint32_t inline_release_resource_provider(
-  void* user_data, const mln_resource_request_info* request,
-  mln_resource_request handle
-) {
-  inline_release_provider_state* state = user_data;
-  const mln_resource_response response =
-    mln_test_text_response(inline_style_json);
-  (void)request;
-  atomic_store(
-    &state->completion_status,
-    mln_resource_request_complete(handle, &response, NULL)
-  );
-  mln_resource_request_release(handle);
-  mln_test_flag_set(&state->callback_finished);
-  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
-}
-
-static void resource_provider_defers_inline_release_until_callback_returns(
-  void
-) {
-  inline_release_provider_state state;
-  atomic_init(&state.callback_finished, false);
-  atomic_init(&state.completion_status, MLN_STATUS_NATIVE_ERROR);
-  mln_runtime runtime = mln_test_create_runtime();
-  const mln_resource_provider provider = {
-    .size = sizeof(mln_resource_provider),
-    .callback = inline_release_resource_provider,
-    .user_data = &state,
-  };
-  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
-  mln_map map = mln_test_create_map(runtime);
-  MLN_TEST_OK(mln_test_map_set_style_url(map, "custom://inline-style.json"));
-  TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
-  TEST_ASSERT_TRUE(atomic_load(&state.callback_finished));
-  MLN_TEST_OK(atomic_load(&state.completion_status));
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 typedef struct cancel_probe {
   atomic_bool provider_entered;
   atomic_int cancel_count;
@@ -571,7 +499,7 @@ static bool rejects_invalid_cancel_handlers(
   return true;
 }
 
-static uint32_t cancel_probe_resource_provider(
+static void cancel_probe_resource_provider(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
@@ -594,7 +522,6 @@ static uint32_t cancel_probe_resource_provider(
     atomic_store(&probe->register_reported_cancelled, cancelled);
   }
   mln_test_flag_set(&probe->provider_entered);
-  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 
 static mln_map start_cancel_probe_request(
@@ -1058,7 +985,6 @@ static void a_usable_cached_style_loads_before_the_provider_answers(void) {
   MLN_TEST_OK(
     mln_resource_request_complete(revalidation->handle, &not_modified, NULL)
   );
-  mln_resource_request_release(revalidation->handle);
   mln_test_destroy_map(map);
   mln_test_destroy_map(first);
   mln_test_destroy_runtime(runtime);
@@ -1066,15 +992,15 @@ static void a_usable_cached_style_loads_before_the_provider_answers(void) {
 }
 
 #if !defined(__EMSCRIPTEN__)
-static uint32_t hand_back_inline(
+static void hand_back_inline(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
   (void)request;
   atomic_int* status = user_data;
-  atomic_store(status, mln_resource_request_pass_through(handle, NULL));
-  mln_resource_request_release(handle);
-  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+  const mln_status passed = mln_resource_request_pass_through(handle, NULL);
+  atomic_store(status, passed);
+  if (passed != MLN_STATUS_OK) mln_resource_request_release(handle);
 }
 
 static void a_callback_request_can_pass_through_inline_or_later(void) {
@@ -1116,7 +1042,6 @@ static void a_callback_request_can_pass_through_inline_or_later(void) {
       ));
       const mln_resource_request handle = atomic_load(&probe.handle);
       MLN_TEST_OK(mln_resource_request_pass_through(handle, NULL));
-      mln_resource_request_release(handle);
     }
     TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
     if (mode == 0) MLN_TEST_STATUS(MLN_STATUS_OK, atomic_load(&status));
@@ -1142,15 +1067,13 @@ MLN_TEST_GROUP {
   RUN_TEST(custom_provider_request_handles_reject_raw_null_handles);
   RUN_TEST(resource_provider_command_copies_cross_thread_descriptor);
   RUN_TEST(releasing_a_claimed_request_without_a_response_fails_it);
-  RUN_TEST(releasing_a_request_inside_its_callback_then_claiming_fails_it);
-  RUN_TEST(releasing_a_request_before_an_unknown_decision_fails_it);
-  RUN_TEST(a_request_completed_while_deciding_is_answered);
+  RUN_TEST(releasing_a_request_inside_its_callback_fails_it);
+  RUN_TEST(a_request_completed_inside_its_callback_consumes_its_handle);
   RUN_TEST(a_released_request_does_not_hold_its_runtime_open);
   RUN_TEST(a_held_request_does_not_hold_its_runtime_open);
   RUN_TEST(unsupported_style_url_scheme_names_scheme_and_url);
   RUN_TEST(unsupported_style_url_diagnostic_redacts_credentials);
   RUN_TEST(unsupported_style_url_names_declining_provider);
-  RUN_TEST(resource_provider_defers_inline_release_until_callback_returns);
   RUN_TEST(cancel_callback_runs_when_map_discards_request);
   RUN_TEST(late_cancel_callback_registration_reports_cancelled);
   RUN_TEST(cancel_callback_may_release_the_request);

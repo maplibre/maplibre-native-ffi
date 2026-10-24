@@ -128,6 +128,21 @@ export function closeSync(
 }
 
 /**
+ * Answers the handle through a synchronous call, which native code consumes
+ * the handle with when it accepts the call. A repeated answer still reaches
+ * native code, which reports the handle stale, where a second close does
+ * nothing.
+ */
+export function answerSync(
+  owner: Owner,
+  answer: (handle: bigint, token: object | undefined) => void,
+) {
+  const state = stateOf(owner);
+  answer(state.handle, state.token);
+  released(state);
+}
+
+/**
  * Releases the handle through an asynchronous call, whose Promise reports
  * retirement. Native code consumes the handle when it accepts the call. A
  * release after an accepted one still reaches native code, which reports the

@@ -272,23 +272,19 @@ mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, 
         unknown = values.Event._from_native({"payload": {"kind": None, "tag": 42}})
         self.assertEqual(unknown.payload, values.UnknownVariant(42))
 
-    def test_decision_handle_owner_takes_its_name_from_the_issued_handle(self):
-        api = self.parse(groups=("decision",))
+    def test_an_owned_callback_handle_arrives_as_its_owner(self):
+        api = self.parse(groups=("owned_argument",))
         self.assertEqual(python.coverage(api)["unsupported"], {})
         generated = self.materialize(api)
         owners, values = generated.owners, generated.values
-        # The provider hands its callback the issued handle's owner.
+        # The handler hands its callback the received handle's owner.
         values._wrap_response = lambda native, owner: (owner, native)
         received = []
-        provider = values.TicketProvider(
-            callback=lambda ticket: received.append(ticket) or values.Decision.CLAIM
+        handler = values.QueryHandler(
+            callback=lambda text, query: received.append((text, query))
         )
-        self.assertEqual(provider._invoke_callback(41), values.Decision.CLAIM)
-        self.assertEqual(received, [("TicketHandle", 41)])
-        self.assertTrue(issubclass(owners.TicketHandle, generated.NativeHandleMixin))
+        handler._invoke_callback("text", 41)
+        self.assertEqual(received, [("text", ("QueryHandle", 41))])
+        self.assertTrue(issubclass(owners.QueryHandle, generated.NativeHandleMixin))
         with self.assertRaises(TypeError):
-            owners.TicketHandle()
-        native = MagicMock()
-        ticket = owners.TicketHandle._from_native(native)
-        ticket.on_cancel(print)
-        native.on_cancel.assert_called_once_with(print)
+            owners.QueryHandle()

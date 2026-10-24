@@ -78,37 +78,6 @@ internal constructor(
   internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope,
 )
 
-/**
- * Resource provider state. Kotlin/Wasm takes `QueuedResourceProvider` in its place.
- *
- * See `mln_resource_provider` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class ResourceProvider(
-  /** The requests that reach the provider; empty to claim every request. */
-  public val routes: List<ResourceRoute> = emptyList(),
-  /** Decides each request that the routes leave to the provider. */
-  public val callback: ResourceProviderCallback,
-)
-
-/**
- * Intercepts a network resource request. Kotlin/Wasm takes `QueuedResourceProviderCallback` in its
- * place.
- *
- * Native code calls it on one of its own threads and waits for it to return.
- *
- * If it throws, native receives `4294967295`, and the binding reports it as a `CallbackException`.
- *
- * See `mln_resource_provider_callback` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public fun interface ResourceProviderCallback {
-  public operator fun invoke(
-    request: ResourceRequestInfo,
-    handle: ResourceRequestHandle,
-  ): ResourceProviderDecision
-}
-
 internal fun NativeCall.putLogHandler(target: Long, value: LogHandler) {
   writeU32(target, w(24, 40).toUInt())
   writeAddress(target + w(8, 16), registrations.register(value))
@@ -134,21 +103,6 @@ internal fun NativeCall.putHttpHeaderTransform(target: Long, value: HttpHeaderTr
 
 internal fun NativeCall.writeHttpHeaderTransform(value: HttpHeaderTransform): Long =
   allocate(w(24, 48), w(4, 8)).also { putHttpHeaderTransform(it, value) }
-
-internal fun NativeCall.putResourceProvider(target: Long, value: ResourceProvider) {
-  writeU32(target, w(32, 56).toUInt())
-  writeAddress(
-    target + w(24, 40),
-    array(value.routes, w(16, 24), w(4, 8)) { at, item -> putResourceRoute(at, item) },
-  )
-  writeSize(target + w(28, 48), value.routes.size.toULong())
-  writeAddress(target + w(8, 16), registrations.register(value))
-  writeAddress(target + w(4, 8), UpcallStubs.resourceProviderCallback)
-  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
-}
-
-internal fun NativeCall.writeResourceProvider(value: ResourceProvider): Long =
-  allocate(w(32, 56), 8).also { putResourceProvider(it, value) }
 
 /**
  * Sets one outgoing HTTP request header for the current transform invocation.
@@ -189,26 +143,6 @@ public fun GeneratedRuntimeOperations.setHttpHeaderTransform(
       C.mln_runtime_set_http_header_transform(
         handle,
         writeHttpHeaderTransform(transform),
-        completion,
-        diagnostic,
-      ),
-    )
-  }
-
-/**
- * Registers or replaces a runtime-scoped network resource provider.
- *
- * See `mln_runtime_set_resource_provider` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public fun GeneratedRuntimeOperations.setResourceProvider(
-  provider: ResourceProvider,
-): Deferred<Unit> =
-  nativeUnit(this, binding, bindingCallbacks) {
-    check(
-      C.mln_runtime_set_resource_provider(
-        handle,
-        writeResourceProvider(provider),
         completion,
         diagnostic,
       ),

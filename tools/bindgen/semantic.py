@@ -108,13 +108,6 @@ class CompletionPlan:
 
 
 @dataclass(frozen=True)
-class DecisionPlan:
-    parameter: str
-    handle: HandlePlan
-    accept: str
-
-
-@dataclass(frozen=True)
 class MaskFlag:
     mask: str
     name: str
@@ -250,15 +243,13 @@ class CallbackPlan:
     parameters: tuple[ParameterPlan, ...]
     result: ValuePlan
     failure: str | None = None
-    decision: DecisionPlan | None = None
     context: str | None = None
     borrowed_owner: str | None = None
     status: bool = False
     # How a delivery queue carries the call, for a registration in queue mode.
     delivery: DeliveryPlan | None = None
-    # The result that native code answers in queue mode: the decision's
-    # accepted outcome, or the `queue_result=` of another callback that
-    # returns a value.
+    # The result that native code answers in queue mode, from the
+    # `queue_result=` of a callback that returns a value.
     queue_result: str | None = None
     # Whether native code relies on the callback's work being done when it
     # returns, so a binding must run it on the calling thread rather than
@@ -364,6 +355,10 @@ class OperationPlan:
     result: ValuePlan | None
     registrations: tuple[RegistrationPlan, ...] = ()
     consumes: str | None = None
+    # Whether the call is its receiver's release or cleanup. Another call that
+    # consumes its receiver, such as an answer, keeps its own name, and a
+    # second call on the consumed receiver fails as on any released handle.
+    release: bool = False
     # The record default, handle disposal, borrowed view scope, or delivery
     # protocol that the operation backs.
     support: DefaultSupport | DisposeSupport | ViewSupport | DeliverySupport | None = (
@@ -492,15 +487,6 @@ class BoundApi:
     @property
     def operations_by_name(self) -> dict[str, OperationPlan]:
         return {operation.name: operation for operation in self.operations}
-
-    @property
-    def decisions(self) -> dict[str, DecisionPlan]:
-        """The decision protocol of each decision handle, by handle name."""
-        return {
-            callback.decision.handle.native: callback.decision
-            for callback in self.callbacks.values()
-            if callback.decision
-        }
 
     @property
     def defaults(self) -> dict[str, OperationPlan]:
@@ -1170,10 +1156,14 @@ class Binder:
                     for handle in self.handles.values()
                 ),
             )
-        consumes = None
+        # A release consumes its handle; another call that answers its handle
+        # once declares consumes=, as a resource request's completion does.
+        consumes = metadata.get("consumes")
+        release = False
         for handle in self.handles.values():
             if function.name in {handle.release, handle.cleanup}:
                 consumes = handle.release_consumes
+                release = True
                 if function.name == handle.dispose and function.name != handle.release:
                     support = DisposeSupport(handle)
                 break
@@ -1264,6 +1254,7 @@ class Binder:
             result,
             tuple(registrations),
             consumes,
+            release,
             support,
             completion,
             tuple(owners),
@@ -1400,16 +1391,13 @@ class Binder:
                 context + " return",
             ),
             typedef.metadata["failure"],
-            self.decision(typedef),
             contexts[0] if contexts else None,
             typedef.metadata.get("borrowed_owner"),
             is_status(function.result),
             synchronous=typedef.metadata.get("synchronous") == "true",
             delivery=self.delivery(typedef),
             queue_result=(
-                typedef.metadata.get(
-                    "queue_result", typedef.metadata.get("decision_accept")
-                )
+                typedef.metadata.get("queue_result")
                 if "delivery" in typedef.metadata
                 else None
             ),
@@ -1427,19 +1415,6 @@ class Binder:
             if field.metadata.get("variant") == constant
         )
         return DeliveryPlan(constant, member.name, type_name(member.type))
-
-    def decision(self, typedef) -> DecisionPlan | None:
-        metadata = typedef.metadata
-        if "decision_handle" not in metadata:
-            return None
-        parameter = next(
-            p for p in typedef.parameters if p.name == metadata["decision_handle"]
-        )
-        return DecisionPlan(
-            parameter.name,
-            self.handles[type_name(parameter.type)],
-            metadata["decision_accept"],
-        )
 
     def bind(self, *, require_complete: bool = False) -> BoundApi:
         operations, diagnostics, unsupported = [], [], {}

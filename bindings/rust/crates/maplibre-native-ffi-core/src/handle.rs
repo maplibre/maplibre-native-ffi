@@ -71,14 +71,9 @@ impl<T: NativeHandle> HandleState<T> {
         T::from_raw(self.raw)
     }
 
-    /// Reports whether native accepted a release or ownership was transferred.
+    /// Reports whether native accepted a release or another consuming call.
     pub fn is_released(&self) -> bool {
         lock(&self.state).released
-    }
-
-    /// Transfers ownership without a native call.
-    pub fn hand_off(&self) {
-        lock(&self.state).released = true;
     }
 
     /// Holds off release until borrowed output has been copied.

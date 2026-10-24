@@ -653,7 +653,8 @@ def lifecycle(plan, values, native):
         return encodings(plan) + "; ".join([*setup, call])
 
     if not plan.completion:
-        return f"  public fun {method}({parameters}): Unit = nativeClose(this, binding) {{ {body()} }}\n"
+        close = "nativeClose" if plan.release else "nativeAnswer"
+        return f"  public fun {method}({parameters}): Unit = {close}(this, binding) {{ {body()} }}\n"
     retire = (
         f"  public fun {method}({parameters}): Deferred<Unit> = "
         f"nativeRetire(this, binding) {{ {body('completion')} }}\n"

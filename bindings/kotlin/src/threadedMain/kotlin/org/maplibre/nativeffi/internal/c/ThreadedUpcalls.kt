@@ -44,19 +44,4 @@ internal object ThreadedUpcalls {
       }
       0
     }
-
-  @JvmStatic
-  fun resourceProviderCallback(userData: Long, request: Long, handle: Long): Int =
-    upcall<ResourceProvider, Int>("mln_resource_provider_callback", userData, -1) { value ->
-      val requestOwner = ResourceRequestHandle(handle)
-      val decision =
-        try {
-          value.callback(readResourceRequestInfo(request), requestOwner).rawValue.toInt()
-        } catch (failure: Throwable) {
-          requestOwner.binding.handOff()
-          throw failure
-        }
-      if (decision != 1) requestOwner.binding.handOff()
-      decision
-    }
 }

@@ -103,6 +103,21 @@ internal object Upcalls {
   }
 
   @JvmStatic
+  fun resourceProviderCallback(userData: Long, request: Long, handle: Long): Unit = run {
+    val handleOwner = ResourceRequestHandle(handle)
+    if (
+      !upcall<ResourceProvider, Boolean>("mln_resource_provider_callback", userData, false) { value
+        ->
+        value.callback(readResourceRequestInfo(request), handleOwner)
+        true
+      }
+    ) {
+      handleOwner.close()
+    }
+    Unit
+  }
+
+  @JvmStatic
   fun resourceTransformCallback(userData: Long, kind: Int, url: Long, request: Long): Unit = run {
     val requestOwner = ResourceTransformRequestHandle(request)
     if (
@@ -163,13 +178,13 @@ internal expect object UpcallStubs {
   val releaseRoot: Long
   val logHandlerCallback: Long
   val httpHeaderTransformCallback: Long
-  val resourceProviderCallback: Long
   val customGeometrySourceOptionsFetchTile: Long
   val customGeometrySourceOptionsCancelTile: Long
   val customMvtVectorSourceOptionsFetchTile: Long
   val customMvtVectorSourceOptionsCancelTile: Long
   val resourceRequestCancelHandlerCallback: Long
   val runtimeEventHandlerCallback: Long
+  val resourceProviderCallback: Long
   val resourceTransformCallback: Long
   val wakeCallback: Long
   val queueLockLock: Long

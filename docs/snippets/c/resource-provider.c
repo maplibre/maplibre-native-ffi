@@ -11,7 +11,7 @@ bool asset_store_find(
   size_t* out_size
 );
 
-static uint32_t serve_bundled_asset(
+static void serve_bundled_asset(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
@@ -24,7 +24,11 @@ static uint32_t serve_bundled_asset(
     strncmp(request->resolved_url, "app://", 6) != 0 ||
     !asset_store_find(store, request->resolved_url, &bytes, &size)
   ) {
-    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+    // Declining hands the request to the built-in loader.
+    if (mln_resource_request_pass_through(handle, NULL) != MLN_STATUS_OK) {
+      mln_resource_request_release(handle);
+    }
+    return;
   }
   // #endregion match
 
@@ -36,18 +40,20 @@ static uint32_t serve_bundled_asset(
     .bytes = bytes,
     .byte_count = size,
   };
-  // The C API copies these bytes before the call returns.
-  mln_resource_request_complete(handle, &response, NULL);
-  mln_resource_request_release(handle);
-  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+  // The C API copies these bytes before the call returns. Completing consumes
+  // the handle; a request that was cancelled meanwhile is released instead.
+  if (mln_resource_request_complete(handle, &response, NULL) != MLN_STATUS_OK) {
+    mln_resource_request_release(handle);
+  }
   // #endregion complete
 }
 
 // #region cancel
 typedef struct pending_fetch pending_fetch;
 
-// The host's I/O pool aborts the fetch. Its completion path then releases the
-// handle exactly once, whether the fetch finished or was aborted.
+// The host's I/O pool aborts the fetch. Its completion path then completes the
+// request, which consumes the handle, or releases the handle of an aborted
+// fetch.
 void pending_fetch_abort(pending_fetch* fetch);
 
 static void abort_pending_fetch(void* user_data, mln_resource_request handle) {
@@ -100,9 +106,9 @@ mln_status install_provider(
 // #endregion install
 
 // #region pass-through
+// Passing through consumes the handle. A request that was cancelled first keeps
+// its handle for the caller to release.
 mln_status resume_native_loading(mln_resource_request handle) {
-  const mln_status status = mln_resource_request_pass_through(handle, NULL);
-  if (status == MLN_STATUS_OK) mln_resource_request_release(handle);
-  return status;
+  return mln_resource_request_pass_through(handle, NULL);
 }
 // #endregion pass-through

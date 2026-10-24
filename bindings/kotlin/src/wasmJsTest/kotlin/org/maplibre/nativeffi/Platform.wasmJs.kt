@@ -4,7 +4,6 @@ package org.maplibre.nativeffi
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.runTest
@@ -14,10 +13,7 @@ import kotlinx.coroutines.yield
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LogEvent
 import org.maplibre.nativeffi.generated.QueuedLogHandler
-import org.maplibre.nativeffi.generated.QueuedResourceProvider
-import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.generated.logSetCallback
-import org.maplibre.nativeffi.generated.setResourceProvider
 import org.maplibre.nativeffi.internal.delivery.HostDelivery
 
 /**
@@ -78,14 +74,6 @@ internal actual fun interceptUncaught(sink: (Throwable) -> Boolean): (() -> Unit
   val previous = replaceReportError { failure -> sink(failure.get()) }
   return { restoreReportError(previous) }
 }
-
-// Native keeps each routed request and queues it, and the page runs the callback as it drains.
-internal actual fun RuntimeHandle.setTestProvider(provider: TestProvider): Deferred<Unit> =
-  setResourceProvider(
-    QueuedResourceProvider(provider.routes) { request, handle ->
-      provider.callback(request, handle)
-    },
-  )
 
 // Native consumes each record and queues it, and the page runs the callback as it drains.
 internal actual fun setTestLogCallback(callback: (LogEvent) -> Unit) {

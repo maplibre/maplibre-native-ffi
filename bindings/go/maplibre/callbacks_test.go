@@ -167,9 +167,9 @@ func discardProviderCycle(t *testing.T) weak.Pointer[bindingOwner] {
 	if err != nil {
 		t.Fatal(err)
 	}
-	await(t, submitted(host.SetResourceProvider(ResourceProvider{Callback: func(ResourceRequestInfo, *ResourceRequestHandle) ResourceProviderDecision {
+	await(t, submitted(host.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) {
 		stdruntime.KeepAlive(host)
-		return ResourceProviderDecisionPassThrough
+		_ = request.PassThrough()
 	}})))
 	return weak.Make(host.bindingOwner)
 }
@@ -202,7 +202,7 @@ func TestCallbackPanicIsContained(t *testing.T) {
 	}
 
 	await(t, submitted(f.runtime.ClearResourceTransform()))
-	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(ResourceRequestInfo, *ResourceRequestHandle) ResourceProviderDecision {
+	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(ResourceRequestInfo, *ResourceRequestHandle) {
 		panic("provider failed")
 	}})))
 	if _, err := f.m.SetStyleUrl("custom://unserved.json"); err != nil {
@@ -279,13 +279,13 @@ func (handler panicLogHandler) Handle(_ context.Context, record slog.Record) err
 	return nil
 }
 
-// A provider can take a request and answer it later from another goroutine.
+// A provider can take a request and answer it later from another goroutine,
+// once.
 func TestProviderAnswersADeferredRequest(t *testing.T) {
 	f := newFixture(t)
 	requests := make(chan *ResourceRequestHandle, 1)
-	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) ResourceProviderDecision {
+	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) {
 		offer(requests, request)
-		return ResourceProviderDecisionHandle
 	}})))
 	if _, err := f.m.SetStyleUrl("custom://deferred.json"); err != nil {
 		t.Fatal(err)
@@ -294,8 +294,10 @@ func TestProviderAnswersADeferredRequest(t *testing.T) {
 	if err := request.Complete(ResourceResponse{Status: ResourceResponseStatusOk, Bytes: []byte(emptyStyle)}); err != nil {
 		t.Fatalf("Complete: %v", err)
 	}
-	if err := request.Close(); err != nil {
-		t.Fatalf("Close: %v", err)
+	// The accepted completion consumed the handle, so native refuses a second
+	// one.
+	if err := request.Complete(ResourceResponse{Status: ResourceResponseStatusOk}); !errors.Is(err, StatusInvalidState) {
+		t.Fatalf("a second Complete = %v, want StatusInvalidState", err)
 	}
 	f.awaitEvent(t, "the deferred style load", isStyleLoaded)
 }
@@ -322,14 +324,13 @@ func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {
 		{Kinds: ResourceKindMaskStyle, Url: "custom://routed/style.json"},
 		allKindsRoute,
 	}
-	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Routes: routes, Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) ResourceProviderDecision {
+	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Routes: routes, Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) {
 		offer(requests, routed{*request.RequestedUrl, request.Kind})
 		if *request.RequestedUrl != "custom://routed/style.json" {
-			return deny(request, handle)
+			deny(request, handle)
+			return
 		}
 		_ = handle.Complete(ResourceResponse{Status: ResourceResponseStatusOk, Bytes: []byte(routedStyle)})
-		_ = handle.Close()
-		return ResourceProviderDecisionHandle
 	}})))
 	for i := range routes {
 		routes[i] = ResourceRoute{Url: "custom://overwritten.json"}
@@ -451,9 +452,8 @@ func TestReplacingAGlobalCallbackReleasesThePreviousOne(t *testing.T) {
 func TestCancelCallbackIsRootedOnlyWhenStored(t *testing.T) {
 	f := newFixture(t)
 	requests := make(chan *ResourceRequestHandle, 2)
-	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) ResourceProviderDecision {
+	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) {
 		offer(requests, request)
-		return ResourceProviderDecisionHandle
 	}})))
 
 	if _, err := f.m.SetStyleUrl("custom://held.json"); err != nil {

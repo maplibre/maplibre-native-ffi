@@ -4,20 +4,25 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension ResourceRequestHandle {
-  /// Completes a C API resource provider request.
+  /// Completes a C API resource provider request and consumes its handle.
   ///
   /// See `mln_resource_request_complete` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func complete(response bindingArg0: ResourceResponse) throws {
-    try nativeInvoke { raw, arena, diagnostic in
-      try mln_resource_request_complete(
+  func complete(response: ResourceResponse) throws {
+    let arena = NativeInputArena()
+    defer { withExtendedLifetime(arena) {} }
+    try handle.closeOnce(idempotent: false) { live in
+      var raw = live.raw
+      try checkStatus { diagnostic in try mln_resource_request_complete(
         raw,
-        arena.store(bindingArg0.nativeValue(arena: arena)),
+        arena.store(response.nativeValue(arena: arena)),
         diagnostic
-      )
+      ) }
     }
   }
+}
 
+public extension ResourceRequestHandle {
   /// Reports whether MapLibre has cancelled a C API resource provider request.
   ///
   /// See `mln_resource_request_is_cancelled` in the
@@ -33,18 +38,7 @@ public extension ResourceRequestHandle {
     } result: { value0 }
   }
 
-  /// Hands an outstanding provider request to the built-in network loader.
-  ///
-  /// See `mln_resource_request_pass_through` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func passThrough() throws {
-    try nativeInvoke { raw, _, diagnostic in mln_resource_request_pass_through(
-      raw,
-      diagnostic
-    ) }
-  }
-
-  /// Releases the provider's reference to a resource request handle.
+  /// Releases the provider's resource request handle without answering it.
   ///
   /// See `mln_resource_request_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -71,5 +65,24 @@ public extension ResourceRequestHandle {
         diagnostic
       ); arena.decline(if: status == MLN_STATUS_OK && value0); return status
     } result: { value0 }
+  }
+}
+
+public extension ResourceRequestHandle {
+  /// Hands an outstanding provider request to the built-in network loader and
+  /// consumes its handle.
+  ///
+  /// See `mln_resource_request_pass_through` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  func passThrough() throws {
+    let arena = NativeInputArena()
+    defer { withExtendedLifetime(arena) {} }
+    try handle.closeOnce(idempotent: false) { live in
+      var raw = live.raw
+      try checkStatus { diagnostic in mln_resource_request_pass_through(
+        raw,
+        diagnostic
+      ) }
+    }
   }
 }

@@ -698,9 +698,10 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             raise Unsupported("consumption with outputs requires an owner transaction")
         if ending[0].startswith(f"{call_local}.status("):
             ending = [ending[0].removesuffix("?;")]
-        # A synchronous release is idempotent; an asynchronous one reaches
-        # native, which reports a stale handle through the error channel.
-        close = "close_once" if public == "()" else "close"
+        # A synchronous release is idempotent. An asynchronous one, and an
+        # answer that consumes its receiver, reach native, which reports a
+        # stale handle through the error channel.
+        close = "close_once" if public == "()" and plan.release else "close"
         body = [
             *prelude,
             f"self.inner.{close}(|{target}| {{",

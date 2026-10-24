@@ -1671,7 +1671,7 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
     _native: _native._ResourceRequestHandle
 
     def complete(self, response: ResourceResponse) -> None:
-        """Completes a C API resource provider request.
+        """Completes a C API resource provider request and consumes its handle.
 
         See `mln_resource_request_complete` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1688,7 +1688,8 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
         return self._native.is_cancelled()
 
     def pass_through(self) -> None:
-        """Hands an outstanding provider request to the built-in network loader.
+        """Hands an outstanding provider request to the built-in network loader
+        and consumes its handle.
 
         See `mln_resource_request_pass_through` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1696,7 +1697,7 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
         return self._native.pass_through()
 
     def close(self) -> None:
-        """Releases the provider's reference to a resource request handle.
+        """Releases the provider's resource request handle without answering it.
 
         See `mln_resource_request_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

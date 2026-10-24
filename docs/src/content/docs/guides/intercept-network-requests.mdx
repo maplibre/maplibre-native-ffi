@@ -68,8 +68,9 @@ that the host serves, and pass the others to MapLibre's network stack.
 
 <Code code={region(providerSnippet, "match")} lang="c" title="resource-provider.c" />
 
-When bytes are already available, complete and release the request in the
-callback.
+When bytes are already available, complete the request in the callback.
+Completing or passing a request through consumes its handle, so release only a
+handle that neither call accepted.
 
 <Code code={region(providerSnippet, "complete")} lang="c" title="resource-provider.c" />
 

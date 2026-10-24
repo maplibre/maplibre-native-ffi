@@ -262,11 +262,10 @@ class KotlinLayoutTests(unittest.TestCase):
                 for value in values.bound.public_values.values()
                 if kotlin_callbacks.splits(value, values)
             },
-            {"mln_log_handler", "mln_resource_provider", "mln_http_header_transform"},
+            {"mln_log_handler", "mln_http_header_transform"},
         )
         registrations = {
             "mln_log_set_callback",
-            "mln_runtime_set_resource_provider",
             "mln_runtime_set_http_header_transform",
         }
         response = "mln_http_header_transform_response_set_header"

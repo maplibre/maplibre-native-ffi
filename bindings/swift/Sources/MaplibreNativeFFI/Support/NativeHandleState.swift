@@ -40,10 +40,6 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     lock.withLock { closed }
   }
 
-  func handOff() {
-    lock.withLock { closed = true }
-  }
-
   /// Batch getters lend memory beyond the native call, until the copy ends.
   func withHandle<T>(_ body: (Handle) throws -> T) throws -> T {
     if protectsCopies {

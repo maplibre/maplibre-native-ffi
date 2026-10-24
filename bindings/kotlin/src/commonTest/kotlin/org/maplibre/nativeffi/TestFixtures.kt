@@ -19,6 +19,7 @@ import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.MapOptions
 import org.maplibre.nativeffi.generated.ResourceErrorReason
+import org.maplibre.nativeffi.generated.ResourceProvider
 import org.maplibre.nativeffi.generated.ResourceRequestHandle
 import org.maplibre.nativeffi.generated.ResourceRequestInfo
 import org.maplibre.nativeffi.generated.ResourceResponse
@@ -72,22 +73,6 @@ internal val NETWORK_URLS: List<ResourceRoute> by lazy {
 }
 
 /**
- * A resource provider that claims the requests that [routes] match, every request when [routes] is
- * empty, and keeps each request that reaches [callback]. Each target installs it in the form that
- * it takes, through [setTestProvider].
- */
-internal class TestProvider(
-  val routes: List<ResourceRoute>,
-  val callback: (ResourceRequestInfo, ResourceRequestHandle) -> Unit,
-)
-
-/**
- * Installs [provider]: as a `ResourceProvider` whose callback keeps each request on a threaded
- * target, and as a `QueuedResourceProvider` on wasm.
- */
-internal expect fun RuntimeHandle.setTestProvider(provider: TestProvider): Deferred<Unit>
-
-/**
  * Installs [callback] as the process-global log callback, in the form that the target takes. The
  * callback consumes each record.
  */
@@ -102,12 +87,10 @@ internal expect fun setTestLogCallback(callback: (LogEvent) -> Unit)
 internal fun denyingProvider(
   routes: List<ResourceRoute> = emptyList(),
   serve: (ResourceRequestInfo, ResourceRequestHandle) -> Boolean = { _, _ -> false },
-): TestProvider =
-  TestProvider(routes) { request, handle ->
-    if (!serve(request, handle)) handle.deny()
-  }
+): ResourceProvider =
+  ResourceProvider(routes) { request, handle -> if (!serve(request, handle)) handle.deny() }
 
-/** Completes this request with the fixture's NOT_FOUND error and releases it. */
+/** Completes this request with the fixture's NOT_FOUND error. */
 internal fun ResourceRequestHandle.deny() {
   complete(
     ResourceResponse(
@@ -116,13 +99,11 @@ internal fun ResourceRequestHandle.deny() {
       errorMessage = "the test fixture serves no resources",
     ),
   )
-  close()
 }
 
-/** Completes this request with [body] and releases it. */
+/** Completes this request with [body]. */
 internal fun ResourceRequestHandle.serve(body: String) {
   complete(ResourceResponse(status = ResourceResponseStatus.OK, bytes = body.encodeToByteArray()))
-  close()
 }
 
 /** Options for the fixture's small map, [width] x [height] logical pixels. */
@@ -171,7 +152,7 @@ private constructor(val runtime: RuntimeHandle, private val events: Channel<Runt
      * releases the runtime afterwards even when [block] fails. The fixture owns the event receiver.
      */
     suspend fun <T> use(
-      provider: TestProvider = denyingProvider(),
+      provider: ResourceProvider = denyingProvider(),
       options: RuntimeOptions = GeneratedApi.runtimeOptionsDefault(),
       block: suspend RuntimeFixture.() -> T,
     ): T {
@@ -184,7 +165,7 @@ private constructor(val runtime: RuntimeHandle, private val events: Channel<Runt
             RuntimeEventHandler { batch -> batch.events.forEach { events.trySend(it) } },
           )
           .awaitWithin("the event handler")
-        runtime.setTestProvider(provider).awaitWithin("the resource provider")
+        runtime.setResourceProvider(provider).awaitWithin("the resource provider")
         fixture.block()
       }
     }
@@ -212,7 +193,7 @@ internal class MapFixture(val runtimeFixture: RuntimeFixture, val map: MapHandle
  */
 internal suspend fun <T> withMap(
   mapMode: MapMode = MapMode.CONTINUOUS,
-  provider: TestProvider = denyingProvider(),
+  provider: ResourceProvider = denyingProvider(),
   options: MapOptions = smallMapOptions(mapMode),
   runtimeOptions: RuntimeOptions = GeneratedApi.runtimeOptionsDefault(),
   block: suspend MapFixture.() -> T,

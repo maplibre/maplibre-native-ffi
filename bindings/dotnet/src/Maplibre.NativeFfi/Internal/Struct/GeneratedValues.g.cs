@@ -1851,36 +1851,25 @@ internal static unsafe class GeneratedValues
         );
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static uint InvokeResourceProviderCallback(
+    private static void InvokeResourceProviderCallback(
         void* user_data,
         mln_resource_request_info* request,
         MlnResourceRequest handle
     )
     {
-        ResourceRequestHandle? owned = null;
+        ResourceRequestHandle? ownedHandle = null;
         try
         {
-            owned = ResourceRequestHandle.Adopt(handle);
-            var decision =
-                ((ResourceProvider)NativeCallbackRoot.Value(user_data)).Callback?.Invoke(
-                    CopyResourceRequestInfo(NativeCallScope.Read(request)),
-                    owned
-                )
-                ?? (ResourceProviderDecision)4294967295;
-            if (
-                decision
-                != (ResourceProviderDecision)
-                    mln_resource_provider_decision.MLN_RESOURCE_PROVIDER_DECISION_HANDLE
-            )
-                ((INativeOwner<MlnResourceRequest>)owned).State.HandOff();
-            return (uint)decision;
+            ownedHandle = ResourceRequestHandle.Adopt(handle);
+            ((ResourceProvider)NativeCallbackRoot.Value(user_data)).Callback?.Invoke(
+                CopyResourceRequestInfo(NativeCallScope.Read(request)),
+                ownedHandle
+            );
         }
         catch (Exception error)
         {
             NativeCallbackFailure.Report("mln_resource_provider_callback", error);
-            if (owned is not null)
-                ((INativeOwner<MlnResourceRequest>)owned).State.HandOff();
-            return unchecked((uint)(4294967295));
+            ownedHandle?.Dispose();
         }
     }
 

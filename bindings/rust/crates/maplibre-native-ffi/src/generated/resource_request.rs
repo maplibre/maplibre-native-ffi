@@ -14,17 +14,18 @@ native_owner! {
 }
 
 impl ResourceRequestHandle {
-    /// Completes a C API resource provider request.
+    /// Completes a C API resource provider request and consumes its handle.
     ///
     /// See `mln_resource_request_complete` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn complete(&self, response: &ResourceResponse) -> Result<()> {
-        let mut call = self.inner.call();
-        let response = call.reference(&response)?;
-        call.status(|handle, out_diagnostic| unsafe {
-            sys::mln_resource_request_complete(handle, response, out_diagnostic)
-        })?;
-        Ok(())
+        self.inner.close(|handle| {
+            let mut call = Call::new(handle, None);
+            let response = call.reference(&response)?;
+            call.status(|handle, out_diagnostic| unsafe {
+                sys::mln_resource_request_complete(handle, response, out_diagnostic)
+            })
+        })
     }
 
     /// Reports whether MapLibre has cancelled a C API resource provider
@@ -41,19 +42,21 @@ impl ResourceRequestHandle {
         Ok(out_cancelled)
     }
 
-    /// Hands an outstanding provider request to the built-in network loader.
+    /// Hands an outstanding provider request to the built-in network loader and
+    /// consumes its handle.
     ///
     /// See `mln_resource_request_pass_through` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn pass_through(&self) -> Result<()> {
-        let mut call = self.inner.call();
-        call.status(|handle, out_diagnostic| unsafe {
-            sys::mln_resource_request_pass_through(handle, out_diagnostic)
-        })?;
-        Ok(())
+        self.inner.close(|handle| {
+            let mut call = Call::new(handle, None);
+            call.status(|handle, out_diagnostic| unsafe {
+                sys::mln_resource_request_pass_through(handle, out_diagnostic)
+            })
+        })
     }
 
-    /// Releases the provider's reference to a resource request handle.
+    /// Releases the provider's resource request handle without answering it.
     ///
     /// See `mln_resource_request_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

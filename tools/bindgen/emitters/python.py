@@ -337,7 +337,13 @@ def operation(
             f"        let handle = self.scope.pointer(self.native)? as *mut sys::{native_owner};"
         )
     elif plan.consumes or abandon:
-        idempotent = "false" if plan.completion and not exit else "true"
+        # A synchronous release is idempotent; an answer that consumes its
+        # receiver, like an asynchronous release, reaches native again.
+        idempotent = (
+            "false"
+            if (plan.completion and not exit) or (plan.consumes and not plan.release)
+            else "true"
+        )
         setup += [
             f"        let Some({'mut ' if plan.consumes else ''}reservation) = self.reserve({idempotent})? else {{ return Ok(py.None()); }};",
             "        let mut handle = reservation.handle();"

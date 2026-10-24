@@ -158,15 +158,13 @@ pub fn expectCommitted(future_value: maplibre.Future(maplibre.CommandCompletion)
 
 /// Answers every request with a not-found error, so no test reaches the
 /// network by accident.
-fn denyResource(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, request: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
-    try request.complete(.{
+fn denyResource(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, request: maplibre.ResourceRequest) maplibre.Error!void {
+    var owned = request;
+    try owned.complete(.{
         .status = .@"error",
         .error_reason = .not_found,
         .error_message = "the Zig test fixture serves no resources",
     }, null);
-    var owned = request;
-    owned.release();
-    return .handle;
 }
 
 pub const denying_provider = maplibre.ResourceProvider{ .callback = denyResource };

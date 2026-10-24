@@ -377,12 +377,16 @@ def emit_operation(
             method(f"public void {pascal(plan.member)}()", ["state.Retire();"]),
             set(),
         )
+    # A release with inputs, or an answer that consumes its receiver, runs
+    # through the owner's state, which marks the handle closed once native
+    # accepts it. An answer keeps its name, and a repeated one reaches native.
+    answers = bool(plan.consumes and not plan.release and not plan.completion)
     if (
         plan.consumes
         and handle_plan
         and function.name == handle_plan.release
         and handle_plan.release_inputs
-    ):
+    ) or (answers and handle_plan):
         declarations, arguments = [], ["live"]
         # The release runs synchronously, so its scope outlives the call. The
         # release delegate cannot capture the scope, so the arguments convert
@@ -419,8 +423,11 @@ def emit_operation(
         return (
             owner_class,
             method(
-                f"public void Release({', '.join(declarations)})",
-                [*body, f"state.Release((live, diagnostic) => {call});"],
+                f"public void {pascal(plan.member) if answers else 'Release'}({', '.join(declarations)})",
+                [
+                    *body,
+                    f"state.Release((live, diagnostic) => {call}{', idempotent: false' if answers else ''});",
+                ],
             ),
             set(values.plans),
         )

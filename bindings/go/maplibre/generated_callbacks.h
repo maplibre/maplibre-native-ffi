@@ -36,7 +36,7 @@ mln_status binding_mln_http_header_transform_callback(
   void* user_data, uint32_t kind, const char* url,
   mln_http_header_transform_response* out_response
 );
-uint32_t binding_mln_resource_provider_callback(
+void binding_mln_resource_provider_callback(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 );

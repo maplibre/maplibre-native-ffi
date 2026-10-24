@@ -30,11 +30,6 @@ internal open class HandleState(
    */
   open fun <T> release(call: () -> T): T = call().also { released.store(true) }
 
-  /** Marks the handle released without a call, for a handle that native took back. */
-  fun handOff() {
-    released.store(true)
-  }
-
   /**
    * Disposes a handle that its owner never released, then reports the leak, with any disposal
    * failure as its cause, where the binding reports callback failures. Does nothing for a released

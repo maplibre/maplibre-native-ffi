@@ -37,13 +37,9 @@ internal object Deliveries {
         }
       3u ->
         when (CallbackRoots.get(token)?.value) {
-          is QueuedResourceProvider -> {
+          is ResourceProvider -> {
             take()
-            WasmUpcalls.queuedResourceProviderCallback(
-              token,
-              readAddress(payload),
-              readI64(payload + 8),
-            )
+            Upcalls.resourceProviderCallback(token, readAddress(payload), readI64(payload + 8))
           }
           else -> Unit
         }

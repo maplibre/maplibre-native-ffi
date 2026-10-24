@@ -633,8 +633,6 @@ def callback_argument(parameter, values):
 
 def owns(callback, parameter):
     """Whether the callback receives [parameter] as a handle that it owns."""
-    if callback.decision and parameter.name == callback.decision.parameter:
-        return True
     return parameter.value.kind == "handle" and parameter.value.ownership == "owned"
 
 
@@ -651,17 +649,11 @@ def callback_site(site_name, callback_value, member, root_type, values, site_for
             site_name, callback, callback_value, member, root_type, values, parameters
         )
     failure = failure_literal(callback, values)
-    decision = callback.decision
     arguments = []
     lines = []
     owned = []
     for parameter in callback.arguments:
-        if decision and parameter.name == decision.parameter:
-            lines.append(
-                f"val requestOwner = {owner_class(decision.handle)}({identifier(parameter.name)})"
-            )
-            arguments.append("requestOwner")
-        elif owns(callback, parameter):
+        if owns(callback, parameter):
             # The callback owns the handle; a callback that throws releases it.
             local = identifier(parameter.name) + "Owner"
             lines.append(
@@ -681,17 +673,7 @@ def callback_site(site_name, callback_value, member, root_type, values, site_for
     if owned:
         closes = "; ".join(f"{local}.close()" for local in owned)
         invocation = f"try {{ {invocation} }} catch (failure: Throwable) {{ {closes}; throw failure }}"
-    if decision:
-        # Native takes back a request that the provider does not keep, including
-        # when the provider throws.
-        accept = number_literal(values.bound.enum_number(decision.accept), result)
-        lines.append(
-            f"val decision = try {{ {callback_result(callback.result, invocation, values)} }} "
-            "catch (failure: Throwable) { requestOwner.binding.handOff(); throw failure }"
-        )
-        lines.append(f"if (decision != {accept}) requestOwner.binding.handOff()")
-        lines.append("decision")
-    elif callback.result.native == "void":
+    if callback.result.native == "void":
         lines.append(invocation)
     elif status_callback(callback):
         lines.append(invocation)
@@ -740,11 +722,7 @@ def queued_site(
     adopted, owners, arguments = [], [], []
     for parameter in callback.arguments:
         if owns(callback, parameter):
-            handle = (
-                callback.decision.handle
-                if callback.decision and parameter.name == callback.decision.parameter
-                else parameter.value.handle
-            )
+            handle = parameter.value.handle
             local = identifier(parameter.name) + "Owner"
             adopted.append(
                 f"val {local} = {owner_class(handle)}({identifier(parameter.name)})"

@@ -28,7 +28,7 @@
 "CB-01" = "A callback registration is rooted while native holds it and released when native releases it, including when the registration is rejected"
 "CB-02" = "A registered callback does not keep its receiver alive"
 "CB-04" = "An error thrown by a callback is contained and reported through the language's idiom"
-"CB-05" = "A resource provider can hand a request to a decision handle and answer it later"
+"CB-05" = "A resource provider can keep the request handle it receives and answer it later"
 "CB-06" = "A scoped response object rejects use after its callback returns and use from another thread"
 "CB-07" = "Replacing a process-global callback releases the previous registration"
 "CB-08" = "A registration whose accepted_unless output reports rejection is not rooted"

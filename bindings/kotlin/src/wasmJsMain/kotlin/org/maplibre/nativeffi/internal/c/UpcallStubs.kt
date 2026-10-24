@@ -42,13 +42,6 @@ internal actual object UpcallStubs {
         "httpHeaderTransformCallback needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
       )
 
-  actual val resourceProviderCallback: Long
-    get() =
-      throw MaplibreException(
-        Status.UNSUPPORTED,
-        "resourceProviderCallback needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
-      )
-
   actual val customGeometrySourceOptionsFetchTile: Long
     get() =
       throw MaplibreException(
@@ -89,6 +82,13 @@ internal actual object UpcallStubs {
       throw MaplibreException(
         Status.UNSUPPORTED,
         "runtimeEventHandlerCallback needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
+      )
+
+  actual val resourceProviderCallback: Long
+    get() =
+      throw MaplibreException(
+        Status.UNSUPPORTED,
+        "resourceProviderCallback needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
       )
 
   actual val resourceTransformCallback: Long

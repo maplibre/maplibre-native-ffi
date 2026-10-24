@@ -45,6 +45,28 @@ struct GlobalStateTests {
     }
   }
 
+  /// A callback's thrown error is reported to standard error, native receives
+  /// the callback's fallback, and the runtime keeps working.
+  @Test func aCallbackThatThrowsIsContainedAndReported() async throws {
+    let capture = try StandardErrorCapture()
+    defer { capture.finish() }
+    defer { try? Maplibre.logClearCallback() }
+    try Maplibre.logSetCallback(handler: LogHandler { _, _, _, _ in
+      throw CallbackFailure()
+    })
+    let report =
+      "mln_log_callback failed and native received its fallback: CallbackFailure()"
+    try await withMapFixture { fixture in
+      // MapLibre logs the parse failure of a malformed document.
+      _ = try? await fixture.map
+        .setStyleJson(Data(#"{"version":8,"#.utf8))
+      await awaitCondition("the thrown error's report") {
+        capture.text.contains(report)
+      }
+      try await fixture.map.setStyleJson(emptyStyle)
+    }
+  }
+
   /// Abandoned handles are disposed on a worker and reported once to standard
   /// error.
   @Test func anAbandonedHandleIsDisposedOffTheCallbackStackAndReported(
@@ -70,6 +92,8 @@ struct GlobalStateTests {
     #expect(disposals.count == 2)
   }
 }
+
+private struct CallbackFailure: Error {}
 
 private func recordingHandler(
   into records: LockedBox<[LogSeverity]>,

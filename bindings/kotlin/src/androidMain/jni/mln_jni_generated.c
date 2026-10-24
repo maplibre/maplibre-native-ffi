@@ -3462,8 +3462,6 @@ mln_jni_upcall mln_jni_upcalls[] = {
    "(JIIJJ)I", NULL},
   {"org/maplibre/nativeffi/internal/c/ThreadedUpcalls",
    "httpHeaderTransformCallback", "(JIJJ)I", NULL},
-  {"org/maplibre/nativeffi/internal/c/ThreadedUpcalls",
-   "resourceProviderCallback", "(JJJ)I", NULL},
   {"org/maplibre/nativeffi/internal/c/Upcalls",
    "customGeometrySourceOptionsFetchTile", "(JJ)V", NULL},
   {"org/maplibre/nativeffi/internal/c/Upcalls",
@@ -3476,6 +3474,8 @@ mln_jni_upcall mln_jni_upcalls[] = {
    "resourceRequestCancelHandlerCallback", "(JJ)V", NULL},
   {"org/maplibre/nativeffi/internal/c/Upcalls", "runtimeEventHandlerCallback",
    "(JJ)V", NULL},
+  {"org/maplibre/nativeffi/internal/c/Upcalls", "resourceProviderCallback",
+   "(JJJ)V", NULL},
   {"org/maplibre/nativeffi/internal/c/Upcalls", "resourceTransformCallback",
    "(JIJJ)V", NULL},
   {"org/maplibre/nativeffi/internal/c/Upcalls", "wakeCallback", "(J)V", NULL},
@@ -3536,27 +3536,13 @@ static mln_status mln_jni_httpHeaderTransformCallback(
   return (mln_status)result;
 }
 
-static uint32_t mln_jni_resourceProviderCallback(
-  void* userData, const mln_resource_request_info* request,
-  mln_resource_request handle
-) {
-  jvalue arguments[] = {
-    {.j = MLN_JNI_ADDRESS(userData)},
-    {.j = MLN_JNI_ADDRESS(request)},
-    {.j = (jlong)handle}
-  };
-  jint result = -1;
-  mln_jni_upcall_int(&mln_jni_upcalls[5], arguments, &result);
-  return (uint32_t)result;
-}
-
 static void mln_jni_customGeometrySourceOptionsFetchTile(
   void* userData, mln_canonical_tile_id tileId
 ) {
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
   };
-  mln_jni_upcall_void(&mln_jni_upcalls[6], arguments);
+  mln_jni_upcall_void(&mln_jni_upcalls[5], arguments);
 }
 
 static void mln_jni_customGeometrySourceOptionsCancelTile(
@@ -3565,7 +3551,7 @@ static void mln_jni_customGeometrySourceOptionsCancelTile(
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
   };
-  mln_jni_upcall_void(&mln_jni_upcalls[7], arguments);
+  mln_jni_upcall_void(&mln_jni_upcalls[6], arguments);
 }
 
 static void mln_jni_customMvtVectorSourceOptionsFetchTile(
@@ -3574,7 +3560,7 @@ static void mln_jni_customMvtVectorSourceOptionsFetchTile(
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
   };
-  mln_jni_upcall_void(&mln_jni_upcalls[8], arguments);
+  mln_jni_upcall_void(&mln_jni_upcalls[7], arguments);
 }
 
 static void mln_jni_customMvtVectorSourceOptionsCancelTile(
@@ -3583,14 +3569,14 @@ static void mln_jni_customMvtVectorSourceOptionsCancelTile(
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
   };
-  mln_jni_upcall_void(&mln_jni_upcalls[9], arguments);
+  mln_jni_upcall_void(&mln_jni_upcalls[8], arguments);
 }
 
 static void mln_jni_resourceRequestCancelHandlerCallback(
   void* userData, mln_resource_request handle
 ) {
   jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}, {.j = (jlong)handle}};
-  mln_jni_upcall_void(&mln_jni_upcalls[10], arguments);
+  mln_jni_upcall_void(&mln_jni_upcalls[9], arguments);
 }
 
 static void mln_jni_runtimeEventHandlerCallback(
@@ -3599,7 +3585,21 @@ static void mln_jni_runtimeEventHandlerCallback(
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(events)}
   };
-  mln_jni_upcall_void(&mln_jni_upcalls[11], arguments);
+  mln_jni_upcall_void(&mln_jni_upcalls[10], arguments);
+}
+
+static void mln_jni_resourceProviderCallback(
+  void* userData, const mln_resource_request_info* request,
+  mln_resource_request handle
+) {
+  jvalue arguments[] = {
+    {.j = MLN_JNI_ADDRESS(userData)},
+    {.j = MLN_JNI_ADDRESS(request)},
+    {.j = (jlong)handle}
+  };
+  if (!mln_jni_upcall_void(&mln_jni_upcalls[11], arguments)) {
+    mln_resource_request_release(handle);
+  }
 }
 
 static void mln_jni_resourceTransformCallback(
@@ -3647,13 +3647,13 @@ void* const mln_jni_upcall_stubs[] = {
   (void*)mln_jni_releaseRoot,
   (void*)mln_jni_logHandlerCallback,
   (void*)mln_jni_httpHeaderTransformCallback,
-  (void*)mln_jni_resourceProviderCallback,
   (void*)mln_jni_customGeometrySourceOptionsFetchTile,
   (void*)mln_jni_customGeometrySourceOptionsCancelTile,
   (void*)mln_jni_customMvtVectorSourceOptionsFetchTile,
   (void*)mln_jni_customMvtVectorSourceOptionsCancelTile,
   (void*)mln_jni_resourceRequestCancelHandlerCallback,
   (void*)mln_jni_runtimeEventHandlerCallback,
+  (void*)mln_jni_resourceProviderCallback,
   (void*)mln_jni_resourceTransformCallback,
   (void*)mln_jni_wakeCallback,
   (void*)mln_jni_queueLockLock,

@@ -596,7 +596,7 @@ static mln_status render_still_image(
 
 // Answers every request with a not-found error, so every resource the library
 // asks for fails without reaching the network.
-static uint32_t deny_every_request(
+static void deny_every_request(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
@@ -609,9 +609,7 @@ static uint32_t deny_every_request(
     .error_message =
       (mln_buffer_view){.data = denied_message, .size = strlen(denied_message)},
   };
-  (void)mln_resource_request_complete(handle, &response, NULL);
-  mln_resource_request_release(handle);
-  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+  mln_test_request_answer(handle, &response);
 }
 
 static bool offline_events_logged(void* context) {

@@ -54,10 +54,6 @@ impl<H: NativeHandle> OwnerState<H> {
         Some(Arc::clone(self) as Arc<dyn Any + Send + Sync>)
     }
 
-    pub(crate) fn hand_off(&self) {
-        self.handle.hand_off();
-    }
-
     pub(crate) fn is_closed(&self) -> bool {
         self.handle.is_released()
     }

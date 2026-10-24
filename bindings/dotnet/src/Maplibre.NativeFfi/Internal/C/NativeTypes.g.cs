@@ -737,7 +737,7 @@ internal unsafe struct mln_resource_provider
         void*,
         mln_resource_request_info*,
         MlnResourceRequest,
-        uint> callback;
+        void> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
     public MlnDeliveryQueue queue;
@@ -1637,12 +1637,6 @@ internal enum mln_resource_priority : uint
 {
     MLN_RESOURCE_PRIORITY_REGULAR = 0,
     MLN_RESOURCE_PRIORITY_LOW = 1,
-}
-
-internal enum mln_resource_provider_decision : uint
-{
-    MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH = 0,
-    MLN_RESOURCE_PROVIDER_DECISION_HANDLE = 1,
 }
 
 internal enum mln_resource_request_field : uint

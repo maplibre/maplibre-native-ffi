@@ -10,8 +10,9 @@ fn consumeLog(_: ?*anyopaque, _: maplibre.LogSeverity, _: maplibre.LogEvent, _: 
     return 1;
 }
 
-fn passThrough(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, _: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
-    return .pass_through;
+fn passThrough(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, request: maplibre.ResourceRequest) maplibre.Error!void {
+    var owned = request;
+    try owned.passThrough(null);
 }
 
 fn resolve(future_value: anytype) !@TypeOf(future_value).Value {

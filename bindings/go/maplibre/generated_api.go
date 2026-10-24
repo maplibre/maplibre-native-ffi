@@ -894,23 +894,6 @@ func (value ResourcePriority) String() string {
 	return fmt.Sprintf("ResourcePriority(%d)", value)
 }
 
-type ResourceProviderDecision uint32
-
-const (
-	ResourceProviderDecisionPassThrough ResourceProviderDecision = ResourceProviderDecision(C.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH)
-	ResourceProviderDecisionHandle      ResourceProviderDecision = ResourceProviderDecision(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE)
-)
-
-func (value ResourceProviderDecision) String() string {
-	switch value {
-	case 0:
-		return "ResourceProviderDecisionPassThrough"
-	case 1:
-		return "ResourceProviderDecisionHandle"
-	}
-	return fmt.Sprintf("ResourceProviderDecision(%d)", value)
-}
-
 // ResourceResponseStatus corresponds to mln_resource_response_status. How a
 // resource provider answered a request.
 //
@@ -4069,8 +4052,8 @@ func copyRenderingStats(raw C.mln_rendering_stats) RenderingStats {
 type ResourceProvider struct {
 	// The requests that reach the provider; empty to claim every request.
 	Routes []ResourceRoute
-	// Decides each request that the routes leave to the provider.
-	Callback func(ResourceRequestInfo, *ResourceRequestHandle) ResourceProviderDecision
+	// Answers each request that the routes leave to the provider.
+	Callback func(ResourceRequestInfo, *ResourceRequestHandle)
 }
 
 func nativeResourceProvider(input ResourceProvider, arena *bindingArena) C.mln_resource_provider {
@@ -8446,12 +8429,12 @@ func (receiver *RenderSessionHandle) SetWebgpuSurfaceTarget(descriptor WebgpuSur
 	}, completionUnit)
 }
 
-// Complete completes a C API resource provider request.
+// Complete completes a C API resource provider request and consumes its handle.
 //
 // See mln_resource_request_complete in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *ResourceRequestHandle) Complete(response ResourceResponse) error {
-	return bindingDo(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingAnswering(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_resource_request_complete(C.mln_resource_request(raw), bindingStore(nativeResourceResponse(response, arena), arena), diagnostic))
 	})
 }
@@ -8471,17 +8454,17 @@ func (receiver *ResourceRequestHandle) IsCancelled() (bool, error) {
 }
 
 // PassThrough hands an outstanding provider request to the built-in network
-// loader.
+// loader and consumes its handle.
 //
 // See mln_resource_request_pass_through in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *ResourceRequestHandle) PassThrough() error {
-	return bindingDo(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingAnswering(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_resource_request_pass_through(C.mln_resource_request(raw), diagnostic))
 	})
 }
 
-// Close releases the provider's reference to a resource request handle.
+// Close releases the provider's resource request handle without answering it.
 //
 // See mln_resource_request_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
@@ -9474,26 +9457,20 @@ func mlnGo_mln_http_header_transform_callback(native_user_data unsafe.Pointer, n
 }
 
 //export mlnGo_mln_resource_provider_callback
-func mlnGo_mln_resource_provider_callback(native_user_data unsafe.Pointer, native_request *C.mln_resource_request_info, native_handle C.mln_resource_request) (result C.uint32_t) {
-	result = 4294967295
-	request := adoptResourceRequestHandle(uint64(native_handle), nil)
-	defer func() {
-		if uint32(result) != uint32(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
-			request.state.released.Store(true)
-		}
-		runtime.KeepAlive(request)
-	}()
+func mlnGo_mln_resource_provider_callback(native_user_data unsafe.Pointer, native_request *C.mln_resource_request_info, native_handle C.mln_resource_request) {
+	owned_handle := adoptResourceRequestHandle(uint64(native_handle), nil)
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_resource_provider_callback", failure)
-			result = 4294967295
+			owned_handle.Close()
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[ResourceProvider](native_user_data)
 	if !ok || callbacks.Callback == nil {
+		owned_handle.Close()
 		return
 	}
-	result = C.uint32_t(callbacks.Callback(copyResourceRequestInfo((*native_request)), request))
+	callbacks.Callback(copyResourceRequestInfo((*native_request)), owned_handle)
 	return
 }
 

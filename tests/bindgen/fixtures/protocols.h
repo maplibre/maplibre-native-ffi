@@ -585,49 +585,6 @@ typedef struct mln_ticket_cancel_delivery {
 } mln_ticket_cancel_delivery;
 #endif
 
-#ifdef MLN_PROTOCOL_DECISION
-// A provider callback that claims or passes through an issued decision handle.
-typedef unsigned long long mln_host BIND(
-  "kind=handle;release=mln_host_destroy;"
-  "dispose=mln_host_destroy"
-);
-typedef enum mln_decision : unsigned {
-  MLN_DECISION_DELEGATE = 0,
-  MLN_DECISION_CLAIM = 1
-} mln_decision;
-typedef struct mln_ticket_response {
-  unsigned code;
-} mln_ticket_response;
-typedef unsigned (*mln_ticket_provider_callback)(void* context, mln_ticket ticket) BIND(
-  "enum=mln_decision;failure=4294967295;delivery=MLN_DELIVERY_TYPE_TICKET;"
-  "decision_handle=ticket;decision_accept=MLN_DECISION_CLAIM"
-);
-typedef struct mln_ticket_provider {
-  mln_ticket_provider_callback callback;
-  void* user_data BIND("kind=context");
-  mln_ticket_release_context release;
-  mln_delivery_queue queue BIND("kind=delivery_queue");
-} mln_ticket_provider BIND("kind=callback_registration;release=release");
-mln_status mln_host_destroy(mln_host host, mln_diagnostic* out_diagnostic);
-BIND("execution=command")
-mln_status mln_host_set_provider(
-  mln_host host, const mln_ticket_provider* provider,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-);
-mln_status mln_ticket_answer(
-  mln_ticket ticket, const mln_ticket_response* response,
-  mln_diagnostic* out_diagnostic
-);
-mln_status mln_ticket_cancelled(
-  mln_ticket ticket, bool* result BIND("direction=out"),
-  mln_diagnostic* out_diagnostic
-);
-// The queued copy owns its decision handle.
-typedef struct mln_ticket_delivery {
-  mln_ticket ticket;
-} mln_ticket_delivery;
-#endif
-
 #ifdef MLN_PROTOCOL_DELIVERY
 // A queue registration outside any command, whose callback returns a result
 // that native code supplies in queue mode.
@@ -670,9 +627,6 @@ typedef union mln_delivery_payload {
 #ifdef MLN_PROTOCOL_DECLINABLE_REGISTRATION
   mln_ticket_cancel_delivery ticket_cancel
     BIND("variant=MLN_DELIVERY_TYPE_TICKET_CANCEL");
-#endif
-#ifdef MLN_PROTOCOL_DECISION
-  mln_ticket_delivery ticket BIND("variant=MLN_DELIVERY_TYPE_TICKET");
 #endif
 #ifdef MLN_PROTOCOL_DELIVERY
   mln_notice_delivery notice BIND("variant=MLN_DELIVERY_TYPE_NOTICE");

@@ -39,7 +39,6 @@ export async function routeRequests(
       callback(request, handle) {
         requests.push(request.requestedUrl ?? "");
         handle.complete(styleResponse());
-        handle.close();
       },
     },
   });

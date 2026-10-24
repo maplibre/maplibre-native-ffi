@@ -141,13 +141,6 @@ internal sealed unsafe class NativeHandleState<T>
         }
     }
 
-    internal void HandOff()
-    {
-        lock (gate)
-            closed = true;
-        GC.SuppressFinalize(this);
-    }
-
     internal bool Close(bool idempotent = true) => Release(destroy, idempotent);
 
     internal void Retire() => Release(disposeAbandoned ?? destroy);

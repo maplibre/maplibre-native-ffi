@@ -150,11 +150,11 @@ mln_status mln_measurement_create(mln_measurement *out_measurement BIND("directi
     def test_dart_generates_callback_registrations_only_with_queue_delivery(
         self,
     ):
-        text = protocol_header(groups=("delivery", "decision"))
+        text = protocol_header(groups=("delivery", "owned_argument"))
         api = parse_sources({"api.h": text})
         generated = dart.coverage(api)["generated"]
         self.assertIn("mln_notice_set_callback", generated)
-        self.assertIn("mln_host_set_provider", generated)
+        self.assertIn("mln_map_set_query_handler", generated)
         # Without a queue, Dart has no way to answer the callback.
         synchronous = parse_sources(
             {

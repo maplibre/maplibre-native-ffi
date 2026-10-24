@@ -3867,14 +3867,9 @@ impl Default for ResourcePriority {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Clone, Default)]
 pub struct ResourceProvider {
-    /// Decides each request that the routes leave to the provider.
+    /// Answers each request that the routes leave to the provider.
     pub callback: Option<
-        std::sync::Arc<
-            dyn Fn(ResourceRequestInfo, ResourceRequestHandle) -> ResourceProviderDecision
-                + Send
-                + Sync
-                + 'static,
-        >,
+        std::sync::Arc<dyn Fn(ResourceRequestInfo, ResourceRequestHandle) + Send + Sync + 'static>,
     >,
     /// The requests that reach the provider; empty to claim every request.
     pub routes: Vec<ResourceRoute>,
@@ -3887,20 +3882,14 @@ impl std::fmt::Debug for ResourceProvider {
 impl ResourceProvider {
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
-        F: Fn(ResourceRequestInfo, ResourceRequestHandle) -> ResourceProviderDecision
-            + Send
-            + Sync
-            + 'static,
+        F: Fn(ResourceRequestInfo, ResourceRequestHandle) + Send + Sync + 'static,
     {
         self.callback = Some(std::sync::Arc::new(callback));
         self
     }
     pub fn new<F>(callback: F) -> Self
     where
-        F: Fn(ResourceRequestInfo, ResourceRequestHandle) -> ResourceProviderDecision
-            + Send
-            + Sync
-            + 'static,
+        F: Fn(ResourceRequestInfo, ResourceRequestHandle) + Send + Sync + 'static,
     {
         Self::default().with_callback(callback)
     }
@@ -3908,25 +3897,18 @@ impl ResourceProvider {
         user_data: *mut std::ffi::c_void,
         request: *const sys::mln_resource_request_info,
         handle: sys::mln_resource_request,
-    ) -> u32 {
-        let _scope = maplibre_core::callback::CallbackScope::enter();
-        let Ok(decision_handle) = ResourceRequestHandle::adopt(handle, None) else {
-            return 4294967295;
-        };
-        let request_state = std::sync::Arc::clone(&decision_handle.inner);
-        // SAFETY: native keeps the registration alive throughout this callback.
+    ) {
+        // SAFETY: native passes the registration that this trampoline's
+        // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        let decision = callback::invoke("mln_resource_provider_callback", 4294967295, || {
-            Ok(callback::require(&state.callback)?(
+        callback::invoke("mln_resource_provider_callback", (), || {
+            let handle = ResourceRequestHandle::adopt(handle, None)?;
+            callback::require(&state.callback)?(
                 unsafe { convert::copy_reference(request) }?,
-                decision_handle,
-            )
-            .as_raw())
-        });
-        if decision != sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE {
-            request_state.hand_off();
-        }
-        decision
+                handle,
+            );
+            Ok(())
+        })
     }
 }
 impl ToNative<sys::mln_resource_provider> for ResourceProvider {
@@ -3945,18 +3927,6 @@ impl ToNative<sys::mln_resource_provider> for ResourceProvider {
             raw.release_user_data = Some(callback::release::<Self>);
         }
         Ok(raw)
-    }
-}
-
-native_enum! {
-pub enum ResourceProviderDecision: u32 {
-    PassThrough = 0,
-    Handle = 1,
-} Unknown
-}
-impl Default for ResourceProviderDecision {
-    fn default() -> Self {
-        Self::PassThrough
     }
 }
 

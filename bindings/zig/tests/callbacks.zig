@@ -1,5 +1,5 @@
 //! Callback registrations, host errors inside callbacks, resource-request
-//! decisions, provider routes, and scoped callback arguments.
+//! handles, provider routes, and scoped callback arguments.
 
 const std = @import("std");
 const testing = std.testing;
@@ -92,18 +92,17 @@ test "replacing the process-global log callback releases the previous one" {
 
 const failing_style_url = "custom://failing-provider.json";
 
-fn completeThenFail(_: ?*anyopaque, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
+fn completeThenFail(_: ?*anyopaque, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!void {
     if (std.mem.eql(u8, request.requested_url orelse "", failing_style_url)) {
-        try handle.complete(.{ .bytes = support.style_json }, null);
         var owned = handle;
-        owned.release();
+        try owned.complete(.{ .bytes = support.style_json }, null);
     }
     return error.NativeError;
 }
 
-// A provider's error stays inside the binding, which reports it. A request the
-// provider already answered keeps that answer, and one it did not answer
-// fails with the unknown decision returned by the trampoline.
+// A provider's error stays inside the binding, which reports it and releases
+// the request it adopted. A request the provider already answered keeps that
+// answer, and one it did not answer fails.
 test "an error returned by a resource provider is contained and reported" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
@@ -118,24 +117,21 @@ test "an error returned by a resource provider is contained and reported" {
     defer failed.deinit();
 }
 
-/// A provider that takes every request matching `url` as a decision, hands
-/// it to the test, and denies the rest.
+/// A provider that keeps every request matching `url`, hands it to the test,
+/// and denies the rest.
 const DeferringProvider = struct {
     url: []const u8,
     taken: support.Counter = .{},
     handles: [4]maplibre.ResourceRequest = undefined,
 
-    fn provide(self: *DeferringProvider, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
+    fn provide(self: *DeferringProvider, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!void {
         if (!std.mem.eql(u8, request.requested_url orelse "", self.url)) {
-            try handle.complete(.{ .status = .@"error", .error_reason = .not_found }, null);
             var owned = handle;
-            owned.release();
-            return .handle;
+            return owned.complete(.{ .status = .@"error", .error_reason = .not_found }, null);
         }
         const index = self.taken.get();
         self.handles[index] = handle;
         self.taken.add();
-        return .handle;
     }
 
     fn install(self: *DeferringProvider, fixture: *support.Fixture) !void {
@@ -150,7 +146,7 @@ const DeferringProvider = struct {
     }
 };
 
-fn completeOnThread(handle: maplibre.ResourceRequest, result: *?anyerror) void {
+fn completeOnThread(handle: *maplibre.ResourceRequest, result: *?anyerror) void {
     handle.complete(.{ .bytes = support.style_json }, null) catch |err| {
         result.* = err;
         return;
@@ -158,10 +154,11 @@ fn completeOnThread(handle: maplibre.ResourceRequest, result: *?anyerror) void {
     result.* = null;
 }
 
-// A provider can keep a request as a decision handle and answer it later from
-// any thread. The binding validates the response's strings first, and a
-// handle accepts exactly one completion.
-test "a decision handle answers its request later from another thread" {
+// A provider can keep its request and answer it later from any thread. The
+// binding validates the response's strings first, a refused completion leaves
+// the handle open, and an accepted one closes it. Native refuses a second
+// completion, through the closed handle or a copy made before it closed.
+test "a kept request handle answers its request later from another thread" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
     var provider = DeferringProvider{ .url = "custom://later.json" };
@@ -173,12 +170,16 @@ test "a decision handle answers its request later from another thread" {
     var diagnostic: maplibre.Diagnostic = .{};
     try testing.expectError(error.InvalidArgument, handle.complete(.{ .etag = "bad\x00tag" }, &diagnostic));
     try testing.expect(diagnostic.status != null);
+    try testing.expect(!handle.isClosed());
 
+    var copy = handle;
     var thread_result: ?anyerror = error.NotRun;
-    const thread = try std.Thread.spawn(.{}, completeOnThread, .{ handle, &thread_result });
+    const thread = try std.Thread.spawn(.{}, completeOnThread, .{ &handle, &thread_result });
     thread.join();
     try testing.expectEqual(@as(?anyerror, null), thread_result);
+    try testing.expect(handle.isClosed());
     try testing.expectError(error.InvalidState, handle.complete(.{ .bytes = support.style_json }, null));
+    try testing.expectError(error.InvalidState, copy.complete(.{ .bytes = support.style_json }, null));
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     loaded.deinit();
 }
@@ -192,7 +193,7 @@ test "released request handle copies stay closed after later requests" {
     try provider.install(fixture);
 
     var stale = try provider.take(fixture);
-    const stale_copy = stale;
+    var stale_copy = stale;
     stale.release();
     try testing.expectError(error.InvalidState, stale_copy.isCancelled(null));
 
@@ -245,8 +246,9 @@ test "a registration that reports cancellation is never rooted" {
     try testing.expectEqual(@as(usize, 0), probe.releases.get());
 }
 
-fn passThrough(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, _: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
-    return .pass_through;
+fn passThrough(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, request: maplibre.ResourceRequest) maplibre.Error!void {
+    var owned = request;
+    try owned.passThrough(null);
 }
 
 const HeaderProbe = struct {
@@ -352,17 +354,16 @@ const RoutedProvider = struct {
     sources: support.Counter = .{},
     others: support.Counter = .{},
 
-    fn provide(self: *RoutedProvider, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
+    fn provide(self: *RoutedProvider, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!void {
         const url = request.requested_url orelse "";
         const is_style = request.kind == .style and std.mem.eql(u8, url, routed_style_url);
         const is_source = request.kind == .source and std.mem.eql(u8, url, routed_source_url);
-        if (is_style) {
-            try handle.complete(.{ .bytes = routed_style_json }, null);
-        } else {
-            try handle.complete(.{ .status = .@"error", .error_reason = .not_found }, null);
-        }
         var owned = handle;
-        owned.release();
+        if (is_style) {
+            try owned.complete(.{ .bytes = routed_style_json }, null);
+        } else {
+            try owned.complete(.{ .status = .@"error", .error_reason = .not_found }, null);
+        }
         if (is_style) {
             self.styles.add();
         } else if (is_source) {
@@ -370,7 +371,6 @@ const RoutedProvider = struct {
         } else {
             self.others.add();
         }
-        return .handle;
     }
 
     fn calls(self: *RoutedProvider) usize {

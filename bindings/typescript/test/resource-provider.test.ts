@@ -112,13 +112,15 @@ test(
     handle.complete(styleResponse());
     await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded, map.id);
 
-    // The request takes one answer, and the handle stays open until closed.
+    // The accepted answer consumed the handle, so closing it does nothing and
+    // native code refuses a second answer or any other call on it.
+    assert.equal(handle.isClosed, true);
+    handle.close();
     assert.throws(
       () => handle.complete({ status: ResourceResponseStatus.noContent }),
       isStatus(Status.invalidState),
     );
-    handle.close();
-    handle.close();
+    assert.throws(() => handle.passThrough(), isStatus(Status.invalidState));
     assert.throws(() => handle.isCancelled(), isStatus(Status.invalidState));
   },
   { needs: ["httpOrigin"] },

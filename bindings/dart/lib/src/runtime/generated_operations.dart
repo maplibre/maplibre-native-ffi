@@ -7173,19 +7173,19 @@ final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
   String toString() =>
       'ResourceRequestHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
 
-  /// Completes a C API resource provider request.
+  /// Completes a C API resource provider request and consumes its handle.
   ///
   /// See `mln_resource_request_complete` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  void complete(ResourceResponse response) => withNativeArena((arena) {
-    _check(
-      raw.mln_resource_request_complete(
-        _handle.raw,
+  void complete(ResourceResponse response) => _state.answer(
+    (handle) => withNativeArena(
+      (arena) => raw.mln_resource_request_complete(
+        handle.raw,
         _writeResourceResponse(response, arena),
         nativeDiagnostic,
       ),
-    );
-  });
+    ),
+  );
 
   /// Reports whether MapLibre has cancelled a C API resource provider request.
   ///
@@ -7203,15 +7203,17 @@ final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
     return outCancelled.value;
   });
 
-  /// Hands an outstanding provider request to the built-in network loader.
+  /// Hands an outstanding provider request to the built-in network loader and
+  /// consumes its handle.
   ///
   /// See `mln_resource_request_pass_through` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  void passThrough() => _check(
-    raw.mln_resource_request_pass_through(_handle.raw, nativeDiagnostic),
+  void passThrough() => _state.answer(
+    (handle) =>
+        raw.mln_resource_request_pass_through(handle.raw, nativeDiagnostic),
   );
 
-  /// Releases the provider's reference to a resource request handle.
+  /// Releases the provider's resource request handle without answering it.
   ///
   /// See `mln_resource_request_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

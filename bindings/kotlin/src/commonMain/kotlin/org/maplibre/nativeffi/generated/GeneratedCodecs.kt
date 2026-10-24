@@ -942,6 +942,25 @@ internal fun NativeCall.putRuntimeEventHandler(target: Long, value: RuntimeEvent
 internal fun NativeCall.writeRuntimeEventHandler(value: RuntimeEventHandler): Long =
   allocate(w(24, 40), 8).also { putRuntimeEventHandler(it, value) }
 
+internal fun NativeCall.putResourceProvider(target: Long, value: ResourceProvider) {
+  writeU32(target, w(32, 56).toUInt())
+  writeAddress(
+    target + w(24, 40),
+    array(value.routes, w(16, 24), w(4, 8)) { at, item -> putResourceRoute(at, item) },
+  )
+  writeSize(target + w(28, 48), value.routes.size.toULong())
+  writeAddress(target + w(8, 16), registrations.register(value))
+  val queue = HostDelivery.queue
+  if (queue != 0L) writeI64(target + w(16, 32), queue)
+  else {
+    writeAddress(target + w(4, 8), UpcallStubs.resourceProviderCallback)
+    writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  }
+}
+
+internal fun NativeCall.writeResourceProvider(value: ResourceProvider): Long =
+  allocate(w(32, 56), 8).also { putResourceProvider(it, value) }
+
 internal fun NativeCall.putResourceTransform(target: Long, value: ResourceTransform) {
   writeU32(target, w(24, 40).toUInt())
   writeAddress(target + w(8, 16), registrations.register(value))
@@ -1014,15 +1033,6 @@ internal fun NativeArena.putHttpHeaderRule(target: Long, value: HttpHeaderRule) 
 
 internal fun NativeArena.writeHttpHeaderRule(value: HttpHeaderRule): Long =
   allocate(w(24, 40), w(4, 8)).also { putHttpHeaderRule(it, value) }
-
-internal fun NativeArena.putResourceRoute(target: Long, value: ResourceRoute) {
-  writeU32(target, value.kinds.rawValue)
-  writeU32(target + 4, value.flags.rawValue)
-  putView(target + 8, value.url)
-}
-
-internal fun NativeArena.writeResourceRoute(value: ResourceRoute): Long =
-  allocate(w(16, 24), w(4, 8)).also { putResourceRoute(it, value) }
 
 internal fun readMetalTextureFrame(source: Long, scope: ViewScope? = null): MetalTextureFrame =
   MetalTextureFrame(
@@ -1708,24 +1718,6 @@ internal fun readStyleExpressionInfo(source: Long): StyleExpressionInfo =
     isZoomConstant = readBool(source + 5),
   )
 
-internal fun readResourceRequestInfo(source: Long): ResourceRequestInfo {
-  val fields = readU32(source + 4)
-  return ResourceRequestInfo(
-    requestedUrl = readCStringOrNull(readAddress(source + 8)),
-    resolvedUrl = readCStringOrNull(readAddress(source + w(12, 16))),
-    kind = ResourceKind(readU32(source + w(16, 24))),
-    loadingMethod = ResourceLoadingMethod(readU32(source + w(20, 28))),
-    priority = ResourcePriority(readU32(source + w(24, 32))),
-    usage = ResourceUsage(readU32(source + w(28, 36))),
-    storagePolicy = ResourceStoragePolicy(readU32(source + w(32, 40))),
-    range = if ((fields and 1u) != 0u) readResourceRange(source + w(40, 48)) else null,
-    priorModifiedUnixMs = if ((fields and 2u) != 0u) readI64(source + w(56, 64)) else null,
-    priorExpiresUnixMs = if ((fields and 4u) != 0u) readI64(source + w(64, 72)) else null,
-    priorEtag = readCStringOrNull(readAddress(source + w(72, 80))),
-    priorData = readBytes(readAddress(source + w(76, 88)), readSize(source + w(80, 96))),
-  )
-}
-
 internal fun NativeArena.putStyleExpressionType(target: Long, value: StyleExpressionType) {
   writeU32(target, value.kind.rawValue)
   writeU32(target + 4, value.itemKind.rawValue)
@@ -1978,6 +1970,15 @@ internal fun NativeArena.writeOfflineGeometryRegionDefinition(
   value: OfflineGeometryRegionDefinition,
 ): Long = allocate(w(40, 56), 8).also { putOfflineGeometryRegionDefinition(it, value) }
 
+internal fun NativeArena.putResourceRoute(target: Long, value: ResourceRoute) {
+  writeU32(target, value.kinds.rawValue)
+  writeU32(target + 4, value.flags.rawValue)
+  putView(target + 8, value.url)
+}
+
+internal fun NativeArena.writeResourceRoute(value: ResourceRoute): Long =
+  allocate(w(16, 24), w(4, 8)).also { putResourceRoute(it, value) }
+
 internal fun NativeArena.putHttpHeader(target: Long, value: HttpHeader) {
   putView(target, value.name)
   putView(target + w(8, 16), value.value)
@@ -2001,6 +2002,24 @@ internal fun readEventBatchView(source: Long): EventBatchView =
         readRuntimeEvent(item)
       },
   )
+
+internal fun readResourceRequestInfo(source: Long): ResourceRequestInfo {
+  val fields = readU32(source + 4)
+  return ResourceRequestInfo(
+    requestedUrl = readCStringOrNull(readAddress(source + 8)),
+    resolvedUrl = readCStringOrNull(readAddress(source + w(12, 16))),
+    kind = ResourceKind(readU32(source + w(16, 24))),
+    loadingMethod = ResourceLoadingMethod(readU32(source + w(20, 28))),
+    priority = ResourcePriority(readU32(source + w(24, 32))),
+    usage = ResourceUsage(readU32(source + w(28, 36))),
+    storagePolicy = ResourceStoragePolicy(readU32(source + w(32, 40))),
+    range = if ((fields and 1u) != 0u) readResourceRange(source + w(40, 48)) else null,
+    priorModifiedUnixMs = if ((fields and 2u) != 0u) readI64(source + w(56, 64)) else null,
+    priorExpiresUnixMs = if ((fields and 4u) != 0u) readI64(source + w(64, 72)) else null,
+    priorEtag = readCStringOrNull(readAddress(source + w(72, 80))),
+    priorData = readBytes(readAddress(source + w(76, 88)), readSize(source + w(80, 96))),
+  )
+}
 
 internal fun readMapView(source: Long): MapView =
   MapView(
@@ -2149,9 +2168,6 @@ internal fun readOfflineRegionDefinition(source: Long): OfflineRegionDefinition 
       },
   )
 
-internal fun readResourceRange(source: Long): ResourceRange =
-  ResourceRange(start = readU64(source), end = readU64(source + 8))
-
 internal fun NativeArena.putUnitBezier(target: Long, value: UnitBezier) {
   writeF64(target, value.x1)
   writeF64(target + 8, value.y1)
@@ -2236,6 +2252,9 @@ internal fun readRuntimeEvent(source: Long): RuntimeEvent =
         }
       },
   )
+
+internal fun readResourceRange(source: Long): ResourceRange =
+  ResourceRange(start = readU64(source), end = readU64(source + 8))
 
 internal fun readWglContextDescriptor(source: Long): WglContextDescriptor =
   WglContextDescriptor(

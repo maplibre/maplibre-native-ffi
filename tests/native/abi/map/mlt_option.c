@@ -10,6 +10,7 @@
 // case waits instead for the tile parse warning that map.h documents.
 
 #include "support/map.h"
+#include "support/resources.h"
 #include "support/test_support.h"
 
 // The source carries "encoding":"mlt" so the tiles parse as MapLibre Tiles, and
@@ -27,7 +28,7 @@ typedef struct mlt_tile {
   size_t byte_count;
 } mlt_tile;
 
-static uint32_t serve_recorded_tile(
+static void serve_recorded_tile(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
@@ -40,9 +41,7 @@ static uint32_t serve_recorded_tile(
     .bytes = tile->bytes,
     .byte_count = tile->byte_count,
   };
-  mln_resource_request_complete(handle, &response, NULL);
-  mln_resource_request_release(handle);
-  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+  mln_test_request_answer(handle, &response);
 }
 
 // Set from MapLibre's logging threads, so it lives in static storage that

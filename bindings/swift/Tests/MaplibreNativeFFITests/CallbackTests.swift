@@ -90,50 +90,26 @@ private func addCustomSource(
   }
 }
 
-/// Installs a provider for `url` that hands each of its requests to `body`
-/// and returns `body`'s decision, and denies every other request.
+/// Installs a provider for `url` that hands each of its requests to `body`,
+/// and denies every other request.
 func installProvider(
   on runtime: RuntimeHandle,
   for url: String,
-  _ body: @escaping @Sendable (ResourceRequestHandle) throws
-    -> ResourceProviderDecision
+  _ body: @escaping @Sendable (ResourceRequestHandle) throws -> Void
 ) async throws {
   let deny = denyingProvider()
   try await runtime.setResourceProvider(ResourceProvider(
     callback: { request, handle in
       guard request.requestedUrl == url else {
-        return try deny.callback!(request, handle)
+        return deny.callback!(request, handle)
       }
-      do { return try body(handle) }
+      do { try body(handle) }
       catch {
         Issue.record("provider failed: \(error)")
-        throw error
+        handle.close()
       }
     }
   ))
-}
-
-private struct ProviderFailure: Error {}
-
-/// A provider that throws fails its request, and the runtime keeps working.
-@Test func aProviderThatThrowsFailsItsRequest() async throws {
-  try await withMapFixture { fixture in
-    let url = "custom://thrown.json"
-    let deny = denyingProvider()
-    try await fixture.runtime.setResourceProvider(ResourceProvider(
-      callback: { request, handle in
-        guard request.requestedUrl == url else {
-          return try deny.callback!(request, handle)
-        }
-        throw ProviderFailure()
-      }
-    ))
-    try await fixture.map.setStyleUrl(url)
-    #expect(try await fixture.awaitEvent("the thrown request to fail") {
-      $0.type == .mapLoadingFailed
-    } != nil)
-    try await fixture.map.setStyleJson(emptyStyle)
-  }
 }
 
 /// A cancel callback that does not capture its request lets a provider drop
@@ -152,7 +128,6 @@ private struct ProviderFailure: Error {}
         [sentinel = ReleaseProbe(releases)] in withExtendedLifetime(sentinel) {}
       })
       request.update { $0 = handle }
-      return .handle
     }
     try await fixture.map.setStyleUrl("custom://dropped.json")
     await awaitCondition("the provider call") { request.value != nil }
@@ -167,7 +142,7 @@ private struct ProviderFailure: Error {}
 }
 
 /// A provider that takes a request answers it later, from outside the
-/// callback, and the request retires once the host releases it.
+/// callback, and the answer consumes the request's handle.
 @Test func aProviderAnswersATakenRequestLater() async throws {
   try await withMapFixture { fixture in
     let taken = LockedBox<ResourceRequestHandle?>(nil)
@@ -176,7 +151,6 @@ private struct ProviderFailure: Error {}
       for: "custom://later.json"
     ) { handle in
       taken.update { $0 = handle }
-      return .handle
     }
     try await fixture.map.setStyleUrl("custom://later.json")
     await awaitCondition("the provider to take the request") {
@@ -191,7 +165,10 @@ private struct ProviderFailure: Error {}
     #expect(try await fixture.awaitEvent("the style answered later") {
       $0.type == .mapStyleLoaded
     } != nil)
-    request.close()
+    #expect(request.isClosed)
+    await expectMaplibreError(.invalidState) {
+      try request.complete(response: ResourceResponse(status: .ok))
+    }
   }
 }
 
@@ -202,8 +179,8 @@ private struct ProviderFailure: Error {}
     // The provider passes this request to the HTTP client, which runs the
     // header transform before it tries a port that nothing serves.
     let url = "http://127.0.0.1:1/headers.json"
-    try await installProvider(on: fixture.runtime, for: url) { _ in
-      .passThrough
+    try await installProvider(on: fixture.runtime, for: url) {
+      try $0.passThrough()
     }
     let escaped = LockedBox<HttpHeaderTransformResponse?>(nil)
     let otherThread = LockedBox<MaplibreError?>(nil)
@@ -245,8 +222,8 @@ private struct ProviderFailure: Error {}
     // The provider passes the style through to the online source, which
     // waits for the transform's answer.
     let url = "custom://transformed.json"
-    try await installProvider(on: fixture.runtime, for: url) { _ in
-      .passThrough
+    try await installProvider(on: fixture.runtime, for: url) {
+      try $0.passThrough()
     }
     let taken = LockedBox<ResourceTransformRequestHandle?>(nil)
     try await fixture.runtime.setResourceTransform(
@@ -292,15 +269,18 @@ private struct ProviderFailure: Error {}
     try await fixture.runtime.setResourceProvider(ResourceProvider(
       callback: { request, handle in
         seen.update { $0.append(request) }
-        try handle.complete(response: request.kind == .style
-          ? ResourceResponse(status: .ok, bytes: style)
-          : ResourceResponse(
-            status: .error,
-            errorReason: .notFound,
-            errorMessage: "the test serves no sprite"
-          ))
-        handle.close()
-        return .handle
+        do {
+          try handle.complete(response: request.kind == .style
+            ? ResourceResponse(status: .ok, bytes: style)
+            : ResourceResponse(
+              status: .error,
+              errorReason: .notFound,
+              errorMessage: "the test serves no sprite"
+            ))
+        } catch {
+          Issue.record("provider failed: \(error)")
+          handle.close()
+        }
       },
       routes: [ResourceRoute(flags: .glob, url: "custom://routed/**")]
     ))
@@ -333,7 +313,6 @@ private struct ProviderFailure: Error {}
       for: "custom://cancelled.json"
     ) { handle in
       taken.update { $0 = handle }
-      return .handle
     }
     try await fixture.map.setStyleUrl("custom://cancelled.json")
     await awaitCondition("the provider to take the request") {

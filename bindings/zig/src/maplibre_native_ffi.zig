@@ -1323,12 +1323,13 @@ pub const ResourceRequest = struct {
     pub const isClosed = methods.isClosed;
     pub const format = methods.format;
     pub const deinit = methods.deinit;
-    /// Completes a C API resource provider request.
+    /// Completes a C API resource provider request and consumes its handle.
     ///
     /// See `mln_resource_request_complete` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn complete(self: ResourceRequest, response: ResourceResponse, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        return call.invoke("mln_resource_request_complete", .handle, self, null, diagnostic, .{response});
+    pub fn complete(self: *ResourceRequest, response: ResourceResponse, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        try call.invoke("mln_resource_request_complete", .handle, self.*, null, diagnostic, .{response});
+        self.closed = true;
     }
 
     /// Reports whether MapLibre has cancelled a C API resource provider request.
@@ -1339,15 +1340,17 @@ pub const ResourceRequest = struct {
         return call.invoke("mln_resource_request_is_cancelled", .handle, self, null, diagnostic, .{call.out(bool)});
     }
 
-    /// Hands an outstanding provider request to the built-in network loader.
+    /// Hands an outstanding provider request to the built-in network loader and
+    /// consumes its handle.
     ///
     /// See `mln_resource_request_pass_through` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn passThrough(self: ResourceRequest, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        return call.invoke("mln_resource_request_pass_through", .handle, self, null, diagnostic, .{});
+    pub fn passThrough(self: *ResourceRequest, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        try call.invoke("mln_resource_request_pass_through", .handle, self.*, null, diagnostic, .{});
+        self.closed = true;
     }
 
-    /// Releases the provider's reference to a resource request handle.
+    /// Releases the provider's resource request handle without answering it.
     ///
     /// See `mln_resource_request_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4636,7 +4639,7 @@ pub const ResourcePriority = enum(u32) {
 pub const ResourceProvider = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
-    callback: ?*const fn (?*anyopaque, ResourceRequestInfo, ResourceRequest) anyerror!ResourceProviderDecision = null,
+    callback: ?*const fn (?*anyopaque, ResourceRequestInfo, ResourceRequest) anyerror!void = null,
     /// The requests that reach the provider; empty to claim every request.
     routes: []const ResourceRoute = &.{},
     pub fn toNative(self: ResourceProvider, allocator: std.mem.Allocator, roots: *callbacks.Roots) status.Error!c.mln_resource_provider {
@@ -4661,21 +4664,22 @@ pub const ResourceProvider = struct {
             fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_resource_provider_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_resource_provider_callback, 1), callback_arg_2: marshal.CallbackArg(c.mln_resource_provider_callback, 2)) anyerror!marshal.CallbackResult(c.mln_resource_provider_callback) {
                 const state = callbacks.Registration(ResourceProvider).get(callback_arg_0);
                 const host = state.value.callback orelse {
-                    return 4294967295;
+                    return;
                 };
-                const request = ResourceRequest.adopt(callback_arg_2);
+                var ownership_transferred = false;
+                var owned_handle = ResourceRequest.adopt(callback_arg_2);
+                defer if (!ownership_transferred) {
+                    owned_handle.release();
+                };
                 var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
                 defer arena.deinit();
                 const allocator = arena.allocator();
-                const result = host(state.value.context, try ResourceRequestInfo.fromNative(allocator, (callback_arg_1 orelse return error.NativeError).*), request) catch |err| {
-                    callbacks.reportError("mln_resource_provider_callback", err);
-                    return 4294967295;
-                };
-                return result.toNative();
+                try host(state.value.context, try ResourceRequestInfo.fromNative(allocator, (callback_arg_1 orelse return error.NativeError).*), owned_handle);
+                ownership_transferred = true;
             }
         }.invoke(native_arg_0, native_arg_1, native_arg_2) catch |err| {
             callbacks.reportError("mln_resource_provider_callback", err);
-            return 4294967295;
+            return;
         };
     }
     /// Builds a `ResourceProvider` whose callbacks receive `context`, a pointer, as
@@ -4694,20 +4698,12 @@ pub const ResourceProvider = struct {
                 }
             }.call,
             .callback = if (@TypeOf(callback) == @TypeOf(null)) null else struct {
-                fn call(erased: ?*anyopaque, argument_0: ResourceRequestInfo, argument_1: ResourceRequest) anyerror!ResourceProviderDecision {
+                fn call(erased: ?*anyopaque, argument_0: ResourceRequestInfo, argument_1: ResourceRequest) anyerror!void {
                     return callback(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0, argument_1);
                 }
             }.call,
         };
     }
-};
-
-pub const ResourceProviderDecision = enum(u32) {
-    pass_through = 0,
-    handle = 1,
-    _,
-    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
-    pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
 /// Inclusive byte range of a resource request.

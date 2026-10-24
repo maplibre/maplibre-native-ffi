@@ -581,44 +581,36 @@ mln_status discard_frame(frame value, mln_diagnostic *out_diagnostic);
                 self.parse(source.replace("discard=", "dispose=discard_frame;discard="))
             )
 
-    def test_resource_decision_protocol_uses_verified_relationships(self):
+    def test_resource_request_protocol_uses_verified_relationships(self):
         source = """
-typedef enum decision : unsigned { DELEGATE = 0, CLAIM = 1 } decision;
 typedef unsigned long request BIND("kind=handle;release=release_request");
 typedef void (*cancel)(void *context);
 typedef void (*release_cancel)(void *context);
 typedef struct cancel_handler { unsigned size; cancel callback; void *context BIND("kind=context"); release_cancel release; } cancel_handler BIND("kind=callback_registration;release=release");
-typedef unsigned (*provider)(request ticket) BIND("enum=decision;failure=DELEGATE;decision_handle=ticket;decision_accept=CLAIM");
-mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
+typedef void (*provider)(void *context, request ticket BIND("ownership=owned"));
+BIND("consumes=success") mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
 mln_status is_cancelled(request value, bool *result BIND("direction=out"), mln_diagnostic *out_diagnostic);
 BIND("accepted_unless=cancelled") mln_status on_cancel(
   request value, const cancel_handler *handler, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
 void release_request(request value);
 """
         model = bind(self.parse(source), require_complete=True)
-        decision = model.callbacks["provider"].decision
-        assert decision is not None
+        (ticket,) = model.callbacks["provider"].arguments
         self.assertEqual(
-            (decision.parameter, decision.accept),
-            ("ticket", "CLAIM"),
+            (ticket.value.kind, ticket.value.ownership), ("handle", "owned")
         )
-        self.assertEqual(decision.handle.release_consumes, "always")
+        # An answer consumes the request it answers, as its release does, but
+        # is no release: it keeps its name, and a repeated one reaches native.
+        answer = model.operations_by_name["answer"]
+        self.assertEqual((answer.consumes, answer.release), ("success", False))
+        self.assertTrue(model.operations_by_name["release_request"].release)
         (registration,) = model.operations_by_name["on_cancel"].registrations
         self.assertEqual(
             (registration.release, registration.accepted_unless),
             ("release", "cancelled"),
         )
         for before, after, error in (
-            (
-                "decision_accept=CLAIM",
-                "decision_accept=MISSING",
-                "decision_accept must name",
-            ),
-            (
-                "decision_handle=ticket",
-                "decision_handle=absent",
-                "callback handle parameter",
-            ),
+            ("consumes=success", "consumes=always", "consumes"),
             ("accepted_unless=cancelled", "accepted_unless=value", "boolean output"),
             (
                 "const cancel_handler *handler",
@@ -734,23 +726,20 @@ typedef struct signals { notify signal; void *state BIND("kind=context"); releas
             bind(self.parse(source), require_complete=True)
 
     def test_delivered_callbacks_name_the_payload_that_copies_them(self):
-        text = protocol_header(groups=("delivery", "decision"))
+        text = protocol_header(groups=("delivery", "owned_argument"))
         model = bind(parse_sources({"api.h": text}), require_complete=True)
         self.assertEqual(
             model.callbacks["mln_notice_callback"].delivery,
             DeliveryPlan("MLN_DELIVERY_TYPE_NOTICE", "notice", "mln_notice_delivery"),
         )
         self.assertEqual(
-            model.callbacks["mln_ticket_provider_callback"].delivery.record,
-            "mln_ticket_delivery",
+            model.callbacks["mln_query_callback"].delivery.record,
+            "mln_query_delivery",
         )
-        # What queue mode answers in place of each callback with a result: its
-        # queue_result, or a decision's accepted outcome.
+        # What queue mode answers in place of a callback with a result; a void
+        # callback needs no answer.
         self.assertEqual(model.callbacks["mln_notice_callback"].queue_result, "1")
-        self.assertEqual(
-            model.callbacks["mln_ticket_provider_callback"].queue_result,
-            "MLN_DECISION_CLAIM",
-        )
+        self.assertIsNone(model.callbacks["mln_query_callback"].queue_result)
         registration = model.operations_by_name[
             "mln_notice_set_callback"
         ].registrations[0]

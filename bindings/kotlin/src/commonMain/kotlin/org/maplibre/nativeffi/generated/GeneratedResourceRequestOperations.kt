@@ -12,13 +12,13 @@ public abstract class GeneratedResourceRequestOperations internal constructor() 
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
-   * Completes a C API resource provider request.
+   * Completes a C API resource provider request and consumes its handle.
    *
    * See `mln_resource_request_complete` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun complete(response: ResourceResponse): Unit =
-    nativeCall(this, binding) {
+    nativeAnswer(this, binding) {
       check(C.mln_resource_request_complete(handle, writeResourceResponse(response), diagnostic))
     }
 
@@ -36,16 +36,16 @@ public abstract class GeneratedResourceRequestOperations internal constructor() 
     }
 
   /**
-   * Hands an outstanding provider request to the built-in network loader.
+   * Hands an outstanding provider request to the built-in network loader and consumes its handle.
    *
    * See `mln_resource_request_pass_through` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun passThrough(): Unit =
-    nativeCall(this, binding) { check(C.mln_resource_request_pass_through(handle, diagnostic)) }
+    nativeAnswer(this, binding) { check(C.mln_resource_request_pass_through(handle, diagnostic)) }
 
   /**
-   * Releases the provider's reference to a resource request handle.
+   * Releases the provider's resource request handle without answering it.
    *
    * See `mln_resource_request_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

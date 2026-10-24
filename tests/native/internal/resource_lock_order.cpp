@@ -16,6 +16,7 @@
 #include "internal/support/resources.hpp"
 #include "internal/support/sync_points.hpp"
 #include "maplibre_native_c.h"
+#include "support/resources.h"
 #include "support/test_support.h"
 
 namespace {
@@ -34,9 +35,6 @@ using mln::native_tests::SyncPointScope;
 constexpr auto offline_style_url = "custom://offline-style.json";
 constexpr auto lookup_blocking_style_url = "custom://lookup-blocking.json";
 constexpr auto lookup_probe_style_url = "custom://lookup-probe.json";
-
-// An unknown decision becomes a handled provider error.
-constexpr auto provider_error_decision = UINT32_MAX;
 
 // A second runtime on its own thread, which releases once its trigger says the
 // first runtime is inside the wait under test.
@@ -155,14 +153,14 @@ struct LookupProvider {
 auto lookup_provider(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
-) -> uint32_t {
-  static_cast<void>(handle);
+) -> void {
   auto& provider = *static_cast<LookupProvider*>(user_data);
   if (
     request == nullptr || request->requested_url == nullptr ||
     std::strstr(request->requested_url, lookup_probe_style_url) == nullptr
   ) {
-    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+    mln_test_request_pass_through(handle);
+    return;
   }
   mln_test_flag_set(&provider.entered);
   static_cast<void>(mln_test_wait_for_flag(&provider.writer_pending));
@@ -175,7 +173,7 @@ auto lookup_provider(
     provider.sync_points->hits(SyncPoint::ResourceTransformLookup) + 1;
   mln_test_flag_set(&provider.other->armed);
   mln_test_flag_set(&provider.lookup_reached);
-  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+  mln_test_request_pass_through(handle);
 }
 
 // A file source thread's transform lookup releases the registry lock before
@@ -255,9 +253,8 @@ struct ParkedProvider {
 auto parked_provider(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
-) -> uint32_t {
+) -> void {
   static_cast<void>(request);
-  static_cast<void>(handle);
   auto& provider = *static_cast<ParkedProvider*>(user_data);
   mln_test_flag_set(&provider.entered);
   static_cast<void>(mln_test_wait_for_flag(&provider.writer_started));
@@ -265,7 +262,8 @@ auto parked_provider(
     SyncPoint::ResourceProviderExclusive, provider.writer_hits.load()
   );
   mln_test_flag_set(&provider.callback_returned);
-  return provider_error_decision;
+  // Releasing the request unanswered fails it, which keeps it off the network.
+  mln_resource_request_release(handle);
 }
 
 void mark_provider_released(void* user_data) {

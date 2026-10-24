@@ -67,7 +67,7 @@ typedef mln_queue_lock_callbackFunction =
 typedef mln_resource_provider_callback =
     Pointer<NativeFunction<mln_resource_provider_callbackFunction>>;
 typedef mln_resource_provider_callbackFunction =
-    Uint32 Function(
+    Void Function(
       Pointer<Void> user_data,
       Pointer<mln_resource_request_info> request,
       mln_resource_request handle,
@@ -1950,10 +1950,6 @@ const MLN_RESOURCE_LOADING_METHOD_NETWORK_ONLY = 2;
 // mln_resource_priority
 const MLN_RESOURCE_PRIORITY_REGULAR = 0;
 const MLN_RESOURCE_PRIORITY_LOW = 1;
-
-// mln_resource_provider_decision
-const MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH = 0;
-const MLN_RESOURCE_PROVIDER_DECISION_HANDLE = 1;
 
 // mln_resource_request_field
 const MLN_RESOURCE_REQUEST_RANGE = 1;

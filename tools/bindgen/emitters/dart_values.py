@@ -576,10 +576,8 @@ class Values:
 
     def delivered_owner(self, callback, parameter):
         """Whether a delivered argument is a handle that the host takes from
-        the batch: a decision handle, or one the callback owns."""
-        return (
-            callback.decision and parameter.name == callback.decision.parameter
-        ) or (parameter.value.kind == "handle" and parameter.value.ownership == "owned")
+        the batch: one the callback owns."""
+        return parameter.value.kind == "handle" and parameter.value.ownership == "owned"
 
     def render_delivery(self, callback):
         """Decode one queued delivery and run the host callback with it.

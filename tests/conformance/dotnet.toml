@@ -21,7 +21,7 @@
 "CB-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CallbackLifetimeTests.cs::ACallbackIsRootedUntilNativeReleasesIt"
 "CB-02" = { na = "Native registrations strongly root their callbacks until release; a callback that captures its receiver needs explicit close" }
 "CB-04" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs::AProviderExceptionIsContainedAndFailsTheRequest"
-"CB-05" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs::AProviderCanAnswerLaterThroughItsDecisionHandle"
+"CB-05" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs::AProviderCanAnswerLaterThroughItsHandle"
 "CB-06" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceTransformTests.cs::AScopedResponseExpiresWithItsCallbackAndRejectsOtherThreads"
 "CB-07" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/LoggingTests.cs::ReplacingTheLogCallbackReleasesThePreviousOne"
 "CB-08" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs::ARegistrationOnACancelledRequestIsNotRooted"

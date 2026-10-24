@@ -25,7 +25,6 @@ internal sealed class NativeFixture : IAsyncDisposable
         new()
         {
             Callback = (_, request) =>
-            {
                 request.Complete(
                     new ResourceResponse
                     {
@@ -33,10 +32,7 @@ internal sealed class NativeFixture : IAsyncDisposable
                         ErrorReason = ResourceErrorReason.NotFound,
                         ErrorMessage = "The test fixture serves no resources.",
                     }
-                );
-                request.Dispose();
-                return ResourceProviderDecision.Handle;
-            },
+                ),
         };
 
     private readonly SemaphoreSlim events;

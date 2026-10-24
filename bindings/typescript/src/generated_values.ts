@@ -2169,7 +2169,7 @@ export type ResourcePriority =
  */
 export interface ResourceProvider {
   /**
-   * Decides each request that the routes leave to the provider.
+   * Answers each request that the routes leave to the provider.
    */
   callback: (
     request: ResourceRequestInfo,
@@ -2180,15 +2180,6 @@ export interface ResourceProvider {
    */
   routes: readonly ResourceRoute[];
 }
-
-export const ResourceProviderDecision = {
-  passThrough: 0,
-  handle: 1,
-} as const;
-/** One of the ResourceProviderDecision values, or a value this binding does not know. */
-export type ResourceProviderDecision =
-  | (typeof ResourceProviderDecision)[keyof typeof ResourceProviderDecision]
-  | (number & {});
 
 /**
  * Inclusive byte range of a resource request.

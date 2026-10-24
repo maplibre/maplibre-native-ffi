@@ -797,14 +797,13 @@ static void dispose_rejects_an_invalid_completion_and_a_released_session(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static mln_resource_provider_decision retirement_provider(
+static void retirement_provider(
   void* context, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
   (void)context;
   (void)request;
-  (void)handle;
-  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+  mln_test_request_pass_through(handle);
 }
 static void retirement_release(void* context) {
   atomic_store((atomic_bool*)context, true);

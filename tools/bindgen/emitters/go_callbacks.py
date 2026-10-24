@@ -30,8 +30,6 @@ def validate(values, plan):
         if not callback.context:
             raise ModelError([f"{plan.native}: callback requires a context"])
         for p in callback.arguments:
-            if callback.decision and p.name == callback.decision.parameter:
-                continue
             values.require(p.value)
         if callback.result.native != "void":
             values.require(callback.result)
@@ -100,20 +98,12 @@ def sources(values, plan):
         )
         setup = [failure]
         copied = []
-        decision = callback.decision
-        if decision:
-            owner = values.owner(decision.handle.native)
-            setup.append(
-                f"request := adopt{owner}(uint64(native_{decision.parameter}), nil); defer func() {{ if uint32(result) != uint32(C.{decision.accept}) {{ request.state.released.Store(true) }}; runtime.KeepAlive(request) }}()"
-            )
         # A handle the callback owns is adopted first; a callback that never
         # runs or panics closes it, so native never waits on it.
         owned = [
             p
             for p in parameters
-            if p.value.kind == "handle"
-            and p.value.ownership == "owned"
-            and not (decision and p.name == decision.parameter)
+            if p.value.kind == "handle" and p.value.ownership == "owned"
         ]
         for p in owned:
             setup.append(
@@ -131,9 +121,7 @@ def sources(values, plan):
             setup.append("scope := bindingNewScope(); defer scope.alive.Store(false)")
         for p in parameters:
             value = p.value.unwrapped
-            if decision and p.name == decision.parameter:
-                copied.append("request")
-            elif value.kind == "handle" and value.ownership == "owned":
+            if value.kind == "handle" and value.ownership == "owned":
                 copied.append("owned_" + p.name)
             elif value.response:
                 copied.append(

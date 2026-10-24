@@ -28,18 +28,4 @@ internal object WasmUpcalls {
     }
     1
   }
-
-  fun queuedResourceProviderCallback(userData: Long, request: Long, handle: Long): Int = run {
-    val handleOwner = ResourceRequestHandle(handle)
-    if (
-      !upcall<QueuedResourceProvider, Boolean>("mln_resource_provider_callback", userData, false) {
-        value ->
-        value.callback(readResourceRequestInfo(request), handleOwner)
-        true
-      }
-    ) {
-      handleOwner.close()
-    }
-    1
-  }
 }

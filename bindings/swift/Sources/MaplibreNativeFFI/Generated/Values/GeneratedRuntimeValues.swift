@@ -539,15 +539,16 @@ public struct ResourcePriority: RawRepresentable, CustomStringConvertible,
 /// See `mln_resource_provider` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceProvider: Sendable {
-  /// Decides each request that the routes leave to the provider.
-  public var callback: (@Sendable (ResourceRequestInfo,
-                                   ResourceRequestHandle) throws
-      -> ResourceProviderDecision)?
+  /// Answers each request that the routes leave to the provider.
+  public var callback: (@Sendable (ResourceRequestInfo, ResourceRequestHandle)
+    -> Void)?
   /// The requests that reach the provider; empty to claim every request.
   public var routes: [ResourceRoute]
   public init(
-    callback: (@Sendable (ResourceRequestInfo, ResourceRequestHandle) throws
-      -> ResourceProviderDecision)? = nil,
+    callback: (
+      @Sendable (ResourceRequestInfo, ResourceRequestHandle) -> Void
+    )? =
+      nil,
     routes: [ResourceRoute] = []
   ) {
     self.callback = callback
@@ -577,46 +578,21 @@ private func invokeResourceProviderCallback(
   user_data: UnsafeMutableRawPointer?,
   request: UnsafePointer<mln_resource_request_info>?,
   handle: mln_resource_request
-) -> UInt32 {
-  guard let user_data else { return 4_294_967_295 }
+) {
+  guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<ResourceProvider>>
     .fromOpaque(user_data).takeUnretainedValue()
-  guard let decisionOwner = try? ResourceRequestHandle(adopting: handle)
-  else { return 4_294_967_295 }
-  do { let decision = try box.value.callback?(
+  guard let ownedHandle = try? ResourceRequestHandle(adopting: handle)
+  else { mln_resource_request_release(handle); return }
+  do { try box.value.callback?(
     NativeInputArena.copyArray(request, count: 1)
       .map { try ResourceRequestInfo(raw: $0) }[0],
-    decisionOwner
-  ) ?? ResourceProviderDecision(rawValue: 4_294_967_295); if decision
-    .rawValue != MLN_RESOURCE_PROVIDER_DECISION_HANDLE
-    .rawValue
-  {
-    decisionOwner.handle.handOff()
-  }; return decision.rawValue
-  } catch {
+    ownedHandle
+  ) } catch {
     reportToStandardError(
       "mln_resource_provider_callback failed and native received its fallback: \(error)\n"
-    ); decisionOwner
-      .handle.handOff(); return 4_294_967_295
-  }
-}
-
-public struct ResourceProviderDecision: RawRepresentable,
-  CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let passThrough: ResourceProviderDecision = .init(rawValue: 0)
-  public static let handle: ResourceProviderDecision = .init(rawValue: 1)
-  public var description: String {
-    switch rawValue {
-    case 0: return "passThrough"
-    case 1: return "handle"
-    default: return "ResourceProviderDecision(\(rawValue))"
-    }
+    ); ownedHandle
+      .close()
   }
 }
 

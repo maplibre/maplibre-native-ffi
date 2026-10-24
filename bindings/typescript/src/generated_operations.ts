@@ -103,6 +103,7 @@ import {
   Owner,
   ViewScope,
   adopt,
+  answerSync,
   checkKey,
   closeAsync,
   closeSync,
@@ -4100,7 +4101,7 @@ export class ResourceRequestHandle extends Owner {
   declare [Symbol.dispose]: () => void;
 
   /**
-   * Releases the provider's reference to a resource request handle.
+   * Releases the provider's resource request handle without answering it.
    *
    * See `mln_resource_request_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4112,13 +4113,15 @@ export class ResourceRequestHandle extends Owner {
   }
 
   /**
-   * Completes a C API resource provider request.
+   * Completes a C API resource provider request and consumes its handle.
    *
    * See `mln_resource_request_complete` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   complete(response: ResourceResponse = {}): void {
-    native.mln_resource_request_complete(this.id, response);
+    answerSync(this, (handle, token) =>
+      native.mln_resource_request_complete(handle, token, response),
+    );
   }
 
   /**
@@ -4132,13 +4135,16 @@ export class ResourceRequestHandle extends Owner {
   }
 
   /**
-   * Hands an outstanding provider request to the built-in network loader.
+   * Hands an outstanding provider request to the built-in network loader and
+   * consumes its handle.
    *
    * See `mln_resource_request_pass_through` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   passThrough(): void {
-    native.mln_resource_request_pass_through(this.id);
+    answerSync(this, (handle, token) =>
+      native.mln_resource_request_pass_through(handle, token),
+    );
   }
 
   /**

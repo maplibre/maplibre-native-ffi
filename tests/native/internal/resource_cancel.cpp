@@ -52,7 +52,7 @@ void count_cancel_release(void* user_data) {
 auto complete_inline_provider(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
-) -> uint32_t {
+) -> void {
   static_cast<void>(request);
   auto& probe = *static_cast<CompletedRequest*>(user_data);
   probe.handle = handle;
@@ -69,13 +69,12 @@ auto complete_inline_provider(
   const auto response = style_response();
   static_cast<void>(mln_resource_request_complete(handle, &response, nullptr));
   mln_test_flag_set(&probe.provider_entered);
-  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 
 // MapLibre runs its cancel hook on every request teardown, including after the
-// response was delivered. The C API reports cancellation only for a request the
-// provider has not completed. The hook's sync point is the fence: once it has
-// run, a cancel callback it was going to run has run.
+// response was delivered. The C API runs a cancel callback only for a request
+// the provider has not completed. The hook's sync point is the fence: once it
+// has run, a cancel callback it was going to run has run.
 void cancel_callback_skips_a_completed_request() {
   auto sync_points = SyncPointScope{};
   auto probe = CompletedRequest{};
@@ -99,14 +98,12 @@ void cancel_callback_skips_a_completed_request() {
     sync_points.wait_for_hits(SyncPoint::ResourceRequestCancelled, 1)
   );
   TEST_ASSERT_EQUAL_INT(0, probe.cancel_count.load());
+  // Completion consumed the handle, and the registration, whose callback never
+  // ran, retired with it.
   auto cancelled = true;
-  MLN_TEST_OK(mln_resource_request_is_cancelled(handle, &cancelled, nullptr));
-  TEST_ASSERT_FALSE(cancelled);
-  TEST_ASSERT_EQUAL_INT(0, probe.release_count.load());
-
-  // A registration whose callback never ran retires with the request.
-  mln_resource_request_release(handle);
-  TEST_ASSERT_EQUAL_INT(0, probe.cancel_count.load());
+  MLN_TEST_INVALID_STATE(
+    mln_resource_request_is_cancelled(handle, &cancelled, nullptr)
+  );
   TEST_ASSERT_EQUAL_INT(1, probe.release_count.load());
   mln_test_destroy_runtime(runtime);
 }
@@ -155,7 +152,7 @@ void block_in_cancel(void* user_data, mln_resource_request handle) {
 auto blocking_cancel_provider(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
-) -> uint32_t {
+) -> void {
   static_cast<void>(request);
   auto& probe = *static_cast<BlockingCancel*>(user_data);
   probe.handle = handle;
@@ -171,7 +168,6 @@ auto blocking_cancel_provider(
   );
   probe.register_reported_cancelled = cancelled;
   mln_test_flag_set(&probe.provider_entered);
-  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 
 // user_data may be freed once release returns, so release waits for a callback

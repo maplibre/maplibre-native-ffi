@@ -349,7 +349,9 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
             return_type = results[0][1] if results else "void"
             body = [f"return {invoke};"]
     if plan.consumes:
-        body = consume(function, names[receiver_name], body, return_type, infallible)
+        body = consume(
+            function, names[receiver_name], body, return_type, infallible, plan.release
+        )
     if needs_allocator:
         signature.insert(0, "allocator: std.mem.Allocator")
     if function.diagnostic:
@@ -382,10 +384,21 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
     return code
 
 
-def consume(function, receiver, body, return_type, infallible=False):
+def consume(function, receiver, body, return_type, infallible=False, release=True):
     """Close the receiver once native accepts its release. A synchronous release
-    of a closed receiver does nothing; an asynchronous one reaches native,
-    which reports a stale handle."""
+    of a closed receiver does nothing; an asynchronous one, and an answer that
+    consumes its receiver, reach native, which reports a stale handle."""
+    if not release:
+        if len(body) != 1 or not body[0].startswith("return "):
+            raise failure(function, "an answer with outputs needs an owner transaction")
+        answer = body[0].removeprefix("return ").removesuffix(";")
+        if return_type != "void":
+            return [
+                f"const answered = try {answer};",
+                f"{receiver}.closed = true;",
+                "return answered;",
+            ]
+        return [f"try {answer};", f"{receiver}.closed = true;"]
     if infallible and return_type == "void":
         return [
             f"if ({receiver}.closed) return;",

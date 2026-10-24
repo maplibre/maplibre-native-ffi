@@ -2201,12 +2201,12 @@ auto offline_region_delete_start(
 
 namespace {
 
-// Answers HANDLE and queues a copy of the request with its handle. A request
-// the queue refuses fails, unless the process is exiting.
+// Queues a copy of the request with its handle. A request the queue refuses
+// fails, unless the process is exiting, which passes it through.
 auto queue_provider_request(
   void* registration, const mln_resource_request_info* request,
   mln_resource_request handle
-) noexcept -> uint32_t {
+) noexcept -> void {
   const auto arguments = mln_resource_request_delivery{
     .request = request,
     .handle = handle,
@@ -2215,11 +2215,15 @@ auto queue_provider_request(
     static_cast<const mln::delivery::QueuedRegistration*>(registration)
       ->push<MLN_DELIVERY_TYPE_RESOURCE_REQUEST>(arguments)
   ) {
-    return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+    return;
   }
-  if (process_exiting()) return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+  if (process_exiting()) {
+    try {
+      if (pass_through_resource_request(handle) == MLN_STATUS_OK) return;
+    } catch (...) {
+    }
+  }
   release_resource_request(handle);
-  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 
 }  // namespace

@@ -764,18 +764,6 @@ final class ResourcePriority extends _Enum {
   };
 }
 
-final class ResourceProviderDecision extends _Enum {
-  const ResourceProviderDecision.fromRawValue(super.rawValue);
-  static const passThrough = ResourceProviderDecision.fromRawValue(0);
-  static const handle = ResourceProviderDecision.fromRawValue(1);
-  @override
-  String toString() => switch (rawValue) {
-    0 => 'ResourceProviderDecision.passThrough',
-    1 => 'ResourceProviderDecision.handle',
-    _ => 'ResourceProviderDecision($rawValue)',
-  };
-}
-
 /// How a resource provider answered a request.
 ///
 /// See `mln_resource_response_status` in the
@@ -6077,7 +6065,7 @@ final class ResourceProvider {
     List<ResourceRoute> routes = const [],
   }) : routes = List.unmodifiable(routes);
 
-  /// Decides each request that the routes leave to the provider.
+  /// Answers each request that the routes leave to the provider.
   final ResourceProviderCallback callback;
 
   /// The requests that reach the provider; empty to claim every request.

@@ -30,15 +30,6 @@ internal actual object UpcallStubs {
       JAVA_LONG,
       JAVA_LONG,
     )
-  actual val resourceProviderCallback: Long =
-    Ffm.upcall(
-      ThreadedUpcalls::class.java,
-      "resourceProviderCallback",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   actual val customGeometrySourceOptionsFetchTile: Long =
     Ffm.upcall(
       Upcalls::class.java,
@@ -81,6 +72,15 @@ internal actual object UpcallStubs {
     )
   actual val runtimeEventHandlerCallback: Long =
     Ffm.upcall(Upcalls::class.java, "runtimeEventHandlerCallback", null, JAVA_LONG, JAVA_LONG)
+  actual val resourceProviderCallback: Long =
+    Ffm.upcall(
+      Upcalls::class.java,
+      "resourceProviderCallback",
+      null,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   actual val resourceTransformCallback: Long =
     Ffm.upcall(
       Upcalls::class.java,

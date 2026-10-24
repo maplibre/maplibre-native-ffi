@@ -342,6 +342,24 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     }
 
   /**
+   * Registers or replaces a runtime-scoped network resource provider.
+   *
+   * See `mln_runtime_set_resource_provider` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  public fun setResourceProvider(provider: ResourceProvider): Deferred<Unit> =
+    nativeUnit(this, binding, bindingCallbacks) {
+      check(
+        C.mln_runtime_set_resource_provider(
+          handle,
+          writeResourceProvider(provider),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
+  /**
    * Registers or updates a runtime-scoped URL transform for network resources.
    *
    * See `mln_runtime_set_resource_transform` in the

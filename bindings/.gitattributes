@@ -119,7 +119,6 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceLoadingMethod.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourcePriority.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceProvider.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceProviderDecision.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRange.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestCancelHandler.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestHandle.Operations.g.cs linguist-generated=true

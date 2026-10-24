@@ -11,7 +11,6 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.NETWORK_URLS
-import org.maplibre.nativeffi.TestProvider
 import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitDeliveries
 import org.maplibre.nativeffi.awaitWithin
@@ -20,6 +19,7 @@ import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.error.CallbackException
 import org.maplibre.nativeffi.generated.ResourceKind
 import org.maplibre.nativeffi.generated.ResourceKindMask
+import org.maplibre.nativeffi.generated.ResourceProvider
 import org.maplibre.nativeffi.generated.ResourceRequestCancelHandler
 import org.maplibre.nativeffi.generated.ResourceRequestHandle
 import org.maplibre.nativeffi.generated.ResourceResponse
@@ -33,7 +33,6 @@ import org.maplibre.nativeffi.generated.UrlMatchFlags
 import org.maplibre.nativeffi.interceptUncaught
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.serve
-import org.maplibre.nativeffi.setTestProvider
 import org.maplibre.nativeffi.withMap
 
 /** The resource provider and transform callbacks: what they root and what they hand out. */
@@ -132,11 +131,13 @@ class ResourceCallbackTest {
       request.complete(
         ResourceResponse(ResourceResponseStatus.OK, bytes = EMPTY_STYLE_JSON.encodeToByteArray()),
       )
-      // A request takes one response.
+      // The accepted response consumed the handle, so the owner has nothing left to release, and
+      // native refuses a second answer on the stale handle.
+      assertTrue(request.binding.isReleased)
       assertFailsWithStatus(Status.INVALID_STATE) {
         request.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
       }
-      request.close()
+      assertFailsWithStatus(Status.INVALID_STATE) { request.passThrough() }
       awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
     }
   }
@@ -178,7 +179,7 @@ class ResourceCallbackTest {
         ResourceRoute(flags = UrlMatchFlags.GLOB, url = "custom://routed/**"),
       )
     val provider =
-      TestProvider(routes) { request, handle ->
+      ResourceProvider(routes) { request, handle ->
         seen.update { it + (request.kind to request.requestedUrl) }
         when (request.requestedUrl) {
           ROUTED_STYLE_URL -> handle.serve(ROUTED_STYLE_JSON)
@@ -187,7 +188,7 @@ class ResourceCallbackTest {
         }
       }
     withMap {
-      val installing = runtime.setTestProvider(provider)
+      val installing = runtime.setResourceProvider(provider)
       routes.clear()
       installing.awaitWithin("the routed provider")
 

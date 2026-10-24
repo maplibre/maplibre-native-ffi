@@ -84,7 +84,6 @@ void main() {
             bytes: jsonBytes(emptyStyleJson),
           ),
         );
-        handle.close();
       }),
     );
     final map = await fixture.openStyledMap(

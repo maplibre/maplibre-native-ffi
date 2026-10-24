@@ -157,11 +157,25 @@ mln_resource_response mln_test_error_response(
   };
 }
 
+void mln_test_request_answer(
+  mln_resource_request handle, const mln_resource_response* response
+) {
+  if (mln_resource_request_complete(handle, response, NULL) != MLN_STATUS_OK) {
+    mln_resource_request_release(handle);
+  }
+}
+
+void mln_test_request_pass_through(mln_resource_request handle) {
+  if (mln_resource_request_pass_through(handle, NULL) != MLN_STATUS_OK) {
+    mln_resource_request_release(handle);
+  }
+}
+
 static void copy_text(const char* text, char* out, size_t capacity) {
   (void)snprintf(out, capacity, "%s", text == NULL ? "" : text);
 }
 
-static uint32_t scripted_provider(
+static void scripted_provider(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
@@ -207,7 +221,7 @@ static uint32_t scripted_provider(
   mln_test_pulse();
 
   if (held) {
-    return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+    return;
   }
   mln_resource_response response;
   if (match == NULL) {
@@ -221,9 +235,7 @@ static uint32_t scripted_provider(
     response = match->response;
   }
   response.size = sizeof(response);
-  (void)mln_resource_request_complete(handle, &response, NULL);
-  mln_resource_request_release(handle);
-  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+  mln_test_request_answer(handle, &response);
 }
 
 mln_test_provider* mln_test_provider_create(

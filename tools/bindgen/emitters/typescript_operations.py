@@ -2,7 +2,8 @@
 
 Every generated method calls one runtime helper for its execution shape:
 `run`, `command`, `query`, and `attach` for completions,
-`closeSync` and `closeAsync` for a release, `adopt` for a handle that native
+`closeSync` and `closeAsync` for a release, `answerSync` for an answer that
+consumes its receiver, `adopt` for a handle that native
 code transfers to a new owner, and `ViewScope` for a borrowed view. A call
 passes the raw handle ID, and native code reports a released one.
 
@@ -115,6 +116,8 @@ def method_body(bound, values, natives, entry: Lowered, discard=False) -> list[s
     shape = entry.shape
     if shape == "close":
         lines = [f"closeSync(this, (handle, token) => {call});"]
+    elif shape == "answer":
+        lines = [f"answerSync(this, (handle, token) => {call});"]
     elif shape == "close_async":
         lines = [f"return closeAsync(this, (handle, token) => submitRun({start}));"]
     elif shape == "run":
@@ -488,6 +491,7 @@ def runtime_imports(text: str) -> str:
             "Owner",
             "ViewScope",
             "adopt",
+            "answerSync",
             "checkKey",
             "closeAsync",
             "closeSync",

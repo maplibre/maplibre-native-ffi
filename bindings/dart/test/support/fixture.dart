@@ -61,7 +61,6 @@ final denyingProvider = ResourceProvider(
         errorMessage: 'the test fixture serves no resources',
       ),
     );
-    handle.close();
   },
 );
 

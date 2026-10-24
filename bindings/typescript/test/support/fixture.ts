@@ -68,7 +68,6 @@ export const denyingProvider: ResourceProvider = {
       status: ResourceResponseStatus.error,
       errorMessage: "the test fixture serves no resources",
     });
-    handle.close();
   },
 };
 

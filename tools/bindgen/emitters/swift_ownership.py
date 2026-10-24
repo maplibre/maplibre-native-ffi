@@ -31,7 +31,7 @@ def consumed(plan, owner, values):
     from .swift import checked, doc, member_doc, native_call
 
     documented = member_doc(values.bound, function.name)
-    if len(plan.inputs) != 1:
+    if len(plan.inputs) != 1 or not plan.release:
         from .swift import camel, identifier
         from .swift_dynamic_values import encode
 
@@ -44,12 +44,16 @@ def consumed(plan, owner, values):
             local = identifier(camel(parameter.name))
             declarations.append(f"{local}: {values.public(parameter.value)}")
             args.append(encode(values, parameter.value, local))
+        # A release with inputs is idempotent. An answer that consumes its
+        # receiver keeps its name, and a repeated one reaches native.
+        name = "release" if plan.release else identifier(camel(plan.member))
+        idempotent = "" if plan.release else "idempotent: false"
         return (
             f"""public extension {owner} {{
-{doc(values.bound, function.name, "  ")}  func release({", ".join(declarations)}) throws {{
+{doc(values.bound, function.name, "  ")}  func {name}({", ".join(declarations)}) throws {{
     let arena = NativeInputArena()
     defer {{ withExtendedLifetime(arena) {{}} }}
-    try handle.closeOnce {{ live in
+    try handle.closeOnce({idempotent}) {{ live in
       var raw = live.raw
       {checked(native_call(function, *args))}
     }}

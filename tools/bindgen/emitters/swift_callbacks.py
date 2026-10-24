@@ -185,16 +185,10 @@ def descriptor(values, plan):
         owned = [
             parameter
             for parameter in callback.arguments
-            if parameter.value.kind == "handle"
-            and parameter.value.ownership == "owned"
-            and not (
-                callback.decision and parameter.name == callback.decision.parameter
-            )
+            if parameter.value.kind == "handle" and parameter.value.ownership == "owned"
         ]
         args = ", ".join(
-            "decisionOwner"
-            if callback.decision and parameter.name == callback.decision.parameter
-            else "owned" + name(parameter.name)
+            "owned" + name(parameter.name)
             if parameter in owned
             else "response" + name(parameter.name)
             if parameter in responses
@@ -220,9 +214,6 @@ def descriptor(values, plan):
             if release.diagnostic:
                 arguments.append("nil")
             setup += f"  guard let owned{name(parameter.name)} = try? {owner_name(handle)}(adopting: {identifier(parameter.name)}) else {{ {handle.release}({', '.join(arguments)}); {fail or 'return'} }}\n"
-        if callback.decision:
-            decision = callback.decision
-            setup += f"  guard let decisionOwner = try? {owner_name(decision.handle)}(adopting: {identifier(decision.parameter)}) else {{ {fail} }}\n"
         value = "box.value"
         call = f"{'try ' if throws(callback) else ''}{value}.{identifier(camel(field.name))}?({args})"
         invoke = (
@@ -230,10 +221,6 @@ def descriptor(values, plan):
             if result == "Void" or responses
             else f"return {call} ?? {callback.failure}{suffix}"
         )
-        if callback.decision:
-            decision = callback.decision
-            invoke = f"let decision = {call} ?? {values.public(callback.result)}(rawValue: {callback.failure}{suffix}); if decision.rawValue != {decision.accept}.rawValue {{ decisionOwner.handle.handOff() }}; return decision.rawValue"
-            fail = f"decisionOwner.handle.handOff(); return {callback.failure}{suffix}"
 
         if responses:
             invoke += f"; return MLN_STATUS_OK{suffix}"

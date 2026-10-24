@@ -75,6 +75,8 @@ static void the_host_completes_a_drained_request(void) {
 
   const mln_resource_response response = style_response();
   MLN_TEST_OK(mln_resource_request_complete(handle, &response, NULL));
+  // Completion consumed the handle, so no later call reaches the request and
+  // releasing it does nothing.
   MLN_TEST_INVALID_STATE(mln_resource_request_pass_through(handle, NULL));
   mln_resource_request_release(handle);
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
@@ -138,8 +140,9 @@ static void complete_from_wake(void* user_data) {
         mln_resource_request_complete(handle, &response, NULL) == MLN_STATUS_OK
       ) {
         atomic_fetch_add(&wake->completed, 1);
+      } else {
+        mln_resource_request_release(handle);
       }
-      mln_resource_request_release(handle);
     }
     mln_delivery_batch_release(batch);
     batch = MLN_HANDLE_NULL;
@@ -413,16 +416,14 @@ static void invalid_routes_are_rejected(void) {
 #if !defined(__EMSCRIPTEN__)
 
 // A callback provider that answers every request it sees with an empty style.
-static uint32_t answer_with_style(
+static void answer_with_style(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
   (void)request;
   atomic_fetch_add((atomic_int*)user_data, 1);
   const mln_resource_response response = style_response();
-  (void)mln_resource_request_complete(handle, &response, NULL);
-  mln_resource_request_release(handle);
-  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+  mln_test_request_answer(handle, &response);
 }
 
 static void load_style(mln_runtime runtime, const char* url) {
@@ -526,7 +527,6 @@ static void routes_filter_a_queue_provider(void) {
   mln_delivery_batch_release(batch);
   const mln_resource_response response = style_response();
   MLN_TEST_OK(mln_resource_request_complete(handle, &response, NULL));
-  mln_resource_request_release(handle);
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
 
   MLN_TEST_OK(mln_test_clear_resource_provider(runtime));

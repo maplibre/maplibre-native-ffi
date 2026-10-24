@@ -150,14 +150,12 @@ func newRuntimeFixture(t *testing.T) *fixture {
 
 // denyingProvider fails every request, so no test reaches the network.
 func denyingProvider() ResourceProvider {
-	return ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) ResourceProviderDecision {
+	return ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) {
 		_ = request.Complete(ResourceResponse{
 			Status:       ResourceResponseStatusError,
 			ErrorReason:  ResourceErrorReasonNotFound,
 			ErrorMessage: "the test fixture serves no resources",
 		})
-		_ = request.Close()
-		return ResourceProviderDecisionHandle
 	}}
 }
 
@@ -166,13 +164,12 @@ func denyingProvider() ResourceProvider {
 func (f *fixture) serveStyle(t *testing.T, url string) {
 	t.Helper()
 	deny := denyingProvider().Callback
-	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) ResourceProviderDecision {
+	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) {
 		if request.RequestedUrl == nil || *request.RequestedUrl != url {
-			return deny(request, handle)
+			deny(request, handle)
+			return
 		}
 		_ = handle.Complete(ResourceResponse{Status: ResourceResponseStatusOk, Bytes: []byte(emptyStyle)})
-		_ = handle.Close()
-		return ResourceProviderDecisionHandle
 	}})))
 }
 
@@ -193,11 +190,12 @@ func (f *fixture) serveLoopback(t *testing.T, bodies map[string]string) string {
 	}))
 	t.Cleanup(server.Close)
 	deny := denyingProvider().Callback
-	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) ResourceProviderDecision {
+	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) {
 		if request.RequestedUrl != nil && strings.HasPrefix(*request.RequestedUrl, server.URL+"/") {
-			return ResourceProviderDecisionPassThrough
+			_ = handle.PassThrough()
+			return
 		}
-		return deny(request, handle)
+		deny(request, handle)
 	}})))
 	return server.URL
 }

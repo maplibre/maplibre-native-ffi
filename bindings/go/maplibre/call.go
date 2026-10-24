@@ -24,6 +24,10 @@ const (
 	bindingReadAccess
 	// Native consumes the receiver when the call succeeds.
 	bindingCloseAccess
+	// The call answers the receiver, which native consumes when the call
+	// succeeds. A receiver already consumed reaches native, which reports it,
+	// where a repeated close does nothing.
+	bindingAnswerAccess
 	// Native always consumes the receiver.
 	bindingConsumeAccess
 	// The receiver is a response that is valid only inside its callback, on
@@ -50,6 +54,10 @@ func bindingClosing(owner *bindingOwner) bindingTarget {
 	return bindingTarget{owner: owner, access: bindingCloseAccess}
 }
 
+func bindingAnswering(owner *bindingOwner) bindingTarget {
+	return bindingTarget{owner: owner, access: bindingAnswerAccess}
+}
+
 func bindingConsuming(owner *bindingOwner) bindingTarget {
 	return bindingTarget{owner: owner, access: bindingConsumeAccess}
 }
@@ -74,8 +82,8 @@ func bindingRun[T any](target bindingTarget, call func(arena *bindingArena, raw 
 	owner := target.owner
 	state := bindingHandleState(owner)
 	defer runtime.KeepAlive(owner)
-	if target.access == bindingCloseAccess || target.access == bindingConsumeAccess {
-		if synchronous && state.released.Load() {
+	if target.access == bindingCloseAccess || target.access == bindingConsumeAccess || target.access == bindingAnswerAccess {
+		if synchronous && target.access != bindingAnswerAccess && state.released.Load() {
 			var zero T
 			return zero
 		}

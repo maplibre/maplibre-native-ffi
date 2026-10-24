@@ -300,7 +300,7 @@ def operation(plan, values, *, discard=False, dispose=False):
     if plan.consumes == "always":
         access = "Consuming"
     elif plan.consumes:
-        access = "Closing"
+        access = "Closing" if plan.release else "Answering"
     elif needs_read(plan):
         access = "Read"
     else:

@@ -983,22 +983,6 @@ public value class ResourcePriority(public val rawValue: UInt) {
   }
 }
 
-/** Later versions may add values; an unknown one keeps its `rawValue`. */
-@JvmInline
-public value class ResourceProviderDecision(public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "PASS_THROUGH"
-      1u -> "HANDLE"
-      else -> "ResourceProviderDecision($rawValue)"
-    }
-
-  public companion object {
-    public val PASS_THROUGH: ResourceProviderDecision = ResourceProviderDecision(0u)
-    public val HANDLE: ResourceProviderDecision = ResourceProviderDecision(1u)
-  }
-}
-
 /**
  * How a resource provider answered a request.
  *
@@ -4576,6 +4560,34 @@ public data class RuntimeEventHandler(
  */
 public fun interface RuntimeEventCallback {
   public operator fun invoke(events: EventBatchView)
+}
+
+/**
+ * Resource provider state.
+ *
+ * See `mln_resource_provider` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class ResourceProvider(
+  /** The requests that reach the provider; empty to claim every request. */
+  public val routes: List<ResourceRoute> = emptyList(),
+  /** Answers each request that the routes leave to the provider. */
+  public val callback: ResourceProviderCallback,
+)
+
+/**
+ * Intercepts a network resource request.
+ *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
+ * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
+ * See `mln_resource_provider_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public fun interface ResourceProviderCallback {
+  public operator fun invoke(request: ResourceRequestInfo, handle: ResourceRequestHandle)
 }
 
 /**

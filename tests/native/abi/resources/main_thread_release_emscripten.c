@@ -55,7 +55,7 @@ static void block_in_cancel(void* user_data, mln_resource_request handle) {
   mln_test_flag_set(&run->callback_returned);
 }
 
-static uint32_t blocking_cancel_provider(
+static void blocking_cancel_provider(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
@@ -74,7 +74,6 @@ static uint32_t blocking_cancel_provider(
   );
   atomic_store(&run->register_reported_cancelled, cancelled);
   mln_test_flag_set(&run->provider_entered);
-  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 
 static void release_here(void* context) {

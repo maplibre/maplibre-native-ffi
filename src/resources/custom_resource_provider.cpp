@@ -41,16 +41,9 @@ class ProviderRequest final : public mln::AsyncRequest {
   using StartNative = std::function<
     std::unique_ptr<mln::AsyncRequest>(mln::FileSource::Callback)>;
   enum class Decision { None, PassThrough, Failure };
-  enum class Failure {
-    Released,
-    UnknownDecision,
-    Exception,
-    ProcessExit,
-    Native
-  };
+  enum class Failure { Released, Exception, ProcessExit, Native };
   static constexpr auto failure_messages = std::array{
     std::string_view{"resource request was released without a response"},
-    std::string_view{"resource provider returned an unknown decision"},
     std::string_view{"resource provider threw an exception"},
     std::string_view{"the process is exiting"},
     std::string_view{"native resource loading failed"},
@@ -118,8 +111,8 @@ struct ResourceRequestObject {
   bool cancelled = false;
   bool completed = false;
   bool retired = false;
-  // The provider callback is running, has claimed the request, or saw its
-  // handle released before it answered.
+  // The provider callback is running, has returned holding the handle, or saw
+  // the handle released before it returned.
   bool deciding = false;
   bool claimed = false;
   bool released_while_deciding = false;
@@ -546,33 +539,18 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
       const std::scoped_lock lock(invocation.object->mutex);
       invocation.object->deciding = true;
     }
-    const auto decision =
-      invocation.callback(invocation.user_data, &request, invocation.handle);
-    // A request completed or passed through while deciding is handled
-    // whatever the decision says; the decision only says who holds the handle.
-    auto answered = false;
+    invocation.callback(invocation.user_data, &request, invocation.handle);
+    // The provider holds the handle until an answer consumes it or it is
+    // released. A release during the callback fails the request only now, so
+    // that nothing above runs against a failed request.
     {
       const std::scoped_lock lock(invocation.object->mutex);
       invocation.object->deciding = false;
-      answered = invocation.object->completed;
-      if (decision == MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
-        invocation.object->claimed = true;
-        if (invocation.object->released_while_deciding) {
-          fail_locked(*invocation.object, ProviderRequest::Failure::Released);
-        }
+      invocation.object->claimed = true;
+      if (invocation.object->released_while_deciding) {
+        fail_locked(*invocation.object, ProviderRequest::Failure::Released);
       }
     }
-    if (decision == MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH) {
-      retire_request(invocation.handle);
-      return answered;
-    }
-    if (decision != MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
-      fail_request(
-        *invocation.object, ProviderRequest::Failure::UnknownDecision
-      );
-      return true;
-    }
-    // A handled request stays reachable by id until the host releases it.
     return true;
   } catch (...) {
     fail_request(*invocation.object, ProviderRequest::Failure::Exception);
@@ -674,26 +652,31 @@ auto complete_resource_request(
       return MLN_STATUS_INVALID_STATE;
     }
   }
+  // An answered request consumes its handle. It is not cancelled, so no
+  // cancel callback runs that the retirement would wait for.
+  retire_request(handle);
   return MLN_STATUS_OK;
 }
 
 auto pass_through_resource_request(mln_resource_request handle) -> mln_status {
   const auto live = handle_table<ResourceRequestObject>().lease(handle);
   if (live == nullptr) return recorded_handle_fault_status();
-  const auto lock = std::scoped_lock{live->mutex};
-  if (live->retired) {
-    return report_handle_fault(
-      HandleTraits<ResourceRequestObject>::kind, handle, HandleFault::Stale
-    );
+  {
+    const auto lock = std::scoped_lock{live->mutex};
+    if (live->retired) {
+      return report_handle_fault(
+        HandleTraits<ResourceRequestObject>::kind, handle, HandleFault::Stale
+      );
+    }
+    if (live->completed || live->cancelled) {
+      set_thread_error("resource request is completed or cancelled");
+      return MLN_STATUS_INVALID_STATE;
+    }
+    live->loader->schedule(ProviderRequest::Decision::PassThrough);
+    live->completed = true;
   }
-  if (live->completed || live->cancelled) {
-    set_thread_error(
-      "resource request is completed, passed through, or cancelled"
-    );
-    return MLN_STATUS_INVALID_STATE;
-  }
-  live->loader->schedule(ProviderRequest::Decision::PassThrough);
-  live->completed = true;
+  // As in complete_resource_request(), the answer consumes the handle.
+  retire_request(handle);
   return MLN_STATUS_OK;
 }
 

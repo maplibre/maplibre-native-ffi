@@ -310,14 +310,13 @@ static void accepted_close_is_any_thread_and_retires_the_handle(void) {
   MLN_TEST_INVALID_STATE(mln_runtime_get_event_mask(runtime, &mask, NULL));
 }
 
-static mln_resource_provider_decision pass_resource(
+static void pass_resource(
   void* context, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
   (void)context;
   (void)request;
-  (void)handle;
-  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+  mln_test_request_pass_through(handle);
 }
 
 static void disposal_release(void* user_data) {

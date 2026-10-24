@@ -17,14 +17,14 @@ public sealed class ResourceProviderTests
         new() { Status = ResourceResponseStatus.Ok, Bytes = [.. NativeFixture.EmptyStyle] };
 
     [Fact]
-    public async Task AProviderCanAnswerLaterThroughItsDecisionHandle()
+    public async Task AProviderCanAnswerLaterThroughItsHandle()
     {
         var received = new TaskCompletionSource<ResourceRequestHandle>(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
         await using var fixture = await NativeFixture.CreateAsync(provider: Holding(received));
         await fixture.Map.SetStyleUrlAsync(StyleUrl);
-        using var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
+        var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
 
         // Native rejects a malformed etag while the request stays open for another answer.
         Assert.Throws<MaplibreException>(() =>
@@ -32,10 +32,13 @@ public sealed class ResourceProviderTests
                 new ResourceResponse { Status = ResourceResponseStatus.Ok, Etag = "invalid\0etag" }
             )
         );
+        Assert.False(handle.IsClosed);
         handle.Complete(StyleResponse());
         await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
 
-        handle.Dispose();
+        // The answer consumed the handle, so a second answer fails.
+        Assert.True(handle.IsClosed);
+        Assert.Throws<MaplibreException>(() => handle.Complete(StyleResponse()));
     }
 
     // A request outside the routes passes through to native loading, which refuses the scheme.
@@ -76,10 +79,8 @@ public sealed class ResourceProviderTests
                                 ErrorReason = ResourceErrorReason.NotFound,
                             }
                     );
-                    handle.Dispose();
                     if (request.Kind == ResourceKind.Source)
                         sourceRequested.TrySetResult();
-                    return ResourceProviderDecision.Handle;
                 },
                 Routes = routes,
             }
@@ -98,8 +99,8 @@ public sealed class ResourceProviderTests
         );
     }
 
-    // A provider's exception is contained: native receives an unknown decision, and the exception goes
-    // to the CallbackException handlers.
+    // A provider's exception is contained: the binding releases the unanswered handle, which fails
+    // the request, and the exception goes to the CallbackException handlers.
     [Fact]
     public unsafe void AProviderExceptionIsContainedAndFailsTheRequest()
     {
@@ -146,10 +147,7 @@ public sealed class ResourceProviderTests
         Maplibre.CallbackException += record;
         try
         {
-            Assert.Equal(
-                uint.MaxValue,
-                native.callback(native.user_data, &request, SyntheticHandles.ResourceRequest(1))
-            );
+            native.callback(native.user_data, &request, SyntheticHandles.ResourceRequest(1));
         }
         finally
         {
@@ -167,6 +165,7 @@ public sealed class ResourceProviderTests
         Assert.Equal(new ResourceRange(0, 7), copied.Range);
         Assert.Equal([1, 2, 3], copied.PriorData);
         Assert.NotNull(escaped);
+        Assert.True(escaped.IsClosed);
     }
 
     [Fact]
@@ -185,12 +184,12 @@ public sealed class ResourceProviderTests
             () => Interlocked.Increment(ref calls)
         );
         Assert.False(cancelled);
-        handle.Complete(StyleResponse());
-        await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
         Assert.True(Gc.IsAlive(captured));
 
-        handle.Dispose();
+        // The answer consumes the handle, and the registration retires with it.
+        handle.Complete(StyleResponse());
         Assert.False(Gc.IsAlive(captured));
+        await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
         Assert.Equal(0, calls);
     }
 
@@ -234,7 +233,7 @@ public sealed class ResourceProviderTests
                     handle.SetCancelCallback(
                         new ResourceRequestCancelHandler(() => Interlocked.Increment(ref calls))
                     );
-                    return ResourceProviderDecision.PassThrough;
+                    handle.PassThrough();
                 },
             }
         );
@@ -244,19 +243,13 @@ public sealed class ResourceProviderTests
 
         Assert.NotNull(escaped);
         Assert.Equal(0, calls);
+        Assert.True(escaped.IsClosed);
         Assert.Throws<MaplibreException>(() => escaped.IsCancelled());
     }
 
     /// <summary>A provider that keeps each request to answer later.</summary>
     private static ResourceProvider Holding(TaskCompletionSource<ResourceRequestHandle> received) =>
-        new()
-        {
-            Callback = (_, handle) =>
-            {
-                received.TrySetResult(handle);
-                return ResourceProviderDecision.Handle;
-            },
-        };
+        new() { Callback = (_, handle) => received.TrySetResult(handle) };
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static (bool Cancelled, WeakReference Captured) RegisterCapturing(

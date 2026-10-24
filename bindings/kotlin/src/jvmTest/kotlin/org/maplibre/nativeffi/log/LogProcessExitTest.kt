@@ -19,7 +19,6 @@ import org.maplibre.nativeffi.libraryProperties
 import org.maplibre.nativeffi.runChildJvm
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.runtime.use
-import org.maplibre.nativeffi.setTestProvider
 import org.maplibre.nativeffi.smallMapOptions
 
 /**
@@ -62,7 +61,7 @@ object LogProcessExitProbe {
       // The runtime keeps its provider and wake, and the map a loaded style, as the process exits.
       runSuspendTest {
         val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
-        runtime.setTestProvider(denyingProvider()).await()
+        runtime.setResourceProvider(denyingProvider()).await()
         val (map, ready) = runtime.createMap(smallMapOptions())
         ready.await()
         liveHandles = listOf(runtime, map)

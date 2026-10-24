@@ -106,7 +106,7 @@ def denied_response() -> mln.ResourceResponse:
     )
 
 
-type Route = Callable[[mln.ResourceRequestInfo, mln.ResourceRequestHandle], object]
+type Route = Callable[[mln.ResourceRequestInfo, mln.ResourceRequestHandle], None]
 
 
 class Harness:
@@ -136,15 +136,12 @@ class Harness:
 
     def _provide(
         self, request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
-    ) -> mln.ResourceProviderDecision:
+    ) -> None:
         route = self.routes.get(request.requested_url or "")
         if route is not None:
-            decision = route(request, handle)
-            if decision is not None:
-                return decision
-            return mln.ResourceProviderDecision.HANDLE
+            route(request, handle)
+            return
         handle.complete(denied_response())
-        return mln.ResourceProviderDecision.HANDLE
 
     def create_map(self, **options: object) -> mln.MapHandle:
         map_handle = ready_map(

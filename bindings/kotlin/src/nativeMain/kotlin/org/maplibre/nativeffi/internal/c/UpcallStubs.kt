@@ -51,15 +51,6 @@ internal actual object UpcallStubs {
       )
     }
     .toLong()
-  actual val resourceProviderCallback: Long =
-    staticCFunction {
-      userData: COpaquePointer?,
-      request: CPointer<mln_resource_request_info>?,
-      handle: ULong ->
-      ThreadedUpcalls.resourceProviderCallback(userData.toLong(), request.toLong(), handle.toLong())
-        .toUInt()
-    }
-    .toLong()
   actual val customGeometrySourceOptionsFetchTile: Long =
     staticCFunction { userData: COpaquePointer?, tileId: CValue<mln_canonical_tile_id> ->
       tileId.useContents {
@@ -100,6 +91,14 @@ internal actual object UpcallStubs {
   actual val runtimeEventHandlerCallback: Long =
     staticCFunction { userData: COpaquePointer?, events: CPointer<mln_event_batch_view>? ->
       Upcalls.runtimeEventHandlerCallback(userData.toLong(), events.toLong())
+    }
+    .toLong()
+  actual val resourceProviderCallback: Long =
+    staticCFunction {
+      userData: COpaquePointer?,
+      request: CPointer<mln_resource_request_info>?,
+      handle: ULong ->
+      Upcalls.resourceProviderCallback(userData.toLong(), request.toLong(), handle.toLong())
     }
     .toLong()
   actual val resourceTransformCallback: Long =

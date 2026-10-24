@@ -60,7 +60,7 @@ public sealed unsafe partial class ResourceRequestHandle
     }
 
     /// <summary>
-    /// Completes a C API resource provider request.
+    /// Completes a C API resource provider request and consumes its handle.
     /// </summary>
     /// <remarks>
     /// See <c>mln_resource_request_complete</c> in the <see
@@ -68,10 +68,13 @@ public sealed unsafe partial class ResourceRequestHandle
     /// </remarks>
     public void Complete(ResourceResponse response)
     {
-        using var scope = new NativeCallScope(this);
-        var nativeResponse = NativeResourceResponse(response, scope);
-        Check(NativeMethods.mln_resource_request_complete(Handle, &nativeResponse, Diagnostic));
-        scope.Accept();
+        using var scope = new NativeCallScope();
+        var nativeResponse = scope.Value(NativeResourceResponse(response, scope));
+        state.Release(
+            (live, diagnostic) =>
+                NativeMethods.mln_resource_request_complete(live, nativeResponse, diagnostic),
+            idempotent: false
+        );
     }
 
     /// <summary>
@@ -91,7 +94,8 @@ public sealed unsafe partial class ResourceRequestHandle
     }
 
     /// <summary>
-    /// Hands an outstanding provider request to the built-in network loader.
+    /// Hands an outstanding provider request to the built-in network loader and
+    /// consumes its handle.
     /// </summary>
     /// <remarks>
     /// See <c>mln_resource_request_pass_through</c> in the <see
@@ -99,8 +103,11 @@ public sealed unsafe partial class ResourceRequestHandle
     /// </remarks>
     public void PassThrough()
     {
-        using var call = Enter(this);
-        Check(NativeMethods.mln_resource_request_pass_through(Handle, Diagnostic));
+        using var scope = new NativeCallScope();
+        state.Release(
+            (live, diagnostic) => NativeMethods.mln_resource_request_pass_through(live, diagnostic),
+            idempotent: false
+        );
     }
 
     /// <summary>

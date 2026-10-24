@@ -266,9 +266,6 @@ pub const MLN_RESOURCE_LOADING_METHOD_NETWORK_ONLY: mln_resource_loading_method 
 pub type mln_resource_priority = u32;
 pub const MLN_RESOURCE_PRIORITY_REGULAR: mln_resource_priority = 0;
 pub const MLN_RESOURCE_PRIORITY_LOW: mln_resource_priority = 1;
-pub type mln_resource_provider_decision = u32;
-pub const MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH: mln_resource_provider_decision = 0;
-pub const MLN_RESOURCE_PROVIDER_DECISION_HANDLE: mln_resource_provider_decision = 1;
 pub type mln_resource_request_field = u32;
 pub const MLN_RESOURCE_REQUEST_RANGE: mln_resource_request_field = 1;
 pub const MLN_RESOURCE_REQUEST_PRIOR_MODIFIED: mln_resource_request_field = 2;
@@ -1667,7 +1664,7 @@ pub type mln_resource_provider_callback = Option<
         user_data: *mut std::ffi::c_void,
         request: *const mln_resource_request_info,
         handle: mln_resource_request,
-    ) -> u32,
+    ),
 >;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

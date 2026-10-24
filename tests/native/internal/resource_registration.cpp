@@ -8,6 +8,7 @@
 #include "internal/support/resources.hpp"
 #include "resources/custom_resource_provider.hpp"
 #include "runtime/runtime.hpp"
+#include "support/resources.h"
 #include "support/test_support.h"
 
 namespace {
@@ -64,9 +65,9 @@ void rejected_provider_registration_queues_no_retirement() {
 
 void count_release(void* data) { ++*static_cast<int*>(data); }
 auto provider_callback(
-  void*, const mln_resource_request_info*, mln_resource_request
-) -> uint32_t {
-  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+  void*, const mln_resource_request_info*, mln_resource_request handle
+) -> void {
+  mln_test_request_pass_through(handle);
 }
 void transform_callback(
   void*, uint32_t, const char*, mln_resource_transform_request request
@@ -145,18 +146,15 @@ struct PersistentCopyFailure {
   mln_resource_provider_callback callback;
   void* data;
   std::optional<mln::native_tests::AllocationFaults> faults;
-  bool handled = false;
 };
 
 auto refuse_until_the_wrapper_returns(
   void* data, const mln_resource_request_info* request,
   mln_resource_request handle
-) -> uint32_t {
+) -> void {
   auto& probe = *static_cast<PersistentCopyFailure*>(data);
   probe.faults.emplace();
-  const auto decision = probe.callback(probe.data, request, handle);
-  probe.handled = decision == MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
-  return decision;
+  probe.callback(probe.data, request, handle);
 }
 
 void a_failed_provider_copy_delivers_with_persistent_allocation_failure() {
@@ -203,7 +201,6 @@ void a_failed_provider_copy_delivers_with_persistent_allocation_failure() {
   mln_test_destroy_runtime(runtime);
   mln_delivery_queue_release(queue);
   TEST_ASSERT_TRUE(reached);
-  TEST_ASSERT_TRUE(probe.handled);
   TEST_ASSERT_FALSE(passed_through);
   TEST_ASSERT_TRUE_MESSAGE(
     failed, "the failed copy left its request without a terminal response"
@@ -217,10 +214,7 @@ void a_queued_cancel_precedes_retirement_when_allocations_fail() {
     mln::Resource::style("custom://queued-cancel"), "custom://queued-cancel",
     [](
       void* data, const mln_resource_request_info*, mln_resource_request value
-    ) -> uint32_t {
-      *static_cast<mln_resource_request*>(data) = value;
-      return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
-    },
+    ) -> void { *static_cast<mln_resource_request*>(data) = value; },
     &handle, [](const mln::Response&) {},
     [](mln::FileSource::Callback) -> std::unique_ptr<mln::AsyncRequest> {
       return nullptr;
@@ -268,10 +262,7 @@ void pass_through_retry_starts_native_after_scheduling_failure() {
       "custom://pass-through-allocation",
       [](
         void* data, const mln_resource_request_info*, mln_resource_request value
-      ) -> uint32_t {
-        *static_cast<mln_resource_request*>(data) = value;
-        return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
-      },
+      ) -> void { *static_cast<mln_resource_request*>(data) = value; },
       &handle, [](const mln::Response&) {},
       [&](mln::FileSource::Callback) -> std::unique_ptr<mln::AsyncRequest> {
         ++starts;
@@ -307,10 +298,7 @@ void reserved_decisions_are_cancelled_with_the_native_request() {
       "custom://cancelled-decision",
       [](
         void* data, const mln_resource_request_info*, mln_resource_request value
-      ) -> uint32_t {
-        *static_cast<mln_resource_request*>(data) = value;
-        return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
-      },
+      ) -> void { *static_cast<mln_resource_request*>(data) = value; },
       &handle, [&](const mln::Response&) { ++callbacks; },
       [&](mln::FileSource::Callback) -> std::unique_ptr<mln::AsyncRequest> {
         ++starts;

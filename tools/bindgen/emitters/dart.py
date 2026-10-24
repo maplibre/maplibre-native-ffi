@@ -350,7 +350,7 @@ def lower_function(
         )
         return (
             owner,
-            f"  void {name}({', '.join(signature)}) => _state.close({closure('handle', body)});\n",
+            f"  void {name}({', '.join(signature)}) => _state.{'close' if plan.release else 'answer'}({closure('handle', body)});\n",
         )
     if not plan.completion:
         if not status_return and plan.result:

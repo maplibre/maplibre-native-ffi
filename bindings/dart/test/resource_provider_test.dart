@@ -1,6 +1,5 @@
 // Resource providers: routes that decide which requests reach the provider,
-// and queued requests that the binding hands over as transferable decision
-// handles.
+// and queued requests that the binding hands over as owned handles.
 import 'dart:async';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
@@ -38,7 +37,6 @@ void main() {
               ),
             ),
           );
-          handle.close();
           if (request.kind == ResourceKind.source) sourceRequested.complete();
         },
       ),
@@ -93,41 +91,25 @@ void main() {
     handle.complete(emptyStyleResponse);
     await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded);
 
-    // The request takes one answer, and the handle stays open until closed.
+    // The accepted answer consumed the handle, so closing it does nothing and
+    // native refuses a second answer or any other call on it.
+    expect(handle.isClosed, isTrue);
+    handle.close();
+    final isInvalidState = throwsA(
+      isA<MaplibreException>().having(
+        (error) => error.status,
+        'status',
+        Status.invalidState,
+      ),
+    );
     expect(
       () => handle.complete(
         ResourceResponse(status: ResourceResponseStatus.noContent),
       ),
-      throwsA(
-        isA<MaplibreException>().having(
-          (error) => error.status,
-          'status',
-          Status.invalidState,
-        ),
-      ),
+      isInvalidState,
     );
-    handle.close();
-    handle.close();
-    expect(
-      handle.isCancelled,
-      throwsA(
-        isA<MaplibreException>().having(
-          (error) => error.status,
-          'status',
-          Status.invalidState,
-        ),
-      ),
-    );
-    expect(
-      () => handle.complete(emptyStyleResponse),
-      throwsA(
-        isA<MaplibreException>().having(
-          (error) => error.status,
-          'status',
-          Status.invalidState,
-        ),
-      ),
-    );
+    expect(handle.passThrough, isInvalidState);
+    expect(handle.isCancelled, isInvalidState);
   });
 
   test(

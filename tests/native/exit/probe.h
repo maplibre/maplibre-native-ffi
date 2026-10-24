@@ -182,7 +182,7 @@ static inline void probe_write_points(void) {
 
 // Serves the style and its GeoJSON data, and fails every other request, from
 // inside the callback on the file source thread that asks.
-static inline uint32_t probe_provide(
+static inline void probe_provide(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
@@ -204,9 +204,9 @@ static inline uint32_t probe_provide(
     response.status = MLN_RESOURCE_RESPONSE_STATUS_ERROR;
     response.error_reason = MLN_RESOURCE_ERROR_REASON_NOT_FOUND;
   }
-  (void)mln_resource_request_complete(handle, &response, NULL);
-  mln_resource_request_release(handle);
-  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+  if (mln_resource_request_complete(handle, &response, NULL) != MLN_STATUS_OK) {
+    mln_resource_request_release(handle);
+  }
 }
 
 // Writes the probe's data and installs the process-global log callback,

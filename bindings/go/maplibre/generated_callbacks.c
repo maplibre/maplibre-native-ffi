@@ -107,15 +107,15 @@ mln_status binding_mln_http_header_transform_callback(
     (mln_http_header_transform_response*)out_response
   );
 }
-extern uint32_t mlnGo_mln_resource_provider_callback(
+extern void mlnGo_mln_resource_provider_callback(
   void* user_data, mln_resource_request_info* request,
   mln_resource_request handle
 );
-uint32_t binding_mln_resource_provider_callback(
+void binding_mln_resource_provider_callback(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
-  return mlnGo_mln_resource_provider_callback(
+  mlnGo_mln_resource_provider_callback(
     (void*)user_data, (mln_resource_request_info*)request, handle
   );
 }

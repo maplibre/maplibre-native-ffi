@@ -205,7 +205,6 @@ pub fn denying_provider() -> ResourceProvider {
         handle
             .complete(&response)
             .expect("the denial was not accepted");
-        ResourceProviderDecision::Handle
     })
 }
 
@@ -219,7 +218,6 @@ pub fn serving_provider(url: &'static str, body: &'static str) -> ResourceProvid
         handle
             .complete(&ok_response(body.as_bytes()))
             .expect("the response was not accepted");
-        ResourceProviderDecision::Handle
     })
 }
 

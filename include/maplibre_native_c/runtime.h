@@ -323,11 +323,6 @@ typedef enum mln_resource_error_reason : uint32_t {
   MLN_RESOURCE_ERROR_REASON_OTHER = 5,
 } mln_resource_error_reason;
 
-typedef enum mln_resource_provider_decision : uint32_t {
-  MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH = 0,
-  MLN_RESOURCE_PROVIDER_DECISION_HANDLE = 1,
-} mln_resource_provider_decision;
-
 /**
  * Reads MapLibre Native's process-global network status.
  *
@@ -940,48 +935,27 @@ typedef struct mln_resource_response {
 /**
  * Intercepts a network resource request.
  *
- * The callback runs synchronously on a MapLibre thread.
+ * The callback runs synchronously on a MapLibre thread. request and its
+ * pointed-to fields are borrowed for the callback. The callback owns handle
+ * and answers through it, inline or later from any thread: complete the
+ * request with mln_resource_request_complete(), hand it to the built-in network
+ * loader with mln_resource_request_pass_through(), or release it, which fails
+ * the request. Either answer consumes the handle when it returns
+ * MLN_STATUS_OK. A handle released during the callback fails the request once
+ * the callback returns.
  *
- * Request handling follows these rules:
+ * The callback must be thread-safe and return quickly. It may call the C API,
+ * but must not wait for runtime work that only its own thread can advance. The
+ * C API invokes release_user_data after the final callback returns.
  *
- * - request and its pointed-to fields are borrowed for the callback duration.
- * - MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH uses the built-in network
- *   loader.
- * - After returning PASS_THROUGH, the provider must not retain, complete, or
- *   release the handle.
- * - A request that the callback completes or passes through before returning
- *   is answered whatever the callback returns. The return value then decides
- *   only whether the provider still holds the handle.
- * - MLN_RESOURCE_PROVIDER_DECISION_HANDLE lets the provider complete the
- *   request through the handle inline or later.
- * - A callback that returns HANDLE may release the handle during the callback.
- *   A request released without a response fails once the callback returns.
- * - Unknown decision values produce a provider error response. The C API
- *   releases the provided handle and does not pass the request through.
- * - The C API copies completion data, and mln_resource_request_complete() may
- *   be called from any thread.
- * - Providers must release handled request handles after they no longer need to
- *   complete or observe cancellation.
- * - The callback must be thread-safe and return quickly. It may call the C API,
- *   but must not wait for runtime work that only its own thread can advance.
- * - The C API invokes release_user_data after the final callback returns.
- *
- * A provider in queue mode answers MLN_RESOURCE_PROVIDER_DECISION_HANDLE
- * without a callback and queues a copy of the request with its handle as an
- * mln_resource_request_delivery, for the host to complete later.
+ * A provider in queue mode queues a copy of the request with its handle as an
+ * mln_resource_request_delivery, for the host to answer later.
  */
-MLN_BINDING(
-  "enum=mln_resource_provider_decision;"
-  "failure=4294967295;"
-  "delivery=MLN_DELIVERY_TYPE_RESOURCE_REQUEST;"
-  "decision_handle=handle;"
-  "decision_accept=MLN_RESOURCE_PROVIDER_DECISION_HANDLE"
-)
-typedef uint32_t (*mln_resource_provider_callback)(
+MLN_BINDING("delivery=MLN_DELIVERY_TYPE_RESOURCE_REQUEST")
+typedef void (*mln_resource_provider_callback)(
   void* user_data, const mln_resource_request_info* request,
-  mln_resource_request handle
+  mln_resource_request handle MLN_BINDING("ownership=owned")
 );
-
 /**
  * Reports that MapLibre cancelled a C API resource provider request.
  *
@@ -1054,7 +1028,7 @@ typedef struct mln_resource_request_cancel_handler {
 typedef struct mln_resource_provider {
   uint32_t size;
   /**
-   * Decides each request that the routes leave to the provider.
+   * Answers each request that the routes leave to the provider.
    *
    * Required in callback mode; null in queue mode.
    */
@@ -1073,9 +1047,8 @@ typedef struct mln_resource_provider {
    */
   mln_user_data_release release_user_data;
   /**
-   * Optional. Queue delivery: native code answers each request
-   * MLN_RESOURCE_PROVIDER_DECISION_HANDLE and queues a copy of the request
-   * with its handle as an MLN_DELIVERY_TYPE_RESOURCE_REQUEST delivery carrying
+   * Optional. Queue delivery: native code queues a copy of each request with
+   * its handle as an MLN_DELIVERY_TYPE_RESOURCE_REQUEST delivery carrying
    * user_data. A request the queue refuses, because the queue was released or
    * the copy could not be allocated, fails without native loading, except
    * during process exit, which passes it through. After replacement, clear, or
@@ -1190,56 +1163,61 @@ MLN_API mln_status mln_runtime_clear_resource_provider(
 ) MLN_NOEXCEPT;
 
 /**
- * Completes a C API resource provider request.
+ * Completes a C API resource provider request and consumes its handle.
  *
  * This function may be called inline from the provider callback or later from
  * any thread. The C API copies all response bytes and strings before returning.
  *
- * Completion is one-shot. A second completion, completion after cancellation,
- * or completion with null arguments returns a non-OK status and does not invoke
- * MapLibre's resource callback. Malformed response contents are converted to
- * provider error responses and still consume the completion. Invalid string
- * views are rejected before the completion is consumed.
+ * MLN_STATUS_OK consumes the handle, as mln_resource_request_release() would,
+ * so the caller does not release it; a request's cancel registration retires
+ * with it. Any other status leaves the handle with the caller, who releases it
+ * or answers again. Completion after cancellation or with null arguments does
+ * not invoke MapLibre's resource callback. Malformed response contents are
+ * converted to provider error responses and still complete the request.
+ * Invalid string views are rejected before the request is completed.
  *
  * Returns:
  * - MLN_STATUS_OK when the response was accepted for asynchronous delivery.
  * - MLN_STATUS_INVALID_ARGUMENT when handle is an invalid handle, response is
  *   null, or a response string has null data with a nonzero size or embedded
- * NUL.
- * - MLN_STATUS_INVALID_STATE when handle has been released, or the request was
- *   cancelled, already completed, passed through, or can no longer accept a
- * response.
+ *   NUL.
+ * - MLN_STATUS_INVALID_STATE when handle has been released or consumed, or the
+ *   request was cancelled or can no longer accept a response.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
+MLN_BINDING("consumes=success")
 MLN_API mln_status mln_resource_request_complete(
   mln_resource_request handle, const mln_resource_response* response,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
- * Hands an outstanding provider request to the built-in network loader.
+ * Hands an outstanding provider request to the built-in network loader and
+ * consumes its handle.
  *
- * Call from any thread, inline in a callback that returns HANDLE or after that
- * callback returns, or after taking a queued request. Native loading starts on
- * the requesting MapLibre thread and applies the current native transforms.
- * The request bypasses the provider when it resumes.
+ * This is how a provider declines a request. Call from any thread, inline in
+ * the provider callback or after it returns, or after taking a queued request.
+ * Native loading starts on the requesting MapLibre thread and applies the
+ * current native transforms. The request bypasses the provider when it
+ * resumes.
  *
- * Passing through is one-shot and shares the terminal decision with completion.
- * Completion, cancellation, release, and pass-through are serialized: only an
- * outstanding request can pass through. Cancellation that wins first returns
- * MLN_STATUS_INVALID_STATE; cancellation after acceptance cancels native
- * loading as usual. The provider's cancel callback no longer runs after
- * acceptance. The host still releases its handle, which retires any cancel
- * registration; releasing it after pass-through does not cancel native loading.
+ * MLN_STATUS_OK consumes the handle, as mln_resource_request_release() would,
+ * without cancelling native loading; the request's cancel registration retires
+ * with it, and its cancel callback never runs. Any other status leaves the
+ * handle with the caller. Completion, cancellation, release, and pass-through
+ * are serialized: only an outstanding request can pass through. Cancellation
+ * that wins first returns MLN_STATUS_INVALID_STATE; cancellation after
+ * acceptance cancels native loading as usual.
  *
  * Returns:
  * - MLN_STATUS_OK when native loading was scheduled.
  * - MLN_STATUS_INVALID_ARGUMENT when handle is invalid.
- * - MLN_STATUS_INVALID_STATE when the request is cancelled, released,
- * completed, or already passed through.
+ * - MLN_STATUS_INVALID_STATE when handle has been released or consumed, or the
+ *   request was cancelled.
  * - MLN_STATUS_NATIVE_ERROR when scheduling fails; the request stays
- * outstanding.
+ *   outstanding.
  */
+MLN_BINDING("consumes=success")
 MLN_API mln_status mln_resource_request_pass_through(
   mln_resource_request handle, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -1249,8 +1227,7 @@ MLN_API mln_status mln_resource_request_pass_through(
  *
  * This function may be called from any thread while the provider still owns the
  * handle. A cancelled request no longer wants a response; later completion is
- * ignored with MLN_STATUS_INVALID_STATE. A request the provider already
- * completed is never reported as cancelled, even after MapLibre discards it.
+ * ignored with MLN_STATUS_INVALID_STATE, and the provider releases the handle.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -1302,14 +1279,13 @@ MLN_API mln_status mln_resource_request_set_cancel_callback(
 ) MLN_NOEXCEPT;
 
 /**
- * Releases the provider's reference to a resource request handle.
+ * Releases the provider's resource request handle without answering it.
  *
- * Release the handle exactly once after completing the request or deciding not
- * to complete it. A provider callback that returns
- * MLN_RESOURCE_PROVIDER_DECISION_HANDLE may release the handle inline.
- * Releasing a handled request that is neither completed nor cancelled fails it
+ * Release a handle that mln_resource_request_complete() and
+ * mln_resource_request_pass_through() did not consume, such as one whose
+ * request was cancelled. Releasing a request that is not cancelled fails it
  * with an MLN_RESOURCE_ERROR_REASON_OTHER error, which reaches the map
- * asynchronously.
+ * asynchronously; the provider callback may release its handle inline.
  * A request handle is not a child of its runtime, whether the provider still
  * holds it or its failure is still queued, so it never makes
  * mln_runtime_release() or mln_map_release() return MLN_STATUS_INVALID_STATE.

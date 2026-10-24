@@ -19,7 +19,6 @@ await runtime.SetResourceProviderAsync(
         {
             request.SetCancelCallback(new ResourceRequestCancelHandler(() => { }));
             held.TrySetResult(request);
-            return ResourceProviderDecision.Handle;
         },
     }
 );

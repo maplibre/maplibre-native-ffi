@@ -572,7 +572,9 @@ def lower_function(
         if lowered.shape == "run":
             lowered.shape = "close_async"
         elif lowered.shape == "call" and lowered.returns == "void":
-            lowered.shape = "close"
+            # An answer that consumes its receiver is no release, so no
+            # disposer runs it and a repeated one reaches native.
+            lowered.shape = "close" if plan.release else "answer"
         else:
             raise Unsupported("consumption requires an owned receiver without outputs")
     if completion and lowered.shape != "attach":

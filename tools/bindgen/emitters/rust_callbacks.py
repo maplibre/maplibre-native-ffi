@@ -1,4 +1,4 @@
-"""Retained callback descriptors, scoped responses, and decision handles."""
+"""Retained callback descriptors and scoped responses."""
 
 from .rust import Unsupported, doc, identifier, native_call, native_identifier
 from .rust_dynamic_values import decode, encode, optional
@@ -190,8 +190,6 @@ def declaration(values, value):
             f"{public}_trampoline",
             f"callback::require(&state.{public})?",
         )
-        if callback.decision:
-            code = decision_trampoline(values, callback, f"{public}_trampoline", public)
         trampolines.append(code)
         returns = "" if output == "()" else f" -> {output}"
         function = f"Fn({signature}){returns} + Send + Sync + 'static"
@@ -298,45 +296,6 @@ def declaration(values, value):
             else ""
         )
     )
-
-
-def decision_trampoline(values, callback, name, public):
-    """A provider trampoline, which turns the host's decision into ownership of
-    the request handle it was given."""
-    decision = callback.decision
-    locals_by_name = {
-        parameter.name: identifier(parameter.name) for parameter in callback.parameters
-    }
-    arguments = callback.arguments
-    raw_arguments = ", ".join(
-        f"{locals_by_name[p.name]}: {native_type(values, p.value.ctype)}"
-        for p in callback.parameters
-    )
-    raw = native_type(values, callback.result.ctype)
-    owner = values.public(
-        next(p.value for p in arguments if p.name == decision.parameter)
-    )
-    copies = ", ".join(
-        "decision_handle"
-        if p.name == decision.parameter
-        else callback_parameter_capture(values, p, locals_by_name[p.name])
-        for p in arguments
-    )
-    failure = (
-        f"sys::{callback.failure}"
-        if callback.failure.startswith("MLN_")
-        else callback.failure
-    )
-    return f"""unsafe extern "C" fn {name}({raw_arguments}) -> {raw} {{
-    let _scope = maplibre_core::callback::CallbackScope::enter();
-    let Ok(decision_handle) = {owner}::adopt({locals_by_name[decision.parameter]}, None) else {{ return {failure}; }};
-    let request_state = std::sync::Arc::clone(&decision_handle.inner);
-    // SAFETY: native keeps the registration alive throughout this callback.
-    let state = unsafe {{ callback::state::<Self>({locals_by_name[callback.context]}) }};
-    let decision = callback::invoke("{callback.native}", {failure}, || Ok(callback::require(&state.{public})?({copies}).as_raw()));
-    if decision != sys::{decision.accept} {{ request_state.hand_off(); }}
-    decision
-}}"""
 
 
 def response(value):

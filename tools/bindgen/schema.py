@@ -56,6 +56,7 @@ ANNOTATION_VALUES = {
     "synchronous": frozenset({"true"}),
     "capture": frozenset({"manual"}),
     "blocks": frozenset({"thread_start"}),
+    "consumes": frozenset({"success"}),
 }
 
 # The same semantic vocabulary applies to all target languages. A field's
@@ -73,6 +74,7 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "view_owner",
         "enum",
         "blocks",
+        "consumes",
     }
 )
 PARAMETER_KEYS = COMMON_KEYS | frozenset(
@@ -108,8 +110,6 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "enum",
         "borrowed_owner",
         "abandon",
-        "decision_handle",
-        "decision_accept",
         "delivery",
         "queue_result",
         "synchronous",
@@ -1072,36 +1072,6 @@ def validate(api: Api) -> None:
             errors.append(
                 f"{context}: a synchronous callback cannot be delivered through a queue"
             )
-        decision_keys = {"decision_handle", "decision_accept"}
-        if decision_keys & typedef.metadata.keys():
-            if not decision_keys <= typedef.metadata.keys():
-                errors.append(
-                    f"{context}: decision requires a handle and an accepted outcome"
-                )
-                continue
-            parameter = next(
-                (
-                    p
-                    for p in typedef.parameters
-                    if p.name == typedef.metadata["decision_handle"]
-                ),
-                None,
-            )
-            handle = (
-                api.typedefs_by_name.get(parameter.type.declaration or "")
-                if parameter
-                else None
-            )
-            if handle is None or handle.metadata.get("kind") != "handle":
-                errors.append(
-                    f"{context}: decision_handle requires a callback handle parameter"
-                )
-            if enum_constants.get(typedef.metadata["decision_accept"], (None,))[
-                0
-            ] != typedef.metadata.get("enum"):
-                errors.append(
-                    f"{context}: decision_accept must name a value of the callback enum"
-                )
     for enum in api.enums:
         errors.extend(
             metadata_errors(
@@ -1281,7 +1251,7 @@ FUNCTION_REFERENCES = {
 }
 PARAMETER_REFERENCES = {
     "function": ("view_owner", "accepted_unless"),
-    "typedef": ("decision_handle", "borrowed_owner"),
+    "typedef": ("borrowed_owner",),
 }
 
 
@@ -1460,9 +1430,8 @@ def queue_result_errors(typedef, enum_constants, context: str) -> list[str]:
     """Check the result that native answers for a callback in queue mode.
 
     A queue-mode registration answers each call without its callback. A
-    decision callback answers its accepted outcome; any other delivered
-    callback with a result names the answer in `queue_result=`, which a host
-    that serves the queue form through a callback returns.
+    delivered callback with a result names the answer in `queue_result=`, which
+    a host that serves the queue form through a callback returns.
     """
     metadata = typedef.metadata
     signature = typedef.type.pointee
@@ -1473,7 +1442,7 @@ def queue_result_errors(typedef, enum_constants, context: str) -> list[str]:
         and signature.result.kind != "void"
         and not is_status(signature.result)
     )
-    needed = returns and "delivery" in metadata and "decision_accept" not in metadata
+    needed = returns and "delivery" in metadata
     if "queue_result" not in metadata:
         return (
             [f"{context}: a delivered callback with a result declares its queue_result"]
@@ -1482,10 +1451,7 @@ def queue_result_errors(typedef, enum_constants, context: str) -> list[str]:
         )
     if not needed:
         return [
-            (
-                f"{context}: queue_result requires a delivered callback with a "
-                "result and no decision"
-            )
+            (f"{context}: queue_result requires a delivered callback with a result")
         ]
     return callback_result_errors(
         typedef, metadata["queue_result"], "queue_result", enum_constants, context

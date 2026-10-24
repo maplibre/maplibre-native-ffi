@@ -573,11 +573,6 @@ class ResourcePriority(UnknownIntEnum):
     LOW = 1
 
 
-class ResourceProviderDecision(UnknownIntEnum):
-    PASS_THROUGH = 0
-    HANDLE = 1
-
-
 class ResourceResponseStatus(UnknownIntEnum):
     """How a resource provider answered a request.
 
@@ -3212,10 +3207,7 @@ class ResourceProvider:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    callback: (
-        Callable[[ResourceRequestInfo, ResourceRequestHandle], ResourceProviderDecision]
-        | None
-    ) = None
+    callback: Callable[[ResourceRequestInfo, ResourceRequestHandle], None] | None = None
     routes: Sequence[ResourceRoute] = ()
     """The requests that reach the provider; empty to claim every request."""
 
@@ -3225,10 +3217,12 @@ class ResourceProvider:
     def _invoke_callback(self, request, handle):
         callback = self.callback
         assert callback is not None
-        return callback(
-            ResourceRequestInfo._from_native(request),
-            _wrap_response(handle, "ResourceRequestHandle"),
-        )
+        handle = _wrap_response(handle, "ResourceRequestHandle")
+        try:
+            return callback(ResourceRequestInfo._from_native(request), handle)
+        except BaseException:
+            handle.close()
+            raise
 
 
 @dataclass(frozen=True, slots=True)

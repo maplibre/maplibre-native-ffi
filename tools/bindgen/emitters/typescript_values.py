@@ -396,10 +396,8 @@ class Values:
 
     def delivered_owner(self, callback, parameter) -> bool:
         """Whether a delivered argument is a handle that the host takes from
-        the batch: a decision handle, or one the callback owns."""
-        return bool(
-            callback.decision and parameter.name == callback.decision.parameter
-        ) or (parameter.value.kind == "handle" and parameter.value.ownership == "owned")
+        the batch: one the callback owns."""
+        return parameter.value.kind == "handle" and parameter.value.ownership == "owned"
 
     def delivered_handle(self, parameter):
         return parameter.value.handle or self.bound.handles[parameter.value.native]

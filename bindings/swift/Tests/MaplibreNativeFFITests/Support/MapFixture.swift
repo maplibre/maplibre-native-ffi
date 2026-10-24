@@ -17,20 +17,14 @@ let redStyle = Data(##"""
 func denyingProvider(routes: [String: Data] = [:]) -> ResourceProvider {
   ResourceProvider { request, handle in
     let url = request.requestedUrl ?? ""
-    if let bytes = routes[url] {
-      try handle.complete(response: ResourceResponse(
-        status: .ok,
-        bytes: bytes
-      ))
-    } else {
-      try handle.complete(response: ResourceResponse(
+    let response = routes[url].map { ResourceResponse(status: .ok, bytes: $0) }
+      ?? ResourceResponse(
         status: .error,
         errorReason: .notFound,
         errorMessage: "the test fixture serves no \(url)"
-      ))
-    }
-    handle.close()
-    return .handle
+      )
+    // A request that native cancelled first refuses the answer.
+    do { try handle.complete(response: response) } catch { handle.close() }
   }
 }
 

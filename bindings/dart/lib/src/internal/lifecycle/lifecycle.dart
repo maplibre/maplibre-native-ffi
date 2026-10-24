@@ -64,7 +64,14 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   /// Releases the native handle once native accepts [destroy].
   void close(int Function(H) destroy) {
     if (_closed) return;
-    checkNativeCall(destroy(_handle));
+    answer(destroy);
+  }
+
+  /// Runs [answer], which native consumes the handle with when it accepts the
+  /// call. A repeated answer still reaches native, which reports the handle
+  /// stale, where a second [close] does nothing.
+  void answer(int Function(H) answer) {
+    checkNativeCall(answer(_handle));
     _closed = true;
     _detachOwnerFinalizer();
   }

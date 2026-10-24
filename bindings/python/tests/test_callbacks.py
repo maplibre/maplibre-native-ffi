@@ -205,12 +205,12 @@ def test_a_provider_can_answer_a_request_later_from_another_thread(
     answer.join(TIMEOUT)
     assert not answer.is_alive()
     harness.wait_event(mln.RuntimeEventType.MAP_STYLE_LOADED)
-
+    # The answer consumed the handle, so a second answer fails.
+    assert handle.is_closed
     with pytest.raises(
         mln.MaplibreError, check=lambda error: error.status == mln.Status.INVALID_STATE
     ):
         handle.complete(ok_response())
-    handle.close()
 
 
 def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
@@ -248,9 +248,9 @@ def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
 
     def pass_through(
         request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
-    ) -> mln.ResourceProviderDecision:
+    ) -> None:
         passed_through.append(handle)
-        return mln.ResourceProviderDecision.PASS_THROUGH
+        handle.pass_through()
 
     harness.routes[style] = pass_through
     result(
@@ -267,12 +267,9 @@ def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
         "response belongs to its callback thread",
         "response callback has returned",
     ]
-    # A request handle passed through with its callback closes with it.
+    # Passing a request through consumed its handle.
     assert len(passed_through) == 1
-    with pytest.raises(
-        mln.MaplibreError, check=lambda error: error.status == mln.Status.INVALID_STATE
-    ):
-        passed_through[0].complete(ok_response())
+    assert passed_through[0].is_closed
 
 
 def test_a_transform_request_is_answered_from_another_thread_after_its_callback(
@@ -293,9 +290,7 @@ def test_a_transform_request_is_answered_from_another_thread_after_its_callback(
 
     # The provider passes the style through to the online source, which waits
     # for the transform's answer.
-    harness.routes[style] = lambda request, handle: (
-        mln.ResourceProviderDecision.PASS_THROUGH
-    )
+    harness.routes[style] = lambda request, handle: handle.pass_through()
     result(
         harness.runtime.set_resource_transform(
             mln.ResourceTransform(callback=transform)
@@ -408,7 +403,7 @@ def test_a_providers_routes_decide_which_requests_reach_it(
 
     def provide(
         request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
-    ) -> mln.ResourceProviderDecision:
+    ) -> None:
         seen.append((request.kind, request.requested_url))
         if request.kind == mln.ResourceKind.STYLE:
             handle.complete(ok_response(routed_style))
@@ -416,7 +411,6 @@ def test_a_providers_routes_decide_which_requests_reach_it(
             handle.complete(denied_response())
         if sprites <= {kind for kind, _ in seen}:
             sprites_seen.set()
-        return mln.ResourceProviderDecision.HANDLE
 
     routes = [
         # Another kind: claims no style or sprite, whatever its URL.

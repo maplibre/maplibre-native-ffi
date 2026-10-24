@@ -59,9 +59,12 @@ public sealed class ResourceTransformTests
             provider: new ResourceProvider
             {
                 Callback = (request, handle) =>
-                    request.RequestedUrl == styleUrl
-                        ? ResourceProviderDecision.PassThrough
-                        : deny(request, handle),
+                {
+                    if (request.RequestedUrl == styleUrl)
+                        handle.PassThrough();
+                    else
+                        deny(request, handle);
+                },
             }
         );
         await fixture.Runtime.SetResourceTransformAsync(

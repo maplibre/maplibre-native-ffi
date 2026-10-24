@@ -292,7 +292,6 @@ unsafe extern "C" fn generated_callback_mln_camera_transition_handler_callback(
             Ok(())
         },
     );
-
     outcome
 }
 
@@ -341,7 +340,6 @@ unsafe extern "C" fn generated_callback_mln_custom_geometry_source_options_fetch
             Ok(())
         },
     );
-
     outcome
 }
 
@@ -361,7 +359,6 @@ unsafe extern "C" fn generated_callback_mln_custom_geometry_source_options_cance
             Ok(())
         },
     );
-
     outcome
 }
 
@@ -445,7 +442,6 @@ unsafe extern "C" fn generated_callback_mln_custom_mvt_vector_source_options_fet
             Ok(())
         },
     );
-
     outcome
 }
 
@@ -465,7 +461,6 @@ unsafe extern "C" fn generated_callback_mln_custom_mvt_vector_source_options_can
             Ok(())
         },
     );
-
     outcome
 }
 
@@ -737,7 +732,6 @@ unsafe extern "C" fn generated_callback_mln_http_header_transform_callback(
             }
         },
     );
-
     outcome
 }
 
@@ -812,7 +806,6 @@ unsafe extern "C" fn generated_callback_mln_log_handler_callback(
             }
         },
     );
-
     outcome
 }
 
@@ -1421,7 +1414,6 @@ unsafe extern "C" fn generated_callback_mln_queue_lock_lock(user_data: *mut std:
             Ok(())
         },
     );
-
     outcome
 }
 
@@ -1436,7 +1428,6 @@ unsafe extern "C" fn generated_callback_mln_queue_lock_unlock(user_data: *mut st
             Ok(())
         },
     );
-
     outcome
 }
 
@@ -1644,25 +1635,22 @@ unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
     user_data: *mut std::ffi::c_void,
     request: *const sys::mln_resource_request_info,
     handle: sys::mln_resource_request,
-) -> sys::mln_resource_provider_decision {
-    let _scope = maplibre_core::callback::CallbackScope::enter();
-    let mut decision_state = None;
-
+) {
+    let handle_adopted = std::cell::Cell::new(false);
     let outcome = generated_invoke(
-        || 4294967295,
+        || {
+            if !handle_adopted.get() {
+                unsafe { sys::mln_resource_request_release(handle) };
+            }
+        },
         |py| {
-            let decision_owner = unsafe { ResourceRequestHandle::adopt(py, handle, Vec::new()) }?;
-            decision_state = Some(Arc::clone(
-                &decision_owner
-                    .cast_bound::<ResourceRequestHandle>(py)
-                    .unwrap()
-                    .borrow()
-                    .state,
-            ));
+            let handle_owner = unsafe { ResourceRequestHandle::adopt(py, handle, Vec::new()) };
+            handle_adopted.set(true);
+            let handle_owner = handle_owner?;
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
-                return Ok(4294967295);
+                return Ok(());
             };
-            let result = callback.bind(py).call1((
+            let _result = callback.bind(py).call1((
                 {
                     if request.is_null() {
                         return Err(native_error("null record pointer"));
@@ -1672,20 +1660,11 @@ unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
                         generated_copy_mln_resource_request_info(py, &referenced)?
                     }
                 },
-                decision_owner.clone_ref(py),
+                handle_owner,
             ))?;
-            result.extract::<u32>()
+            Ok(())
         },
     );
-    if outcome != sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE {
-        if let Some(state) = decision_state {
-            state
-                .lock()
-                .unwrap_or_else(|p| p.into_inner())
-                .handle
-                .hand_off();
-        }
-    }
     outcome
 }
 
@@ -1713,7 +1692,6 @@ unsafe extern "C" fn generated_callback_mln_resource_request_cancel_handler_call
             Ok(())
         },
     );
-
     outcome
 }
 
@@ -1806,7 +1784,6 @@ unsafe extern "C" fn generated_callback_mln_resource_transform_callback(
             Ok(())
         },
     );
-
     outcome
 }
 
@@ -1900,7 +1877,6 @@ unsafe extern "C" fn generated_callback_mln_runtime_event_handler_callback(
             Ok(())
         },
     );
-
     outcome
 }
 
@@ -2630,7 +2606,6 @@ unsafe extern "C" fn generated_callback_mln_wake_callback(user_data: *mut std::f
             Ok(())
         },
     );
-
     outcome
 }
 
@@ -9145,12 +9120,16 @@ impl ResourceRequestHandle {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let response_value = generated_input_mln_resource_response(&response.clone(), storage)?;
-        let handle = self.input();
+        let Some(mut reservation) = self.reserve(false)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
         unsafe {
             call.status(|diagnostic| {
                 sys::mln_resource_request_complete(handle, &response_value, diagnostic)
             })
         }?;
+        reservation.commit();
         Ok(py.None())
     }
     #[pyo3(signature = ())]
@@ -9168,10 +9147,14 @@ impl ResourceRequestHandle {
     #[pyo3(signature = ())]
     fn pass_through(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
-        let handle = self.input();
+        let Some(mut reservation) = self.reserve(false)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
         unsafe {
             call.status(|diagnostic| sys::mln_resource_request_pass_through(handle, diagnostic))
         }?;
+        reservation.commit();
         Ok(py.None())
     }
     #[pyo3(signature = ())]

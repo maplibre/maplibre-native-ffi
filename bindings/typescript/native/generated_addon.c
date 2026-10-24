@@ -5640,23 +5640,25 @@ static napi_value mln_ts_export_mln_resource_request_complete(
   mln_resource_response arg_response;
   mln_diagnostic diagnostic;
   mln_status status;
-  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  if (!mln_ts_begin(call, env, info, 3)) return NULL;
   {
     uint64_t number = 0;
     if (!mln_ts_read_u64(call, call->argv[0], &number, "handle")) goto done;
     arg_handle = (mln_resource_request)number;
   }
+  if (!mln_ts_read_owner(call, call->argv[1])) goto done;
   memset(&arg_response, 0, sizeof arg_response);
   arg_response.size = sizeof arg_response;
-  if (!mln_ts_read_record(call, call->argv[1], "response")) goto done;
+  if (!mln_ts_read_record(call, call->argv[2], "response")) goto done;
   if (!mln_ts_write_resource_response(
-        call, call->argv[1], &arg_response, "response"
+        call, call->argv[2], &arg_response, "response"
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status =
     mln_resource_request_complete(arg_handle, &arg_response, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_consume(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5697,15 +5699,17 @@ static napi_value mln_ts_export_mln_resource_request_pass_through(
   mln_resource_request arg_handle = 0;
   mln_diagnostic diagnostic;
   mln_status status;
-  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
   {
     uint64_t number = 0;
     if (!mln_ts_read_u64(call, call->argv[0], &number, "handle")) goto done;
     arg_handle = (mln_resource_request)number;
   }
+  if (!mln_ts_read_owner(call, call->argv[1])) goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_resource_request_pass_through(arg_handle, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_consume(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);

@@ -867,7 +867,6 @@ static void a_download_completes_from_provider_served_resources(void) {
     .byte_count = sizeof(offline_style_json) - 1,
   };
   MLN_TEST_OK(mln_resource_request_complete(refetch->handle, &style, NULL));
-  mln_resource_request_release(refetch->handle);
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, after));
 
   mln_test_destroy_map(after);

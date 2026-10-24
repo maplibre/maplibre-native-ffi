@@ -288,6 +288,18 @@ internal fun nativeClose(owner: Any, state: HandleState, body: NativeCall.() -> 
   }
 }
 
+/**
+ * Runs a call that answers [state]'s handle, which native consumes when it accepts the call. A
+ * consumed handle reaches native, which reports it, where a repeated [nativeClose] does nothing.
+ */
+internal fun nativeAnswer(owner: Any, state: HandleState, body: NativeCall.() -> Unit) {
+  try {
+    state.release { NativeCall(state.handle).use { it.body() } }
+  } finally {
+    bindingKeepAlive(owner)
+  }
+}
+
 /** Starts [state]'s asynchronous release, whose completion keeps [owner] reachable. */
 internal fun nativeRetire(
   owner: Any,

@@ -22,9 +22,9 @@ fn a_registration_is_rooted_while_native_holds_it_and_a_rejected_one_is_released
     wait_for(
         fixture
             .runtime()
-            .set_resource_provider(ResourceProvider::new(move |_, _| {
+            .set_resource_provider(ResourceProvider::new(move |_, handle| {
                 let _ = &probe;
-                ResourceProviderDecision::PassThrough
+                handle.pass_through().unwrap();
             })),
     );
     assert!(released.try_recv().is_err());
@@ -113,9 +113,9 @@ fn a_registered_callback_does_not_keep_its_runtime_alive() {
     let (probe, released) = release_probe();
     let runtime = runtime_create(&RuntimeOptions::default()).unwrap();
     wait_for(
-        runtime.set_resource_provider(ResourceProvider::new(move |_, _| {
+        runtime.set_resource_provider(ResourceProvider::new(move |_, handle| {
             let _ = &probe;
-            ResourceProviderDecision::PassThrough
+            handle.pass_through().unwrap();
         })),
     );
 
@@ -148,8 +148,8 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
             })),
     );
 
-    // The binding catches the panic at the callback boundary, and native
-    // fails the request it got no decision for.
+    // The binding catches the panic at the callback boundary and releases the
+    // request it adopted, which fails it.
     fixture
         .map()
         .discarding()
@@ -166,7 +166,7 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
             .runtime()
             .set_resource_provider(ResourceProvider::new(move |request, handle| {
                 if request.requested_url.as_deref() == Some("custom://transformed.json") {
-                    return ResourceProviderDecision::PassThrough;
+                    return handle.pass_through().unwrap();
                 }
                 deny(request, handle)
             })),
@@ -246,7 +246,6 @@ fn a_provider_hands_its_request_to_another_thread_and_answers_later() {
                     return deny(request, handle);
                 }
                 sender.lock().unwrap().send(handle).unwrap();
-                ResourceProviderDecision::Handle
             })),
     );
 
@@ -261,7 +260,13 @@ fn a_provider_hands_its_request_to_another_thread_and_answers_later() {
         handle
             .complete(&ok_response(BACKGROUND_STYLE_JSON))
             .unwrap();
-        handle.release().unwrap();
+        // The accepted completion consumed the handle, so native refuses a
+        // second one.
+        assert!(handle.is_closed());
+        let error = handle
+            .complete(&ok_response(BACKGROUND_STYLE_JSON))
+            .unwrap_err();
+        assert_eq!(error.status(), Status::InvalidState);
     })
     .join()
     .unwrap();
@@ -334,7 +339,6 @@ fn a_provider_receives_only_the_requests_its_routes_match() {
             };
             handle.complete(&ok_response(body)).unwrap();
             sender.lock().unwrap().send((request.kind, url)).unwrap();
-            ResourceProviderDecision::Handle
         })
     };
     wait_for(fixture.runtime().set_resource_provider(provider));
@@ -412,7 +416,6 @@ fn registering_for_an_already_cancelled_request_reports_it_and_roots_nothing() {
                     return deny(request, handle);
                 }
                 sender.lock().unwrap().send(handle).unwrap();
-                ResourceProviderDecision::Handle
             })),
     );
     fixture

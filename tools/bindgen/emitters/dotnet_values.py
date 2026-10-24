@@ -880,39 +880,6 @@ class Values:
                 f"{self.raw_type(parameter.value)} {member(parameter.name)}"
                 for parameter in callback.parameters
             )
-            if callback.decision:
-                decision = callback.decision
-                input_handle = next(
-                    parameter
-                    for parameter in callback.parameters
-                    if parameter.name == decision.parameter
-                )
-                owner = self.public_type(input_handle.value)
-                converted = ", ".join(
-                    "owned"
-                    if parameter.name == decision.parameter
-                    else self.copy(parameter.value, member(parameter.name))
-                    for parameter in callback.arguments
-                )
-                accept = self.constant(decision.accept)
-                raw = self.raw_type(callback.result)
-                failure = (
-                    self.constant(callback.failure)
-                    if callback.failure.startswith("MLN_")
-                    else callback.failure
-                )
-                methods.append(
-                    "    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]\n"
-                    f"    private static {raw} Invoke{public_name(plan.native)}{pascal(name)}({args})\n    {{\n"
-                    f"        {owner}? owned = null;\n        try\n        {{\n"
-                    f"            owned = {owner}.Adopt({member(decision.parameter)});\n"
-                    f"{restriction}"
-                    f"            var decision = (({public_name(plan.native)})NativeCallbackRoot.Value({member(callback.context)})).{pascal(name)}?.Invoke({converted}) ?? ({self.public_type(callback.result)}){failure};\n"
-                    f"            if (decision != ({self.public_type(callback.result)}){accept}) ((INativeOwner<{self.raw_type(input_handle.value)}>)owned).State.HandOff();\n"
-                    f"            return ({raw})decision;\n"
-                    f'        }}\n        catch (Exception error) {{ NativeCallbackFailure.Report("{callback.native}", error); if (owned is not null) ((INativeOwner<{self.raw_type(input_handle.value)}>)owned).State.HandOff(); return unchecked(({raw})({failure})); }}\n    }}\n'
-                )
-                continue
             responses = [
                 parameter
                 for parameter in callback.parameters

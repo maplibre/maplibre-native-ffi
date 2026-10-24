@@ -10,6 +10,7 @@
 
 #include "env.h"
 #include "render.h"
+#include "resources.h"
 #include "status.h"
 #include "unity.h"
 #include "wait.h"
@@ -287,7 +288,7 @@ typedef struct served_routes {
   size_t count;
 } served_routes;
 
-static uint32_t serve_route(
+static void serve_route(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
@@ -316,9 +317,7 @@ static uint32_t serve_route(
     atomic_fetch_add(&route->requests, 1);
   }
   mln_test_pulse();
-  (void)mln_resource_request_complete(handle, &response, NULL);
-  mln_resource_request_release(handle);
-  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+  mln_test_request_answer(handle, &response);
 }
 
 static void release_served_routes(void* user_data) { free(user_data); }
