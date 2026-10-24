@@ -83,7 +83,8 @@ endif()
 # JS_LIBRARIES.
 function(mln_kw_module target output)
   cmake_parse_arguments(PARSE_ARGV 2 MODULE "" "" "SOURCES;JS_LIBRARIES")
-  add_executable(${target} mln_kw_generated.c mln_kw_runtime.c ${MODULE_SOURCES})
+  add_executable(
+    ${target} mln_kw_generated.c mln_kw_runtime.c ${MODULE_SOURCES})
   set_target_properties(
     ${target}
     PROPERTIES OUTPUT_NAME ${output} SUFFIX ".mjs")

@@ -74,16 +74,24 @@ impl RuntimeHandle {
     ///
     /// See `mln_runtime_create_map` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn create_map(&self, options: &MapOptions) -> Result<NativeFuture<MapHandle>> {
+    pub fn create_map(&self, options: &MapOptions) -> Result<(MapHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
         let parent = self.inner.parent();
+        let mut out_map = sys::mln_map(0);
         let options = call.reference(&options)?;
-        call.complete(
+        let future = call.complete(
             |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_create_map(runtime, options, completion, out_diagnostic)
+                sys::mln_runtime_create_map(
+                    runtime,
+                    options,
+                    &mut out_map,
+                    completion,
+                    out_diagnostic,
+                )
             },
-            move |result| MapHandle::adopt(completion::copy_value::<sys::mln_map>(result)?, parent),
-        )
+            completion::unit,
+        )?;
+        Ok((MapHandle::adopt(out_map, parent)?, future))
     }
 
     /// Starts creating an offline region.

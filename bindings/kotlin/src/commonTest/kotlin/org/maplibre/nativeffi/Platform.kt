@@ -1,7 +1,5 @@
 package org.maplibre.nativeffi
 
-import kotlinx.coroutines.Deferred
-
 /** A weak reference that the garbage collector clears once nothing else reaches its value. */
 internal expect class TestWeakReference(value: Any) {
   /** The value, or null once the collector has cleared it. */
@@ -39,10 +37,3 @@ internal expect fun interceptUncaught(sink: (Throwable) -> Boolean): (() -> Unit
  * page drains them in order on later tasks.
  */
 internal expect suspend fun awaitDeliveries()
-
-/**
- * Holds the native thread that runs a completion handler until [release] completes, so the work
- * that native queues behind the handler waits for the test. The page runs a handler as it drains
- * the handler's completion, after the test yields, so on wasm the work already waits.
- */
-internal expect fun holdThreadUntil(release: Deferred<Unit>)

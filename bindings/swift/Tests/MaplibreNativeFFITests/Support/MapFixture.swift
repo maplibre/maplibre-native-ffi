@@ -83,8 +83,7 @@ final class MapFixture: Sendable {
         }))
       try await runtime
         .setResourceProvider(denyingProvider(routes: routes))
-      let map = try await runtime
-        .createMap(options: MapOptions(initialExtent: extent))
+      let map = try await makeMap(on: runtime, extent: extent)
       return MapFixture(runtime: runtime, map: map, events: events)
     } catch {
       try? await runtime.close()
@@ -95,6 +94,24 @@ final class MapFixture: Sendable {
   /// A runtime for a test that manages its own maps.
   static func makeRuntime() throws -> RuntimeHandle {
     try Maplibre.runtimeCreate(options: RuntimeOptions(cachePath: ":memory:"))
+  }
+
+  /// Creates a map on `runtime` and waits until it is ready. A map that fails
+  /// to become ready is closed before the error propagates.
+  static func makeMap(
+    on runtime: RuntimeHandle,
+    extent: LogicalExtent = LogicalExtent(width: 8, height: 8, scaleFactor: 1)
+  ) async throws -> MapHandle {
+    let created = try runtime.createMap(options: MapOptions(
+      initialExtent: extent
+    ))
+    do {
+      try await created.ready.value
+    } catch {
+      try? await created.map.close()
+      throw error
+    }
+    return created.map
   }
 
   /// Closes the map, if the test left it open, and then the runtime, waiting

@@ -63,6 +63,23 @@ func await[T any](t *testing.T, future *Future[T]) T {
 	return value
 }
 
+// createMap creates a map and waits until it is ready, closing it if its
+// creation fails.
+func createMap(t *testing.T, runtime *RuntimeHandle, options MapOptions) *MapHandle {
+	t.Helper()
+	m, ready, err := runtime.CreateMap(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout())
+	defer cancel()
+	if _, err := ready.Await(ctx); err != nil {
+		_, _ = m.Close()
+		t.Fatal(err)
+	}
+	return m
+}
+
 // awaitFailure waits for a future and returns its *Error, failing unless the
 // future failed with one.
 func awaitFailure[T any](t *testing.T, future *Future[T]) *Error {
@@ -94,7 +111,7 @@ func newFixture(t *testing.T) *fixture {
 func newFixtureWith(t *testing.T, options MapOptions) *fixture {
 	t.Helper()
 	f := newRuntimeFixture(t)
-	f.m = await(t, submitted(f.runtime.CreateMap(options)))
+	f.m = createMap(t, f.runtime, options)
 	// A test may already have released its fixture owner.
 	t.Cleanup(func() {
 		future, err := f.m.Close()

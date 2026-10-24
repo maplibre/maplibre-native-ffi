@@ -1781,11 +1781,11 @@ int32_t mln_kw_mln_runtime_create(
 }
 
 int32_t mln_kw_mln_runtime_create_map(
-  int64_t runtime, uintptr_t options, uintptr_t completion,
+  int64_t runtime, uintptr_t options, uintptr_t out_map, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_runtime_create_map(
-    (mln_runtime)runtime, (const mln_map_options*)options,
+    (mln_runtime)runtime, (const mln_map_options*)options, (mln_map*)out_map,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }

@@ -116,21 +116,6 @@ napi_value mln_ts_decode_lat_lng_list(
   return array;
 }
 
-napi_value mln_ts_decode_map(
-  napi_env env, const mln_completion_result* result
-) {
-  if (result->value == NULL || result->value_count == 0)
-    return mln_ts_missing_value(env);
-  if (result->value_size < sizeof(uint64_t)) {
-    napi_throw_range_error(env, NULL, "native completion stride is too small");
-    return NULL;
-  }
-  const char* value = (const char*)result->value;
-  size_t stride = result->value_size;
-  (void)stride;
-  return mln_ts_u64(env, (uint64_t)(*(const uint64_t*)value));
-}
-
 napi_value mln_ts_decode_offline_region_info(
   napi_env env, const mln_completion_result* result
 ) {
@@ -8061,7 +8046,6 @@ const mln_ts_decoder mln_ts_decoders[] = {
   mln_ts_decode_camera_query_result,
   mln_ts_decode_lat_lng_bounds,
   mln_ts_decode_lat_lng_list,
-  mln_ts_decode_map,
   mln_ts_decode_offline_region_info,
   mln_ts_decode_offline_region_info_list,
   mln_ts_decode_offline_region_info_optional,
@@ -8076,4 +8060,4 @@ const mln_ts_decoder mln_ts_decoders[] = {
   mln_ts_decode_style_transition_options,
   mln_ts_decode_texture_readback_result,
 };
-const size_t mln_ts_decoder_count = 20;
+const size_t mln_ts_decoder_count = 19;

@@ -12,7 +12,8 @@ await runtime.setResourceProvider({
   routes: [styleRoute("open://style.json")],
   callback() {},
 });
-const map = await runtime.createMap();
+const { map, ready } = runtime.createMap();
+await ready;
 await map.setStyleJson(emptyStyle());
 await map.addCustomGeometrySource("custom", { fetchTile() {} });
 await events.awaitEventType(RuntimeEventType.mapStyleLoaded, map.id);

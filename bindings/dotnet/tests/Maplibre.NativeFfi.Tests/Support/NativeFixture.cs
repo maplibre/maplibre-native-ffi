@@ -78,9 +78,16 @@ internal sealed class NativeFixture : IAsyncDisposable
                 })
             );
             await runtime.SetResourceProviderAsync(provider ?? DenyingProvider);
-            var map = await runtime
-                .CreateMapAsync(options ?? SmallMap)
-                .WaitAsync(TestWaits.Deadline, TestWaits.Token);
+            var map = runtime.CreateMap(options ?? SmallMap);
+            try
+            {
+                await map.Ready.WaitAsync(TestWaits.Deadline, TestWaits.Token);
+            }
+            catch
+            {
+                await map.DisposeAsync();
+                throw;
+            }
             return new NativeFixture(runtime, map, events, pendingEvents);
         }
         catch

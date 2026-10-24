@@ -15,7 +15,6 @@
 "LIFE-06" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::AHandleIdNamesItsEventsAndOutlivesClose"
 "COMP-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CompletionTests.cs::ACompletionDeliversOnceAndAFailedConversionFaultsItsTask"
 "COMP-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CompletionTests.cs::ARejectedSubmissionFreesItsCompletionState"
-"COMP-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::ADroppedCreationTaskRetiresTheMapItCreates"
 "COMP-04" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CompletionTests.cs::AFailedCommandArrivesAsItsDisposition"
 "COMP-05" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CompletionTests.cs::AWaitCanTimeOutOrBeCancelled"
 "COMP-06" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CompletionTests.cs::DiscardedCommandsAreFencedAndSynchronousRejectionThrows"

@@ -36,15 +36,6 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     }
   }
 
-  func retire() {
-    guard !lock.withLock({ closed }) else { return }
-    if NativeRetirement(handle: value, parent: parent, typeName: typeName)
-      .dispose(reportLeak: false)
-    {
-      lock.withLock { closed = true }
-    }
-  }
-
   var isClosed: Bool {
     lock.withLock { closed }
   }
@@ -119,20 +110,16 @@ private final class NativeRetirement<Handle: NativeHandle>: @unchecked Sendable 
   /// A leaked owner's last reference can disappear inside an unsafe callback.
   func schedule() {
     DispatchQueue.global().async {
-      self.dispose(reportLeak: true)
+      self.dispose()
     }
   }
 
-  @discardableResult
-  func dispose(reportLeak: Bool) -> Bool {
+  private func dispose() {
     defer { withExtendedLifetime(parent) {} }
     let disposed = handle.disposeAbandoned()
-    if reportLeak || !disposed {
-      let detail = disposed ? "" : " (native disposal failed)"
-      reportToStandardError(
-        "Leaked \(typeName) native handle 0x\(String(handle.raw, radix: 16))\(detail); close handles explicitly.\n"
-      )
-    }
-    return disposed
+    let detail = disposed ? "" : " (native disposal failed)"
+    reportToStandardError(
+      "Leaked \(typeName) native handle 0x\(String(handle.raw, radix: 16))\(detail); close handles explicitly.\n"
+    )
   }
 }

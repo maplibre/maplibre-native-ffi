@@ -4,7 +4,6 @@
 import {
   CameraUpdateMode,
   logSetCallback,
-  type MapHandle,
   type RenderSessionHandle,
   type ResourceRequestHandle,
   type RuntimeHandle,
@@ -75,9 +74,8 @@ export async function routeRequests(
 export async function burst(started: () => void): Promise<never> {
   const runtime: RuntimeHandle = runtimeCreate();
   await runtime.setEventHandler(() => {});
-  const map: MapHandle = await runtime.createMap({
-    initialExtent: renderExtent,
-  });
+  const { map, ready } = runtime.createMap({ initialExtent: renderExtent });
+  await ready;
   let ended = 0;
   for (let round = 0; ; round++) {
     const pending: Promise<unknown>[] = [
@@ -121,13 +119,17 @@ export async function liveNativeWork(): Promise<RenderSessionHandle> {
     callback: (_request, handle) => hold(handle),
   });
   await runtime.setResourceTransform((_kind, _url, request) => request.close());
-  const pending = await runtime.createMap({ initialExtent: renderExtent });
+  const { map: pending, ready: pendingReady } = runtime.createMap({
+    initialExtent: renderExtent,
+  });
   liveWork.push(runtime, pending);
+  await pendingReady;
   await bounded(pending.setStyleUrl("exit://style.json"), "a command");
   // The provider callback holds nothing alive, so a bounded wait does.
   liveWork.push(await callbackArrival(held, "the held request"));
 
-  const map = await runtime.createMap({ initialExtent: renderExtent });
+  const { map, ready } = runtime.createMap({ initialExtent: renderExtent });
+  await ready;
   await bounded(map.setStyleJson(backgroundStyle()), "a command");
   await bounded(
     map.addCustomGeometrySource("custom", { fetchTile() {} }),

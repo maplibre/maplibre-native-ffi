@@ -11,9 +11,9 @@ public extension MapHandle {
   func attachMetalSurface(
     descriptor bindingArg0: MetalSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
-  ) throws -> RenderSessionAttachment {
+  ) throws -> NewRenderSession {
     var value0: mln_render_session = 0
-    return try nativeAttach(as: RenderSessionAttachment
+    return try nativeAttach(as: NewRenderSession
       .init)
     { raw, arena, completion, diagnostic in
       try mln_map_attach_metal_surface(
@@ -34,9 +34,9 @@ public extension MapHandle {
   func attachOpenglSurface(
     descriptor bindingArg0: OpenglSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
-  ) throws -> RenderSessionAttachment {
+  ) throws -> NewRenderSession {
     var value0: mln_render_session = 0
-    return try nativeAttach(as: RenderSessionAttachment
+    return try nativeAttach(as: NewRenderSession
       .init)
     { raw, arena, completion, diagnostic in
       try mln_map_attach_opengl_surface(
@@ -57,9 +57,9 @@ public extension MapHandle {
   func attachVulkanSurface(
     descriptor bindingArg0: VulkanSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
-  ) throws -> RenderSessionAttachment {
+  ) throws -> NewRenderSession {
     var value0: mln_render_session = 0
-    return try nativeAttach(as: RenderSessionAttachment
+    return try nativeAttach(as: NewRenderSession
       .init)
     { raw, arena, completion, diagnostic in
       try mln_map_attach_vulkan_surface(
@@ -80,9 +80,9 @@ public extension MapHandle {
   func attachWebgpuSurface(
     descriptor bindingArg0: WebgpuSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
-  ) throws -> RenderSessionAttachment {
+  ) throws -> NewRenderSession {
     var value0: mln_render_session = 0
-    return try nativeAttach(as: RenderSessionAttachment
+    return try nativeAttach(as: NewRenderSession
       .init)
     { raw, arena, completion, diagnostic in
       try mln_map_attach_webgpu_surface(

@@ -109,46 +109,30 @@ export function query<T>(decoder: number, start: Start): Promise<T> {
   return rejected(() =>
     submit(start, (index, header) => {
       check(header);
-      return native.completionValue(index, decoder, false) as T;
+      return native.completionValue(index, decoder) as T;
     }),
   );
 }
 
 /**
- * An attachment, which creates its owner at once and completes later. The
- * completion keeps the owner reachable until native attachment finishes.
+ * An operation that creates its owner at once in a pending state, such as a
+ * map creation or a render-session attach, and reports it ready later. The
+ * readiness keeps the owner reachable until it settles.
  */
 export function attach<T>(
   start: (completion: number) => bigint,
   adopt: (handle: bigint) => T,
 ): [T, Promise<void>] {
   let handle = 0n;
-  const completed = submitRun((completion) => {
+  const ready = submitRun((completion) => {
     handle = start(completion);
   });
   let owner: T;
   try {
     owner = adopt(handle);
   } catch (error) {
-    completed.catch(() => {});
+    ready.catch(() => {});
     throw error;
   }
-  return [owner, completed.then(() => void owner)];
-}
-
-/**
- * An operation whose completion transfers one handle to a new owner, which
- * takes it from the batch.
- */
-export function queryOwned<T>(
-  decoder: number,
-  start: Start,
-  adopt: (handle: bigint) => T,
-): Promise<T> {
-  return rejected(() =>
-    submit(start, (index, header) => {
-      check(header);
-      return adopt(native.completionValue(index, decoder, true) as bigint);
-    }),
-  );
+  return [owner, ready.then(() => void owner)];
 }

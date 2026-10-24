@@ -322,10 +322,7 @@ def operation(plan, values, *, discard=False, dispose=False):
         else:
             values.require(result)
             completion_type = values.type(result)
-            if result.kind == "handle":
-                parent = parent_of(plan.completion.result_owner)
-                convert = f"completionOf(func(raw C.{result.native}) {completion_type} {{ return adopt{values.owner(result.native)}(uint64(raw), {parent}) }})"
-            elif result.kind == "array":
+            if result.kind == "array":
                 helper = "completionListOf"
                 convert = f"{helper}({copier(values, result.element)})"
                 if result.nullable:
@@ -364,11 +361,13 @@ def operation(plan, values, *, discard=False, dispose=False):
         call = f"bindingCallerSizedText(&{storage}, func({storage} *C.char, {capacity} C.size_t, {length} *C.size_t) int32 {{ return int32({call}) }})"
     # Several outputs return as Go results, named after the C outputs and,
     # for a completion, ready. The runtime carries them in an unnamed struct.
+    # A keyword output, such as map, is named for the handle it holds.
     results = None
     if len(output_types) > 1:
-        names = [camel(output_member(p.name)) for p, _, _ in outputs] + (
-            ["ready"] if plan.completion else []
-        )
+        names = [
+            member + "Handle" if member in GO_KEYWORDS else member
+            for member in (camel(output_member(p.name)) for p, _, _ in outputs)
+        ] + (["ready"] if plan.completion else [])
         taken = set(names) & {labels[p.name] for p in plan.inputs}
         if taken:
             raise ModelError([f"{plan.name}: results {sorted(taken)} name parameters"])

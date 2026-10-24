@@ -63,15 +63,18 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * See `mln_runtime_create_map` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun createMap(options: MapOptions): Deferred<MapHandle> =
-    nativeSubmitOwned(
-      this,
-      binding,
-      { MapHandle(it, this@GeneratedRuntimeOperations as RuntimeHandle) },
-      GeneratedOwnerDisposal::map,
-      { it.dispose() },
-    ) {
-      check(C.mln_runtime_create_map(handle, writeMapOptions(options), completion, diagnostic))
+  public fun createMap(options: MapOptions): NewMap =
+    nativeCall(this, binding) {
+      attach(
+        { out, completion ->
+          C.mln_runtime_create_map(handle, writeMapOptions(options), out, completion, diagnostic)
+        },
+        GeneratedOwnerDisposal::map,
+        { MapHandle(it, this@GeneratedRuntimeOperations as RuntimeHandle) },
+        null,
+        { it.dispose() },
+        ::NewMap,
+      )
     }
 
   /**

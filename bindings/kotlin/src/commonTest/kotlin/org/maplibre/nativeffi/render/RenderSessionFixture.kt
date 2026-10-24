@@ -17,10 +17,10 @@ import org.maplibre.nativeffi.generated.FrameDemand
 import org.maplibre.nativeffi.generated.FrameDemandFlag
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.MapMode
+import org.maplibre.nativeffi.generated.NewRenderSession
 import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderFrameResult
 import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
-import org.maplibre.nativeffi.generated.RenderSessionAttachment
 import org.maplibre.nativeffi.generated.RenderSessionCapabilityFlag
 import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.RenderSessionState
@@ -195,7 +195,7 @@ internal suspend fun <T> withOwnedTexture(
  */
 internal suspend fun <T> MapFixture.withRenderSession(
   driver: RenderDriverKind,
-  attach: suspend (RenderSessionAttachOptions) -> RenderSessionAttachment,
+  attach: suspend (RenderSessionAttachOptions) -> NewRenderSession,
   textureRingDepth: UInt = 1u,
   onFrameWake: () -> Unit = {},
   block: suspend RenderSessionFixture.() -> T,

@@ -5556,7 +5556,7 @@ impl MapHandle {
         }?;
         let result = PyDict::new(py);
         result.set_item("session", out_session_python)?;
-        result.set_item("completion", future)?;
+        result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (descriptor, options=None))]
@@ -5599,7 +5599,7 @@ impl MapHandle {
         }?;
         let result = PyDict::new(py);
         result.set_item("session", out_session_python)?;
-        result.set_item("completion", future)?;
+        result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (descriptor, options=None))]
@@ -5642,7 +5642,7 @@ impl MapHandle {
         }?;
         let result = PyDict::new(py);
         result.set_item("session", out_session_python)?;
-        result.set_item("completion", future)?;
+        result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (descriptor, options=None))]
@@ -5685,7 +5685,7 @@ impl MapHandle {
         }?;
         let result = PyDict::new(py);
         result.set_item("session", out_session_python)?;
-        result.set_item("completion", future)?;
+        result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (descriptor, options=None))]
@@ -5728,7 +5728,7 @@ impl MapHandle {
         }?;
         let result = PyDict::new(py);
         result.set_item("session", out_session_python)?;
-        result.set_item("completion", future)?;
+        result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (descriptor, options=None))]
@@ -5771,7 +5771,7 @@ impl MapHandle {
         }?;
         let result = PyDict::new(py);
         result.set_item("session", out_session_python)?;
-        result.set_item("completion", future)?;
+        result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (descriptor, options=None))]
@@ -5814,7 +5814,7 @@ impl MapHandle {
         }?;
         let result = PyDict::new(py);
         result.set_item("session", out_session_python)?;
-        result.set_item("completion", future)?;
+        result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (descriptor, options=None))]
@@ -5857,7 +5857,7 @@ impl MapHandle {
         }?;
         let result = PyDict::new(py);
         result.set_item("session", out_session_python)?;
-        result.set_item("completion", future)?;
+        result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (descriptor, options=None))]
@@ -5900,7 +5900,7 @@ impl MapHandle {
         }?;
         let result = PyDict::new(py);
         result.set_item("session", out_session_python)?;
-        result.set_item("completion", future)?;
+        result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (descriptor, options=None))]
@@ -5943,7 +5943,7 @@ impl MapHandle {
         }?;
         let result = PyDict::new(py);
         result.set_item("session", out_session_python)?;
-        result.set_item("completion", future)?;
+        result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (descriptor, options=None))]
@@ -5986,7 +5986,7 @@ impl MapHandle {
         }?;
         let result = PyDict::new(py);
         result.set_item("session", out_session_python)?;
-        result.set_item("completion", future)?;
+        result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (descriptor, options=None))]
@@ -6029,7 +6029,7 @@ impl MapHandle {
         }?;
         let result = PyDict::new(py);
         result.set_item("session", out_session_python)?;
-        result.set_item("completion", future)?;
+        result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
     #[pyo3(signature = ())]
@@ -9332,25 +9332,28 @@ impl RuntimeHandle {
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_map_options(&options.clone(), storage)?;
         let handle = self.input();
-        let convert = |py: Python<'_>, result: &sys::mln_completion_result| unsafe {
-            MapHandle::adopt(py, completion_value::<sys::mln_map>(result)?, Vec::new())
-        };
-        let discard: unsafe fn(&sys::mln_completion_result) = |result| {
-            if !result.value.is_null() && result.value_count == 1 {
-                unsafe {
-                    generated_dispose_mln_map(result.value.cast::<sys::mln_map>().read());
-                }
-            }
-        };
-        unsafe {
-            call.complete_owned(
+        let mut out_map: sys::mln_map = unsafe { std::mem::zeroed() };
+        let convert = py_none;
+        let future = unsafe {
+            call.complete(
                 |completion, diagnostic| {
-                    sys::mln_runtime_create_map(handle, &options_value, completion, diagnostic)
+                    sys::mln_runtime_create_map(
+                        handle,
+                        &options_value,
+                        &mut out_map,
+                        completion,
+                        diagnostic,
+                    )
                 },
                 convert,
-                discard,
             )
-        }
+        }?;
+        let mut out_map_owner = GeneratedOwnedOutput::new(out_map, generated_dispose_mln_map);
+        let out_map_python = unsafe { MapHandle::adopt(py, out_map_owner.take(), Vec::new()) }?;
+        let result = PyDict::new(py);
+        result.set_item("map", out_map_python)?;
+        result.set_item("ready", future)?;
+        Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (definition, metadata))]
     fn create_offline_region(

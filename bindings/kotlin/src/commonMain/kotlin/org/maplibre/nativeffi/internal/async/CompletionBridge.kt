@@ -35,7 +35,6 @@ internal object CompletionBridge {
   private class State<T>(
     private val convert: (Long) -> T,
     private val acceptErrorStatus: Boolean,
-    private val closeDropped: (T) -> Unit,
   ) {
     val deferred = CompletableDeferred<T>()
 
@@ -43,8 +42,7 @@ internal object CompletionBridge {
       try {
         val status = readI32(result + CompletionResultLayout.STATUS)
         if (status == Status.OK.rawValue || acceptErrorStatus) {
-          val value = convert(result)
-          if (!deferred.complete(value)) closeDropped(value)
+          deferred.complete(convert(result))
         } else {
           deferred.completeExceptionally(MaplibreException(Status(status), diagnostic(result)))
         }
@@ -57,25 +55,6 @@ internal object CompletionBridge {
   fun <T> submit(arena: NativeArena, convert: (Long) -> T, call: (Long) -> Unit): Deferred<T> =
     submitInternal(arena, convert, false, call)
 
-  /**
-   * Submits a completion that produces an owned handle wrapper, handing the wrapper to
-   * [closeDropped] when the caller cancelled the deferred before the value arrived.
-   */
-  fun <T> submitOwned(
-    arena: NativeArena,
-    convert: (Long) -> T,
-    closeDropped: (T) -> Unit,
-    disposeUnadopted: (Long) -> Unit,
-    call: (Long) -> Unit,
-  ): Deferred<T> =
-    submitInternal(
-      arena,
-      { result -> adoptOwned(result, disposeUnadopted, convert) },
-      false,
-      call,
-      closeDropped,
-    )
-
   fun unit(arena: NativeArena, call: (Long) -> Unit): Deferred<Unit> = submit(arena, {}, call)
 
   fun command(arena: NativeArena, call: (Long) -> Unit): Deferred<CommandCompletion> =
@@ -86,9 +65,8 @@ internal object CompletionBridge {
     convert: (Long) -> T,
     acceptErrorStatus: Boolean,
     call: (Long) -> Unit,
-    closeDropped: (T) -> Unit = {},
   ): Deferred<T> {
-    val state = State(convert, acceptErrorStatus, closeDropped)
+    val state = State(convert, acceptErrorStatus)
     val token = NativeRoots.retain(state)
     try {
       val completion = arena.allocate(CompletionLayout.SIZEOF)

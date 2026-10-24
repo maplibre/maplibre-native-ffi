@@ -196,21 +196,6 @@ static void releasing_from_the_wake_neither_deadlocks_nor_wakes_again(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Releasing a queue discards what it holds: an untaken map is disposed, so
-// the runtime has no child left to block its release.
-static void releasing_a_queue_disposes_its_pending_owned_values(void) {
-  mln_test_delivery_queue queue;
-  mln_test_delivery_queue_create(&queue);
-  mln_runtime runtime = mln_test_create_runtime();
-  const mln_completion completion =
-    mln_test_queue_completion(queue.handle, NULL);
-  MLN_TEST_OK(mln_runtime_create_map(runtime, NULL, &completion, NULL));
-  TEST_ASSERT_TRUE(mln_test_wait_for_count(&queue.wakes, 1));
-
-  mln_test_delivery_queue_release(&queue);
-  mln_test_destroy_runtime(runtime);
-}
-
 static void handles_report_their_status(void) {
   mln_delivery_batch batch = MLN_HANDLE_NULL;
   mln_delivery_batch_view view = {.size = sizeof(view)};
@@ -273,21 +258,6 @@ static void take_reports_its_status(void) {
     MLN_STATUS_INVALID_STATE, mln_delivery_batch_take(batch, 0, NULL)
   );
 
-  // An owned map takes once.
-  const mln_completion completion =
-    mln_test_queue_completion(queue.handle, NULL);
-  MLN_TEST_OK(mln_runtime_create_map(runtime, NULL, &completion, NULL));
-  batch = mln_test_delivery_await_single(queue.handle, &delivery);
-  MLN_TEST_OK(delivery->payload.completion.status);
-  const mln_map map = *(const mln_map*)delivery->payload.completion.value;
-  MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
-  MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE, mln_delivery_batch_take(batch, 0, NULL)
-  );
-  mln_delivery_batch_release(batch);
-  TEST_ASSERT_TRUE(mln_test_map_is_live(map));
-  mln_test_destroy_map(map);
-
   mln_test_delivery_queue_release(&queue);
   mln_test_destroy_runtime(runtime);
 }
@@ -297,7 +267,6 @@ MLN_TEST_GROUP {
   RUN_TEST(concurrent_drains_deliver_each_item_exactly_once);
   RUN_TEST(a_batch_outlives_its_queue_and_runtime);
   RUN_TEST(releasing_from_the_wake_neither_deadlocks_nor_wakes_again);
-  RUN_TEST(releasing_a_queue_disposes_its_pending_owned_values);
   RUN_TEST(handles_report_their_status);
   RUN_TEST(take_reports_its_status);
 }

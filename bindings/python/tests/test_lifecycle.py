@@ -8,7 +8,7 @@ import weakref
 
 import maplibre_native_ffi as mln
 import pytest
-from support import EMPTY_STYLE, TIMEOUT, Harness, leak_reports, result
+from support import EMPTY_STYLE, TIMEOUT, Harness, leak_reports, ready_map, result
 
 
 def test_closing_twice_is_safe_and_a_closed_handle_refuses_use() -> None:
@@ -16,7 +16,7 @@ def test_closing_twice_is_safe_and_a_closed_handle_refuses_use() -> None:
         mln.MapHandle()
 
     with mln.runtime_create() as runtime:
-        with result(runtime.create_map()) as map_handle:
+        with ready_map(runtime) as map_handle:
             assert map_handle.get_snapshot() is not None
         with pytest.raises(
             mln.MaplibreError,
@@ -55,7 +55,7 @@ def _check_handle(
 
 def test_dispose_closes_a_handle_once() -> None:
     runtime = mln.runtime_create()
-    map_handle = result(runtime.create_map())
+    map_handle = ready_map(runtime)
     for handle in (map_handle, runtime):
         _check_handle(handle, closed=False)
         handle.dispose()
@@ -73,7 +73,7 @@ def test_dispose_closes_a_handle_once() -> None:
 
 def test_leaving_a_block_after_an_explicit_close_does_nothing() -> None:
     with mln.runtime_create() as runtime:
-        with result(runtime.create_map()) as map_handle:
+        with ready_map(runtime) as map_handle:
             result(map_handle.close())
         result(runtime.close())
 
@@ -81,7 +81,7 @@ def test_leaving_a_block_after_an_explicit_close_does_nothing() -> None:
 def test_leaving_a_root_block_disposes_it_without_waiting_for_its_children() -> None:
     with mln.runtime_create() as runtime:
         # Release refuses a runtime with a live map, and dispose accepts it.
-        map_handle = result(runtime.create_map())
+        map_handle = ready_map(runtime)
     _check_handle(runtime, closed=True)
     _check_handle(map_handle, closed=False)
     assert type(map_handle).__module__ == "maplibre_native_ffi"
@@ -121,7 +121,7 @@ def test_a_handle_abandoned_on_a_callback_stack_is_reported_and_disposed(
     handles: list[mln.ResourceRequestHandle] = []
     submitted = threading.Event()
     cancelled = threading.Event()
-    owners = {"map": result(harness.runtime.create_map())}
+    owners = {"map": ready_map(harness.runtime)}
 
     def abandon_map(
         request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
@@ -148,7 +148,7 @@ def test_a_handle_abandoned_on_a_callback_stack_is_reported_and_disposed(
 def test_a_child_keeps_its_parent_alive() -> None:
     runtime = mln.runtime_create()
     parent = weakref.ref(runtime)
-    map_handle = result(runtime.create_map())
+    map_handle = ready_map(runtime)
     del runtime
     gc.collect()
 
@@ -202,7 +202,7 @@ runtime.set_resource_provider(
     m.ResourceProvider(callback=lambda request, handle: m.ResourceProviderDecision.HANDLE)
 ).result(10)
 m.log_set_callback(m.LogHandler(lambda severity, event, code, message: 1))
-live = runtime.create_map().result(10)
+live = runtime.create_map().map
 live.set_style_url("custom://never-answered.json")
 """
 

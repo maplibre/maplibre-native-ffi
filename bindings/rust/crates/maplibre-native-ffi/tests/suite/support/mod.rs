@@ -377,7 +377,8 @@ impl Fixture {
             })),
         );
         wait_for(runtime.set_resource_provider(denying_provider()));
-        let map = wait_for(runtime.create_map(&map_options));
+        let (map, ready) = runtime.create_map(&map_options).unwrap();
+        wait_for(Ok(ready));
         Self {
             runtime: Some(Arc::new(runtime)),
             map: Some(map),

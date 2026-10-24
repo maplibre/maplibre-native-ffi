@@ -34,8 +34,6 @@ typedef struct probe_latch {
   bool done;
 #endif
   mln_status status;
-  // The completion's value, for a creation that delivers a handle.
-  uint64_t handle;
   // The completion's diagnostic, which a failure prints.
   char diagnostic[MLN_DIAGNOSTIC_MESSAGE_CAPACITY];
 } probe_latch;
@@ -54,10 +52,6 @@ static inline void probe_latch_deliver(
   void* user_data, const mln_completion_result* result
 ) {
   probe_latch* latch = user_data;
-  uint64_t handle = 0;
-  if (result->value != NULL && result->value_count == 1) {
-    memcpy(&handle, result->value, sizeof(handle));
-  }
   size_t diagnostic_size = result->diagnostic.size;
   if (diagnostic_size >= sizeof(latch->diagnostic)) {
     diagnostic_size = sizeof(latch->diagnostic) - 1;
@@ -68,12 +62,10 @@ static inline void probe_latch_deliver(
   latch->diagnostic[diagnostic_size] = '\0';
 #ifdef _WIN32
   latch->status = result->status;
-  latch->handle = handle;
   SetEvent(latch->delivered);
 #else
   pthread_mutex_lock(&latch->lock);
   latch->status = result->status;
-  latch->handle = handle;
   latch->done = true;
   pthread_cond_broadcast(&latch->changed);
   pthread_mutex_unlock(&latch->lock);
@@ -257,12 +249,12 @@ static inline mln_map probe_create_map(mln_runtime runtime) {
   probe_latch latch;
   const mln_completion completion = probe_latch_completion(&latch);
   const mln_map_options options = mln_map_options_default();
+  mln_map map = MLN_HANDLE_NULL;
   probe_require(
-    mln_runtime_create_map(runtime, &options, &completion, NULL),
+    mln_runtime_create_map(runtime, &options, &map, &completion, NULL),
     "creating a map"
   );
   probe_require(probe_latch_wait(&latch), "creating a map");
-  const mln_map map = latch.handle;
   probe_require(
     mln_map_set_style_url(
       map,

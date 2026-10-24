@@ -58,7 +58,6 @@ struct Done {
   std::condition_variable condition;
   bool ready = false;
   Clock::time_point at;
-  uint64_t value = 0;
   mln_completion descriptor{
     .size = sizeof(mln_completion),
     .callback = callback,
@@ -69,8 +68,6 @@ struct Done {
     auto& self = *static_cast<Done*>(context);
     check(static_cast<mln_status>(result->status));
     self.at = Clock::now();
-    if (result->value && result->value_size == sizeof(self.value))
-      std::memcpy(&self.value, result->value, sizeof(self.value));
   }
   static void release(void* context) {
     auto& self = *static_cast<Done*>(context);
@@ -381,11 +378,11 @@ int main(int argc, char** argv) {
   map_options.map_mode = MLN_MAP_MODE_CONTINUOUS;
   map_options.initial_extent = {.width = 64, .height = 64, .scale_factor = 1};
   auto created = Done{};
-  check(
-    mln_runtime_create_map(runtime, &map_options, &created.descriptor, nullptr)
-  );
+  auto map = mln_map{MLN_HANDLE_NULL};
+  check(mln_runtime_create_map(
+    runtime, &map_options, &map, &created.descriptor, nullptr
+  ));
   created.wait();
-  const auto map = static_cast<mln_map>(created.value);
   auto style = Done{};
   check(mln_map_set_style_json(
     map,

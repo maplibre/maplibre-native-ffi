@@ -13,11 +13,11 @@ mln_status open_runtime(const char* cache_path, mln_runtime* out_runtime) {
   // #endregion runtime
 }
 
-static void map_created(void* user_data, const mln_completion_result* result) {
-  mln_map* out_map = user_data;
-  if (result->status == MLN_STATUS_OK && result->value_count == 1) {
-    *out_map = *(const mln_map*)result->value;
-  }
+static void map_ready(void* user_data, const mln_completion_result* result) {
+  (void)user_data;
+  // Attach a render target once result->status is MLN_STATUS_OK. On failure,
+  // release the map.
+  (void)result;
 }
 
 mln_status open_map(
@@ -33,10 +33,9 @@ mln_status open_map(
   *out_map = MLN_HANDLE_NULL;
   const mln_completion completion = {
     .size = sizeof(mln_completion),
-    .callback = map_created,
-    .user_data = out_map,
+    .callback = map_ready,
   };
-  return mln_runtime_create_map(runtime, &options, &completion, NULL);
+  return mln_runtime_create_map(runtime, &options, out_map, &completion, NULL);
   // #endregion map
 }
 

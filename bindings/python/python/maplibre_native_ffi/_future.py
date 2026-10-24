@@ -68,11 +68,7 @@ class NativeFuture[T](Future[T]):
         return True
 
     def _claim(self) -> bool:
-        """Claim the future for a result, or return False once it is cancelled.
-
-        A cancelled future takes no result, so the caller disposes any value
-        that the result transfers.
-        """
+        """Claim the future for a result, or return False once it is cancelled."""
         return self._settle()
 
     def _settle(self) -> bool:
@@ -88,14 +84,11 @@ class NativeFuture[T](Future[T]):
 def map_future[T, U](
     source: Future[T],
     transform: Callable[[T], U],
-    discard: Callable[[T], object] | None = None,
 ) -> Future[U]:
     """Return a future that transforms a native completion result.
 
     ``cancel()`` on the derived future abandons the wait and cancels its
-    source, and native work continues to its terminal disposition. When the
-    source resolves after the derived future was cancelled, ``discard``
-    releases the value that nothing adopts.
+    source, and native work continues to its terminal disposition.
     """
     result: NativeFuture[U] = NativeFuture()
     # A weak reference keeps the derived future from holding its source, and
@@ -104,14 +97,6 @@ def map_future[T, U](
 
     def complete(completed: Future[T]) -> None:
         if not result._claim():
-            # A cancelled source released its value natively, and a failed
-            # one carries none.
-            if (
-                discard is not None
-                and not completed.cancelled()
-                and completed.exception() is None
-            ):
-                discard(completed.result())
             return
         try:
             try:

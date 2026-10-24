@@ -30,10 +30,6 @@ internal actual fun runSuspendTest(block: suspend CoroutineScope.() -> Unit): Te
     withTimeout(TEST_TIMEOUT) { block() }
   }
 
-internal actual fun holdThreadUntil(release: Deferred<Unit>) {
-  runBlocking { release.await() }
-}
-
 // Native runs each release and callback inside its own call.
 internal actual suspend fun awaitDeliveries() {}
 

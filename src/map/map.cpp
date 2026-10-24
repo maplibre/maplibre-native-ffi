@@ -2652,22 +2652,6 @@ MapObject::~MapObject() = default;
 
 MapProjectionObject::~MapProjectionObject() = default;
 
-class PendingMapResult final {
- public:
-  explicit PendingMapResult(mln_map value) : value_(value) {}
-  ~PendingMapResult();
-  PendingMapResult(const PendingMapResult&) = delete;
-  PendingMapResult(PendingMapResult&&) = delete;
-  auto operator=(const PendingMapResult&) -> PendingMapResult& = delete;
-  auto operator=(PendingMapResult&&) -> PendingMapResult& = delete;
-
-  [[nodiscard]] auto value() const noexcept -> mln_map { return value_; }
-  auto transfer() noexcept -> void { value_ = MLN_HANDLE_NULL; }
-
- private:
-  mln_map value_ = MLN_HANDLE_NULL;
-};
-
 namespace {
 
 class RuntimeMapRetainGuard final {
@@ -2720,6 +2704,11 @@ auto validate_map_live_locked(mln_map map, MapObject*& out_map) -> mln_status {
       HandleTraits<MapObject>::kind, map, HandleFault::Stale
     );
   }
+  if (!out_map->created.load(std::memory_order_acquire)) {
+    out_map = nullptr;
+    set_thread_error("map creation has not succeeded");
+    return MLN_STATUS_INVALID_STATE;
+  }
   return MLN_STATUS_OK;
 }
 
@@ -2732,6 +2721,14 @@ auto lease_map(mln_map map) -> std::shared_ptr<MapObject> {
     return nullptr;
   }
   return live;
+}
+
+// Runs on the runtime worker. Creation is a map's first submission, so later
+// work finds no native map only when creation failed.
+auto map_creation_failed(const MapObject& live) -> bool {
+  if (live.map != nullptr) return false;
+  set_thread_error("map creation failed");
+  return true;
 }
 
 auto publish_map_snapshot(MapObject& live) -> uint64_t {
@@ -2895,6 +2892,11 @@ auto run_map_transaction(std::shared_ptr<MapObject> map, Work&& work)
   auto& live = *map;
   const auto event_state = live.event_state;
   auto outcome = MapCommandOutcome{};
+  if (map_creation_failed(live)) {
+    outcome.status = MLN_STATUS_INVALID_STATE;
+    outcome.message = thread_last_error_message();
+    return outcome;
+  }
   open_map_transaction(*event_state);
   clear_thread_error();
   try {
@@ -3211,6 +3213,13 @@ auto start_style_operation(
       static_cast<void>(control);
       auto result = std::make_shared<StyleOperationResult>();
       clear_thread_error();
+      if (map_creation_failed(*live)) {
+        state->complete(
+          MLN_STATUS_INVALID_STATE, thread_last_error_message(),
+          std::any{result}
+        );
+        return;
+      }
       try {
         const auto status = std::invoke(std::move(work), *live, *result);
         state->complete(status, thread_last_error_message(), std::any{result});
@@ -3283,6 +3292,13 @@ auto start_geometry_operation(
       static_cast<void>(control);
       auto result = GeometryValue<Function>{};
       clear_thread_error();
+      if (map_creation_failed(*live)) {
+        state->complete(
+          MLN_STATUS_INVALID_STATE, thread_last_error_message(),
+          std::any{std::move(result)}
+        );
+        return;
+      }
       try {
         const auto status = std::invoke(std::move(work), *live, result);
         state->complete(
@@ -3328,61 +3344,16 @@ auto with_projection(mln_map_projection projection, Work work) -> mln_status {
 
 }  // namespace
 
-// Runs on the runtime worker, after create_map_start() validated the options
-// and reserved the runtime's map slot.
-auto create_map(
-  mln_runtime runtime, const mln_map_options& effective, mln_map* out_map
-) -> mln_status {
-  auto runtime_state = lease_runtime(runtime);
-  if (runtime_state == nullptr) return recorded_handle_fault_status();
-  auto* live_runtime = runtime_state.get();
+namespace {
 
-  const auto retain_status = retain_runtime_map(runtime);
-  if (retain_status != MLN_STATUS_OK) {
-    return retain_status;
-  }
-  auto retain_guard = RuntimeMapRetainGuard{runtime};
-
-  auto owned_map = std::make_shared<MapObject>();
-  if (!live_runtime->control.acquire()) {
-    set_thread_error("runtime is closing");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  owned_map->runtime_cleanup_lease = ControlLease{&live_runtime->control};
-  // Every allocation this function owns happens before the handle is published,
-  // so a throw here cannot leave a registered map the caller has no handle to
-  // destroy.
-  auto event_state = std::make_shared<MapEventState>();
-  auto source_registry = std::make_shared<CallbackSourceRegistry>();
-  // Publish the handle first, so the observer and frontend capture an id that
-  // already resolves.
-  const auto handle = handle_table<MapObject>().insert(owned_map);
-  owned_map->self = handle;
-  owned_map->runtime = runtime;
-  owned_map->runtime_state = std::move(runtime_state);
-  owned_map->map_mode = effective.map_mode;
-  owned_map->logical_extent = effective.initial_extent;
-  owned_map->event_state = std::move(event_state);
-  owned_map->callback_sources = std::move(source_registry);
-  owned_map->event_state->mask.store(
-    effective.event_mask, std::memory_order_relaxed
-  );
-  owned_map->event_state->runtime_events =
-    owned_map->runtime_state->event_state;
-  owned_map->event_state->map = handle;
-  owned_map->event_state->owner = owned_map;
+// Runs on the runtime worker as the map's first submission, so every later
+// submission finds the native map built or, if building it failed, absent.
+auto construct_map(MapObject& live, const mln_map_options& effective) -> void {
+  // Construction is a transaction, so the events that MapLibre raises from
+  // its constructor carry the first published generation.
+  open_map_transaction(*live.event_state);
   try {
-    owned_map->observer = std::make_unique<HeadlessObserver>(
-      owned_map->event_state, owned_map->callback_sources
-    );
-    owned_map->frontend = std::make_unique<HeadlessFrontend>(
-      runtime_run_loop(live_runtime), owned_map->event_state,
-      owned_map->feature_state
-    );
-    // Construction is a transaction, so the events that MapLibre raises from
-    // its constructor carry the first published generation.
-    open_map_transaction(*owned_map->event_state);
-
+    mln::testing::hit(mln::testing::SyncPoint::MapConstruction);
     auto map_options = mln::MapOptions{};
     map_options.withMapMode(to_native_map_mode(effective.map_mode))
       .withSize(
@@ -3392,36 +3363,47 @@ auto create_map(
       )
       .withPixelRatio(static_cast<float>(effective.initial_extent.scale_factor))
       .withFastPFOREnabled(effective.fast_pfor_enabled);
-    owned_map->map = std::make_unique<mln::Map>(
-      *owned_map->frontend, *owned_map->observer, map_options,
-      resource_options_for_runtime(*live_runtime)
+    live.map = std::make_unique<mln::Map>(
+      *live.frontend, *live.observer, map_options,
+      resource_options_for_runtime(*live.runtime_state)
     );
-    owned_map->callback_sources->attach(*owned_map->map);
-    owned_map->frontend->store_held_update();
-    close_map_transaction(*owned_map, publish_map_snapshot(*owned_map));
+    live.callback_sources->attach(*live.map);
+    live.frontend->store_held_update();
+    close_map_transaction(live, publish_map_snapshot(live));
   } catch (...) {
-    static_cast<void>(handle_table<MapObject>().remove(handle));
+    live.callback_sources->detach();
+    live.map.reset();
+    if (live.event_state->in_transaction()) {
+      try {
+        close_map_transaction(live, 0);
+      } catch (...) {
+      }
+    }
     throw;
   }
-  *out_map = handle;
-  retain_guard.dismiss();
-  return MLN_STATUS_OK;
+  live.created.store(true, std::memory_order_release);
 }
+
+}  // namespace
+
 auto create_map_start(
-  mln_runtime runtime, const mln_map_options* options,
+  mln_runtime runtime, const mln_map_options* options, mln_map* out_map,
   const mln_completion* completion
 ) -> mln_status {
   const auto options_status = validate_map_options(options);
   if (options_status != MLN_STATUS_OK) {
     return options_status;
   }
+  if (out_map == nullptr) {
+    set_thread_error("out_map must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (*out_map != MLN_HANDLE_NULL) {
+    set_thread_error("out_map must point to the null handle");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   auto runtime_state = lease_runtime(runtime);
   if (runtime_state == nullptr) return recorded_handle_fault_status();
-  const auto reserve_status = retain_runtime_map(runtime);
-  if (reserve_status != MLN_STATUS_OK) {
-    return reserve_status;
-  }
-  auto reserve_guard = RuntimeMapRetainGuard{runtime};
   const auto effective = options == nullptr ? map_options_default() : *options;
   auto completion_state = std::shared_ptr<Completion>{};
   if (
@@ -3430,59 +3412,87 @@ auto create_map_start(
   ) {
     return made;
   }
-  auto state =
-    std::make_shared<OperationObject>([completion_state](
-                                        mln_status status,
-                                        std::string diagnostic, std::any result
-                                      ) mutable {
-      if (status != MLN_STATUS_OK) {
-        complete_failure(completion_state, status, std::move(diagnostic));
-        return;
-      }
-      auto* pending = std::any_cast<std::shared_ptr<PendingMapResult>>(&result);
-      if (pending == nullptr || *pending == nullptr) {
-        complete_failure(
-          completion_state, MLN_STATUS_NATIVE_ERROR,
-          "map creation produced an invalid result"
-        );
-        return;
-      }
-      const auto map = (*pending)->value();
-      (*pending)->transfer();
-      CompletionValue<&mln_runtime_create_map>::complete(completion_state, map);
-    });
-  const auto submit_status = submit_runtime_operation(
-    runtime_state, state,
-    [runtime, effective, state]() mutable -> void {
-      auto result = mln_map{MLN_HANDLE_NULL};
-      auto status = MLN_STATUS_NATIVE_ERROR;
-      auto diagnostic = std::string{};
-      try {
-        status = create_map(runtime, effective, &result);
-      } catch (...) {
-        diagnostic = exception_message(std::current_exception());
-      }
-      // Drop the creation reservation before publishing completion. Once the
-      // result is observable, the map itself is the runtime's only child and
-      // callers may release the map and runtime back to back.
-      release_runtime_map(runtime);
-      if (status == MLN_STATUS_OK) {
-        // Keep the handle owned while allocating its retained result storage.
-        auto guard = PendingMapResult{result};
-        auto pending = std::make_shared<PendingMapResult>(result);
-        guard.transfer();
-        state->complete(status, {}, std::any{std::move(pending)});
-      } else {
-        state->complete(
-          status,
-          diagnostic.empty() ? "map creation failed" : std::move(diagnostic), {}
-        );
-      }
-    },
-    completion_state
+  const auto retain_status = retain_runtime_map(runtime);
+  if (retain_status != MLN_STATUS_OK) {
+    return retain_status;
+  }
+  auto retain_guard = RuntimeMapRetainGuard{runtime};
+
+  auto owned_map = std::make_shared<MapObject>();
+  owned_map->runtime = runtime;
+  owned_map->runtime_state = runtime_state;
+  owned_map->map_mode = effective.map_mode;
+  owned_map->logical_extent = effective.initial_extent;
+  owned_map->event_state = std::make_shared<MapEventState>();
+  owned_map->callback_sources = std::make_shared<CallbackSourceRegistry>();
+  owned_map->event_state->mask.store(
+    effective.event_mask, std::memory_order_relaxed
   );
-  if (submit_status == MLN_STATUS_OK) reserve_guard.dismiss();
-  return submit_status;
+  owned_map->event_state->runtime_events = runtime_state->event_state;
+  owned_map->event_state->owner = owned_map;
+  owned_map->observer = std::make_unique<HeadlessObserver>(
+    owned_map->event_state, owned_map->callback_sources
+  );
+  owned_map->frontend = std::make_unique<HeadlessFrontend>(
+    runtime_run_loop(runtime_state.get()), owned_map->event_state,
+    owned_map->feature_state
+  );
+  auto state = std::make_shared<OperationObject>([completion_state](
+                                                   mln_status status,
+                                                   std::string diagnostic,
+                                                   std::any /*result*/
+                                                 ) mutable {
+    if (status != MLN_STATUS_OK) {
+      complete_failure(completion_state, status, std::move(diagnostic));
+      return;
+    }
+    valueless_completion<&mln_runtime_create_map>().complete(completion_state);
+  });
+  if (!runtime_state->control.acquire()) {
+    set_thread_error("runtime is closing");
+    return MLN_STATUS_INVALID_STATE;
+  }
+  owned_map->runtime_cleanup_lease = ControlLease{&runtime_state->control};
+  // A new map cannot be closing, so this acquire succeeds.
+  static_cast<void>(owned_map->control.acquire());
+  auto creation = std::make_shared<ControlLease>(&owned_map->control);
+  auto work = std::function<void()>{
+    [live = owned_map, creation = std::move(creation), state,
+     effective]() mutable -> void {
+      // The creation lease is captured so map release waits for this work.
+      static_cast<void>(creation);
+      try {
+        construct_map(*live, effective);
+        state->complete(MLN_STATUS_OK, {}, std::any{std::monostate{}});
+      } catch (...) {
+        state->complete(
+          MLN_STATUS_NATIVE_ERROR, exception_message(std::current_exception()),
+          {}
+        );
+      }
+    }
+  };
+  // Every allocation above happens before the handle is published, so a throw
+  // cannot leave a registered map that no caller holds. The handle resolves
+  // before the worker builds the map, so the observer and frontend capture an
+  // id that already resolves.
+  const auto handle = handle_table<MapObject>().insert(owned_map);
+  owned_map->self = handle;
+  owned_map->event_state->map = handle;
+  // The completion may run before this call returns, so the caller's handle
+  // is written before the work that runs it is submitted.
+  *out_map = handle;
+  const auto submit_status = submit_runtime_operation(
+    runtime_state, state, std::move(work), completion_state
+  );
+  if (submit_status != MLN_STATUS_OK) {
+    *out_map = MLN_HANDLE_NULL;
+    static_cast<void>(handle_table<MapObject>().remove(handle));
+    return submit_status;
+  }
+  retain_guard.dismiss();
+  mln::testing::hit(mln::testing::SyncPoint::MapCreationSubmitted);
+  return MLN_STATUS_OK;
 }
 
 auto map_snapshot_get(mln_map map, mln_map_snapshot* out_snapshot)
@@ -3499,6 +3509,10 @@ auto map_snapshot_get(mln_map map, mln_map_snapshot* out_snapshot)
   if (live == nullptr) return recorded_handle_fault_status();
   if (live->control.is_closing()) {
     set_thread_error("map is closing");
+    return MLN_STATUS_INVALID_STATE;
+  }
+  if (!live->created.load(std::memory_order_acquire)) {
+    set_thread_error("map creation has not succeeded");
     return MLN_STATUS_INVALID_STATE;
   }
   const std::scoped_lock lock(live->snapshot_mutex);
@@ -3710,16 +3724,6 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
   retire_map(std::move(owned), std::move(release_completion));
   return MLN_STATUS_OK;
 }
-PendingMapResult::~PendingMapResult() {
-  if (value_ == MLN_HANDLE_NULL) {
-    return;
-  }
-  try {
-    static_cast<void>(dispose_map(value_));
-  } catch (...) {
-  }
-}
-
 auto map_request_repaint(mln_map map, const mln_completion* completion)
   -> mln_status {
   const auto live = lease_map(map);
@@ -3807,6 +3811,13 @@ auto map_request_still_image_start(
     [map, live = std::move(live), state, release_submission]() mutable -> void {
       if (live->control.is_closing()) {
         state->complete(MLN_STATUS_CANCELLED, {}, {});
+        release_submission();
+        return;
+      }
+      if (map_creation_failed(*live)) {
+        state->complete(
+          MLN_STATUS_INVALID_STATE, thread_last_error_message(), {}
+        );
         release_submission();
         return;
       }
@@ -4087,6 +4098,12 @@ auto start_map_string_operation(
     runtime, state,
     [live = std::move(live), state, read = std::move(read),
      submission = std::move(submission)]() mutable -> void {
+      if (map_creation_failed(*live)) {
+        state->complete(
+          MLN_STATUS_INVALID_STATE, thread_last_error_message(), {}
+        );
+        return;
+      }
       try {
         state->complete(MLN_STATUS_OK, {}, std::any{read(*live)});
       } catch (...) {
@@ -4507,6 +4524,12 @@ auto map_camera_query_start(mln_map map, const mln_completion* completion)
     runtime, state,
     [live = std::move(live), state,
      submission = std::move(submission)]() mutable -> void {
+      if (map_creation_failed(*live)) {
+        state->complete(
+          MLN_STATUS_INVALID_STATE, thread_last_error_message(), {}
+        );
+        return;
+      }
       try {
         const auto generation = publish_map_snapshot(*live);
         state->complete(

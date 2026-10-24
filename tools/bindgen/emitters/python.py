@@ -454,15 +454,6 @@ def operation(
                 f"Future[{public_result}]",
             )
             helper = "complete"
-        disposer = None
-        if (
-            plan.result
-            and plan.result.kind == "handle"
-            and plan.result.ownership == "owned"
-        ):
-            helper = "complete_owned"
-            values.disposed.add(plan.result.native)
-            disposer = f"|result| {{ if !result.value.is_null() && result.value_count == 1 {{ unsafe {{ generated_dispose_{plan.result.native}(result.value.cast::<sys::{plan.result.native}>().read()); }} }} }}"
         call = native_call(function, [arguments[p.name] for p in function.parameters])
         # The converters run outside the native call's unsafe contract.
         body = [
@@ -480,16 +471,8 @@ def operation(
                 if converter
                 else []
             ),
-            *(
-                [
-                    f"        let discard: unsafe fn(&sys::mln_completion_result) = {disposer};"
-                ]
-                if disposer
-                else []
-            ),
             f"        unsafe {{ call.{helper}(|completion, diagnostic| {call}"
             + (", convert" if converter else "")
-            + (", discard" if disposer else "")
             + ") }",
         ]
         expression = f"self._native.{name}({', '.join(python_arguments)})"
@@ -526,14 +509,14 @@ def operation(
                 body.append(
                     f'        result.set_item("{output_member(output)}", {output}_python)?;'
                 )
-            body.append('        result.set_item("completion", future)?;')
+            body.append('        result.set_item("ready", future)?;')
             body.append("        Ok(result.into_any().unbind())")
             product_name = public_name(function.name) + "Result"
             product_fields = [
                 f"    {output_member(output)}: {OWNERS[value.native]}"
                 for output, value in outputs
             ]
-            product_fields.append(f"    completion: {public_result}")
+            product_fields.append(f"    ready: {public_result}")
             product = (
                 "class "
                 + product_name
@@ -553,18 +536,14 @@ def operation(
                 public_copies.append(
                     f"{output_member(output)}=_adopt_value(raw[{output_member(output)!r}], {OWNERS[value.native]!r}, {parent})"
                 )
-            public_copies.append('completion=raw["completion"]')
+            public_copies.append('ready=raw["ready"]')
             expression = f"{product_name}(" + ", ".join(public_copies) + ")"
             public_result = product_name
             native_result = "dict[str, Any]"
         elif plan.result:
-            if plan.result.kind == "handle":
-                result_owner = OWNERS[plan.result.native]
-                expression = f"_adopt_future({expression}, {result_owner!r}, {'self' if plan.result.handle.parent else 'None'})"
-            else:
-                converted = values.facade_copy(plan.result, "value")
-                if converted != "value":
-                    expression = f"map_future({expression}, lambda value: {converted})"
+            converted = values.facade_copy(plan.result, "value")
+            if converted != "value":
+                expression = f"map_future({expression}, lambda value: {converted})"
     else:
         if dropped_completion:
             arguments[dropped_completion] = "std::ptr::null()"
@@ -1018,7 +997,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         if not values.records.get(record, values.enums.get(record)).response
     )
     files["python/maplibre_native_ffi/_generated_operations.py"] = (
-        f'"""{notice}"""\n\nfrom __future__ import annotations\n\nfrom collections.abc import Buffer, Sequence\nfrom concurrent.futures import Future\nfrom contextlib import AbstractContextManager\nfrom dataclasses import dataclass\nfrom typing import TYPE_CHECKING, Any, Callable, NamedTuple\nfrom . import _native\nfrom ._completion import CommandCompletion\nfrom ._future import map_future\nfrom ._operation import GeneratedOperations, _adopt_future, _adopt_value, _view\nfrom ._generated_values import _maybe\n{imports}\nif TYPE_CHECKING:\n    from ._generated_owners import {", ".join([*OWNERS.values(), *scope_owners.values()]) or "__name__"}\n\n'
+        f'"""{notice}"""\n\nfrom __future__ import annotations\n\nfrom collections.abc import Buffer, Sequence\nfrom concurrent.futures import Future\nfrom contextlib import AbstractContextManager\nfrom dataclasses import dataclass\nfrom typing import TYPE_CHECKING, Any, Callable, NamedTuple\nfrom . import _native\nfrom ._completion import CommandCompletion\nfrom ._future import map_future\nfrom ._operation import GeneratedOperations, _adopt_value, _view\nfrom ._generated_values import _maybe\n{imports}\nif TYPE_CHECKING:\n    from ._generated_owners import {", ".join([*OWNERS.values(), *scope_owners.values()]) or "__name__"}\n\n'
         + "\n".join(sorted(records))
         + "\n".join(
             f"class _{owner}Operations(GeneratedOperations):\n    _native: _native._{owner}\n\n{chr(10).join(methods)}"

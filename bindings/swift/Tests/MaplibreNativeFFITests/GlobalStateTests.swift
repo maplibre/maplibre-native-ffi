@@ -62,47 +62,12 @@ struct GlobalStateTests {
     capture.finish()
     #expect(capture.text.components(separatedBy: failed).count == 2)
     #expect(capture.text.components(separatedBy: disposed).count == 2)
-    let disposals = RecordedHandle.disposals.value.filter { $0.raw != 0x5 }
+    let disposals = RecordedHandle.disposals.value
     #expect(Set(disposals) == [
       RecordedHandle.Disposal(raw: 0x3, insideACallback: false),
       RecordedHandle.Disposal(raw: 0x4, insideACallback: false),
     ])
     #expect(disposals.count == 2)
-  }
-
-  /// A created handle that arrives after its wait is cancelled never reached
-  /// a caller, so the binding disposes it without reporting a leak.
-  @Test func aHandleArrivingAfterItsWaitIsCancelledIsRetiredWithoutAReport(
-  ) async throws {
-    let capture = try StandardErrorCapture()
-    let held = LockedBox<mln_completion?>(nil)
-    let future = try NativeCompletion.start({ completion, _ in
-      held.update { $0 = completion.pointee }
-      return MLN_STATUS_OK
-    }) { result in
-      try RecordedOwner(raw: NativeCompletion.value(result, as: UInt64.self))
-    }
-    let waiting = Task { try await future.value() }
-    waiting.cancel()
-    await #expect(throws: CancellationError.self) { try await waiting.value }
-
-    let descriptor = try #require(held.value)
-    withUnsafePointer(to: UInt64(0x5)) { value in
-      var result = mln_completion_result()
-      result.size = UInt32(MemoryLayout<mln_completion_result>.size)
-      result.status = MLN_STATUS_OK.rawValue
-      result.value = UnsafeRawPointer(value)
-      result.value_count = 1
-      descriptor.callback?(descriptor.user_data, &result)
-    }
-    descriptor.release_user_data?(descriptor.user_data)
-    _ = consume future
-    _ = consume waiting
-    #expect(RecordedHandle.disposals.value.contains(
-      RecordedHandle.Disposal(raw: 0x5, insideACallback: false)
-    ))
-    capture.finish()
-    #expect(!capture.text.contains("late_handle"))
   }
 }
 
@@ -138,19 +103,6 @@ private struct RecordedHandle: NativeHandle {
       $0.append(Disposal(raw: raw, insideACallback: inside))
     }
     return raw != 0x3
-  }
-}
-
-/// An owner the binding creates from a completion, as a generated creation
-/// does.
-private final class RecordedOwner: NativeReceiver, @unchecked Sendable {
-  let handle: NativeHandleState<RecordedHandle>
-
-  init(raw: UInt64) throws {
-    handle = try NativeHandleState(
-      typeName: "late_handle",
-      handle: RecordedHandle(raw: raw)
-    )
   }
 }
 

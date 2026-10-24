@@ -31,19 +31,22 @@ pub const MapState = struct {
         map_options.initial_extent = render_target.extent(viewport);
         map_options.map_mode = .continuous;
         map_options.event_mask = .{};
-        var map_future = runtime.createMap(map_options, &diagnostic) catch |err| {
+        var created = runtime.createMap(map_options, &diagnostic) catch |err| {
             diagnostics.logError("map create failed", err, &diagnostic);
             return types.AppError.MapCreateFailed;
         };
-        defer map_future.deinit();
-        var map = map_future.wait(&diagnostic) catch |err| {
-            diagnostics.logError("map create failed", err, &diagnostic);
-            return types.AppError.MapCreateFailed;
-        };
+        // The map is ours from the call, so a failed creation still releases
+        // it.
+        var map = created.map;
         errdefer if (map.release(null)) |future| {
             var teardown = future;
             teardown.deinit();
         } else |_| map.deinit();
+        defer created.ready.deinit();
+        created.ready.wait(&diagnostic) catch |err| {
+            diagnostics.logError("map create failed", err, &diagnostic);
+            return types.AppError.MapCreateFailed;
+        };
 
         try loadStyle(&map, &diagnostic, smoke);
         try setCamera(allocator, &map, &diagnostic);

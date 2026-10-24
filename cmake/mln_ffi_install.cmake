@@ -64,8 +64,10 @@ endfunction()
 # dependencies, so the walk follows those targets too.
 function(mln_ffi_static_link_metadata libraries_var frameworks_var)
   set(MLN_FFI_PENDING "")
-  foreach(dependencies mln_ffi_platform_dependencies mln_ffi_render_dependencies)
-    get_target_property(MLN_FFI_ENTRIES ${dependencies} INTERFACE_LINK_LIBRARIES)
+  foreach(
+    dependencies mln_ffi_platform_dependencies mln_ffi_render_dependencies)
+    get_target_property(
+      MLN_FFI_ENTRIES ${dependencies} INTERFACE_LINK_LIBRARIES)
     if(MLN_FFI_ENTRIES AND NOT MLN_FFI_ENTRIES MATCHES "-NOTFOUND$")
       list(APPEND MLN_FFI_PENDING ${MLN_FFI_ENTRIES})
     endif()
@@ -133,7 +135,8 @@ function(mln_ffi_install_emscripten_options)
   endif()
   set(link_options)
   set(compile_options)
-  foreach(dependencies mln_ffi_platform_dependencies mln_ffi_render_dependencies)
+  foreach(
+    dependencies mln_ffi_platform_dependencies mln_ffi_render_dependencies)
     foreach(kind LINK COMPILE)
       get_target_property(options ${dependencies} INTERFACE_${kind}_OPTIONS)
       if(options AND NOT options MATCHES "-NOTFOUND$")
@@ -325,7 +328,8 @@ function(mln_ffi_install_c_api_library target)
     FILES "${pc_file}"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/pkgconfig"
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
-  foreach(dependencies mln_ffi_platform_dependencies mln_ffi_render_dependencies)
+  foreach(
+    dependencies mln_ffi_platform_dependencies mln_ffi_render_dependencies)
     get_target_property(MLN_FFI_INSTALL_LIBRARY_FILES ${dependencies}
                         MLN_FFI_INSTALL_LIBRARY_FILES)
     if(MLN_FFI_INSTALL_LIBRARY_FILES

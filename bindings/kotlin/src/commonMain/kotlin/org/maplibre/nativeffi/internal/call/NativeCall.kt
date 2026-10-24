@@ -92,26 +92,27 @@ internal class NativeCall(val handle: Long, var completion: Long = 0L) : NativeA
   }
 
   /**
-   * Runs a render-session attach: [submit] receives an out slot and a completion, writes the new
-   * session to the slot at once, and reports readiness through the completion. A refused call
-   * throws before anything is adopted. Otherwise the session is adopted as [adoptRegistered] does,
-   * or as [adopt] does when [callbacks] is null, and held for abandonment at process exit. [result]
-   * pairs it with the readiness.
+   * Runs a call that creates an owner in a pending state, such as a map creation or a render
+   * session attach: [submit] receives an out slot and a completion, writes the new owner to the
+   * slot at once, and reports readiness through the completion. A refused call throws before
+   * anything is adopted. Otherwise the owner is adopted as [adoptRegistered] does, or as [adopt]
+   * does when [callbacks] is null, and a render session is held for abandonment at process exit.
+   * [result] pairs the owner with the readiness.
    */
-  fun <R> attach(
+  fun <O, R> attach(
     submit: (out: Long, completion: Long) -> Int,
     dispose: (Long) -> Unit,
-    create: (Long) -> RenderSessionHandle,
-    callbacks: ((RenderSessionHandle) -> CallbackOwner)?,
-    drop: (RenderSessionHandle) -> Unit,
-    result: (RenderSessionHandle, Deferred<Unit>) -> R,
+    create: (Long) -> O,
+    callbacks: ((O) -> CallbackOwner)?,
+    drop: (O) -> Unit,
+    result: (O, Deferred<Unit>) -> R,
   ): R {
     val out = allocate(8)
     val ready = CompletionBridge.unit(this) { completion -> check(submit(out, completion)) }
     val owner =
       if (callbacks == null) adopt(out, dispose, create)
       else adoptRegistered(out, dispose, create, callbacks, drop)
-    endGraphicsAtExit(owner.binding)
+    if (owner is RenderSessionHandle) endGraphicsAtExit(owner.binding)
     return result(owner, ready)
   }
 
@@ -255,31 +256,6 @@ internal fun nativeDiscard(
     NativeCall(handle).use { call -> run(call, 0L, callbacks, body) }
   }
 }
-
-/**
- * Submits a C operation whose completion carries a new owned handle: [adopt] wraps it, [dispose]
- * releases one nobody adopted, and [drop] releases a wrapper whose caller stopped waiting.
- */
-internal fun <T> nativeSubmitOwned(
-  owner: Any?,
-  state: HandleState?,
-  adopt: (Long) -> T,
-  dispose: (Long) -> Unit,
-  drop: (T) -> Unit,
-  body: NativeCall.() -> Unit,
-): Deferred<T> =
-  receive(owner, state) { handle ->
-    NativeCall(handle).use { call ->
-      CompletionBridge.submitOwned(
-        call,
-        { result -> adopt(readI64(CompletionBridge.value(result))) },
-        drop,
-        { result -> dispose(readI64(CompletionBridge.value(result))) },
-      ) { completion ->
-        run(call, completion, null, body)
-      }
-    }
-  }
 
 private fun run(
   call: NativeCall,

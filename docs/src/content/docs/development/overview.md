@@ -41,12 +41,13 @@ the shell. After an NDK change, run `mise run clean <preset>` for each Android
 preset, because CMake caches the compiler path.
 
 `mise run test` boots an Android or OpenHarmony emulator on demand and leaves it
-running. An emulator boots in minutes under KVM on Linux, and takes an hour or
-more in software everywhere else. Every checkout on a machine shares one Android
-emulator per API level and ABI: the AVD `api-<level>-<abi>`, such as
-`api-36-arm64-v8a`, in the default AVD home. A task reuses the one that is
-running, whoever started it, and creates the AVD if it is missing. Since another
-session may be using it, no task stops it; run
+running. An emulator boots in minutes under KVM on Linux. Without KVM it runs in
+software, which takes an hour or more on Linux, but the OpenHarmony emulator
+boots in under a minute on an Apple silicon Mac. Every checkout on a machine
+shares one Android emulator per API level and ABI: the AVD `api-<level>-<abi>`,
+such as `api-36-arm64-v8a`, in the default AVD home. A task reuses the one that
+is running, whoever started it, and creates the AVD if it is missing. Since
+another session may be using it, no task stops it; run
 `mise run //:android-emulator:stop <abi> --api <level>` when none is.
 
 ## Debug on a CI runner

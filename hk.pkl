@@ -2,9 +2,9 @@
 // Repository-wide tools are installed at the root. Language-specific steps
 // enter their binding's mise context and install that toolchain on demand.
 
-amends "package://github.com/jdx/hk/releases/download/v2.7.0/hk@2.7.0#/Config.pkl"
+amends "package://github.com/jdx/hk/releases/download/v2.8.1/hk@2.8.1#/Config.pkl"
 
-import "package://github.com/jdx/hk/releases/download/v2.7.0/hk@2.7.0#/Builtins.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.8.1/hk@2.8.1#/Builtins.pkl"
 
 steps {
   ["dprint"] = (Builtins.dprint) {

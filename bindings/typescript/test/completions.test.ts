@@ -10,49 +10,31 @@ import {
   MapDebugOption,
   MapMode,
   MaplibreError,
-  type RuntimeHandle,
-  runtimeCreate,
   Status,
 } from "../src/index.ts";
 import { native } from "../src/internal/addon.ts";
-import { queryOwned, run } from "../src/internal/completions.ts";
-import { adopt } from "../src/internal/owners.ts";
+import { query, run } from "../src/internal/completions.ts";
 import { extent, openRuntime } from "./support/fixture.ts";
-import {
-  bounded,
-  collectGarbageUntil,
-  teardown,
-  test,
-  watchCollection,
-} from "./support/harness.ts";
-import { captureLeaks, pendingCompletions } from "./support/internals.ts";
+import { bounded, test } from "./support/harness.ts";
+import { pendingCompletions } from "./support/internals.ts";
 import { emptyStyle } from "./support/styles.ts";
 
-test("a completion delivers once and disposes a value that fails to convert", async () => {
+test("a completion delivers once and reports a value that fails to convert", async () => {
   const fixture = await openRuntime();
-  let conversions = 0;
-  // The map creation of RuntimeHandle.createMap, with an owner that fails to
-  // build after the binding took the map from its batch.
-  const creation = queryOwned(
-    Decoder.map,
-    (completion) =>
-      native.mln_runtime_create_map(fixture.runtime.id, {}, completion),
-    (handle) =>
-      adopt(
-        handle,
-        () => {
-          conversions++;
-          throw new TypeError("the created map failed to convert");
-        },
-        (disposed) => native.mln_map_dispose(disposed, undefined),
-      ),
+  const pending = pendingCompletions();
+  // A runtime command completes without a value, so a decoder that expects
+  // one fails to convert it.
+  const conversion = query(Decoder.cameraOptions, (completion) =>
+    native.mln_runtime_clear_resource_transform(fixture.runtime.id, completion),
   );
-  await assert.rejects(bounded(creation, "map creation"), TypeError);
-  assert.equal(conversions, 1);
-
-  // The runtime closes only once no map remains, so the transferred map was
-  // disposed when its owner failed to build.
-  await bounded(fixture.runtime.close(), "runtime close");
+  await assert.rejects(
+    bounded(conversion, "the conversion"),
+    /the completion carried no value/,
+  );
+  // The delivery settled its entry once and left none behind.
+  assert.equal(pendingCompletions(), pending);
+  await bounded(fixture.runtime.clearResourceTransform(), "a later call");
+  assert.equal(pendingCompletions(), pending);
 });
 
 test("a submission native rejects frees its completion state", async () => {
@@ -72,50 +54,6 @@ test("a submission native rejects frees its completion state", async () => {
   await bounded(fixture.runtime.clearResourceTransform(), "a later call");
   assert.equal(pendingCompletions(), pending);
 });
-
-/** Starts a map creation and drops its Promise, keeping a weak reference. */
-async function dropMapCreation(
-  runtime: RuntimeHandle,
-): Promise<{ id: bigint; collected: () => boolean }> {
-  let delivered: { id: bigint; collected: () => boolean } | undefined;
-  void runtime.createMap({ initialExtent: extent }).then((map) => {
-    delivered = { id: map.id, collected: watchCollection(map) };
-  });
-  // The creation's completion reaches the queue before the later call's.
-  await bounded(runtime.clearResourceTransform(), "a later call");
-  return delivered!;
-}
-
-test(
-  "a dropped map creation is disposed once collected",
-  async () => {
-    const leaks = captureLeaks();
-    const runtime = runtimeCreate();
-    teardown(() => runtime.dispose());
-    const map = await dropMapCreation(runtime);
-    assert.equal(map.collected(), false);
-    // The live map holds off the runtime's release.
-    await assert.rejects(
-      runtime.close(),
-      (error) =>
-        error instanceof MaplibreError && error.status === Status.invalidState,
-    );
-
-    // Collecting the map runs its owner token's finalizer, which disposes the
-    // map outside any callback, and then the runtime releases.
-    await collectGarbageUntil(
-      () =>
-        map.collected() &&
-        leaks.some((line) =>
-          line.includes(`MapHandle 0x${map.id.toString(16)}`),
-        ),
-      "the dropped map",
-    );
-    await bounded(runtime.clearResourceTransform(), "a later call");
-    await bounded(runtime.close(), "runtime close");
-  },
-  { needs: ["forcedGc"] },
-);
 
 test("a failed command rejects with its status and generation", async () => {
   const fixture = await openRuntime();

@@ -15,7 +15,6 @@
 "LIFE-06" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_handle_id_names_its_events_and_outlives_close"
 "COMP-01" = "bindings/rust/crates/maplibre-native-ffi/src/completion.rs::a_panicking_converter_completes_with_an_error_before_native_release"
 "COMP-02" = "bindings/rust/crates/maplibre-native-ffi/src/completion.rs::a_rejected_submission_frees_the_bridge_and_reports_the_status"
-"COMP-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_dropped_map_creation_future_retires_the_map"
 "COMP-04" = "bindings/rust/crates/maplibre-native-ffi/src/completion.rs::a_command_reports_a_rejection_while_other_operations_fail"
 "COMP-05" = "bindings/rust/crates/maplibre-native-ffi/src/completion.rs::a_wait_times_out_and_a_dropped_future_leaves_native_its_bridge"
 "COMP-06" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::discarded_commands_are_fenced_and_sync_rejections_return_errors"

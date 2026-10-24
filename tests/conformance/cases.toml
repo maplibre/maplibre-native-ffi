@@ -18,9 +18,8 @@
 "LIFE-06" = "A handle's ID equals the source of the events it raises and stays readable after close"
 
 # Completions
-"COMP-01" = "A completion delivers exactly once, and a value that fails to convert is disposed"
+"COMP-01" = "A completion delivers exactly once, and a value that fails to convert is reported"
 "COMP-02" = "A submission the native side rejects frees the binding's completion state"
-"COMP-03" = "Dropping the future of a creation retires the object it creates"
 "COMP-04" = "A failed command disposition arrives as data, not as an error"
 "COMP-05" = "Waiting on a completion can time out or be cancelled in the language's idiom"
 "COMP-06" = "A discarded command applies its change and a later command completion on the same map fences it; a synchronously rejected discarded command raises the binding's error"

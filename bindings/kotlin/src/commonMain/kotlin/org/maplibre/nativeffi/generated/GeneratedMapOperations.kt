@@ -219,7 +219,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun attachMetalBorrowedTexture(
     descriptor: MetalBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
+  ): NewRenderSession =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
@@ -236,7 +236,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
         { it.bindingCallbacks },
         { it.dispose() },
-        ::RenderSessionAttachment,
+        ::NewRenderSession,
       )
     }
 
@@ -249,7 +249,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun attachMetalOwnedTexture(
     descriptor: MetalOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
+  ): NewRenderSession =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
@@ -266,7 +266,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
         { it.bindingCallbacks },
         { it.dispose() },
-        ::RenderSessionAttachment,
+        ::NewRenderSession,
       )
     }
 
@@ -279,7 +279,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun attachMetalSurface(
     descriptor: MetalSurfaceDescriptor,
     options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
+  ): NewRenderSession =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
@@ -296,7 +296,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
         { it.bindingCallbacks },
         { it.dispose() },
-        ::RenderSessionAttachment,
+        ::NewRenderSession,
       )
     }
 
@@ -309,7 +309,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun attachOpenglBorrowedTexture(
     descriptor: OpenglBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
+  ): NewRenderSession =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
@@ -326,7 +326,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
         { it.bindingCallbacks },
         { it.dispose() },
-        ::RenderSessionAttachment,
+        ::NewRenderSession,
       )
     }
 
@@ -339,7 +339,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun attachOpenglOwnedTexture(
     descriptor: OpenglOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
+  ): NewRenderSession =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
@@ -356,7 +356,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
         { it.bindingCallbacks },
         { it.dispose() },
-        ::RenderSessionAttachment,
+        ::NewRenderSession,
       )
     }
 
@@ -369,7 +369,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun attachOpenglSurface(
     descriptor: OpenglSurfaceDescriptor,
     options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
+  ): NewRenderSession =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
@@ -386,7 +386,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
         { it.bindingCallbacks },
         { it.dispose() },
-        ::RenderSessionAttachment,
+        ::NewRenderSession,
       )
     }
 
@@ -399,7 +399,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun attachVulkanBorrowedTexture(
     descriptor: VulkanBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
+  ): NewRenderSession =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
@@ -416,7 +416,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
         { it.bindingCallbacks },
         { it.dispose() },
-        ::RenderSessionAttachment,
+        ::NewRenderSession,
       )
     }
 
@@ -429,7 +429,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun attachVulkanOwnedTexture(
     descriptor: VulkanOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
+  ): NewRenderSession =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
@@ -446,7 +446,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
         { it.bindingCallbacks },
         { it.dispose() },
-        ::RenderSessionAttachment,
+        ::NewRenderSession,
       )
     }
 
@@ -459,7 +459,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun attachVulkanSurface(
     descriptor: VulkanSurfaceDescriptor,
     options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
+  ): NewRenderSession =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
@@ -476,7 +476,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
         { it.bindingCallbacks },
         { it.dispose() },
-        ::RenderSessionAttachment,
+        ::NewRenderSession,
       )
     }
 
@@ -489,7 +489,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun attachWebgpuBorrowedTexture(
     descriptor: WebgpuBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
+  ): NewRenderSession =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
@@ -506,7 +506,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
         { it.bindingCallbacks },
         { it.dispose() },
-        ::RenderSessionAttachment,
+        ::NewRenderSession,
       )
     }
 
@@ -519,7 +519,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun attachWebgpuOwnedTexture(
     descriptor: WebgpuOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
+  ): NewRenderSession =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
@@ -536,7 +536,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
         { it.bindingCallbacks },
         { it.dispose() },
-        ::RenderSessionAttachment,
+        ::NewRenderSession,
       )
     }
 
@@ -549,7 +549,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun attachWebgpuSurface(
     descriptor: WebgpuSurfaceDescriptor,
     options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
+  ): NewRenderSession =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
@@ -566,7 +566,7 @@ public abstract class GeneratedMapOperations internal constructor() {
         { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
         { it.bindingCallbacks },
         { it.dispose() },
-        ::RenderSessionAttachment,
+        ::NewRenderSession,
       )
     }
 

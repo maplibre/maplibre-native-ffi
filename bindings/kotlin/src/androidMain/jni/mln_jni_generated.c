@@ -2177,11 +2177,12 @@ static jint mln_runtime_create_jni(
 }
 
 static jint mln_runtime_create_map_jni(
-  JNIEnv* env, jclass type, jlong runtime, jlong options, jlong completion,
-  jlong out_diagnostic
+  JNIEnv* env, jclass type, jlong runtime, jlong options, jlong out_map,
+  jlong completion, jlong out_diagnostic
 ) {
   return (jint)mln_runtime_create_map(
     (mln_runtime)runtime, MLN_JNI_POINTER(const mln_map_options*, options),
+    MLN_JNI_POINTER(mln_map*, out_map),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -2942,7 +2943,7 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_runtime_clear_resource_transform", "(JJJ)I",
    (void*)mln_runtime_clear_resource_transform_jni},
   {"mln_runtime_create", "(JJJ)I", (void*)mln_runtime_create_jni},
-  {"mln_runtime_create_map", "(JJJJ)I", (void*)mln_runtime_create_map_jni},
+  {"mln_runtime_create_map", "(JJJJJ)I", (void*)mln_runtime_create_map_jni},
   {"mln_runtime_create_offline_region", "(JJJJJJ)I",
    (void*)mln_runtime_create_offline_region_jni},
   {"mln_runtime_delete_offline_region", "(JJJJ)I",
@@ -3377,7 +3378,7 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_runtime_clear_resource_transform", "(JJJ)I",
    (void*)mln_runtime_clear_resource_transform_jni},
   {"mln_runtime_create", "(JJJ)I", (void*)mln_runtime_create_jni},
-  {"mln_runtime_create_map", "(JJJJ)I", (void*)mln_runtime_create_map_jni},
+  {"mln_runtime_create_map", "(JJJJJ)I", (void*)mln_runtime_create_map_jni},
   {"mln_runtime_create_offline_region", "(JJJJJJ)I",
    (void*)mln_runtime_create_offline_region_jni},
   {"mln_runtime_delete_offline_region", "(JJJJ)I",

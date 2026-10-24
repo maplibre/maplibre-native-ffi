@@ -4945,7 +4945,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_attach_metal_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  RenderSessionAttachment attachMetalBorrowedTexture(
+  NewRenderSession attachMetalBorrowedTexture(
     MetalBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -4972,7 +4972,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      RenderSessionAttachment.new,
+      NewRenderSession.new,
     );
   }
 
@@ -4980,7 +4980,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_attach_metal_owned_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  RenderSessionAttachment attachMetalOwnedTexture(
+  NewRenderSession attachMetalOwnedTexture(
     MetalOwnedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -5007,7 +5007,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      RenderSessionAttachment.new,
+      NewRenderSession.new,
     );
   }
 
@@ -5015,7 +5015,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_attach_metal_surface` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  RenderSessionAttachment attachMetalSurface(
+  NewRenderSession attachMetalSurface(
     MetalSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -5042,7 +5042,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      RenderSessionAttachment.new,
+      NewRenderSession.new,
     );
   }
 
@@ -5050,7 +5050,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_attach_opengl_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  RenderSessionAttachment attachOpenglBorrowedTexture(
+  NewRenderSession attachOpenglBorrowedTexture(
     OpenglBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -5077,7 +5077,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      RenderSessionAttachment.new,
+      NewRenderSession.new,
     );
   }
 
@@ -5085,7 +5085,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_attach_opengl_owned_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  RenderSessionAttachment attachOpenglOwnedTexture(
+  NewRenderSession attachOpenglOwnedTexture(
     OpenglOwnedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -5112,7 +5112,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      RenderSessionAttachment.new,
+      NewRenderSession.new,
     );
   }
 
@@ -5120,7 +5120,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_attach_opengl_surface` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  RenderSessionAttachment attachOpenglSurface(
+  NewRenderSession attachOpenglSurface(
     OpenglSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -5147,7 +5147,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      RenderSessionAttachment.new,
+      NewRenderSession.new,
     );
   }
 
@@ -5155,7 +5155,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_attach_vulkan_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  RenderSessionAttachment attachVulkanBorrowedTexture(
+  NewRenderSession attachVulkanBorrowedTexture(
     VulkanBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -5182,7 +5182,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      RenderSessionAttachment.new,
+      NewRenderSession.new,
     );
   }
 
@@ -5190,7 +5190,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_attach_vulkan_owned_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  RenderSessionAttachment attachVulkanOwnedTexture(
+  NewRenderSession attachVulkanOwnedTexture(
     VulkanOwnedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -5217,7 +5217,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      RenderSessionAttachment.new,
+      NewRenderSession.new,
     );
   }
 
@@ -5225,7 +5225,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_attach_vulkan_surface` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  RenderSessionAttachment attachVulkanSurface(
+  NewRenderSession attachVulkanSurface(
     VulkanSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -5252,7 +5252,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      RenderSessionAttachment.new,
+      NewRenderSession.new,
     );
   }
 
@@ -5260,7 +5260,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_attach_webgpu_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  RenderSessionAttachment attachWebgpuBorrowedTexture(
+  NewRenderSession attachWebgpuBorrowedTexture(
     WebgpuBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -5287,7 +5287,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      RenderSessionAttachment.new,
+      NewRenderSession.new,
     );
   }
 
@@ -5295,7 +5295,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_attach_webgpu_owned_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  RenderSessionAttachment attachWebgpuOwnedTexture(
+  NewRenderSession attachWebgpuOwnedTexture(
     WebgpuOwnedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -5322,7 +5322,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      RenderSessionAttachment.new,
+      NewRenderSession.new,
     );
   }
 
@@ -5330,7 +5330,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_attach_webgpu_surface` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  RenderSessionAttachment attachWebgpuSurface(
+  NewRenderSession attachWebgpuSurface(
     WebgpuSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -5357,7 +5357,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      RenderSessionAttachment.new,
+      NewRenderSession.new,
     );
   }
 
@@ -7384,10 +7384,11 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_create_map` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<MapHandle> createMap(MapOptions options) => _queryOwned(
-    (arena, completion) => raw.mln_runtime_create_map(
+  NewMap createMap(MapOptions options) => _attach(
+    (arena, completion, outMap) => raw.mln_runtime_create_map(
       _handle.raw,
       _writeMapOptions(options, arena),
+      outMap,
       completion,
       nativeDiagnostic,
     ),
@@ -7398,6 +7399,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
         _check(raw.mln_map_dispose(handle, nativeDiagnostic));
       },
     ),
+    NewMap.new,
   );
 
   /// Starts creating an offline region.
@@ -7773,18 +7775,30 @@ final class StyleExpressionHandle implements Finalizable {
   });
 }
 
-/// A new session and the completion of the attachment that created it.
-final class RenderSessionAttachment {
-  const RenderSessionAttachment(this.session, this.completed);
+/// A new map and the completion that reports it ready.
+final class NewMap {
+  const NewMap(this.map, this.ready);
 
-  /// The session, usable at once while attachment completes.
+  /// The map, which the caller owns before it is ready.
+  final MapHandle map;
+
+  /// Completes once the map is ready, or fails with its status.
+  /// Await it or call `ignore()`, because the zone reports a failure
+  /// that nothing handles.
+  final Future<void> ready;
+}
+
+/// A new session and the completion that reports it ready.
+final class NewRenderSession {
+  const NewRenderSession(this.session, this.ready);
+
+  /// The session, which the caller owns before it is ready.
   final RenderSessionHandle session;
 
-  /// Completes after native attachment finishes, or fails with its
-  /// status, such as `Status.targetLost` when the session is disposed
-  /// first. Await it or call `ignore()`, because the zone reports a
-  /// failure that nothing handles.
-  final Future<void> completed;
+  /// Completes once the session is ready, or fails with its status.
+  /// Await it or call `ignore()`, because the zone reports a failure
+  /// that nothing handles.
+  final Future<void> ready;
 }
 
 /// A `MetalTextureFrame` that is readable only while the callback of

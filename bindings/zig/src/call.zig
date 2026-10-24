@@ -658,16 +658,6 @@ pub fn value(comptime T: type, comptime Raw: type) type {
     };
 }
 
-pub fn handle(comptime T: type, comptime Raw: type) type {
-    return struct {
-        pub const Value = T;
-        pub const output = true;
-        pub fn copy(result: *const c.mln_completion_result, _: marshal.Decode) Error!Value {
-            return T.adopt(try completion.value(Raw)(result));
-        }
-    };
-}
-
 pub fn orNull(comptime Copy: type) type {
     return struct {
         pub const Value = ?Copy.Value;

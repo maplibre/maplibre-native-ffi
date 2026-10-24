@@ -552,7 +552,7 @@ def owned(plan, values, native):
     create = f"{{ {owner_name(handle)}(it{parent}) }}"
     attachment = immediate_owner and bool(plan.completion)
     if attachment:
-        returns = name(handle.native) + "Attachment"
+        returns = "New" + name(handle.native)
         values.attachments[returns] = (
             identifier(output_member(plan.owned_outputs[0].parameter)),
             result,
@@ -562,14 +562,6 @@ def owned(plan, values, native):
     head = f"  public fun {method}({declaration(params)}): {returns} ="
     arguments = call_arguments(plan, values)
     owners = receiver_arguments(plan)
-    if plan.completion and not immediate_owner:
-        arguments.append("completion")
-        body = encodings(plan) + native.checked(plan.function, arguments)
-        drop = "it." + disposal_method(handle) + "()"
-        return (
-            f"{head} nativeSubmitOwned({owners}, {create}, {disposal(handle)}, "
-            f"{{ {drop} }}) {{ {body} }}\n"
-        )
     arguments.append("out")
     registered = any(values.needs_registration(p.value) for p in inputs)
     if plan.blocks:

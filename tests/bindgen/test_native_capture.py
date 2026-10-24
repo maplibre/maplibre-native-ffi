@@ -5,7 +5,6 @@ from __future__ import annotations
 import shutil
 import tempfile
 import unittest
-from dataclasses import replace
 from pathlib import Path
 
 from support import (
@@ -71,17 +70,8 @@ class NativeCaptureTests(unittest.TestCase):
             with self.assertRaisesRegex(ModelError, "owned"):
                 generate(mutated)
 
-    def test_compiled_capture_copies_deeply_and_disposes_discarded_handles(self):
-        api = replace(
-            self.api,
-            functions=tuple(
-                replace(function, metadata={**function.metadata, "shape": "array"})
-                if function.name == "mln_runtime_create_map"
-                else function
-                for function in self.api.functions
-            ),
-        )
-        compile_and_run(self, generate(api), CAPTURE_TEST)
+    def test_compiled_capture_copies_completion_values_deeply(self):
+        compile_and_run(self, generate(self.api), CAPTURE_TEST)
 
     def test_delivered_callback_copies_outlive_their_call_and_release_handles(
         self,
@@ -200,10 +190,9 @@ CAPTURE_TEST = r"""
 #include <cstring>
 #include <new>
 #include "delivery/delivery_queue.hpp"
-static unsigned disposed = 0;
-auto mln::delivery::dispose_owner(mln::core::HandleKind kind, std::uint64_t handle) noexcept -> mln_status {
-  assert(kind == mln::core::HandleKind::Map && (handle == 42 || handle == 43));
-  ++disposed;
+// Only delivered records own handles, and this case discards none.
+auto mln::delivery::dispose_owner(mln::core::HandleKind, std::uint64_t) noexcept -> mln_status {
+  assert(false);
   return MLN_STATUS_OK;
 }
 
@@ -250,21 +239,6 @@ int main() {
   try { static_cast<void>(copy(&offline, 1)); }
   catch (const std::invalid_argument&) { variant = true; }
   assert(variant);
-
-  // A copied map is still the batch's: discarding it disposes the map, and a
-  // value that owns no handle has nothing to discard.
-  mln_map handles[] = {42, 43};
-  const auto* maps = copy(handles, 2);
-  assert(maps[0] == 42 && maps[1] == 43);
-  auto owned = mln::delivery::DeliveryItem{};
-  owned.view.payload.completion = mln_completion_result{
-    .size = sizeof(mln_completion_result), .status = MLN_STATUS_OK,
-    .disposition = 0, .value_size = sizeof(mln_map), .generation = 0,
-    .render_update_generation = 0, .diagnostic = {}, .value = maps,
-    .value_count = 2
-  };
-  mln::delivery::completion_capture<mln_map>.discard(owned);
-  assert(disposed == 2);
 }
 """
 

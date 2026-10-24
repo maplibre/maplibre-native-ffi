@@ -10,7 +10,8 @@ function(mln_ffi_configure_render_dependencies target)
       get_target_property(MLN_FFI_EGL_INCLUDE_DIRS MLN_FFI::EGL
                           INTERFACE_INCLUDE_DIRECTORIES)
       get_target_property(MLN_FFI_EGL_LIBRARY MLN_FFI::EGL IMPORTED_LOCATION)
-      get_target_property(MLN_FFI_GLES_LIBRARY MLN_FFI::GLESv2 IMPORTED_LOCATION)
+      get_target_property(
+        MLN_FFI_GLES_LIBRARY MLN_FFI::GLESv2 IMPORTED_LOCATION)
       get_filename_component(
         MLN_FFI_EGL_LIBRARY_DIR "${MLN_FFI_EGL_LIBRARY}"
         DIRECTORY)

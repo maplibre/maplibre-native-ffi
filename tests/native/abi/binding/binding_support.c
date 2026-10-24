@@ -92,12 +92,12 @@ static void dart_wakes_post_zero_per_wake_and_one_on_release(void) {
 // Creates a map that the handle fixtures do not record, for a case that hands
 // it to an owner token.
 static mln_map create_untracked_map(mln_runtime runtime) {
-  mln_test_completion completion = mln_test_completion_default(sizeof(mln_map));
-  MLN_TEST_OK(
-    mln_runtime_create_map(runtime, NULL, &completion.descriptor, NULL)
-  );
+  mln_test_completion completion = mln_test_completion_default(0);
   mln_map map = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_test_completion_finish_value(&completion, &map, sizeof(map)));
+  MLN_TEST_OK(
+    mln_runtime_create_map(runtime, NULL, &map, &completion.descriptor, NULL)
+  );
+  MLN_TEST_OK(mln_test_completion_settle(&completion));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
   return map;
 }
