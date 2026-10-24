@@ -62,7 +62,7 @@ final class MetalRenderTarget {
     viewport: Viewport,
     frameWake: Wake
   ) async throws -> MetalRenderTarget {
-    let attachment = try map.attachMetalSurface(
+    let created = try map.attachMetalSurface(
       descriptor: MetalSurfaceDescriptor(
         extent: viewport.extent,
         context: graphics.contextDescriptor,
@@ -70,9 +70,9 @@ final class MetalRenderTarget {
       ),
       options: .init(driver: .coreWorker, frameWake: frameWake)
     )
-    let session = attachment.session
+    let session = created.session
     do {
-      try await attachment.completion.value
+      try await created.ready.value
       return MetalRenderTarget(session: session)
     } catch {
       _ = try? session.abandon()

@@ -131,7 +131,9 @@ test "a child map keeps its disposed runtime's callbacks alive" {
     defer options.deinit();
     var runtime = try maplibre.runtimeCreate(options.value, null);
     try support.resolve(try runtime.setEventHandler(.init(&handler_releases, ignoreEvents, countRelease), null));
-    var map = try support.resolve(try runtime.createMap(maplibre.mapOptionsDefault(), null));
+    const created = try runtime.createMap(maplibre.mapOptionsDefault(), null);
+    var map = created.map;
+    try support.resolve(created.ready);
 
     runtime.deinit();
     try testing.expectError(error.InvalidState, runtime.getEventMask(null));
@@ -144,23 +146,4 @@ test "a child map keeps its disposed runtime's callbacks alive" {
 
     map.deinit();
     try handler_releases.waitFor(1);
-}
-
-// A creation future owns the object it adopts until a wait hands it out, so
-// discarding the future, before or after native completes it, retires the map.
-test "discarding a creation future retires the map it creates" {
-    const fixture = try support.Fixture.create(.{});
-    defer fixture.destroy();
-    try fixture.closeMap();
-
-    var completed = try fixture.runtime.createMap(maplibre.mapOptionsDefault(), null);
-    while (!try completed.poll()) try fixture.fence();
-    completed.deinit();
-    var pending = try fixture.runtime.createMap(maplibre.mapOptionsDefault(), null);
-    pending.deinit();
-    try fixture.fence();
-
-    // Both maps retire, so the runtime is left with no child to refuse its
-    // release.
-    try fixture.releaseRuntimeWhenChildless();
 }

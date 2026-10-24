@@ -14,7 +14,8 @@ public sealed class HandleLifecycleTests
     public async Task SynchronousCloseIsIdempotentAndAsyncReleaseReachesNative()
     {
         var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        var map = await runtime.CreateMapAsync(NativeFixture.SmallMap, TestWaits.Token);
+        var map = runtime.CreateMap(NativeFixture.SmallMap);
+        await map.Ready.WaitAsync(TestWaits.Token);
 
         await map.CloseAsync();
         Assert.Equal(
@@ -142,7 +143,8 @@ public sealed class HandleLifecycleTests
     public async Task ARefusedCloseLeavesTheHandleUsableAndARetrySucceeds()
     {
         using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        using var map = await runtime.CreateMapAsync(NativeFixture.SmallMap, TestWaits.Token);
+        using var map = runtime.CreateMap(NativeFixture.SmallMap);
+        await map.Ready.WaitAsync(TestWaits.Token);
 
         var error = Assert.Throws<MaplibreException>(() =>
         {
@@ -160,7 +162,8 @@ public sealed class HandleLifecycleTests
     public async Task AClosedHandlePassesItsStaleIdToNative()
     {
         var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        var map = await runtime.CreateMapAsync(NativeFixture.SmallMap, TestWaits.Token);
+        var map = runtime.CreateMap(NativeFixture.SmallMap);
+        await map.Ready.WaitAsync(TestWaits.Token);
         await map.CloseAsync();
         await runtime.CloseAsync();
 
@@ -190,29 +193,10 @@ public sealed class HandleLifecycleTests
     private static (MapHandle Map, WeakReference Runtime) CreateMapOfUnreferencedRuntime()
     {
         var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        var map = runtime.CreateMapAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
+        var map = runtime.CreateMap(NativeFixture.SmallMap);
+        map.Ready.GetAwaiter().GetResult();
         return (map, new WeakReference(runtime));
     }
-
-    [Fact]
-    public async Task ADroppedCreationTaskRetiresTheMapItCreates()
-    {
-        var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        var creation = DropCreation(runtime);
-        // The creation completes before a later runtime command, so the dropped task holds the
-        // map.
-        await runtime.ClearResourceTransformAsync();
-
-        Gc.Collect();
-
-        Assert.False(creation.IsAlive);
-        // A live map would make the runtime refuse to close.
-        await runtime.CloseAsync();
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static WeakReference DropCreation(RuntimeHandle runtime) =>
-        new(runtime.CreateMapAsync(NativeFixture.SmallMap));
 }
 
 #pragma warning restore xUnit1031

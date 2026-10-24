@@ -79,7 +79,7 @@ import type {
 } from "./generated_values.ts";
 
 /** The digest of the C headers that this facade and its addon came from. */
-export const ABI_DIGEST = "9d73cb2ac5fafbd8";
+export const ABI_DIGEST = "d831974474435625";
 
 /** The index of each completion decoder in the addon's decoder table. */
 export const Decoder = {
@@ -89,20 +89,19 @@ export const Decoder = {
   cameraQueryResult: 3,
   latLngBounds: 4,
   latLngList: 5,
-  map: 6,
-  offlineRegionInfo: 7,
-  offlineRegionInfoList: 8,
-  offlineRegionInfoOptional: 9,
-  offlineRegionStatus: 10,
-  renderedFeatureList: 11,
-  sourceFeatureList: 12,
-  styleImageInfoOptional: 13,
-  styleLayerInfoList: 14,
-  styleLayerInfoOptional: 15,
-  styleSourceInfoList: 16,
-  styleSourceInfoOptional: 17,
-  styleTransitionOptions: 18,
-  textureReadbackResult: 19,
+  offlineRegionInfo: 6,
+  offlineRegionInfoList: 7,
+  offlineRegionInfoOptional: 8,
+  offlineRegionStatus: 9,
+  renderedFeatureList: 10,
+  sourceFeatureList: 11,
+  styleImageInfoOptional: 12,
+  styleLayerInfoList: 13,
+  styleLayerInfoOptional: 14,
+  styleSourceInfoList: 15,
+  styleSourceInfoOptional: 16,
+  styleTransitionOptions: 17,
+  textureReadbackResult: 18,
 } as const;
 
 /** The addon function of each generated operation, by C function name. */
@@ -782,7 +781,7 @@ export interface NativeOperations {
     runtime: bigint,
     options: MapOptions | undefined,
     completion: number,
-  ): void;
+  ): bigint;
   mln_runtime_create_offline_region(
     runtime: bigint,
     definition: OfflineRegionDefinition,

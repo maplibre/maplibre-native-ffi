@@ -63,14 +63,13 @@ internal sealed class RenderFixture : IDisposable
                 Graphics.MakeCurrent();
             Runtime = RuntimeHandle.Create(RuntimeOptions.Default);
             Complete(Runtime.SetResourceProviderAsync(NativeFixture.DenyingProvider));
-            Map = Complete(
-                Runtime.CreateMapAsync(
-                    MapOptions.Default with
-                    {
-                        InitialExtent = new LogicalExtent(Width, Height, 1),
-                    }
-                )
+            Map = Runtime.CreateMap(
+                MapOptions.Default with
+                {
+                    InitialExtent = new LogicalExtent(Width, Height, 1),
+                }
             );
+            Complete(Map.Ready);
             Complete(Map.SetStyleJsonAsync(RedStyle));
             Session = Attach(
                 configure(
@@ -100,7 +99,7 @@ internal sealed class RenderFixture : IDisposable
 
     internal MapHandle Map { get; } = null!;
 
-    /// <summary>The attached session. Its attachment completes once the fixture services it.</summary>
+    /// <summary>The attached session, which becomes ready once the fixture services it.</summary>
     internal RenderSessionHandle Session { get; } = null!;
 
     /// <summary>

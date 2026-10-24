@@ -58,11 +58,11 @@ int main(void) {
   probe_require(mln_runtime_create(&options, &runtime, NULL), "create runtime");
   probe_latch creation;
   const mln_completion created = probe_latch_completion(&creation);
+  mln_map map = MLN_HANDLE_NULL;
   probe_require(
-    mln_runtime_create_map(runtime, NULL, &created, NULL), "create map"
+    mln_runtime_create_map(runtime, NULL, &map, &created, NULL), "create map"
   );
   probe_require(probe_latch_wait(&creation), "map completion");
-  const mln_map map = creation.handle;
   mln_camera_update camera = mln_camera_update_default();
   camera.mode = MLN_CAMERA_UPDATE_MODE_EASE;
   camera.camera.fields = MLN_CAMERA_OPTION_ZOOM;

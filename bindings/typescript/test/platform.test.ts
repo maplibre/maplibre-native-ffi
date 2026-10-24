@@ -101,7 +101,8 @@ test(
         "} catch (error) {",
         "  console.log(`the second copy failed: ${(error as Error).message}`);",
         "}",
-        "const map = await runtime.createMap();",
+        "const { map, ready } = runtime.createMap();",
+        "await ready;",
         "await map.close();",
         "await runtime.close();",
         'console.log("the first copy still works");',
@@ -172,7 +173,8 @@ test(
 /** Leaves a runtime and a map open for the collector. */
 async function abandonRuntimeWithMap() {
   const runtime = runtimeCreate();
-  const map = await runtime.createMap();
+  const { map, ready } = runtime.createMap();
+  await ready;
   return {
     runtime: runtime.id,
     map: map.id,

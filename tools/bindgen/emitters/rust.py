@@ -181,23 +181,13 @@ def adopt_owned(owned, raw, value_types, parent="parent"):
     return public, f"{public}::adopt({raw}, {source})"
 
 
-def result_rule(
-    plan: OperationPlan, value_types, parent: str = "parent"
-) -> tuple[str, str]:
+def result_rule(plan: OperationPlan, value_types) -> tuple[str, str]:
     """The completion's public result type and the converter that copies it."""
     from .rust_dynamic_values import decode
 
     result = plan.result
     if result is None:
         return "()", "completion::unit"
-    if plan.completion and plan.completion.result_owner:
-        public, adopted = adopt_owned(
-            plan.completion.result_owner,
-            f"completion::copy_value::<sys::{result.native}>(result)?",
-            value_types,
-            parent,
-        )
-        return public, f"move |result| {adopted}"
     if result.ownership != "borrowed":
         raise Unsupported("completion result requires resolved ownership transfer")
     array = result.kind == "array"
@@ -342,16 +332,8 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
     signature = ["&self"] if receiver else []
     prelude, setup, outputs = [], [], []
     uses_call = False
-    owner_plans = [
-        *plan.owned_outputs,
-        *(
-            [plan.completion.result_owner]
-            if plan.completion and plan.completion.result_owner
-            else []
-        ),
-    ]
     parent_line = None
-    if any(owner.parent_parameter for owner in owner_plans):
+    if any(owner.parent_parameter for owner in plan.owned_outputs):
         parent_line = f"let {parent_local} = self.inner.parent();"
         prelude.append(parent_line)
     input_plans = {parameter.name: parameter for parameter in plan.inputs}
@@ -681,7 +663,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             completed = "NativeFuture<CommandCompletion>"
             expression = f"{call_local}.command({closure} {native})"
         else:
-            result, converter = result_rule(plan, value_types, parent_local)
+            result, converter = result_rule(plan, value_types)
             completed = f"NativeFuture<{result}>"
             expression = f"{call_local}.complete({closure} {native}, {converter})"
         if outputs:

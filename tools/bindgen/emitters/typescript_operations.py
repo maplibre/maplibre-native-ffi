@@ -1,7 +1,7 @@
 """Render the TypeScript owner classes, top-level functions, and addon interface.
 
 Every generated method calls one runtime helper for its execution shape:
-`run`, `command`, `query`, `queryOwned`, and `attach` for completions,
+`run`, `command`, `query`, and `attach` for completions,
 `closeSync` and `closeAsync` for a release, `adopt` for a handle that native
 code transfers to a new owner, and `ViewScope` for a borrowed view. A call
 passes the raw handle ID, and native code reports a released one.
@@ -124,15 +124,11 @@ def method_body(bound, values, natives, entry: Lowered, discard=False) -> list[s
     elif shape == "query":
         result = entry.returns.removeprefix("Promise<").removesuffix(">")
         lines = [f"return query<{result}>({decoder}, {start});"]
-    elif shape == "query_owned":
-        lines = [
-            f"return queryOwned({decoder}, {start}, (handle) => {construct(bound, entry, entry.owned, 'handle')});"
-        ]
     elif shape == "attach":
         member = identifier(output_member(entry.owned.parameter))
         lines = [
-            f"const [{member}, completed] = attach({start}, (handle) => {construct(bound, entry, entry.owned, 'handle')});",
-            f"return {{ {member}, completed }};",
+            f"const [{member}, ready] = attach({start}, (handle) => {construct(bound, entry, entry.owned, 'handle')});",
+            f"return {{ {member}, ready }};",
         ]
     elif shape == "owned":
         lines = [f"const handle = {call};"]
@@ -320,17 +316,16 @@ def render_attachments(bound, lowered: list[Lowered]) -> list[str]:
         name = attachment_name(entry.owned)
         member = identifier(output_member(entry.owned.parameter))
         chunks[name] = (
-            f"/** A new {member} and the completion of the attachment that created it. */\n"
+            f"/** A new {member} and the completion that reports it ready. */\n"
             f"export interface {name} {{\n"
-            f"  /** The {member}, usable at once while attachment completes. */\n"
+            f"  /** The {member}, which the caller owns before it is ready. */\n"
             f"  readonly {member}: {owner_class(entry.owned.handle)};\n"
             "  /**\n"
-            "   * Settles after native attachment finishes. It rejects with a\n"
-            "   * `MaplibreError` when target initialization fails or the session is\n"
-            "   * abandoned first, so await it or attach a rejection handler: an\n"
-            "   * unhandled rejection ends a Node process by default.\n"
+            f"   * Settles once the {member} is ready. It rejects with a `MaplibreError`\n"
+            "   * when it fails to become ready, so await it or attach a rejection\n"
+            "   * handler: an unhandled rejection ends a Node process by default.\n"
             "   */\n"
-            "  readonly completed: Promise<void>;\n}\n"
+            "  readonly ready: Promise<void>;\n}\n"
         )
     return [chunks[name] for name in sorted(chunks)]
 
@@ -484,7 +479,6 @@ def runtime_imports(text: str) -> str:
             "attach",
             "command",
             "query",
-            "queryOwned",
             "run",
             "submitRun",
         ],

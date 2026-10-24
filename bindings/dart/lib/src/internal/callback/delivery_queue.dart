@@ -27,19 +27,13 @@ abstract interface class _PendingCompletionBase {
 }
 
 final class _PendingCompletion<T> implements _PendingCompletionBase {
-  _PendingCompletion(
-    this.completer,
-    this.decode,
-    this.submissionStack,
-    this.ownsHandle,
-  );
+  _PendingCompletion(this.completer, this.decode, this.submissionStack);
 
   @override
   final zone = Zone.current;
   final Completer<T> completer;
   final NativeCompletionDecoder<T> decode;
   final StackTrace submissionStack;
-  final bool ownsHandle;
 
   @override
   void finish(int batch, int index, raw.mln_completion_result result) {
@@ -51,7 +45,6 @@ final class _PendingCompletion<T> implements _PendingCompletionBase {
           generation: result.generation,
         );
       }
-      if (ownsHandle) _take(batch, index);
       final value = decode(result);
       completer.complete(value);
     } catch (error) {
@@ -59,10 +52,6 @@ final class _PendingCompletion<T> implements _PendingCompletionBase {
     }
   }
 }
-
-void _take(int batch, int index) => checkNativeCall(
-  raw.mln_delivery_batch_take(batch, index, nativeDiagnostic),
-);
 
 /// The handlers of one queued callback registration, which its user data
 /// token names.
@@ -276,14 +265,9 @@ final isolateDeliveryQueue = DeliveryQueue._();
 Future<T> startNativeCompletion<T>({
   required NativeCompletionStart start,
   required NativeCompletionDecoder<T> decode,
-  bool ownsHandle = false,
 }) {
   try {
-    return submitNativeCompletion(
-      start: start,
-      decode: decode,
-      ownsHandle: ownsHandle,
-    );
+    return submitNativeCompletion(start: start, decode: decode);
   } catch (error, stack) {
     return Future.error(error, stack);
   }
@@ -294,12 +278,11 @@ Future<T> startNativeCompletion<T>({
 Future<T> submitNativeCompletion<T>({
   required NativeCompletionStart start,
   required NativeCompletionDecoder<T> decode,
-  bool ownsHandle = false,
 }) {
   final queue = isolateDeliveryQueue;
   final completer = Completer<T>();
   final token = queue._addCompletion(
-    _PendingCompletion<T>(completer, decode, StackTrace.current, ownsHandle),
+    _PendingCompletion<T>(completer, decode, StackTrace.current),
   );
   try {
     withNativeArena((arena) {

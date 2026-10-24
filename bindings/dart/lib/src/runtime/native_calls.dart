@@ -104,21 +104,13 @@ Future<List<T>?> _queryOptionalList<T>(
   decode: (result) => result.value == nullptr ? null : value.readList(result),
 );
 
-/// Starts an operation whose completion transfers one handle, which [adopt]
-/// gives its owner once the binding has taken it from the delivery batch.
-Future<T> _queryOwned<T>(_NativeStart start, T Function(int handle) adopt) =>
-    startNativeCompletion(
-      start: _withArena(start),
-      decode: (result) => adopt(result.value.cast<Uint64>().value),
-      ownsHandle: true,
-    );
-
-/// Starts an attachment, which writes its owner's handle at admission and
-/// completes once attachment finishes.
+/// Starts a call that creates an owner in a pending state, such as a map
+/// creation or a render-session attach. The call writes its owner's handle at
+/// admission and completes once the owner is ready.
 ///
 /// [adopt] gives the handle its owner as soon as native code admits the call,
-/// and [attachment] pairs that owner with the completion, which keeps the
-/// owner reachable until it completes.
+/// and [result] pairs that owner with its readiness, which keeps the owner
+/// reachable until it completes.
 A _attach<T extends Object, A>(
   int Function(
     Allocator arena,
@@ -127,10 +119,10 @@ A _attach<T extends Object, A>(
   )
   start,
   T Function(int handle) adopt,
-  A Function(T owner, Future<void> completed) attachment,
+  A Function(T owner, Future<void> ready) result,
 ) {
   var handle = 0;
-  final completed = submitNativeCompletion<void>(
+  final ready = submitNativeCompletion<void>(
     start: (completion) => withNativeArena((arena) {
       final output = arena<Uint64>();
       final status = start(arena, completion, output);
@@ -143,10 +135,10 @@ A _attach<T extends Object, A>(
   try {
     owner = adopt(handle);
   } catch (_) {
-    completed.ignore();
+    ready.ignore();
     rethrow;
   }
-  return attachment(owner, completed.whenComplete(() => _keepAlive(owner)));
+  return result(owner, ready.whenComplete(() => _keepAlive(owner)));
 }
 
 @pragma('vm:never-inline')

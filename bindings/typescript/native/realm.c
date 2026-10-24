@@ -602,35 +602,29 @@ static bool take(mln_ts_call* call, size_t index) {
 }
 
 /**
- * completionValue(index, decoder, take) converts a drained completion's value
- * through the decoder that the TypeScript half names, then takes its owned
- * handle from the batch when take is set.
+ * completionValue(index, decoder) converts a drained completion's value
+ * through the decoder that the TypeScript half names.
  */
 static napi_value completion_value(napi_env env, napi_callback_info info) {
   mln_ts_call call;
-  if (!mln_ts_begin(&call, env, info, 3)) {
+  if (!mln_ts_begin(&call, env, info, 2)) {
     return NULL;
   }
   size_t index = 0;
   int64_t decoder = 0;
-  bool taken = false;
   const mln_delivery* delivery = delivery_at(&call, &index);
   if (
-    delivery != NULL &&
-    mln_ts_read_int(
-      &call, call.argv[1], 0, (int64_t)mln_ts_decoder_count - 1, &decoder,
-      "decoder"
-    ) &&
-    mln_ts_read_bool(&call, call.argv[2], &taken, "take")
+    delivery != NULL && mln_ts_read_int(
+                          &call, call.argv[1], 0,
+                          (int64_t)mln_ts_decoder_count - 1, &decoder, "decoder"
+                        )
   ) {
     if (delivery->type != MLN_DELIVERY_TYPE_COMPLETION) {
       napi_throw_error(env, NULL, "the delivery is not a completion");
     } else {
-      // Decode before taking, so a value that fails to convert stays in the
-      // batch, and batchRelease disposes it.
       napi_value value =
         mln_ts_decoders[decoder](env, &delivery->payload.completion);
-      if (value != NULL && (!taken || take(&call, index))) {
+      if (value != NULL) {
         call.result = value;
       }
     }
@@ -653,8 +647,7 @@ static napi_value delivery_take(napi_env env, napi_callback_info info) {
 
 /**
  * batchRelease() releases the drained batch, which disposes what the realm
- * did not take: an owned completion value, or a request, which then fails or
- * keeps its URL.
+ * did not take: a request, which then fails or keeps its URL.
  */
 static napi_value batch_release(napi_env env, napi_callback_info info) {
   (void)info;

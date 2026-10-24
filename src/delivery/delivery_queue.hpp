@@ -80,8 +80,6 @@ struct CompletionCapture {
   void (*measure)(Arena<false>& arena, const void* values, std::size_t count);
   auto (*write)(Arena<true>& arena, const void* values, std::size_t count)
     -> const void*;
-  // Disposes a completion's values, or null when they own no handle.
-  void (*discard)(DeliveryItem& item) noexcept;
 };
 
 template <class T>
@@ -106,29 +104,13 @@ auto write_values(Arena<true>& arena, const void* values, std::size_t count)
   );
 }
 
+// A completion value owns no handle, so a dropped completion leaks nothing; a
+// function returns a new handle through an out parameter instead.
 template <class T>
-auto discard_values(const void* values, std::size_t count) noexcept -> void {
-  if (values == nullptr) return;
-  for (std::size_t index = 0; index < count; ++index) {
-    discard_element(static_cast<const T*>(values)[index]);
-  }
-}
-
-template <class T>
-auto discard_completion_item(DeliveryItem& item) noexcept -> void {
-  const auto& result = item.view.payload.completion;
-  if (result.status == MLN_STATUS_OK) {
-    discard_values<T>(result.value, result.value_count);
-  }
-}
-
-template <class T>
+  requires(!element_owns_handles(static_cast<const T*>(nullptr)))
 inline constexpr auto completion_capture = CompletionCapture{
   .measure = &measure_values<T>,
   .write = &write_values<T>,
-  .discard = element_owns_handles(static_cast<const T*>(nullptr))
-               ? &discard_completion_item<T>
-               : nullptr,
 };
 
 // A delivery with no copied payload, such as MLN_DELIVERY_TYPE_RETIRED.

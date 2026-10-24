@@ -94,7 +94,7 @@ from ._generated_values import (
     WebgpuTextureFrame,
     _maybe,
 )
-from ._operation import GeneratedOperations, _adopt_future, _adopt_value, _view
+from ._operation import GeneratedOperations, _adopt_value, _view
 
 if TYPE_CHECKING:
     from ._generated_owners import (
@@ -116,62 +116,67 @@ class LogicalExtentPhysicalSizeResult(NamedTuple):
 
 class MapAttachMetalBorrowedTextureResult(NamedTuple):
     session: RenderSessionHandle
-    completion: Future[None]
+    ready: Future[None]
 
 
 class MapAttachMetalOwnedTextureResult(NamedTuple):
     session: RenderSessionHandle
-    completion: Future[None]
+    ready: Future[None]
 
 
 class MapAttachMetalSurfaceResult(NamedTuple):
     session: RenderSessionHandle
-    completion: Future[None]
+    ready: Future[None]
 
 
 class MapAttachOpenglBorrowedTextureResult(NamedTuple):
     session: RenderSessionHandle
-    completion: Future[None]
+    ready: Future[None]
 
 
 class MapAttachOpenglOwnedTextureResult(NamedTuple):
     session: RenderSessionHandle
-    completion: Future[None]
+    ready: Future[None]
 
 
 class MapAttachOpenglSurfaceResult(NamedTuple):
     session: RenderSessionHandle
-    completion: Future[None]
+    ready: Future[None]
 
 
 class MapAttachVulkanBorrowedTextureResult(NamedTuple):
     session: RenderSessionHandle
-    completion: Future[None]
+    ready: Future[None]
 
 
 class MapAttachVulkanOwnedTextureResult(NamedTuple):
     session: RenderSessionHandle
-    completion: Future[None]
+    ready: Future[None]
 
 
 class MapAttachVulkanSurfaceResult(NamedTuple):
     session: RenderSessionHandle
-    completion: Future[None]
+    ready: Future[None]
 
 
 class MapAttachWebgpuBorrowedTextureResult(NamedTuple):
     session: RenderSessionHandle
-    completion: Future[None]
+    ready: Future[None]
 
 
 class MapAttachWebgpuOwnedTextureResult(NamedTuple):
     session: RenderSessionHandle
-    completion: Future[None]
+    ready: Future[None]
 
 
 class MapAttachWebgpuSurfaceResult(NamedTuple):
     session: RenderSessionHandle
-    completion: Future[None]
+    ready: Future[None]
+
+
+class RuntimeCreateMapResult(NamedTuple):
+    map: MapHandle
+    ready: Future[None]
 
 
 class _AcquiredFrameHandleOperations(GeneratedOperations):
@@ -405,7 +410,7 @@ class _MapHandleOperations(GeneratedOperations):
         raw = self._native.attach_metal_borrowed_texture(descriptor, options)
         return MapAttachMetalBorrowedTextureResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
+            ready=raw["ready"],
         )
 
     def attach_metal_owned_texture(
@@ -421,7 +426,7 @@ class _MapHandleOperations(GeneratedOperations):
         raw = self._native.attach_metal_owned_texture(descriptor, options)
         return MapAttachMetalOwnedTextureResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
+            ready=raw["ready"],
         )
 
     def attach_metal_surface(
@@ -437,7 +442,7 @@ class _MapHandleOperations(GeneratedOperations):
         raw = self._native.attach_metal_surface(descriptor, options)
         return MapAttachMetalSurfaceResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
+            ready=raw["ready"],
         )
 
     def attach_opengl_borrowed_texture(
@@ -453,7 +458,7 @@ class _MapHandleOperations(GeneratedOperations):
         raw = self._native.attach_opengl_borrowed_texture(descriptor, options)
         return MapAttachOpenglBorrowedTextureResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
+            ready=raw["ready"],
         )
 
     def attach_opengl_owned_texture(
@@ -469,7 +474,7 @@ class _MapHandleOperations(GeneratedOperations):
         raw = self._native.attach_opengl_owned_texture(descriptor, options)
         return MapAttachOpenglOwnedTextureResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
+            ready=raw["ready"],
         )
 
     def attach_opengl_surface(
@@ -485,7 +490,7 @@ class _MapHandleOperations(GeneratedOperations):
         raw = self._native.attach_opengl_surface(descriptor, options)
         return MapAttachOpenglSurfaceResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
+            ready=raw["ready"],
         )
 
     def attach_vulkan_borrowed_texture(
@@ -501,7 +506,7 @@ class _MapHandleOperations(GeneratedOperations):
         raw = self._native.attach_vulkan_borrowed_texture(descriptor, options)
         return MapAttachVulkanBorrowedTextureResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
+            ready=raw["ready"],
         )
 
     def attach_vulkan_owned_texture(
@@ -517,7 +522,7 @@ class _MapHandleOperations(GeneratedOperations):
         raw = self._native.attach_vulkan_owned_texture(descriptor, options)
         return MapAttachVulkanOwnedTextureResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
+            ready=raw["ready"],
         )
 
     def attach_vulkan_surface(
@@ -533,7 +538,7 @@ class _MapHandleOperations(GeneratedOperations):
         raw = self._native.attach_vulkan_surface(descriptor, options)
         return MapAttachVulkanSurfaceResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
+            ready=raw["ready"],
         )
 
     def attach_webgpu_borrowed_texture(
@@ -549,7 +554,7 @@ class _MapHandleOperations(GeneratedOperations):
         raw = self._native.attach_webgpu_borrowed_texture(descriptor, options)
         return MapAttachWebgpuBorrowedTextureResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
+            ready=raw["ready"],
         )
 
     def attach_webgpu_owned_texture(
@@ -565,7 +570,7 @@ class _MapHandleOperations(GeneratedOperations):
         raw = self._native.attach_webgpu_owned_texture(descriptor, options)
         return MapAttachWebgpuOwnedTextureResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
+            ready=raw["ready"],
         )
 
     def attach_webgpu_surface(
@@ -581,7 +586,7 @@ class _MapHandleOperations(GeneratedOperations):
         raw = self._native.attach_webgpu_surface(descriptor, options)
         return MapAttachWebgpuSurfaceResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
+            ready=raw["ready"],
         )
 
     def begin_command_group(self) -> Future[CommandCompletion]:
@@ -1763,13 +1768,16 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.clear_resource_transform()
 
-    def create_map(self, options: MapOptions | None = None) -> Future[MapHandle]:
+    def create_map(self, options: MapOptions | None = None) -> RuntimeCreateMapResult:
         """Starts creation of a map on the runtime.
 
         See `mln_runtime_create_map` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
         """
-        return _adopt_future(self._native.create_map(options), "MapHandle", self)
+        raw = self._native.create_map(options)
+        return RuntimeCreateMapResult(
+            map=_adopt_value(raw["map"], "MapHandle", self), ready=raw["ready"]
+        )
 
     def create_offline_region(
         self, definition: OfflineRegionDefinition, metadata: Buffer

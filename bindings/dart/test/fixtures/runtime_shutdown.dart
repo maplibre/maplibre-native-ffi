@@ -13,7 +13,8 @@ Future<void> closeRuntimes() async {
     await Future.wait(
       List.generate(2, (_) async {
         final runtime = runtimeCreate(runtimeOptionsDefault());
-        final map = await runtime.createMap(mapOptionsDefault());
+        final NewMap(:map, :ready) = runtime.createMap(mapOptionsDefault());
+        await ready;
         try {
           await runtime.close();
           throw StateError('runtime closed with a live map');
@@ -36,7 +37,8 @@ Uint8List _json(String value) => Uint8List.fromList(utf8.encode(value));
 /// shutdown to finalize.
 Future<void> abandonHandles() async {
   final runtime = runtimeCreate(runtimeOptionsDefault());
-  final map = await runtime.createMap(mapOptionsDefault());
+  final NewMap(:map, :ready) = runtime.createMap(mapOptionsDefault());
+  await ready;
   await map.setStyleJson(_json('{"version":8,"sources":{},"layers":[]}'));
   print('ABANDONED_HANDLES');
 }
@@ -47,7 +49,10 @@ Future<void> abandonHandles() async {
 Future<void> abandonSession() async {
   final extent = LogicalExtent(width: 32, height: 32, scaleFactor: 1);
   final runtime = runtimeCreate(runtimeOptionsDefault());
-  final map = await runtime.createMap(MapOptions(initialExtent: extent));
+  final NewMap(:map, :ready) = runtime.createMap(
+    MapOptions(initialExtent: extent),
+  );
+  await ready;
   await map.setStyleJson(
     _json(
       '{"version":8,"sources":{},"layers":[{"id":"background",'
@@ -69,7 +74,7 @@ Future<void> abandonSession() async {
     ),
   );
   final session = attachment.session;
-  await attachment.completed;
+  await attachment.ready;
   // A frame wake leaves the isolate free to finish, so a port keeps it alive
   // until a frame result arrives.
   final waiting = ReceivePort();
@@ -118,7 +123,8 @@ Future<void> exitWithLiveCallbacks() async {
       },
     ),
   );
-  final map = await runtime.createMap(mapOptionsDefault());
+  final NewMap(:map, :ready) = runtime.createMap(mapOptionsDefault());
+  await ready;
   await map.setStyleUrl('shutdown://style');
   await served.future;
   print('LIVE_CALLBACKS');

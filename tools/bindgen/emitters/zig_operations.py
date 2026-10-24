@@ -72,9 +72,6 @@ def copier(plan, values):
     if result is None:
         return "call.unit", "void"
     values.add(result)
-    if plan.completion.result_owner:
-        handle = values.public(result)
-        return f"call.handle({handle}, c.{result.native})", handle
     if result.nullable and result.optional == "empty":
         raise failure(plan.function, "result is both nullable and optional")
     content = replace(result, nullable=False, optional=None)

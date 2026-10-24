@@ -124,7 +124,7 @@ internal abstract class RenderTarget : IDisposable
         Session = attach(driver.AttachOptions(frames, ringDepth));
         try
         {
-            driver.Await(Session, Session.Attached);
+            driver.Await(Session, Session.Ready);
         }
         catch
         {

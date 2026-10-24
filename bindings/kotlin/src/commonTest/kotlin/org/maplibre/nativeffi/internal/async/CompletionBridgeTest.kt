@@ -57,7 +57,7 @@ internal expect fun callCompletion(callback: Long, userData: Long, result: Long)
 internal expect fun callCompletionRelease(release: Long, userData: Long)
 
 /** Submits through [submit] and keeps the descriptor's fields for hand delivery. */
-internal fun <T> capture(submit: ((Long) -> Unit) -> Deferred<T>): HandDeliveredCompletion<T> {
+private fun <T> capture(submit: ((Long) -> Unit) -> Deferred<T>): HandDeliveredCompletion<T> {
   var fields: Triple<Long, Long, Long>? = null
   val deferred = submit { descriptor ->
     fields =
@@ -112,6 +112,31 @@ class CompletionBridgeTest {
       writeU32(result + CompletionResultLayout.VALUE_SIZE, 15u)
       assertFailsWith<IllegalArgumentException> { read() }
     }
+  }
+
+  @Test
+  fun aCompletionConvertsOnceAndAConversionFailureFailsItsDeferred() = runSuspendTest {
+    val failure = IllegalStateException("conversion")
+    var conversions = 0
+    val completion = capture { call ->
+      NativeArena().use { arena ->
+        CompletionBridge.submit<String>(
+          arena,
+          {
+            conversions++
+            throw failure
+          },
+          call,
+        )
+      }
+    }
+    completion.deliver(Status.OK.rawValue, 7u)
+    completion.release()
+    assertEquals(
+      failure.message,
+      assertFailsWith<IllegalStateException> { completion.deferred.await() }.message,
+    )
+    assertEquals(1, conversions)
   }
 
   @Test

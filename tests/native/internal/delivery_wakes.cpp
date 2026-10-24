@@ -132,15 +132,17 @@ void the_next_push_wakes_after_a_failed_drain() {
   TEST_ASSERT_EQUAL_size_t(3, count);
 }
 
-// A release during a failed batch allocation discards the detached owned map,
-// allowing its runtime to close even while a registration retains the state.
+// A release during a failed batch allocation discards the detached items, even
+// while a registration retains the queue state.
 void a_failed_drain_discards_its_items_when_the_queue_closes() {
   auto queue = mln_test_delivery_queue{};
   mln_test_delivery_queue_create(&queue);
   const auto retained = mln::delivery::resolve_delivery_queue(queue.handle);
   const auto runtime = mln_test_create_runtime();
   const auto completion = mln_test_queue_completion(queue.handle, nullptr);
-  MLN_TEST_OK(mln_runtime_create_map(runtime, nullptr, &completion, nullptr));
+  MLN_TEST_OK(
+    mln_runtime_clear_resource_transform(runtime, &completion, nullptr)
+  );
   TEST_ASSERT_TRUE(mln_test_wait_for_count(&queue.wakes, 1));
 
   auto batch = MLN_HANDLE_NULL;

@@ -74,10 +74,6 @@ static void store_completion(
 ) {
   awaited_completion* completion = user_data;
   completion->status = result->status;
-  // Only map creation completes with a value in this example.
-  if (result->value != nullptr && result->value_count == 1) {
-    completion->map = *(const mln_map*)result->value;
-  }
 }
 
 /// Signals from the release callback, which runs once native code is done with

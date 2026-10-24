@@ -99,8 +99,7 @@ pub fn Future(comptime T: type) type {
         /// status and message into `diagnostic`. A command that failed or was
         /// cancelled fails this way too, and the diagnostic carries the
         /// generation it published. A value the caller never takes is
-        /// released by `deinit`, including an owned handle returned by a
-        /// creation operation.
+        /// released by `deinit`.
         pub fn wait(self: *Self, diagnostic: ?*diagnostics.Diagnostic) status.Error!T {
             status.begin(diagnostic);
             return status.propagate(diagnostic, self.waitInner(diagnostic));
@@ -363,9 +362,8 @@ const Tracked = struct {
 
 // A completion hands out its value once. A value that fails to convert never
 // becomes a binding value: the conversion runs in the completion callback and
-// disposes what it built (a generated copy adopts a native handle through
-// owner.adopt, which disposes the handle when adoption fails), so the future
-// reports the error once and has nothing of its own to dispose.
+// disposes what it built, so the future reports the error once and has nothing
+// of its own to dispose.
 test "a completion delivers once, and a value that fails to convert reports the error once" {
     Tracked.disposals = 0;
     FakeSubmission.refuse = false;

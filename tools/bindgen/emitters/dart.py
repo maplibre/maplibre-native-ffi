@@ -328,8 +328,6 @@ def lower_function(
     if plan.registrations:
         if not status_return:
             raise Unsupported("registration requires an admission status")
-        if plan.completion and plan.completion.result_owner:
-            raise Unsupported("an adopted result cannot retain its registrations")
         # A transaction accepts its registrations once native code admits the
         # call, unless native reports that it kept nothing from them.
         transaction = [f"final registrations = _NativeRegistrations({roots});"]
@@ -425,11 +423,6 @@ def lower_function(
         # A release reports native rejection at the call, so its owner can
         # tell whether native accepted it.
         public, operation = "void", f"{'_submit' if plan.consumes else '_run'}({start})"
-    elif plan.completion.result_owner:
-        public, decode = adopt_owner(
-            plan.completion.result_owner, "handle", receiver, function, values
-        )
-        operation = f"_queryOwned({start}, (handle) => {decode})"
     else:
         result = plan.result
         values.check(result)
@@ -526,7 +519,7 @@ def completion_value(values: Values, element, read) -> str:
 
 
 def attachment_name(owned):
-    return pascal(owned.handle.stem) + "Attachment"
+    return "New" + pascal(owned.handle.stem)
 
 
 def lower(api: Api | BoundApi):
@@ -661,7 +654,8 @@ def render_owner(native, handle, bodies, bound, roots):
 
 
 def render_attachments(bound, generated):
-    """Pair each owner an attachment creates at once with its completion."""
+    """Pair each owner a call creates at once with the completion that
+    reports it ready."""
     chunks = {}
     for plan in bound.operations:
         if plan.name not in generated or not plan.completion:
@@ -670,16 +664,15 @@ def render_attachments(bound, generated):
             name = attachment_name(owned)
             field = camel(output_member(owned.parameter))
             chunks[name] = (
-                f"/// A new {field} and the completion of the attachment that created it.\n"
+                f"/// A new {field} and the completion that reports it ready.\n"
                 f"final class {name} {{\n"
-                f"  const {name}(this.{field}, this.completed);\n\n"
-                f"  /// The {field}, usable at once while attachment completes.\n"
+                f"  const {name}(this.{field}, this.ready);\n\n"
+                f"  /// The {field}, which the caller owns before it is ready.\n"
                 f"  final {owner_names(owned.handle)[0]} {field};\n\n"
-                "  /// Completes after native attachment finishes, or fails with its\n"
-                "  /// status, such as `Status.targetLost` when the session is disposed\n"
-                "  /// first. Await it or call `ignore()`, because the zone reports a\n"
-                "  /// failure that nothing handles.\n"
-                "  final Future<void> completed;\n}\n"
+                f"  /// Completes once the {field} is ready, or fails with its status.\n"
+                "  /// Await it or call `ignore()`, because the zone reports a failure\n"
+                "  /// that nothing handles.\n"
+                "  final Future<void> ready;\n}\n"
             )
     return [chunks[name] for name in sorted(chunks)]
 

@@ -279,7 +279,7 @@ auto validate_image_source_coordinates(
 ) -> mln_status;
 
 auto create_map_start(
-  mln_runtime runtime, const mln_map_options* options,
+  mln_runtime runtime, const mln_map_options* options, mln_map* out_map,
   const mln_completion* completion
 ) -> mln_status;
 auto dispose_map(mln_map map) -> mln_status;

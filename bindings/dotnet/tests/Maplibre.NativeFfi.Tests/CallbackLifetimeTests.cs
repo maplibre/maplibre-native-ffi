@@ -155,7 +155,8 @@ public sealed class CallbackLifetimeTests
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference RegisterCallbackCapturingItsMap(RuntimeHandle runtime)
     {
-        var map = runtime.CreateMapAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
+        var map = runtime.CreateMap(NativeFixture.SmallMap);
+        map.Ready.GetAwaiter().GetResult();
         map.SetStyleJsonAsync(NativeFixture.EmptyStyle).GetAwaiter().GetResult();
         var added = map.AddCustomGeometrySourceAsync(
                 "captured-map",

@@ -56,6 +56,7 @@ static void expect_runtime_calls_reject(
 ) {
   const mln_completion discard = mln_test_discard_completion();
   const mln_map_options map_options = mln_map_options_default();
+  mln_map map = MLN_HANDLE_NULL;
   uint64_t mask = 0;
   MLN_TEST_STATUS(expected, mln_runtime_release(handle, &discard, NULL));
   MLN_TEST_STATUS(expected, mln_runtime_dispose(handle, NULL));
@@ -68,8 +69,9 @@ static void expect_runtime_calls_reject(
     mln_runtime_set_event_mask(handle, MLN_RUNTIME_EVENT_MASK_ALL, NULL)
   );
   MLN_TEST_STATUS(
-    expected, mln_runtime_create_map(handle, &map_options, &discard, NULL)
+    expected, mln_runtime_create_map(handle, &map_options, &map, &discard, NULL)
   );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
 }
 
 // The null handle and a live handle of another kind name no runtime, so every
@@ -110,11 +112,15 @@ static mln_status create_map_from(
   void* context, const void* descriptor, mln_diagnostic* diagnostic
 ) {
   mln_test_completion completion = mln_test_completion_default(0);
+  mln_map map = MLN_HANDLE_NULL;
   const mln_status status = mln_runtime_create_map(
-    *(const mln_runtime*)context, descriptor, &completion.descriptor, diagnostic
+    *(const mln_runtime*)context, descriptor, &map, &completion.descriptor,
+    diagnostic
   );
-  // A rejected submission never runs or releases the completion.
+  // A rejected submission writes no map and never runs or releases the
+  // completion.
   TEST_ASSERT_NOT_EQUAL_INT(MLN_STATUS_OK, status);
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
   TEST_ASSERT_FALSE(mln_test_completion_poll(&completion));
   mln_test_completion_reject(&completion);
   mln_test_completion_destroy(&completion);
@@ -129,6 +135,22 @@ static void map_creation_validates_its_options(void) {
     sizeof(map_creation_cases) / sizeof(*map_creation_cases), &defaults,
     sizeof(defaults), create_map_from, &runtime
   );
+  mln_test_destroy_runtime(runtime);
+}
+
+// The map comes back through out_map, which must point to the null handle.
+static void map_creation_checks_its_output(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  const mln_map_options options = mln_map_options_default();
+  const mln_completion discard = mln_test_discard_completion();
+  MLN_TEST_INVALID(
+    mln_runtime_create_map(runtime, &options, NULL, &discard, NULL)
+  );
+  mln_map map = runtime;
+  MLN_TEST_INVALID(
+    mln_runtime_create_map(runtime, &options, &map, &discard, NULL)
+  );
+  TEST_ASSERT_EQUAL_UINT64(runtime, map);
   mln_test_destroy_runtime(runtime);
 }
 
@@ -204,13 +226,15 @@ static void create_on_temporary_thread(void* argument) {
   probe->status = mln_runtime_create(&options, &probe->runtime, NULL);
   if (probe->status != MLN_STATUS_OK) return;
 
-  mln_test_completion create_map = mln_test_completion_default(sizeof(mln_map));
-  probe->status =
-    mln_runtime_create_map(probe->runtime, NULL, &create_map.descriptor, NULL);
+  mln_test_completion create_map = mln_test_completion_default(0);
+  probe->status = mln_runtime_create_map(
+    probe->runtime, NULL, &probe->map, &create_map.descriptor, NULL
+  );
   if (probe->status == MLN_STATUS_OK) {
-    probe->status = mln_test_completion_finish_value(
-      &create_map, &probe->map, sizeof(probe->map)
-    );
+    probe->status = mln_test_completion_settle(&create_map);
+    if (probe->status != MLN_STATUS_OK) {
+      (void)mln_map_dispose(probe->map, NULL);
+    }
   } else {
     mln_test_completion_reject(&create_map);
     mln_test_completion_destroy(&create_map);
@@ -439,6 +463,7 @@ MLN_TEST_GROUP {
   RUN_TEST(runtime_creation_validates_its_options);
   RUN_TEST(runtime_calls_reject_a_value_that_names_no_runtime);
   RUN_TEST(map_creation_validates_its_options);
+  RUN_TEST(map_creation_checks_its_output);
   RUN_TEST(a_released_map_accepts_no_call);
   RUN_TEST(style_functions_reject_null_inputs);
   RUN_TEST(disposal_waits_for_children_and_retires_callback_state);

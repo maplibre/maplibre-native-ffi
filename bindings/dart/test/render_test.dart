@@ -56,7 +56,7 @@ void main() {
       RenderSessionAttachOptions(),
     );
     addTearDown(() => releaseSession(attachment.session));
-    await within(attachment.completed, 'attachment');
+    await within(attachment.ready, 'attachment');
   }, skip: _wglSkip);
 
   test(
@@ -70,7 +70,7 @@ void main() {
         RenderSessionAttachOptions(),
       );
       addTearDown(() => releaseSession(attachment.session));
-      await within(attachment.completed, 'attachment');
+      await within(attachment.ready, 'attachment');
 
       attachment.session.dispose();
       expect(attachment.session.isClosed, isTrue);
@@ -94,7 +94,7 @@ void main() {
         RenderSessionAttachOptions(),
       );
       addTearDown(() => releaseSession(attachment.session));
-      await within(attachment.completed, 'attachment');
+      await within(attachment.ready, 'attachment');
 
       await within(attachment.session.close(), 'session close');
       graphics.close();

@@ -133,35 +133,6 @@ private struct ConversionFailure: Error {}
   #expect(releases.value == 1)
 }
 
-/// Cancelling a task that awaits a map creation abandons the creation: the
-/// map native creates anyway is disposed with the bridge state, so the runtime
-/// is left with no child and closes.
-@Test func cancellingACreationWaitRetiresTheCreatedMap() async throws {
-  let runtime = try MapFixture.makeRuntime()
-  let creation = Task {
-    try await runtime.createMap(options: MapOptions(
-      initialExtent: LogicalExtent(width: 8, height: 8, scaleFactor: 1)
-    ))
-  }
-  creation.cancel()
-  // A creation that finished before the cancellation reached it returns its
-  // map, which this test then disposes.
-  if let map = try? await creation.value {
-    try map.dispose()
-  }
-
-  var teardown: NativeFuture<Void>?
-  try await awaitCondition("the abandoned map to retire") {
-    do {
-      teardown = try runtime.startClose()
-      return true
-    } catch let error as MaplibreError where error.status == .invalidState {
-      return false
-    }
-  }
-  try await teardown?.value()
-}
-
 /// A command that native accepts and then fails throws its status, its
 /// diagnostic, and the generation it published.
 @Test func aFailedCommandThrowsItsStatusAndGeneration() async throws {

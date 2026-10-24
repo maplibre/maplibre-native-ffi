@@ -226,33 +226,6 @@ func passImageToCForTest(image *C.mln_premultiplied_rgba8_image) (err error) {
 	return nil
 }
 
-// createMapFailingAfterAdoptionForTest creates a map through a completion
-// whose conversion adopts the native map and then panics: a conversion that
-// fails while it owns a value.
-func createMapFailingAfterAdoptionForTest(receiver *RuntimeHandle) (*Future[*MapHandle], error) {
-	return bindingCall(func() *Future[*MapHandle] {
-		arena := &bindingArena{}
-		defer arena.close()
-		raw := arena.lease(receiver.owner())
-		options := (*C.mln_map_options)(arena.allocate(unsafe.Sizeof(C.mln_map_options{})))
-		*options = nativeMapOptions(DefaultMapOptions(), arena)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_create_map(C.mln_runtime(raw), options, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*MapHandle, error) {
-			value, err := completionValue[C.mln_map](result)
-			if err != nil {
-				return nil, err
-			}
-			adoptMapHandle(uint64(value), receiver)
-			panic("conversion failed after adopting the map")
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
-}
-
 // wake returns a native wake whose callback and release are C functions.
 func (recorder *nativeRecorderForTest) wake() Wake {
 	return NewNativeWake(

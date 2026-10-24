@@ -90,7 +90,8 @@ test("a handle names its id and whether it is closed", async () => {
 
 test("a refused close leaves the handle usable for a later close", async () => {
   const runtime = runtimeCreate();
-  const map = await bounded(runtime.createMap(), "map creation");
+  const { map, ready } = runtime.createMap();
+  await bounded(ready, "map creation");
 
   // The live map makes native refuse the release before teardown starts.
   await assert.rejects(runtime.close(), isInvalidState);
@@ -118,10 +119,8 @@ test("a handle id names its events and outlives close", async () => {
 /** Creates a runtime and a map on it, and keeps only the map. */
 async function mapWithoutItsRuntime() {
   const runtime = runtimeCreate();
-  const map = await bounded(
-    runtime.createMap({ initialExtent: extent }),
-    "map creation",
-  );
+  const { map, ready } = runtime.createMap({ initialExtent: extent });
+  await bounded(ready, "map creation");
   return {
     map,
     runtime: new WeakRef(runtime),

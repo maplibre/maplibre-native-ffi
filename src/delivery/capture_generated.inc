@@ -141,20 +141,6 @@ constexpr auto element_owns_handles(const mln_lat_lng_bounds*) noexcept
 }
 template <bool Writing>
 auto capture_element(
-  [[maybe_unused]] Arena<Writing>& arena, const mln_map& source
-) -> mln_map {
-  auto result = source;
-  return result;
-}
-inline auto discard_element([[maybe_unused]] const mln_map& value) noexcept
-  -> void {
-  static_cast<void>(dispose_owner(mln::core::HandleKind::Map, value));
-}
-constexpr auto element_owns_handles(const mln_map*) noexcept -> bool {
-  return true;
-}
-template <bool Writing>
-auto capture_element(
   [[maybe_unused]] Arena<Writing>& arena, const mln_offline_region_info& source
 ) -> mln_offline_region_info {
   auto result = source;

@@ -1,7 +1,6 @@
 // Completions: the shared receive port, conversion failures, rejected
 // submissions, failed commands, and waits that give up.
 import 'dart:async';
-import 'dart:ffi';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart'
@@ -9,7 +8,6 @@ import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart'
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
 import 'package:maplibre_native_ffi/src/internal/callback/delivery_queue.dart';
-import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
 import 'support/runtime_probes.dart';
 import 'package:test/test.dart';
 
@@ -41,36 +39,25 @@ void main() {
   );
 
   test(
-    'a completion delivers once and disposes a value that fails to convert',
+    'a completion delivers once and reports a value that fails to convert',
     () async {
       final fixture = await openRuntime();
+      final map = await fixture.openMap();
       var decodes = 0;
-      final creation = startNativeCompletion<void>(
-        start: (completion) => withNativeArena((arena) {
-          final options = arena<raw.mln_map_options>();
-          options.ref = raw.mln_map_options_default();
-          return raw.mln_runtime_create_map(
-            fixture.runtime.id.toSigned(64).toInt(),
-            options,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
+      final camera = startNativeCompletion<void>(
+        start: (completion) => raw.mln_map_get_camera(
+          map.id.toSigned(64).toInt(),
+          completion,
+          nativeDiagnostic,
+        ),
         decode: (_) {
           decodes += 1;
-          throw StateError('the created map failed to convert');
+          throw StateError('the camera failed to convert');
         },
       );
-      await expectLater(within(creation, 'map creation'), throwsStateError);
-      await within(
-        fixture.runtime.clearResourceTransform(),
-        'a later runtime command',
-      );
+      await expectLater(within(camera, 'the camera query'), throwsStateError);
+      await within(map.requestRepaint(), 'a later command on the map');
       expect(decodes, 1);
-
-      // The runtime closes only once no map remains, so the batch that held
-      // the map disposed it when the conversion left it untaken.
-      await within(fixture.runtime.close(), 'runtime close');
     },
   );
 

@@ -924,6 +924,7 @@ internal expect object C {
   fun mln_runtime_create_map(
     runtime: Long,
     options: Long,
+    outMap: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int

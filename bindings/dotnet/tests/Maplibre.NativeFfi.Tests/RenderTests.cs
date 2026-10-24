@@ -15,7 +15,7 @@ public sealed class RenderTests
             backend,
             fixture =>
             {
-                fixture.Await(fixture.Session.Attached, "the attachment");
+                fixture.Await(fixture.Session.Ready, "the session to be ready");
                 fixture.RenderFrame();
 
                 var image = fixture.Await(fixture.Session.ReadTextureAsync(), "the readback");
@@ -44,7 +44,7 @@ public sealed class RenderTests
             fixture =>
             {
                 var session = fixture.Session;
-                fixture.Await(session.Attached, "the attachment");
+                fixture.Await(session.Ready, "the session to be ready");
                 // Native reports both calls as not ready, which reads as null.
                 Assert.Null(session.DrainFrameResults());
                 Assert.Null(session.AcquireFrame());
@@ -62,8 +62,8 @@ public sealed class RenderTests
             {
                 var session = fixture.Session;
                 // Only the graphics thread services the session, and it has not yet.
-                Assert.False(session.Attached.IsCompleted);
-                fixture.Await(session.Attached, "the attachment");
+                Assert.False(session.Ready.IsCompleted);
+                fixture.Await(session.Ready, "the session to be ready");
                 Assert.Equal(
                     RenderDriverKind.CallerGraphicsThread,
                     session.GetCapabilities().Driver
@@ -90,7 +90,7 @@ public sealed class RenderTests
             fixture =>
             {
                 using (var session = fixture.Session)
-                    fixture.Await(session.Attached, "the attachment");
+                    fixture.Await(session.Ready, "the session to be ready");
 
                 // A disposal reports no retirement, so the map's release waits for it.
                 RenderFixture.Complete(fixture.Map.CloseAsync());
@@ -107,7 +107,7 @@ public sealed class RenderTests
             backend,
             fixture =>
             {
-                fixture.Await(fixture.Session.Attached, "the attachment");
+                fixture.Await(fixture.Session.Ready, "the session to be ready");
 
                 RenderFixture.Complete(DisposeInScope(fixture.Session));
                 // The session has retired, so its graphics objects may go before its map does.
@@ -130,7 +130,7 @@ public sealed class RenderTests
             fixture =>
             {
                 var session = fixture.Session;
-                fixture.Await(session.Attached, "the attachment");
+                fixture.Await(session.Ready, "the session to be ready");
                 var rendered = fixture.RenderFrame();
                 var frame =
                     session.AcquireFrame()

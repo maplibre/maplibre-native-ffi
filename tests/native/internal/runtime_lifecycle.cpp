@@ -66,12 +66,12 @@ void a_deferred_runtime_release_does_not_hold_other_retirements() {
   const auto waiting = create_runtime();
   const auto other = create_runtime();
 
-  auto create_map = mln_test_completion_default(sizeof(mln_map));
-  MLN_TEST_OK(
-    mln_runtime_create_map(waiting, nullptr, &create_map.descriptor, nullptr)
-  );
+  auto create_map = mln_test_completion_default(0);
   auto map = mln_map{MLN_HANDLE_NULL};
-  MLN_TEST_OK(mln_test_completion_finish_value(&create_map, &map, sizeof(map)));
+  MLN_TEST_OK(mln_runtime_create_map(
+    waiting, nullptr, &map, &create_map.descriptor, nullptr
+  ));
+  MLN_TEST_OK(mln_test_completion_settle(&create_map));
   auto map_close = mln_test_completion_default(0);
   MLN_TEST_OK(mln_map_release(map, &map_close.descriptor, nullptr));
   const auto cleanup_parked =
@@ -115,12 +115,12 @@ void a_deferred_runtime_release_does_not_hold_other_retirements() {
 // cancellation. The transition's CLOSED callback fences the first close stage.
 void map_release_waits_for_a_lease_queued_after_close_begins() {
   const auto runtime = create_runtime();
-  auto creation = mln_test_completion_default(sizeof(mln_map));
-  MLN_TEST_OK(
-    mln_runtime_create_map(runtime, nullptr, &creation.descriptor, nullptr)
-  );
+  auto creation = mln_test_completion_default(0);
   auto map = mln_map{MLN_HANDLE_NULL};
-  MLN_TEST_OK(mln_test_completion_finish_value(&creation, &map, sizeof(map)));
+  MLN_TEST_OK(mln_runtime_create_map(
+    runtime, nullptr, &map, &creation.descriptor, nullptr
+  ));
+  MLN_TEST_OK(mln_test_completion_settle(&creation));
   auto transition = mln_test_transition_end{};
   mln_test_transition_end_init(&transition);
   auto camera = mln_camera_update_default();

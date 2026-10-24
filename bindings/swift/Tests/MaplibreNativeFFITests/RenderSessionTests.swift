@@ -78,7 +78,7 @@ private func attachOwnedTextureSession(
   let fixture = try await MapFixture.make()
   var thread: RenderThread?
   let graphics: TestGraphics
-  let attachment: RenderSessionAttachment
+  let created: NewRenderSession
   do {
     try await fixture.map.setStyleJson(style)
     graphics = try TestGraphics()
@@ -87,7 +87,7 @@ private func attachOwnedTextureSession(
       thread = host
       try await host.perform { try graphics.makeCurrentIfNeeded() }
     }
-    attachment = try graphics.attachOwnedTexture(
+    created = try graphics.attachOwnedTexture(
       map: fixture.map,
       options: RenderSessionAttachOptions(
         driver: thread == nil ? .coreWorker : .callerGraphicsThread,
@@ -105,12 +105,12 @@ private func attachOwnedTextureSession(
   let attached = OwnedTextureSession(
     fixture: fixture,
     graphics: graphics,
-    session: attachment.session,
+    session: created.session,
     thread: thread
   )
   do {
-    thread?.service(attachment.session)
-    try await attachment.completion.value
+    thread?.service(created.session)
+    try await created.ready.value
   } catch {
     await attached.close()
     throw error
@@ -282,11 +282,11 @@ private func attachOwnedTextureSession(
   let fixture = try await MapFixture.make()
   let thread = RenderThread()
   let graphics: TestGraphics
-  let attachment: RenderSessionAttachment
+  let created: NewRenderSession
   do {
     graphics = try TestGraphics()
     try await thread.perform { try graphics.makeCurrentIfNeeded() }
-    attachment = try graphics.attachOwnedTexture(
+    created = try graphics.attachOwnedTexture(
       map: fixture.map,
       options: RenderSessionAttachOptions(
         driver: .callerGraphicsThread,
@@ -302,14 +302,14 @@ private func attachOwnedTextureSession(
   let attached = OwnedTextureSession(
     fixture: fixture,
     graphics: graphics,
-    session: attachment.session,
+    session: created.session,
     thread: thread
   )
   try await attached.use { rendered in
     let session = rendered.session
     #expect(try session.getSnapshot().state == .attaching)
     thread.service(session)
-    try await attachment.completion.value
+    try await created.ready.value
     #expect(try session.getCapabilities().driver == .callerGraphicsThread)
 
     // A demand that waits for the style's first update wakes the thread when

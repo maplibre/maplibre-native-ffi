@@ -15,7 +15,7 @@ import {
   RenderDriverKind,
   type RenderFrameResult,
   RenderResult,
-  type RenderSessionAttachment,
+  type NewRenderSession,
   type RenderSessionAttachOptions,
   type RenderSessionHandle,
   supportedRenderBackendMask,
@@ -112,7 +112,7 @@ function attachOwnedTexture(
   context: GraphicsContext,
   map: MapHandle,
   options: RenderSessionAttachOptions,
-): RenderSessionAttachment {
+): NewRenderSession {
   const extent = renderExtent;
   if (backend === "metal") {
     return map.attachMetalOwnedTexture(
@@ -173,7 +173,7 @@ function attachOwnedTexture(
 export function attachSession(
   map: MapHandle,
   options: RenderSessionAttachOptions,
-): RenderSessionAttachment {
+): NewRenderSession {
   const attachment = attachOwnedTexture(openGraphics(), map, {
     driver: RenderDriverKind.coreWorker,
     requestedTextureRingDepth: 1,
@@ -191,7 +191,7 @@ export function attachSession(
 export function attachSessionOverOwnGraphics(
   map: MapHandle,
   options: RenderSessionAttachOptions = {},
-): RenderSessionAttachment & { readonly destroyGraphics: () => void } {
+): NewRenderSession & { readonly destroyGraphics: () => void } {
   const context = addon.create(backends[backend]);
   let destroyed = false;
   const destroyGraphics = () => {
@@ -339,7 +339,7 @@ export class TestSession {
       throw new Error("the test graphics context could not be made current");
     }
     const wake = new AwaitableWake();
-    const { session, completed } = attachOwnedTexture(context, map, {
+    const { session, ready } = attachOwnedTexture(context, map, {
       driver: serviced
         ? RenderDriverKind.callerGraphicsThread
         : RenderDriverKind.coreWorker,
@@ -349,7 +349,7 @@ export class TestSession {
     });
     teardown(() => releaseSession(session));
     const attached = new TestSession(session, wake, serviced);
-    await attached.settle(completed, "the attachment");
+    await attached.settle(ready, "the attachment");
     return attached;
   }
 

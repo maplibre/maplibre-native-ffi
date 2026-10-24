@@ -89,12 +89,13 @@ public sealed class LeakReportTests
         return (new WeakReference(runtime), runtime.Id, new WeakReference(map), map.Id);
     }
 
-    // The creation's completion roots its result until native releases it on the runtime
-    // worker. An ordered query on the map runs after that release.
+    // The creation's completion roots the map until native releases it on the runtime worker.
+    // An ordered query on the map runs after that release.
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static MapHandle CreateMapReleased(RuntimeHandle runtime)
     {
-        var map = runtime.CreateMapAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
+        var map = runtime.CreateMap(NativeFixture.SmallMap);
+        map.Ready.GetAwaiter().GetResult();
         map.GetStyleUrlAsync().GetAwaiter().GetResult();
         return map;
     }

@@ -19,7 +19,7 @@
 #include "maplibre_native_c/texture.h"
 #include "runtime.h"
 
-#define MLN_TS_ABI_DIGEST "9d73cb2ac5fafbd8"
+#define MLN_TS_ABI_DIGEST "d831974474435625"
 
 napi_value mln_ts_decode_buffer_view(
   napi_env env, const mln_completion_result* result
@@ -39,7 +39,6 @@ napi_value mln_ts_decode_lat_lng_bounds(
 napi_value mln_ts_decode_lat_lng_list(
   napi_env env, const mln_completion_result* result
 );
-napi_value mln_ts_decode_map(napi_env env, const mln_completion_result* result);
 napi_value mln_ts_decode_offline_region_info(
   napi_env env, const mln_completion_result* result
 );
