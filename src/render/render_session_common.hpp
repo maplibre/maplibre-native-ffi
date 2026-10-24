@@ -394,6 +394,12 @@ class RenderSessionScheduler final : public mln::Scheduler {
 
   // Wakes the render owner when work makes an idle queue nonempty. Cleared
   // before detach so late worker results are discarded.
+  //
+  // Replacing the hook waits for a hook that another thread is running. The
+  // hook leases the session, and a mailbox runs it inside schedule() while it
+  // holds this scheduler's WeakPtr guard. Were its lease the session's last,
+  // the scheduler's destructor would wait for that guard forever, so detach and
+  // abandon clear the hook to end every such lease before the session can go.
   auto set_work_available_callback(std::function<void()> work_available)
     -> void;
 
@@ -414,9 +420,15 @@ class RenderSessionScheduler final : public mln::Scheduler {
     RenderSessionScheduler& scheduler_;
   };
 
+  // Runs the hook, and returns early when there is none.
+  auto notify_work_available() -> void;
+
   std::mutex mutex_;
   std::vector<std::function<void()>> queue_;
   std::vector<std::function<void()>> drain_batch_;
+  // Held while the hook runs and while it is replaced. Recursive, because a
+  // hook may service its caller-driver session inline, which can detach it.
+  std::recursive_mutex hook_mutex_;
   std::function<void()> work_available_;
   bool draining_ = false;
   mapbox::base::WeakPtrFactory<mln::Scheduler> weak_factory_{this};

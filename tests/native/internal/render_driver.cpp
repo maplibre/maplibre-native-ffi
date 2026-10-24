@@ -92,6 +92,52 @@ void a_resize_queued_before_detach_completes_as_failed() {
   destroy_fixture(fixture);
 }
 
+struct RunningHook {
+  mln::core::RenderSessionScheduler scheduler;
+  mln_test_gate gate{};
+  std::atomic_bool hook_returned{false};
+  bool replaced_after_return = false;
+};
+
+// Schedules as a mailbox does, inside the scheduler's WeakPtr guard.
+void schedule_from_a_mailbox(void* argument) {
+  auto& running = *static_cast<RunningHook*>(argument);
+  auto weak = running.scheduler.makeWeakPtr();
+  const auto guard = weak.lock();
+  weak->schedule([] {});
+}
+
+void replace_the_hook(void* argument) {
+  auto& running = *static_cast<RunningHook*>(argument);
+  running.scheduler.set_work_available_callback({});
+  running.replaced_after_return = running.hook_returned.load();
+}
+
+// A hook that a mailbox runs leases the session inside the scheduler's
+// WeakPtr guard. Detach and abandon replace the hook, and the replacement
+// waits for that lease to end, so the session never goes inside the guard,
+// where the scheduler's destructor would wait for the guard forever.
+void a_hook_replacement_waits_for_the_running_hook() {
+  auto points = SyncPointScope{};
+  auto running = RunningHook{};
+  mln_test_gate_init(&running.gate);
+  running.scheduler.set_work_available_callback([&running] {
+    mln_test_gate_park(&running.gate);
+    running.hook_returned = true;
+  });
+  auto* scheduling = mln_test_thread_start(schedule_from_a_mailbox, &running);
+  TEST_ASSERT_TRUE(mln_test_gate_wait_entered(&running.gate));
+  auto* replacing = mln_test_thread_start(replace_the_hook, &running);
+  const auto waited =
+    points.wait_for_hits(SyncPoint::RenderSchedulerHookWaits, 1);
+  mln_test_gate_release(&running.gate);
+  mln_test_thread_join(replacing);
+  mln_test_thread_join(scheduling);
+  running.scheduler.discard();
+  TEST_ASSERT_TRUE(waited);
+  TEST_ASSERT_TRUE(running.replaced_after_return);
+}
+
 auto wait_for_results(const Fixture& fixture) -> mln_render_frame_batch {
   return mln_test_render_wait_for_results(&fixture.render);
 }
@@ -1560,6 +1606,7 @@ MLN_TEST_GROUP {
   RUN_TEST(an_idle_demand_reports_a_failed_backend_activation);
   RUN_TEST(a_same_size_resize_redraws_after_an_earlier_queued_frame);
   RUN_TEST(a_resize_queued_before_detach_completes_as_failed);
+  RUN_TEST(a_hook_replacement_waits_for_the_running_hook);
   RUN_TEST(a_barrier_waits_for_an_ordered_operation_after_a_running_demand);
   RUN_TEST(if_needed_demands_supersede_and_forced_demands_render);
   RUN_TEST(supersession_preserves_a_forced_demand_after_a_resize);

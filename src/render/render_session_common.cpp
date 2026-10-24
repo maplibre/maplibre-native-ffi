@@ -923,18 +923,13 @@ auto register_render_session(std::shared_ptr<mln_render_session_object> session)
 }
 
 void RenderSessionScheduler::schedule(std::function<void()>&& task) {
-  auto notify_work = std::function<void()>{};
+  auto notify_work = false;
   {
     const auto lock = std::scoped_lock{mutex_};
-    const auto was_empty = queue_.empty();
+    notify_work = queue_.empty() && !draining_;
     queue_.push_back(std::move(task));
-    if (was_empty && !draining_) {
-      notify_work = work_available_;
-    }
   }
-  if (notify_work) {
-    notify_work();
-  }
+  if (notify_work) notify_work_available();
 }
 
 void RenderSessionScheduler::schedule(
@@ -973,19 +968,15 @@ auto RenderSessionScheduler::drain() -> void {
 
 RenderSessionScheduler::DrainGuard::~DrainGuard() {
   scheduler_.drain_batch_.clear();
-  auto notify_work = std::function<void()>{};
+  auto notify_work = false;
   {
     const auto lock = std::scoped_lock{scheduler_.mutex_};
     if (scheduler_.draining_) {
       scheduler_.draining_ = false;
-      if (!scheduler_.queue_.empty()) {
-        notify_work = scheduler_.work_available_;
-      }
+      notify_work = !scheduler_.queue_.empty();
     }
   }
-  if (notify_work) {
-    notify_work();
-  }
+  if (notify_work) scheduler_.notify_work_available();
 }
 
 auto RenderSessionScheduler::discard() -> void {
@@ -997,8 +988,17 @@ auto RenderSessionScheduler::discard() -> void {
 auto RenderSessionScheduler::set_work_available_callback(
   std::function<void()> work_available
 ) -> void {
-  const auto lock = std::scoped_lock{mutex_};
+  auto lock = std::unique_lock{hook_mutex_, std::try_to_lock};
+  if (!lock.owns_lock()) {
+    mln::testing::hit(mln::testing::SyncPoint::RenderSchedulerHookWaits);
+    lock.lock();
+  }
   work_available_ = std::move(work_available);
+}
+
+auto RenderSessionScheduler::notify_work_available() -> void {
+  const auto lock = std::scoped_lock{hook_mutex_};
+  if (work_available_) work_available_();
 }
 
 namespace {

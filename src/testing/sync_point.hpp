@@ -74,6 +74,10 @@ enum class SyncPoint : std::uint8_t {
   // Abandoning a core-worker session found a driver call in flight and is
   // about to wait for it to end. It fires only when abandon has to wait.
   RenderAbandonWaits,
+  // Replacing a render session scheduler's work-available hook found another
+  // thread running the hook and is about to wait for it to return. It fires
+  // only when the replacement has to wait. No lock is held.
+  RenderSchedulerHookWaits,
   // A detach has marked its session detaching and queued the work that
   // detaches it, and is about to return. No lock is held, so an abandon can
   // run while a detaching thread is parked here.
