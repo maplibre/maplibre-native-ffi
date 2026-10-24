@@ -228,14 +228,23 @@ ci:
         OpenHarmony on ARM64 and x64 with OpenGL ES and Vulkan. The x64 jobs run
         the C, Rust, Go, and TypeScript (ArkTS) tests in the Oniro emulator; the
         ARM64 jobs only build. Catches OpenHarmony SDK and platform problems.
-        Platform-independent code that Linux x64 tests doesn't need it.
+        Platform-independent code that Linux x64 tests doesn't need it. Nor does
+        a C API change that only regenerates the TypeScript binding; a change to
+        its handwritten runtime, native addon, or ArkTS harness does.
       paths:
         - cmake/platform/ohos.cmake
         - mise.ohos.*
         - src/platform/ohos/*
         - tests/native/abi/platform/transport.c
-        - bindings/typescript/src/*
-        - bindings/typescript/test/*
+        - bindings/typescript/native/CMake*
+        - bindings/typescript/native/exports.map
+        - bindings/typescript/native/realm.c
+        - bindings/typescript/native/runtime.*
+        - bindings/typescript/scripts/build-hap.sh
+        - bindings/typescript/scripts/test-arkts.sh
+        - bindings/typescript/src/arkts.ts
+        - bindings/typescript/src/internal/*
+        - bindings/typescript/test/arkts/*
         - third_party/maplibre-native
     web:
       covers: >-
