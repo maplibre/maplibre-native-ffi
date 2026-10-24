@@ -11,7 +11,7 @@ import {
   Status,
 } from "../src/index.ts";
 import { rootsOf } from "../src/internal/owners.ts";
-import { expectCommitted, openRuntime } from "./support/fixture.ts";
+import { openRuntime } from "./support/fixture.ts";
 import { bounded, callbackArrival, test } from "./support/harness.ts";
 import { liveRoots, released } from "./support/internals.ts";
 
@@ -27,12 +27,13 @@ test("a callback root is released by a removal, a map close, or a refusal", asyn
   const own = rootsOf(map).roots;
   const baseline = liveRoots();
 
-  await expectCommitted(
+  await bounded(
     map.addCustomGeometrySource("source", { fetchTile() {} }),
+    "a command",
   );
   assert.equal(own.size, 1);
   assert.equal(liveRoots(), baseline + 1);
-  await expectCommitted(map.removeStyleSource("source"));
+  await bounded(map.removeStyleSource("source"), "a command");
   await released(
     () => own.size === 0 && liveRoots() === baseline,
     "the release after a removal",
@@ -46,8 +47,9 @@ test("a callback root is released by a removal, a map close, or a refusal", asyn
   assert.equal(own.size, 0);
   assert.equal(liveRoots(), baseline);
 
-  await expectCommitted(
+  await bounded(
     map.addCustomGeometrySource("source", { fetchTile() {} }),
+    "a command",
   );
   assert.equal(own.size, 1);
   await bounded(map.close(), "map close");
@@ -67,15 +69,16 @@ test("a camera end handler root is released after the handler runs", async () =>
   let end!: (value: CameraTransitionEnd) => void;
   const ended = new Promise<CameraTransitionEnd>((resolve) => (end = resolve));
 
-  await expectCommitted(
+  await bounded(
     map.updateCamera({
       camera: { zoom: 4 },
       mode: CameraUpdateMode.ease,
       animation: { durationMs: 60_000, transitionId: 3n, endHandler: end },
     }),
+    "a command",
   );
   assert.equal(own.size, 1);
-  await expectCommitted(map.cancelCameraTransition(3n));
+  await bounded(map.cancelCameraTransition(3n), "a command");
   const result = await callbackArrival(ended, "the end handler");
   assert.equal(result.outcome, CameraTransitionOutcome.cancelled);
   assert.notEqual(result.generation, 0n);

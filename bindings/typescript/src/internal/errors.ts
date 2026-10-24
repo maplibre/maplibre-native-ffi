@@ -10,8 +10,8 @@ export function statusName(status: number): string {
 }
 
 /**
- * A failed MapLibre Native call: its status, the status name, and the call's
- * own diagnostic message.
+ * A failed MapLibre Native call: its status, the status name, the call's own
+ * diagnostic message, and for a map command, the generation it published.
  */
 export class MaplibreError extends Error {
   /** The `mln_status` code, kept as is when this binding does not know it. */
@@ -20,14 +20,20 @@ export class MaplibreError extends Error {
   readonly statusName: string;
   /** The diagnostic message of the failed call, which may be empty. */
   readonly diagnostic: string;
+  /**
+   * The map snapshot generation that a failed or cancelled map command
+   * published, and zero for any other call.
+   */
+  readonly generation: bigint;
 
-  constructor(status: number, diagnostic: string) {
+  constructor(status: number, diagnostic: string, generation = 0n) {
     const name = statusName(status);
     super(diagnostic ? `${name}: ${diagnostic}` : name);
     this.name = "MaplibreError";
     this.status = status;
     this.statusName = name;
     this.diagnostic = diagnostic;
+    this.generation = generation;
   }
 }
 

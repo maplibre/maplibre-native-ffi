@@ -31,7 +31,7 @@
 "COMP-01" = "bindings/typescript/test/completions.test.ts::a completion delivers once and disposes a value that fails to convert"
 "COMP-02" = "bindings/typescript/test/completions.test.ts::a submission native rejects frees its completion state"
 "COMP-03" = "bindings/typescript/test/completions.test.ts::a dropped map creation is disposed once collected"
-"COMP-04" = "bindings/typescript/test/completions.test.ts::a failed command reports its disposition as data"
+"COMP-04" = { na = "TypeScript applies decision 1 of #993 first: a failed or cancelled command rejects with MaplibreError, which completions.test.ts::a failed command rejects with its status and generation covers" }
 # A Promise cannot be cancelled. A waiter races it against an AbortSignal, and
 # AwaitableWake.next() takes the signal itself.
 "COMP-05" = "bindings/typescript/test/completions.test.ts::a wait that is abandoned leaves its completion to arrive later"

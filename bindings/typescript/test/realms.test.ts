@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 
 import { RuntimeEventType } from "../src/index.ts";
-import { expectCommitted, openRuntime } from "./support/fixture.ts";
+import { openRuntime } from "./support/fixture.ts";
 import { bounded, test } from "./support/harness.ts";
 import {
   nextMessage,
@@ -70,7 +70,7 @@ test(
       await nextMessage(worker, `burst ${iteration}`);
       await terminateRealm(worker, `termination ${iteration}`);
 
-      await expectCommitted(
+      await bounded(
         map.setStyleJson(
           JSON.stringify({
             version: 8,
@@ -78,6 +78,7 @@ test(
             layers: [{ id: `layer-${iteration}`, type: "background" }],
           }),
         ),
+        "a command",
       );
       await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded, map.id);
     }
@@ -100,7 +101,7 @@ test(
     assert.deepEqual(await nextMessage(worker, "the worker's exit"), {
       exited: true,
     });
-    await expectCommitted(map.setStyleJson(emptyStyle()));
+    await bounded(map.setStyleJson(emptyStyle()), "a command");
     await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded, map.id);
   },
   { needs: ["realmSpawn", "processExit"] },

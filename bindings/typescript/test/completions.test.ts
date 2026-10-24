@@ -1,13 +1,12 @@
 // Completions: delivery through the realm's queue, conversion failures,
-// rejected submissions, failed dispositions, discarded commands, and waits
-// that give up.
+// rejected submissions, failed commands, discarded commands, and waits that
+// give up.
 
 import assert from "node:assert/strict";
 
 import { Decoder } from "../src/generated_native.ts";
 import {
   AwaitableWake,
-  CommandDisposition,
   MapDebugOption,
   MapMode,
   MaplibreError,
@@ -18,7 +17,7 @@ import {
 import { native } from "../src/internal/addon.ts";
 import { queryOwned, run } from "../src/internal/completions.ts";
 import { adopt } from "../src/internal/owners.ts";
-import { expectCommitted, extent, openRuntime } from "./support/fixture.ts";
+import { extent, openRuntime } from "./support/fixture.ts";
 import {
   bounded,
   collectGarbageUntil,
@@ -118,17 +117,22 @@ test(
   { needs: ["forcedGc"] },
 );
 
-test("a failed command reports its disposition as data", async () => {
+test("a failed command rejects with its status and generation", async () => {
   const fixture = await openRuntime();
   const map = await fixture.openStyledMap();
-
-  const completion = await bounded(
-    map.removeStyleSource("missing-source"),
-    "source removal",
+  const committed = await bounded(
+    map.setDebugOptions(MapDebugOption.tileBorders),
+    "a committed command",
   );
-  assert.equal(completion.disposition, CommandDisposition.failed);
-  assert.equal(completion.status, Status.notFound);
-  assert.ok(completion.diagnostic.length > 0);
+
+  await assert.rejects(
+    bounded(map.removeStyleSource("missing-source"), "source removal"),
+    (error) =>
+      error instanceof MaplibreError &&
+      error.status === Status.notFound &&
+      error.diagnostic.length > 0 &&
+      error.generation > committed.generation,
+  );
 });
 
 test("discarded commands are fenced and synchronous rejection throws", async () => {
@@ -174,7 +178,7 @@ test("a wait that is abandoned leaves its completion to arrive later", async () 
     mapMode: MapMode.staticValue,
     initialExtent: extent,
   });
-  await expectCommitted(map.setStyleJson(emptyStyle()));
+  await bounded(map.setStyleJson(emptyStyle()), "a command");
 
   // A static map with no render session never produces the image, so the
   // request stays owed. A Promise cannot be cancelled; a waiter races it

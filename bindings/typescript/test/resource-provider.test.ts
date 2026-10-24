@@ -19,7 +19,6 @@ import {
 } from "../src/index.ts";
 import { rootsOf } from "../src/internal/owners.ts";
 import {
-  expectCommitted,
   headerTransforms,
   openRuntime,
   setHeaderTransform,
@@ -85,7 +84,7 @@ test(
 
     // A request that no route matches passes through to the network.
     const passed = await fixture.openMap();
-    await expectCommitted(passed.setStyleUrl(`${origin.url}/style.json`));
+    await bounded(passed.setStyleUrl(`${origin.url}/style.json`), "a command");
     await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded, passed.id);
     assert.deepEqual(
       (await origin.requests()).map((request) => request.path),
@@ -95,7 +94,7 @@ test(
     // A claimed request arrives as a handle that answers it after the
     // provider callback returned.
     const map = await fixture.openMap();
-    await expectCommitted(map.setStyleUrl(claimed));
+    await bounded(map.setStyleUrl(claimed), "a command");
     const handle = await callbackArrival(handed, "the provider");
     assert.deepEqual(requests, [claimed]);
     assert.equal(handle.isCancelled(), false);
@@ -138,7 +137,7 @@ test("a provider callback error is reported and fails the request", async () => 
   });
   const map = await fixture.openMap();
 
-  await expectCommitted(map.setStyleUrl(url));
+  await bounded(map.setStyleUrl(url), "a command");
   // The binding closes the handle that the throwing callback abandoned, which
   // fails the request instead of leaving the style load waiting.
   await fixture.awaitEventType(RuntimeEventType.mapLoadingFailed, map.id);
@@ -175,7 +174,7 @@ test(
     );
 
     const map = await fixture.openMap();
-    await expectCommitted(map.setStyleUrl(requested));
+    await bounded(map.setStyleUrl(requested), "a command");
     // The request waits for its URL until the host answers from the event
     // loop, after the transform callback returned.
     const request = await callbackArrival(transformed, "the transform");
@@ -215,7 +214,7 @@ test(
     // The file source fetches on native threads; this realm only awaits the
     // command and the event.
     const map = await fixture.openMap();
-    await expectCommitted(map.setStyleUrl(`${origin.url}/style.json`));
+    await bounded(map.setStyleUrl(`${origin.url}/style.json`), "a command");
     await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded, map.id);
     const requests = await origin.requests();
     assert.equal(requests.length, 1);
@@ -233,7 +232,7 @@ test("a cancel registration on a cancelled request is refused and not rooted", a
   const { handed, provider } = handoff();
   const fixture = await openRuntime({ provider: provider(url) });
   const map = await fixture.openMap();
-  await expectCommitted(map.setStyleUrl(url));
+  await bounded(map.setStyleUrl(url), "a command");
   const [, handle] = await callbackArrival(handed, "the provider");
   teardown(() => handle.close());
 
@@ -255,7 +254,7 @@ test("a cancel callback runs once for a request that teardown discards", async (
   const { handed, provider } = handoff();
   const fixture = await openRuntime({ provider: provider(url) });
   const map = await fixture.openMap();
-  await expectCommitted(map.setStyleUrl(url));
+  await bounded(map.setStyleUrl(url), "a command");
   const [, handle] = await callbackArrival(handed, "the provider");
   teardown(() => handle.close());
   const cancels: boolean[] = [];

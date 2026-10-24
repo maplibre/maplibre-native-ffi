@@ -474,9 +474,6 @@ static napi_value completion_header(
   if (
     !mln_ts_set(env, header, "status", mln_ts_number(env, result->status)) ||
     !mln_ts_set(
-      env, header, "disposition", mln_ts_number(env, result->disposition)
-    ) ||
-    !mln_ts_set(
       env, header, "generation", mln_ts_u64(env, result->generation)
     ) ||
     !mln_ts_set(
@@ -496,7 +493,7 @@ static napi_value completion_header(
 /**
  * drain() moves every queued delivery into a batch that the realm keeps until
  * batchRelease(), and returns one [type, token, payload, error] entry per
- * delivery: a completion's status, disposition, generation, and diagnostic,
+ * delivery: a completion's status, generations, and diagnostic,
  * or another delivery's copied arguments, or the error that converting them
  * threw. It returns undefined when nothing is queued, and null when the batch
  * could not be allocated, in which case the deliveries stay queued.

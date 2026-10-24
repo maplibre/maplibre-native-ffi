@@ -11,7 +11,7 @@ import {
   Status,
   Wake,
 } from "../src/index.ts";
-import { expectCommitted, openRuntime } from "./support/fixture.ts";
+import { openRuntime } from "./support/fixture.ts";
 import {
   attachSession,
   attachSessionOverOwnGraphics,
@@ -31,7 +31,7 @@ const red = [255, 0, 0, 255];
 async function openRenderMap(style = backgroundStyle()): Promise<MapHandle> {
   const fixture = await openRuntime();
   const map = await fixture.openMap({ initialExtent: renderExtent });
-  await expectCommitted(map.setStyleJson(style));
+  await bounded(map.setStyleJson(style), "a command");
   return map;
 }
 

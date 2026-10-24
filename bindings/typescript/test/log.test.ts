@@ -14,8 +14,8 @@ import {
   LogSeverityMask,
   type MapHandle,
 } from "../src/index.ts";
-import { expectCommitted, openRuntime } from "./support/fixture.ts";
-import { teardown, test } from "./support/harness.ts";
+import { openRuntime } from "./support/fixture.ts";
+import { bounded, teardown, test } from "./support/harness.ts";
 import { liveRoots, released } from "./support/internals.ts";
 
 /** Whether a message is one of the two rules around a debug-log dump. */
@@ -56,7 +56,7 @@ async function openLoggingMap(): Promise<MapHandle> {
 test("replacing the log callback releases the previous registration", async () => {
   const map = await openLoggingMap();
   const baseline = liveRoots();
-  const dump = () => expectCommitted(map.dumpDebugLogs());
+  const dump = () => bounded(map.dumpDebugLogs(), "a command");
 
   const first = collectDumpRules();
   assert.equal(liveRoots(), baseline + 1);
@@ -99,7 +99,7 @@ test("a log record reaches the event loop after its native call returns", async 
   });
   const dumped = map.dumpDebugLogs();
   order.push("returned");
-  await expectCommitted(dumped);
+  await bounded(dumped, "a command");
   // The records were raised on a native thread while this thread still ran,
   // and they waited in the realm's queue until it returned to the event loop.
   assert.equal(order[0], "returned");

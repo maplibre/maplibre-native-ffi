@@ -12,12 +12,7 @@ import {
   runtimeCreate,
   UrlMatchFlags,
 } from "../../src/index.ts";
-import {
-  expectCommitted,
-  openRuntime,
-  styleResponse,
-  styleRoute,
-} from "./fixture.ts";
+import { openRuntime, styleResponse, styleRoute } from "./fixture.ts";
 import { renderExtent, requestFrame, TestSession } from "./graphics.ts";
 import { bounded, callbackArrival } from "./harness.ts";
 import { backgroundStyle, emptyStyle } from "./styles.ts";
@@ -50,18 +45,20 @@ export async function routeRequests(
     },
   });
   const map = await fixture.openMap({ initialExtent: renderExtent });
-  await expectCommitted(map.setStyleUrl(`${scheme}://style.json`));
+  await bounded(map.setStyleUrl(`${scheme}://style.json`), "a command");
   await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded, map.id);
-  await expectCommitted(
+  await bounded(
     map.addCustomGeometrySource("custom", {
       fetchTile: (tile) =>
         tiles.push(`${scheme}/${tile.z}/${tile.x}/${tile.y}`),
     }),
+    "a command",
   );
-  await expectCommitted(
+  await bounded(
     map.addStyleLayerJson(
       JSON.stringify({ id: "fill", type: "fill", source: "custom" }),
     ),
+    "a command",
   );
   const worker = await TestSession.attach(map);
   for (let frame = 0; frame < 32 && tiles.length === 0; frame++) {
@@ -126,14 +123,15 @@ export async function liveNativeWork(): Promise<RenderSessionHandle> {
   await runtime.setResourceTransform((_kind, _url, request) => request.close());
   const pending = await runtime.createMap({ initialExtent: renderExtent });
   liveWork.push(runtime, pending);
-  await expectCommitted(pending.setStyleUrl("exit://style.json"));
+  await bounded(pending.setStyleUrl("exit://style.json"), "a command");
   // The provider callback holds nothing alive, so a bounded wait does.
   liveWork.push(await callbackArrival(held, "the held request"));
 
   const map = await runtime.createMap({ initialExtent: renderExtent });
-  await expectCommitted(map.setStyleJson(backgroundStyle()));
-  await expectCommitted(
+  await bounded(map.setStyleJson(backgroundStyle()), "a command");
+  await bounded(
     map.addCustomGeometrySource("custom", { fetchTile() {} }),
+    "a command",
   );
   const worker = await TestSession.attach(map);
   liveWork.push(map, worker);

@@ -5,20 +5,19 @@
 // queue. The entry settles when the realm drains the completion, never inside
 // the submitting call.
 
-import { type CommandDisposition, type Status } from "../generated_values.ts";
 import { type CompletionHeader, native } from "./addon.ts";
 import { MaplibreError } from "./errors.ts";
 import { addCompletion, removeCompletion } from "./realm.ts";
 
-/** The terminal receipt of a map command, including a failed one. */
+/**
+ * The generations that a committed map command published. A failed or
+ * cancelled command rejects with a {@link MaplibreError} instead.
+ */
 export interface CommandCompletion {
-  readonly disposition: CommandDisposition;
   /** The map snapshot generation that the command published. */
   readonly generation: bigint;
   /** The first map render update that includes the command. */
   readonly renderUpdateGeneration: bigint;
-  readonly status: Status;
-  readonly diagnostic: string;
 }
 
 type Start = (completion: number) => void;
@@ -80,16 +79,25 @@ export function run(start: Start): Promise<void> {
   return rejected(() => submitRun(start));
 }
 
-/** A map command, which resolves with its receipt even when it failed. */
+/**
+ * A map command, which resolves once it commits. A failed or cancelled
+ * command rejects with the generation that it published.
+ */
 export function command(start: Start): Promise<CommandCompletion> {
   return rejected(() =>
-    submit(start, (_index, header) => ({
-      disposition: header.disposition,
-      generation: header.generation,
-      renderUpdateGeneration: header.renderUpdateGeneration,
-      status: header.status,
-      diagnostic: header.diagnostic,
-    })),
+    submit(start, (_index, header) => {
+      if (header.status !== 0) {
+        throw new MaplibreError(
+          header.status,
+          header.diagnostic,
+          header.generation,
+        );
+      }
+      return {
+        generation: header.generation,
+        renderUpdateGeneration: header.renderUpdateGeneration,
+      };
+    }),
   );
 }
 

@@ -15,7 +15,7 @@ import {
   Status,
   styleExpressionCreate,
 } from "../src/index.ts";
-import { expectCommitted, openRuntime, utf8 } from "./support/fixture.ts";
+import { openRuntime, utf8 } from "./support/fixture.ts";
 import { bounded, callbackArrival, test } from "./support/harness.ts";
 import { capabilities } from "./support/host-capabilities.ts";
 
@@ -53,7 +53,7 @@ test("presence fields keep a present zero apart from an absent one", async () =>
   const map = await fixture.openStyledMap();
 
   const options = { durationMs: 0, enablePlacementTransitions: false };
-  await expectCommitted(map.setStyleTransitionOptions(options));
+  await bounded(map.setStyleTransitionOptions(options), "a command");
   const read = await bounded(map.getStyleTransitionOptions(), "the options");
   // An absent member stays out of the object, so the present zero round-trips
   // and the absent delay is not read back as zero.
@@ -107,14 +107,15 @@ test("integer narrowing is checked and 64-bit carriers round-trip", async () => 
   const maximum = 2n ** 64n - 1n;
   let end!: (value: CameraTransitionEnd) => void;
   const ended = new Promise<CameraTransitionEnd>((resolve) => (end = resolve));
-  await expectCommitted(
+  await bounded(
     map.updateCamera({
       camera: { zoom: 2 },
       mode: CameraUpdateMode.ease,
       animation: { durationMs: 60_000, transitionId: maximum, endHandler: end },
     }),
+    "a command",
   );
-  await expectCommitted(map.cancelCameraTransition(maximum));
+  await bounded(map.cancelCameraTransition(maximum), "a command");
   assert.equal(
     (await callbackArrival(ended, "the end handler")).outcome,
     CameraTransitionOutcome.cancelled,

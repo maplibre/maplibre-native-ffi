@@ -7,8 +7,6 @@ import assert from "node:assert/strict";
 
 import {
   AwaitableWake,
-  type CommandCompletion,
-  CommandDisposition,
   type HttpHeaderTransform,
   MaplibreError,
   type MapHandle,
@@ -81,18 +79,6 @@ export function styleRoute(url: string): ResourceRoute {
 
 export function styleResponse(style = emptyStyle()): ResourceResponse {
   return { status: ResourceResponseStatus.ok, bytes: utf8(style) };
-}
-
-export async function expectCommitted(
-  command: Promise<CommandCompletion>,
-): Promise<CommandCompletion> {
-  const completion = await bounded(command, "a command");
-  assert.equal(
-    completion.disposition,
-    CommandDisposition.committed,
-    completion.diagnostic,
-  );
-  return completion;
 }
 
 /**
@@ -190,7 +176,7 @@ export async function openRuntime(
     },
     async openStyledMap(style = emptyStyle(), mapOptions) {
       const map = await fixture.openMap(mapOptions);
-      await expectCommitted(map.setStyleJson(style));
+      await bounded(map.setStyleJson(style), "a command");
       return map;
     },
   };
