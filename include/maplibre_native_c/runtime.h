@@ -84,6 +84,9 @@ typedef struct mln_offline_region_status {
  * no named values; message carries the failure text; payload NONE.
  * - MAP_IDLE: code is 0; payload NONE.
  * - MAP_RENDER_ERROR: code is 0; message carries the error text; payload NONE.
+ *   MapLibre reports a failure that it renders past, and a render session
+ *   reports the failure that lost its target; see
+ *   MLN_RENDER_SESSION_STATE_TARGET_LOST.
  * - MAP_RENDER_FRAME_STARTED: code is 0; payload NONE.
  * - MAP_RENDER_FRAME_FINISHED: code is 0; payload RENDER_FRAME.
  * - MAP_RENDER_MAP_STARTED: code is 0; payload NONE.

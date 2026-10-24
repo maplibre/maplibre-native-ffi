@@ -9,6 +9,7 @@
 #include <mutex>
 #include <optional>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -2727,7 +2728,8 @@ auto publish_frame_result(
 }
 
 auto fail_frame_target(
-  const std::shared_ptr<mln_render_session_object>& session, mln_status status
+  const std::shared_ptr<mln_render_session_object>& session, mln_status status,
+  std::exception_ptr reason = {}
 ) -> void;
 
 // Delivers queued worker results to the renderer without rendering. Tile and
@@ -2756,7 +2758,9 @@ auto deliver_pending_session_work(
     return MLN_STATUS_NOT_READY;
 #endif
   } catch (...) {
-    fail_frame_target(session, MLN_STATUS_TARGET_LOST);
+    fail_frame_target(
+      session, MLN_STATUS_TARGET_LOST, std::current_exception()
+    );
     return MLN_STATUS_TARGET_LOST;
   }
 }
@@ -2829,9 +2833,33 @@ auto wait_for_map_update(
   return false;
 }
 
+// Reports why the session lost its target as a map render error, where a host
+// reads it. A failed status leaves its message in the driver thread's error,
+// which no host call reads, so a report without an exception carries that.
+auto report_target_lost(
+  const mln_render_session_object& session, std::exception_ptr reason
+) noexcept -> void {
+  if (session.map_object == nullptr) return;
+  auto* observer = map_renderer_observer(*session.map_object);
+  if (observer == nullptr) return;
+  try {
+    if (reason == nullptr) {
+      reason = std::make_exception_ptr(
+        std::runtime_error{thread_last_error_message()}
+      );
+    }
+    observer->onRenderError(reason);
+  } catch (...) {
+    // A report that cannot allocate is dropped; the session is lost anyway.
+  }
+}
+
 auto fail_frame_target(
-  const std::shared_ptr<mln_render_session_object>& session, mln_status status
+  const std::shared_ptr<mln_render_session_object>& session, mln_status status,
+  std::exception_ptr reason
 ) -> void {
+  if (status != MLN_STATUS_NOT_READY)
+    report_target_lost(*session, std::move(reason));
   auto discarded = std::deque<RenderDriverWork>{};
   {
     auto wakes = DeferredWakes{};
@@ -3105,7 +3133,9 @@ auto run_frame_demand(
     result.disposition = MLN_RENDER_RESULT_TARGET_NOT_READY;
 #endif
   } catch (...) {
-    fail_frame_target(session, MLN_STATUS_TARGET_LOST);
+    fail_frame_target(
+      session, MLN_STATUS_TARGET_LOST, std::current_exception()
+    );
     result.disposition = MLN_RENDER_RESULT_TARGET_NOT_READY;
   }
   if (result.disposition != MLN_RENDER_RESULT_RENDERED) {

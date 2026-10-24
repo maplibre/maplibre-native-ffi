@@ -56,6 +56,11 @@ typedef enum mln_render_session_state : uint32_t {
   MLN_RENDER_SESSION_STATE_ATTACHED = 2U,
   MLN_RENDER_SESSION_STATE_DETACHING = 3U,
   MLN_RENDER_SESSION_STATE_DETACHED = 4U,
+  /**
+   * A frame or driver task failed and the session can no longer render. The
+   * map reports the failure as MLN_RUNTIME_EVENT_MAP_RENDER_ERROR. A failed
+   * attach reports it through its completion instead.
+   */
   MLN_RENDER_SESSION_STATE_TARGET_LOST = 5U,
   MLN_RENDER_SESSION_STATE_ABANDONED = 6U,
 } mln_render_session_state;

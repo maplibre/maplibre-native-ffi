@@ -265,8 +265,9 @@ static const payload_row payload_rows[] = {
   {MLN_RUNTIME_EVENT_MAP_RENDER_ERROR, SCENARIO_UNREACHABLE, MAP,
    .message = MESSAGE_TEXT,
    .unreachable_reason =
-     "MapLibre reports a render error only when a frame throws, which no "
-     "valid style or target provokes"},
+     "MapLibre reports a render error only when a frame throws, and a render "
+     "session only when it loses its target, which no valid style or target "
+     "provokes"},
   {MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED, SCENARIO_RENDER, MAP},
   {MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED, SCENARIO_RENDER, MAP,
    MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME,

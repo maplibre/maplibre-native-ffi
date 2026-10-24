@@ -5,11 +5,13 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <stdexcept>
 #include <vector>
 
 #include <mln/gfx/context.hpp>
 
+#include "diagnostics/diagnostics.hpp"
 #include "internal/support/checks.hpp"
 #include "internal/support/driver_blocker.hpp"
 #include "internal/support/sync_points.hpp"
@@ -128,6 +130,7 @@ auto request_frame(const Fixture& fixture, const mln_frame_demand& demand)
 
 enum class FrameFailure {
   Activation,
+  Slot,
   Resources,
   Scheduler,
   Metadata,
@@ -171,6 +174,10 @@ class FailingFrameBackend final : public mln::core::TextureSessionBackend {
                                                 : backend_->renderer_backend();
   }
   auto select_render_slot(std::size_t slot) -> mln_status override {
+    if (failure_ == FrameFailure::Slot) {
+      mln::core::set_thread_error("render slot failed");
+      return MLN_STATUS_NATIVE_ERROR;
+    }
     if (failure_ == FrameFailure::Drawable && !retried_) {
       retried_ = true;
       throw mln::core::RenderTargetNotReady("drawable unavailable");
@@ -241,10 +248,19 @@ void install_frame_failure(const Fixture& fixture, FrameFailure failure) {
   mln_test_completion_destroy(&install);
 }
 
+struct LostTargetCase {
+  FrameFailure failure;
+  const char* message;
+};
+
 void graphics_failures_finish_demands_and_lose_the_target() {
-  for (const auto failure :
-       {FrameFailure::Activation, FrameFailure::Resources,
-        FrameFailure::Scheduler, FrameFailure::Metadata}) {
+  for (const auto [failure, message] : {
+         LostTargetCase{FrameFailure::Activation, "activation failed"},
+         LostTargetCase{FrameFailure::Slot, "render slot failed"},
+         LostTargetCase{FrameFailure::Resources, "resource preparation failed"},
+         LostTargetCase{FrameFailure::Scheduler, "scheduler failed"},
+         LostTargetCase{FrameFailure::Metadata, "frame metadata failed"},
+       }) {
     auto fixture = Fixture{};
     create_fixture(fixture);
     static_cast<void>(mln_test_render_until_idle(
@@ -278,12 +294,20 @@ void graphics_failures_finish_demands_and_lose_the_target() {
     MLN_TEST_OK(mln_render_session_get_snapshot(
       fixture.render.session, &snapshot, nullptr
     ));
+    auto error = mln_runtime_event{};
+    auto error_message = std::array<char, 256>{};
+    const auto reported = mln_test_await_event(
+      fixture.runtime, MLN_RUNTIME_EVENT_MAP_RENDER_ERROR, fixture.map, &error,
+      error_message.data(), error_message.size()
+    );
     auto abandoned =
       mln_render_abandon_result{.size = sizeof(mln_render_abandon_result)};
     MLN_TEST_OK(
       mln_render_session_abandon(fixture.render.session, &abandoned, nullptr)
     );
     destroy_fixture(fixture);
+    TEST_ASSERT_TRUE(reported);
+    TEST_ASSERT_NOT_NULL(std::strstr(error_message.data(), message));
     TEST_ASSERT_EQUAL_UINT32(
       MLN_RENDER_RESULT_TARGET_NOT_READY, first.disposition
     );
