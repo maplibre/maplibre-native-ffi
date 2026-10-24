@@ -29,9 +29,8 @@ sdk_root="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}"
 log_dir=${TMPDIR:-/tmp}
 log_file="${log_dir%/}/android-emulator-$avd_name.log"
 serial_script="$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh"
-# The emulator looks for AVDs under $HOME, but avdmanager's JVM finds its home
-# its own way, and on a CI runner the two disagree. Naming the default AVD home
-# makes both use it.
+# The default AVD home, named so that avdmanager and the emulator use the same
+# directory.
 export ANDROID_AVD_HOME="${ANDROID_AVD_HOME:-$HOME/.android/avd}"
 
 # adb arrives with platform-tools, which the package check below installs, so
@@ -124,10 +123,12 @@ if ! emulator_current; then
   fi
 fi
 
-# `emulator -list-avds` reads the AVD home that the emulator itself resolves.
 if ! "$sdk_root/emulator/emulator" -list-avds 2>/dev/null | tr -d '\r' | grep -qx "$avd_name"; then
-  # `no` declines the custom hardware profile prompt. Everything the suite
-  # depends on is a launch flag below rather than a stored device setting.
+  # avdmanager succeeds without creating anything when the AVD home is missing,
+  # as it is on a fresh runner. `no` declines the custom hardware profile
+  # prompt. Everything the suite depends on is a launch flag below rather than
+  # a stored device setting.
+  mkdir -p "$ANDROID_AVD_HOME"
   "$avdmanager" create avd --name "$avd_name" --package "$image" --device pixel_6 <<<"no"
 fi
 
