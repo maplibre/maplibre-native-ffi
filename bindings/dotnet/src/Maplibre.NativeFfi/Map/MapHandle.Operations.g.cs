@@ -1938,25 +1938,28 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     public Task<CommandCompletion> SetCustomMvtVectorSourceTileDataAsync(
         string sourceId,
         CanonicalTileId tileId,
-        byte[] data,
+        ReadOnlySpan<byte> data,
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_set_custom_mvt_vector_source_tile_data(
-            Handle,
-            scope.Utf8(sourceId),
-            NativeCanonicalTileId(tileId),
-            scope.Buffer(data),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
+        fixed (byte* pinnedData = data)
+        {
+            using var scope = new NativeCallScope(this);
+            mln_completion nativeCompletion;
+            var nativeStatus = NativeMethods.mln_map_set_custom_mvt_vector_source_tile_data(
+                Handle,
+                scope.Utf8(sourceId),
+                NativeCanonicalTileId(tileId),
+                new mln_buffer_view { data = pinnedData, size = (nuint)data.Length },
+                NativeCompletion.StartCommand(
+                    &nativeCompletion,
+                    cancellationToken,
+                    out var nativePending
+                ),
+                Diagnostic
+            );
+            return scope.Accepted(nativePending.Submitted(nativeStatus));
+        }
     }
 
     /// <summary>
@@ -3123,22 +3126,25 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetCustomMvtVectorSourceTileData(
             string sourceId,
             CanonicalTileId tileId,
-            byte[] data
+            ReadOnlySpan<byte> data
         )
         {
-            var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner);
-            Check(
-                NativeMethods.mln_map_set_custom_mvt_vector_source_tile_data(
-                    receiverHandle,
-                    scope.Utf8(sourceId),
-                    NativeCanonicalTileId(tileId),
-                    scope.Buffer(data),
-                    null,
-                    Diagnostic
-                )
-            );
-            scope.Accept();
+            fixed (byte* pinnedData = data)
+            {
+                var receiverHandle = owner.Handle;
+                using var scope = new NativeCallScope(owner);
+                Check(
+                    NativeMethods.mln_map_set_custom_mvt_vector_source_tile_data(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        NativeCanonicalTileId(tileId),
+                        new mln_buffer_view { data = pinnedData, size = (nuint)data.Length },
+                        null,
+                        Diagnostic
+                    )
+                );
+                scope.Accept();
+            }
         }
 
         public void SetCustomMvtVectorSourceTileError(

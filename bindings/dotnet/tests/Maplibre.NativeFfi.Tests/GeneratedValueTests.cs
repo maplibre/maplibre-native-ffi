@@ -23,6 +23,20 @@ public sealed class GeneratedValueTests
         Assert.Equal(text, expression.Evaluate());
     }
 
+    // C borrows a byte input only for the call, so the binding pins the caller's span instead of
+    // copying it. An empty span pins to null, which C accepts with a zero size.
+    [Fact]
+    public void ByteInputsCrossAsPinnedSpans()
+    {
+        using var data = GeojsonSourceDataHandle.Create(
+            """{"type":"FeatureCollection","features":[]}"""u8
+        );
+        var error = Assert.Throws<MaplibreException>(() =>
+            GeojsonSourceDataHandle.Create(ReadOnlySpan<byte>.Empty)
+        );
+        Assert.Equal(Status.InvalidArgument, error.Status);
+    }
+
     [Fact]
     public async Task SynchronousCallsFillCallerSizedOutputsInInputOrder()
     {

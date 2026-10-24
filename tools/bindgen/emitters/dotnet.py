@@ -440,6 +440,9 @@ def emit_operation(
     parameters = []
     # Parameters that may be absent, which default to null when trailing.
     omittable: set[str] = set()
+    # Byte spans that C borrows only for the call, pinned around it as
+    # (pointer, span) pairs instead of copied.
+    pins: list[tuple[str, str]] = []
     prologue: list[str] = []
     outputs = []
     scoped = False
@@ -488,7 +491,7 @@ def emit_operation(
             counted = input_plans[counts[parameter.name]]
             size = (
                 f"buffer{pascal(counts[parameter.name])}.size"
-                if counted.encoding in {"utf8", "bytes", "json"}
+                if counted.encoding in {"utf8", "json"}
                 and (
                     counted.kind == "buffer"
                     or counted.element
@@ -552,14 +555,22 @@ def emit_operation(
             )
         ):
             value_plan = input_plans[parameter.name]
+            raw = (
+                values.raw_type(value_plan.element) + "*"
+                if value_plan.element
+                else values.raw_type(value_plan)
+            )
+            if value_plan.encoding == "bytes" and not value_plan.nullable:
+                parameters.append(f"ReadOnlySpan<byte> {name}")
+                pins.append((f"pinned{pascal(name)}", name))
+                args.append(f"({raw})pinned{pascal(name)}")
+                continue
             public = "string" if value_plan.encoding == "utf8" else "byte[]"
             parameters.append(f"{public} {name}")
             scoped = True
             encoder = "Utf8" if value_plan.encoding == "utf8" else "Buffer"
             prologue.append(f"var buffer{pascal(name)} = scope.{encoder}({name});")
-            args.append(
-                f"({values.raw_type(value_plan.element) + '*' if value_plan.element else values.raw_type(value_plan)})buffer{pascal(name)}.data"
-            )
+            args.append(f"({raw})buffer{pascal(name)}.data")
         elif (
             parameter.name in input_plans
             and input_plans[parameter.name].kind == "native_pointer"
@@ -601,6 +612,17 @@ def emit_operation(
             and value_plan.buffer_form == "view"
             and value_plan.encoding in {"bytes", "json", "utf8"}
         ):
+            if (
+                value_plan.encoding == "bytes"
+                and not value_plan.optional
+                and not value_plan.nullable
+            ):
+                parameters.append(f"ReadOnlySpan<byte> {name}")
+                pins.append((f"pinned{pascal(name)}", name))
+                args.append(
+                    f"new mln_buffer_view {{ data = pinned{pascal(name)}, size = (nuint){name}.Length }}"
+                )
+                continue
             parameters.append(f"{values.public_type(value_plan)} {name}")
             if value_plan.optional or value_plan.nullable:
                 omittable.add(name)
@@ -700,6 +722,14 @@ def emit_operation(
             raise Unsupported(
                 f"parameter {parameter.name}: {parameter.type.spelling} needs a conversion rule"
             )
+
+    def pinned(body: list[str]) -> list[str]:
+        """Pins the byte spans around the whole body, which returns inside."""
+        if not pins:
+            return body
+        fixed = ", ".join(f"{pointer} = {span}" for pointer, span in pins)
+        return [f"fixed (byte* {fixed})", "{", *(f"    {line}" for line in body), "}"]
+
     for index in reversed(range(len(parameters))):
         if parameters[index].rsplit(" ", 1)[1] not in omittable:
             break
@@ -734,6 +764,8 @@ def emit_operation(
         else plan.member
     )
     modifiers = "public static" if static else "public"
+    if pins and (plan.view or text):
+        raise Unsupported("a pinned span requires a single native call")
     if plan.view:
         assert handle_plan and handle_plan.view_begin and handle_plan.view_end
         if len(outputs) != 1:
@@ -856,7 +888,8 @@ def emit_operation(
             return (
                 owner_class,
                 method(
-                    f"{modifiers} {result_type} {name}({', '.join(parameters)})", body
+                    f"{modifiers} {result_type} {name}({', '.join(parameters)})",
+                    pinned(body),
                 ),
                 records | values.plans.keys(),
             )
@@ -937,7 +970,9 @@ def emit_operation(
             ]
     return (
         owner_class,
-        method(f"{modifiers} {result_type} {name}({', '.join(parameters)})", body),
+        method(
+            f"{modifiers} {result_type} {name}({', '.join(parameters)})", pinned(body)
+        ),
         records | values.plans.keys(),
     )
 

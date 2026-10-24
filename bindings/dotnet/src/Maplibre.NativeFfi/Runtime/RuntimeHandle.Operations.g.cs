@@ -173,32 +173,34 @@ public sealed unsafe partial class RuntimeHandle
     /// </remarks>
     public Task<OfflineRegionInfo> CreateOfflineRegionAsync(
         OfflineRegionDefinition definition,
-        byte[] metadata,
+        ReadOnlySpan<byte> metadata,
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this);
-        var nativeDefinition = NativeOfflineRegionDefinition(definition, scope);
-        var bufferMetadata = scope.Buffer(metadata);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_runtime_create_offline_region(
-            Handle,
-            &nativeDefinition,
-            (byte*)bufferMetadata.data,
-            checked((nuint)bufferMetadata.size),
-            NativeCompletion.Start<OfflineRegionInfo>(
-                &nativeCompletion,
-                static nativeResult =>
-                    NativeCompletion.Single<mln_offline_region_info, OfflineRegionInfo>(
-                        nativeResult,
-                        CopyOfflineRegionInfo
-                    ),
-                cancellationToken,
-                out var nativePending
-            ),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
+        fixed (byte* pinnedMetadata = metadata)
+        {
+            using var scope = new NativeCallScope(this);
+            var nativeDefinition = NativeOfflineRegionDefinition(definition, scope);
+            mln_completion nativeCompletion;
+            var nativeStatus = NativeMethods.mln_runtime_create_offline_region(
+                Handle,
+                &nativeDefinition,
+                (byte*)pinnedMetadata,
+                checked((nuint)metadata.Length),
+                NativeCompletion.Start<OfflineRegionInfo>(
+                    &nativeCompletion,
+                    static nativeResult =>
+                        NativeCompletion.Single<mln_offline_region_info, OfflineRegionInfo>(
+                            nativeResult,
+                            CopyOfflineRegionInfo
+                        ),
+                    cancellationToken,
+                    out var nativePending
+                ),
+                Diagnostic
+            );
+            return scope.Accepted(nativePending.Submitted(nativeStatus));
+        }
     }
 
     /// <summary>
@@ -634,30 +636,32 @@ public sealed unsafe partial class RuntimeHandle
     /// </remarks>
     public Task<OfflineRegionInfo> UpdateOfflineRegionMetadataAsync(
         long regionId,
-        byte[] metadata,
+        ReadOnlySpan<byte> metadata,
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this);
-        var bufferMetadata = scope.Buffer(metadata);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_runtime_update_offline_region_metadata(
-            Handle,
-            regionId,
-            (byte*)bufferMetadata.data,
-            checked((nuint)bufferMetadata.size),
-            NativeCompletion.Start<OfflineRegionInfo>(
-                &nativeCompletion,
-                static nativeResult =>
-                    NativeCompletion.Single<mln_offline_region_info, OfflineRegionInfo>(
-                        nativeResult,
-                        CopyOfflineRegionInfo
-                    ),
-                cancellationToken,
-                out var nativePending
-            ),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
+        fixed (byte* pinnedMetadata = metadata)
+        {
+            using var scope = new NativeCallScope(this);
+            mln_completion nativeCompletion;
+            var nativeStatus = NativeMethods.mln_runtime_update_offline_region_metadata(
+                Handle,
+                regionId,
+                (byte*)pinnedMetadata,
+                checked((nuint)metadata.Length),
+                NativeCompletion.Start<OfflineRegionInfo>(
+                    &nativeCompletion,
+                    static nativeResult =>
+                        NativeCompletion.Single<mln_offline_region_info, OfflineRegionInfo>(
+                            nativeResult,
+                            CopyOfflineRegionInfo
+                        ),
+                    cancellationToken,
+                    out var nativePending
+                ),
+                Diagnostic
+            );
+            return scope.Accepted(nativePending.Submitted(nativeStatus));
+        }
     }
 }

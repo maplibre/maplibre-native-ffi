@@ -54,22 +54,28 @@ public sealed unsafe partial class GeojsonSourceDataHandle
     /// See <c>mln_geojson_source_data_create</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public static GeojsonSourceDataHandle Create(byte[] data, GeojsonSourceOptions? options = null)
+    public static GeojsonSourceDataHandle Create(
+        ReadOnlySpan<byte> data,
+        GeojsonSourceOptions? options = null
+    )
     {
-        using var scope = new NativeCallScope(null);
-        var nativeOptions = options is null
-            ? default(mln_geojson_source_options)
-            : NativeGeojsonSourceOptions(options, scope);
-        MlnGeojsonSourceData outData = default;
-        Check(
-            NativeMethods.mln_geojson_source_data_create(
-                scope.Buffer(data),
-                options is null ? null : &nativeOptions,
-                &outData,
-                Diagnostic
-            )
-        );
-        scope.Accept();
-        return GeojsonSourceDataHandle.Adopt(outData);
+        fixed (byte* pinnedData = data)
+        {
+            using var scope = new NativeCallScope(null);
+            var nativeOptions = options is null
+                ? default(mln_geojson_source_options)
+                : NativeGeojsonSourceOptions(options, scope);
+            MlnGeojsonSourceData outData = default;
+            Check(
+                NativeMethods.mln_geojson_source_data_create(
+                    new mln_buffer_view { data = pinnedData, size = (nuint)data.Length },
+                    options is null ? null : &nativeOptions,
+                    &outData,
+                    Diagnostic
+                )
+            );
+            scope.Accept();
+            return GeojsonSourceDataHandle.Adopt(outData);
+        }
     }
 }
