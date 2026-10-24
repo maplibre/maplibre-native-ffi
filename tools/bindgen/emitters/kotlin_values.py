@@ -482,6 +482,7 @@ class Values:
                     result[-1] += " {\n" + companion + "\n}"
         for public, (field, value) in self.attachments.items():
             result.append(
+                f"/** A new {field} and the completion that reports it ready. */\n"
                 f"public data class {public}(public val {field}: {self.public(value)}, public val ready: kotlinx.coroutines.Deferred<Unit>)"
                 + content_equality(
                     public,

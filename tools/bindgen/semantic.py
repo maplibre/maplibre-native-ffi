@@ -101,8 +101,6 @@ class OwnedOutputPlan:
 class CompletionPlan:
     parameter: str
     immediate_owners: tuple[OwnedOutputPlan, ...]
-    result_owned: bool
-    result_owner: OwnedOutputPlan | None = None
     discardable: bool = False
     # Whether the completion may be null without being a command's discard: the
     # function is also its handle's dispose, which passes none.
@@ -1094,16 +1092,6 @@ class Binder:
                 else CType(result_name, result_name, result_name)
             )
             result = self.value(type_, metadata, context + " completion")
-            if (
-                result.ownership == "owned"
-                and result.handle
-                and not result.handle.cleanup
-            ):
-                raise ModelError(
-                    [
-                        f"{context}: owned result requires a disposal contract for abandoned delivery"
-                    ]
-                )
             if metadata.get("shape") == "array":
                 # An array result steps by the stride of the native build
                 # rather than by the binding's own size of the element.
@@ -1172,39 +1160,9 @@ class Binder:
                 owners.append(OwnedOutputPlan(output.name, value.handle, parent))
         completion = None
         if completion_parameter:
-            result_value = (
-                result.element if result and result.kind == "array" else result
-            )
-            result_owner = None
-            if (
-                result_value
-                and result_value.handle
-                and result_value.ownership == "owned"
-            ):
-                parent = next(
-                    (
-                        parameter.name
-                        for parameter in inputs
-                        if parameter.value.native == result_value.handle.parent
-                    ),
-                    None,
-                )
-                if result_value.handle.parent and parent is None:
-                    raise ModelError(
-                        [
-                            f"{context}: owned completion requires its parent handle input"
-                        ]
-                    )
-                if parent is not None and parent != receiver:
-                    raise ModelError(
-                        [f"{context}: owned completion requires its parent receiver"]
-                    )
-                result_owner = OwnedOutputPlan("result", result_value.handle, parent)
             completion = CompletionPlan(
                 completion_parameter,
                 tuple(owners),
-                bool(result and result.ownership == "owned"),
-                result_owner=result_owner,
                 discardable=metadata["execution"] == "command",
                 optional=any(
                     handle.dispose_completion == completion_parameter

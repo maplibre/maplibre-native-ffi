@@ -17,6 +17,7 @@ from support import (
     denied_response,
     leak_reports,
     ok_response,
+    ready_map,
     result,
 )
 
@@ -145,7 +146,7 @@ def test_a_registered_callback_does_not_keep_its_receiver_alive() -> None:
     result(runtime.set_event_handler(mln.RuntimeEventHandler(receive_events)))
     receiver["runtime"] = runtime
     owner = weakref.ref(runtime)
-    map_handle = result(runtime.create_map())
+    map_handle = ready_map(runtime)
     result(map_handle.set_style_json(EMPTY_STYLE))
     assert woke.wait(TIMEOUT)
     result(map_handle.close())

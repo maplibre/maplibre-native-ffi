@@ -51,7 +51,6 @@ constexpr auto driver_work_completion =
 struct Result {
   std::atomic_int status{MLN_STATUS_INVALID_STATE};
   std::atomic_uint releases{0};
-  std::atomic_uint64_t handle{MLN_HANDLE_NULL};
 };
 
 auto descriptor(Result& result) -> mln_completion {
@@ -61,8 +60,6 @@ auto descriptor(Result& result) -> mln_completion {
       [](void* context, const mln_completion_result* completion) {
         auto& result = *static_cast<Result*>(context);
         result.status = completion->status;
-        if (completion->value != nullptr)
-          result.handle = *static_cast<const mln_map*>(completion->value);
       },
     .user_data = &result,
     .release_user_data =
@@ -95,10 +92,13 @@ auto create_map(mln_runtime runtime) -> mln_map {
   const auto completion = descriptor(result);
   auto options = mln_map_options_default();
   options.map_mode = MLN_MAP_MODE_STATIC;
-  MLN_TEST_OK(mln_runtime_create_map(runtime, &options, &completion, nullptr));
+  auto map = mln_map{MLN_HANDLE_NULL};
+  MLN_TEST_OK(
+    mln_runtime_create_map(runtime, &options, &map, &completion, nullptr)
+  );
   TEST_ASSERT_TRUE(released(result));
   MLN_TEST_OK(result.status.load());
-  return result.handle;
+  return map;
 }
 
 // Parks the runtime worker in a task of its own until released.
@@ -189,17 +189,22 @@ void failed_creation_releases_parent_reservation() {
   auto result = Result{};
   const auto completion = descriptor(result);
   auto status = MLN_STATUS_OK;
+  auto map = mln_map{MLN_HANDLE_NULL};
   {
     const auto faults = AllocationFaults{};
-    status = mln_runtime_create_map(runtime, nullptr, &completion, nullptr);
+    status =
+      mln_runtime_create_map(runtime, nullptr, &map, &completion, nullptr);
   }
   MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, status);
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
   TEST_ASSERT_EQUAL_UINT(0, result.releases.load());
   MLN_TEST_OK(mln_runtime_dispose(runtime, nullptr));
   TEST_ASSERT_TRUE(expired(weak));
 }
 
-void disposal_waits_for_pending_child_creation() {
+// A map is the runtime's child from acceptance, so a disposed runtime finishes
+// the map's creation and retires only once the map is gone.
+void disposal_waits_for_a_creating_child() {
   const auto runtime = create_runtime();
   auto live = mln::core::lease_runtime(runtime);
   auto weak = std::weak_ptr{live};
@@ -207,18 +212,21 @@ void disposal_waits_for_pending_child_creation() {
   park_worker(*live, worker);
   auto result = Result{};
   const auto completion = descriptor(result);
-  MLN_TEST_OK(mln_runtime_create_map(runtime, nullptr, &completion, nullptr));
+  auto map = mln_map{MLN_HANDLE_NULL};
+  MLN_TEST_OK(
+    mln_runtime_create_map(runtime, nullptr, &map, &completion, nullptr)
+  );
   MLN_TEST_OK(mln_runtime_dispose(runtime, nullptr));
   live.reset();
-  // The worker is parked, so the accepted creation cannot have run yet.
-  TEST_ASSERT_FALSE_MESSAGE(
-    weak.expired(), "the parent retired before an accepted child creation"
-  );
   worker.release = true;
   mln_test_pulse();
-  TEST_ASSERT_TRUE(expired(weak));
   TEST_ASSERT_TRUE(released(result));
-  MLN_TEST_INVALID_STATE(result.status.load());
+  MLN_TEST_OK(result.status.load());
+  TEST_ASSERT_FALSE_MESSAGE(
+    weak.expired(), "the parent retired before its creating child"
+  );
+  MLN_TEST_OK(mln_map_dispose(map, nullptr));
+  TEST_ASSERT_TRUE(expired(weak));
 }
 
 // An operation that stays pending after its run-loop task returns, the way an
@@ -833,12 +841,12 @@ void a_serviced_driver_call_parks_its_retirement_without_stalling_others() {
 void map_query_admission_failure_releases_its_map_lease() {
   for (const auto query : {mln_map_get_camera, mln_map_get_style_url}) {
     const auto runtime = create_runtime();
-    auto creation = mln_test_completion_default(sizeof(mln_map));
-    MLN_TEST_OK(
-      mln_runtime_create_map(runtime, nullptr, &creation.descriptor, nullptr)
-    );
+    auto creation = mln_test_completion_default(0);
     auto map = mln_map{MLN_HANDLE_NULL};
-    MLN_TEST_OK(mln_test_completion_finish_value(&creation, &map, sizeof(map)));
+    MLN_TEST_OK(mln_runtime_create_map(
+      runtime, nullptr, &map, &creation.descriptor, nullptr
+    ));
+    MLN_TEST_OK(mln_test_completion_settle(&creation));
     auto transition = mln_test_transition_end{};
     mln_test_transition_end_init(&transition);
     auto camera = mln_camera_update_default();
@@ -887,7 +895,7 @@ MLN_TEST_GROUP {
   RUN_TEST(finalization_abandons_an_attached_session);
   RUN_TEST(disposal_drains_queued_work_and_map_cleanup);
   RUN_TEST(failed_creation_releases_parent_reservation);
-  RUN_TEST(disposal_waits_for_pending_child_creation);
+  RUN_TEST(disposal_waits_for_a_creating_child);
   RUN_TEST(a_pending_operation_keeps_only_its_runtime_alive);
   RUN_TEST(dropping_a_pending_operation_cancels_and_retires_its_runtime);
 }

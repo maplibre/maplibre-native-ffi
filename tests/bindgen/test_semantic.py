@@ -529,6 +529,18 @@ BIND("execution=lifecycle") mln_status attach(
                 ),
                 require_complete=True,
             )
+        # A handle that only the completion carried would leak if the host
+        # dropped the completion, so it comes back through the out parameter.
+        with self.assertRaisesRegex(ModelError, "a completion cannot deliver a handle"):
+            bind(
+                self.parse(
+                    source.replace(
+                        'BIND("execution=lifecycle")',
+                        'BIND("execution=lifecycle;result=child")',
+                    ).replace('child *owner BIND("direction=out"),', "")
+                ),
+                require_complete=True,
+            )
 
     def test_consuming_release_preserves_required_synchronization(self):
         model = bind(

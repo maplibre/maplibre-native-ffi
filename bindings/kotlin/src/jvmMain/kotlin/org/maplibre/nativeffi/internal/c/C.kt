@@ -1124,7 +1124,15 @@ internal actual object C {
   private val mln_runtime_create =
     Ffm.downcall("mln_runtime_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_runtime_create_map =
-    Ffm.downcall("mln_runtime_create_map", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+    Ffm.downcall(
+      "mln_runtime_create_map",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_runtime_create_offline_region =
     Ffm.downcall(
       "mln_runtime_create_offline_region",
@@ -3122,9 +3130,11 @@ internal actual object C {
   actual fun mln_runtime_create_map(
     runtime: Long,
     options: Long,
+    outMap: Long,
     completion: Long,
     outDiagnostic: Long,
-  ): Int = mln_runtime_create_map.invokeExact(runtime, options, completion, outDiagnostic) as Int
+  ): Int =
+    mln_runtime_create_map.invokeExact(runtime, options, outMap, completion, outDiagnostic) as Int
 
   actual fun mln_runtime_create_offline_region(
     runtime: Long,

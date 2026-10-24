@@ -242,7 +242,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_attach_metal_borrowed_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    pub fn attachMetalBorrowedTexture(self: Map, allocator: std.mem.Allocator, descriptor: MetalBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
+    pub fn attachMetalBorrowedTexture(self: Map, allocator: std.mem.Allocator, descriptor: MetalBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
         const started = try call.submit("mln_map_attach_metal_borrowed_texture", .handle, self, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
         return .{ .session = started.outputs, .ready = started.ready };
     }
@@ -251,7 +251,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_attach_metal_owned_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    pub fn attachMetalOwnedTexture(self: Map, descriptor: MetalOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
+    pub fn attachMetalOwnedTexture(self: Map, descriptor: MetalOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
         const started = try call.submit("mln_map_attach_metal_owned_texture", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
         return .{ .session = started.outputs, .ready = started.ready };
     }
@@ -260,7 +260,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_attach_metal_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    pub fn attachMetalSurface(self: Map, descriptor: MetalSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
+    pub fn attachMetalSurface(self: Map, descriptor: MetalSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
         const started = try call.submit("mln_map_attach_metal_surface", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
         return .{ .session = started.outputs, .ready = started.ready };
     }
@@ -269,7 +269,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_attach_opengl_borrowed_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    pub fn attachOpenglBorrowedTexture(self: Map, allocator: std.mem.Allocator, descriptor: OpenglBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
+    pub fn attachOpenglBorrowedTexture(self: Map, allocator: std.mem.Allocator, descriptor: OpenglBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
         const started = try call.submit("mln_map_attach_opengl_borrowed_texture", .handle, self, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
         return .{ .session = started.outputs, .ready = started.ready };
     }
@@ -278,7 +278,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_attach_opengl_owned_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    pub fn attachOpenglOwnedTexture(self: Map, descriptor: OpenglOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
+    pub fn attachOpenglOwnedTexture(self: Map, descriptor: OpenglOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
         const started = try call.submit("mln_map_attach_opengl_owned_texture", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
         return .{ .session = started.outputs, .ready = started.ready };
     }
@@ -287,7 +287,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_attach_opengl_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    pub fn attachOpenglSurface(self: Map, descriptor: OpenglSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
+    pub fn attachOpenglSurface(self: Map, descriptor: OpenglSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
         const started = try call.submit("mln_map_attach_opengl_surface", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
         return .{ .session = started.outputs, .ready = started.ready };
     }
@@ -296,7 +296,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_attach_vulkan_borrowed_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    pub fn attachVulkanBorrowedTexture(self: Map, allocator: std.mem.Allocator, descriptor: VulkanBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
+    pub fn attachVulkanBorrowedTexture(self: Map, allocator: std.mem.Allocator, descriptor: VulkanBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
         const started = try call.submit("mln_map_attach_vulkan_borrowed_texture", .handle, self, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
         return .{ .session = started.outputs, .ready = started.ready };
     }
@@ -305,7 +305,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_attach_vulkan_owned_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    pub fn attachVulkanOwnedTexture(self: Map, descriptor: VulkanOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
+    pub fn attachVulkanOwnedTexture(self: Map, descriptor: VulkanOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
         const started = try call.submit("mln_map_attach_vulkan_owned_texture", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
         return .{ .session = started.outputs, .ready = started.ready };
     }
@@ -314,7 +314,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_attach_vulkan_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    pub fn attachVulkanSurface(self: Map, descriptor: VulkanSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
+    pub fn attachVulkanSurface(self: Map, descriptor: VulkanSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
         const started = try call.submit("mln_map_attach_vulkan_surface", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
         return .{ .session = started.outputs, .ready = started.ready };
     }
@@ -323,7 +323,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_attach_webgpu_borrowed_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    pub fn attachWebgpuBorrowedTexture(self: Map, allocator: std.mem.Allocator, descriptor: WebgpuBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
+    pub fn attachWebgpuBorrowedTexture(self: Map, allocator: std.mem.Allocator, descriptor: WebgpuBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
         const started = try call.submit("mln_map_attach_webgpu_borrowed_texture", .handle, self, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
         return .{ .session = started.outputs, .ready = started.ready };
     }
@@ -332,7 +332,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_attach_webgpu_owned_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    pub fn attachWebgpuOwnedTexture(self: Map, descriptor: WebgpuOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
+    pub fn attachWebgpuOwnedTexture(self: Map, descriptor: WebgpuOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
         const started = try call.submit("mln_map_attach_webgpu_owned_texture", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
         return .{ .session = started.outputs, .ready = started.ready };
     }
@@ -341,7 +341,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_attach_webgpu_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    pub fn attachWebgpuSurface(self: Map, descriptor: WebgpuSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
+    pub fn attachWebgpuSurface(self: Map, descriptor: WebgpuSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
         const started = try call.submit("mln_map_attach_webgpu_surface", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
         return .{ .session = started.outputs, .ready = started.ready };
     }
@@ -1460,8 +1460,9 @@ pub const Runtime = struct {
     ///
     /// See `mln_runtime_create_map` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn createMap(self: Runtime, options: MapOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(Map) {
-        return call.submit("mln_runtime_create_map", .handle, self, call.handle(Map, c.mln_map), null, diagnostic, .{options});
+    pub fn createMap(self: Runtime, options: MapOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewMap {
+        const started = try call.submit("mln_runtime_create_map", .handle, self, call.unit, null, diagnostic, .{ options, call.adopt(Map) });
+        return .{ .map = started.outputs, .ready = started.ready };
     }
 
     /// Starts creating an offline region.
@@ -6715,8 +6716,14 @@ pub const LogicalExtentPhysicalSizeResult = struct {
     height: u32,
 };
 
-/// The `RenderSession` that a call creates, and the future that completes once it attaches.
-pub const RenderSessionAttachment = struct {
+/// A new `Map`, and the future that completes once it is ready.
+pub const NewMap = struct {
+    map: Map,
+    ready: completion.Future(void),
+};
+
+/// A new `RenderSession`, and the future that completes once it is ready.
+pub const NewRenderSession = struct {
     session: RenderSession,
     ready: completion.Future(void),
 };

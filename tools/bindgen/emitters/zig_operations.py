@@ -72,9 +72,6 @@ def copier(plan, values):
     if result is None:
         return "call.unit", "void"
     values.add(result)
-    if plan.completion.result_owner:
-        handle = values.public(result)
-        return f"call.handle({handle}, c.{result.native})", handle
     if result.nullable and result.optional == "empty":
         raise failure(plan.function, "result is both nullable and optional")
     content = replace(result, nullable=False, optional=None)
@@ -262,16 +259,16 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
             body = [f"return call.discard({head}, {allocator}, {diagnostic}, {args});"]
         elif results:
             # A call that creates an owner returns it with the completion that
-            # reports when it is ready, as every attach call does.
-            attachment = len(results) == 1 and plan.owned_outputs
+            # reports when it is ready, as map creation and every attach do.
+            created = len(results) == 1 and plan.owned_outputs
             return_type = values.result(
-                results[0][1] + "Attachment"
-                if attachment
+                "New" + results[0][1]
+                if created
                 else pascal(plan.name.removeprefix("mln_")) + "Result",
                 [*results, ("ready", future)],
-                f"The `{results[0][1]}` that a call creates, and the future that"
-                " completes once it attaches."
-                if attachment
+                f"A new `{results[0][1]}`, and the future that completes once it"
+                " is ready."
+                if created
                 else "The outputs of a call, and the future of its completion.",
             )
             picks = (

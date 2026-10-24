@@ -101,25 +101,8 @@ auto CompletionSink::deliver_queued(
       measure.offset
     };
     item->view.payload.completion = copy_result(arena, result, capture);
-    if (
-      capture != nullptr && result.status == MLN_STATUS_OK &&
-      result.value != nullptr
-    ) {
-      item->discard = capture->discard;
-    }
   } catch (...) {
-    // The fallback reports the failure, and nothing keeps the source's owned
-    // values, so they are disposed here.
-    if (
-      capture != nullptr && result.status == MLN_STATUS_OK &&
-      result.value != nullptr
-    ) {
-      if (capture->discard != nullptr) {
-        auto source = delivery::DeliveryItem{};
-        source.view.payload.completion = result;
-        capture->discard(source);
-      }
-    }
+    // The fallback reports the failure.
     if (item == nullptr) item = std::move(owner_->fallback_);
     if (item == nullptr) return;
     item->view.payload.completion = mln_completion_result{
@@ -137,7 +120,7 @@ auto CompletionSink::deliver_queued(
       .value_count = 0,
     };
   }
-  // A released queue refuses the item, which disposes its owned values.
+  // A released queue refuses the item.
   if (!queue_->push(item)) item.reset();
 }
 

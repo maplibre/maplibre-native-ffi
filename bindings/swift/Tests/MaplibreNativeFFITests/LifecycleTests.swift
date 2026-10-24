@@ -63,9 +63,7 @@ private func expectDescription(
 @Test func synchronousCloseIsIdempotentAndAsyncReleaseReachesNative(
 ) async throws {
   let runtime = try MapFixture.makeRuntime()
-  let map = try await runtime.createMap(options: MapOptions(
-    initialExtent: LogicalExtent(width: 8, height: 8, scaleFactor: 1)
-  ))
+  let map = try await MapFixture.makeMap(on: runtime)
   #expect(!map.isClosed)
   expectDescription(
     of: "\(map)",
@@ -139,9 +137,7 @@ private func expectDescription(
 @Test func aMapKeepsItsRuntimeAlive() async throws {
   var runtime: RuntimeHandle? = try MapFixture.makeRuntime()
   weak let weakRuntime = runtime
-  var map: MapHandle? = try await runtime?.createMap(options: MapOptions(
-    initialExtent: LogicalExtent(width: 8, height: 8, scaleFactor: 1)
-  ))
+  var map: MapHandle? = try await MapFixture.makeMap(on: #require(runtime))
   runtime = nil
   #expect(weakRuntime != nil)
   _ = try await map?.setStyleJson(emptyStyle)

@@ -26,17 +26,16 @@ internal sealed class MapState : IDisposable
         MapHandle? map = null;
         try
         {
-            map = runtime
-                .CreateMapAsync(
-                    MapOptions.Default with
-                    {
-                        InitialExtent = viewport.LogicalExtent,
-                        MapMode = MapMode.Continuous,
-                        EventMask = 0,
-                    }
-                )
-                .GetAwaiter()
-                .GetResult();
+            map = runtime.CreateMap(
+                MapOptions.Default with
+                {
+                    InitialExtent = viewport.LogicalExtent,
+                    MapMode = MapMode.Continuous,
+                    EventMask = 0,
+                }
+            );
+            // A render target attaches only to a ready map.
+            map.Ready.GetAwaiter().GetResult();
             var style = styleJson is null
                 ? map.SetStyleUrlAsync(StyleUrl)
                 : map.SetStyleJsonAsync(styleJson);

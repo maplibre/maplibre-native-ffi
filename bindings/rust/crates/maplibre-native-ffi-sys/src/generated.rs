@@ -2688,6 +2688,7 @@ unsafe extern "C" {
     pub fn mln_runtime_create_map(
         runtime: mln_runtime,
         options: *const mln_map_options,
+        out_map: *mut mln_map,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

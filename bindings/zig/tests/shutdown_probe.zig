@@ -29,7 +29,9 @@ pub fn main() !void {
     defer options.deinit();
     const runtime = try maplibre.runtimeCreate(options.value, null);
     try resolve(try runtime.setResourceProvider(allocator, .{ .callback = passThrough }, null));
-    const map = try resolve(try runtime.createMap(maplibre.mapOptionsDefault(), null));
+    const created = try runtime.createMap(maplibre.mapOptionsDefault(), null);
+    const map = created.map;
+    try resolve(created.ready);
     _ = try resolve(try map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}", null));
     try resolve(try runtime.clearResourceTransform(null));
 }

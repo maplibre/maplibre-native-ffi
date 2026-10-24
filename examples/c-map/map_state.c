@@ -29,8 +29,9 @@ static app_error create_map(map_state* state, viewport initial_viewport) {
   mln_completion completion;
   MAP_TRY(awaited_completion_init(&created, &completion));
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  const mln_status status =
-    mln_runtime_create_map(state->runtime, &options, &completion, &diagnostic);
+  const mln_status status = mln_runtime_create_map(
+    state->runtime, &options, &state->map, &completion, &diagnostic
+  );
   if (status == MLN_STATUS_OK) {
     awaited_completion_wait(&created, -1);
   }
@@ -39,11 +40,11 @@ static app_error create_map(map_state* state, viewport initial_viewport) {
     diagnostics_log_status("map create start failed", status, &diagnostic);
     return APP_ERROR_MAP_CREATE_FAILED;
   }
-  if (created.status != MLN_STATUS_OK || created.map == MLN_HANDLE_NULL) {
+  // map_state_deinit() releases a map that failed to create.
+  if (created.status != MLN_STATUS_OK) {
     diagnostics_log_status("map create failed", created.status, NULL);
     return APP_ERROR_MAP_CREATE_FAILED;
   }
-  state->map = created.map;
   return APP_OK;
 }
 

@@ -51,9 +51,7 @@ func (future *Future[T]) Done() <-chan struct{} {
 // Work that fails, or a command that fails or is cancelled, returns an *Error
 // with the native status and diagnostic.
 // A cancelled context ends only this wait: native work continues, and a later
-// Await still returns its result. A handle that a creation delivers belongs to
-// the caller once Await returns it. The owner's cleanup retires the handle of a
-// Future that is dropped before any Await returns it.
+// Await still returns its result.
 func (future *Future[T]) Await(ctx context.Context) (T, error) {
 	var zero T
 	if future == nil || future.state == nil {

@@ -46,10 +46,6 @@ internal actual fun runSuspendTest(block: suspend CoroutineScope.() -> Unit): Te
     }
   }
 
-// The page runs a completion handler as it delivers the completion, after the test yields, so the
-// work that native queues behind the handler already waits for the test, and nothing needs holding.
-internal actual fun holdThreadUntil(release: Deferred<Unit>) {}
-
 internal actual class TestWeakReference actual constructor(value: Any) {
   private val reference: JsAny = weakRef(value.toJsReference())
 

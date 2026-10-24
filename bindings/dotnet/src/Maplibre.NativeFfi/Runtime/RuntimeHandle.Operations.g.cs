@@ -156,26 +156,22 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_create_map</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<MapHandle> CreateMapAsync(
-        MapOptions options,
-        CancellationToken cancellationToken = default
-    )
+    public MapHandle CreateMap(MapOptions options)
     {
         using var scope = new NativeCallScope(this);
         var nativeOptions = NativeMapOptions(options);
+        MlnMap outMap = default;
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_create_map(
             Handle,
             &nativeOptions,
-            NativeCompletion.Start<MapHandle>(
-                &nativeCompletion,
-                nativeResult => MapHandle.Adopt(this, NativeCompletion.Value<MlnMap>(nativeResult)),
-                cancellationToken,
-                out var nativePending
-            ),
+            &outMap,
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
+        var nativeReady = nativePending.Submitted(nativeStatus);
+        scope.Accept();
+        return MapHandle.Adopt(this, outMap, nativeReady);
     }
 
     /// <summary>

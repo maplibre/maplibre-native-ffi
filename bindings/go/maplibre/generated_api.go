@@ -8592,10 +8592,21 @@ func RuntimeCreate(options RuntimeOptions) (*RuntimeHandle, error) {
 //
 // See mln_runtime_create_map in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *RuntimeHandle) CreateMap(options MapOptions) (*Future[*MapHandle], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_create_map(C.mln_runtime(raw), bindingStore(nativeMapOptions(options, arena), arena), completion, diagnostic))
-	}, completionOf(func(raw C.mln_map) *MapHandle { return adoptMapHandle(uint64(raw), receiver) }))
+func (receiver *RuntimeHandle) CreateMap(options MapOptions) (mapHandle *MapHandle, ready *Future[struct{}], err error) {
+	var outMap C.mln_map
+	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_create_map(C.mln_runtime(raw), bindingStore(nativeMapOptions(options, arena), arena), &outMap, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
+		mapHandle *MapHandle
+		ready     *Future[struct{}]
+	} {
+		adopted := adoptMapHandle(uint64(outMap), receiver)
+		return struct {
+			mapHandle *MapHandle
+			ready     *Future[struct{}]
+		}{adopted, future}
+	})
+	return result.mapHandle, result.ready, err
 }
 
 // CreateOfflineRegion starts creating an offline region.

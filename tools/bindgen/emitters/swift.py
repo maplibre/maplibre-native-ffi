@@ -281,10 +281,16 @@ def operation(
             )
         owned = plan.completion.immediate_owners[0]
         public = owner_name(owned.handle)
-        result = name(owned.handle.stem) + "Attachment"
+        result = "New" + name(owned.handle.stem)
         member = camel(output_member(owned.parameter))
         value_types.attachments[result] = (
-            f"public struct {result}: Sendable {{ public let {member}: {public}; public let completion: Task<Void, Error> }}\n"
+            f"/// A new {member} and the task that reports it ready.\n"
+            f"public struct {result}: Sendable {{\n"
+            f"  /// The {member}, which the caller owns before it is ready.\n"
+            f"  public let {member}: {public}\n"
+            f"  /// Finishes once the {member} is ready, and throws if it fails.\n"
+            "  public let ready: Task<Void, Error>\n"
+            "}\n"
         )
         parent = ", parent: self" if owned.parent_parameter == plan.receiver else ""
         return (
@@ -324,29 +330,9 @@ def operation(
         elif shape == "none" and result_type == "void":
             result, start = "Void", "Unit"
         else:
-            if (
-                plan.result
-                and plan.result.kind == "handle"
-                and plan.completion
-                and plan.completion.result_owned
-            ):
-                value_types.add(plan.result)
-                result = value_types.public(plan.result)
-                parent = (
-                    ", parent: self"
-                    if plan.completion.result_owner.parent_parameter == plan.receiver
-                    else ""
-                )
-                conversion = f"try {result}(adopting: NativeCompletion.value(result, as: {plan.result.native}.self){parent})"
-                copying = f"{{ try {result}(adopting: $0{parent}) }}"
-            elif returned.ownership != "borrowed":
-                raise unsupported(
-                    function,
-                    "payload needs a borrowed ownership rule or an owned-result adapter",
-                )
-            if plan.result and plan.result.kind == "handle":
-                pass
-            elif shape == "value" and returned.kind == "scalar":
+            if returned.ownership != "borrowed":
+                raise unsupported(function, "payload needs a borrowed ownership rule")
+            if shape == "value" and returned.kind == "scalar":
                 result = value_types.public(returned)
                 conversion = f"try NativeCompletion.value(result, as: {result}.self)"
             elif (

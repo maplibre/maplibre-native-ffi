@@ -11,9 +11,9 @@ public extension MapHandle {
   func attachMetalBorrowedTexture(
     descriptor bindingArg0: MetalBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
-  ) throws -> RenderSessionAttachment {
+  ) throws -> NewRenderSession {
     var value0: mln_render_session = 0
-    return try nativeAttach(as: RenderSessionAttachment
+    return try nativeAttach(as: NewRenderSession
       .init)
     { raw, arena, completion, diagnostic in
       try mln_map_attach_metal_borrowed_texture(
@@ -34,9 +34,9 @@ public extension MapHandle {
   func attachMetalOwnedTexture(
     descriptor bindingArg0: MetalOwnedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
-  ) throws -> RenderSessionAttachment {
+  ) throws -> NewRenderSession {
     var value0: mln_render_session = 0
-    return try nativeAttach(as: RenderSessionAttachment
+    return try nativeAttach(as: NewRenderSession
       .init)
     { raw, arena, completion, diagnostic in
       try mln_map_attach_metal_owned_texture(
@@ -57,9 +57,9 @@ public extension MapHandle {
   func attachOpenglBorrowedTexture(
     descriptor bindingArg0: OpenglBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
-  ) throws -> RenderSessionAttachment {
+  ) throws -> NewRenderSession {
     var value0: mln_render_session = 0
-    return try nativeAttach(as: RenderSessionAttachment
+    return try nativeAttach(as: NewRenderSession
       .init)
     { raw, arena, completion, diagnostic in
       try mln_map_attach_opengl_borrowed_texture(
@@ -80,9 +80,9 @@ public extension MapHandle {
   func attachOpenglOwnedTexture(
     descriptor bindingArg0: OpenglOwnedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
-  ) throws -> RenderSessionAttachment {
+  ) throws -> NewRenderSession {
     var value0: mln_render_session = 0
-    return try nativeAttach(as: RenderSessionAttachment
+    return try nativeAttach(as: NewRenderSession
       .init)
     { raw, arena, completion, diagnostic in
       try mln_map_attach_opengl_owned_texture(
@@ -103,9 +103,9 @@ public extension MapHandle {
   func attachVulkanBorrowedTexture(
     descriptor bindingArg0: VulkanBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
-  ) throws -> RenderSessionAttachment {
+  ) throws -> NewRenderSession {
     var value0: mln_render_session = 0
-    return try nativeAttach(as: RenderSessionAttachment
+    return try nativeAttach(as: NewRenderSession
       .init)
     { raw, arena, completion, diagnostic in
       try mln_map_attach_vulkan_borrowed_texture(
@@ -126,9 +126,9 @@ public extension MapHandle {
   func attachVulkanOwnedTexture(
     descriptor bindingArg0: VulkanOwnedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
-  ) throws -> RenderSessionAttachment {
+  ) throws -> NewRenderSession {
     var value0: mln_render_session = 0
-    return try nativeAttach(as: RenderSessionAttachment
+    return try nativeAttach(as: NewRenderSession
       .init)
     { raw, arena, completion, diagnostic in
       try mln_map_attach_vulkan_owned_texture(
@@ -149,9 +149,9 @@ public extension MapHandle {
   func attachWebgpuBorrowedTexture(
     descriptor bindingArg0: WebgpuBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
-  ) throws -> RenderSessionAttachment {
+  ) throws -> NewRenderSession {
     var value0: mln_render_session = 0
-    return try nativeAttach(as: RenderSessionAttachment
+    return try nativeAttach(as: NewRenderSession
       .init)
     { raw, arena, completion, diagnostic in
       try mln_map_attach_webgpu_borrowed_texture(
@@ -172,9 +172,9 @@ public extension MapHandle {
   func attachWebgpuOwnedTexture(
     descriptor bindingArg0: WebgpuOwnedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
-  ) throws -> RenderSessionAttachment {
+  ) throws -> NewRenderSession {
     var value0: mln_render_session = 0
-    return try nativeAttach(as: RenderSessionAttachment
+    return try nativeAttach(as: NewRenderSession
       .init)
     { raw, arena, completion, diagnostic in
       try mln_map_attach_webgpu_owned_texture(

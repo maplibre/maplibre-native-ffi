@@ -146,7 +146,7 @@ final class TestGraphics {
   /// Attaches a session-owned texture on this device for a core worker. On
   /// EGL, the session creates a dedicated context that shares nothing with
   /// the host's.
-  RenderSessionAttachment attachOwnedTexture(
+  NewRenderSession attachOwnedTexture(
     MapHandle map,
     LogicalExtent extent,
     RenderSessionAttachOptions options,

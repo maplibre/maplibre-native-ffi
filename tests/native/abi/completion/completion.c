@@ -8,7 +8,6 @@ typedef struct callback_probe {
   atomic_uint calls;
   atomic_int releases;
   atomic_int status;
-  atomic_uint_fast64_t value;
 } callback_probe;
 
 static void record_completion(
@@ -16,9 +15,6 @@ static void record_completion(
 ) {
   callback_probe* probe = user_data;
   atomic_store(&probe->status, result->status);
-  if (result->value != NULL && result->value_count == 1) {
-    atomic_store(&probe->value, *(const mln_map*)result->value);
-  }
   atomic_fetch_add(&probe->calls, 1);
 }
 
@@ -43,13 +39,14 @@ static void an_accepted_completion_runs_and_releases_exactly_once(void) {
   mln_completion completion = probed_completion(&probe);
 
   const mln_map_options options = mln_map_options_default();
-  MLN_TEST_OK(mln_runtime_create_map(runtime, &options, &completion, NULL));
+  mln_map map = MLN_HANDLE_NULL;
+  MLN_TEST_OK(
+    mln_runtime_create_map(runtime, &options, &map, &completion, NULL)
+  );
+  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
   TEST_ASSERT_TRUE(mln_test_wait_for_count(&probe.releases, 1));
   TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.calls));
   MLN_TEST_OK(atomic_load(&probe.status));
-
-  const mln_map map = (mln_map)atomic_load(&probe.value);
-  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -58,10 +55,12 @@ static void a_rejected_submission_leaves_callback_state_with_the_caller(void) {
   callback_probe probe = {0};
   mln_completion completion = probed_completion(&probe);
   const mln_map_options options = mln_map_options_default();
+  mln_map map = MLN_HANDLE_NULL;
 
   MLN_TEST_INVALID(
-    mln_runtime_create_map(MLN_HANDLE_NULL, &options, &completion, NULL)
+    mln_runtime_create_map(MLN_HANDLE_NULL, &options, &map, &completion, NULL)
   );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
   TEST_ASSERT_EQUAL_UINT32(0, atomic_load(&probe.calls));
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.releases));
 }
@@ -173,7 +172,8 @@ static void queries_operations_and_lifecycle_require_a_completion(void) {
   MLN_TEST_INVALID(mln_map_get_loaded_style_json(map, NULL, NULL));
   MLN_TEST_INVALID(mln_map_request_still_image(map, NULL, NULL));
   MLN_TEST_INVALID(mln_runtime_clear_resource_provider(runtime, NULL, NULL));
-  MLN_TEST_INVALID(mln_runtime_create_map(runtime, NULL, NULL, NULL));
+  mln_map created = MLN_HANDLE_NULL;
+  MLN_TEST_INVALID(mln_runtime_create_map(runtime, NULL, &created, NULL, NULL));
   MLN_TEST_INVALID(mln_map_release(map, NULL, NULL));
   MLN_TEST_INVALID(mln_runtime_release(runtime, NULL, NULL));
   mln_test_destroy_map(map);

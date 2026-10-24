@@ -51,11 +51,19 @@ final class MapState {
     )
     let map: MapHandle
     do {
-      map = try await runtime.createMap(options: MapOptions(
+      let created = try runtime.createMap(options: MapOptions(
         initialExtent: viewport.extent,
         mapMode: .continuous,
         eventMask: []
       ))
+      // A render target attaches only to a ready map.
+      do {
+        try await created.ready.value
+      } catch {
+        try? await created.map.close()
+        throw error
+      }
+      map = created.map
     } catch {
       try? await runtime.close()
       throw error

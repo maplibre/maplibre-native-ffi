@@ -1,8 +1,6 @@
 package org.maplibre.nativeffi.lifecycle
 
 // AutoCloseable's `use`, which the suspending `use` imported below would shadow.
-import kotlin.concurrent.atomics.AtomicInt
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -10,7 +8,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.use as useAndClose
-import kotlinx.coroutines.CompletableDeferred
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.RuntimeFixture
 import org.maplibre.nativeffi.TestWeakReference
@@ -23,14 +20,12 @@ import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.generated.Status
-import org.maplibre.nativeffi.holdThreadUntil
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.runtime.awaitCommitted
 import org.maplibre.nativeffi.runtime.use
 import org.maplibre.nativeffi.smallMapOptions
 
 /** How the generated owners close and keep their parents. */
-@OptIn(ExperimentalAtomicApi::class)
 class HandleLifecycleTest {
   @Test
   fun closingAHandleTwiceIsSafeAndLaterUseIsRefused() = runSuspendTest {
@@ -91,7 +86,8 @@ class HandleLifecycleTest {
   @Test
   fun aRefusedReleaseLeavesTheRuntimeUsableAndALaterReleaseSucceeds() = runSuspendTest {
     val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
-    val map = runtime.createMap(smallMapOptions()).awaitWithin("the map")
+    val (map, ready) = runtime.createMap(smallMapOptions())
+    ready.awaitWithin("the map")
 
     // Native refuses to release a runtime with a live map, so the call throws and the runtime
     // stays usable.
@@ -113,7 +109,9 @@ class HandleLifecycleTest {
     val failure =
       assertFailsWith<IllegalStateException> {
         runtime.use {
-          map = it.createMap(smallMapOptions()).awaitWithin("the map")
+          val (created, ready) = it.createMap(smallMapOptions())
+          map = created
+          ready.awaitWithin("the map")
           error("the block failure")
         }
       }
@@ -131,7 +129,11 @@ class HandleLifecycleTest {
     lateinit var map: MapHandle
 
     assertFailsWithStatus(Status.INVALID_STATE) {
-      runtime.use { map = it.createMap(smallMapOptions()).awaitWithin("the map") }
+      runtime.use {
+        val (created, ready) = it.createMap(smallMapOptions())
+        map = created
+        ready.awaitWithin("the map")
+      }
     }
 
     map.release().awaitWithin("the map release")
@@ -148,7 +150,8 @@ class HandleLifecycleTest {
   @Test
   fun aHandleIdNamesItsEventsAndOutlivesRelease() = runSuspendTest {
     RuntimeFixture.use {
-      val map = runtime.createMap(smallMapOptions()).awaitWithin("the map")
+      val (map, ready) = runtime.createMap(smallMapOptions())
+      ready.awaitWithin("the map")
       map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray()).awaitCommitted()
       val event = awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
       assertEquals(map.id, event.source)
@@ -173,51 +176,6 @@ class HandleLifecycleTest {
     }
   }
 
-  @Test
-  fun droppingAMapCreationRetiresTheMapItCreates() = runSuspendTest {
-    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
-    val map = runtime.createMap(smallMapOptions()).awaitWithin("the first map")
-    // Parking the runtime's worker holds the creation behind it, so the creation is still pending
-    // when the test drops it.
-    val resume = CompletableDeferred<Unit>()
-    parkWorker(map, resume)
-    val creation = runtime.createMap(smallMapOptions())
-    try {
-      creation.cancel()
-    } finally {
-      resume.complete(Unit)
-    }
-    // The creation completes on the worker before this command does, and the binding retires the
-    // map it no longer has a caller for, so the runtime's only live child is the first map.
-    map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray()).awaitCommitted()
-    assertTrue(creation.isCancelled)
-    map.release().awaitWithin("the first map's release")
-    runtime.release().awaitWithin("the runtime release")
-  }
-
-  /**
-   * Parks the runtime's worker inside the completion of one of [map]'s commands until [resume]
-   * completes, and returns once it is parked. A command that completes before its handler is
-   * registered runs the handler on this thread, which must not park, so the next command tries
-   * again.
-   */
-  private suspend fun parkWorker(map: MapHandle, resume: CompletableDeferred<Unit>) {
-    while (true) {
-      val registered = AtomicInt(0)
-      val parked = CompletableDeferred<Boolean>()
-      map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray()).invokeOnCompletion {
-        if (registered.load() == 0) {
-          parked.complete(false)
-        } else {
-          parked.complete(true)
-          holdThreadUntil(resume)
-        }
-      }
-      registered.store(1)
-      if (parked.awaitWithin("the worker to finish the command")) return
-    }
-  }
-
   /** A weak reference to an object that nothing else references. */
   private suspend fun returnFromUse(runtime: RuntimeHandle) {
     runtime.use {
@@ -230,7 +188,8 @@ class HandleLifecycleTest {
   /** Creates a map whose runtime nothing but the map references, and a weak reference to it. */
   private suspend fun mapWithUnreferencedRuntime(): Pair<MapHandle, TestWeakReference> {
     val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
-    val map = runtime.createMap(smallMapOptions()).awaitWithin("the map")
+    val (map, ready) = runtime.createMap(smallMapOptions())
+    ready.awaitWithin("the map")
     return map to TestWeakReference(runtime)
   }
 

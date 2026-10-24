@@ -17,13 +17,36 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     private readonly NativeHandleState<MlnMap> state;
     private volatile Task teardown = Task.CompletedTask;
 
-    internal MapHandle(RuntimeHandle parent, MlnMap handle)
+    /// <summary>
+    /// Completes once the handle is ready, and faults with a
+    /// <see cref="MaplibreException" /> when it fails to become ready.
+    /// </summary>
+    public Task Ready { get; }
+
+    internal MapHandle(RuntimeHandle parent, MlnMap handle, Task completion)
     {
+        Ready = completion
+            .ContinueWith(
+                static (finished, retained) =>
+                {
+                    GC.KeepAlive(retained);
+                    return finished;
+                },
+                this,
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default
+            )
+            .Unwrap();
         state = new(handle, StartRelease, nameof(MapHandle), Abandon, retainedParent: parent);
     }
 
-    internal static MapHandle Adopt(RuntimeHandle parent, MlnMap handle) =>
-        NativeHandleState<MlnMap>.Adopt(handle, () => new MapHandle(parent, handle), Abandon);
+    internal static MapHandle Adopt(RuntimeHandle parent, MlnMap handle, Task completion) =>
+        NativeHandleState<MlnMap>.Adopt(
+            handle,
+            () => new MapHandle(parent, handle, completion),
+            Abandon
+        );
 
     private static mln_status Abandon(MlnMap live, mln_diagnostic* diagnostic) =>
         NativeMethods.mln_map_dispose(live, diagnostic);
@@ -308,9 +331,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
-        var nativeAttachment = nativePending.Submitted(nativeStatus);
+        var nativeReady = nativePending.Submitted(nativeStatus);
         scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeAttachment);
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
     }
 
     /// <summary>
@@ -338,9 +361,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
-        var nativeAttachment = nativePending.Submitted(nativeStatus);
+        var nativeReady = nativePending.Submitted(nativeStatus);
         scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeAttachment);
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
     }
 
     /// <summary>
@@ -368,9 +391,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
-        var nativeAttachment = nativePending.Submitted(nativeStatus);
+        var nativeReady = nativePending.Submitted(nativeStatus);
         scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeAttachment);
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
     }
 
     /// <summary>
@@ -398,9 +421,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
-        var nativeAttachment = nativePending.Submitted(nativeStatus);
+        var nativeReady = nativePending.Submitted(nativeStatus);
         scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeAttachment);
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
     }
 
     /// <summary>
@@ -428,9 +451,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
-        var nativeAttachment = nativePending.Submitted(nativeStatus);
+        var nativeReady = nativePending.Submitted(nativeStatus);
         scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeAttachment);
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
     }
 
     /// <summary>
@@ -458,9 +481,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
-        var nativeAttachment = nativePending.Submitted(nativeStatus);
+        var nativeReady = nativePending.Submitted(nativeStatus);
         scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeAttachment);
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
     }
 
     /// <summary>
@@ -488,9 +511,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
-        var nativeAttachment = nativePending.Submitted(nativeStatus);
+        var nativeReady = nativePending.Submitted(nativeStatus);
         scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeAttachment);
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
     }
 
     /// <summary>
@@ -518,9 +541,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
-        var nativeAttachment = nativePending.Submitted(nativeStatus);
+        var nativeReady = nativePending.Submitted(nativeStatus);
         scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeAttachment);
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
     }
 
     /// <summary>
@@ -548,9 +571,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
-        var nativeAttachment = nativePending.Submitted(nativeStatus);
+        var nativeReady = nativePending.Submitted(nativeStatus);
         scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeAttachment);
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
     }
 
     /// <summary>
@@ -578,9 +601,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
-        var nativeAttachment = nativePending.Submitted(nativeStatus);
+        var nativeReady = nativePending.Submitted(nativeStatus);
         scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeAttachment);
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
     }
 
     /// <summary>
@@ -608,9 +631,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
-        var nativeAttachment = nativePending.Submitted(nativeStatus);
+        var nativeReady = nativePending.Submitted(nativeStatus);
         scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeAttachment);
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
     }
 
     /// <summary>
@@ -638,9 +661,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
-        var nativeAttachment = nativePending.Submitted(nativeStatus);
+        var nativeReady = nativePending.Submitted(nativeStatus);
         scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeAttachment);
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
     }
 
     /// <summary>

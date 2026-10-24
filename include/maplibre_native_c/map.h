@@ -1103,24 +1103,35 @@ MLN_API mln_map_options mln_map_options_default(void) MLN_NOEXCEPT;
 /**
  * Starts creation of a map on the runtime.
  *
- * Input is copied before this function returns. The completion value points to
- * one mln_map handle when status is MLN_STATUS_OK.
+ * Input is copied before this function returns. An accepted creation writes
+ * the map to out_map, in a creating state, before the completion can run, so
+ * the completion may read it there; the caller owns the map from then on.
+ * A rejected creation leaves out_map null. Commands, operations, and queries
+ * submitted to the map run after creation finishes; if creation failed, each
+ * completes with MLN_STATUS_INVALID_STATE. Until the completion reports
+ * MLN_STATUS_OK, mln_map_get_snapshot() and every render target attach return
+ * MLN_STATUS_INVALID_STATE. Release or dispose the map whether or not creation
+ * succeeds. A map released while it is still creating finishes creation and
+ * reports it through the completion before the map retires.
  *
  * Returns:
  * - MLN_STATUS_OK when the creation is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle; options is
  *   null, undersized, or carries an invalid field; options->initial_extent has
  *   a zero width or height, or a scale_factor that is not finite and positive;
- *   or completion is invalid.
+ *   out_map is null or does not point to the null handle; or completion is
+ *   invalid.
  * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
  * Completes with:
+ * - MLN_STATUS_OK once the map is ready.
  * - MLN_STATUS_NATIVE_ERROR when map creation fails.
  */
-MLN_BINDING("execution=lifecycle;result=mln_map")
+MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_runtime_create_map(
   mln_runtime runtime, const mln_map_options* options,
+  mln_map* out_map MLN_BINDING("direction=out"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1131,7 +1142,8 @@ MLN_API mln_status mln_runtime_create_map(
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or out_snapshot
  *   is null or undersized.
- * - MLN_STATUS_INVALID_STATE when map has been released.
+ * - MLN_STATUS_INVALID_STATE when map has been released, or its creation has
+ *   not succeeded.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_BINDING("execution=snapshot")

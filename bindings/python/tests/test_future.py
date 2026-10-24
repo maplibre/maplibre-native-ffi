@@ -56,20 +56,20 @@ def test_cancelling_a_derived_future_cancels_a_pending_source() -> None:
     assert source._claim() is False
 
 
-def test_a_value_that_arrives_after_cancellation_is_discarded() -> None:
+def test_a_value_that_arrives_after_cancellation_is_dropped() -> None:
     source: NativeFuture[int] = NativeFuture()
     # The native completion has claimed its source, so only the derived future
     # can still be cancelled.
     assert source.set_running_or_notify_cancel()
-    discarded: list[int] = []
-    result = map_future(source, lambda value: value, discarded.append)
+    converted: list[int] = []
+    result = map_future(source, lambda value: converted.append(value) or value)
 
     assert result.cancel() is True
     assert source.cancel() is False
     assert wait([result], timeout=0).done == {result}
     source.set_result(42)
 
-    assert discarded == [42]
+    assert converted == []
     with pytest.raises(CancelledError):
         result.result(timeout=0)
 

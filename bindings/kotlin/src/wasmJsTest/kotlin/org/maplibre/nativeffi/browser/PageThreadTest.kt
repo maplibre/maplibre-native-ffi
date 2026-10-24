@@ -39,10 +39,10 @@ class PageThreadTest {
     assertFalse(creation.isCompleted, "runtime creation returned before its thread could start")
     val runtime = creation.awaitWithin("the runtime")
 
-    // Native queues the map for the page, which drains it only after it yields.
-    val creatingMap = runtime.createMap(smallMapOptions())
-    assertFalse(creatingMap.isCompleted, "the map arrived inside the call that created it")
-    val map = creatingMap.awaitWithin("the map")
+    // Native queues the map's readiness for the page, which drains it only after it yields.
+    val (map, ready) = runtime.createMap(smallMapOptions())
+    assertFalse(ready.isCompleted, "the map was ready inside the call that created it")
+    ready.awaitWithin("the map")
 
     map.release().awaitWithin("the map release")
     runtime.release().awaitWithin("the runtime release")
