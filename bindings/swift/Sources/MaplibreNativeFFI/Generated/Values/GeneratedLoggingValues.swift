@@ -34,23 +34,23 @@ public struct LogEvent: RawRepresentable, CustomStringConvertible,
   public static let timing: LogEvent = .init(rawValue: 16)
   public var description: String {
     switch rawValue {
-    case 0: return "GENERAL"
-    case 1: return "SETUP"
-    case 2: return "SHADER"
-    case 3: return "PARSE_STYLE"
-    case 4: return "PARSE_TILE"
-    case 5: return "RENDER"
-    case 6: return "STYLE"
-    case 7: return "DATABASE"
-    case 8: return "HTTP_REQUEST"
-    case 9: return "SPRITE"
-    case 10: return "IMAGE"
-    case 11: return "GRAPHICS_BACKEND"
-    case 12: return "JNI"
-    case 13: return "ANDROID"
-    case 14: return "CRASH"
-    case 15: return "GLYPH"
-    case 16: return "TIMING"
+    case 0: return "general"
+    case 1: return "setup"
+    case 2: return "shader"
+    case 3: return "parseStyle"
+    case 4: return "parseTile"
+    case 5: return "render"
+    case 6: return "style"
+    case 7: return "database"
+    case 8: return "httpRequest"
+    case 9: return "sprite"
+    case 10: return "image"
+    case 11: return "graphicsBackend"
+    case 12: return "jni"
+    case 13: return "android"
+    case 14: return "crash"
+    case 15: return "glyph"
+    case 16: return "timing"
     default: return "LogEvent(\(rawValue))"
     }
   }
@@ -62,10 +62,10 @@ public struct LogEvent: RawRepresentable, CustomStringConvertible,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 public struct LogHandler: Sendable {
   /// Receives each record.
-  public var callback: (@Sendable (LogSeverity, LogEvent, Int64, String)
+  public var callback: (@Sendable (LogSeverity, LogEvent, Int64, String) throws
     -> UInt32)?
-  public init(callback: (@Sendable (LogSeverity, LogEvent, Int64, String)
-      -> UInt32)? = nil)
+  public init(callback: (@Sendable (LogSeverity, LogEvent, Int64,
+                                    String) throws -> UInt32)? = nil)
   {
     self.callback = callback
   }
@@ -125,9 +125,9 @@ public struct LogSeverity: RawRepresentable, CustomStringConvertible,
   public static let error: LogSeverity = .init(rawValue: 3)
   public var description: String {
     switch rawValue {
-    case 1: return "INFO"
-    case 2: return "WARNING"
-    case 3: return "ERROR"
+    case 1: return "info"
+    case 2: return "warning"
+    case 3: return "error"
     default: return "LogSeverity(\(rawValue))"
     }
   }

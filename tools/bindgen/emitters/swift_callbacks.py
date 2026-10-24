@@ -11,6 +11,11 @@ def contains_callback(value):
     )
 
 
+def throws(callback):
+    """Whether a host closure may throw, since native has a fallback result."""
+    return callback.result.native != "void"
+
+
 def closure_type(values, callback):
     parameters = [values.public(parameter.value) for parameter in callback.arguments]
     result = (
@@ -22,7 +27,8 @@ def closure_type(values, callback):
         )
         else values.public(callback.result)
     )
-    return f"@Sendable ({', '.join(parameters)}) -> {result}"
+    effect = " throws" if throws(callback) else ""
+    return f"@Sendable ({', '.join(parameters)}){effect} -> {result}"
 
 
 def raw_type(type_):
@@ -218,7 +224,7 @@ def descriptor(values, plan):
             decision = callback.decision
             setup += f"  guard let decisionOwner = try? {owner_name(decision.handle)}(adopting: {identifier(decision.parameter)}) else {{ {fail} }}\n"
         value = "box.value"
-        call = f"{value}.{identifier(camel(field.name))}?({args})"
+        call = f"{'try ' if throws(callback) else ''}{value}.{identifier(camel(field.name))}?({args})"
         invoke = (
             f"{call}"
             if result == "Void" or responses

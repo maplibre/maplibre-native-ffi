@@ -102,16 +102,38 @@ func installProvider(
   try await runtime.setResourceProvider(provider: ResourceProvider(
     callback: { request, handle in
       guard request.requestedUrl == url else {
-        return deny.callback!(request, handle)
+        return try deny.callback!(request, handle)
       }
       do { return try body(handle) }
       catch {
-        Issue
-          .record("provider failed: \(error)"); return ResourceProviderDecision(rawValue: UInt32
-            .max)
+        Issue.record("provider failed: \(error)")
+        throw error
       }
     }
   ))
+}
+
+private struct ProviderFailure: Error {}
+
+/// A provider that throws fails its request, and the runtime keeps working.
+@Test func aProviderThatThrowsFailsItsRequest() async throws {
+  try await withMapFixture { fixture in
+    let url = "custom://thrown.json"
+    let deny = denyingProvider()
+    try await fixture.runtime.setResourceProvider(provider: ResourceProvider(
+      callback: { request, handle in
+        guard request.requestedUrl == url else {
+          return try deny.callback!(request, handle)
+        }
+        throw ProviderFailure()
+      }
+    ))
+    try await fixture.map.setStyleUrl(url: url)
+    #expect(try await fixture.awaitEvent("the thrown request to fail") {
+      $0.type == .mapLoadingFailed
+    } != nil)
+    try await fixture.map.setStyleJson(json: emptyStyle)
+  }
 }
 
 /// A cancel callback that does not capture its request lets a provider drop
@@ -197,7 +219,7 @@ func installProvider(
           done.signal()
         }.start()
         _ = isSignalled(done)
-        try! response.setHeader(name: "X-Test", value: "inside")
+        try response.setHeader(name: "X-Test", value: "inside")
         escaped.update { $0 = response }
       })
     )
@@ -270,7 +292,7 @@ func installProvider(
     try await fixture.runtime.setResourceProvider(provider: ResourceProvider(
       callback: { request, handle in
         seen.update { $0.append(request) }
-        try! handle.complete(response: request.kind == .style
+        try handle.complete(response: request.kind == .style
           ? ResourceResponse(status: .ok, bytes: style)
           : ResourceResponse(
             status: .error,

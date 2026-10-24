@@ -17,10 +17,10 @@ public struct AmbientCacheOperation: RawRepresentable, CustomStringConvertible,
   public static let clear: AmbientCacheOperation = .init(rawValue: 4)
   public var description: String {
     switch rawValue {
-    case 1: return "RESET_DATABASE"
-    case 2: return "PACK_DATABASE"
-    case 3: return "INVALIDATE"
-    case 4: return "CLEAR"
+    case 1: return "resetDatabase"
+    case 2: return "packDatabase"
+    case 3: return "invalidate"
+    case 4: return "clear"
     default: return "AmbientCacheOperation(\(rawValue))"
     }
   }
@@ -44,8 +44,8 @@ public struct CameraChangeMode: RawRepresentable, CustomStringConvertible,
   public static let animated: CameraChangeMode = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "IMMEDIATE"
-    case 1: return "ANIMATED"
+    case 0: return "immediate"
+    case 1: return "animated"
     default: return "CameraChangeMode(\(rawValue))"
     }
   }
@@ -178,12 +178,12 @@ public struct HttpHeaderTransform: Sendable {
     ResourceKind,
     String,
     HttpHeaderTransformResponse
-  ) -> Void)?
+  ) throws -> Void)?
   /// Header rules for a transform without a callback; empty with one.
   public var rules: [HttpHeaderRule]
   public init(
-    callback: (@Sendable (ResourceKind, String, HttpHeaderTransformResponse)
-      -> Void)? = nil,
+    callback: (@Sendable (ResourceKind, String,
+                          HttpHeaderTransformResponse) throws -> Void)? = nil,
     rules: [HttpHeaderRule] = []
   ) {
     self.callback = callback
@@ -261,8 +261,8 @@ public struct NetworkStatus: RawRepresentable, CustomStringConvertible,
   public static let offline: NetworkStatus = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
-    case 1: return "ONLINE"
-    case 2: return "OFFLINE"
+    case 1: return "online"
+    case 2: return "offline"
     default: return "NetworkStatus(\(rawValue))"
     }
   }
@@ -280,8 +280,8 @@ public struct OfflineRegionDownloadState: RawRepresentable,
   public static let active: OfflineRegionDownloadState = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "INACTIVE"
-    case 1: return "ACTIVE"
+    case 0: return "inactive"
+    case 1: return "active"
     default: return "OfflineRegionDownloadState(\(rawValue))"
     }
   }
@@ -362,8 +362,8 @@ public struct RenderMode: RawRepresentable, CustomStringConvertible,
   public static let full: RenderMode = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "PARTIAL"
-    case 1: return "FULL"
+    case 0: return "partial"
+    case 1: return "full"
     default: return "RenderMode(\(rawValue))"
     }
   }
@@ -427,12 +427,12 @@ public struct ResourceErrorReason: RawRepresentable, CustomStringConvertible,
   public static let other: ResourceErrorReason = .init(rawValue: 5)
   public var description: String {
     switch rawValue {
-    case 0: return "NONE"
-    case 1: return "NOT_FOUND"
-    case 2: return "SERVER"
-    case 3: return "CONNECTION"
-    case 4: return "RATE_LIMIT"
-    case 5: return "OTHER"
+    case 0: return "none"
+    case 1: return "notFound"
+    case 2: return "server"
+    case 3: return "connection"
+    case 4: return "rateLimit"
+    case 5: return "other"
     default: return "ResourceErrorReason(\(rawValue))"
     }
   }
@@ -456,14 +456,14 @@ public struct ResourceKind: RawRepresentable, CustomStringConvertible,
   public static let image: ResourceKind = .init(rawValue: 7)
   public var description: String {
     switch rawValue {
-    case 0: return "UNKNOWN"
-    case 1: return "STYLE"
-    case 2: return "SOURCE"
-    case 3: return "TILE"
-    case 4: return "GLYPHS"
-    case 5: return "SPRITE_IMAGE"
-    case 6: return "SPRITE_JSON"
-    case 7: return "IMAGE"
+    case 0: return "unknown"
+    case 1: return "style"
+    case 2: return "source"
+    case 3: return "tile"
+    case 4: return "glyphs"
+    case 5: return "spriteImage"
+    case 6: return "spriteJson"
+    case 7: return "image"
     default: return "ResourceKind(\(rawValue))"
     }
   }
@@ -507,9 +507,9 @@ public struct ResourceLoadingMethod: RawRepresentable, CustomStringConvertible,
   public static let networkOnly: ResourceLoadingMethod = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
-    case 0: return "ALL"
-    case 1: return "CACHE_ONLY"
-    case 2: return "NETWORK_ONLY"
+    case 0: return "all"
+    case 1: return "cacheOnly"
+    case 2: return "networkOnly"
     default: return "ResourceLoadingMethod(\(rawValue))"
     }
   }
@@ -527,8 +527,8 @@ public struct ResourcePriority: RawRepresentable, CustomStringConvertible,
   public static let low: ResourcePriority = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "REGULAR"
-    case 1: return "LOW"
+    case 0: return "regular"
+    case 1: return "low"
     default: return "ResourcePriority(\(rawValue))"
     }
   }
@@ -540,12 +540,13 @@ public struct ResourcePriority: RawRepresentable, CustomStringConvertible,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceProvider: Sendable {
   /// Decides each request that the routes leave to the provider.
-  public var callback: (@Sendable (ResourceRequestInfo, ResourceRequestHandle)
-    -> ResourceProviderDecision)?
+  public var callback: (@Sendable (ResourceRequestInfo,
+                                   ResourceRequestHandle) throws
+      -> ResourceProviderDecision)?
   /// The requests that reach the provider; empty to claim every request.
   public var routes: [ResourceRoute]
   public init(
-    callback: (@Sendable (ResourceRequestInfo, ResourceRequestHandle)
+    callback: (@Sendable (ResourceRequestInfo, ResourceRequestHandle) throws
       -> ResourceProviderDecision)? = nil,
     routes: [ResourceRoute] = []
   ) {
@@ -612,8 +613,8 @@ public struct ResourceProviderDecision: RawRepresentable,
   public static let handle: ResourceProviderDecision = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "PASS_THROUGH"
-    case 1: return "HANDLE"
+    case 0: return "passThrough"
+    case 1: return "handle"
     default: return "ResourceProviderDecision(\(rawValue))"
     }
   }
@@ -877,10 +878,10 @@ public struct ResourceResponseStatus: RawRepresentable, CustomStringConvertible,
   public static let notModified: ResourceResponseStatus = .init(rawValue: 3)
   public var description: String {
     switch rawValue {
-    case 0: return "OK"
-    case 1: return "ERROR"
-    case 2: return "NO_CONTENT"
-    case 3: return "NOT_MODIFIED"
+    case 0: return "ok"
+    case 1: return "error"
+    case 2: return "noContent"
+    case 3: return "notModified"
     default: return "ResourceResponseStatus(\(rawValue))"
     }
   }
@@ -941,8 +942,8 @@ public struct ResourceStoragePolicy: RawRepresentable, CustomStringConvertible,
   public static let volatile: ResourceStoragePolicy = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "PERMANENT"
-    case 1: return "VOLATILE"
+    case 0: return "permanent"
+    case 1: return "volatile"
     default: return "ResourceStoragePolicy(\(rawValue))"
     }
   }
@@ -1019,8 +1020,8 @@ public struct ResourceUsage: RawRepresentable, CustomStringConvertible,
   public static let offline: ResourceUsage = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "ONLINE"
-    case 1: return "OFFLINE"
+    case 0: return "online"
+    case 1: return "offline"
     default: return "ResourceUsage(\(rawValue))"
     }
   }
@@ -1393,8 +1394,8 @@ public struct RuntimeEventSourceType: RawRepresentable, CustomStringConvertible,
   public static let map: RuntimeEventSourceType = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "RUNTIME"
-    case 1: return "MAP"
+    case 0: return "runtime"
+    case 1: return "map"
     default: return "RuntimeEventSourceType(\(rawValue))"
     }
   }
@@ -1464,25 +1465,25 @@ public struct RuntimeEventType: RawRepresentable, CustomStringConvertible,
   public static let mapSourceChanged: RuntimeEventType = .init(rawValue: 23)
   public var description: String {
     switch rawValue {
-    case 1: return "MAP_CAMERA_WILL_CHANGE"
-    case 2: return "MAP_CAMERA_IS_CHANGING"
-    case 3: return "MAP_CAMERA_DID_CHANGE"
-    case 4: return "MAP_STYLE_LOADED"
-    case 5: return "MAP_LOADING_STARTED"
-    case 6: return "MAP_LOADING_FINISHED"
-    case 7: return "MAP_LOADING_FAILED"
-    case 8: return "MAP_IDLE"
-    case 10: return "MAP_RENDER_ERROR"
-    case 13: return "MAP_RENDER_FRAME_STARTED"
-    case 14: return "MAP_RENDER_FRAME_FINISHED"
-    case 15: return "MAP_RENDER_MAP_STARTED"
-    case 16: return "MAP_RENDER_MAP_FINISHED"
-    case 17: return "MAP_STYLE_IMAGE_MISSING"
-    case 18: return "MAP_TILE_ACTION"
-    case 19: return "OFFLINE_REGION_STATUS_CHANGED"
-    case 20: return "OFFLINE_REGION_RESPONSE_ERROR"
-    case 21: return "OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED"
-    case 23: return "MAP_SOURCE_CHANGED"
+    case 1: return "mapCameraWillChange"
+    case 2: return "mapCameraIsChanging"
+    case 3: return "mapCameraDidChange"
+    case 4: return "mapStyleLoaded"
+    case 5: return "mapLoadingStarted"
+    case 6: return "mapLoadingFinished"
+    case 7: return "mapLoadingFailed"
+    case 8: return "mapIdle"
+    case 10: return "mapRenderError"
+    case 13: return "mapRenderFrameStarted"
+    case 14: return "mapRenderFrameFinished"
+    case 15: return "mapRenderMapStarted"
+    case 16: return "mapRenderMapFinished"
+    case 17: return "mapStyleImageMissing"
+    case 18: return "mapTileAction"
+    case 19: return "offlineRegionStatusChanged"
+    case 20: return "offlineRegionResponseError"
+    case 21: return "offlineRegionTileCountLimitExceeded"
+    case 23: return "mapSourceChanged"
     default: return "RuntimeEventType(\(rawValue))"
     }
   }
@@ -1593,15 +1594,15 @@ public struct TileOperation: RawRepresentable, CustomStringConvertible,
   public static let null: TileOperation = .init(rawValue: 8)
   public var description: String {
     switch rawValue {
-    case 0: return "REQUESTED_FROM_CACHE"
-    case 1: return "REQUESTED_FROM_NETWORK"
-    case 2: return "LOAD_FROM_NETWORK"
-    case 3: return "LOAD_FROM_CACHE"
-    case 4: return "START_PARSE"
-    case 5: return "END_PARSE"
-    case 6: return "ERROR"
-    case 7: return "CANCELLED"
-    case 8: return "NULL"
+    case 0: return "requestedFromCache"
+    case 1: return "requestedFromNetwork"
+    case 2: return "loadFromNetwork"
+    case 3: return "loadFromCache"
+    case 4: return "startParse"
+    case 5: return "endParse"
+    case 6: return "error"
+    case 7: return "cancelled"
+    case 8: return "null"
     default: return "TileOperation(\(rawValue))"
     }
   }

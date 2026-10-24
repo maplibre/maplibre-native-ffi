@@ -517,9 +517,9 @@ public struct CameraTransitionOutcome: RawRepresentable,
   public static let closed: CameraTransitionOutcome = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
-    case 0: return "COMPLETED"
-    case 1: return "CANCELLED"
-    case 2: return "CLOSED"
+    case 0: return "completed"
+    case 1: return "cancelled"
+    case 2: return "closed"
     default: return "CameraTransitionOutcome(\(rawValue))"
     }
   }
@@ -588,9 +588,9 @@ public struct CameraUpdateMode: RawRepresentable, CustomStringConvertible,
   public static let fly: CameraUpdateMode = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
-    case 0: return "JUMP"
-    case 1: return "EASE"
-    case 2: return "FLY"
+    case 0: return "jump"
+    case 1: return "ease"
+    case 2: return "fly"
     default: return "CameraUpdateMode(\(rawValue))"
     }
   }
@@ -614,10 +614,10 @@ public struct ConstrainMode: RawRepresentable, CustomStringConvertible,
   public static let screen: ConstrainMode = .init(rawValue: 3)
   public var description: String {
     switch rawValue {
-    case 0: return "NONE"
-    case 1: return "HEIGHT_ONLY"
-    case 2: return "WIDTH_AND_HEIGHT"
-    case 3: return "SCREEN"
+    case 0: return "none"
+    case 1: return "heightOnly"
+    case 2: return "widthAndHeight"
+    case 3: return "screen"
     default: return "ConstrainMode(\(rawValue))"
     }
   }
@@ -811,11 +811,11 @@ public struct GesturePhase: RawRepresentable, CustomStringConvertible,
   public static let cancel: GesturePhase = .init(rawValue: 4)
   public var description: String {
     switch rawValue {
-    case 0: return "NONE"
-    case 1: return "BEGIN"
-    case 2: return "UPDATE"
-    case 3: return "END"
-    case 4: return "CANCEL"
+    case 0: return "none"
+    case 1: return "begin"
+    case 2: return "update"
+    case 3: return "end"
+    case 4: return "cancel"
     default: return "GesturePhase(\(rawValue))"
     }
   }
@@ -968,9 +968,9 @@ public struct MapMode: RawRepresentable, CustomStringConvertible,
   public static let tile: MapMode = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
-    case 0: return "CONTINUOUS"
-    case 1: return "STATIC"
-    case 2: return "TILE"
+    case 0: return "continuous"
+    case 1: return "static"
+    case 2: return "tile"
     default: return "MapMode(\(rawValue))"
     }
   }
@@ -1313,10 +1313,10 @@ public struct NorthOrientation: RawRepresentable, CustomStringConvertible,
   public static let left: NorthOrientation = .init(rawValue: 3)
   public var description: String {
     switch rawValue {
-    case 0: return "UP"
-    case 1: return "RIGHT"
-    case 2: return "DOWN"
-    case 3: return "LEFT"
+    case 0: return "up"
+    case 1: return "right"
+    case 2: return "down"
+    case 3: return "left"
     default: return "NorthOrientation(\(rawValue))"
     }
   }
@@ -1751,8 +1751,8 @@ public struct TileLodMode: RawRepresentable, CustomStringConvertible,
   public static let distance: TileLodMode = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "DEFAULT"
-    case 1: return "DISTANCE"
+    case 0: return "default"
+    case 1: return "distance"
     default: return "TileLodMode(\(rawValue))"
     }
   }
@@ -1853,8 +1853,8 @@ public struct ViewportMode: RawRepresentable, CustomStringConvertible,
   public static let flippedY: ViewportMode = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "DEFAULT"
-    case 1: return "FLIPPED_Y"
+    case 0: return "default"
+    case 1: return "flippedY"
     default: return "ViewportMode(\(rawValue))"
     }
   }

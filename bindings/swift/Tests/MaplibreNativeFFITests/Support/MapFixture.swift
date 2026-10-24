@@ -18,12 +18,12 @@ func denyingProvider(routes: [String: Data] = [:]) -> ResourceProvider {
   ResourceProvider { request, handle in
     let url = request.requestedUrl ?? ""
     if let bytes = routes[url] {
-      try! handle.complete(response: ResourceResponse(
+      try handle.complete(response: ResourceResponse(
         status: .ok,
         bytes: bytes
       ))
     } else {
-      try! handle.complete(response: ResourceResponse(
+      try handle.complete(response: ResourceResponse(
         status: .error,
         errorReason: .notFound,
         errorMessage: "the test fixture serves no \(url)"

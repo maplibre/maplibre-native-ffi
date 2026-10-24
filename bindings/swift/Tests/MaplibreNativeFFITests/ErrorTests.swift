@@ -13,7 +13,7 @@ import Testing
     #expect(native?.status == .invalidArgument)
     #expect(native?.diagnostic.isEmpty == false)
     #expect(native?.description
-      .hasPrefix("INVALID_ARGUMENT: ") == true)
+      .hasPrefix("invalidArgument: ") == true)
     #expect(native.map { ($0 as Error).localizedDescription }
       == native?.description)
 

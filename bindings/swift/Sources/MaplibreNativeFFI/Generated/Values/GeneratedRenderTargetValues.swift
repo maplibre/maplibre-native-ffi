@@ -129,8 +129,8 @@ public struct GpuSyncKind: RawRepresentable, CustomStringConvertible,
   public static let openglFence: GpuSyncKind = .init(rawValue: 3)
   public var description: String {
     switch rawValue {
-    case 0: return "CPU_COMPLETE"
-    case 3: return "OPENGL_FENCE"
+    case 0: return "cpuComplete"
+    case 3: return "openglFence"
     default: return "GpuSyncKind(\(rawValue))"
     }
   }
@@ -182,9 +182,9 @@ public struct OpenglClientApi: RawRepresentable, CustomStringConvertible,
   public static let gles: OpenglClientApi = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
-    case 0: return "UNSPECIFIED"
-    case 1: return "GL"
-    case 2: return "GLES"
+    case 0: return "unspecified"
+    case 1: return "gl"
+    case 2: return "gles"
     default: return "OpenglClientApi(\(rawValue))"
     }
   }
@@ -294,8 +294,8 @@ public struct OpenglContextOwnership: RawRepresentable, CustomStringConvertible,
   public static let dedicated: OpenglContextOwnership = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "SHARED"
-    case 1: return "DEDICATED"
+    case 0: return "shared"
+    case 1: return "dedicated"
     default: return "OpenglContextOwnership(\(rawValue))"
     }
   }
@@ -385,8 +385,8 @@ public struct RenderDriverKind: RawRepresentable, CustomStringConvertible,
   public static let callerGraphicsThread: RenderDriverKind = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
-    case 1: return "CORE_WORKER"
-    case 2: return "CALLER_GRAPHICS_THREAD"
+    case 1: return "coreWorker"
+    case 2: return "callerGraphicsThread"
     default: return "RenderDriverKind(\(rawValue))"
     }
   }
@@ -679,8 +679,8 @@ public struct WebglContextKind: RawRepresentable, CustomStringConvertible,
   public static let transferredCanvas: WebglContextKind = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "EXISTING"
-    case 1: return "TRANSFERRED_CANVAS"
+    case 0: return "existing"
+    case 1: return "transferredCanvas"
     default: return "WebglContextKind(\(rawValue))"
     }
   }

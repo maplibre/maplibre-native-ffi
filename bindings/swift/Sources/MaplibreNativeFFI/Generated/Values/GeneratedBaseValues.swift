@@ -58,17 +58,17 @@ public struct Status: RawRepresentable, CustomStringConvertible,
   public static let notFound: Status = .init(rawValue: -10)
   public var description: String {
     switch rawValue {
-    case 0: return "OK"
-    case -1: return "INVALID_ARGUMENT"
-    case -2: return "INVALID_STATE"
-    case -3: return "WRONG_THREAD"
-    case -4: return "UNSUPPORTED"
-    case -5: return "NATIVE_ERROR"
-    case -6: return "CANCELLED"
-    case -7: return "BUSY"
-    case -8: return "TARGET_LOST"
-    case -9: return "NOT_READY"
-    case -10: return "NOT_FOUND"
+    case 0: return "ok"
+    case -1: return "invalidArgument"
+    case -2: return "invalidState"
+    case -3: return "wrongThread"
+    case -4: return "unsupported"
+    case -5: return "nativeError"
+    case -6: return "cancelled"
+    case -7: return "busy"
+    case -8: return "targetLost"
+    case -9: return "notReady"
+    case -10: return "notFound"
     default: return "Status(\(rawValue))"
     }
   }

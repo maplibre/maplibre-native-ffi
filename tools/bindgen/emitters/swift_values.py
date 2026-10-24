@@ -255,7 +255,7 @@ class Values:
         if value.enum_kind != "bitmask":
             conformance += ", CustomStringConvertible"
             cases = "\n".join(
-                f'case {number}: return "{key.removeprefix(prefix)}"'
+                f'case {number}: return "{camel(key.removeprefix(prefix).lower())}"'
                 for number, key in {
                     number: key for key, number in value.enum_values
                 }.items()

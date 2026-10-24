@@ -21,10 +21,10 @@ public struct CommandDisposition: RawRepresentable, CustomStringConvertible,
   public static let cancelled: CommandDisposition = .init(rawValue: 3)
   public var description: String {
     switch rawValue {
-    case 0: return "COMMITTED"
-    case 1: return "SUPERSEDED"
-    case 2: return "FAILED"
-    case 3: return "CANCELLED"
+    case 0: return "committed"
+    case 1: return "superseded"
+    case 2: return "failed"
+    case 3: return "cancelled"
     default: return "CommandDisposition(\(rawValue))"
     }
   }

@@ -89,8 +89,8 @@ public struct RenderAbandonDisposition: RawRepresentable,
   public static let quarantined: RenderAbandonDisposition = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "CLEAN"
-    case 1: return "QUARANTINED"
+    case 0: return "clean"
+    case 1: return "quarantined"
     default: return "RenderAbandonDisposition(\(rawValue))"
     }
   }
@@ -244,10 +244,10 @@ public struct RenderResult: RawRepresentable, CustomStringConvertible,
   public static let superseded: RenderResult = .init(rawValue: 4)
   public var description: String {
     switch rawValue {
-    case 0: return "RENDERED"
-    case 1: return "NO_UPDATE"
-    case 3: return "TARGET_NOT_READY"
-    case 4: return "SUPERSEDED"
+    case 0: return "rendered"
+    case 1: return "noUpdate"
+    case 3: return "targetNotReady"
+    case 4: return "superseded"
     default: return "RenderResult(\(rawValue))"
     }
   }
@@ -339,12 +339,12 @@ public struct RenderSessionState: RawRepresentable, CustomStringConvertible,
   public static let abandoned: RenderSessionState = .init(rawValue: 6)
   public var description: String {
     switch rawValue {
-    case 1: return "ATTACHING"
-    case 2: return "ATTACHED"
-    case 3: return "DETACHING"
-    case 4: return "DETACHED"
-    case 5: return "TARGET_LOST"
-    case 6: return "ABANDONED"
+    case 1: return "attaching"
+    case 2: return "attached"
+    case 3: return "detaching"
+    case 4: return "detached"
+    case 5: return "targetLost"
+    case 6: return "abandoned"
     default: return "RenderSessionState(\(rawValue))"
     }
   }

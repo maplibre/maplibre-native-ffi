@@ -25,7 +25,7 @@
 "COMP-06" = "bindings/swift/Tests/MaplibreNativeFFITests/CompletionTests.swift::discardedCommandsAreFencedAndSynchronousRejectionThrows"
 "CB-01" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aRegistrationIsRootedUntilNativeReleasesIt"
 "CB-02" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aCancelCallbackDoesNotKeepItsRequestAlive"
-"CB-04" = { na = "Swift callbacks are non-throwing" }
+"CB-04" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aProviderThatThrowsFailsItsRequest"
 "CB-05" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aProviderAnswersATakenRequestLater"
 "CB-06" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aHeaderResponseExpiresWithItsCallback"
 "CB-07" = "bindings/swift/Tests/MaplibreNativeFFITests/GlobalStateTests.swift::replacingTheLogCallbackReleasesThePreviousOne"

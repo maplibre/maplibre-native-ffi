@@ -733,9 +733,9 @@ public struct StyleImageTextFit: RawRepresentable, CustomStringConvertible,
   public static let proportional: StyleImageTextFit = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
-    case 0: return "STRETCH_OR_SHRINK"
-    case 1: return "STRETCH_ONLY"
-    case 2: return "PROPORTIONAL"
+    case 0: return "stretchOrShrink"
+    case 1: return "stretchOnly"
+    case 2: return "proportional"
     default: return "StyleImageTextFit(\(rawValue))"
     }
   }
@@ -818,8 +818,8 @@ public struct StyleLayerVisibility: RawRepresentable, CustomStringConvertible,
   public static let none: StyleLayerVisibility = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "VISIBLE"
-    case 1: return "NONE"
+    case 0: return "visible"
+    case 1: return "none"
     default: return "StyleLayerVisibility(\(rawValue))"
     }
   }
@@ -841,8 +841,8 @@ public struct StyleRasterDemEncoding: RawRepresentable, CustomStringConvertible,
   public static let terrarium: StyleRasterDemEncoding = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "MAPBOX"
-    case 1: return "TERRARIUM"
+    case 0: return "mapbox"
+    case 1: return "terrarium"
     default: return "StyleRasterDemEncoding(\(rawValue))"
     }
   }
@@ -1000,16 +1000,16 @@ public struct StyleSourceType: RawRepresentable, CustomStringConvertible,
   public static let customMvtVector: StyleSourceType = .init(rawValue: 9)
   public var description: String {
     switch rawValue {
-    case 0: return "UNKNOWN"
-    case 1: return "VECTOR"
-    case 2: return "RASTER"
-    case 3: return "RASTER_DEM"
-    case 4: return "GEOJSON"
-    case 5: return "IMAGE"
-    case 6: return "VIDEO"
-    case 7: return "ANNOTATIONS"
-    case 8: return "CUSTOM_VECTOR"
-    case 9: return "CUSTOM_MVT_VECTOR"
+    case 0: return "unknown"
+    case 1: return "vector"
+    case 2: return "raster"
+    case 3: return "rasterDem"
+    case 4: return "geojson"
+    case 5: return "image"
+    case 6: return "video"
+    case 7: return "annotations"
+    case 8: return "customVector"
+    case 9: return "customMvtVector"
     default: return "StyleSourceType(\(rawValue))"
     }
   }
@@ -1031,8 +1031,8 @@ public struct StyleTileScheme: RawRepresentable, CustomStringConvertible,
   public static let tms: StyleTileScheme = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "XYZ"
-    case 1: return "TMS"
+    case 0: return "xyz"
+    case 1: return "tms"
     default: return "StyleTileScheme(\(rawValue))"
     }
   }
@@ -1112,8 +1112,8 @@ public struct StyleVectorTileEncoding: RawRepresentable,
   public static let mlt: StyleVectorTileEncoding = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "MVT"
-    case 1: return "MLT"
+    case 0: return "mvt"
+    case 1: return "mlt"
     default: return "StyleVectorTileEncoding(\(rawValue))"
     }
   }

@@ -259,17 +259,17 @@ public struct StyleExpressionTypeKind: RawRepresentable,
   public static let array: StyleExpressionTypeKind = .init(rawValue: 10)
   public var description: String {
     switch rawValue {
-    case 0: return "VALUE"
-    case 1: return "NUMBER"
-    case 2: return "STRING"
-    case 3: return "BOOLEAN"
-    case 4: return "COLOR"
-    case 5: return "OBJECT"
-    case 6: return "FORMATTED"
-    case 7: return "IMAGE"
-    case 8: return "PADDING"
-    case 9: return "VARIABLE_ANCHOR_OFFSET_COLLECTION"
-    case 10: return "ARRAY"
+    case 0: return "value"
+    case 1: return "number"
+    case 2: return "string"
+    case 3: return "boolean"
+    case 4: return "color"
+    case 5: return "object"
+    case 6: return "formatted"
+    case 7: return "image"
+    case 8: return "padding"
+    case 9: return "variableAnchorOffsetCollection"
+    case 10: return "array"
     default: return "StyleExpressionTypeKind(\(rawValue))"
     }
   }
