@@ -59,6 +59,11 @@ blacksmith testbox run --id <id> "mise run test linux-gnu-x64-egl"
 Run `blacksmith testbox run` from the repository root, because rsync mirrors the
 current directory with `--delete`.
 
+The testbox shell has the workflow's sccache settings but not its S3
+credentials, so builds fail until you prefix the command with
+`env -u SCCACHE_BUCKET -u SCCACHE_ENDPOINT -u SCCACHE_REGION -u SCCACHE_S3_USE_SSL`,
+which makes sccache use the testbox's local disk.
+
 ## Code coverage
 
 `mise run coverage [suite]` builds the `macos-arm64-metal-coverage` preset, runs
