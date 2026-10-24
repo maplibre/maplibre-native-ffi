@@ -23,6 +23,6 @@ public extension RenderFrameBatchHandle {
   /// See `mln_render_frame_batch_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func close() throws {
-    try nativeClose { raw in mln_render_frame_batch_release(raw) }
+    try nativeGuardedClose { raw in mln_render_frame_batch_release(raw) }
   }
 }

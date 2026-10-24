@@ -205,7 +205,7 @@ def descriptor(values, plan):
             f"  guard let {identifier(parameter.name)} else {{ {fail or 'return'} }}\n  let response{name(parameter.name)} = {values.public(parameter.value.element)}(pointer: {identifier(parameter.name)})\n  defer {{ response{name(parameter.name)}.expire() }}\n"
             for parameter in responses
         )
-        from .swift_ownership import disposer_arguments, owner_name
+        from .swift_ownership import disposer_arguments, infallible_close, owner_name
 
         for parameter in owned:
             handle = parameter.value.handle
@@ -235,7 +235,14 @@ def descriptor(values, plan):
             # The synchronous release of a handle whose release is also its
             # dispose is the dispose.
             fail = " ".join(
-                f"try? owned{name(p.name)}.{'dispose' if p.value.handle.dispose_completion else 'close'}();"
+                f"try? owned{name(p.name)}.dispose();"
+                if p.value.handle.dispose_completion
+                else f"owned{name(p.name)}.close();"
+                if infallible_close(
+                    p.value.handle,
+                    values.bound.source.functions_by_name[p.value.handle.release],
+                )
+                else f"try? owned{name(p.name)}.close();"
                 for p in owned
             ) + (" " + fail if fail else "")
         body = (

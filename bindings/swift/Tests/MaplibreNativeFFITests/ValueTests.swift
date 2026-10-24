@@ -129,7 +129,7 @@ import Testing
     let projection = try Maplibre.mapProjectionCreate(
       view: fixture.map.getSnapshot().view
     )
-    defer { try! projection.close() }
+    defer { projection.close() }
     let coordinates = [
       LatLng(latitude: 0, longitude: 0),
       LatLng(latitude: 10, longitude: 20),
@@ -155,11 +155,11 @@ import Testing
   )
   #expect(try zoom.evaluate(inputs: StyleExpressionInputs(zoom: 5)) ==
     Data("50.0".utf8))
-  try zoom.close()
+  zoom.close()
 
   // The result outgrows the runtime's first storage, so the call runs again.
   let text = Data(("\"" + String(repeating: "a", count: 1000) + "\"").utf8)
   let long = try Maplibre.styleExpressionCreate(expression: text)
   #expect(try long.evaluate() == text)
-  try long.close()
+  long.close()
 }

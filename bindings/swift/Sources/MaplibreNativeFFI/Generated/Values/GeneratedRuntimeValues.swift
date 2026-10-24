@@ -1002,7 +1002,7 @@ private func invokeResourceTransformCallback(
   ) } catch {
     reportToStandardError(
       "mln_resource_transform_callback failed and native received its fallback: \(error)\n"
-    ); try? ownedRequest
+    ); ownedRequest
       .close()
   }
 }

@@ -66,6 +66,17 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     return try body(value)
   }
 
+  var description: String {
+    let closed = lock.withLock { self.closed }
+    return "\(typeName)(id=0x\(String(value.raw, radix: 16)), closed=\(closed))"
+  }
+
+  /// Closes a handle that guards no copies, so only `destroy` could fail.
+  func closeUnguarded(_ destroy: (Handle) -> Void) {
+    precondition(!protectsCopies, "\(typeName) guards copies")
+    try! closeOnce(destroy)
+  }
+
   func closeOnce(
     idempotent: Bool = true,
     _ destroy: (Handle) throws -> Void

@@ -22,7 +22,7 @@ public extension ResourceTransformRequestHandle {
   ///
   /// See `mln_resource_transform_request_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func close() throws {
-    try nativeClose { raw in mln_resource_transform_request_release(raw) }
+  func close() {
+    nativeClose { raw in mln_resource_transform_request_release(raw) }
   }
 }

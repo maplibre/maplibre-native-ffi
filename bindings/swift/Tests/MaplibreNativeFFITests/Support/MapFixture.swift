@@ -29,7 +29,7 @@ func denyingProvider(routes: [String: Data] = [:]) -> ResourceProvider {
         errorMessage: "the test fixture serves no \(url)"
       ))
     }
-    try! handle.close()
+    handle.close()
     return .handle
   }
 }

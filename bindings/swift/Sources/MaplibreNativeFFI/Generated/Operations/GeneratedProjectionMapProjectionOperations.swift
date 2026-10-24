@@ -155,8 +155,8 @@ public extension MapProjectionHandle {
   ///
   /// See `mln_map_projection_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  func close() throws {
-    try nativeClose { raw in mln_map_projection_release(raw) }
+  func close() {
+    nativeClose { raw in mln_map_projection_release(raw) }
   }
 
   /// Applies a camera update to a standalone projection.

@@ -65,11 +65,22 @@ def consumed(plan, owner, values):
         else "dispose"
     )
     # The closure's parameters select the overload: a status-returning close
-    # takes the diagnostic, so its status is always checked.
+    # takes the diagnostic, so its status is always checked. A void release
+    # can't fail, so its close throws only when a batch refuses it.
     call = native_call(function, *disposer_arguments(handle, function, "raw"))
-    parameters = "raw" if function.return_type.kind == "void" else "raw, diagnostic"
-    synchronous = f"""{documented}func {method}() throws {{
-  try nativeClose {{ {parameters} in {call} }}
+    if infallible_close(handle, function):
+        synchronous = f"""{documented}func {method}() {{
+  nativeClose {{ raw in {call} }}
+}}
+"""
+    elif function.return_type.kind != "void":
+        synchronous = f"""{documented}func {method}() throws {{
+  try nativeClose {{ raw, diagnostic in {call} }}
+}}
+"""
+    else:
+        synchronous = f"""{documented}func {method}() throws {{
+  try nativeGuardedClose {{ raw in {call} }}
 }}
 """
     if plan.completion:
@@ -98,6 +109,16 @@ def disposer_arguments(handle, function, raw):
     if handle.dispose_completion and function.name == handle.dispose:
         return [raw, "nil"]
     return [raw]
+
+
+def protects_copies(handle):
+    """Whether the handle lends memory that its getters copy after they return."""
+    return handle.native == "mln_render_frame_batch"
+
+
+def infallible_close(handle, function):
+    """Whether `function`, a release of `handle`, closes it without a throw."""
+    return function.return_type.kind == "void" and not protects_copies(handle)
 
 
 def owner_name(handle):
@@ -149,16 +170,21 @@ def owner_declarations(bound):
             else ""
         )
         passed = ", parent: parent" if handle.parent else ""
-        if handle.native == "mln_render_frame_batch":
+        if protects_copies(handle):
             passed += ", protectsCopies: true"
         from .swift import doc
 
-        chunks.append(f'''{doc(bound, handle.native)}public final class {owner}: @unchecked Sendable, NativeReceiver {{
+        chunks.append(f'''{doc(bound, handle.native)}public final class {owner}: @unchecked Sendable, NativeReceiver, Identifiable, Hashable, CustomStringConvertible {{
   let handle: NativeHandleState<{raw}>
   init(adopting raw: {handle.native}{parent}) throws {{
     handle = try NativeHandleState(typeName: "{owner}", handle: {raw}(raw: raw){passed})
   }}
+  /// The native handle, which no later handle in the process reuses. It
+  /// stays valid after the handle closes.
   public var id: UInt64 {{ handle.value.raw }}
+  public var description: String {{ handle.description }}
+  public static func == (lhs: {owner}, rhs: {owner}) -> Bool {{ lhs.id == rhs.id }}
+  public func hash(into hasher: inout Hasher) {{ hasher.combine(id) }}
 }}
 ''')
     return "\n".join(chunks)

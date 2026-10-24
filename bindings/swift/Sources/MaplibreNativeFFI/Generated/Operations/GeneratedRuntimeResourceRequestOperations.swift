@@ -48,8 +48,8 @@ public extension ResourceRequestHandle {
   ///
   /// See `mln_resource_request_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func close() throws {
-    try nativeClose { raw in mln_resource_request_release(raw) }
+  func close() {
+    nativeClose { raw in mln_resource_request_release(raw) }
   }
 
   /// Registers a callback that runs when MapLibre cancels a C API resource

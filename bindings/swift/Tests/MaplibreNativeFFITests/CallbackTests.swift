@@ -169,7 +169,7 @@ func installProvider(
     #expect(try await fixture.awaitEvent("the style answered later") {
       $0.type == .mapStyleLoaded
     } != nil)
-    try request.close()
+    request.close()
   }
 }
 
@@ -229,7 +229,7 @@ func installProvider(
     let taken = LockedBox<ResourceTransformRequestHandle?>(nil)
     try await fixture.runtime.setResourceTransform(
       transform: ResourceTransform(callback: { _, requested, request in
-        guard requested == url else { return try! request.close() }
+        guard requested == url else { return request.close() }
         taken.update { $0 = request }
       })
     )
@@ -243,7 +243,7 @@ func installProvider(
     Thread {
       do {
         try request.complete(url: "unsupported://rewritten.json")
-        try request.close()
+        request.close()
       } catch { answered.update { $0 = error } }
       done.signal()
     }.start()
@@ -277,7 +277,7 @@ func installProvider(
             errorReason: .notFound,
             errorMessage: "the test serves no sprite"
           ))
-        try! handle.close()
+        handle.close()
         return .handle
       },
       routes: [ResourceRoute(flags: .glob, url: "custom://routed/**")]
@@ -332,7 +332,7 @@ func installProvider(
     )
     #expect(cancelled)
     #expect(releases.value == 1)
-    try request.close()
+    request.close()
     #expect(releases.value == 1)
   }
 }

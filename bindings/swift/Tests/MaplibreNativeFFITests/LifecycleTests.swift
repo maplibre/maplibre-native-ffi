@@ -3,6 +3,7 @@ import MaplibreNativeFFI
 import Testing
 
 /// Synchronous close is idempotent; asynchronous release reaches native.
+/// Handles compare by id, so distinct handles key a set apart.
 @Test func synchronousCloseIsIdempotentAndAsyncReleaseReachesNative(
 ) async throws {
   try await withMapFixture { fixture in
@@ -10,8 +11,15 @@ import Testing
     let data = try Maplibre.geojsonSourceDataCreate(
       data: Data(#"{"type":"FeatureCollection","features":[]}"#.utf8)
     )
-    try data.close()
-    try data.close()
+    let other = try Maplibre
+      .geojsonSourceDataCreate(
+        data: Data(#"{"type":"FeatureCollection","features":[]}"#
+          .utf8)
+      )
+    #expect(Set([data, data, other]).count == 2)
+    data.close()
+    data.close()
+    other.close()
 
     let error = await expectMaplibreError(.invalidState) {
       try await fixture.map.addGeojsonSourceData(sourceId: "late", data: data)
@@ -26,7 +34,8 @@ import Testing
 }
 
 /// A handle's id is the source that its events carry, and it stays readable
-/// after close, so a host can route events that it drains later.
+/// after close, so a host can route events that it drains later. The id also
+/// names the handle in its description.
 @Test func aHandleIdNamesItsEventsAndOutlivesClose() async throws {
   try await withMapFixture { fixture in
     try await fixture.map.setStyleJson(json: emptyStyle)
@@ -34,8 +43,11 @@ import Testing
       $0.type == .mapStyleLoaded
     }
     #expect(loaded?.source == fixture.map.id)
+    let hex = String(fixture.map.id, radix: 16)
+    #expect(fixture.map.description == "MapHandle(id=0x\(hex), closed=false)")
     try await fixture.map.close()
     #expect(fixture.map.id == loaded?.source)
+    #expect(fixture.map.description == "MapHandle(id=0x\(hex), closed=true)")
   }
 }
 

@@ -16,7 +16,9 @@ struct NativeAcquiredFrameHandle: NativeHandle {
 ///
 /// See `mln_acquired_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class AcquiredFrameHandle: @unchecked Sendable, NativeReceiver {
+public final class AcquiredFrameHandle: @unchecked Sendable, NativeReceiver,
+  Identifiable, Hashable, CustomStringConvertible
+{
   let handle: NativeHandleState<NativeAcquiredFrameHandle>
   init(adopting raw: mln_acquired_frame, parent: RenderSessionHandle) throws {
     handle = try NativeHandleState(
@@ -26,8 +28,24 @@ public final class AcquiredFrameHandle: @unchecked Sendable, NativeReceiver {
     )
   }
 
+  /// The native handle, which no later handle in the process reuses. It
+  /// stays valid after the handle closes.
   public var id: UInt64 {
     handle.value.raw
+  }
+
+  public var description: String {
+    handle.description
+  }
+
+  public static func == (lhs: AcquiredFrameHandle,
+                         rhs: AcquiredFrameHandle) -> Bool
+  {
+    lhs.id == rhs.id
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
   }
 }
 
@@ -43,8 +61,8 @@ struct NativeGeojsonSourceDataHandle: NativeHandle {
 ///
 /// See `mln_geojson_source_data` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class GeojsonSourceDataHandle: @unchecked Sendable,
-  NativeReceiver
+public final class GeojsonSourceDataHandle: @unchecked Sendable, NativeReceiver,
+  Identifiable, Hashable, CustomStringConvertible
 {
   let handle: NativeHandleState<NativeGeojsonSourceDataHandle>
   init(adopting raw: mln_geojson_source_data) throws {
@@ -54,8 +72,25 @@ public final class GeojsonSourceDataHandle: @unchecked Sendable,
     )
   }
 
+  /// The native handle, which no later handle in the process reuses. It
+  /// stays valid after the handle closes.
   public var id: UInt64 {
     handle.value.raw
+  }
+
+  public var description: String {
+    handle.description
+  }
+
+  public static func == (
+    lhs: GeojsonSourceDataHandle,
+    rhs: GeojsonSourceDataHandle
+  ) -> Bool {
+    lhs.id == rhs.id
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
   }
 }
 
@@ -72,7 +107,9 @@ struct NativeMapHandle: NativeHandle {
 ///
 /// See `mln_map` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class MapHandle: @unchecked Sendable, NativeReceiver {
+public final class MapHandle: @unchecked Sendable, NativeReceiver, Identifiable,
+  Hashable, CustomStringConvertible
+{
   let handle: NativeHandleState<NativeMapHandle>
   init(adopting raw: mln_map, parent: RuntimeHandle) throws {
     handle = try NativeHandleState(
@@ -82,8 +119,24 @@ public final class MapHandle: @unchecked Sendable, NativeReceiver {
     )
   }
 
+  /// The native handle, which no later handle in the process reuses. It
+  /// stays valid after the handle closes.
   public var id: UInt64 {
     handle.value.raw
+  }
+
+  public var description: String {
+    handle.description
+  }
+
+  public static func == (lhs: MapHandle,
+                         rhs: MapHandle) -> Bool
+  {
+    lhs.id == rhs.id
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
   }
 }
 
@@ -99,7 +152,9 @@ struct NativeMapProjectionHandle: NativeHandle {
 ///
 /// See `mln_map_projection` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class MapProjectionHandle: @unchecked Sendable, NativeReceiver {
+public final class MapProjectionHandle: @unchecked Sendable, NativeReceiver,
+  Identifiable, Hashable, CustomStringConvertible
+{
   let handle: NativeHandleState<NativeMapProjectionHandle>
   init(adopting raw: mln_map_projection) throws {
     handle = try NativeHandleState(
@@ -108,8 +163,24 @@ public final class MapProjectionHandle: @unchecked Sendable, NativeReceiver {
     )
   }
 
+  /// The native handle, which no later handle in the process reuses. It
+  /// stays valid after the handle closes.
   public var id: UInt64 {
     handle.value.raw
+  }
+
+  public var description: String {
+    handle.description
+  }
+
+  public static func == (lhs: MapProjectionHandle,
+                         rhs: MapProjectionHandle) -> Bool
+  {
+    lhs.id == rhs.id
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
   }
 }
 
@@ -125,7 +196,9 @@ struct NativeRenderFrameBatchHandle: NativeHandle {
 ///
 /// See `mln_render_frame_batch` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class RenderFrameBatchHandle: @unchecked Sendable, NativeReceiver {
+public final class RenderFrameBatchHandle: @unchecked Sendable, NativeReceiver,
+  Identifiable, Hashable, CustomStringConvertible
+{
   let handle: NativeHandleState<NativeRenderFrameBatchHandle>
   init(adopting raw: mln_render_frame_batch) throws {
     handle = try NativeHandleState(
@@ -135,8 +208,25 @@ public final class RenderFrameBatchHandle: @unchecked Sendable, NativeReceiver {
     )
   }
 
+  /// The native handle, which no later handle in the process reuses. It
+  /// stays valid after the handle closes.
   public var id: UInt64 {
     handle.value.raw
+  }
+
+  public var description: String {
+    handle.description
+  }
+
+  public static func == (
+    lhs: RenderFrameBatchHandle,
+    rhs: RenderFrameBatchHandle
+  ) -> Bool {
+    lhs.id == rhs.id
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
   }
 }
 
@@ -154,7 +244,9 @@ struct NativeRenderSessionHandle: NativeHandle {
 ///
 /// See `mln_render_session` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class RenderSessionHandle: @unchecked Sendable, NativeReceiver {
+public final class RenderSessionHandle: @unchecked Sendable, NativeReceiver,
+  Identifiable, Hashable, CustomStringConvertible
+{
   let handle: NativeHandleState<NativeRenderSessionHandle>
   init(adopting raw: mln_render_session, parent: MapHandle) throws {
     handle = try NativeHandleState(
@@ -164,8 +256,24 @@ public final class RenderSessionHandle: @unchecked Sendable, NativeReceiver {
     )
   }
 
+  /// The native handle, which no later handle in the process reuses. It
+  /// stays valid after the handle closes.
   public var id: UInt64 {
     handle.value.raw
+  }
+
+  public var description: String {
+    handle.description
+  }
+
+  public static func == (lhs: RenderSessionHandle,
+                         rhs: RenderSessionHandle) -> Bool
+  {
+    lhs.id == rhs.id
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
   }
 }
 
@@ -181,7 +289,9 @@ struct NativeResourceRequestHandle: NativeHandle {
 ///
 /// See `mln_resource_request` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class ResourceRequestHandle: @unchecked Sendable, NativeReceiver {
+public final class ResourceRequestHandle: @unchecked Sendable, NativeReceiver,
+  Identifiable, Hashable, CustomStringConvertible
+{
   let handle: NativeHandleState<NativeResourceRequestHandle>
   init(adopting raw: mln_resource_request) throws {
     handle = try NativeHandleState(
@@ -190,8 +300,24 @@ public final class ResourceRequestHandle: @unchecked Sendable, NativeReceiver {
     )
   }
 
+  /// The native handle, which no later handle in the process reuses. It
+  /// stays valid after the handle closes.
   public var id: UInt64 {
     handle.value.raw
+  }
+
+  public var description: String {
+    handle.description
+  }
+
+  public static func == (lhs: ResourceRequestHandle,
+                         rhs: ResourceRequestHandle) -> Bool
+  {
+    lhs.id == rhs.id
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
   }
 }
 
@@ -208,7 +334,7 @@ struct NativeResourceTransformRequestHandle: NativeHandle {
 /// See `mln_resource_transform_request` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class ResourceTransformRequestHandle: @unchecked Sendable,
-  NativeReceiver
+  NativeReceiver, Identifiable, Hashable, CustomStringConvertible
 {
   let handle: NativeHandleState<NativeResourceTransformRequestHandle>
   init(adopting raw: mln_resource_transform_request) throws {
@@ -218,8 +344,25 @@ public final class ResourceTransformRequestHandle: @unchecked Sendable,
     )
   }
 
+  /// The native handle, which no later handle in the process reuses. It
+  /// stays valid after the handle closes.
   public var id: UInt64 {
     handle.value.raw
+  }
+
+  public var description: String {
+    handle.description
+  }
+
+  public static func == (
+    lhs: ResourceTransformRequestHandle,
+    rhs: ResourceTransformRequestHandle
+  ) -> Bool {
+    lhs.id == rhs.id
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
   }
 }
 
@@ -236,7 +379,9 @@ struct NativeRuntimeHandle: NativeHandle {
 ///
 /// See `mln_runtime` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class RuntimeHandle: @unchecked Sendable, NativeReceiver {
+public final class RuntimeHandle: @unchecked Sendable, NativeReceiver,
+  Identifiable, Hashable, CustomStringConvertible
+{
   let handle: NativeHandleState<NativeRuntimeHandle>
   init(adopting raw: mln_runtime) throws {
     handle = try NativeHandleState(
@@ -245,8 +390,24 @@ public final class RuntimeHandle: @unchecked Sendable, NativeReceiver {
     )
   }
 
+  /// The native handle, which no later handle in the process reuses. It
+  /// stays valid after the handle closes.
   public var id: UInt64 {
     handle.value.raw
+  }
+
+  public var description: String {
+    handle.description
+  }
+
+  public static func == (lhs: RuntimeHandle,
+                         rhs: RuntimeHandle) -> Bool
+  {
+    lhs.id == rhs.id
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
   }
 }
 
@@ -262,7 +423,9 @@ struct NativeStyleExpressionHandle: NativeHandle {
 ///
 /// See `mln_style_expression` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class StyleExpressionHandle: @unchecked Sendable, NativeReceiver {
+public final class StyleExpressionHandle: @unchecked Sendable, NativeReceiver,
+  Identifiable, Hashable, CustomStringConvertible
+{
   let handle: NativeHandleState<NativeStyleExpressionHandle>
   init(adopting raw: mln_style_expression) throws {
     handle = try NativeHandleState(
@@ -271,8 +434,24 @@ public final class StyleExpressionHandle: @unchecked Sendable, NativeReceiver {
     )
   }
 
+  /// The native handle, which no later handle in the process reuses. It
+  /// stays valid after the handle closes.
   public var id: UInt64 {
     handle.value.raw
+  }
+
+  public var description: String {
+    handle.description
+  }
+
+  public static func == (lhs: StyleExpressionHandle,
+                         rhs: StyleExpressionHandle) -> Bool
+  {
+    lhs.id == rhs.id
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
   }
 }
 
