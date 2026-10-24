@@ -43,7 +43,7 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_delete_offline_region` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  func deleteOfflineRegion(regionId bindingArg0: Int64) async throws {
+  func deleteOfflineRegion(_ bindingArg0: Int64) async throws {
     try await nativeUnit { raw, _, completion, diagnostic in
       mln_runtime_delete_offline_region(
         raw,
@@ -58,7 +58,7 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_get_offline_region` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  func getOfflineRegion(regionId bindingArg0: Int64) async throws
+  func getOfflineRegion(_ bindingArg0: Int64) async throws
     -> OfflineRegionInfo?
   {
     try await nativeStart(convert: { result in
@@ -83,7 +83,7 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_get_offline_region_status` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  func getOfflineRegionStatus(regionId bindingArg0: Int64) async throws
+  func getOfflineRegionStatus(_ bindingArg0: Int64) async throws
     -> OfflineRegionStatus
   {
     try await nativeStart(copying: OfflineRegionStatus
@@ -102,7 +102,7 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_invalidate_offline_region` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  func invalidateOfflineRegion(regionId bindingArg0: Int64) async throws {
+  func invalidateOfflineRegion(_ bindingArg0: Int64) async throws {
     try await nativeUnit { raw, _, completion, diagnostic in
       mln_runtime_invalidate_offline_region(
         raw,
@@ -155,7 +155,7 @@ public extension RuntimeHandle {
   /// See `mln_runtime_set_offline_region_download_state` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   func setOfflineRegionDownloadState(
-    regionId bindingArg0: Int64,
+    _ bindingArg0: Int64,
     state bindingArg1: OfflineRegionDownloadState
   ) async throws {
     try await nativeUnit { raw, _, completion, diagnostic in
@@ -174,7 +174,7 @@ public extension RuntimeHandle {
   /// See `mln_runtime_set_offline_region_observed` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   func setOfflineRegionObserved(
-    regionId bindingArg0: Int64,
+    _ bindingArg0: Int64,
     observed bindingArg1: Bool
   ) async throws {
     try await nativeUnit { raw, _, completion, diagnostic in
@@ -193,7 +193,7 @@ public extension RuntimeHandle {
   /// See `mln_runtime_update_offline_region_metadata` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   func updateOfflineRegionMetadata(
-    regionId bindingArg0: Int64,
+    _ bindingArg0: Int64,
     metadata bindingArg1: Data
   ) async throws -> OfflineRegionInfo {
     try await nativeStart(copying: { try OfflineRegionInfo(raw: $0)

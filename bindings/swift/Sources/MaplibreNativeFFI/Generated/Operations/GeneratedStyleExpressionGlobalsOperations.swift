@@ -9,7 +9,7 @@ public extension Maplibre {
   /// See `mln_style_expression_create` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
   static func styleExpressionCreate(
-    expression bindingArg0: Data,
+    _ bindingArg0: Data,
     options bindingArg1: StyleExpressionOptions? = nil
   ) throws -> StyleExpressionHandle {
     var value0: mln_style_expression = 0

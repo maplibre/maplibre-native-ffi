@@ -13,7 +13,7 @@ private func addCustomSource(
 ) async throws -> CommandCompletion {
   let sentinel = ReleaseProbe(releases)
   return try await map.addCustomGeometrySource(
-    sourceId: id,
+    id,
     options: CustomGeometrySourceOptions(fetchTile: { _ in
       withExtendedLifetime(sentinel) {}
     })
@@ -25,7 +25,7 @@ private func addCustomSource(
 /// time a later command on the map completes.
 @Test func aRegistrationIsRootedUntilNativeReleasesIt() async throws {
   try await withMapFixture { fixture in
-    try await fixture.map.setStyleJson(json: emptyStyle)
+    try await fixture.map.setStyleJson(emptyStyle)
     let accepted = LockedBox(0)
     try await addCustomSource(fixture.map, id: "custom", releases: accepted)
 
@@ -38,7 +38,7 @@ private func addCustomSource(
     #expect(rejected.value == 1)
     #expect(accepted.value == 0)
 
-    try await fixture.map.removeStyleSource(sourceId: "custom")
+    try await fixture.map.removeStyleSource("custom")
     #expect(accepted.value == 1)
   }
 }
@@ -64,10 +64,10 @@ private func addCustomSource(
           }
         )
       )
-      try await fixture.map.updateCamera(update: update)
+      try await fixture.map.updateCamera(update)
     }
     #expect(releases.value == 0)
-    _ = try await fixture.map.cancelCameraTransition(transitionId: UInt64.max)
+    _ = try await fixture.map.cancelCameraTransition(UInt64.max)
     await awaitCondition("the end handler's release") { releases.value == 1 }
     #expect(ends.value.count == 1)
     #expect(ends.value.first?.outcome == .cancelled)
@@ -83,7 +83,7 @@ private func addCustomSource(
         })
       )
       await #expect(throws: (any Error).self) {
-        try await fixture.map.applyCameraDelta(delta: delta)
+        try await fixture.map.applyCameraDelta(delta)
       }
     }
     #expect(rejected.value == 1)
@@ -99,7 +99,7 @@ func installProvider(
     -> ResourceProviderDecision
 ) async throws {
   let deny = denyingProvider()
-  try await runtime.setResourceProvider(provider: ResourceProvider(
+  try await runtime.setResourceProvider(ResourceProvider(
     callback: { request, handle in
       guard request.requestedUrl == url else {
         return try deny.callback!(request, handle)
@@ -120,7 +120,7 @@ private struct ProviderFailure: Error {}
   try await withMapFixture { fixture in
     let url = "custom://thrown.json"
     let deny = denyingProvider()
-    try await fixture.runtime.setResourceProvider(provider: ResourceProvider(
+    try await fixture.runtime.setResourceProvider(ResourceProvider(
       callback: { request, handle in
         guard request.requestedUrl == url else {
           return try deny.callback!(request, handle)
@@ -128,11 +128,11 @@ private struct ProviderFailure: Error {}
         throw ProviderFailure()
       }
     ))
-    try await fixture.map.setStyleUrl(url: url)
+    try await fixture.map.setStyleUrl(url)
     #expect(try await fixture.awaitEvent("the thrown request to fail") {
       $0.type == .mapLoadingFailed
     } != nil)
-    try await fixture.map.setStyleJson(json: emptyStyle)
+    try await fixture.map.setStyleJson(emptyStyle)
   }
 }
 
@@ -154,7 +154,7 @@ private struct ProviderFailure: Error {}
       request.update { $0 = handle }
       return .handle
     }
-    try await fixture.map.setStyleUrl(url: "custom://dropped.json")
+    try await fixture.map.setStyleUrl("custom://dropped.json")
     await awaitCondition("the provider call") { request.value != nil }
     weakRequest = request.value
     request.update { $0 = nil }
@@ -178,7 +178,7 @@ private struct ProviderFailure: Error {}
       taken.update { $0 = handle }
       return .handle
     }
-    try await fixture.map.setStyleUrl(url: "custom://later.json")
+    try await fixture.map.setStyleUrl("custom://later.json")
     await awaitCondition("the provider to take the request") {
       taken.value != nil
     }
@@ -208,7 +208,7 @@ private struct ProviderFailure: Error {}
     let escaped = LockedBox<HttpHeaderTransformResponse?>(nil)
     let otherThread = LockedBox<MaplibreError?>(nil)
     try await fixture.runtime.setHttpHeaderTransform(
-      transform: HttpHeaderTransform(callback: { _, requested, response in
+      HttpHeaderTransform(callback: { _, requested, response in
         guard requested == url else { return }
         let done = DispatchSemaphore(value: 0)
         Thread {
@@ -223,7 +223,7 @@ private struct ProviderFailure: Error {}
         escaped.update { $0 = response }
       })
     )
-    try await fixture.map.setStyleUrl(url: url)
+    try await fixture.map.setStyleUrl(url)
     let failure = try await fixture
       .awaitEvent("the request to fail") {
         $0.type == .mapLoadingFailed
@@ -250,12 +250,12 @@ private struct ProviderFailure: Error {}
     }
     let taken = LockedBox<ResourceTransformRequestHandle?>(nil)
     try await fixture.runtime.setResourceTransform(
-      transform: ResourceTransform(callback: { _, requested, request in
+      ResourceTransform(callback: { _, requested, request in
         guard requested == url else { return request.close() }
         taken.update { $0 = request }
       })
     )
-    try await fixture.map.setStyleUrl(url: url)
+    try await fixture.map.setStyleUrl(url)
     await awaitCondition("the transform to take the request") {
       taken.value != nil
     }
@@ -289,7 +289,7 @@ private struct ProviderFailure: Error {}
     {"version":8,"sources":{},"layers":[],"sprite":"custom://routed/sprite"}
     """#.utf8)
     let seen = LockedBox<[ResourceRequestInfo]>([])
-    try await fixture.runtime.setResourceProvider(provider: ResourceProvider(
+    try await fixture.runtime.setResourceProvider(ResourceProvider(
       callback: { request, handle in
         seen.update { $0.append(request) }
         try handle.complete(response: request.kind == .style
@@ -305,14 +305,14 @@ private struct ProviderFailure: Error {}
       routes: [ResourceRoute(flags: .glob, url: "custom://routed/**")]
     ))
 
-    try await fixture.map.setStyleUrl(url: "custom://routed/style.json")
+    try await fixture.map.setStyleUrl("custom://routed/style.json")
     await awaitCondition("the routed style and sprite requests") {
       Set(seen.value.map(\.kind))
         .isSuperset(of: [.style, .spriteJson, .spriteImage])
     }
 
     // Outside the routes, native loading has no transport for the scheme.
-    try await fixture.map.setStyleUrl(url: "custom://elsewhere/style.json")
+    try await fixture.map.setStyleUrl("custom://elsewhere/style.json")
     #expect(try await fixture.awaitEvent("the unrouted style to fail") {
       $0.type == .mapLoadingFailed && $0.message.contains("elsewhere")
     } != nil)
@@ -335,7 +335,7 @@ private struct ProviderFailure: Error {}
       taken.update { $0 = handle }
       return .handle
     }
-    try await fixture.map.setStyleUrl(url: "custom://cancelled.json")
+    try await fixture.map.setStyleUrl("custom://cancelled.json")
     await awaitCondition("the provider to take the request") {
       taken.value != nil
     }

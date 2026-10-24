@@ -62,6 +62,16 @@ class SwiftEmitterTests(unittest.TestCase):
             outputs["Generated/GeneratedOwners.swift"],
         )
 
+    def test_a_first_label_that_repeats_the_method_name_is_omitted(self):
+        # A trailing Id or Name names the key of what the method names.
+        self.assertTrue(swift.repeats("setStyleUrl", "url"))
+        self.assertTrue(swift.repeats("updateCamera", "update"))
+        self.assertTrue(swift.repeats("deleteOfflineRegion", "regionId"))
+        self.assertTrue(swift.repeats("setGlobalStateProperty", "propertyName"))
+        self.assertFalse(swift.repeats("createMap", "options"))
+        self.assertFalse(swift.repeats("setHeader", "name"))
+        self.assertFalse(swift.repeats("queryFeatureExtensions", "sourceId"))
+
     def test_generated_values_and_keyword_parameters_round_trip(self):
         swiftc = require_tool(self, "swiftc", ROOT / "bindings/swift")
         clang = require_tool(self, "clang")

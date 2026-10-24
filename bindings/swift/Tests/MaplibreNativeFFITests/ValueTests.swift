@@ -14,7 +14,7 @@ import Testing
 
   try await withMapFixture { fixture in
     let error = await expectMaplibreError(.invalidArgument) {
-      try await fixture.map.setStyleUrl(url: "custom://a\0b.json")
+      try await fixture.map.setStyleUrl("custom://a\0b.json")
     }
     #expect(error?.status == .invalidArgument)
   }
@@ -150,7 +150,7 @@ import Testing
 
 @Test func callerSizedTextReturnsResultsLongerThanItsFirstStorage() throws {
   let zoom = try Maplibre.styleExpressionCreate(
-    expression: Data(#"["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"#
+    Data(#"["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"#
       .utf8)
   )
   #expect(try zoom.evaluate(inputs: StyleExpressionInputs(zoom: 5)) ==
@@ -159,7 +159,7 @@ import Testing
 
   // The result outgrows the runtime's first storage, so the call runs again.
   let text = Data(("\"" + String(repeating: "a", count: 1000) + "\"").utf8)
-  let long = try Maplibre.styleExpressionCreate(expression: text)
+  let long = try Maplibre.styleExpressionCreate(text)
   #expect(try long.evaluate() == text)
   long.close()
 }

@@ -25,9 +25,9 @@ def consumed(plan, owner, values):
                 f"Swift: {function.name}: release inputs require scoped ownership conversion"
             ]
         )
-    from .swift import checked, doc, native_call
+    from .swift import checked, doc, member_doc, native_call
 
-    documented = doc(values.bound, function.name)
+    documented = member_doc(values.bound, function.name)
     if len(plan.inputs) != 1:
         from .swift import camel, identifier
         from .swift_dynamic_values import encode

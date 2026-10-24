@@ -63,9 +63,8 @@ final class MapState {
 
     self.runtime = runtime
     self.map = map
-    _ = try await map.setStyleUrl(url:
-      "https://tiles.openfreemap.org/styles/bright")
-    _ = try await map.updateCamera(update: CameraUpdate(camera: CameraOptions(
+    _ = try await map.setStyleUrl("https://tiles.openfreemap.org/styles/bright")
+    _ = try await map.updateCamera(CameraUpdate(camera: CameraOptions(
       center: LatLng(latitude: 37.7749, longitude: -122.4194),
       zoom: 13,
       bearing: 12,
@@ -83,7 +82,7 @@ final class MapState {
   }
 
   func setGestureInProgress(_ inProgress: Bool) {
-    submit { [map] in _ = try await map.updateCamera(update: CameraUpdate(
+    submit { [map] in _ = try await map.updateCamera(CameraUpdate(
       camera: CameraOptions(),
       gesturePhase: inProgress ? .begin : .end
     )) }
@@ -94,26 +93,30 @@ final class MapState {
   }
 
   func moveBy(dx: Double, dy: Double) {
-    submit { [map] in _ = try await map.applyCameraDelta(delta:
-      CameraDelta(offset: ScreenPoint(x: dx, y: dy))) }
+    submit { [map] in
+      _ = try await map.applyCameraDelta(CameraDelta(offset: ScreenPoint(
+        x: dx,
+        y: dy
+      )))
+    }
   }
 
   func scaleBy(_ scale: Double, anchor: ScreenPoint) {
-    submit { [map] in _ = try await map.applyCameraDelta(delta: CameraDelta(
+    submit { [map] in _ = try await map.applyCameraDelta(CameraDelta(
       scale: scale,
       anchor: anchor
     )) }
   }
 
   func adjustBearing(delta: Double, anchor: ScreenPoint) {
-    submit { [map] in _ = try await map.applyCameraDelta(delta: CameraDelta(
+    submit { [map] in _ = try await map.applyCameraDelta(CameraDelta(
       bearing: delta,
       anchor: anchor
     )) }
   }
 
   func adjustPitch(delta: Double) {
-    submit { [map] in _ = try await map.applyCameraDelta(delta: CameraDelta(
+    submit { [map] in _ = try await map.applyCameraDelta(CameraDelta(
       pitch: delta
     )) }
   }
@@ -123,7 +126,7 @@ final class MapState {
   func zoomToNextStep(anchor: ScreenPoint, animation: AnimationOptions) {
     submit { [map] in
       let zoom = try map.getSnapshot().view.camera.zoom ?? 0
-      _ = try await map.applyCameraDelta(delta: CameraDelta(
+      _ = try await map.applyCameraDelta(CameraDelta(
         scale: pow(2.0, (zoom.rounded() + 1) - zoom),
         anchor: anchor,
         animation: animation

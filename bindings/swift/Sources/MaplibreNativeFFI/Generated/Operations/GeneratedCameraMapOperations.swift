@@ -9,7 +9,7 @@ public extension MapHandle {
   /// See `mln_map_apply_camera_delta` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
-  func applyCameraDelta(delta bindingArg0: CameraDelta) async throws
+  func applyCameraDelta(_ bindingArg0: CameraDelta) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -27,7 +27,7 @@ public extension MapHandle {
   /// See `mln_map_camera_for_geometry` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   func cameraForGeometry(
-    geometry bindingArg0: Data,
+    _ bindingArg0: Data,
     fitOptions bindingArg1: CameraFitOptions? = nil
   ) async throws -> CameraOptions {
     try await nativeStart(copying: CameraOptions
@@ -48,7 +48,7 @@ public extension MapHandle {
   /// See `mln_map_camera_for_lat_lng_bounds` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   func cameraForLatLngBounds(
-    bounds bindingArg0: LatLngBounds,
+    _ bindingArg0: LatLngBounds,
     fitOptions bindingArg1: CameraFitOptions? = nil
   ) async throws -> CameraOptions {
     try await nativeStart(copying: CameraOptions
@@ -92,7 +92,7 @@ public extension MapHandle {
   /// See `mln_map_cancel_camera_transition` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
-  func cancelCameraTransition(transitionId bindingArg0: UInt64) async throws
+  func cancelCameraTransition(_ bindingArg0: UInt64) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, _, completion, diagnostic in
@@ -153,7 +153,7 @@ public extension MapHandle {
   ///
   /// See `mln_map_lat_lng_bounds_for_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  func latLngBoundsForCamera(camera bindingArg0: CameraOptions) async throws
+  func latLngBoundsForCamera(_ bindingArg0: CameraOptions) async throws
     -> LatLngBounds
   {
     try await nativeStart(copying: LatLngBounds
@@ -172,9 +172,7 @@ public extension MapHandle {
   ///
   /// See `mln_map_lat_lng_bounds_for_camera_unwrapped` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  func latLngBoundsForCameraUnwrapped(
-    camera bindingArg0: CameraOptions
-  ) async throws
+  func latLngBoundsForCameraUnwrapped(_ bindingArg0: CameraOptions) async throws
     -> LatLngBounds
   {
     try await nativeStart(copying: LatLngBounds
@@ -212,7 +210,7 @@ public extension MapHandle {
   /// See `mln_map_set_debug_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
-  func setDebugOptions(options bindingArg0: MapDebugOption) async throws
+  func setDebugOptions(_ bindingArg0: MapDebugOption) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, _, completion, diagnostic in
@@ -230,7 +228,7 @@ public extension MapHandle {
   /// See `mln_map_set_free_camera_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
-  func setFreeCameraOptions(options bindingArg0: FreeCameraOptions) async throws
+  func setFreeCameraOptions(_ bindingArg0: FreeCameraOptions) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -248,7 +246,7 @@ public extension MapHandle {
   /// See `mln_map_set_projection_mode` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
-  func setProjectionMode(mode bindingArg0: ProjectionMode) async throws
+  func setProjectionMode(_ bindingArg0: ProjectionMode) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -266,7 +264,7 @@ public extension MapHandle {
   /// See `mln_map_set_rendering_stats_view_enabled` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
-  func setRenderingStatsViewEnabled(enabled bindingArg0: Bool) async throws
+  func setRenderingStatsViewEnabled(_ bindingArg0: Bool) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, _, completion, diagnostic in
@@ -284,7 +282,7 @@ public extension MapHandle {
   /// See `mln_map_set_tile_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
-  func setTileOptions(options bindingArg0: MapTileOptions) async throws
+  func setTileOptions(_ bindingArg0: MapTileOptions) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -302,7 +300,7 @@ public extension MapHandle {
   /// See `mln_map_set_viewport_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
-  func setViewportOptions(options bindingArg0: MapViewportOptions) async throws
+  func setViewportOptions(_ bindingArg0: MapViewportOptions) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -320,7 +318,7 @@ public extension MapHandle {
   /// See `mln_map_update_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
-  func updateCamera(update bindingArg0: CameraUpdate) async throws
+  func updateCamera(_ bindingArg0: CameraUpdate) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -335,7 +333,7 @@ public extension MapHandle {
 }
 
 public extension MapHandleDiscarding {
-  func applyCameraDelta(delta bindingArg0: CameraDelta) throws {
+  func applyCameraDelta(_ bindingArg0: CameraDelta) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in try mln_map_apply_camera_delta(
         raw,
@@ -345,7 +343,7 @@ public extension MapHandleDiscarding {
       ) }
   }
 
-  func cancelCameraTransition(transitionId bindingArg0: UInt64) throws {
+  func cancelCameraTransition(_ bindingArg0: UInt64) throws {
     try owner
       .nativeInvoke { raw, _, diagnostic in mln_map_cancel_camera_transition(
         raw,
@@ -380,7 +378,7 @@ public extension MapHandleDiscarding {
     ) }
   }
 
-  func setDebugOptions(options bindingArg0: MapDebugOption) throws {
+  func setDebugOptions(_ bindingArg0: MapDebugOption) throws {
     try owner.nativeInvoke { raw, _, diagnostic in mln_map_set_debug_options(
       raw,
       bindingArg0.nativeValue(),
@@ -389,7 +387,7 @@ public extension MapHandleDiscarding {
     ) }
   }
 
-  func setFreeCameraOptions(options bindingArg0: FreeCameraOptions) throws {
+  func setFreeCameraOptions(_ bindingArg0: FreeCameraOptions) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in mln_map_set_free_camera_options(
         raw,
@@ -399,7 +397,7 @@ public extension MapHandleDiscarding {
       ) }
   }
 
-  func setProjectionMode(mode bindingArg0: ProjectionMode) throws {
+  func setProjectionMode(_ bindingArg0: ProjectionMode) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in mln_map_set_projection_mode(
         raw,
@@ -409,7 +407,7 @@ public extension MapHandleDiscarding {
       ) }
   }
 
-  func setRenderingStatsViewEnabled(enabled bindingArg0: Bool) throws {
+  func setRenderingStatsViewEnabled(_ bindingArg0: Bool) throws {
     try owner
       .nativeInvoke { raw, _, diagnostic in
         mln_map_set_rendering_stats_view_enabled(
@@ -421,7 +419,7 @@ public extension MapHandleDiscarding {
       }
   }
 
-  func setTileOptions(options bindingArg0: MapTileOptions) throws {
+  func setTileOptions(_ bindingArg0: MapTileOptions) throws {
     try owner.nativeInvoke { raw, arena, diagnostic in mln_map_set_tile_options(
       raw,
       arena.store(bindingArg0.nativeValue()),
@@ -430,7 +428,7 @@ public extension MapHandleDiscarding {
     ) }
   }
 
-  func setViewportOptions(options bindingArg0: MapViewportOptions) throws {
+  func setViewportOptions(_ bindingArg0: MapViewportOptions) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in mln_map_set_viewport_options(
         raw,
@@ -440,7 +438,7 @@ public extension MapHandleDiscarding {
       ) }
   }
 
-  func updateCamera(update bindingArg0: CameraUpdate) throws {
+  func updateCamera(_ bindingArg0: CameraUpdate) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in try mln_map_update_camera(
         raw,

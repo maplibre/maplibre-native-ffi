@@ -8,9 +8,7 @@ public extension Maplibre {
   ///
   /// See `mln_lat_lng_for_projected_meters` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  static func latLngForProjectedMeters(
-    meters bindingArg0: ProjectedMeters
-  ) throws
+  static func latLngForProjectedMeters(_ bindingArg0: ProjectedMeters) throws
     -> LatLng
   {
     var value0 = mln_lat_lng()

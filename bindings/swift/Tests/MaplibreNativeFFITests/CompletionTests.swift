@@ -39,7 +39,7 @@ private struct ConversionFailure: Error {}
 @Test func discardedCommandsAreFencedAndSynchronousRejectionThrows(
 ) async throws {
   try await withMapFixture { fixture in
-    try fixture.map.discarding.setDebugOptions(options: .tileBorders)
+    try fixture.map.discarding.setDebugOptions(.tileBorders)
     // A later command on the same map completes after the discarded one.
     _ = try await fixture.map.requestRepaint()
     #expect(try fixture.map.getSnapshot().debugOptions == .tileBorders)
@@ -166,9 +166,9 @@ private struct ConversionFailure: Error {}
 /// diagnostic, and the generation it published.
 @Test func aFailedCommandThrowsItsStatusAndGeneration() async throws {
   try await withMapFixture { fixture in
-    let committed = try await fixture.map.setStyleJson(json: emptyStyle)
+    let committed = try await fixture.map.setStyleJson(emptyStyle)
     let error = await expectMaplibreError(.notFound) {
-      try await fixture.map.removeStyleSource(sourceId: "missing")
+      try await fixture.map.removeStyleSource("missing")
     }
     #expect(error?.diagnostic.isEmpty == false)
     #expect(error.map { $0.generation > committed.generation } == true)
@@ -233,7 +233,7 @@ private func generationsOfCommandsStarted(
   for index in 0 ..< 32 {
     let update = CameraUpdate(camera: CameraOptions(zoom: Double(index % 16)))
     let command: @MainActor () async throws -> CommandCompletion = {
-      try await map.updateCamera(update: update)
+      try await map.updateCamera(update)
     }
     if immediately,
        #available(macOS 26, iOS 26, macCatalyst 26, tvOS 26, *)

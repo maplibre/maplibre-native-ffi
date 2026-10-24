@@ -37,7 +37,7 @@ public extension Maplibre {
   /// See `mln_geojson_source_data_create` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   static func geojsonSourceDataCreate(
-    data bindingArg0: Data,
+    _ bindingArg0: Data,
     options bindingArg1: GeojsonSourceOptions? = nil
   ) throws -> GeojsonSourceDataHandle {
     var value0: mln_geojson_source_data = 0

@@ -64,12 +64,12 @@ final class MapState {
     self.runtime = runtime
     self.map = map
     if let styleJSON {
-      _ = try await map.setStyleJson(json: styleJSON)
+      _ = try await map.setStyleJson(styleJSON)
     } else {
-      _ = try await map.setStyleUrl(url:
-        "https://tiles.openfreemap.org/styles/bright")
+      _ = try await map
+        .setStyleUrl("https://tiles.openfreemap.org/styles/bright")
     }
-    _ = try await map.updateCamera(update: CameraUpdate(camera: CameraOptions(
+    _ = try await map.updateCamera(CameraUpdate(camera: CameraOptions(
       center: LatLng(latitude: 37.7749, longitude: -122.4194),
       zoom: 13.0,
       bearing: 12.0,
@@ -87,7 +87,7 @@ final class MapState {
   }
 
   func setGestureInProgress(_ inProgress: Bool) {
-    submit { [map] in _ = try await map.updateCamera(update: CameraUpdate(
+    submit { [map] in _ = try await map.updateCamera(CameraUpdate(
       camera: CameraOptions(),
       gesturePhase: inProgress ? .begin : .end
     )) }
@@ -98,7 +98,7 @@ final class MapState {
   }
 
   func moveBy(dx: Double, dy: Double, animation: AnimationOptions? = nil) {
-    submit { [map] in _ = try await map.applyCameraDelta(delta: CameraDelta(
+    submit { [map] in _ = try await map.applyCameraDelta(CameraDelta(
       offset: ScreenPoint(x: dx, y: dy),
       animation: animation ?? AnimationOptions()
     )) }
@@ -109,7 +109,7 @@ final class MapState {
     anchor: ScreenPoint,
     animation: AnimationOptions? = nil
   ) {
-    submit { [map] in _ = try await map.applyCameraDelta(delta: CameraDelta(
+    submit { [map] in _ = try await map.applyCameraDelta(CameraDelta(
       scale: scale,
       anchor: anchor,
       animation: animation ?? AnimationOptions()
@@ -123,7 +123,7 @@ final class MapState {
     pitch: Double? = nil,
     animation: AnimationOptions? = nil
   ) {
-    submit { [map] in _ = try await map.applyCameraDelta(delta: CameraDelta(
+    submit { [map] in _ = try await map.applyCameraDelta(CameraDelta(
       bearing: bearing,
       pitch: pitch,
       animation: animation ?? AnimationOptions()
@@ -131,7 +131,7 @@ final class MapState {
   }
 
   func resetOrientation(animation: AnimationOptions) {
-    submit { [map] in _ = try await map.updateCamera(update: CameraUpdate(
+    submit { [map] in _ = try await map.updateCamera(CameraUpdate(
       mode: .ease,
       camera: CameraOptions(bearing: 0, pitch: 0),
       animation: animation

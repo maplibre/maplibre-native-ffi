@@ -38,9 +38,8 @@ public extension RenderSessionHandle {
   /// Ends every frame demand that has not started with
   /// `MLN_RENDER_RESULT_NO_UPDATE` and completes after earlier driver work has
   /// finished. A running demand finishes its attempt and ends any wait for a
-  /// map
-  /// update or a free slot. After completion, a new frame demand is required to
-  /// render again.
+  /// map update or a free slot. After completion, a new frame demand is
+  /// required to render again.
   ///
   /// See `mln_render_session_barrier` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -209,13 +208,10 @@ public extension RenderSessionHandle {
 
   /// Starts an ordered logical resize of the driver and the map. The driver
   /// applies the extent in order with its other work, and later driver work
-  /// does
-  /// not wait for the map. The completion runs after both have applied it and
-  /// the
-  /// map has published its snapshot. Frames render once a map update matches
-  /// the
-  /// applied extent; static and tile maps publish that update for their next
-  /// still image.
+  /// does not wait for the map. The completion runs after both have applied it
+  /// and the map has published its snapshot. Frames render once a map update
+  /// matches the applied extent; static and tile maps publish that update for
+  /// their next still image.
   ///
   /// See `mln_render_session_resize` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -235,9 +231,8 @@ public extension RenderSessionHandle {
 
   /// Services every queued item for a caller-graphics-thread driver. The first
   /// successful service call fixes the session's graphics-thread identity;
-  /// later
-  /// calls from another native thread return `MLN_STATUS_WRONG_THREAD`. The
-  /// target context must be current. Core-worker sessions return
+  /// later calls from another native thread return `MLN_STATUS_WRONG_THREAD`.
+  /// The target context must be current. Core-worker sessions return
   /// `MLN_STATUS_INVALID_STATE`.
   ///
   /// See `mln_render_session_service_driver_work` in the

@@ -5,8 +5,7 @@ import Foundation
 
 public extension RenderSessionHandle {
   /// Reads back the latest frame of the session's owned texture as
-  /// premultiplied
-  /// RGBA8.
+  /// premultiplied RGBA8.
   ///
   /// See `mln_render_session_read_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).

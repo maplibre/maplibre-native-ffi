@@ -96,12 +96,11 @@ public extension MapProjectionHandle {
   }
 
   /// Reads the ground distance covered by one logical map pixel at a latitude
-  /// for
-  /// the helper camera zoom.
+  /// for the helper camera zoom.
   ///
   /// See `mln_map_projection_meters_per_pixel_at_latitude` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  func metersPerPixelAtLatitude(latitude bindingArg0: Double) throws -> Double {
+  func metersPerPixelAtLatitude(_ bindingArg0: Double) throws -> Double {
     var value0: Double = 0
     return try nativeInvoke { raw, _, diagnostic in
       mln_map_projection_meters_per_pixel_at_latitude(
@@ -163,7 +162,7 @@ public extension MapProjectionHandle {
   ///
   /// See `mln_map_projection_set_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  func setCamera(camera bindingArg0: CameraOptions) throws {
+  func setCamera(_ bindingArg0: CameraOptions) throws {
     try nativeInvoke { raw, arena, diagnostic in mln_map_projection_set_camera(
       raw,
       arena.store(bindingArg0.nativeValue()),

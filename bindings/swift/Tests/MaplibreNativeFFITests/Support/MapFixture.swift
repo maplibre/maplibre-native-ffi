@@ -78,11 +78,11 @@ final class MapFixture: Sendable {
     let events = EventCopies()
     do {
       try await runtime
-        .setEventHandler(handler: RuntimeEventHandler(callback: { batch in
+        .setEventHandler(RuntimeEventHandler(callback: { batch in
           events.receive(batch)
         }))
       try await runtime
-        .setResourceProvider(provider: denyingProvider(routes: routes))
+        .setResourceProvider(denyingProvider(routes: routes))
       let map = try await runtime
         .createMap(options: MapOptions(initialExtent: extent))
       return MapFixture(runtime: runtime, map: map, events: events)

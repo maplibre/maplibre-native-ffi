@@ -31,7 +31,7 @@ public extension Maplibre {
   ///
   /// See `mln_network_set_status` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  static func networkSetStatus(status bindingArg0: NetworkStatus) throws {
+  static func networkSetStatus(_ bindingArg0: NetworkStatus) throws {
     try nativeInvoke { _, _, diagnostic in mln_network_set_status(
       bindingArg0.nativeValue(),
       diagnostic

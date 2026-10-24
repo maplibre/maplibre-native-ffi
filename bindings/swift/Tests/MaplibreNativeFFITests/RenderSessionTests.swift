@@ -77,7 +77,7 @@ private func attachOwnedTextureSession(
   let graphics: TestGraphics
   let attachment: RenderSessionAttachment
   do {
-    try await fixture.map.setStyleJson(json: style)
+    try await fixture.map.setStyleJson(style)
     graphics = try TestGraphics()
     if graphics.backend == MLN_TEST_GRAPHICS_BACKEND_EGL {
       let host = RenderThread()
@@ -278,7 +278,7 @@ private func attachOwnedTextureSession(
     // A demand that waits for the style's first update wakes the thread when
     // the update arrives.
     try session.requestFrame(demand: FrameDemand(flags: [.ifNeeded], token: 1))
-    try await fixture.map.setStyleJson(json: redStyle)
+    try await fixture.map.setStyleJson(redStyle)
     #expect(try await session.awaitRenderedFrame()?.disposition == .rendered)
     let readback = try await session.readTexture()
     #expect(Array(readback.data.prefix(4)) == [255, 0, 0, 255])

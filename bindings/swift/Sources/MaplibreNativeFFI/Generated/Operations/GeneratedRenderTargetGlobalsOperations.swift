@@ -16,9 +16,7 @@ public extension Maplibre {
   ///
   /// See `mln_logical_extent_physical_size` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-  static func logicalExtentPhysicalSize(
-    extent bindingArg0: LogicalExtent
-  ) throws
+  static func logicalExtentPhysicalSize(_ bindingArg0: LogicalExtent) throws
     -> (width: UInt32, height: UInt32)
   {
     var value0: UInt32 = 0

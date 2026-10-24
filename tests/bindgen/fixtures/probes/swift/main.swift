@@ -29,7 +29,7 @@ if ProcessInfo.processInfo.environment["MLN_PROBE_C_VERSION"] != nil {
 
 // A record built from its initializer defaults equals the native default,
 // including its nested record.
-try Maplibre.probeSettingsCheck(settings: ProbeSettings())
+try Maplibre.probeSettingsCheck(ProbeSettings())
 
 let point = ProbePoint(type: 9.5, gain: 3.25)
 let input = ProbeOptions(
@@ -129,7 +129,7 @@ let batchPoints = [
   ProbeBatchPoint(x: -3, y: 17),
 ]
 try check(
-  Maplibre.probeBatchPoints(points: batchPoints) == [
+  Maplibre.probeBatchPoints(batchPoints) == [
     ProbeBatchPoint(x: 5, y: 3),
     ProbeBatchPoint(x: 11, y: 8),
     ProbeBatchPoint(x: 17, y: -2),
@@ -141,7 +141,7 @@ try check(
   "caller-sized scalars"
 )
 try check(
-  Maplibre.probeBatchPoints(points: []).isEmpty,
+  Maplibre.probeBatchPoints([]).isEmpty,
   "empty caller-sized points"
 )
 try check(

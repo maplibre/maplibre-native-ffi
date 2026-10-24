@@ -12,13 +12,13 @@ import Testing
     await #expect(processExitsWith: .success) {
       try Maplibre.logSetCallback(handler: LogHandler { _, _, _, _ in 1 })
       let runtime = try MapFixture.makeRuntime()
-      try await runtime.setResourceProvider(provider: denyingProvider(
+      try await runtime.setResourceProvider(denyingProvider(
         routes: ["custom://exit.json": emptyStyle]
       ))
       let map = try await runtime.createMap(options: MapOptions(
         initialExtent: LogicalExtent(width: 8, height: 8, scaleFactor: 1)
       ))
-      try await map.setStyleUrl(url: "custom://exit.json")
+      try await map.setStyleUrl("custom://exit.json")
       // Keeps both handles referenced through the exit, so that neither one's
       // deinit retires it first.
       withExtendedLifetime((runtime, map)) { exit(0) }

@@ -190,7 +190,7 @@ public extension MapHandle {
   /// See `mln_map_set_event_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   @discardableResult
-  func setEventMask(mask bindingArg0: RuntimeEventMask) async throws
+  func setEventMask(_ bindingArg0: RuntimeEventMask) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, _, completion, diagnostic in
@@ -228,7 +228,7 @@ public extension MapHandle {
   /// See `mln_map_set_style_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   @discardableResult
-  func setStyleJson(json bindingArg0: Data) async throws -> CommandCompletion {
+  func setStyleJson(_ bindingArg0: Data) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_style_json(
         raw,
@@ -244,7 +244,7 @@ public extension MapHandle {
   /// See `mln_map_set_style_url` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   @discardableResult
-  func setStyleUrl(url bindingArg0: String) async throws -> CommandCompletion {
+  func setStyleUrl(_ bindingArg0: String) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_style_url(
         raw,
@@ -302,7 +302,7 @@ public extension MapHandleDiscarding {
     ) }
   }
 
-  func setEventMask(mask bindingArg0: RuntimeEventMask) throws {
+  func setEventMask(_ bindingArg0: RuntimeEventMask) throws {
     try owner.nativeInvoke { raw, _, diagnostic in mln_map_set_event_mask(
       raw,
       bindingArg0.nativeValue(),
@@ -325,7 +325,7 @@ public extension MapHandleDiscarding {
       ) }
   }
 
-  func setStyleJson(json bindingArg0: Data) throws {
+  func setStyleJson(_ bindingArg0: Data) throws {
     try owner.nativeInvoke { raw, arena, diagnostic in mln_map_set_style_json(
       raw,
       arena.view(bindingArg0),
@@ -334,7 +334,7 @@ public extension MapHandleDiscarding {
     ) }
   }
 
-  func setStyleUrl(url bindingArg0: String) throws {
+  func setStyleUrl(_ bindingArg0: String) throws {
     try owner.nativeInvoke { raw, arena, diagnostic in mln_map_set_style_url(
       raw,
       arena.view(bindingArg0),

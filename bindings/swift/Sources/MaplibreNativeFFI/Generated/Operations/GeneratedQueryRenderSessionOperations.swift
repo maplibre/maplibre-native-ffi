@@ -6,8 +6,7 @@ import Foundation
 public extension RenderSessionHandle {
   /// Starts a feature-extension query against the latest driver state. The
   /// completion borrows one `mln_buffer_view` holding UTF-8 JSON (value_count
-  /// 1),
-  /// valid only for the callback.
+  /// 1), valid only for the callback.
   ///
   /// See `mln_render_session_query_feature_extensions` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -62,7 +61,7 @@ public extension RenderSessionHandle {
   /// See `mln_render_session_query_source_features` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
   func querySourceFeatures(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     options bindingArg1: SourceFeatureQueryOptions? = nil
   ) async throws -> [SourceFeature] {
     try await nativeStart(convert: { result in try NativeCompletion.values(

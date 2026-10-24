@@ -10,7 +10,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addCustomGeometrySource(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     options bindingArg1: CustomGeometrySourceOptions
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -30,7 +30,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addCustomMvtVectorSource(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     options bindingArg1: CustomMvtVectorSourceOptions
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -50,7 +50,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addGeojsonSourceData(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     data bindingArg1: GeojsonSourceDataHandle
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -70,7 +70,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addGeojsonSourceUrl(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     url bindingArg1: String,
     options bindingArg2: GeojsonSourceOptions? = nil
   ) async throws -> CommandCompletion {
@@ -92,7 +92,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addImageSourceImage(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     coordinates bindingArg1: [LatLng],
     image bindingArg3: PremultipliedRgba8Image
   ) async throws -> CommandCompletion {
@@ -115,7 +115,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addImageSourceUrl(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     coordinates bindingArg1: [LatLng],
     url bindingArg3: String
   ) async throws -> CommandCompletion {
@@ -138,7 +138,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addStyleLayerJson(
-    layerJson bindingArg0: Data,
+    _ bindingArg0: Data,
     beforeLayerId bindingArg1: String? = nil
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -158,7 +158,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addStyleSourceJson(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     sourceJson bindingArg1: Data
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -191,7 +191,7 @@ public extension MapHandle {
   ///
   /// See `mln_map_get_image_source_coordinates` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func getImageSourceCoordinates(sourceId bindingArg0: String) async throws
+  func getImageSourceCoordinates(_ bindingArg0: String) async throws
     -> [LatLng]
   {
     try await nativeStart(convert: { result in try NativeCompletion.values(
@@ -212,9 +212,7 @@ public extension MapHandle {
   ///
   /// See `mln_map_get_style_image` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func getStyleImage(imageId bindingArg0: String) async throws
-    -> StyleImageInfo?
-  {
+  func getStyleImage(_ bindingArg0: String) async throws -> StyleImageInfo? {
     try await nativeStart(convert: { result in
       if result.pointee
         .value_count ==
@@ -237,9 +235,7 @@ public extension MapHandle {
   ///
   /// See `mln_map_get_style_layer` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func getStyleLayer(layerId bindingArg0: String) async throws
-    -> StyleLayerInfo?
-  {
+  func getStyleLayer(_ bindingArg0: String) async throws -> StyleLayerInfo? {
     try await nativeStart(convert: { result in
       if result.pointee
         .value_count ==
@@ -262,7 +258,7 @@ public extension MapHandle {
   ///
   /// See `mln_map_get_style_layer_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func getStyleLayerJson(layerId bindingArg0: String) async throws -> Data? {
+  func getStyleLayerJson(_ bindingArg0: String) async throws -> Data? {
     try await nativeStart(convert: { result in
       if result.pointee
         .value_count == 0
@@ -283,7 +279,7 @@ public extension MapHandle {
   /// See `mln_map_get_style_layer_property` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func getStyleLayerProperty(
-    layerId bindingArg0: String,
+    _ bindingArg0: String,
     propertyName bindingArg1: String
   ) async throws -> Data? {
     try await nativeStart(convert: { result in
@@ -308,9 +304,7 @@ public extension MapHandle {
   ///
   /// See `mln_map_get_style_light_property` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func getStyleLightProperty(propertyName bindingArg0: String) async throws
-    -> Data?
-  {
+  func getStyleLightProperty(_ bindingArg0: String) async throws -> Data? {
     try await nativeStart(convert: { result in
       if result.pointee
         .value_count == 0
@@ -332,9 +326,7 @@ public extension MapHandle {
   ///
   /// See `mln_map_get_style_source` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func getStyleSource(sourceId bindingArg0: String) async throws
-    -> StyleSourceInfo?
-  {
+  func getStyleSource(_ bindingArg0: String) async throws -> StyleSourceInfo? {
     try await nativeStart(convert: { result in
       if result.pointee
         .value_count ==
@@ -375,7 +367,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func invalidateCustomGeometrySourceRegion(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     bounds bindingArg1: LatLngBounds
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -395,7 +387,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func invalidateCustomGeometrySourceTile(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -415,7 +407,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func invalidateCustomMvtVectorSourceTile(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -467,7 +459,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func moveStyleLayer(
-    layerId bindingArg0: String,
+    _ bindingArg0: String,
     beforeLayerId bindingArg1: String? = nil
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -486,7 +478,7 @@ public extension MapHandle {
   /// See `mln_map_remove_style_image` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
-  func removeStyleImage(imageId bindingArg0: String) async throws
+  func removeStyleImage(_ bindingArg0: String) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -504,7 +496,7 @@ public extension MapHandle {
   /// See `mln_map_remove_style_layer` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
-  func removeStyleLayer(layerId bindingArg0: String) async throws
+  func removeStyleLayer(_ bindingArg0: String) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -522,7 +514,7 @@ public extension MapHandle {
   /// See `mln_map_remove_style_source` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
-  func removeStyleSource(sourceId bindingArg0: String) async throws
+  func removeStyleSource(_ bindingArg0: String) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -541,7 +533,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setCustomGeometrySourceTileData(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId,
     data bindingArg2: Data
   ) async throws -> CommandCompletion {
@@ -563,7 +555,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setCustomGeometrySourceTileError(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId,
     message bindingArg2: String
   ) async throws -> CommandCompletion {
@@ -585,7 +577,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setCustomMvtVectorSourceTileData(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId,
     data bindingArg2: Data
   ) async throws -> CommandCompletion {
@@ -607,7 +599,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setCustomMvtVectorSourceTileError(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId,
     message bindingArg2: String
   ) async throws -> CommandCompletion {
@@ -629,7 +621,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setGeojsonSourceData(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     data bindingArg1: GeojsonSourceDataHandle
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -649,7 +641,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setGeojsonSourceSynchronousTiling(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     enabled bindingArg1: Bool
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -669,7 +661,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setGeojsonSourceUrl(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     url bindingArg1: String
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -689,7 +681,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setGlobalStateProperty(
-    propertyName bindingArg0: String,
+    _ bindingArg0: String,
     value bindingArg1: Data
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -709,7 +701,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setImageSourceCoordinates(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     coordinates bindingArg1: [LatLng]
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -730,7 +722,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setImageSourceImage(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     image bindingArg1: PremultipliedRgba8Image
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -749,10 +741,10 @@ public extension MapHandle {
   /// See `mln_map_set_image_source_url` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
-  func setImageSourceUrl(
-    sourceId bindingArg0: String,
-    url bindingArg1: String
-  ) async throws -> CommandCompletion {
+  func setImageSourceUrl(_ bindingArg0: String,
+                         url bindingArg1: String) async throws
+    -> CommandCompletion
+  {
     try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_image_source_url(
         raw,
@@ -770,7 +762,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setStyleImage(
-    imageId bindingArg0: String,
+    _ bindingArg0: String,
     image bindingArg1: PremultipliedRgba8Image,
     options bindingArg2: StyleImageOptions? = nil
   ) async throws -> CommandCompletion {
@@ -792,7 +784,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setStyleLayerProperty(
-    layerId bindingArg0: String,
+    _ bindingArg0: String,
     propertyName bindingArg1: String,
     value bindingArg2: Data
   ) async throws -> CommandCompletion {
@@ -813,7 +805,7 @@ public extension MapHandle {
   /// See `mln_map_set_style_light_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
-  func setStyleLightJson(lightJson bindingArg0: Data) async throws
+  func setStyleLightJson(_ bindingArg0: Data) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -832,7 +824,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setStyleLightProperty(
-    propertyName bindingArg0: String,
+    _ bindingArg0: String,
     value bindingArg1: Data
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -853,7 +845,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setStyleSourceVolatile(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     isVolatile bindingArg1: Bool
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -873,7 +865,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setStyleTransitionOptions(
-    options bindingArg0: StyleTransitionOptions
+    _ bindingArg0: StyleTransitionOptions
   ) async throws
     -> CommandCompletion
   {
@@ -890,7 +882,7 @@ public extension MapHandle {
 
 public extension MapHandleDiscarding {
   func addCustomGeometrySource(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     options bindingArg1: CustomGeometrySourceOptions
   ) throws {
     try owner
@@ -906,7 +898,7 @@ public extension MapHandleDiscarding {
   }
 
   func addCustomMvtVectorSource(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     options bindingArg1: CustomMvtVectorSourceOptions
   ) throws {
     try owner
@@ -922,7 +914,7 @@ public extension MapHandleDiscarding {
   }
 
   func addGeojsonSourceData(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     data bindingArg1: GeojsonSourceDataHandle
   ) throws {
     try owner
@@ -936,7 +928,7 @@ public extension MapHandleDiscarding {
   }
 
   func addGeojsonSourceUrl(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     url bindingArg1: String,
     options bindingArg2: GeojsonSourceOptions? = nil
   ) throws {
@@ -954,7 +946,7 @@ public extension MapHandleDiscarding {
   }
 
   func addImageSourceImage(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     coordinates bindingArg1: [LatLng],
     image bindingArg3: PremultipliedRgba8Image
   ) throws {
@@ -973,7 +965,7 @@ public extension MapHandleDiscarding {
   }
 
   func addImageSourceUrl(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     coordinates bindingArg1: [LatLng],
     url bindingArg3: String
   ) throws {
@@ -992,7 +984,7 @@ public extension MapHandleDiscarding {
   }
 
   func addStyleLayerJson(
-    layerJson bindingArg0: Data,
+    _ bindingArg0: Data,
     beforeLayerId bindingArg1: String? = nil
   ) throws {
     try owner
@@ -1006,7 +998,7 @@ public extension MapHandleDiscarding {
   }
 
   func addStyleSourceJson(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     sourceJson bindingArg1: Data
   ) throws {
     try owner
@@ -1020,7 +1012,7 @@ public extension MapHandleDiscarding {
   }
 
   func invalidateCustomGeometrySourceRegion(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     bounds bindingArg1: LatLngBounds
   ) throws {
     try owner
@@ -1036,7 +1028,7 @@ public extension MapHandleDiscarding {
   }
 
   func invalidateCustomGeometrySourceTile(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId
   ) throws {
     try owner
@@ -1052,7 +1044,7 @@ public extension MapHandleDiscarding {
   }
 
   func invalidateCustomMvtVectorSourceTile(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId
   ) throws {
     try owner
@@ -1068,7 +1060,7 @@ public extension MapHandleDiscarding {
   }
 
   func moveStyleLayer(
-    layerId bindingArg0: String,
+    _ bindingArg0: String,
     beforeLayerId bindingArg1: String? = nil
   ) throws {
     try owner.nativeInvoke { raw, arena, diagnostic in mln_map_move_style_layer(
@@ -1080,7 +1072,7 @@ public extension MapHandleDiscarding {
     ) }
   }
 
-  func removeStyleImage(imageId bindingArg0: String) throws {
+  func removeStyleImage(_ bindingArg0: String) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in mln_map_remove_style_image(
         raw,
@@ -1090,7 +1082,7 @@ public extension MapHandleDiscarding {
       ) }
   }
 
-  func removeStyleLayer(layerId bindingArg0: String) throws {
+  func removeStyleLayer(_ bindingArg0: String) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in mln_map_remove_style_layer(
         raw,
@@ -1100,7 +1092,7 @@ public extension MapHandleDiscarding {
       ) }
   }
 
-  func removeStyleSource(sourceId bindingArg0: String) throws {
+  func removeStyleSource(_ bindingArg0: String) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in mln_map_remove_style_source(
         raw,
@@ -1111,7 +1103,7 @@ public extension MapHandleDiscarding {
   }
 
   func setCustomGeometrySourceTileData(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId,
     data bindingArg2: Data
   ) throws {
@@ -1129,7 +1121,7 @@ public extension MapHandleDiscarding {
   }
 
   func setCustomGeometrySourceTileError(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId,
     message bindingArg2: String
   ) throws {
@@ -1147,7 +1139,7 @@ public extension MapHandleDiscarding {
   }
 
   func setCustomMvtVectorSourceTileData(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId,
     data bindingArg2: Data
   ) throws {
@@ -1165,7 +1157,7 @@ public extension MapHandleDiscarding {
   }
 
   func setCustomMvtVectorSourceTileError(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId,
     message bindingArg2: String
   ) throws {
@@ -1183,7 +1175,7 @@ public extension MapHandleDiscarding {
   }
 
   func setGeojsonSourceData(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     data bindingArg1: GeojsonSourceDataHandle
   ) throws {
     try owner
@@ -1197,7 +1189,7 @@ public extension MapHandleDiscarding {
   }
 
   func setGeojsonSourceSynchronousTiling(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     enabled bindingArg1: Bool
   ) throws {
     try owner
@@ -1213,7 +1205,7 @@ public extension MapHandleDiscarding {
   }
 
   func setGeojsonSourceUrl(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     url bindingArg1: String
   ) throws {
     try owner
@@ -1227,7 +1219,7 @@ public extension MapHandleDiscarding {
   }
 
   func setGlobalStateProperty(
-    propertyName bindingArg0: String,
+    _ bindingArg0: String,
     value bindingArg1: Data
   ) throws {
     try owner
@@ -1243,7 +1235,7 @@ public extension MapHandleDiscarding {
   }
 
   func setImageSourceCoordinates(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     coordinates bindingArg1: [LatLng]
   ) throws {
     try owner
@@ -1260,7 +1252,7 @@ public extension MapHandleDiscarding {
   }
 
   func setImageSourceImage(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     image bindingArg1: PremultipliedRgba8Image
   ) throws {
     try owner
@@ -1275,10 +1267,9 @@ public extension MapHandleDiscarding {
       }
   }
 
-  func setImageSourceUrl(
-    sourceId bindingArg0: String,
-    url bindingArg1: String
-  ) throws {
+  func setImageSourceUrl(_ bindingArg0: String,
+                         url bindingArg1: String) throws
+  {
     try owner
       .nativeInvoke { raw, arena, diagnostic in mln_map_set_image_source_url(
         raw,
@@ -1290,7 +1281,7 @@ public extension MapHandleDiscarding {
   }
 
   func setStyleImage(
-    imageId bindingArg0: String,
+    _ bindingArg0: String,
     image bindingArg1: PremultipliedRgba8Image,
     options bindingArg2: StyleImageOptions? = nil
   ) throws {
@@ -1306,7 +1297,7 @@ public extension MapHandleDiscarding {
   }
 
   func setStyleLayerProperty(
-    layerId bindingArg0: String,
+    _ bindingArg0: String,
     propertyName bindingArg1: String,
     value bindingArg2: Data
   ) throws {
@@ -1323,7 +1314,7 @@ public extension MapHandleDiscarding {
       }
   }
 
-  func setStyleLightJson(lightJson bindingArg0: Data) throws {
+  func setStyleLightJson(_ bindingArg0: Data) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in mln_map_set_style_light_json(
         raw,
@@ -1334,7 +1325,7 @@ public extension MapHandleDiscarding {
   }
 
   func setStyleLightProperty(
-    propertyName bindingArg0: String,
+    _ bindingArg0: String,
     value bindingArg1: Data
   ) throws {
     try owner
@@ -1350,7 +1341,7 @@ public extension MapHandleDiscarding {
   }
 
   func setStyleSourceVolatile(
-    sourceId bindingArg0: String,
+    _ bindingArg0: String,
     isVolatile bindingArg1: Bool
   ) throws {
     try owner
@@ -1365,9 +1356,7 @@ public extension MapHandleDiscarding {
       }
   }
 
-  func setStyleTransitionOptions(
-    options bindingArg0: StyleTransitionOptions
-  ) throws {
+  func setStyleTransitionOptions(_ bindingArg0: StyleTransitionOptions) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in
         mln_map_set_style_transition_options(

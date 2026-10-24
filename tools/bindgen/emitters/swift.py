@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -45,6 +46,20 @@ def name(value: str) -> str:
     return "".join(part[:1].upper() + part[1:] for part in value.split("_"))
 
 
+def words(text: str) -> list[str]:
+    return [word.lower() for word in re.findall(r"[A-Z]?[a-z]+|[A-Z]+|\d+", text)]
+
+
+def repeats(method: str, label: str) -> bool:
+    """Whether a first argument label only repeats words of its method's name,
+    as `setStyleUrl(url:)` and `deleteOfflineRegion(regionId:)` do. A trailing
+    `Id` or `Name` names the key of what the method already names."""
+    named = words(label)
+    while len(named) > 1 and named[-1] in {"id", "name"}:
+        named.pop()
+    return set(named) <= set(words(method))
+
+
 def native(type_: CType) -> str:
     return type_.declaration or type_.spelling.removeprefix("const ")
 
@@ -68,6 +83,12 @@ def unsupported(function: Function | Record, detail: str) -> ModelError:
 def doc(bound: BoundApi, native: str, indent: str = "") -> str:
     """The DocC comment of a declaration, or empty when it has none."""
     return docs.line_comment(bound.doc(native), indent)
+
+
+def member_doc(bound: BoundApi, native: str) -> str:
+    """The DocC comment of an operation, which `render` places in an extension
+    and so wraps at the member indent."""
+    return doc(bound, native, "  ")
 
 
 def operation(
@@ -103,7 +124,7 @@ def operation(
         from .swift_views import operation as view_operation
 
         code, view_owner = view_operation(plan, value_types)
-        return doc(value_types.bound, function.name) + code, view_owner
+        return member_doc(value_types.bound, function.name) + code, view_owner
     if plan.consumes:
         from .swift_ownership import consumed
 
@@ -145,9 +166,18 @@ def operation(
         else {}
     )
     output_names = {parameter.name for parameter in plan.outputs}
+    method = camel(plan.member)
     for parameter_index, param in enumerate(params):
         local = f"bindingArg{parameter_index}"
-        label = identifier(camel(param.name)) + " " + local
+        label = (
+            (
+                "_"
+                if not declarations and repeats(method, camel(param.name))
+                else identifier(camel(param.name))
+            )
+            + " "
+            + local
+        )
         value_plan = input_plans.get(param.name)
         if param.name in text_arguments:
             arguments.append(text_arguments[param.name])
@@ -228,7 +258,7 @@ def operation(
     call = native_call(function, *args)
     if "try " in call:
         call = "try " + call
-    doc_comment = doc(value_types.bound, function.name)
+    doc_comment = member_doc(value_types.bound, function.name)
     modifier = "" if receiver else "static "
     target = ""
     if plan.scoped_receiver:

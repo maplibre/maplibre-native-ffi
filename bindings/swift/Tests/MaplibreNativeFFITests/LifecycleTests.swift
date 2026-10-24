@@ -7,13 +7,13 @@ import Testing
 @Test func synchronousCloseIsIdempotentAndAsyncReleaseReachesNative(
 ) async throws {
   try await withMapFixture { fixture in
-    try await fixture.map.setStyleJson(json: emptyStyle)
+    try await fixture.map.setStyleJson(emptyStyle)
     let data = try Maplibre.geojsonSourceDataCreate(
-      data: Data(#"{"type":"FeatureCollection","features":[]}"#.utf8)
+      Data(#"{"type":"FeatureCollection","features":[]}"#.utf8)
     )
     let other = try Maplibre
       .geojsonSourceDataCreate(
-        data: Data(#"{"type":"FeatureCollection","features":[]}"#
+        Data(#"{"type":"FeatureCollection","features":[]}"#
           .utf8)
       )
     #expect(Set([data, data, other]).count == 2)
@@ -22,7 +22,7 @@ import Testing
     other.close()
 
     let error = await expectMaplibreError(.invalidState) {
-      try await fixture.map.addGeojsonSourceData(sourceId: "late", data: data)
+      try await fixture.map.addGeojsonSourceData("late", data: data)
     }
     #expect(error?.status == .invalidState)
     try await fixture.map.close()
@@ -38,7 +38,7 @@ import Testing
 /// names the handle in its description.
 @Test func aHandleIdNamesItsEventsAndOutlivesClose() async throws {
   try await withMapFixture { fixture in
-    try await fixture.map.setStyleJson(json: emptyStyle)
+    try await fixture.map.setStyleJson(emptyStyle)
     let loaded = try await fixture.awaitEvent("the style load") {
       $0.type == .mapStyleLoaded
     }
@@ -76,7 +76,7 @@ import Testing
   ))
   runtime = nil
   #expect(weakRuntime != nil)
-  _ = try await map?.setStyleJson(json: emptyStyle)
+  _ = try await map?.setStyleJson(emptyStyle)
 
   try await map?.close()
   map = nil

@@ -8,7 +8,7 @@ import Testing
   try await withMapFixture { fixture in
     let native = await expectMaplibreError(.invalidArgument) {
       try fixture.runtime
-        .setEventMask(mask: RuntimeEventMask(rawValue: 1 << 63))
+        .setEventMask(RuntimeEventMask(rawValue: 1 << 63))
     }
     #expect(native?.status == .invalidArgument)
     #expect(native?.diagnostic.isEmpty == false)
