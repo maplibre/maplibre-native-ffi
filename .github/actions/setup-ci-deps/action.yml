@@ -438,7 +438,7 @@ runs:
           ${{ steps.toolchain-key.outputs.prefix }}-
 
     # Windows stays on mise 2026.8.2 for the Flutter zip extract (#844). That
-    # release does not verify github-attestations provenance that 2026.10.13
+    # release does not verify github-attestations provenance that 2026.10.18
     # records in mise.lock (aqua:dprint/dprint@0.63.0). Skip the lockfile on
     # Windows, and do not let mise-action pass --locked (it conflicts with
     # lockfile=false). Unix keeps lockfile installs.
@@ -459,7 +459,7 @@ runs:
         # error 5) on a toolchain-cache miss. 2026.8.2 extracts the same
         # Flutter 3.44.8 zip into http-tarballs and succeeds on the same
         # windows-2022 image (#844).
-        version: ${{ runner.os == 'Windows' && '2026.8.2' || '2026.10.13' }}
+        version: ${{ runner.os == 'Windows' && '2026.8.2' || '2026.10.18' }}
         cache: false
         # Unix: mise-action runs locked bootstrap. Windows: install the mise
         # binary only; the next step bootstraps without --locked.
