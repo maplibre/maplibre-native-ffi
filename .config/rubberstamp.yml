@@ -105,12 +105,11 @@ ci:
     `cmake/platform/`, render backends, SDK setup, or packaging. A test change
     matters only to units that run that suite. The workflows are generated from
     `ci/`, so changing a unit's generated jobs puts it at risk. Windows runs
-    shared scripts differently, with an older mise without the lockfile, Git
-    Bash, and MSVC, and a tool configured for only some operating systems puts
-    those at risk. Release workflows don't run on pull requests. Hygiene always
-    runs formatting, lint, generated-code checks, and the tests for `ci/`. Main
-    runs every unit after merge, so a pull request needs only the coverage a
-    reviewer would expect.
+    shared scripts differently, with Git Bash and MSVC, and a tool configured
+    for only some operating systems puts those at risk. Release workflows don't
+    run on pull requests. Hygiene always runs formatting, lint, generated-code
+    checks, and the tests for `ci/`. Main runs every unit after merge, so a pull
+    request needs only the coverage a reviewer would expect.
   units:
     docs:
       covers: >-
@@ -193,6 +192,7 @@ ci:
         - cmake/platform/windows.cmake
         - mise.windows.toml
         - .github/actions/setup-windows-*
+        - .github/actions/setup-ci-deps/*
         - third_party/maplibre-native
     windows-arm64:
       covers: >-
