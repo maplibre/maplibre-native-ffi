@@ -407,7 +407,12 @@ runs:
       id: toolchain-key
       shell: bash
       run: |
-        prefix="toolchains-v1-${{ runner.os }}-${{ runner.arch }}-${ImageOS:-unknown}"
+        # DO NOT MERGE: force a Windows toolchain cache miss so CI extracts http:flutter.
+        if [ "${{ runner.os }}" = "Windows" ]; then
+          prefix="toolchains-v1-flutter-cachebust-${{ runner.os }}-${{ runner.arch }}-${ImageOS:-unknown}"
+        else
+          prefix="toolchains-v1-${{ runner.os }}-${{ runner.arch }}-${ImageOS:-unknown}"
+        fi
         echo "prefix=${prefix}" >> "$GITHUB_OUTPUT"
         echo "key=${prefix}-${{ hashFiles('mise.toml', 'mise.lock', 'mise.linux.toml', 'mise.macos.toml', 'mise.windows.toml', 'mise.android.toml', 'mise.android.lock', 'mise.emscripten.toml', 'mise.emscripten.lock', 'mise.ohos.toml', 'mise.ohos.lock', 'bindings/*/mise.toml', 'examples/*/mise.toml', 'docs/mise.toml') }}" >> "$GITHUB_OUTPUT"
 
