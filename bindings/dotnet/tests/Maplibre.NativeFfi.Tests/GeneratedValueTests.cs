@@ -71,26 +71,21 @@ public sealed class GeneratedValueTests
         await using var fixture = await NativeFixture.WithEmptyStyleAsync();
 
         // A source ID crosses as an explicit-length view, so an embedded NUL is part of the ID.
-        var added = await fixture.Map.AddStyleSourceJsonAsync(
-            "before\0after",
-            EmptyGeoJsonSource,
-            TestWaits.Token
-        );
+        var added = await fixture.Map.AddStyleSourceJsonAsync("before\0after", EmptyGeoJsonSource);
         Assert.Equal(CommandDisposition.Committed, added.Disposition);
-        Assert.NotNull(await fixture.Map.GetStyleSourceAsync("before\0after", TestWaits.Token));
-        Assert.Null(await fixture.Map.GetStyleSourceAsync("before", TestWaits.Token));
+        Assert.NotNull(await fixture.Map.GetStyleSourceAsync("before\0after"));
+        Assert.Null(await fixture.Map.GetStyleSourceAsync("before"));
 
         // An omitted optional ID crosses as the empty view, which appends the layer.
         var appended = await fixture.Map.AddStyleLayerJsonAsync(
-            """{"id":"last","type":"background"}"""u8.ToArray(),
-            cancellationToken: TestWaits.Token
+            """{"id":"last","type":"background"}"""u8.ToArray()
         );
         Assert.Equal(CommandDisposition.Committed, appended.Disposition);
 
         // Native rejects a NUL in a URL view before a C-string consumer reads it.
         var error = Assert.Throws<MaplibreException>(() =>
         {
-            _ = fixture.Map.SetStyleUrlAsync("style\0.json", TestWaits.Token);
+            _ = fixture.Map.SetStyleUrlAsync("style\0.json");
         });
         Assert.Contains("embedded NUL", error.Diagnostic, StringComparison.Ordinal);
         Assert.Equal(Status.InvalidArgument, error.Status);
@@ -105,18 +100,16 @@ public sealed class GeneratedValueTests
             CameraUpdate.Default with
             {
                 Camera = new CameraOptions { Center = new LatLng(10, 20), Zoom = 3 },
-            },
-            TestWaits.Token
+            }
         );
         // Only the bearing is present, so the center and zoom stay as they were.
         await fixture.Map.UpdateCameraAsync(
             CameraUpdate.Default with
             {
                 Camera = new CameraOptions { Bearing = 30 },
-            },
-            TestWaits.Token
+            }
         );
-        var camera = (await fixture.Map.GetCameraAsync(TestWaits.Token)).Camera;
+        var camera = (await fixture.Map.GetCameraAsync()).Camera;
 
         Assert.NotNull(camera.Center);
         Assert.Equal(10, camera.Center.Value.Latitude, 6);

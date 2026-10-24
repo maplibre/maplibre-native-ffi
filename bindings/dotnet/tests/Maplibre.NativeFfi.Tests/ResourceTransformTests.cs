@@ -73,10 +73,9 @@ public sealed class ResourceTransformTests
                     else
                         request.Dispose();
                 }
-            ),
-            TestWaits.Token
+            )
         );
-        await fixture.Map.SetStyleUrlAsync(styleUrl, TestWaits.Token);
+        await fixture.Map.SetStyleUrlAsync(styleUrl);
         var request = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
 
         await Task.Run(() =>
@@ -86,6 +85,6 @@ public sealed class ResourceTransformTests
         });
         // The online source cannot load the rewritten scheme.
         await fixture.WaitForMapEventAsync(RuntimeEventType.MapLoadingFailed);
-        await fixture.Runtime.ClearResourceTransformAsync(TestWaits.Token);
+        await fixture.Runtime.ClearResourceTransformAsync();
     }
 }

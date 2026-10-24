@@ -12,7 +12,7 @@ public sealed class CompletionTests
         await using var fixture = await NativeFixture.CreateAsync();
         fixture.Map.Discarding.SetDebugOptions(MapDebugOption.TileBorders);
         // A later command on the same map completes after the discarded one.
-        await fixture.Map.RequestRepaintAsync(TestWaits.Token);
+        await fixture.Map.RequestRepaintAsync();
         Assert.Equal(MapDebugOption.TileBorders, fixture.Map.GetSnapshot().DebugOptions);
         Assert.Throws<MaplibreException>(() =>
             fixture.Map.Discarding.Resize(
@@ -146,7 +146,7 @@ public sealed class CompletionTests
     {
         await using var fixture = await NativeFixture.WithEmptyStyleAsync();
 
-        var completion = await fixture.Map.RemoveStyleSourceAsync("missing", TestWaits.Token);
+        var completion = await fixture.Map.RemoveStyleSourceAsync("missing");
 
         Assert.Equal(CommandDisposition.Failed, completion.Disposition);
         Assert.Equal((int)Status.NotFound, completion.RawStatus);
@@ -154,7 +154,8 @@ public sealed class CompletionTests
     }
 
     // A still image on a static map with no session stays pending until the map closes, so every
-    // outcome below comes from the wait rather than from native.
+    // outcome below comes from the wait rather than from native. A caller abandons a wait with
+    // WaitAsync, and only a creation takes a token, so the binding can dispose its late map.
     [Fact]
     public async Task AWaitCanTimeOutOrBeCancelled()
     {
@@ -165,15 +166,18 @@ public sealed class CompletionTests
             }
         );
         using var cancellation = new CancellationTokenSource();
-        var stillImage = fixture.Map.RequestStillImageAsync(cancellation.Token);
+        cancellation.Cancel();
+        var stillImage = fixture.Map.RequestStillImageAsync();
 
         await Assert.ThrowsAsync<TimeoutException>(() =>
             stillImage.WaitAsync(TimeSpan.Zero, TestWaits.Token)
         );
-        cancellation.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => stillImage);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            stillImage.WaitAsync(cancellation.Token)
+        );
 
         // The native request is still outstanding, and closing the map retires it.
+        Assert.False(stillImage.IsCompleted);
         await fixture.Map.CloseAsync();
 
         // Native creates this map although its wait ended before submission.
@@ -182,7 +186,7 @@ public sealed class CompletionTests
         // Runtime release refuses a runtime that still owns a map, so it succeeds only because
         // the binding disposed the map that arrived after the wait. The creation runs on the
         // worker before a later runtime command completes.
-        await fixture.Runtime.ClearResourceTransformAsync(TestWaits.Token);
+        await fixture.Runtime.ClearResourceTransformAsync();
         await fixture.Runtime.CloseAsync().WaitAsync(TestWaits.Deadline, TestWaits.Token);
     }
 

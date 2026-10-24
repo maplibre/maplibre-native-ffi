@@ -94,7 +94,6 @@ internal static unsafe class NativeCompletion
     /// <summary>Starts a command completion, which reports a failure as its disposition.</summary>
     internal static mln_completion* StartCommand(
         mln_completion* completion,
-        CancellationToken cancellationToken,
         out Pending<CommandCompletion> pending
     ) =>
         Start(
@@ -106,7 +105,7 @@ internal static unsafe class NativeCompletion
                 result->status,
                 ValueStructs.CopyUtf8View(result->diagnostic)
             ),
-            cancellationToken,
+            CancellationToken.None,
             out pending,
             acceptErrorStatus: true
         );
@@ -114,9 +113,15 @@ internal static unsafe class NativeCompletion
     /// <summary>Starts a completion that carries no value.</summary>
     internal static mln_completion* StartUnit(
         mln_completion* completion,
-        CancellationToken cancellationToken,
         out Pending<bool> pending
-    ) => Start(completion, static _ => true, cancellationToken, out pending);
+    ) => Start(completion, static _ => true, out pending);
+
+    /// <summary>Starts a completion whose value <paramref name="convert"/> copies.</summary>
+    internal static mln_completion* Start<T>(
+        mln_completion* completion,
+        CompletionConverter<T> convert,
+        out Pending<T> pending
+    ) => Start(completion, convert, CancellationToken.None, out pending);
 
     /// <summary>
     /// Fills <paramref name="completion"/> for one native call and returns it.
@@ -124,10 +129,11 @@ internal static unsafe class NativeCompletion
     /// </summary>
     /// <remarks>
     /// A generated call starts its completion as the last argument that can
-    /// throw, so a started completion always reaches its submission. Cancelling
-    /// <paramref name="cancellationToken"/> cancels the task, not the native
-    /// work, which continues to its terminal disposition. A value that arrives
-    /// after cancellation has no receiver, so a disposable one is disposed.
+    /// throw, so a started completion always reaches its submission. Only a
+    /// call that delivers an owner takes a token: cancelling it cancels the
+    /// task, not the native work, and the binding disposes an owner that
+    /// arrives after cancellation, which a caller's own <c>WaitAsync</c> would
+    /// leave to the finalizer.
     /// </remarks>
     internal static mln_completion* Start<T>(
         mln_completion* completion,

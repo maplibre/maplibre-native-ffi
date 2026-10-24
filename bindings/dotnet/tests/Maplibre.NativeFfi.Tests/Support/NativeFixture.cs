@@ -75,10 +75,9 @@ internal sealed class NativeFixture : IAsyncDisposable
                     foreach (var item in batch.Events)
                         pendingEvents.Enqueue(item);
                     events.Release();
-                }),
-                TestWaits.Token
+                })
             );
-            await runtime.SetResourceProviderAsync(provider ?? DenyingProvider, TestWaits.Token);
+            await runtime.SetResourceProviderAsync(provider ?? DenyingProvider);
             var map = await runtime
                 .CreateMapAsync(options ?? SmallMap)
                 .WaitAsync(TestWaits.Deadline, TestWaits.Token);
@@ -98,7 +97,7 @@ internal sealed class NativeFixture : IAsyncDisposable
         var fixture = await CreateAsync(options);
         try
         {
-            await fixture.Map.SetStyleJsonAsync(EmptyStyle, TestWaits.Token);
+            await fixture.Map.SetStyleJsonAsync(EmptyStyle);
             return fixture;
         }
         catch

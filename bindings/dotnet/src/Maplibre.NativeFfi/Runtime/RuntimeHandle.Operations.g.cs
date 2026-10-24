@@ -49,13 +49,13 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_clear_event_handler</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task ClearEventHandlerAsync(CancellationToken cancellationToken = default)
+    public Task ClearEventHandlerAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_clear_event_handler(
             Handle,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -68,13 +68,13 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_clear_http_header_transform</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task ClearHttpHeaderTransformAsync(CancellationToken cancellationToken = default)
+    public Task ClearHttpHeaderTransformAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_clear_http_header_transform(
             Handle,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -87,13 +87,13 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_clear_resource_provider</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task ClearResourceProviderAsync(CancellationToken cancellationToken = default)
+    public Task ClearResourceProviderAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_clear_resource_provider(
             Handle,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -106,13 +106,13 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_clear_resource_transform</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task ClearResourceTransformAsync(CancellationToken cancellationToken = default)
+    public Task ClearResourceTransformAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_clear_resource_transform(
             Handle,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -173,8 +173,7 @@ public sealed unsafe partial class RuntimeHandle
     /// </remarks>
     public Task<OfflineRegionInfo> CreateOfflineRegionAsync(
         OfflineRegionDefinition definition,
-        ReadOnlySpan<byte> metadata,
-        CancellationToken cancellationToken = default
+        ReadOnlySpan<byte> metadata
     )
     {
         fixed (byte* pinnedMetadata = metadata)
@@ -194,7 +193,6 @@ public sealed unsafe partial class RuntimeHandle
                             nativeResult,
                             CopyOfflineRegionInfo
                         ),
-                    cancellationToken,
                     out var nativePending
                 ),
                 Diagnostic
@@ -210,17 +208,14 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_delete_offline_region</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task DeleteOfflineRegionAsync(
-        long regionId,
-        CancellationToken cancellationToken = default
-    )
+    public Task DeleteOfflineRegionAsync(long regionId)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_delete_offline_region(
             Handle,
             regionId,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -248,10 +243,7 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_get_offline_region</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<OfflineRegionInfo?> GetOfflineRegionAsync(
-        long regionId,
-        CancellationToken cancellationToken = default
-    )
+    public Task<OfflineRegionInfo?> GetOfflineRegionAsync(long regionId)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -265,7 +257,6 @@ public sealed unsafe partial class RuntimeHandle
                         nativeResult,
                         CopyOfflineRegionInfo
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -280,10 +271,7 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_get_offline_region_status</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<OfflineRegionStatus> GetOfflineRegionStatusAsync(
-        long regionId,
-        CancellationToken cancellationToken = default
-    )
+    public Task<OfflineRegionStatus> GetOfflineRegionStatusAsync(long regionId)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -297,7 +285,6 @@ public sealed unsafe partial class RuntimeHandle
                         nativeResult,
                         CopyOfflineRegionStatus
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -312,17 +299,14 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_invalidate_offline_region</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task InvalidateOfflineRegionAsync(
-        long regionId,
-        CancellationToken cancellationToken = default
-    )
+    public Task InvalidateOfflineRegionAsync(long regionId)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_invalidate_offline_region(
             Handle,
             regionId,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -335,9 +319,7 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_list_offline_regions</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<OfflineRegionInfo[]> ListOfflineRegionsAsync(
-        CancellationToken cancellationToken = default
-    )
+    public Task<OfflineRegionInfo[]> ListOfflineRegionsAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -350,7 +332,6 @@ public sealed unsafe partial class RuntimeHandle
                         nativeResult,
                         CopyOfflineRegionInfo
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -365,10 +346,7 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_merge_offline_regions</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<OfflineRegionInfo[]> MergeOfflineRegionsAsync(
-        string sideDatabasePath,
-        CancellationToken cancellationToken = default
-    )
+    public Task<OfflineRegionInfo[]> MergeOfflineRegionsAsync(string sideDatabasePath)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -382,7 +360,6 @@ public sealed unsafe partial class RuntimeHandle
                         nativeResult,
                         CopyOfflineRegionInfo
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -410,11 +387,7 @@ public sealed unsafe partial class RuntimeHandle
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_release(
             handle,
-            NativeCompletion.StartUnit(
-                &nativeCompletion,
-                CancellationToken.None,
-                out var nativePending
-            ),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         teardown = nativePending.Submitted(nativeStatus);
@@ -428,17 +401,14 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_run_ambient_cache_operation</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task RunAmbientCacheOperationAsync(
-        AmbientCacheOperation operation,
-        CancellationToken cancellationToken = default
-    )
+    public Task RunAmbientCacheOperationAsync(AmbientCacheOperation operation)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_run_ambient_cache_operation(
             Handle,
             (uint)operation,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -451,10 +421,7 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_set_event_handler</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetEventHandlerAsync(
-        RuntimeEventHandler handler,
-        CancellationToken cancellationToken = default
-    )
+    public Task SetEventHandlerAsync(RuntimeEventHandler handler)
     {
         using var scope = new NativeCallScope(this);
         var nativeHandler = NativeRuntimeEventHandler(handler, scope);
@@ -462,7 +429,7 @@ public sealed unsafe partial class RuntimeHandle
         var nativeStatus = NativeMethods.mln_runtime_set_event_handler(
             Handle,
             &nativeHandler,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -488,10 +455,7 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_set_http_header_transform</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetHttpHeaderTransformAsync(
-        HttpHeaderTransform transform,
-        CancellationToken cancellationToken = default
-    )
+    public Task SetHttpHeaderTransformAsync(HttpHeaderTransform transform)
     {
         using var scope = new NativeCallScope(this);
         var nativeTransform = NativeHttpHeaderTransform(transform, scope);
@@ -499,7 +463,7 @@ public sealed unsafe partial class RuntimeHandle
         var nativeStatus = NativeMethods.mln_runtime_set_http_header_transform(
             Handle,
             &nativeTransform,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -512,17 +476,14 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_set_maximum_ambient_cache_size</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetMaximumAmbientCacheSizeAsync(
-        ulong size,
-        CancellationToken cancellationToken = default
-    )
+    public Task SetMaximumAmbientCacheSizeAsync(ulong size)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_set_maximum_ambient_cache_size(
             Handle,
             size,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -535,11 +496,7 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_set_offline_region_download_state</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetOfflineRegionDownloadStateAsync(
-        long regionId,
-        OfflineRegionDownloadState state,
-        CancellationToken cancellationToken = default
-    )
+    public Task SetOfflineRegionDownloadStateAsync(long regionId, OfflineRegionDownloadState state)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -547,7 +504,7 @@ public sealed unsafe partial class RuntimeHandle
             Handle,
             regionId,
             (uint)state,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -560,11 +517,7 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_set_offline_region_observed</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetOfflineRegionObservedAsync(
-        long regionId,
-        bool observed,
-        CancellationToken cancellationToken = default
-    )
+    public Task SetOfflineRegionObservedAsync(long regionId, bool observed)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -572,7 +525,7 @@ public sealed unsafe partial class RuntimeHandle
             Handle,
             regionId,
             (byte)(observed ? 1 : 0),
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -585,10 +538,7 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_set_resource_provider</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetResourceProviderAsync(
-        ResourceProvider provider,
-        CancellationToken cancellationToken = default
-    )
+    public Task SetResourceProviderAsync(ResourceProvider provider)
     {
         using var scope = new NativeCallScope(this);
         var nativeProvider = NativeResourceProvider(provider, scope);
@@ -596,7 +546,7 @@ public sealed unsafe partial class RuntimeHandle
         var nativeStatus = NativeMethods.mln_runtime_set_resource_provider(
             Handle,
             &nativeProvider,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -610,10 +560,7 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_set_resource_transform</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetResourceTransformAsync(
-        ResourceTransform transform,
-        CancellationToken cancellationToken = default
-    )
+    public Task SetResourceTransformAsync(ResourceTransform transform)
     {
         using var scope = new NativeCallScope(this);
         var nativeTransform = NativeResourceTransform(transform, scope);
@@ -621,7 +568,7 @@ public sealed unsafe partial class RuntimeHandle
         var nativeStatus = NativeMethods.mln_runtime_set_resource_transform(
             Handle,
             &nativeTransform,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -636,8 +583,7 @@ public sealed unsafe partial class RuntimeHandle
     /// </remarks>
     public Task<OfflineRegionInfo> UpdateOfflineRegionMetadataAsync(
         long regionId,
-        ReadOnlySpan<byte> metadata,
-        CancellationToken cancellationToken = default
+        ReadOnlySpan<byte> metadata
     )
     {
         fixed (byte* pinnedMetadata = metadata)
@@ -656,7 +602,6 @@ public sealed unsafe partial class RuntimeHandle
                             nativeResult,
                             CopyOfflineRegionInfo
                         ),
-                    cancellationToken,
                     out var nativePending
                 ),
                 Diagnostic

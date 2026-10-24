@@ -48,8 +48,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CommandCompletion> AddCustomGeometrySourceAsync(
         string sourceId,
-        CustomGeometrySourceOptions options,
-        CancellationToken cancellationToken = default
+        CustomGeometrySourceOptions options
     )
     {
         using var scope = new NativeCallScope(this);
@@ -59,11 +58,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(sourceId),
             &nativeOptions,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -78,8 +73,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CommandCompletion> AddCustomMvtVectorSourceAsync(
         string sourceId,
-        CustomMvtVectorSourceOptions options,
-        CancellationToken cancellationToken = default
+        CustomMvtVectorSourceOptions options
     )
     {
         using var scope = new NativeCallScope(this);
@@ -89,11 +83,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(sourceId),
             &nativeOptions,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -108,8 +98,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CommandCompletion> AddGeojsonSourceDataAsync(
         string sourceId,
-        GeojsonSourceDataHandle data,
-        CancellationToken cancellationToken = default
+        GeojsonSourceDataHandle data
     )
     {
         using var scope = new NativeCallScope(this);
@@ -118,11 +107,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(sourceId),
             scope.Use(data),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -138,8 +123,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     public Task<CommandCompletion> AddGeojsonSourceUrlAsync(
         string sourceId,
         string url,
-        GeojsonSourceOptions? options = null,
-        CancellationToken cancellationToken = default
+        GeojsonSourceOptions? options = null
     )
     {
         using var scope = new NativeCallScope(this);
@@ -152,11 +136,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Utf8(sourceId),
             scope.Utf8(url),
             options is null ? null : &nativeOptions,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -172,8 +152,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     public Task<CommandCompletion> AddImageSourceImageAsync(
         string sourceId,
         LatLng[] coordinates,
-        PremultipliedRgba8Image image,
-        CancellationToken cancellationToken = default
+        PremultipliedRgba8Image image
     )
     {
         using var scope = new NativeCallScope(this);
@@ -188,11 +167,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             ),
             checked((nuint)coordinates.Length),
             &nativeImage,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -208,8 +183,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     public Task<CommandCompletion> AddImageSourceUrlAsync(
         string sourceId,
         LatLng[] coordinates,
-        string url,
-        CancellationToken cancellationToken = default
+        string url
     )
     {
         using var scope = new NativeCallScope(this);
@@ -223,11 +197,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             ),
             checked((nuint)coordinates.Length),
             scope.Utf8(url),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -242,8 +212,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CommandCompletion> AddStyleLayerJsonAsync(
         byte[] layerJson,
-        string? beforeLayerId = null,
-        CancellationToken cancellationToken = default
+        string? beforeLayerId = null
     )
     {
         using var scope = new NativeCallScope(this);
@@ -252,11 +221,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Buffer(layerJson),
             scope.Utf8(beforeLayerId ?? ""),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -269,11 +234,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_add_style_source_json</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> AddStyleSourceJsonAsync(
-        string sourceId,
-        byte[] sourceJson,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> AddStyleSourceJsonAsync(string sourceId, byte[] sourceJson)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -281,11 +242,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(sourceId),
             scope.Buffer(sourceJson),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -298,10 +255,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_apply_camera_delta</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> ApplyCameraDeltaAsync(
-        CameraDelta delta,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> ApplyCameraDeltaAsync(CameraDelta delta)
     {
         using var scope = new NativeCallScope(this);
         var nativeDelta = NativeCameraDelta(delta, scope);
@@ -309,11 +263,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeStatus = NativeMethods.mln_map_apply_camera_delta(
             Handle,
             &nativeDelta,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -341,11 +291,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             &nativeDescriptor,
             &nativeOptions,
             &outSession,
-            NativeCompletion.StartUnit(
-                &nativeCompletion,
-                CancellationToken.None,
-                out var nativePending
-            ),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         var nativeAttachment = nativePending.Submitted(nativeStatus);
@@ -375,11 +321,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             &nativeDescriptor,
             &nativeOptions,
             &outSession,
-            NativeCompletion.StartUnit(
-                &nativeCompletion,
-                CancellationToken.None,
-                out var nativePending
-            ),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         var nativeAttachment = nativePending.Submitted(nativeStatus);
@@ -409,11 +351,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             &nativeDescriptor,
             &nativeOptions,
             &outSession,
-            NativeCompletion.StartUnit(
-                &nativeCompletion,
-                CancellationToken.None,
-                out var nativePending
-            ),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         var nativeAttachment = nativePending.Submitted(nativeStatus);
@@ -443,11 +381,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             &nativeDescriptor,
             &nativeOptions,
             &outSession,
-            NativeCompletion.StartUnit(
-                &nativeCompletion,
-                CancellationToken.None,
-                out var nativePending
-            ),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         var nativeAttachment = nativePending.Submitted(nativeStatus);
@@ -477,11 +411,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             &nativeDescriptor,
             &nativeOptions,
             &outSession,
-            NativeCompletion.StartUnit(
-                &nativeCompletion,
-                CancellationToken.None,
-                out var nativePending
-            ),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         var nativeAttachment = nativePending.Submitted(nativeStatus);
@@ -511,11 +441,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             &nativeDescriptor,
             &nativeOptions,
             &outSession,
-            NativeCompletion.StartUnit(
-                &nativeCompletion,
-                CancellationToken.None,
-                out var nativePending
-            ),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         var nativeAttachment = nativePending.Submitted(nativeStatus);
@@ -545,11 +471,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             &nativeDescriptor,
             &nativeOptions,
             &outSession,
-            NativeCompletion.StartUnit(
-                &nativeCompletion,
-                CancellationToken.None,
-                out var nativePending
-            ),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         var nativeAttachment = nativePending.Submitted(nativeStatus);
@@ -579,11 +501,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             &nativeDescriptor,
             &nativeOptions,
             &outSession,
-            NativeCompletion.StartUnit(
-                &nativeCompletion,
-                CancellationToken.None,
-                out var nativePending
-            ),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         var nativeAttachment = nativePending.Submitted(nativeStatus);
@@ -613,11 +531,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             &nativeDescriptor,
             &nativeOptions,
             &outSession,
-            NativeCompletion.StartUnit(
-                &nativeCompletion,
-                CancellationToken.None,
-                out var nativePending
-            ),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         var nativeAttachment = nativePending.Submitted(nativeStatus);
@@ -647,11 +561,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             &nativeDescriptor,
             &nativeOptions,
             &outSession,
-            NativeCompletion.StartUnit(
-                &nativeCompletion,
-                CancellationToken.None,
-                out var nativePending
-            ),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         var nativeAttachment = nativePending.Submitted(nativeStatus);
@@ -681,11 +591,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             &nativeDescriptor,
             &nativeOptions,
             &outSession,
-            NativeCompletion.StartUnit(
-                &nativeCompletion,
-                CancellationToken.None,
-                out var nativePending
-            ),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         var nativeAttachment = nativePending.Submitted(nativeStatus);
@@ -715,11 +621,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             &nativeDescriptor,
             &nativeOptions,
             &outSession,
-            NativeCompletion.StartUnit(
-                &nativeCompletion,
-                CancellationToken.None,
-                out var nativePending
-            ),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         var nativeAttachment = nativePending.Submitted(nativeStatus);
@@ -735,19 +637,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_begin_command_group</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> BeginCommandGroupAsync(
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> BeginCommandGroupAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_begin_command_group(
             Handle,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -762,8 +658,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CameraOptions> CameraForGeometryAsync(
         byte[] geometry,
-        CameraFitOptions? fitOptions = null,
-        CancellationToken cancellationToken = default
+        CameraFitOptions? fitOptions = null
     )
     {
         using var scope = new NativeCallScope(this);
@@ -782,7 +677,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         CopyCameraOptions
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -799,8 +693,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CameraOptions> CameraForLatLngBoundsAsync(
         LatLngBounds bounds,
-        CameraFitOptions? fitOptions = null,
-        CancellationToken cancellationToken = default
+        CameraFitOptions? fitOptions = null
     )
     {
         using var scope = new NativeCallScope(this);
@@ -819,7 +712,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         CopyCameraOptions
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -836,8 +728,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CameraOptions> CameraForLatLngsAsync(
         LatLng[] coordinates,
-        CameraFitOptions? fitOptions = null,
-        CancellationToken cancellationToken = default
+        CameraFitOptions? fitOptions = null
     )
     {
         using var scope = new NativeCallScope(this);
@@ -860,7 +751,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         CopyCameraOptions
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -876,21 +766,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_cancel_camera_transition</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> CancelCameraTransitionAsync(
-        ulong transitionId,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> CancelCameraTransitionAsync(ulong transitionId)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_cancel_camera_transition(
             Handle,
             transitionId,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -903,19 +786,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_cancel_transitions</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> CancelTransitionsAsync(
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> CancelTransitionsAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_cancel_transitions(
             Handle,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -928,17 +805,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_dump_debug_logs</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> DumpDebugLogsAsync(CancellationToken cancellationToken = default)
+    public Task<CommandCompletion> DumpDebugLogsAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_dump_debug_logs(
             Handle,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -952,19 +825,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_end_command_group</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> EndCommandGroupAsync(
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> EndCommandGroupAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_end_command_group(
             Handle,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -977,7 +844,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_camera</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CameraQueryResult> GetCameraAsync(CancellationToken cancellationToken = default)
+    public Task<CameraQueryResult> GetCameraAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -990,7 +857,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         CopyCameraQueryResult
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -1005,10 +871,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_feature_state</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<byte[]> GetFeatureStateAsync(
-        FeatureStateSelector selector,
-        CancellationToken cancellationToken = default
-    )
+    public Task<byte[]> GetFeatureStateAsync(FeatureStateSelector selector)
     {
         using var scope = new NativeCallScope(this);
         var nativeSelector = NativeFeatureStateSelector(selector, scope);
@@ -1023,7 +886,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         ValueStructs.CopyBufferView
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -1040,7 +902,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_global_state</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<byte[]> GetGlobalStateAsync(CancellationToken cancellationToken = default)
+    public Task<byte[]> GetGlobalStateAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -1053,7 +915,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         ValueStructs.CopyBufferView
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -1068,10 +929,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_image_source_coordinates</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<LatLng[]> GetImageSourceCoordinatesAsync(
-        string sourceId,
-        CancellationToken cancellationToken = default
-    )
+    public Task<LatLng[]> GetImageSourceCoordinatesAsync(string sourceId)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -1082,7 +940,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 &nativeCompletion,
                 static nativeResult =>
                     NativeCompletion.Array<mln_lat_lng, LatLng>(nativeResult, CopyLatLng),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -1097,7 +954,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_loaded_style_json</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<byte[]> GetLoadedStyleJsonAsync(CancellationToken cancellationToken = default)
+    public Task<byte[]> GetLoadedStyleJsonAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -1110,7 +967,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         ValueStructs.CopyBufferView
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -1140,10 +996,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_style_image</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<StyleImageInfo?> GetStyleImageAsync(
-        string imageId,
-        CancellationToken cancellationToken = default
-    )
+    public Task<StyleImageInfo?> GetStyleImageAsync(string imageId)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -1157,7 +1010,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         CopyStyleImageInfo
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -1172,10 +1024,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_style_layer</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<StyleLayerInfo?> GetStyleLayerAsync(
-        string layerId,
-        CancellationToken cancellationToken = default
-    )
+    public Task<StyleLayerInfo?> GetStyleLayerAsync(string layerId)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -1189,7 +1038,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         CopyStyleLayerInfo
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -1204,10 +1052,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_style_layer_json</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<byte[]?> GetStyleLayerJsonAsync(
-        string layerId,
-        CancellationToken cancellationToken = default
-    )
+    public Task<byte[]?> GetStyleLayerJsonAsync(string layerId)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -1221,7 +1066,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         ValueStructs.CopyBufferView
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -1236,11 +1080,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_style_layer_property</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<byte[]?> GetStyleLayerPropertyAsync(
-        string layerId,
-        string propertyName,
-        CancellationToken cancellationToken = default
-    )
+    public Task<byte[]?> GetStyleLayerPropertyAsync(string layerId, string propertyName)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -1255,7 +1095,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         ValueStructs.CopyBufferView
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -1270,10 +1109,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_style_light_property</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<byte[]?> GetStyleLightPropertyAsync(
-        string propertyName,
-        CancellationToken cancellationToken = default
-    )
+    public Task<byte[]?> GetStyleLightPropertyAsync(string propertyName)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -1287,7 +1123,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         ValueStructs.CopyBufferView
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -1302,10 +1137,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_style_source</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<StyleSourceInfo?> GetStyleSourceAsync(
-        string sourceId,
-        CancellationToken cancellationToken = default
-    )
+    public Task<StyleSourceInfo?> GetStyleSourceAsync(string sourceId)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -1319,7 +1151,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         CopyStyleSourceInfo
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -1334,9 +1165,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_style_transition_options</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<StyleTransitionOptions> GetStyleTransitionOptionsAsync(
-        CancellationToken cancellationToken = default
-    )
+    public Task<StyleTransitionOptions> GetStyleTransitionOptionsAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -1349,7 +1178,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         CopyStyleTransitionOptions
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -1364,7 +1192,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_style_url</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<string> GetStyleUrlAsync(CancellationToken cancellationToken = default)
+    public Task<string> GetStyleUrlAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -1377,7 +1205,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         ValueStructs.CopyUtf8View
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -1394,8 +1221,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CommandCompletion> InvalidateCustomGeometrySourceRegionAsync(
         string sourceId,
-        LatLngBounds bounds,
-        CancellationToken cancellationToken = default
+        LatLngBounds bounds
     )
     {
         using var scope = new NativeCallScope(this);
@@ -1404,11 +1230,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(sourceId),
             NativeLatLngBounds(bounds),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -1423,8 +1245,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CommandCompletion> InvalidateCustomGeometrySourceTileAsync(
         string sourceId,
-        CanonicalTileId tileId,
-        CancellationToken cancellationToken = default
+        CanonicalTileId tileId
     )
     {
         using var scope = new NativeCallScope(this);
@@ -1433,11 +1254,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(sourceId),
             NativeCanonicalTileId(tileId),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -1452,8 +1269,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CommandCompletion> InvalidateCustomMvtVectorSourceTileAsync(
         string sourceId,
-        CanonicalTileId tileId,
-        CancellationToken cancellationToken = default
+        CanonicalTileId tileId
     )
     {
         using var scope = new NativeCallScope(this);
@@ -1462,11 +1278,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(sourceId),
             NativeCanonicalTileId(tileId),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -1479,10 +1291,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_lat_lng_bounds_for_camera</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<LatLngBounds> LatLngBoundsForCameraAsync(
-        CameraOptions camera,
-        CancellationToken cancellationToken = default
-    )
+    public Task<LatLngBounds> LatLngBoundsForCameraAsync(CameraOptions camera)
     {
         using var scope = new NativeCallScope(this);
         var nativeCamera = NativeCameraOptions(camera);
@@ -1497,7 +1306,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         CopyLatLngBounds
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -1512,10 +1320,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_lat_lng_bounds_for_camera_unwrapped</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<LatLngBounds> LatLngBoundsForCameraUnwrappedAsync(
-        CameraOptions camera,
-        CancellationToken cancellationToken = default
-    )
+    public Task<LatLngBounds> LatLngBoundsForCameraUnwrappedAsync(CameraOptions camera)
     {
         using var scope = new NativeCallScope(this);
         var nativeCamera = NativeCameraOptions(camera);
@@ -1530,7 +1335,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         CopyLatLngBounds
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -1545,9 +1349,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_list_style_layers</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<StyleLayerInfo[]> ListStyleLayersAsync(
-        CancellationToken cancellationToken = default
-    )
+    public Task<StyleLayerInfo[]> ListStyleLayersAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -1560,7 +1362,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         CopyStyleLayerInfo
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -1575,9 +1376,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_list_style_sources</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<StyleSourceInfo[]> ListStyleSourcesAsync(
-        CancellationToken cancellationToken = default
-    )
+    public Task<StyleSourceInfo[]> ListStyleSourcesAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -1590,7 +1389,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         nativeResult,
                         CopyStyleSourceInfo
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -1605,11 +1403,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_move_style_layer</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> MoveStyleLayerAsync(
-        string layerId,
-        string? beforeLayerId = null,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> MoveStyleLayerAsync(string layerId, string? beforeLayerId = null)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -1617,11 +1411,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(layerId),
             scope.Utf8(beforeLayerId ?? ""),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -1647,11 +1437,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_release(
             handle,
-            NativeCompletion.StartUnit(
-                &nativeCompletion,
-                CancellationToken.None,
-                out var nativePending
-            ),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         teardown = nativePending.Submitted(nativeStatus);
@@ -1665,10 +1451,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_remove_feature_state</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> RemoveFeatureStateAsync(
-        FeatureStateSelector selector,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> RemoveFeatureStateAsync(FeatureStateSelector selector)
     {
         using var scope = new NativeCallScope(this);
         var nativeSelector = NativeFeatureStateSelector(selector, scope);
@@ -1676,11 +1459,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeStatus = NativeMethods.mln_map_remove_feature_state(
             Handle,
             &nativeSelector,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -1693,21 +1472,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_remove_style_image</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> RemoveStyleImageAsync(
-        string imageId,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> RemoveStyleImageAsync(string imageId)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_remove_style_image(
             Handle,
             scope.Utf8(imageId),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -1720,21 +1492,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_remove_style_layer</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> RemoveStyleLayerAsync(
-        string layerId,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> RemoveStyleLayerAsync(string layerId)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_remove_style_layer(
             Handle,
             scope.Utf8(layerId),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -1747,21 +1512,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_remove_style_source</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> RemoveStyleSourceAsync(
-        string sourceId,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> RemoveStyleSourceAsync(string sourceId)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_remove_style_source(
             Handle,
             scope.Utf8(sourceId),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -1774,19 +1532,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_request_repaint</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> RequestRepaintAsync(
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> RequestRepaintAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_request_repaint(
             Handle,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -1799,13 +1551,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_request_still_image</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task RequestStillImageAsync(CancellationToken cancellationToken = default)
+    public Task RequestStillImageAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_request_still_image(
             Handle,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -1818,21 +1570,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_resize</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> ResizeAsync(
-        LogicalExtent extent,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> ResizeAsync(LogicalExtent extent)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_resize(
             Handle,
             NativeLogicalExtent(extent),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -1845,10 +1590,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_bounds</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetBoundsAsync(
-        BoundOptions options,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetBoundsAsync(BoundOptions options)
     {
         using var scope = new NativeCallScope(this);
         var nativeOptions = NativeBoundOptions(options);
@@ -1856,11 +1598,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeStatus = NativeMethods.mln_map_set_bounds(
             Handle,
             &nativeOptions,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -1876,8 +1614,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     public Task<CommandCompletion> SetCustomGeometrySourceTileDataAsync(
         string sourceId,
         CanonicalTileId tileId,
-        byte[] data,
-        CancellationToken cancellationToken = default
+        byte[] data
     )
     {
         using var scope = new NativeCallScope(this);
@@ -1887,11 +1624,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Utf8(sourceId),
             NativeCanonicalTileId(tileId),
             scope.Buffer(data),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -1907,8 +1640,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     public Task<CommandCompletion> SetCustomGeometrySourceTileErrorAsync(
         string sourceId,
         CanonicalTileId tileId,
-        string message,
-        CancellationToken cancellationToken = default
+        string message
     )
     {
         using var scope = new NativeCallScope(this);
@@ -1918,11 +1650,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Utf8(sourceId),
             NativeCanonicalTileId(tileId),
             scope.Utf8(message),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -1938,8 +1666,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     public Task<CommandCompletion> SetCustomMvtVectorSourceTileDataAsync(
         string sourceId,
         CanonicalTileId tileId,
-        ReadOnlySpan<byte> data,
-        CancellationToken cancellationToken = default
+        ReadOnlySpan<byte> data
     )
     {
         fixed (byte* pinnedData = data)
@@ -1951,11 +1678,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 scope.Utf8(sourceId),
                 NativeCanonicalTileId(tileId),
                 new mln_buffer_view { data = pinnedData, size = (nuint)data.Length },
-                NativeCompletion.StartCommand(
-                    &nativeCompletion,
-                    cancellationToken,
-                    out var nativePending
-                ),
+                NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
                 Diagnostic
             );
             return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -1972,8 +1695,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     public Task<CommandCompletion> SetCustomMvtVectorSourceTileErrorAsync(
         string sourceId,
         CanonicalTileId tileId,
-        string message,
-        CancellationToken cancellationToken = default
+        string message
     )
     {
         using var scope = new NativeCallScope(this);
@@ -1983,11 +1705,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Utf8(sourceId),
             NativeCanonicalTileId(tileId),
             scope.Utf8(message),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2000,21 +1718,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_debug_options</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetDebugOptionsAsync(
-        MapDebugOption options,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetDebugOptionsAsync(MapDebugOption options)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_debug_options(
             Handle,
             (uint)options,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2027,21 +1738,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_event_mask</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetEventMaskAsync(
-        RuntimeEventMask mask,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetEventMaskAsync(RuntimeEventMask mask)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_event_mask(
             Handle,
             (ulong)mask,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2054,11 +1758,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_feature_state</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetFeatureStateAsync(
-        FeatureStateSelector selector,
-        byte[] state,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetFeatureStateAsync(FeatureStateSelector selector, byte[] state)
     {
         using var scope = new NativeCallScope(this);
         var nativeSelector = NativeFeatureStateSelector(selector, scope);
@@ -2067,11 +1767,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             &nativeSelector,
             scope.Buffer(state),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2084,10 +1780,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_free_camera_options</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetFreeCameraOptionsAsync(
-        FreeCameraOptions options,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetFreeCameraOptionsAsync(FreeCameraOptions options)
     {
         using var scope = new NativeCallScope(this);
         var nativeOptions = NativeFreeCameraOptions(options);
@@ -2095,11 +1788,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeStatus = NativeMethods.mln_map_set_free_camera_options(
             Handle,
             &nativeOptions,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2114,8 +1803,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CommandCompletion> SetGeojsonSourceDataAsync(
         string sourceId,
-        GeojsonSourceDataHandle data,
-        CancellationToken cancellationToken = default
+        GeojsonSourceDataHandle data
     )
     {
         using var scope = new NativeCallScope(this);
@@ -2124,11 +1812,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(sourceId),
             scope.Use(data),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2143,8 +1827,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CommandCompletion> SetGeojsonSourceSynchronousTilingAsync(
         string sourceId,
-        bool enabled,
-        CancellationToken cancellationToken = default
+        bool enabled
     )
     {
         using var scope = new NativeCallScope(this);
@@ -2153,11 +1836,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(sourceId),
             (byte)(enabled ? 1 : 0),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2170,11 +1849,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_geojson_source_url</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetGeojsonSourceUrlAsync(
-        string sourceId,
-        string url,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetGeojsonSourceUrlAsync(string sourceId, string url)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -2182,11 +1857,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(sourceId),
             scope.Utf8(url),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2199,11 +1870,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_global_state_property</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetGlobalStatePropertyAsync(
-        string propertyName,
-        byte[] value,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetGlobalStatePropertyAsync(string propertyName, byte[] value)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -2211,11 +1878,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(propertyName),
             scope.Buffer(value),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2230,8 +1893,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CommandCompletion> SetImageSourceCoordinatesAsync(
         string sourceId,
-        LatLng[] coordinates,
-        CancellationToken cancellationToken = default
+        LatLng[] coordinates
     )
     {
         using var scope = new NativeCallScope(this);
@@ -2244,11 +1906,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 static (item, scope) => NativeLatLng(item)
             ),
             checked((nuint)coordinates.Length),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2263,8 +1921,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CommandCompletion> SetImageSourceImageAsync(
         string sourceId,
-        PremultipliedRgba8Image image,
-        CancellationToken cancellationToken = default
+        PremultipliedRgba8Image image
     )
     {
         using var scope = new NativeCallScope(this);
@@ -2274,11 +1931,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(sourceId),
             &nativeImage,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2291,11 +1944,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_image_source_url</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetImageSourceUrlAsync(
-        string sourceId,
-        string url,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetImageSourceUrlAsync(string sourceId, string url)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -2303,11 +1952,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(sourceId),
             scope.Utf8(url),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2320,10 +1965,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_projection_mode</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetProjectionModeAsync(
-        ProjectionMode mode,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetProjectionModeAsync(ProjectionMode mode)
     {
         using var scope = new NativeCallScope(this);
         var nativeMode = NativeProjectionMode(mode);
@@ -2331,11 +1973,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeStatus = NativeMethods.mln_map_set_projection_mode(
             Handle,
             &nativeMode,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2348,21 +1986,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_rendering_stats_view_enabled</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetRenderingStatsViewEnabledAsync(
-        bool enabled,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetRenderingStatsViewEnabledAsync(bool enabled)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_rendering_stats_view_enabled(
             Handle,
             (byte)(enabled ? 1 : 0),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2378,8 +2009,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     public Task<CommandCompletion> SetStyleImageAsync(
         string imageId,
         PremultipliedRgba8Image image,
-        StyleImageOptions? options = null,
-        CancellationToken cancellationToken = default
+        StyleImageOptions? options = null
     )
     {
         using var scope = new NativeCallScope(this);
@@ -2393,11 +2023,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Utf8(imageId),
             &nativeImage,
             options is null ? null : &nativeOptions,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2410,21 +2036,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_style_json</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetStyleJsonAsync(
-        byte[] json,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetStyleJsonAsync(byte[] json)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_style_json(
             Handle,
             scope.Buffer(json),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2440,8 +2059,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     public Task<CommandCompletion> SetStyleLayerPropertyAsync(
         string layerId,
         string propertyName,
-        byte[] value,
-        CancellationToken cancellationToken = default
+        byte[] value
     )
     {
         using var scope = new NativeCallScope(this);
@@ -2451,11 +2069,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Utf8(layerId),
             scope.Utf8(propertyName),
             scope.Buffer(value),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2468,21 +2082,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_style_light_json</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetStyleLightJsonAsync(
-        byte[] lightJson,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetStyleLightJsonAsync(byte[] lightJson)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_style_light_json(
             Handle,
             scope.Buffer(lightJson),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2496,11 +2103,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_style_light_property</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetStyleLightPropertyAsync(
-        string propertyName,
-        byte[] value,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetStyleLightPropertyAsync(string propertyName, byte[] value)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -2508,11 +2111,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(propertyName),
             scope.Buffer(value),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2526,11 +2125,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_style_source_volatile</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetStyleSourceVolatileAsync(
-        string sourceId,
-        bool isVolatile,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetStyleSourceVolatileAsync(string sourceId, bool isVolatile)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -2538,11 +2133,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(sourceId),
             (byte)(isVolatile ? 1 : 0),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2555,10 +2146,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_style_transition_options</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetStyleTransitionOptionsAsync(
-        StyleTransitionOptions options,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetStyleTransitionOptionsAsync(StyleTransitionOptions options)
     {
         using var scope = new NativeCallScope(this);
         var nativeOptions = NativeStyleTransitionOptions(options);
@@ -2566,11 +2154,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeStatus = NativeMethods.mln_map_set_style_transition_options(
             Handle,
             &nativeOptions,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2583,21 +2167,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_style_url</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetStyleUrlAsync(
-        string url,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetStyleUrlAsync(string url)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_style_url(
             Handle,
             scope.Utf8(url),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2610,10 +2187,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_tile_options</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetTileOptionsAsync(
-        MapTileOptions options,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetTileOptionsAsync(MapTileOptions options)
     {
         using var scope = new NativeCallScope(this);
         var nativeOptions = NativeMapTileOptions(options);
@@ -2621,11 +2195,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeStatus = NativeMethods.mln_map_set_tile_options(
             Handle,
             &nativeOptions,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2638,10 +2208,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_viewport_options</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetViewportOptionsAsync(
-        MapViewportOptions options,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> SetViewportOptionsAsync(MapViewportOptions options)
     {
         using var scope = new NativeCallScope(this);
         var nativeOptions = NativeMapViewportOptions(options);
@@ -2649,11 +2216,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeStatus = NativeMethods.mln_map_set_viewport_options(
             Handle,
             &nativeOptions,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -2666,10 +2229,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_update_camera</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> UpdateCameraAsync(
-        CameraUpdate update,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> UpdateCameraAsync(CameraUpdate update)
     {
         using var scope = new NativeCallScope(this);
         var nativeUpdate = NativeCameraUpdate(update, scope);
@@ -2677,11 +2237,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeStatus = NativeMethods.mln_map_update_camera(
             Handle,
             &nativeUpdate,
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));

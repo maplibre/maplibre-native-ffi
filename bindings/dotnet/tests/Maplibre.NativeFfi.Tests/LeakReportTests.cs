@@ -95,7 +95,7 @@ public sealed class LeakReportTests
     private static MapHandle CreateMapReleased(RuntimeHandle runtime)
     {
         var map = runtime.CreateMapAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
-        map.GetStyleUrlAsync(TestWaits.Token).GetAwaiter().GetResult();
+        map.GetStyleUrlAsync().GetAwaiter().GetResult();
         return map;
     }
 

@@ -18,10 +18,7 @@ public sealed class RenderTests
                 fixture.Await(fixture.Session.Attached, "the attachment");
                 fixture.RenderFrame();
 
-                var image = fixture.Await(
-                    fixture.Session.ReadTextureAsync(TestWaits.Token),
-                    "the readback"
-                );
+                var image = fixture.Await(fixture.Session.ReadTextureAsync(), "the readback");
 
                 Assert.Equal(RenderFixture.Width, image.Info.Width);
                 Assert.Equal(RenderFixture.Height, image.Info.Height);
@@ -74,7 +71,7 @@ public sealed class RenderTests
 
                 Assert.Equal(RenderResult.Rendered, fixture.RenderFrame().Disposition);
 
-                var detach = session.DetachAsync(TestWaits.Token);
+                var detach = session.DetachAsync();
                 Assert.False(detach.IsCompleted);
                 fixture.Await(detach, "the session to detach");
                 Assert.Equal(RenderSessionState.Detached, session.GetSnapshot().State);

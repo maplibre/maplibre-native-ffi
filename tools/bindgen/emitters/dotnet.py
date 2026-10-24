@@ -213,8 +213,8 @@ def submitted(function: Function, args: list[str], start: str) -> list[str]:
     ]
 
 
-def unit_start(cancellation: str) -> str:
-    return f"NativeCompletion.StartUnit(&nativeCompletion, {cancellation}, out var nativePending)"
+def unit_start() -> str:
+    return "NativeCompletion.StartUnit(&nativeCompletion, out var nativePending)"
 
 
 def method(signature: str, body: list[str]) -> str:
@@ -414,7 +414,7 @@ def emit_operation(
                         *submitted(
                             function,
                             ["handle", "completion"],
-                            unit_start("CancellationToken.None"),
+                            unit_start(),
                         ),
                         "teardown = nativePending.Submitted(nativeStatus);",
                         "return mln_status.MLN_STATUS_OK;",
@@ -810,7 +810,7 @@ def emit_operation(
         )
         if asynchronous:
             body = prologue + [
-                *submitted(function, args, unit_start("CancellationToken.None")),
+                *submitted(function, args, unit_start()),
                 "var nativeAttachment = nativePending.Submitted(nativeStatus);",
                 "scope.Accept();",
                 f"return {result_type}.Adopt({parent}{local}, nativeAttachment);",
@@ -953,16 +953,15 @@ def emit_operation(
                         "command carries a typed payload that needs its own conversion"
                     )
                 result_type = "Task<CommandCompletion>"
-                start = "NativeCompletion.StartCommand(&nativeCompletion, cancellationToken, out var nativePending)"
+                start = "NativeCompletion.StartCommand(&nativeCompletion, out var nativePending)"
             else:
                 value_type, converter = completion_query(plan, values, records, api)
                 if value_type == "Task":
                     result_type = "Task"
-                    start = unit_start("cancellationToken")
+                    start = unit_start()
                 else:
                     result_type = f"Task<{value_type}>"
-                    start = f"NativeCompletion.Start<{value_type}>(&nativeCompletion, {converter}, cancellationToken, out var nativePending)"
-            parameters.append("CancellationToken cancellationToken = default")
+                    start = f"NativeCompletion.Start<{value_type}>(&nativeCompletion, {converter}, out var nativePending)"
             name += "Async"
             body = prologue + [
                 *submitted(function, args, start),

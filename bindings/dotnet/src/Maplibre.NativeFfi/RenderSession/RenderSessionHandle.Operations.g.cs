@@ -127,13 +127,13 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// See <c>mln_render_session_barrier</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
     /// </remarks>
-    public Task BarrierAsync(CancellationToken cancellationToken = default)
+    public Task BarrierAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_barrier(
             Handle,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -146,13 +146,13 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// See <c>mln_render_session_clear_data</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
     /// </remarks>
-    public Task ClearDataAsync(CancellationToken cancellationToken = default)
+    public Task ClearDataAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_clear_data(
             Handle,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -165,13 +165,13 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// See <c>mln_render_session_detach</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
     /// </remarks>
-    public Task DetachAsync(CancellationToken cancellationToken = default)
+    public Task DetachAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_detach(
             Handle,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -207,13 +207,13 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// See <c>mln_render_session_dump_debug_logs</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
     /// </remarks>
-    public Task DumpDebugLogsAsync(CancellationToken cancellationToken = default)
+    public Task DumpDebugLogsAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_dump_debug_logs(
             Handle,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -271,8 +271,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         byte[] feature,
         string extension,
         string extensionField,
-        byte[]? arguments = null,
-        CancellationToken cancellationToken = default
+        byte[]? arguments = null
     )
     {
         using var scope = new NativeCallScope(this);
@@ -294,7 +293,6 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
                         nativeResult,
                         ValueStructs.CopyBufferView
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -312,8 +310,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public Task<RenderedFeature[]> QueryRenderedFeaturesAsync(
         RenderedQueryGeometry geometry,
-        RenderedFeatureQueryOptions? options = null,
-        CancellationToken cancellationToken = default
+        RenderedFeatureQueryOptions? options = null
     )
     {
         using var scope = new NativeCallScope(this);
@@ -333,7 +330,6 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
                         nativeResult,
                         CopyRenderedFeature
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -350,8 +346,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public Task<SourceFeature[]> QuerySourceFeaturesAsync(
         string sourceId,
-        SourceFeatureQueryOptions? options = null,
-        CancellationToken cancellationToken = default
+        SourceFeatureQueryOptions? options = null
     )
     {
         using var scope = new NativeCallScope(this);
@@ -370,7 +365,6 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
                         nativeResult,
                         CopySourceFeature
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -386,9 +380,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// See <c>mln_render_session_read_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<TextureReadbackResult> ReadTextureAsync(
-        CancellationToken cancellationToken = default
-    )
+    public Task<TextureReadbackResult> ReadTextureAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -401,7 +393,6 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
                         nativeResult,
                         CopyTextureReadbackResult
                     ),
-                cancellationToken,
                 out var nativePending
             ),
             Diagnostic
@@ -416,13 +407,13 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// See <c>mln_render_session_reduce_memory_use</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
     /// </remarks>
-    public Task ReduceMemoryUseAsync(CancellationToken cancellationToken = default)
+    public Task ReduceMemoryUseAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_reduce_memory_use(
             Handle,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -471,21 +462,14 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// See <c>mln_render_session_resize</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> ResizeAsync(
-        LogicalExtent extent,
-        CancellationToken cancellationToken = default
-    )
+    public Task<CommandCompletion> ResizeAsync(LogicalExtent extent)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_resize(
             Handle,
             NativeLogicalExtent(extent),
-            NativeCompletion.StartCommand(
-                &nativeCompletion,
-                cancellationToken,
-                out var nativePending
-            ),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -521,10 +505,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetMetalBorrowedTextureTargetAsync(
-        MetalBorrowedTextureDescriptor descriptor,
-        CancellationToken cancellationToken = default
-    )
+    public Task SetMetalBorrowedTextureTargetAsync(MetalBorrowedTextureDescriptor descriptor)
     {
         using var scope = new NativeCallScope(this);
         var nativeDescriptor = NativeMetalBorrowedTextureDescriptor(descriptor, scope);
@@ -532,7 +513,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         var nativeStatus = NativeMethods.mln_render_session_set_metal_borrowed_texture_target(
             Handle,
             &nativeDescriptor,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -545,10 +526,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// See <c>mln_render_session_set_metal_surface_target</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetMetalSurfaceTargetAsync(
-        MetalSurfaceDescriptor descriptor,
-        CancellationToken cancellationToken = default
-    )
+    public Task SetMetalSurfaceTargetAsync(MetalSurfaceDescriptor descriptor)
     {
         using var scope = new NativeCallScope(this);
         var nativeDescriptor = NativeMetalSurfaceDescriptor(descriptor);
@@ -556,7 +534,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         var nativeStatus = NativeMethods.mln_render_session_set_metal_surface_target(
             Handle,
             &nativeDescriptor,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -571,10 +549,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetOpenglBorrowedTextureTargetAsync(
-        OpenglBorrowedTextureDescriptor descriptor,
-        CancellationToken cancellationToken = default
-    )
+    public Task SetOpenglBorrowedTextureTargetAsync(OpenglBorrowedTextureDescriptor descriptor)
     {
         using var scope = new NativeCallScope(this);
         var nativeDescriptor = NativeOpenglBorrowedTextureDescriptor(descriptor, scope);
@@ -582,7 +557,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         var nativeStatus = NativeMethods.mln_render_session_set_opengl_borrowed_texture_target(
             Handle,
             &nativeDescriptor,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -595,10 +570,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// See <c>mln_render_session_set_opengl_surface_target</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetOpenglSurfaceTargetAsync(
-        OpenglSurfaceDescriptor descriptor,
-        CancellationToken cancellationToken = default
-    )
+    public Task SetOpenglSurfaceTargetAsync(OpenglSurfaceDescriptor descriptor)
     {
         using var scope = new NativeCallScope(this);
         var nativeDescriptor = NativeOpenglSurfaceDescriptor(descriptor, scope);
@@ -606,7 +578,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         var nativeStatus = NativeMethods.mln_render_session_set_opengl_surface_target(
             Handle,
             &nativeDescriptor,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -621,10 +593,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetVulkanBorrowedTextureTargetAsync(
-        VulkanBorrowedTextureDescriptor descriptor,
-        CancellationToken cancellationToken = default
-    )
+    public Task SetVulkanBorrowedTextureTargetAsync(VulkanBorrowedTextureDescriptor descriptor)
     {
         using var scope = new NativeCallScope(this);
         var nativeDescriptor = NativeVulkanBorrowedTextureDescriptor(descriptor, scope);
@@ -632,7 +601,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         var nativeStatus = NativeMethods.mln_render_session_set_vulkan_borrowed_texture_target(
             Handle,
             &nativeDescriptor,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -645,10 +614,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// See <c>mln_render_session_set_vulkan_surface_target</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetVulkanSurfaceTargetAsync(
-        VulkanSurfaceDescriptor descriptor,
-        CancellationToken cancellationToken = default
-    )
+    public Task SetVulkanSurfaceTargetAsync(VulkanSurfaceDescriptor descriptor)
     {
         using var scope = new NativeCallScope(this);
         var nativeDescriptor = NativeVulkanSurfaceDescriptor(descriptor);
@@ -656,7 +622,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         var nativeStatus = NativeMethods.mln_render_session_set_vulkan_surface_target(
             Handle,
             &nativeDescriptor,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -671,10 +637,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetWebgpuBorrowedTextureTargetAsync(
-        WebgpuBorrowedTextureDescriptor descriptor,
-        CancellationToken cancellationToken = default
-    )
+    public Task SetWebgpuBorrowedTextureTargetAsync(WebgpuBorrowedTextureDescriptor descriptor)
     {
         using var scope = new NativeCallScope(this);
         var nativeDescriptor = NativeWebgpuBorrowedTextureDescriptor(descriptor, scope);
@@ -682,7 +645,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         var nativeStatus = NativeMethods.mln_render_session_set_webgpu_borrowed_texture_target(
             Handle,
             &nativeDescriptor,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -695,10 +658,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// See <c>mln_render_session_set_webgpu_surface_target</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetWebgpuSurfaceTargetAsync(
-        WebgpuSurfaceDescriptor descriptor,
-        CancellationToken cancellationToken = default
-    )
+    public Task SetWebgpuSurfaceTargetAsync(WebgpuSurfaceDescriptor descriptor)
     {
         using var scope = new NativeCallScope(this);
         var nativeDescriptor = NativeWebgpuSurfaceDescriptor(descriptor);
@@ -706,7 +666,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         var nativeStatus = NativeMethods.mln_render_session_set_webgpu_surface_target(
             Handle,
             &nativeDescriptor,
-            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));

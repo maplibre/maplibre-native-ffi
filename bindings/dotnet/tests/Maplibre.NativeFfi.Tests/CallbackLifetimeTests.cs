@@ -17,8 +17,8 @@ public sealed class CallbackLifetimeTests
         Assert.True(Gc.IsAlive(accepted));
 
         // Removing the source is what makes native release the registration.
-        await fixture.Map.RemoveStyleSourceAsync("custom", TestWaits.Token);
-        Assert.Null(await fixture.Map.GetStyleSourceAsync("custom", TestWaits.Token));
+        await fixture.Map.RemoveStyleSourceAsync("custom");
+        Assert.Null(await fixture.Map.GetStyleSourceAsync("custom"));
         Assert.False(Gc.IsAlive(accepted));
 
         // Native validates the zoom range before it takes the registration.
@@ -39,8 +39,7 @@ public sealed class CallbackLifetimeTests
             options with
             {
                 FetchTile = _ => GC.KeepAlive(captured),
-            },
-            TestWaits.Token
+            }
         );
         return (added, new WeakReference(captured));
     }
@@ -60,8 +59,7 @@ public sealed class CallbackLifetimeTests
                     FetchTile = _ => GC.KeepAlive(captured),
                     MinZoom = 5,
                     MaxZoom = 1,
-                },
-                TestWaits.Token
+                }
             );
         });
         return (rejection, new WeakReference(captured));
@@ -79,7 +77,7 @@ public sealed class CallbackLifetimeTests
         Assert.True(Gc.IsAlive(captured));
 
         // The handler runs before the cancellation completes.
-        await fixture.Map.CancelCameraTransitionAsync(ulong.MaxValue, TestWaits.Token);
+        await fixture.Map.CancelCameraTransitionAsync(ulong.MaxValue);
         var end = Assert.Single(ends);
         Assert.Equal(CameraTransitionOutcome.Cancelled, end.Outcome);
         Assert.NotEqual(0UL, end.Generation);
@@ -113,8 +111,7 @@ public sealed class CallbackLifetimeTests
                 Mode = CameraUpdateMode.Ease,
                 Camera = new CameraOptions { Zoom = 4 },
                 Animation = animation,
-            },
-            TestWaits.Token
+            }
         );
         return (started, new WeakReference(captured));
     }
@@ -135,7 +132,7 @@ public sealed class CallbackLifetimeTests
         };
         var rejection = Record.Exception(() =>
         {
-            _ = map.ApplyCameraDeltaAsync(delta, TestWaits.Token);
+            _ = map.ApplyCameraDeltaAsync(delta);
         });
         return (rejection, new WeakReference(captured));
     }

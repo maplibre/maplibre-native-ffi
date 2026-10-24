@@ -101,7 +101,7 @@ public sealed class HandleLifecycleTests
     public async Task AHandleIdNamesItsEventsAndOutlivesClose()
     {
         await using var fixture = await NativeFixture.CreateAsync();
-        await fixture.Map.SetStyleJsonAsync(NativeFixture.EmptyStyle, TestWaits.Token);
+        await fixture.Map.SetStyleJsonAsync(NativeFixture.EmptyStyle);
         var loaded = await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
         Assert.Equal(fixture.Map.Id, loaded.Source);
 
@@ -122,7 +122,7 @@ public sealed class HandleLifecycleTests
         });
         Assert.Equal(Status.InvalidState, error.Status);
         Assert.Contains("live or pending children", error.Diagnostic, StringComparison.Ordinal);
-        await runtime.ClearResourceTransformAsync(TestWaits.Token);
+        await runtime.ClearResourceTransformAsync();
 
         await map.CloseAsync();
         await runtime.CloseAsync();
@@ -138,7 +138,7 @@ public sealed class HandleLifecycleTests
 
         var error = Assert.Throws<MaplibreException>(() =>
         {
-            _ = map.RequestRepaintAsync(TestWaits.Token);
+            _ = map.RequestRepaintAsync();
         });
 
         Assert.Equal(Status.InvalidState, error.Status);
@@ -152,7 +152,7 @@ public sealed class HandleLifecycleTests
         Gc.Collect();
 
         Assert.True(runtime.IsAlive);
-        var completion = await map.SetStyleJsonAsync(NativeFixture.EmptyStyle, TestWaits.Token);
+        var completion = await map.SetStyleJsonAsync(NativeFixture.EmptyStyle);
         Assert.Equal(CommandDisposition.Committed, completion.Disposition);
         await map.CloseAsync();
         await ((RuntimeHandle)runtime.Target!).CloseAsync();
@@ -173,7 +173,7 @@ public sealed class HandleLifecycleTests
         var creation = DropCreation(runtime);
         // The creation completes before a later runtime command, so the dropped task holds the
         // map.
-        await runtime.ClearResourceTransformAsync(TestWaits.Token);
+        await runtime.ClearResourceTransformAsync();
 
         Gc.Collect();
 

@@ -23,7 +23,7 @@ public sealed class ResourceProviderTests
             TaskCreationOptions.RunContinuationsAsynchronously
         );
         await using var fixture = await NativeFixture.CreateAsync(provider: Holding(received));
-        await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
+        await fixture.Map.SetStyleUrlAsync(StyleUrl);
         using var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
 
         // Native rejects a malformed etag while the request stays open for another answer.
@@ -85,11 +85,11 @@ public sealed class ResourceProviderTests
             }
         );
 
-        await fixture.Map.SetStyleUrlAsync("unrouted-test://maps/style.json", TestWaits.Token);
+        await fixture.Map.SetStyleUrlAsync("unrouted-test://maps/style.json");
         await fixture.WaitForMapEventAsync(RuntimeEventType.MapLoadingFailed);
         Assert.Empty(seen);
 
-        await fixture.Map.SetStyleUrlAsync(routedStyle, TestWaits.Token);
+        await fixture.Map.SetStyleUrlAsync(routedStyle);
         await sourceRequested.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
 
         Assert.Equal(
@@ -176,7 +176,7 @@ public sealed class ResourceProviderTests
             TaskCreationOptions.RunContinuationsAsynchronously
         );
         await using var fixture = await NativeFixture.CreateAsync(provider: Holding(received));
-        await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
+        await fixture.Map.SetStyleUrlAsync(StyleUrl);
         var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
         var calls = 0;
 
@@ -203,7 +203,7 @@ public sealed class ResourceProviderTests
             TaskCreationOptions.RunContinuationsAsynchronously
         );
         await using var fixture = await NativeFixture.CreateAsync(provider: Holding(received));
-        await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
+        await fixture.Map.SetStyleUrlAsync(StyleUrl);
         using var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
         await fixture.Map.CloseAsync();
         Assert.True(handle.IsCancelled());
@@ -239,7 +239,7 @@ public sealed class ResourceProviderTests
             }
         );
 
-        await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
+        await fixture.Map.SetStyleUrlAsync(StyleUrl);
         await fixture.WaitForMapEventAsync(RuntimeEventType.MapLoadingFailed);
 
         Assert.NotNull(escaped);

@@ -97,12 +97,11 @@ public sealed class PublicApiSurfaceTests
         Assert.Empty(violations);
     }
 
-    // Every wrapper over a C completion hands the caller a task to await, so it takes a
-    // cancellation token, including a create, whose handle the binding disposes when it arrives
-    // after cancellation. A close is the exception: it consumes its handle synchronously, and its
-    // task only reports retirement.
+    // A token cancels only the wait, never the native work, so a task method takes one only when
+    // it delivers an owner: the binding disposes an owner that arrives after the caller stopped
+    // waiting. Every other caller abandons a wait with Task.WaitAsync.
     [Fact]
-    public void CompletionWrappersTakeACancellationTokenUnlessTheyConsumeTheirHandle()
+    public void OnlyTaskMethodsThatDeliverAnOwnerTakeACancellationToken()
     {
         var violations = new List<string>();
 
@@ -126,18 +125,16 @@ public sealed class PublicApiSurfaceTests
                 var takesToken = method
                     .GetParameters()
                     .Any(parameter => parameter.ParameterType == typeof(CancellationToken));
-                if (method.Name == "CloseAsync")
+                var deliversOwner =
+                    method.ReturnType.IsGenericType
+                    && typeof(IDisposable).IsAssignableFrom(
+                        method.ReturnType.GetGenericArguments()[0]
+                    );
+                if (takesToken != deliversOwner)
                 {
-                    if (takesToken)
-                    {
-                        violations.Add($"{type.FullName}.{method.Name} takes a token");
-                    }
-                    continue;
-                }
-
-                if (!takesToken)
-                {
-                    violations.Add($"{type.FullName}.{method.Name} takes no token");
+                    violations.Add(
+                        $"{type.FullName}.{method.Name} {(takesToken ? "takes" : "takes no")} token"
+                    );
                 }
             }
         }
