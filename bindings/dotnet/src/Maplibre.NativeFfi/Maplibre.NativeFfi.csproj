@@ -14,7 +14,9 @@
     <RepositoryUrl>https://github.com/maplibre/maplibre-native-ffi</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <NoWarn>$(NoWarn);0649</NoWarn>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Generated members carry only the docs their C declarations have. -->
+    <NoWarn>$(NoWarn);0649;1573;1591</NoWarn>
     <RootNamespace>Maplibre.NativeFfi</RootNamespace>
     <AssemblyName>Maplibre.NativeFfi</AssemblyName>
   </PropertyGroup>

@@ -10,9 +10,7 @@
       "dest": "../build/docfx-api",
       "filter": "filterConfig.yml",
       "properties": {
-        "TargetFramework": "net10.0",
-        "GenerateDocumentationFile": "true",
-        "NoWarn": "1591;0649"
+        "TargetFramework": "net10.0"
       }
     }
   ],
