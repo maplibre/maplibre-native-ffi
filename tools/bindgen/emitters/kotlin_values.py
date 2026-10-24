@@ -314,19 +314,10 @@ class Values:
     def field_default(self, field, record=None):
         if record and record.default:
             return f"{name(record.native)}.default.{identifier(field.name)}"
-        output = bool(record) and self.output_only(record)
-        if field.value.kind == "union":
-            if output and field.value.empty_variant:
-                return f"{name(record.native)}{pascal(field.name)}.None"
-            return None
-        return self.default(field.value, output)
+        return self.default(field.value)
 
-    def default(self, value, output=False):
-        """A field's default, or None when a caller must give it.
-
-        Every field of a record the library creates has one, so a field that C appends
-        keeps named-argument constructions compiling.
-        """
+    def default(self, value):
+        """A field's default, or None when a caller must give it."""
         if value.nullable or value.optional:
             return "null"
         if value.kind == "scalar":
@@ -336,16 +327,14 @@ class Values:
         if value.kind == "buffer":
             return '""' if value.encoding == "utf8" else "byteArrayOf()"
         if value.kind == "enum":
-            public = name(value.native)
             constant = zero_constant(value)
-            if constant:
-                return f"{public}.{constant}"
-            return f"{public}({literal(0, self.scalar(value)[0])})" if output else None
+            return f"{name(value.native)}.{constant}" if constant else None
         if value.kind == "record":
             return (
                 name(value.native) + "()"
-                if all(
-                    typ.endswith("?") or self.field_default(field, value)
+                if not self.output_only(value)
+                and all(
+                    typ.endswith("?") or self.field_default(field)
                     for _, typ, field in self.members(value)
                 )
                 else None
@@ -435,10 +424,17 @@ class Values:
                 )
             args = []
             typed = []
+            # A record that only the library creates takes every field, so a
+            # field that C appends reaches each caller that fabricates one.
+            required = self.output_only(value)
             for member, typ, field in self.members(value):
                 typed.append((member, typ))
                 default = (
-                    "null" if typ.endswith("?") else self.field_default(field, value)
+                    None
+                    if required
+                    else "null"
+                    if typ.endswith("?")
+                    else self.field_default(field, value)
                 )
                 args.append(
                     doc(self.bound, f"{value.native}.{field.name}", "  ")
@@ -446,7 +442,8 @@ class Values:
                     + (" = " + default if default is not None else "")
                 )
             args.extend(
-                f"{doc(self.bound, flag.name, '  ')}  public val {self.flag_name(value, flag)}: Boolean = false"
+                f"{doc(self.bound, flag.name, '  ')}  public val {self.flag_name(value, flag)}: Boolean"
+                + ("" if required else " = false")
                 for flag in value.mask_flags
             )
             typed.extend(

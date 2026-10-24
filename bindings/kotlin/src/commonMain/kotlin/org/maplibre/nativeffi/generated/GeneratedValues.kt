@@ -1562,26 +1562,26 @@ public data class WebglContextKind(public val rawValue: UInt) {
  */
 public class MetalTextureFrame(
   /** Session generation that produced this frame. */
-  generation: ULong = 0uL,
+  generation: ULong,
   /** Physical Metal texture width in device pixels. */
-  width: UInt = 0u,
+  width: UInt,
   /** Physical Metal texture height in device pixels. */
-  height: UInt = 0u,
+  height: UInt,
   /** UI-to-device pixel scale used for this frame. */
-  scaleFactor: Double = 0.0,
+  scaleFactor: Double,
   /** Opaque identity of this frame. */
-  frameId: ULong = 0uL,
+  frameId: ULong,
   /**
    * Ring slot that holds this frame. For a borrowed target, the index of its texture in the
    * descriptor's textures array.
    */
-  slot: UInt = 0u,
+  slot: UInt,
   /** Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release. */
   texture: NativePointer,
   /** Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release. */
   device: NativePointer,
   /** Backend-native pixel format value. Metal uses MTLPixelFormat. */
-  pixelFormat: ULong = 0uL,
+  pixelFormat: ULong,
 ) {
   internal var bindingScope: ViewScope? = null
   private val storedGeneration: ULong = generation
@@ -1656,33 +1656,33 @@ public class MetalTextureFrame(
  */
 public class OpenglTextureFrame(
   /** Session generation that produced this frame. */
-  generation: ULong = 0uL,
+  generation: ULong,
   /** Physical OpenGL texture width in device pixels. */
-  width: UInt = 0u,
+  width: UInt,
   /** Physical OpenGL texture height in device pixels. */
-  height: UInt = 0u,
+  height: UInt,
   /** UI-to-device pixel scale used for this frame. */
-  scaleFactor: Double = 0.0,
+  scaleFactor: Double,
   /** Opaque identity of this frame. */
-  frameId: ULong = 0uL,
+  frameId: ULong,
   /**
    * Ring slot that holds this frame. For a borrowed target, the index of its texture in the
    * descriptor's textures array.
    */
-  slot: UInt = 0u,
+  slot: UInt,
   /** Borrowed OpenGL texture object name. Valid until frame release. */
-  texture: UInt = 0u,
+  texture: UInt,
   /** OpenGL texture target. GL_TEXTURE_2D is the expected target. */
-  target: UInt = 0u,
+  target: UInt,
   /**
    * OpenGL internal format, such as GL_RGBA8. Zero for a borrowed texture, whose format the host
    * chose.
    */
-  internalFormat: UInt = 0u,
+  internalFormat: UInt,
   /** OpenGL pixel format, such as GL_RGBA. Zero for a borrowed texture. */
-  format: UInt = 0u,
+  format: UInt,
   /** OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed texture. */
-  type: UInt = 0u,
+  type: UInt,
 ) {
   internal var bindingScope: ViewScope? = null
   private val storedGeneration: ULong = generation
@@ -1947,25 +1947,25 @@ public data class MapView(
  */
 public data class RenderFrameResult(
   /** One `mln_render_result` value. */
-  public val disposition: RenderResult = RenderResult.RENDERED,
-  public val token: ULong = 0uL,
+  public val disposition: RenderResult,
+  public val token: ULong,
   /**
    * Generation of the map render update the demand evaluated. When disposition is
    * `MLN_RENDER_RESULT_RENDERED`, the frame drew that update; compare it with
    * `mln_completion_result.render_update_generation` to find the first frame that includes a
    * command.
    */
-  public val mapUpdateGeneration: ULong = 0uL,
+  public val mapUpdateGeneration: ULong,
   /**
    * The session's target generation when the demand reached its result. See
    * `mln_render_session_snapshot.generation`.
    */
-  public val generation: ULong = 0uL,
+  public val generation: ULong,
   /**
    * Position of the frame among the frames that the session rendered, counting from one. Zero
    * unless disposition is `MLN_RENDER_RESULT_RENDERED`.
    */
-  public val frameGeneration: ULong = 0uL,
+  public val frameGeneration: ULong,
   /**
    * Whether the map asked for another frame while it rendered this one, as during an ongoing paint
    * transition. Set only when disposition is `MLN_RENDER_RESULT_RENDERED`, and false for every
@@ -1974,14 +1974,14 @@ public data class RenderFrameResult(
    * publishes an update for each of the transition's frames instead, which a render-if-needed
    * demand renders.
    */
-  public val needsRepaint: Boolean = false,
+  public val needsRepaint: Boolean,
   /**
    * The view that this frame drew, from the transform of the map update that it rendered. A host
    * that displays the frame builds its projection with `mln_map_projection_create()` to place
    * overlays where the frame drew their coordinates. Zero, with a size of zero, unless disposition
    * is `MLN_RENDER_RESULT_RENDERED`.
    */
-  public val view: MapView = MapView(),
+  public val view: MapView,
 )
 
 /**
@@ -1992,34 +1992,34 @@ public data class RenderFrameResult(
  */
 public class VulkanTextureFrame(
   /** Session generation that produced this frame. */
-  generation: ULong = 0uL,
+  generation: ULong,
   /** Physical Vulkan image width in device pixels. */
-  width: UInt = 0u,
+  width: UInt,
   /** Physical Vulkan image height in device pixels. */
-  height: UInt = 0u,
+  height: UInt,
   /** UI-to-device pixel scale used for this frame. */
-  scaleFactor: Double = 0.0,
+  scaleFactor: Double,
   /** Opaque identity of this frame. */
-  frameId: ULong = 0uL,
+  frameId: ULong,
   /**
    * Ring slot that holds this frame. For a borrowed target, the index of its image in the
    * descriptor's textures array.
    */
-  slot: UInt = 0u,
+  slot: UInt,
   /** Borrowed VkImage bit pattern. Valid until frame release. */
-  image: ULong = 0uL,
+  image: ULong,
   /** Borrowed VkImageView bit pattern. Valid until frame release. */
-  imageView: ULong = 0uL,
+  imageView: ULong,
   /** Borrowed VkDevice. Valid until frame release. */
   device: NativePointer,
   /** Backend-native VkFormat value. */
-  format: UInt = 0u,
+  format: UInt,
   /**
    * Backend-native VkImageLayout value that the image is in:
    * VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for a session-owned ring, and the descriptor's
    * final_layout for a borrowed one.
    */
-  layout: UInt = 0u,
+  layout: UInt,
 ) {
   internal var bindingScope: ViewScope? = null
   private val storedGeneration: ULong = generation
@@ -2108,20 +2108,20 @@ public class VulkanTextureFrame(
  */
 public class WebgpuTextureFrame(
   /** Session generation that produced this frame. */
-  generation: ULong = 0uL,
+  generation: ULong,
   /** Physical WebGPU texture width in device pixels. */
-  width: UInt = 0u,
+  width: UInt,
   /** Physical WebGPU texture height in device pixels. */
-  height: UInt = 0u,
+  height: UInt,
   /** UI-to-device pixel scale used for this frame. */
-  scaleFactor: Double = 0.0,
+  scaleFactor: Double,
   /** Opaque identity of this frame. */
-  frameId: ULong = 0uL,
+  frameId: ULong,
   /**
    * Ring slot that holds this frame. For a borrowed target, the index of its texture in the
    * descriptor's textures array.
    */
-  slot: UInt = 0u,
+  slot: UInt,
   /** Borrowed WGPUTexture. Valid until frame release. */
   texture: NativePointer,
   /** Borrowed WGPUTextureView. Valid until frame release. */
@@ -2129,7 +2129,7 @@ public class WebgpuTextureFrame(
   /** Borrowed WGPUDevice. Valid until frame release. */
   device: NativePointer,
   /** Backend-native WGPUTextureFormat value. */
-  format: UInt = 0u,
+  format: UInt,
 ) {
   internal var bindingScope: ViewScope? = null
   private val storedGeneration: ULong = generation
@@ -2224,13 +2224,13 @@ public data class UnitBezier(
  */
 public data class CameraTransitionEnd(
   /** One of `mln_camera_transition_outcome`. */
-  public val outcome: CameraTransitionOutcome = CameraTransitionOutcome.COMPLETED,
+  public val outcome: CameraTransitionOutcome,
   /**
    * Generation of the published snapshot that shows the camera where the transitions left it. The
    * map events of the change that ended them carry this generation and are queued before the
    * callback runs. Zero for `MLN_CAMERA_TRANSITION_OUTCOME_CLOSED`.
    */
-  public val generation: ULong = 0uL,
+  public val generation: ULong,
 )
 
 /**
@@ -3504,8 +3504,8 @@ public data class WebgpuSurfaceDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class CameraQueryResult(
-  public val generation: ULong = 0uL,
-  public val camera: CameraOptions = CameraOptions(),
+  public val generation: ULong,
+  public val camera: CameraOptions,
 )
 
 /**
@@ -3536,30 +3536,30 @@ public data class FeatureStateSelector(
  */
 public data class MapSnapshot(
   /** Debug overlay mask of `mln_map_debug_option` values. */
-  public val debugOptions: MapDebugOption = MapDebugOption.NONE,
-  public val generation: ULong = 0uL,
+  public val debugOptions: MapDebugOption,
+  public val generation: ULong,
   /** True once every requested style and tile resource finished loading. */
-  public val fullyLoaded: Boolean = false,
-  public val renderingStatsViewEnabled: Boolean = false,
+  public val fullyLoaded: Boolean,
+  public val renderingStatsViewEnabled: Boolean,
   /** True while the map is inside a gesture. */
-  public val gestureInProgress: Boolean = false,
+  public val gestureInProgress: Boolean,
   /** True while a camera command with a duration is still animating. */
-  public val transitionInProgress: Boolean = false,
-  public val eventMask: RuntimeEventMask = RuntimeEventMask.NONE,
+  public val transitionInProgress: Boolean,
+  public val eventMask: RuntimeEventMask,
   /**
    * Generation of the latest render update the map published. A rendered frame at or past it draws
    * map state that includes every command this snapshot observes, though animations and resource
    * loads finish in later frames.
    */
-  public val latestRenderUpdateGeneration: ULong = 0uL,
-  public val tile: MapTileOptions = MapTileOptions(),
-  public val bounds: BoundOptions = BoundOptions(),
-  public val freeCamera: FreeCameraOptions = FreeCameraOptions(),
+  public val latestRenderUpdateGeneration: ULong,
+  public val tile: MapTileOptions,
+  public val bounds: BoundOptions,
+  public val freeCamera: FreeCameraOptions,
   /**
    * The map's camera, extent, projection mode, and viewport options. `mln_map_projection_create()`
    * converts coordinates for this view.
    */
-  public val view: MapView = MapView(),
+  public val view: MapView,
 )
 
 /**
@@ -3570,25 +3570,25 @@ public data class MapSnapshot(
  */
 public data class StyleImageInfo(
   /** Image width in pixels. */
-  public val width: UInt = 0u,
+  public val width: UInt,
   /** Image height in pixels. */
-  public val height: UInt = 0u,
+  public val height: UInt,
   /** Premultiplied RGBA8 pixels in tightly packed rows of width &#42; 4 bytes, top row first. */
-  public val pixels: ByteArray = byteArrayOf(),
+  public val pixels: ByteArray,
   /** Horizontally stretchable intervals. */
-  public val stretchX: List<ImageStretch> = emptyList(),
+  public val stretchX: List<ImageStretch>,
   /** Vertically stretchable intervals. */
-  public val stretchY: List<ImageStretch> = emptyList(),
+  public val stretchY: List<ImageStretch>,
   /** Content box, when the image sets one. */
-  public val content: ImageContent? = null,
+  public val content: ImageContent?,
   /** How the image fits text horizontally, when it sets this. */
-  public val textFitWidth: StyleImageTextFit? = null,
+  public val textFitWidth: StyleImageTextFit?,
   /** How the image fits text vertically, when it sets this. */
-  public val textFitHeight: StyleImageTextFit? = null,
+  public val textFitHeight: StyleImageTextFit?,
   /** Sprite pixel ratio. */
-  public val pixelRatio: Float = 0f,
+  public val pixelRatio: Float,
   /** Whether the image is a signed distance field icon. */
-  public val sdf: Boolean = false,
+  public val sdf: Boolean,
 ) {
   private fun contentFields(): Array<Any?> =
     arrayOf(
@@ -3619,19 +3619,19 @@ public data class StyleImageInfo(
  */
 public data class StyleLayerInfo(
   /** Layer ID. */
-  public val id: String = "",
+  public val id: String,
   /** The style-spec layer type string. */
-  public val type: String = "",
+  public val type: String,
   /** Source ID. Empty for a layer type that takes no source. */
-  public val sourceId: String? = null,
+  public val sourceId: String?,
   /** Source-layer ID. Empty when the layer sets none. */
-  public val sourceLayer: String? = null,
+  public val sourceLayer: String?,
   /** Lowest zoom at which the layer draws; -INFINITY with no lower bound. */
-  public val minZoom: Double = 0.0,
+  public val minZoom: Double,
   /** Highest zoom at which the layer draws; INFINITY with no upper bound. */
-  public val maxZoom: Double = 0.0,
+  public val maxZoom: Double,
   /** One of `mln_style_layer_visibility`. */
-  public val visibility: StyleLayerVisibility = StyleLayerVisibility.VISIBLE,
+  public val visibility: StyleLayerVisibility,
 )
 
 /**
@@ -3642,13 +3642,13 @@ public data class StyleLayerInfo(
  */
 public data class StyleSourceTileInfo(
   /** Tile URL templates in TileJSON order. */
-  public val tileUrls: List<String> = emptyList(),
+  public val tileUrls: List<String>,
   /** Lowest zoom level the TileJSON provides tiles for. */
-  public val minZoom: Double = 0.0,
+  public val minZoom: Double,
   /** Highest zoom level the TileJSON provides tiles for. */
-  public val maxZoom: Double = 0.0,
+  public val maxZoom: Double,
   /** One of `mln_style_tile_scheme`. */
-  public val scheme: StyleTileScheme = StyleTileScheme.XYZ,
+  public val scheme: StyleTileScheme,
 )
 
 /**
@@ -3659,25 +3659,25 @@ public data class StyleSourceTileInfo(
  */
 public data class StyleSourceInfo(
   /** Source ID. */
-  public val id: String = "",
+  public val id: String,
   /** One of `mln_style_source_type`. */
-  public val type: StyleSourceType = StyleSourceType.UNKNOWN,
+  public val type: StyleSourceType,
   /** Whether the source is marked volatile. */
-  public val isVolatile: Boolean = false,
+  public val isVolatile: Boolean,
   /** Attribution string, when the source sets one. It may be empty. */
-  public val attribution: String? = null,
+  public val attribution: String?,
   /** URL that the source loads from, when it has one. */
-  public val url: String? = null,
+  public val url: String?,
   /** Inline TileJSON metadata, when the source was defined with it. */
-  public val tilejson: StyleSourceTileInfo? = null,
+  public val tilejson: StyleSourceTileInfo?,
   /** Geographic bounds, when inline TileJSON sets them. */
-  public val bounds: LatLngBounds? = null,
+  public val bounds: LatLngBounds?,
   /** Tile size in pixels, for a tile source. */
-  public val tileSize: UInt? = null,
+  public val tileSize: UInt?,
   /** Vector tile encoding, for a vector source. */
-  public val vectorEncoding: StyleVectorTileEncoding? = null,
+  public val vectorEncoding: StyleVectorTileEncoding?,
   /** DEM raster encoding, when inline TileJSON sets one. */
-  public val rasterEncoding: StyleRasterDemEncoding? = null,
+  public val rasterEncoding: StyleRasterDemEncoding?,
 )
 
 /**
@@ -3688,14 +3688,14 @@ public data class StyleSourceInfo(
  */
 public data class RenderFrameBatchView(
   /** Borrowed array of result_count terminal frame results in completion order. */
-  public val results: List<RenderFrameResult> = emptyList(),
+  public val results: List<RenderFrameResult>,
 )
 
 public data class RenderAbandonResult(
   /** One `mln_render_abandon_disposition` value. */
-  public val disposition: RenderAbandonDisposition = RenderAbandonDisposition.CLEAN,
+  public val disposition: RenderAbandonDisposition,
   /** Backend resource groups intentionally retained until process exit. */
-  public val quarantinedResourceCount: UInt = 0u,
+  public val quarantinedResourceCount: UInt,
 )
 
 /**
@@ -3706,14 +3706,14 @@ public data class RenderAbandonResult(
  */
 public data class RenderSessionCapabilities(
   /** One `mln_render_driver_kind` value. */
-  public val driver: RenderDriverKind = RenderDriverKind(0u),
+  public val driver: RenderDriverKind,
   /**
    * Granted texture ring depth: the slot count of a session-owned ring, or the texture count of a
    * borrowed one. Zero for a surface.
    */
-  public val textureRingDepth: UInt = 0u,
+  public val textureRingDepth: UInt,
   /** A bitwise OR of `mln_render_session_capability_flag` values. */
-  public val flags: RenderSessionCapabilityFlag = RenderSessionCapabilityFlag.NONE,
+  public val flags: RenderSessionCapabilityFlag,
 )
 
 /**
@@ -3724,27 +3724,27 @@ public data class RenderSessionCapabilities(
  */
 public data class RenderSessionSnapshot(
   /** One `mln_render_session_state` value. */
-  public val state: RenderSessionState = RenderSessionState(0u),
+  public val state: RenderSessionState,
   /** Logical extent applied by the driver. */
-  public val extent: LogicalExtent = LogicalExtent(),
+  public val extent: LogicalExtent,
   /**
    * Increases when the session's lifecycle state, target, or applied extent changes. An acquired
    * texture frame reports the value it rendered under.
    */
-  public val generation: ULong = 0uL,
+  public val generation: ULong,
   /** Generation of the latest map render update that the session has seen. */
-  public val mapUpdateGeneration: ULong = 0uL,
+  public val mapUpdateGeneration: ULong,
   /**
    * Map render update generation that the latest rendered frame drew. Zero before the first frame
    * after attachment or a target replacement.
    */
-  public val renderedUpdateGeneration: ULong = 0uL,
+  public val renderedUpdateGeneration: ULong,
   /** Frame generation of the latest rendered frame, zero before the first. */
-  public val frameGeneration: ULong = 0uL,
+  public val frameGeneration: ULong,
   /** Acquired frames that the host has not released or disposed. */
-  public val acquiredFrameCount: UInt = 0u,
+  public val acquiredFrameCount: UInt,
   /** True when a map update or an accepted resize arrived after the latest rendered frame. */
-  public val pendingChanges: Boolean = false,
+  public val pendingChanges: Boolean,
 )
 
 /**
@@ -3810,11 +3810,11 @@ public data class RenderedQueryGeometry(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 public data class RenderedFeature(
-  public val feature: ByteArray = byteArrayOf(),
-  public val layerId: String = "",
-  public val sourceId: String? = null,
-  public val sourceLayerId: String? = null,
-  public val state: ByteArray? = null,
+  public val feature: ByteArray,
+  public val layerId: String,
+  public val sourceId: String?,
+  public val sourceLayerId: String?,
+  public val state: ByteArray?,
 ) {
   private fun contentFields(): Array<Any?> =
     arrayOf(feature, layerId, sourceId, sourceLayerId, state)
@@ -3833,8 +3833,8 @@ public data class RenderedFeature(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 public data class SourceFeature(
-  public val feature: ByteArray = byteArrayOf(),
-  public val sourceLayerId: String? = null,
+  public val feature: ByteArray,
+  public val sourceLayerId: String?,
 ) {
   private fun contentFields(): Array<Any?> = arrayOf(feature, sourceLayerId)
 
@@ -3853,13 +3853,13 @@ public data class SourceFeature(
  */
 public data class TextureImageInfo(
   /** Physical image width in device pixels. */
-  public val width: UInt = 0u,
+  public val width: UInt,
   /** Physical image height in device pixels. */
-  public val height: UInt = 0u,
+  public val height: UInt,
   /** Bytes per image row. */
-  public val stride: UInt = 0u,
+  public val stride: UInt,
   /** Required output buffer byte length. */
-  public val byteLength: ULong = 0uL,
+  public val byteLength: ULong,
 )
 
 /**
@@ -3870,8 +3870,8 @@ public data class TextureImageInfo(
  */
 public data class TextureReadbackResult(
   /** Borrowed pixel bytes, valid only during the callback. */
-  public val data: ByteArray = byteArrayOf(),
-  public val info: TextureImageInfo = TextureImageInfo(),
+  public val data: ByteArray,
+  public val info: TextureImageInfo,
 ) {
   private fun contentFields(): Array<Any?> = arrayOf(data, info)
 
@@ -4006,10 +4006,10 @@ public data class OfflineRegionDefinition(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class OfflineRegionInfo(
-  public val id: Long = 0L,
+  public val id: Long,
   public val definition: OfflineRegionDefinition,
   /** Metadata bytes. */
-  public val metadata: ByteArray = byteArrayOf(),
+  public val metadata: ByteArray,
 ) {
   private fun contentFields(): Array<Any?> = arrayOf(id, definition, metadata)
 
@@ -4028,15 +4028,15 @@ public data class OfflineRegionInfo(
  */
 public data class OfflineRegionStatus(
   /** One of `mln_offline_region_download_state`. */
-  public val downloadState: OfflineRegionDownloadState = OfflineRegionDownloadState.INACTIVE,
-  public val completedResourceCount: ULong = 0uL,
-  public val completedResourceSize: ULong = 0uL,
-  public val completedTileCount: ULong = 0uL,
-  public val requiredTileCount: ULong = 0uL,
-  public val completedTileSize: ULong = 0uL,
-  public val requiredResourceCount: ULong = 0uL,
-  public val requiredResourceCountIsPrecise: Boolean = false,
-  public val complete: Boolean = false,
+  public val downloadState: OfflineRegionDownloadState,
+  public val completedResourceCount: ULong,
+  public val completedResourceSize: ULong,
+  public val completedTileCount: ULong,
+  public val requiredTileCount: ULong,
+  public val completedTileSize: ULong,
+  public val requiredResourceCount: ULong,
+  public val requiredResourceCountIsPrecise: Boolean,
+  public val complete: Boolean,
 )
 
 /**
@@ -4047,15 +4047,15 @@ public data class OfflineRegionStatus(
  */
 public data class RenderingStats(
   /** Frame CPU encoding time in seconds. */
-  public val encodingTime: Double = 0.0,
+  public val encodingTime: Double,
   /** Frame CPU rendering time in seconds. */
-  public val renderingTime: Double = 0.0,
+  public val renderingTime: Double,
   /** Number of frames rendered by the native renderer. */
-  public val frameCount: Long = 0L,
+  public val frameCount: Long,
   /** Draw calls executed during the most recent frame. */
-  public val drawCallCount: Long = 0L,
+  public val drawCallCount: Long,
   /** Total draw calls executed by the native renderer. */
-  public val totalDrawCallCount: Long = 0L,
+  public val totalDrawCallCount: Long,
 )
 
 /**
@@ -4066,12 +4066,12 @@ public data class RenderingStats(
  */
 public data class RuntimeEventRenderFrame(
   /** One of `mln_render_mode`. */
-  public val mode: RenderMode = RenderMode.PARTIAL,
+  public val mode: RenderMode,
   /** Whether MapLibre needs another frame after this one. */
-  public val needsRepaint: Boolean = false,
+  public val needsRepaint: Boolean,
   /** Whether symbol placement changed during this frame. */
-  public val placementChanged: Boolean = false,
-  public val stats: RenderingStats = RenderingStats(),
+  public val placementChanged: Boolean,
+  public val stats: RenderingStats,
 )
 
 /**
@@ -4082,7 +4082,7 @@ public data class RuntimeEventRenderFrame(
  */
 public data class RuntimeEventRenderMap(
   /** One of `mln_render_mode`. */
-  public val mode: RenderMode = RenderMode.PARTIAL,
+  public val mode: RenderMode,
 )
 
 /**
@@ -4092,11 +4092,11 @@ public data class RuntimeEventRenderMap(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class TileId(
-  public val overscaledZ: UInt = 0u,
-  public val wrap: Int = 0,
-  public val canonicalZ: UInt = 0u,
-  public val canonicalX: UInt = 0u,
-  public val canonicalY: UInt = 0u,
+  public val overscaledZ: UInt,
+  public val wrap: Int,
+  public val canonicalZ: UInt,
+  public val canonicalX: UInt,
+  public val canonicalY: UInt,
 )
 
 /**
@@ -4107,8 +4107,8 @@ public data class TileId(
  */
 public data class RuntimeEventTileAction(
   /** One of `mln_tile_operation`. */
-  public val operation: TileOperation = TileOperation.REQUESTED_FROM_CACHE,
-  public val tileId: TileId = TileId(),
+  public val operation: TileOperation,
+  public val tileId: TileId,
 )
 
 /**
@@ -4118,8 +4118,8 @@ public data class RuntimeEventTileAction(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RuntimeEventOfflineRegionStatus(
-  public val regionId: Long = 0L,
-  public val status: OfflineRegionStatus = OfflineRegionStatus(),
+  public val regionId: Long,
+  public val status: OfflineRegionStatus,
 )
 
 /**
@@ -4129,9 +4129,9 @@ public data class RuntimeEventOfflineRegionStatus(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RuntimeEventOfflineRegionResponseError(
-  public val regionId: Long = 0L,
+  public val regionId: Long,
   /** One of `mln_resource_error_reason`. */
-  public val reason: ResourceErrorReason = ResourceErrorReason.NONE,
+  public val reason: ResourceErrorReason,
 )
 
 /**
@@ -4141,8 +4141,8 @@ public data class RuntimeEventOfflineRegionResponseError(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RuntimeEventOfflineRegionTileCountLimit(
-  public val regionId: Long = 0L,
-  public val limit: ULong = 0uL,
+  public val regionId: Long,
+  public val limit: ULong,
 )
 
 /**
@@ -4190,22 +4190,22 @@ public sealed interface RuntimeEventPayload {
  */
 public data class RuntimeEvent(
   /** One of `mln_runtime_event_type`. */
-  public val type: RuntimeEventType = RuntimeEventType(0u),
+  public val type: RuntimeEventType,
   /** One of `mln_runtime_event_source_type`. */
-  public val sourceType: RuntimeEventSourceType = RuntimeEventSourceType.RUNTIME,
+  public val sourceType: RuntimeEventSourceType,
   /** Source handle selected by source_type: an `mln_runtime` or an `mln_map`. */
-  public val source: ULong = 0uL,
+  public val source: ULong,
   /**
    * Map snapshot generation that the event reports, or zero when source_type is
    * `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
    */
-  public val generation: ULong = 0uL,
+  public val generation: ULong,
   /** Secondary event detail whose meaning type selects; see `mln_runtime_event_type`. */
-  public val code: Int = 0,
+  public val code: Int,
   /** Borrowed UTF-8 message bytes, empty when this event carries no message. */
-  public val message: String = "",
+  public val message: String,
   /** Typed payload selected by payload_type. */
-  public val payload: RuntimeEventPayload = RuntimeEventPayload.None,
+  public val payload: RuntimeEventPayload,
 )
 
 /**
@@ -4216,7 +4216,7 @@ public data class RuntimeEvent(
  */
 public data class EventBatchView(
   /** Borrowed array of event_count events in queue order. */
-  public val events: List<RuntimeEvent> = emptyList(),
+  public val events: List<RuntimeEvent>,
 )
 
 /**
@@ -4227,29 +4227,29 @@ public data class EventBatchView(
  */
 public data class ResourceRange(
   /** First byte offset of the requested range. */
-  public val start: ULong = 0uL,
+  public val start: ULong,
   /** Last byte offset of the requested range, inclusive. */
-  public val end: ULong = 0uL,
+  public val end: ULong,
 )
 
 public data class ResourceRequestInfo(
   /** URL entering the network layer, before tile server normalization. */
-  public val requestedUrl: String? = null,
+  public val requestedUrl: String?,
   /**
    * URL to fetch, after resource-kind normalization against the runtime's tile server options and
    * API key.
    */
-  public val resolvedUrl: String? = null,
-  public val kind: ResourceKind = ResourceKind.UNKNOWN,
-  public val loadingMethod: ResourceLoadingMethod = ResourceLoadingMethod.ALL,
-  public val priority: ResourcePriority = ResourcePriority.REGULAR,
-  public val usage: ResourceUsage = ResourceUsage.ONLINE,
-  public val storagePolicy: ResourceStoragePolicy = ResourceStoragePolicy.PERMANENT,
-  public val range: ResourceRange? = null,
-  public val priorModifiedUnixMs: Long? = null,
-  public val priorExpiresUnixMs: Long? = null,
-  public val priorEtag: String? = null,
-  public val priorData: ByteArray = byteArrayOf(),
+  public val resolvedUrl: String?,
+  public val kind: ResourceKind,
+  public val loadingMethod: ResourceLoadingMethod,
+  public val priority: ResourcePriority,
+  public val usage: ResourceUsage,
+  public val storagePolicy: ResourceStoragePolicy,
+  public val range: ResourceRange?,
+  public val priorModifiedUnixMs: Long?,
+  public val priorExpiresUnixMs: Long?,
+  public val priorEtag: String?,
+  public val priorData: ByteArray,
 ) {
   private fun contentFields(): Array<Any?> =
     arrayOf(
@@ -4282,9 +4282,9 @@ public data class ResourceRequestInfo(
  */
 public data class StyleExpressionInfo(
   /** Whether the result is the same for every feature and feature state. */
-  public val isFeatureConstant: Boolean = false,
+  public val isFeatureConstant: Boolean,
   /** Whether the result is the same at every zoom. */
-  public val isZoomConstant: Boolean = false,
+  public val isZoomConstant: Boolean,
 )
 
 public data class RenderSessionAttachment(

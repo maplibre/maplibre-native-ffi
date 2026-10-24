@@ -32,8 +32,9 @@ class NativeRetireTest {
     try {
       assertRetainedOwner(token)
       val terminal = assertNotNull(CallbackRoots.get(callback)?.value) as CameraTransitionHandler
-      terminal.callback!!(CameraTransitionEnd(outcome = CameraTransitionOutcome.CLOSED))
-      assertEquals(listOf(CameraTransitionEnd(outcome = CameraTransitionOutcome.CLOSED)), delivered)
+      val end = CameraTransitionEnd(generation = 0uL, outcome = CameraTransitionOutcome.CLOSED)
+      terminal.callback!!(end)
+      assertEquals(listOf(end), delivered)
       CallbackRoots.release(callback)
 
       NativeArena().use { arena ->
