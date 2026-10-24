@@ -388,11 +388,16 @@ else
     maplibre.OpenglTextureFrame;
 
 /// Reads a scoped view of an acquired frame's texture on this build's backend.
-pub fn getOwnedTexture(frame: maplibre.AcquiredFrame, context: anytype, comptime use: anytype) @TypeOf(maplibre.acquiredFrameGetMetalTexture(frame, context, use, null)) {
-    if (build_options.supports_metal) return maplibre.acquiredFrameGetMetalTexture(frame, context, use, null);
-    if (build_options.supports_vulkan) return maplibre.acquiredFrameGetVulkanTexture(frame, context, use, null);
-    return maplibre.acquiredFrameGetOpenglTexture(frame, context, use, null);
+pub fn getOwnedTexture(frame: maplibre.AcquiredFrame, context: anytype, comptime use: anytype) @TypeOf(getBackendTexture(frame, context, use, null)) {
+    return getBackendTexture(frame, context, use, null);
 }
+
+const getBackendTexture = if (build_options.supports_metal)
+    maplibre.acquiredFrameGetMetalTexture
+else if (build_options.supports_vulkan)
+    maplibre.acquiredFrameGetVulkanTexture
+else
+    maplibre.acquiredFrameGetOpenglTexture;
 
 /// An owned-texture render session on a fixture's map, with the wakes that
 /// its waits block on. OpenGL sessions share the fixture context, which is

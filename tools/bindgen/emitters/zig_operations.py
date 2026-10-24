@@ -370,7 +370,11 @@ def consume(function, receiver, body, return_type, infallible=False):
     of a closed receiver does nothing; an asynchronous one reaches native,
     which reports a stale handle."""
     if infallible and return_type == "void":
-        return [f"if ({receiver}.closed) return;", body[0], f"{receiver}.closed = true;"]
+        return [
+            f"if ({receiver}.closed) return;",
+            body[0],
+            f"{receiver}.closed = true;",
+        ]
     if len(body) != 1 or not body[0].startswith("return "):
         raise failure(
             function, "consumption with outputs requires an owner transaction"
