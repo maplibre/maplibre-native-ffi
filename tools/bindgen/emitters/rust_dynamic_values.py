@@ -125,6 +125,10 @@ def decode(values, value, source, context="raw"):
         return f"match {context}.{native_identifier(value.tag)} {{ {', '.join(cases)}, tag => {name}::Unknown(tag as u32) }}"
     if value.kind in {"scalar", "native_pointer"}:
         return source
+    if value.kind == "enum":
+        # Open enums and flag sets keep values this binding predates.
+        convert = "from_bits_retain" if value.enum_kind == "bitmask" else "from_raw"
+        return f"{values.public(value)}::{convert}({source})"
     return TRAIT_COPY.format(source)
 
 

@@ -159,7 +159,7 @@ fn array_inputs_are_copied_when_they_are_submitted() {
 
 #[test]
 fn a_record_built_from_its_default_equals_the_native_default() {
-    assert_eq!(MapOptions::default(), map_options_default().unwrap());
+    assert_eq!(MapOptions::default(), map_options_default());
 }
 
 #[test]

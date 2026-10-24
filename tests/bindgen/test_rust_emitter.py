@@ -92,6 +92,13 @@ class RustEmitterTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             root = Path(directory)
             files = rust.generate(api)
+            # Parameters keep their C names, and the body's locals step aside.
+            self.assertIn(
+                "call: NewPoint, value: NewPoint, future: NewPoint",
+                " ".join(
+                    files["crates/maplibre-native-ffi/src/generated/map.rs"].split()
+                ),
+            )
             for path, source in files.items():
                 (root / path).parent.mkdir(parents=True, exist_ok=True)
                 (root / path).write_text(source)

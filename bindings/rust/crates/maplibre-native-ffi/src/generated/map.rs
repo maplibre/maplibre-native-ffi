@@ -1509,16 +1509,16 @@ impl MapHandle {
     pub fn set_global_state_property(
         &self,
         property_name: &str,
-        value_: &[u8],
+        value: &[u8],
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let property_name = call.input(&property_name)?;
-        let value_ = call.input(&value_)?;
+        let value = call.input(&value)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_global_state_property(
                 map,
                 property_name,
-                value_,
+                value,
                 completion,
                 out_diagnostic,
             )
@@ -1652,18 +1652,18 @@ impl MapHandle {
         &self,
         layer_id: &str,
         property_name: &str,
-        value_: &[u8],
+        value: &[u8],
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let layer_id = call.input(&layer_id)?;
         let property_name = call.input(&property_name)?;
-        let value_ = call.input(&value_)?;
+        let value = call.input(&value)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_layer_property(
                 map,
                 layer_id,
                 property_name,
-                value_,
+                value,
                 completion,
                 out_diagnostic,
             )
@@ -1693,16 +1693,16 @@ impl MapHandle {
     pub fn set_style_light_property(
         &self,
         property_name: &str,
-        value_: &[u8],
+        value: &[u8],
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let property_name = call.input(&property_name)?;
-        let value_ = call.input(&value_)?;
+        let value = call.input(&value)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_light_property(
                 map,
                 property_name,
-                value_,
+                value,
                 completion,
                 out_diagnostic,
             )
@@ -2447,15 +2447,15 @@ impl MapHandleDiscarding<'_> {
     ///
     /// See `mln_map_set_global_state_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_global_state_property(&self, property_name: &str, value_: &[u8]) -> Result<()> {
+    pub fn set_global_state_property(&self, property_name: &str, value: &[u8]) -> Result<()> {
         let mut call = self.0.inner.call();
         let property_name = call.input(&property_name)?;
-        let value_ = call.input(&value_)?;
+        let value = call.input(&value)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_global_state_property(
                 map,
                 property_name,
-                value_,
+                value,
                 completion,
                 out_diagnostic,
             )
@@ -2579,18 +2579,18 @@ impl MapHandleDiscarding<'_> {
         &self,
         layer_id: &str,
         property_name: &str,
-        value_: &[u8],
+        value: &[u8],
     ) -> Result<()> {
         let mut call = self.0.inner.call();
         let layer_id = call.input(&layer_id)?;
         let property_name = call.input(&property_name)?;
-        let value_ = call.input(&value_)?;
+        let value = call.input(&value)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_layer_property(
                 map,
                 layer_id,
                 property_name,
-                value_,
+                value,
                 completion,
                 out_diagnostic,
             )
@@ -2614,15 +2614,15 @@ impl MapHandleDiscarding<'_> {
     ///
     /// See `mln_map_set_style_light_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_style_light_property(&self, property_name: &str, value_: &[u8]) -> Result<()> {
+    pub fn set_style_light_property(&self, property_name: &str, value: &[u8]) -> Result<()> {
         let mut call = self.0.inner.call();
         let property_name = call.input(&property_name)?;
-        let value_ = call.input(&value_)?;
+        let value = call.input(&value)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_light_property(
                 map,
                 property_name,
-                value_,
+                value,
                 completion,
                 out_diagnostic,
             )

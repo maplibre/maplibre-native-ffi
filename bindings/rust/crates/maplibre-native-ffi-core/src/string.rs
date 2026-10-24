@@ -28,10 +28,28 @@ pub fn buffer_view(value: &[u8]) -> sys::mln_buffer_view {
 /// When `view.size` is nonzero, `view.data` must point to `view.size` bytes of
 /// storage valid for the duration of this call.
 pub unsafe fn copy_string_view(view: sys::mln_buffer_view) -> Result<String> {
-    // SAFETY: The caller promises the string view storage is valid for this
-    // call; copy_string_view_bytes copies before returning.
-    let bytes = unsafe { copy_string_view_bytes(view) }?;
-    String::from_utf8(bytes).map_err(|error| {
+    // SAFETY: the caller's contract, which this call needs only while it copies.
+    unsafe { borrow_string_view(view) }.map(str::to_owned)
+}
+
+/// Borrows a native string view as text.
+///
+/// # Safety
+///
+/// When `view.size` is nonzero, `view.data` must point to `view.size` bytes of
+/// storage valid for `'a`.
+pub unsafe fn borrow_string_view<'a>(view: sys::mln_buffer_view) -> Result<&'a str> {
+    if view.size == 0 {
+        return Ok("");
+    }
+    if view.data.is_null() {
+        return Err(Error::invalid_argument(
+            "native string view data must not be null when size is nonzero",
+        ));
+    }
+    // SAFETY: The caller promised the view points to view.size valid bytes.
+    let bytes = unsafe { std::slice::from_raw_parts(view.data.cast::<u8>(), view.size) };
+    str::from_utf8(bytes).map_err(|error| {
         Error::invalid_argument(format!("native string view was not valid UTF-8: {error}"))
     })
 }
@@ -64,14 +82,22 @@ pub unsafe fn copy_string_view_bytes(view: sys::mln_buffer_view) -> Result<Vec<u
 /// `ptr` must be null or point to a valid NUL-terminated C string for the
 /// duration of this call.
 pub unsafe fn copy_c_string(ptr: *const c_char) -> Result<String> {
-    if ptr.is_null() {
-        return Ok(String::new());
-    }
+    // SAFETY: the caller's contract, which this call needs only while it copies.
+    unsafe { borrow_c_string(ptr) }.map(str::to_owned)
+}
 
+/// Borrows a NUL-terminated native string as text, empty when `ptr` is null.
+///
+/// # Safety
+///
+/// `ptr` must be null or point to a valid NUL-terminated C string for `'a`.
+pub unsafe fn borrow_c_string<'a>(ptr: *const c_char) -> Result<&'a str> {
+    if ptr.is_null() {
+        return Ok("");
+    }
     // SAFETY: The caller promised ptr is a valid NUL-terminated C string.
     let bytes = unsafe { CStr::from_ptr(ptr) }.to_bytes();
     str::from_utf8(bytes)
-        .map(str::to_owned)
         .map_err(|error| Error::invalid_argument(format!("native C string was not UTF-8: {error}")))
 }
 

@@ -238,7 +238,7 @@ impl FromNative<sys::mln_camera_delta> for CameraDelta {
                 convert::present(raw.fields, sys::MLN_CAMERA_DELTA_ANCHOR, raw.anchor)
             }?,
             animation: unsafe { from_native(raw.animation) }?,
-            gesture_phase: unsafe { from_native(raw.gesture_phase) }?,
+            gesture_phase: GesturePhase::from_raw(raw.gesture_phase),
         })
     }
 }
@@ -428,7 +428,7 @@ impl CameraTransitionEnd {
 impl FromNative<sys::mln_camera_transition_end> for CameraTransitionEnd {
     unsafe fn from_native(raw: sys::mln_camera_transition_end) -> Result<Self> {
         Ok(Self {
-            outcome: unsafe { from_native(raw.outcome) }?,
+            outcome: CameraTransitionOutcome::from_raw(raw.outcome),
             generation: raw.generation,
         })
     }
@@ -441,7 +441,7 @@ impl FromNative<sys::mln_camera_transition_end> for CameraTransitionEnd {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Clone, Default)]
 pub struct CameraTransitionHandler {
-    pub callback: Option<std::sync::Arc<dyn Fn(CameraTransitionEnd) -> () + Send + Sync + 'static>>,
+    pub callback: Option<std::sync::Arc<dyn Fn(CameraTransitionEnd) + Send + Sync + 'static>>,
 }
 impl std::fmt::Debug for CameraTransitionHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -452,14 +452,14 @@ impl std::fmt::Debug for CameraTransitionHandler {
 impl CameraTransitionHandler {
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
-        F: Fn(CameraTransitionEnd) -> () + Send + Sync + 'static,
+        F: Fn(CameraTransitionEnd) + Send + Sync + 'static,
     {
         self.callback = Some(std::sync::Arc::new(callback));
         self
     }
     pub fn new<F>(callback: F) -> Self
     where
-        F: Fn(CameraTransitionEnd) -> () + Send + Sync + 'static,
+        F: Fn(CameraTransitionEnd) + Send + Sync + 'static,
     {
         Self::default().with_callback(callback)
     }
@@ -540,10 +540,10 @@ impl ToNative<sys::mln_camera_update> for CameraUpdate {
 impl FromNative<sys::mln_camera_update> for CameraUpdate {
     unsafe fn from_native(raw: sys::mln_camera_update) -> Result<Self> {
         Ok(Self {
-            mode: unsafe { from_native(raw.mode) }?,
+            mode: CameraUpdateMode::from_raw(raw.mode),
             camera: unsafe { from_native(raw.camera) }?,
             animation: unsafe { from_native(raw.animation) }?,
-            gesture_phase: unsafe { from_native(raw.gesture_phase) }?,
+            gesture_phase: GesturePhase::from_raw(raw.gesture_phase),
         })
     }
 }
@@ -628,9 +628,9 @@ pub enum ConstrainMode: u32 {
 #[derive(Clone)]
 pub struct CustomGeometrySourceOptions {
     /// Tile fetch callback. Required in callback mode; null in queue mode.
-    pub fetch_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) -> () + Send + Sync + 'static>>,
+    pub fetch_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>>,
     /// Optional best-effort tile cancel callback. Null in queue mode.
-    pub cancel_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) -> () + Send + Sync + 'static>>,
+    pub cancel_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>>,
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
     pub tolerance: Option<f64>,
@@ -653,20 +653,20 @@ impl std::fmt::Debug for CustomGeometrySourceOptions {
 impl CustomGeometrySourceOptions {
     pub fn with_fetch_tile<F>(mut self, callback: F) -> Self
     where
-        F: Fn(CanonicalTileId) -> () + Send + Sync + 'static,
+        F: Fn(CanonicalTileId) + Send + Sync + 'static,
     {
         self.fetch_tile = Some(std::sync::Arc::new(callback));
         self
     }
     pub fn new<F>(callback: F) -> Self
     where
-        F: Fn(CanonicalTileId) -> () + Send + Sync + 'static,
+        F: Fn(CanonicalTileId) + Send + Sync + 'static,
     {
         Self::default().with_fetch_tile(callback)
     }
     pub fn with_cancel_tile<F>(mut self, callback: F) -> Self
     where
-        F: Fn(CanonicalTileId) -> () + Send + Sync + 'static,
+        F: Fn(CanonicalTileId) + Send + Sync + 'static,
     {
         self.cancel_tile = Some(std::sync::Arc::new(callback));
         self
@@ -777,9 +777,9 @@ impl FromNative<sys::mln_custom_geometry_source_options> for CustomGeometrySourc
 #[derive(Clone)]
 pub struct CustomMvtVectorSourceOptions {
     /// Tile fetch callback. Required in callback mode; null in queue mode.
-    pub fetch_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) -> () + Send + Sync + 'static>>,
+    pub fetch_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>>,
     /// Optional best-effort tile cancel callback. Null in queue mode.
-    pub cancel_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) -> () + Send + Sync + 'static>>,
+    pub cancel_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>>,
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
 }
@@ -797,20 +797,20 @@ impl std::fmt::Debug for CustomMvtVectorSourceOptions {
 impl CustomMvtVectorSourceOptions {
     pub fn with_fetch_tile<F>(mut self, callback: F) -> Self
     where
-        F: Fn(CanonicalTileId) -> () + Send + Sync + 'static,
+        F: Fn(CanonicalTileId) + Send + Sync + 'static,
     {
         self.fetch_tile = Some(std::sync::Arc::new(callback));
         self
     }
     pub fn new<F>(callback: F) -> Self
     where
-        F: Fn(CanonicalTileId) -> () + Send + Sync + 'static,
+        F: Fn(CanonicalTileId) + Send + Sync + 'static,
     {
         Self::default().with_fetch_tile(callback)
     }
     pub fn with_cancel_tile<F>(mut self, callback: F) -> Self
     where
-        F: Fn(CanonicalTileId) -> () + Send + Sync + 'static,
+        F: Fn(CanonicalTileId) + Send + Sync + 'static,
     {
         self.cancel_tile = Some(std::sync::Arc::new(callback));
         self
@@ -990,7 +990,7 @@ impl FromNative<sys::mln_egl_context_descriptor> for EglContextDescriptor {
             display: raw.display,
             config: raw.config,
             share_context: raw.share_context,
-            client_api: unsafe { from_native(raw.client_api) }?,
+            client_api: OpenglClientApi::from_raw(raw.client_api),
             get_proc_address: raw.get_proc_address,
         })
     }
@@ -1086,7 +1086,7 @@ impl ToNative<sys::mln_frame_demand> for FrameDemand {
 impl FromNative<sys::mln_frame_demand> for FrameDemand {
     unsafe fn from_native(raw: sys::mln_frame_demand) -> Result<Self> {
         Ok(Self {
-            flags: unsafe { from_native(raw.flags) }?,
+            flags: FrameDemandFlag::from_bits_retain(raw.flags),
             token: raw.token,
         })
     }
@@ -1352,7 +1352,7 @@ impl ToNative<sys::mln_gpu_sync> for GpuSync {
 impl FromNative<sys::mln_gpu_sync> for GpuSync {
     unsafe fn from_native(raw: sys::mln_gpu_sync) -> Result<Self> {
         Ok(Self {
-            kind: unsafe { from_native(raw.kind) }?,
+            kind: GpuSyncKind::from_raw(raw.kind),
             object: raw.object,
         })
     }
@@ -1435,8 +1435,8 @@ impl ToNative<sys::mln_http_header_rule> for HttpHeaderRule {
 impl FromNative<sys::mln_http_header_rule> for HttpHeaderRule {
     unsafe fn from_native(raw: sys::mln_http_header_rule) -> Result<Self> {
         Ok(Self {
-            kinds: unsafe { from_native(raw.kinds) }?,
-            flags: unsafe { from_native(raw.flags) }?,
+            kinds: ResourceKindMask::from_bits_retain(raw.kinds),
+            flags: UrlMatchFlags::from_bits_retain(raw.flags),
             url: unsafe { from_native(raw.url) }?,
             headers: unsafe { convert::copy_array(raw.headers, raw.header_count) }?,
         })
@@ -1452,7 +1452,7 @@ pub struct HttpHeaderTransform {
     /// The callback, or null to apply rules.
     pub callback: Option<
         std::sync::Arc<
-            dyn Fn(ResourceKind, String, &mut HttpHeaderTransformResponse<'_>) -> Result<()>
+            dyn Fn(ResourceKind, &str, &mut HttpHeaderTransformResponse<'_>) -> Result<()>
                 + Send
                 + Sync
                 + 'static,
@@ -1470,7 +1470,7 @@ impl std::fmt::Debug for HttpHeaderTransform {
 impl HttpHeaderTransform {
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
-        F: Fn(ResourceKind, String, &mut HttpHeaderTransformResponse<'_>) -> Result<()>
+        F: Fn(ResourceKind, &str, &mut HttpHeaderTransformResponse<'_>) -> Result<()>
             + Send
             + Sync
             + 'static,
@@ -1480,7 +1480,7 @@ impl HttpHeaderTransform {
     }
     pub fn new<F>(callback: F) -> Self
     where
-        F: Fn(ResourceKind, String, &mut HttpHeaderTransformResponse<'_>) -> Result<()>
+        F: Fn(ResourceKind, &str, &mut HttpHeaderTransformResponse<'_>) -> Result<()>
             + Send
             + Sync
             + 'static,
@@ -1501,8 +1501,8 @@ impl HttpHeaderTransform {
             sys::MLN_STATUS_NATIVE_ERROR,
             || {
                 callback::require(&state.callback)?(
-                    unsafe { from_native(kind) }?,
-                    unsafe { from_native(url) }?,
+                    ResourceKind::from_raw(kind),
+                    unsafe { maplibre_core::string::borrow_c_string(url) }?,
                     &mut HttpHeaderTransformResponse::new(out_response)?,
                 )
             },
@@ -1740,7 +1740,7 @@ pub enum LogEvent: u32 {
 pub struct LogHandler {
     /// Receives each record.
     pub callback: Option<
-        std::sync::Arc<dyn Fn(LogSeverity, LogEvent, i64, String) -> u32 + Send + Sync + 'static>,
+        std::sync::Arc<dyn Fn(LogSeverity, LogEvent, i64, &str) -> u32 + Send + Sync + 'static>,
     >,
 }
 impl std::fmt::Debug for LogHandler {
@@ -1751,14 +1751,14 @@ impl std::fmt::Debug for LogHandler {
 impl LogHandler {
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
-        F: Fn(LogSeverity, LogEvent, i64, String) -> u32 + Send + Sync + 'static,
+        F: Fn(LogSeverity, LogEvent, i64, &str) -> u32 + Send + Sync + 'static,
     {
         self.callback = Some(std::sync::Arc::new(callback));
         self
     }
     pub fn new<F>(callback: F) -> Self
     where
-        F: Fn(LogSeverity, LogEvent, i64, String) -> u32 + Send + Sync + 'static,
+        F: Fn(LogSeverity, LogEvent, i64, &str) -> u32 + Send + Sync + 'static,
     {
         Self::default().with_callback(callback)
     }
@@ -1774,10 +1774,10 @@ impl LogHandler {
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke("mln_log_callback", 0, || {
             let value = callback::require(&state.callback)?(
-                unsafe { from_native(severity) }?,
-                unsafe { from_native(event) }?,
+                LogSeverity::from_raw(severity),
+                LogEvent::from_raw(event),
                 code,
-                unsafe { from_native(message) }?,
+                unsafe { maplibre_core::string::borrow_c_string(message) }?,
             );
             Ok(value)
         })
@@ -1957,9 +1957,9 @@ impl FromNative<sys::mln_map_options> for MapOptions {
     unsafe fn from_native(raw: sys::mln_map_options) -> Result<Self> {
         Ok(Self {
             initial_extent: unsafe { from_native(raw.initial_extent) }?,
-            map_mode: unsafe { from_native(raw.map_mode) }?,
+            map_mode: MapMode::from_raw(raw.map_mode),
             fast_pfor_enabled: raw.fast_pfor_enabled,
-            event_mask: unsafe { from_native(raw.event_mask) }?,
+            event_mask: RuntimeEventMask::from_bits_retain(raw.event_mask),
         })
     }
 }
@@ -2027,13 +2027,13 @@ impl MapSnapshot {
 impl FromNative<sys::mln_map_snapshot> for MapSnapshot {
     unsafe fn from_native(raw: sys::mln_map_snapshot) -> Result<Self> {
         Ok(Self {
-            debug_options: unsafe { from_native(raw.debug_options) }?,
+            debug_options: MapDebugOption::from_bits_retain(raw.debug_options),
             generation: raw.generation,
             fully_loaded: raw.fully_loaded,
             rendering_stats_view_enabled: raw.rendering_stats_view_enabled,
             gesture_in_progress: raw.gesture_in_progress,
             transition_in_progress: raw.transition_in_progress,
-            event_mask: unsafe { from_native(raw.event_mask) }?,
+            event_mask: RuntimeEventMask::from_bits_retain(raw.event_mask),
             latest_render_update_generation: raw.latest_render_update_generation,
             tile: unsafe { from_native(raw.tile) }?,
             bounds: unsafe { from_native(raw.bounds) }?,
@@ -2108,9 +2108,11 @@ impl FromNative<sys::mln_map_tile_options> for MapTileOptions {
                 .then_some(raw.lod_pitch_threshold),
             lod_zoom_shift: (raw.fields & sys::MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT != 0)
                 .then_some(raw.lod_zoom_shift),
-            lod_mode: unsafe {
-                convert::present(raw.fields, sys::MLN_MAP_TILE_OPTION_LOD_MODE, raw.lod_mode)
-            }?,
+            lod_mode: if raw.fields & sys::MLN_MAP_TILE_OPTION_LOD_MODE != 0 {
+                Some(TileLodMode::from_raw(raw.lod_mode))
+            } else {
+                None
+            },
         })
     }
 }
@@ -2219,27 +2221,21 @@ impl ToNative<sys::mln_map_viewport_options> for MapViewportOptions {
 impl FromNative<sys::mln_map_viewport_options> for MapViewportOptions {
     unsafe fn from_native(raw: sys::mln_map_viewport_options) -> Result<Self> {
         Ok(Self {
-            north_orientation: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION,
-                    raw.north_orientation,
-                )
-            }?,
-            constrain_mode: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE,
-                    raw.constrain_mode,
-                )
-            }?,
-            viewport_mode: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE,
-                    raw.viewport_mode,
-                )
-            }?,
+            north_orientation: if raw.fields & sys::MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION != 0 {
+                Some(NorthOrientation::from_raw(raw.north_orientation))
+            } else {
+                None
+            },
+            constrain_mode: if raw.fields & sys::MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE != 0 {
+                Some(ConstrainMode::from_raw(raw.constrain_mode))
+            } else {
+                None
+            },
+            viewport_mode: if raw.fields & sys::MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE != 0 {
+                Some(ViewportMode::from_raw(raw.viewport_mode))
+            } else {
+                None
+            },
             frustum_offset: unsafe {
                 convert::present(
                     raw.fields,
@@ -2749,7 +2745,7 @@ impl OfflineRegionStatus {
 impl FromNative<sys::mln_offline_region_status> for OfflineRegionStatus {
     unsafe fn from_native(raw: sys::mln_offline_region_status) -> Result<Self> {
         Ok(Self {
-            download_state: unsafe { from_native(raw.download_state) }?,
+            download_state: OfflineRegionDownloadState::from_raw(raw.download_state),
             completed_resource_count: raw.completed_resource_count,
             completed_resource_size: raw.completed_resource_size,
             completed_tile_count: raw.completed_tile_count,
@@ -2956,7 +2952,7 @@ impl ToNative<sys::mln_opengl_context_descriptor> for OpenglContextDescriptor {
 impl FromNative<sys::mln_opengl_context_descriptor> for OpenglContextDescriptor {
     unsafe fn from_native(raw: sys::mln_opengl_context_descriptor) -> Result<Self> {
         Ok(Self {
-            ownership: unsafe { from_native(raw.ownership) }?,
+            ownership: OpenglContextOwnership::from_raw(raw.ownership),
             data: match raw.platform {
                 sys::MLN_OPENGL_CONTEXT_PLATFORM_WGL => {
                     OpenglContextDescriptorData::Wgl(unsafe { from_native(raw.data.wgl) }?)
@@ -3348,8 +3344,8 @@ impl FromNative<sys::mln_quaternion> for Quaternion {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Clone, Default)]
 pub struct QueueLock {
-    pub lock: Option<std::sync::Arc<dyn Fn() -> () + Send + Sync + 'static>>,
-    pub unlock: Option<std::sync::Arc<dyn Fn() -> () + Send + Sync + 'static>>,
+    pub lock: Option<std::sync::Arc<dyn Fn() + Send + Sync + 'static>>,
+    pub unlock: Option<std::sync::Arc<dyn Fn() + Send + Sync + 'static>>,
 }
 impl std::fmt::Debug for QueueLock {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -3359,20 +3355,20 @@ impl std::fmt::Debug for QueueLock {
 impl QueueLock {
     pub fn with_lock<F>(mut self, callback: F) -> Self
     where
-        F: Fn() -> () + Send + Sync + 'static,
+        F: Fn() + Send + Sync + 'static,
     {
         self.lock = Some(std::sync::Arc::new(callback));
         self
     }
     pub fn new<F>(callback: F) -> Self
     where
-        F: Fn() -> () + Send + Sync + 'static,
+        F: Fn() + Send + Sync + 'static,
     {
         Self::default().with_lock(callback)
     }
     pub fn with_unlock<F>(mut self, callback: F) -> Self
     where
-        F: Fn() -> () + Send + Sync + 'static,
+        F: Fn() + Send + Sync + 'static,
     {
         self.unlock = Some(std::sync::Arc::new(callback));
         self
@@ -3444,7 +3440,7 @@ impl RenderAbandonResult {
 impl FromNative<sys::mln_render_abandon_result> for RenderAbandonResult {
     unsafe fn from_native(raw: sys::mln_render_abandon_result) -> Result<Self> {
         Ok(Self {
-            disposition: unsafe { from_native(raw.disposition) }?,
+            disposition: RenderAbandonDisposition::from_raw(raw.disposition),
             quarantined_resource_count: raw.quarantined_resource_count,
         })
     }
@@ -3559,7 +3555,7 @@ impl RenderFrameResult {
 impl FromNative<sys::mln_render_frame_result> for RenderFrameResult {
     unsafe fn from_native(raw: sys::mln_render_frame_result) -> Result<Self> {
         Ok(Self {
-            disposition: unsafe { from_native(raw.disposition) }?,
+            disposition: RenderResult::from_raw(raw.disposition),
             token: raw.token,
             map_update_generation: raw.map_update_generation,
             generation: raw.generation,
@@ -3658,9 +3654,9 @@ impl ToNative<sys::mln_render_session_attach_options> for RenderSessionAttachOpt
 impl FromNative<sys::mln_render_session_attach_options> for RenderSessionAttachOptions {
     unsafe fn from_native(raw: sys::mln_render_session_attach_options) -> Result<Self> {
         Ok(Self {
-            driver: unsafe { from_native(raw.driver) }?,
+            driver: RenderDriverKind::from_raw(raw.driver),
             requested_texture_ring_depth: raw.requested_texture_ring_depth,
-            producer_sync_kind: unsafe { from_native(raw.producer_sync_kind) }?,
+            producer_sync_kind: GpuSyncKind::from_raw(raw.producer_sync_kind),
             frame_wake: Default::default(),
             driver_work_wake: Default::default(),
             queue_lock: Default::default(),
@@ -3698,9 +3694,9 @@ impl RenderSessionCapabilities {
 impl FromNative<sys::mln_render_session_capabilities> for RenderSessionCapabilities {
     unsafe fn from_native(raw: sys::mln_render_session_capabilities) -> Result<Self> {
         Ok(Self {
-            driver: unsafe { from_native(raw.driver) }?,
+            driver: RenderDriverKind::from_raw(raw.driver),
             texture_ring_depth: raw.texture_ring_depth,
-            flags: unsafe { from_native(raw.flags) }?,
+            flags: RenderSessionCapabilityFlag::from_bits_retain(raw.flags),
         })
     }
 }
@@ -3770,7 +3766,7 @@ impl RenderSessionSnapshot {
 impl FromNative<sys::mln_render_session_snapshot> for RenderSessionSnapshot {
     unsafe fn from_native(raw: sys::mln_render_session_snapshot) -> Result<Self> {
         Ok(Self {
-            state: unsafe { from_native(raw.state) }?,
+            state: RenderSessionState::from_raw(raw.state),
             extent: unsafe { from_native(raw.extent) }?,
             generation: raw.generation,
             map_update_generation: raw.map_update_generation,
@@ -4192,7 +4188,7 @@ impl FromNative<sys::mln_resource_range> for ResourceRange {
 #[derive(Clone, Default)]
 pub struct ResourceRequestCancelHandler {
     /// Required in callback mode; null in queue mode.
-    pub callback: Option<std::sync::Arc<dyn Fn() -> () + Send + Sync + 'static>>,
+    pub callback: Option<std::sync::Arc<dyn Fn() + Send + Sync + 'static>>,
 }
 impl std::fmt::Debug for ResourceRequestCancelHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -4203,14 +4199,14 @@ impl std::fmt::Debug for ResourceRequestCancelHandler {
 impl ResourceRequestCancelHandler {
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
-        F: Fn() -> () + Send + Sync + 'static,
+        F: Fn() + Send + Sync + 'static,
     {
         self.callback = Some(std::sync::Arc::new(callback));
         self
     }
     pub fn new<F>(callback: F) -> Self
     where
-        F: Fn() -> () + Send + Sync + 'static,
+        F: Fn() + Send + Sync + 'static,
     {
         Self::default().with_callback(callback)
     }
@@ -4270,11 +4266,11 @@ impl FromNative<sys::mln_resource_request_info> for ResourceRequestInfo {
         Ok(Self {
             requested_url: unsafe { from_native(raw.requested_url) }?,
             resolved_url: unsafe { from_native(raw.resolved_url) }?,
-            kind: unsafe { from_native(raw.kind) }?,
-            loading_method: unsafe { from_native(raw.loading_method) }?,
-            priority: unsafe { from_native(raw.priority) }?,
-            usage: unsafe { from_native(raw.usage) }?,
-            storage_policy: unsafe { from_native(raw.storage_policy) }?,
+            kind: ResourceKind::from_raw(raw.kind),
+            loading_method: ResourceLoadingMethod::from_raw(raw.loading_method),
+            priority: ResourcePriority::from_raw(raw.priority),
+            usage: ResourceUsage::from_raw(raw.usage),
+            storage_policy: ResourceStoragePolicy::from_raw(raw.storage_policy),
             range: unsafe {
                 convert::present(raw.fields, sys::MLN_RESOURCE_REQUEST_RANGE, raw.range)
             }?,
@@ -4376,8 +4372,8 @@ impl ToNative<sys::mln_resource_route> for ResourceRoute {
 impl FromNative<sys::mln_resource_route> for ResourceRoute {
     unsafe fn from_native(raw: sys::mln_resource_route) -> Result<Self> {
         Ok(Self {
-            kinds: unsafe { from_native(raw.kinds) }?,
-            flags: unsafe { from_native(raw.flags) }?,
+            kinds: ResourceKindMask::from_bits_retain(raw.kinds),
+            flags: UrlMatchFlags::from_bits_retain(raw.flags),
             url: unsafe { from_native(raw.url) }?,
         })
     }
@@ -4399,10 +4395,7 @@ pub struct ResourceTransform {
     /// Required in callback mode; null in queue mode.
     pub callback: Option<
         std::sync::Arc<
-            dyn Fn(ResourceKind, String, ResourceTransformRequestHandle) -> ()
-                + Send
-                + Sync
-                + 'static,
+            dyn Fn(ResourceKind, &str, ResourceTransformRequestHandle) + Send + Sync + 'static,
         >,
     >,
 }
@@ -4414,14 +4407,14 @@ impl std::fmt::Debug for ResourceTransform {
 impl ResourceTransform {
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
-        F: Fn(ResourceKind, String, ResourceTransformRequestHandle) -> () + Send + Sync + 'static,
+        F: Fn(ResourceKind, &str, ResourceTransformRequestHandle) + Send + Sync + 'static,
     {
         self.callback = Some(std::sync::Arc::new(callback));
         self
     }
     pub fn new<F>(callback: F) -> Self
     where
-        F: Fn(ResourceKind, String, ResourceTransformRequestHandle) -> () + Send + Sync + 'static,
+        F: Fn(ResourceKind, &str, ResourceTransformRequestHandle) + Send + Sync + 'static,
     {
         Self::default().with_callback(callback)
     }
@@ -4437,8 +4430,8 @@ impl ResourceTransform {
         callback::invoke("mln_resource_transform_callback", (), || {
             let request = ResourceTransformRequestHandle::adopt(request, None)?;
             callback::require(&state.callback)?(
-                unsafe { from_native(kind) }?,
-                unsafe { from_native(url) }?,
+                ResourceKind::from_raw(kind),
+                unsafe { maplibre_core::string::borrow_c_string(url) }?,
                 request,
             );
             Ok(())
@@ -4495,8 +4488,8 @@ pub struct RuntimeEvent {
 impl FromNative<sys::mln_runtime_event> for RuntimeEvent {
     unsafe fn from_native(raw: sys::mln_runtime_event) -> Result<Self> {
         Ok(Self {
-            r#type: unsafe { from_native(raw.type_) }?,
-            source_type: unsafe { from_native(raw.source_type) }?,
+            r#type: RuntimeEventType::from_raw(raw.type_),
+            source_type: RuntimeEventSourceType::from_raw(raw.source_type),
             source: raw.source,
             generation: raw.generation,
             code: raw.code,
@@ -4543,7 +4536,7 @@ impl FromNative<sys::mln_runtime_event> for RuntimeEvent {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Clone, Default)]
 pub struct RuntimeEventHandler {
-    pub callback: Option<std::sync::Arc<dyn Fn(EventBatchView) -> () + Send + Sync + 'static>>,
+    pub callback: Option<std::sync::Arc<dyn Fn(EventBatchView) + Send + Sync + 'static>>,
 }
 impl std::fmt::Debug for RuntimeEventHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -4554,14 +4547,14 @@ impl std::fmt::Debug for RuntimeEventHandler {
 impl RuntimeEventHandler {
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
-        F: Fn(EventBatchView) -> () + Send + Sync + 'static,
+        F: Fn(EventBatchView) + Send + Sync + 'static,
     {
         self.callback = Some(std::sync::Arc::new(callback));
         self
     }
     pub fn new<F>(callback: F) -> Self
     where
-        F: Fn(EventBatchView) -> () + Send + Sync + 'static,
+        F: Fn(EventBatchView) + Send + Sync + 'static,
     {
         Self::default().with_callback(callback)
     }
@@ -4654,7 +4647,7 @@ impl FromNative<sys::mln_runtime_event_offline_region_response_error>
     ) -> Result<Self> {
         Ok(Self {
             region_id: raw.region_id,
-            reason: unsafe { from_native(raw.reason) }?,
+            reason: ResourceErrorReason::from_raw(raw.reason),
         })
     }
 }
@@ -4762,7 +4755,7 @@ impl RuntimeEventRenderFrame {
 impl FromNative<sys::mln_runtime_event_render_frame> for RuntimeEventRenderFrame {
     unsafe fn from_native(raw: sys::mln_runtime_event_render_frame) -> Result<Self> {
         Ok(Self {
-            mode: unsafe { from_native(raw.mode) }?,
+            mode: RenderMode::from_raw(raw.mode),
             needs_repaint: raw.needs_repaint,
             placement_changed: raw.placement_changed,
             stats: unsafe { from_native(raw.stats) }?,
@@ -4787,7 +4780,7 @@ impl RuntimeEventRenderMap {
 impl FromNative<sys::mln_runtime_event_render_map> for RuntimeEventRenderMap {
     unsafe fn from_native(raw: sys::mln_runtime_event_render_map) -> Result<Self> {
         Ok(Self {
-            mode: unsafe { from_native(raw.mode) }?,
+            mode: RenderMode::from_raw(raw.mode),
         })
     }
 }
@@ -4821,7 +4814,7 @@ impl RuntimeEventTileAction {
 impl FromNative<sys::mln_runtime_event_tile_action> for RuntimeEventTileAction {
     unsafe fn from_native(raw: sys::mln_runtime_event_tile_action) -> Result<Self> {
         Ok(Self {
-            operation: unsafe { from_native(raw.operation) }?,
+            operation: TileOperation::from_raw(raw.operation),
             tile_id: unsafe { from_native(raw.tile_id) }?,
         })
     }
@@ -5282,8 +5275,8 @@ impl ToNative<sys::mln_style_expression_type> for StyleExpressionType {
 impl FromNative<sys::mln_style_expression_type> for StyleExpressionType {
     unsafe fn from_native(raw: sys::mln_style_expression_type) -> Result<Self> {
         Ok(Self {
-            kind: unsafe { from_native(raw.kind) }?,
-            item_kind: unsafe { from_native(raw.item_kind) }?,
+            kind: StyleExpressionTypeKind::from_raw(raw.kind),
+            item_kind: StyleExpressionTypeKind::from_raw(raw.item_kind),
             item_count: raw.item_count,
         })
     }
@@ -5351,20 +5344,16 @@ impl FromNative<sys::mln_style_image_info> for StyleImageInfo {
             content: unsafe {
                 convert::present(raw.fields, sys::MLN_STYLE_IMAGE_INFO_CONTENT, raw.content)
             }?,
-            text_fit_width: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH,
-                    raw.text_fit_width,
-                )
-            }?,
-            text_fit_height: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT,
-                    raw.text_fit_height,
-                )
-            }?,
+            text_fit_width: if raw.fields & sys::MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH != 0 {
+                Some(StyleImageTextFit::from_raw(raw.text_fit_width))
+            } else {
+                None
+            },
+            text_fit_height: if raw.fields & sys::MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT != 0 {
+                Some(StyleImageTextFit::from_raw(raw.text_fit_height))
+            } else {
+                None
+            },
             pixel_ratio: raw.pixel_ratio,
             sdf: raw.sdf,
         })
@@ -5456,20 +5445,16 @@ impl FromNative<sys::mln_style_image_options> for StyleImageOptions {
             content: unsafe {
                 convert::present(raw.fields, sys::MLN_STYLE_IMAGE_OPTION_CONTENT, raw.content)
             }?,
-            text_fit_width: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH,
-                    raw.text_fit_width,
-                )
-            }?,
-            text_fit_height: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT,
-                    raw.text_fit_height,
-                )
-            }?,
+            text_fit_width: if raw.fields & sys::MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH != 0 {
+                Some(StyleImageTextFit::from_raw(raw.text_fit_width))
+            } else {
+                None
+            },
+            text_fit_height: if raw.fields & sys::MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT != 0 {
+                Some(StyleImageTextFit::from_raw(raw.text_fit_height))
+            } else {
+                None
+            },
             pixel_ratio: (raw.fields & sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO != 0)
                 .then_some(raw.pixel_ratio),
             sdf: (raw.fields & sys::MLN_STYLE_IMAGE_OPTION_SDF != 0).then_some(raw.sdf),
@@ -5519,7 +5504,7 @@ impl FromNative<sys::mln_style_layer_info> for StyleLayerInfo {
             source_layer: unsafe { convert::nonempty(raw.source_layer) }?,
             min_zoom: raw.min_zoom,
             max_zoom: raw.max_zoom,
-            visibility: unsafe { from_native(raw.visibility) }?,
+            visibility: StyleLayerVisibility::from_raw(raw.visibility),
         })
     }
 }
@@ -5577,7 +5562,7 @@ impl FromNative<sys::mln_style_source_info> for StyleSourceInfo {
     unsafe fn from_native(raw: sys::mln_style_source_info) -> Result<Self> {
         Ok(Self {
             id: unsafe { from_native(raw.id) }?,
-            r#type: unsafe { from_native(raw.type_) }?,
+            r#type: StyleSourceType::from_raw(raw.type_),
             is_volatile: raw.is_volatile,
             attribution: unsafe {
                 convert::present(
@@ -5599,20 +5584,16 @@ impl FromNative<sys::mln_style_source_info> for StyleSourceInfo {
             }?,
             tile_size: (raw.fields & sys::MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0)
                 .then_some(raw.tile_size),
-            vector_encoding: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING,
-                    raw.vector_encoding,
-                )
-            }?,
-            raster_encoding: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_SOURCE_INFO_RASTER_ENCODING,
-                    raw.raster_encoding,
-                )
-            }?,
+            vector_encoding: if raw.fields & sys::MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING != 0 {
+                Some(StyleVectorTileEncoding::from_raw(raw.vector_encoding))
+            } else {
+                None
+            },
+            raster_encoding: if raw.fields & sys::MLN_STYLE_SOURCE_INFO_RASTER_ENCODING != 0 {
+                Some(StyleRasterDemEncoding::from_raw(raw.raster_encoding))
+            } else {
+                None
+            },
         })
     }
 }
@@ -5638,7 +5619,7 @@ impl FromNative<sys::mln_style_source_tile_info> for StyleSourceTileInfo {
             tile_urls: unsafe { convert::copy_array(raw.tile_urls, raw.tile_url_count) }?,
             min_zoom: raw.min_zoom,
             max_zoom: raw.max_zoom,
-            scheme: unsafe { from_native(raw.scheme) }?,
+            scheme: StyleTileScheme::from_raw(raw.scheme),
         })
     }
 }
@@ -6319,7 +6300,7 @@ impl FromNative<sys::mln_vulkan_texture_frame> for VulkanTextureFrame {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
 #[derive(Clone, Default)]
 pub struct Wake {
-    pub callback: Option<std::sync::Arc<dyn Fn() -> () + Send + Sync + 'static>>,
+    pub callback: Option<std::sync::Arc<dyn Fn() + Send + Sync + 'static>>,
 }
 impl std::fmt::Debug for Wake {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -6329,14 +6310,14 @@ impl std::fmt::Debug for Wake {
 impl Wake {
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
-        F: Fn() -> () + Send + Sync + 'static,
+        F: Fn() + Send + Sync + 'static,
     {
         self.callback = Some(std::sync::Arc::new(callback));
         self
     }
     pub fn new<F>(callback: F) -> Self
     where
-        F: Fn() -> () + Send + Sync + 'static,
+        F: Fn() + Send + Sync + 'static,
     {
         Self::default().with_callback(callback)
     }
@@ -6392,7 +6373,7 @@ impl ToNative<sys::mln_webgl_context_descriptor> for WebglContextDescriptor {
 impl FromNative<sys::mln_webgl_context_descriptor> for WebglContextDescriptor {
     unsafe fn from_native(raw: sys::mln_webgl_context_descriptor) -> Result<Self> {
         Ok(Self {
-            kind: unsafe { from_native(raw.kind) }?,
+            kind: WebglContextKind::from_raw(raw.kind),
             context: raw.context,
             canvas_selector: unsafe { from_native(raw.canvas_selector) }?,
         })

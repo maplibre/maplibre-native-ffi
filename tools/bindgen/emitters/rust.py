@@ -160,13 +160,17 @@ def checked_call(
     return f"{runtime}::check(|diagnostic| unsafe {{ {call} }})"
 
 
-LOCALS = {"call", "parent", "callback", "value", "future", "sys", "convert"}
+# Emitted bodies use these as crate paths and a view's callback parameter, so
+# no parameter can take them.
+RESERVED_LOCALS = {"callback", "sys", "convert"}
 
 
 def local_name(name: str) -> str:
-    """A parameter's Rust name, kept apart from the operation's own locals."""
+    """A parameter's Rust name, which is its C name."""
     name = identifier(name)
-    return name + "_" if name in LOCALS else name
+    if name in RESERVED_LOCALS:
+        raise Unsupported(f"parameter {name} shadows a name the emitted body uses")
+    return name
 
 
 def adopt_owned(owned, raw, value_types, parent="parent"):
@@ -177,7 +181,9 @@ def adopt_owned(owned, raw, value_types, parent="parent"):
     return public, f"{public}::adopt({raw}, {source})"
 
 
-def result_rule(plan: OperationPlan, value_types) -> tuple[str, str]:
+def result_rule(
+    plan: OperationPlan, value_types, parent: str = "parent"
+) -> tuple[str, str]:
     """The completion's public result type and the converter that copies it."""
     from .rust_dynamic_values import decode
 
@@ -189,6 +195,7 @@ def result_rule(plan: OperationPlan, value_types) -> tuple[str, str]:
             plan.completion.result_owner,
             f"completion::copy_value::<sys::{result.native}>(result)?",
             value_types,
+            parent,
         )
         return public, f"move |result| {adopted}"
     if result.ownership != "borrowed":
@@ -300,6 +307,20 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
     read = reads_receiver(plan)
     parameters = function.parameters[1:] if receiver else function.parameters
     names = {parameter.name: local_name(parameter.name) for parameter in parameters}
+    # Parameters keep their C names, so a local the body binds steps aside.
+    taken = {*names.values(), *(local_name(p.name) for p in function.parameters[:1])}
+
+    def body_local(name: str) -> str:
+        while name in taken:
+            name += "_"
+        return name
+
+    call_local, value_local, future_local, parent_local = (
+        body_local("call"),
+        body_local("value"),
+        body_local("future"),
+        body_local("parent"),
+    )
     execution = plan.execution
     if execution not in {
         "command",
@@ -331,7 +352,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
     ]
     parent_line = None
     if any(owner.parent_parameter for owner in owner_plans):
-        parent_line = "let parent = self.inner.parent();"
+        parent_line = f"let {parent_local} = self.inner.parent();"
         prelude.append(parent_line)
     input_plans = {parameter.name: parameter for parameter in plan.inputs}
     output_plans = {parameter.name: parameter for parameter in plan.outputs}
@@ -395,7 +416,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
                 prelude.append(
                     f'if {local}.len() != {value_plan.length} {{ return Err(Error::invalid_argument("{parameter.name} requires {value_plan.length} elements")); }}'
                 )
-            setup.append(f"let {local} = call.array({local})?;")
+            setup.append(f"let {local} = {call_local}.array({local})?;")
             uses_call = True
             args.append(local)
         elif value_plan and value_plan.kind == "handle":
@@ -433,7 +454,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             signature.append(
                 f"{local}: {'Option<' + public + '>' if optional else public}"
             )
-            setup.append(f"let {local} = call.input(&{local})?;")
+            setup.append(f"let {local} = {call_local}.input(&{local})?;")
             uses_call = True
             args.append(local)
         elif (
@@ -443,7 +464,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             and value_plan.encoding == "utf8"
         ):
             signature.append(f"{local}: &str")
-            setup.append(f"let {local} = call.input({local})?;")
+            setup.append(f"let {local} = {call_local}.input({local})?;")
             uses_call = True
             args.append(local)
         elif (
@@ -457,9 +478,9 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
                 f"{local}: {'Option<' + public + '>' if value_plan.nullable else public}"
             )
             setup.append(
-                f"let {local} = call.optional_reference({local})?;"
+                f"let {local} = {call_local}.optional_reference({local})?;"
                 if value_plan.nullable
-                else f"let {local} = call.reference({local})?;"
+                else f"let {local} = {call_local}.reference({local})?;"
             )
             uses_call = True
             args.append(local)
@@ -473,7 +494,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             signature.append(
                 f"{local}: &{public}" if dynamic(value) else f"{local}: {public}"
             )
-            setup.append(f"let {local} = call.input(&{local})?;")
+            setup.append(f"let {local} = {call_local}.input(&{local})?;")
             uses_call = True
             args.append(local)
         elif (
@@ -490,11 +511,11 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             if value_plan.nullable:
                 signature.append(f"{local}: Option<{public}>")
                 setup.append(
-                    f"let {local} = call.optional_reference({local}.as_ref())?;"
+                    f"let {local} = {call_local}.optional_reference({local}.as_ref())?;"
                 )
             else:
                 signature.append(f"{local}: {public}")
-                setup.append(f"let {local} = call.reference(&{local})?;")
+                setup.append(f"let {local} = {call_local}.reference(&{local})?;")
             uses_call = True
             args.append(local)
         elif parameter.name in output_plans:
@@ -541,7 +562,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
                 if not owned:
                     raise Unsupported("handle output lacks ownership transfer")
                 public, converted = adopt_owned(
-                    owned, local, value_types, "parent.clone()"
+                    owned, local, value_types, f"{parent_local}.clone()"
                 )
                 prelude.append(f"let mut {local} = sys::{value.native}(0);")
                 args.append(f"&mut {local}")
@@ -609,12 +630,19 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
     )
     if not plan.completion:
         if function.return_type.kind == "void":
-            ending = [f"call.run({closure} {native});", f"Ok({output})"]
+            ending = [f"{call_local}.run({closure} {native});", f"Ok({output})"]
         elif plan.result:
             value_types.add(plan.result, "out")
             public = value_types.public(plan.result)
-            output = decode(value_types, plan.result, "value")
-            ending = [f"let value = call.run({closure} {native});", f"Ok({output})"]
+            output = (
+                f"convert::native_default({value_local})"
+                if plan.result.kind == "record" and plan.result.default == function.name
+                else decode(value_types, plan.result, value_local)
+            )
+            ending = [
+                f"let {value_local} = {call_local}.run({closure} {native});",
+                f"Ok({output})",
+            ]
         else:
             if not function.diagnostic:
                 raise Unsupported(f"{function.name}: status return has no diagnostic")
@@ -623,16 +651,16 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
                 None,
             )
             ending = [
-                f"call.status_registered({closure} {{ let status = {native}; (status, !{names[declined]}) }})?;"
+                f"{call_local}.status_registered({closure} {{ let status = {native}; (status, !{names[declined]}) }})?;"
                 if declined
-                else f"call.status({closure} {native})?;",
+                else f"{call_local}.status({closure} {native})?;",
                 f"Ok({output})",
             ]
             if plan.absence:
                 if parent_line:
                     prelude.remove(parent_line)
                 ending = [
-                    f"if !call.status_unless(sys::{plan.absence.status}, {closure} {native})? {{",
+                    f"if !{call_local}.status_unless(sys::{plan.absence.status}, {closure} {native})? {{",
                     "    return Ok(None);",
                     "}",
                     *([parent_line] if parent_line else []),
@@ -642,36 +670,38 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
     else:
         if discard:
             completed = "()"
-            expression = f"call.discard({closure} {native})"
+            expression = f"{call_local}.discard({closure} {native})"
         elif execution == "command":
             if plan.result is not None:
                 raise Unsupported("command receipt cannot discard a value payload")
             completed = "NativeFuture<CommandCompletion>"
-            expression = f"call.command({closure} {native})"
+            expression = f"{call_local}.command({closure} {native})"
         else:
-            result, converter = result_rule(plan, value_types)
+            result, converter = result_rule(plan, value_types, parent_local)
             completed = f"NativeFuture<{result}>"
-            expression = f"call.complete({closure} {native}, {converter})"
+            expression = f"{call_local}.complete({closure} {native}, {converter})"
         if outputs:
             public = "(" + ", ".join([*(item[0] for item in outputs), completed]) + ")"
-            converted = ", ".join([*(item[1] for item in outputs), "future"])
-            ending = [f"let future = {expression}?;", f"Ok(({converted}))"]
+            converted = ", ".join([*(item[1] for item in outputs), future_local])
+            ending = [f"let {future_local} = {expression}?;", f"Ok(({converted}))"]
         else:
             public = completed
             ending = [expression]
     text = "\n".join(ending)
-    if text.count("parent.clone()") == 1:
-        ending = [line.replace("parent.clone()", "parent") for line in ending]
+    if text.count(f"{parent_local}.clone()") == 1:
+        ending = [
+            line.replace(f"{parent_local}.clone()", parent_local) for line in ending
+        ]
     generic = ""
     if plan.view:
         handle = plan.view.owner
         prelude.insert(
             0,
-            f"unsafe {{ call.view(sys::{handle.view_begin}, sys::{handle.view_end}) }}?;",
+            f"unsafe {{ {call_local}.view(sys::{handle.view_begin}, sys::{handle.view_end}) }}?;",
         )
         uses_call = True
-        ending[-1] = f"let value = {output};"
-        ending.append("Ok(callback(&value))")
+        ending[-1] = f"let {value_local} = {output};"
+        ending.append(f"Ok(callback(&{value_local}))")
         signature.append(f"callback: impl FnOnce(&{public}) -> R")
         generic, public = "<R>", "R"
     mutable = "mut " if uses_call or not plan.completion else ""
@@ -680,25 +710,37 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             raise Unsupported("consumption requires an owned receiver")
         if outputs:
             raise Unsupported("consumption with outputs requires an owner transaction")
-        if ending[0].startswith("call.status("):
+        if ending[0].startswith(f"{call_local}.status("):
             ending = [ending[0].removesuffix("?;")]
         body = [
             *prelude,
             f"self.inner.close(|{target}| {{",
-            f"    let {mutable}call = Call::new({target}, None);",
+            f"    let {mutable}{call_local} = Call::new({target}, None);",
             *("    " + line for line in [*setup, *ending]),
             "})",
         ]
     else:
         receiver_self = "self.0" if discard else "self"
         body = [
-            f"let {mutable}call = {receiver_self}.inner.{'read()?' if read else 'call()'};"
+            f"let {mutable}{call_local} = {receiver_self}.inner.{'read()?' if read else 'call()'};"
             if receiver
-            else f"let {mutable}call = Call::global();"
+            else f"let {mutable}{call_local} = Call::global();"
         ]
         if plan.owned_outputs and receiver is None:
             body.append("maplibre_core::validate_abi_version()?;")
         body += [*prelude, *setup, *ending]
+    returns = f" -> Result<{public}>"
+    # A call with no status and an infallible conversion returns its value.
+    if (
+        not consuming
+        and body[-1].startswith("Ok(")
+        and not any("?" in line for line in body)
+    ):
+        body[-1] = body[-1].removeprefix("Ok(").removesuffix(")")
+        returns = f" -> {public}"
+        if public == "()":
+            body.pop()
+            returns = ""
 
     def has_pointer(value):
         return (
@@ -722,7 +764,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
     code = (
         doc(value_types.bound, function.name, "    ")
         + safety_doc
-        + f"    pub {'unsafe ' if unsafe_input else ''}fn {method}{generic}({', '.join(signature)}) -> Result<{public}> {{\n"
+        + f"    pub {'unsafe ' if unsafe_input else ''}fn {method}{generic}({', '.join(signature)}){returns} {{\n"
         + "\n".join("        " + line for line in body)
         + "\n    }\n"
     )

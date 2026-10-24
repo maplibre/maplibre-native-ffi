@@ -193,7 +193,8 @@ def declaration(values, value):
         if callback.decision:
             code = decision_trampoline(values, callback, f"{public}_trampoline", public)
         trampolines.append(code)
-        function = f"Fn({signature}) -> {output} + Send + Sync + 'static"
+        returns = "" if output == "()" else f" -> {output}"
+        function = f"Fn({signature}){returns} + Send + Sync + 'static"
         fields.append(
             f"{doc(values.bound, f'{value.native}.{field.name}', '    ')}    pub {public}: Option<std::sync::Arc<dyn {function}>>,"
         )
@@ -348,9 +349,22 @@ def response(value):
     )
 
 
+def lent_text(value):
+    """Whether a callback argument is text that C lends for the call, which the
+    host borrows rather than copies."""
+    return (
+        value.kind == "buffer"
+        and value.encoding == "utf8"
+        and not optional(value)
+        and (value.length == "nul" or value.buffer_form == "view")
+    )
+
+
 def callback_parameter_type(values, parameter):
     scoped = response(parameter.value)
-    return "&mut " + values.public(scoped) if scoped else values.public(parameter.value)
+    if scoped:
+        return "&mut " + values.public(scoped)
+    return "&str" if lent_text(parameter.value) else values.public(parameter.value)
 
 
 def callback_parameter_capture(values, parameter, local=None):
@@ -358,6 +372,13 @@ def callback_parameter_capture(values, parameter, local=None):
     scoped = response(parameter.value)
     if scoped:
         return f"&mut {values.name(scoped)}::new({local})?"
+    if lent_text(parameter.value):
+        borrow = (
+            "borrow_c_string"
+            if parameter.value.length == "nul"
+            else "borrow_string_view"
+        )
+        return f"unsafe {{ maplibre_core::string::{borrow}({local}) }}?"
     if parameter.value.kind == "handle" and parameter.value.ownership == "owned":
         return f"{values.public(parameter.value)}::adopt({local}, None)?"
     if parameter.value.kind == "handle":

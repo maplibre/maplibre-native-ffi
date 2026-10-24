@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let Some(mode) = parse_args(std::env::args().skip(1))? else {
         return Ok(());
     };
-    let backends = maplibre_native_ffi::supported_render_backend_mask()?;
+    let backends = maplibre_native_ffi::supported_render_backend_mask();
     println!("native render backends: {}", render_backend_label(backends));
     if !supports_usable_backend(backends) {
         return Err(

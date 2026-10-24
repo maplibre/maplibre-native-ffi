@@ -154,7 +154,7 @@ impl RuntimeHandle {
         call.status(|runtime, out_diagnostic| unsafe {
             sys::mln_runtime_get_event_mask(runtime, &mut out_mask, out_diagnostic)
         })?;
-        Ok(unsafe { from_native(out_mask) }?)
+        Ok(RuntimeEventMask::from_bits_retain(out_mask))
     }
 
     /// Starts getting one offline region by ID.

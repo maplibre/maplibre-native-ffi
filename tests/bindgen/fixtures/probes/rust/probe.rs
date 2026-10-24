@@ -47,7 +47,7 @@ pub fn run() {
 
     // A copy of a native default keeps its values and leaves a registration
     // unset.
-    let hooks = probe_hooks_default().unwrap();
+    let hooks = probe_hooks_default();
     assert_eq!(hooks.limit, 4);
     assert!(hooks.signal.callback.is_none());
 
