@@ -12,23 +12,6 @@
 [deps.dart]
 auto = true
 
-# `dart format` takes only files and directories, so it cannot join dprint's
-# stdin/stdout exec plugin like the other language formatters. hk calls these
-# path-taking tasks directly instead.
-[tasks._format-check]
-description = "Check Dart formatting."
-hide = true
-raw_args = true
-dir = "../.."
-run = "dart format --output=none --set-exit-if-changed"
-
-[tasks._format-fix]
-description = "Format Dart files."
-hide = true
-raw_args = true
-dir = "../.."
-run = "dart format"
-
 [tasks.api]
 description = "Generate Dart API reference HTML with dart doc."
 run = '''

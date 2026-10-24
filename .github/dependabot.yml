@@ -9,8 +9,6 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 3
     labels: [chore, "area:tooling", dependencies]
     groups:
       github-actions:
@@ -19,8 +17,6 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 3
     labels: [chore, "area:tooling", dependencies]
     groups:
       cargo:
@@ -31,8 +27,6 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 3
     labels: [chore, "area:tooling", dependencies]
     groups:
       gitsubmodule:
@@ -41,8 +35,6 @@ updates:
     directory: /bindings/go
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 3
     labels: [chore, "area:tooling", dependencies]
     groups:
       gomod:
@@ -51,8 +43,6 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 3
     labels: [chore, "area:tooling", dependencies]
     groups:
       gradle:
@@ -63,8 +53,6 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 3
     labels: [chore, "area:tooling", dependencies]
     groups:
       npm:
@@ -76,8 +64,6 @@ updates:
     directories: ["/", "/bindings/dotnet/docfx"]
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 3
     labels: [chore, "area:tooling", dependencies]
     groups:
       nuget:
@@ -86,8 +72,6 @@ updates:
     directory: /bindings/dart
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 3
     labels: [chore, "area:tooling", dependencies]
     groups:
       pub:
@@ -104,8 +88,6 @@ updates:
     directories: ["/bindings/swift", "/examples/swift-map"]
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 3
     labels: [chore, "area:tooling", dependencies]
     groups:
       swift:
@@ -114,8 +96,6 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 3
     labels: [chore, "area:tooling", dependencies]
     groups:
       uv:

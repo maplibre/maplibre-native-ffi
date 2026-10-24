@@ -83,19 +83,15 @@ steps {
     glob = List("docs/snippets/c/**/*.c", "include/**/*.h")
     check = "mise run //docs:check-snippets"
   }
+  // dprint's ruff plugin formats; this step only lints.
   ["ruff"] {
     glob = List("**/*.py", "**/*.pyi")
     exclude = List("third_party/**")
-    check = "uv run --no-sync ruff check {{files}} && uv run --no-sync ruff format --check {{files}}"
-    fix = "uv run --no-sync ruff check --fix {{files}} && uv run --no-sync ruff format {{files}}"
+    check = "uv run --no-sync ruff check {{files}}"
+    fix = "uv run --no-sync ruff check --fix {{files}}"
   }
   ["ty"] {
     glob = List("bindings/python/python/**/*.py", "docs/scripts/**/*.py")
     check = "uv run --no-sync ty check --error-on-warning --ignore invalid-argument-type --ignore not-iterable --ignore not-subscriptable {{files}}"
-  }
-  ["dart-format"] {
-    glob = List("bindings/dart/**/*.dart")
-    check = "mise run --quiet //bindings/dart:_format-check {{files}}"
-    fix = "mise run --quiet //bindings/dart:_format-fix {{files}}"
   }
 }

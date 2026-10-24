@@ -26,6 +26,10 @@
     "gradlew.bat",
     // Oxc rejects the declaration-only style attribute in this logo.
     "docs/src/assets/maplibre-logo-square-for-light-bg.svg",
+    // Bindgen probe fixtures are generated-looking inputs, not formatted by
+    // the Dart package formatter. Keep them out of dprint the way the old hk
+    // dart-format glob did.
+    "tests/bindgen/fixtures/probes/dart/**",
   ],
   "oxc": {
     "experimentalSortImports": { "newlinesBetween": true },
@@ -86,6 +90,10 @@
       {
         "command": "bash .mise/bin/dprint-zig fmt --stdin --zon",
         "exts": ["zon"],
+      },
+      {
+        "command": "bash .mise/bin/dprint-dart format --output=show --stdin-name={{file_path}}",
+        "exts": ["dart"],
       },
       { "command": "rustfmt --edition 2024", "exts": ["rs"] },
       {
