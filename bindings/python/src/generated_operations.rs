@@ -6219,6 +6219,17 @@ impl MapHandle {
         }
     }
     #[pyo3(signature = ())]
+    fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.status(|diagnostic| sys::mln_map_dispose(handle, diagnostic)) }?;
+        reservation.commit();
+        Ok(py.None())
+    }
+    #[pyo3(signature = ())]
     fn dump_debug_logs(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
@@ -6870,23 +6881,6 @@ impl MapHandle {
                 )
             })
         }
-    }
-    #[pyo3(signature = ())]
-    fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve(true)? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| sys::mln_map_release(handle, completion, diagnostic),
-                convert,
-            )
-        }?;
-        reservation.commit();
-        Ok(future)
     }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -9454,6 +9448,17 @@ impl RuntimeHandle {
         }
     }
     #[pyo3(signature = ())]
+    fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.status(|diagnostic| sys::mln_runtime_dispose(handle, diagnostic)) }?;
+        reservation.commit();
+        Ok(py.None())
+    }
+    #[pyo3(signature = ())]
     fn get_event_mask(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
@@ -9570,23 +9575,6 @@ impl RuntimeHandle {
                 convert,
             )
         }
-    }
-    #[pyo3(signature = ())]
-    fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve(true)? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| sys::mln_runtime_release(handle, completion, diagnostic),
-                convert,
-            )
-        }?;
-        reservation.commit();
-        Ok(future)
     }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {

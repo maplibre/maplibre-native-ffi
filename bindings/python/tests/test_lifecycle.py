@@ -45,6 +45,16 @@ def test_leaving_a_block_after_an_explicit_close_does_nothing() -> None:
         result(runtime.close())
 
 
+def test_leaving_a_root_block_disposes_it_without_waiting_for_its_children() -> None:
+    with mln.runtime_create() as runtime:
+        # Release refuses a runtime with a live map, and dispose accepts it.
+        map_handle = result(runtime.create_map())
+    assert repr(runtime) == f"RuntimeHandle(id={runtime.id}, closed=True)"
+    assert repr(map_handle) == f"MapHandle(id={map_handle.id}, closed=False)"
+    assert type(map_handle).__module__ == "maplibre_native_ffi"
+    result(map_handle.close())
+
+
 def test_a_handle_id_names_its_events_and_outlives_close(
     harness: Harness, map_handle: mln.MapHandle
 ) -> None:

@@ -13,6 +13,7 @@ class NativeHandleMixin:
 
     _handle_name = "Handle"
     _native: Any
+    _parent: NativeHandleMixin | None
 
     @property
     def id(self) -> int:
@@ -30,12 +31,16 @@ class NativeHandleMixin:
         native and report an invalid-state error.
 
         A handle whose release reports asynchronous teardown returns a future
-        here. Leaving the ``with`` block discards it, so a host that must
-        observe teardown calls ``close`` itself and waits. Leaving the block
-        after an explicit close does nothing. A render session's block disposes
-        the session instead, because its release refuses an attached session.
+        here, and a host that must observe teardown calls ``close`` itself and
+        waits. Leaving the ``with`` block disposes such a handle instead,
+        without observing teardown, as it does a render session, whose release
+        refuses an attached session. Leaving the block after an explicit close
+        does nothing.
         """
         return self._native.close()
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(id={self.id}, closed={self._native._is_closed})"
 
     def __enter__(self) -> Self:
         return self

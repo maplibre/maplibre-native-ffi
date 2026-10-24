@@ -174,7 +174,7 @@ mln_status mln_host_id(mln_host host, bool *out BIND("direction=out"), mln_diagn
         self.assertEqual(result["generated"], ["mln_host_destroy"])
         self.assertIn("owner member", result["unsupported"]["mln_host_id"])
 
-    def test_scoped_exit_disposes_a_session_and_skips_a_closed_handle(self):
+    def test_scoped_exit_disposes_sessions_and_roots_and_skips_a_closed_handle(self):
         native = python.generate(real_api())["src/generated_operations.rs"]
 
         def method(owner, name):
@@ -189,6 +189,11 @@ mln_status mln_host_id(mln_host host, bool *out BIND("direction=out"), mln_diagn
         self.assertIn(
             "mln_render_session_release", method("RenderSessionHandle", "close")
         )
+        # A release that reports teardown through a completion would hand the
+        # scope a future it drops, so the scope disposes the map instead.
+        self.assertIn("mln_map_dispose", method("MapHandle", "_exit"))
+        self.assertIn("mln_runtime_dispose", method("RuntimeHandle", "_exit"))
+        self.assertIn("mln_map_release", method("MapHandle", "close"))
         # A scope that exits after an explicit asynchronous close does nothing,
         # while a repeated explicit close still reaches native.
         self.assertIn("self.reserve(true)", method("MapHandle", "_exit"))

@@ -730,6 +730,19 @@ def operation(
     return owner, rust, facade, stub, product
 
 
+def scoped_release(handle: HandlePlan, bound: BoundApi) -> str:
+    """The operation that `__exit__` calls.
+
+    A release that reports teardown through a completion would return a future
+    that leaving the block drops, so the block disposes the handle instead, as
+    it does a handle whose release refuses some states.
+    """
+    release = bound.operations_by_name.get(handle.release)
+    if handle.dispose and release is not None and release.completion is not None:
+        return handle.dispose
+    return handle.scoped_release
+
+
 def compact(body: list[str]) -> list[str]:
     """Checks a status where the call makes it, and returns a final copy as is."""
     result = []
@@ -806,7 +819,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         {name: "\n".join(reasons) for name, reasons in bound.unsupported.items()}
     )
     exits = {
-        handle.scoped_release
+        scoped_release(handle, bound)
         for handle in bound.handles.values()
         if handle.native in OWNERS
     }
@@ -1000,6 +1013,8 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
     owner_classes = []
     for owner in scope_owners.values():
         owner_classes.append(f"""class {owner}(_{owner}Operations):
+    __module__ = "maplibre_native_ffi"
+
     def __init__(self):
         raise TypeError("response scopes are supplied during callbacks")
 
@@ -1011,8 +1026,8 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
 """)
     for native, owner in OWNERS.items():
         owner_classes.append(f'''class {owner}(_{owner}Operations, NativeHandleMixin):
-{docs.docstring(bound.doc(native), "    ")}    _handle_name = "{owner}"
-    _parent: NativeHandleMixin | None
+{docs.docstring(bound.doc(native), "    ")}    __module__ = "maplibre_native_ffi"
+    _handle_name = "{owner}"
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")

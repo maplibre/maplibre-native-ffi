@@ -17,6 +17,8 @@ from ._lifecycle import NativeHandleMixin
 
 
 class HttpHeaderTransformResponseScope(_HttpHeaderTransformResponseScopeOperations):
+    __module__ = "maplibre_native_ffi"
+
     def __init__(self):
         raise TypeError("response scopes are supplied during callbacks")
 
@@ -34,8 +36,8 @@ class AcquiredFrameHandle(_AcquiredFrameHandleOperations, NativeHandleMixin):
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     """
 
+    __module__ = "maplibre_native_ffi"
     _handle_name = "AcquiredFrameHandle"
-    _parent: NativeHandleMixin | None
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")
@@ -55,8 +57,8 @@ class GeojsonSourceDataHandle(_GeojsonSourceDataHandleOperations, NativeHandleMi
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     """
 
+    __module__ = "maplibre_native_ffi"
     _handle_name = "GeojsonSourceDataHandle"
-    _parent: NativeHandleMixin | None
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")
@@ -76,8 +78,8 @@ class MapHandle(_MapHandleOperations, NativeHandleMixin):
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     """
 
+    __module__ = "maplibre_native_ffi"
     _handle_name = "MapHandle"
-    _parent: NativeHandleMixin | None
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")
@@ -97,8 +99,8 @@ class MapProjectionHandle(_MapProjectionHandleOperations, NativeHandleMixin):
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     """
 
+    __module__ = "maplibre_native_ffi"
     _handle_name = "MapProjectionHandle"
-    _parent: NativeHandleMixin | None
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")
@@ -118,8 +120,8 @@ class RenderFrameBatchHandle(_RenderFrameBatchHandleOperations, NativeHandleMixi
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     """
 
+    __module__ = "maplibre_native_ffi"
     _handle_name = "RenderFrameBatchHandle"
-    _parent: NativeHandleMixin | None
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")
@@ -139,8 +141,8 @@ class RenderSessionHandle(_RenderSessionHandleOperations, NativeHandleMixin):
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     """
 
+    __module__ = "maplibre_native_ffi"
     _handle_name = "RenderSessionHandle"
-    _parent: NativeHandleMixin | None
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")
@@ -160,8 +162,8 @@ class ResourceRequestHandle(_ResourceRequestHandleOperations, NativeHandleMixin)
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     """
 
+    __module__ = "maplibre_native_ffi"
     _handle_name = "ResourceRequestHandle"
-    _parent: NativeHandleMixin | None
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")
@@ -183,8 +185,8 @@ class ResourceTransformRequestHandle(
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     """
 
+    __module__ = "maplibre_native_ffi"
     _handle_name = "ResourceTransformRequestHandle"
-    _parent: NativeHandleMixin | None
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")
@@ -204,8 +206,8 @@ class RuntimeHandle(_RuntimeHandleOperations, NativeHandleMixin):
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     """
 
+    __module__ = "maplibre_native_ffi"
     _handle_name = "RuntimeHandle"
-    _parent: NativeHandleMixin | None
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")
@@ -225,8 +227,8 @@ class StyleExpressionHandle(_StyleExpressionHandleOperations, NativeHandleMixin)
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     """
 
+    __module__ = "maplibre_native_ffi"
     _handle_name = "StyleExpressionHandle"
-    _parent: NativeHandleMixin | None
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")
