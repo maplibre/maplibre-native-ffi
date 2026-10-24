@@ -14,22 +14,62 @@ namespace Maplibre.NativeFfi.Internal.Memory;
 /// A registration becomes permanent only after <see cref="Accept"/>. Without it, the
 /// scope releases the managed registrations, and the contexts of the native
 /// registrations that the call consumed.
+/// <para>
+/// The scope is a ref struct, so no closure can capture it, and its bookkeeping
+/// lives in state that each thread reuses, so a call allocates nothing for it.
+/// Copies of a scope share that state, and only the declaring call disposes it.
+/// </para>
 /// </remarks>
-internal sealed unsafe partial class NativeCallScope : IDisposable
+internal readonly unsafe ref partial struct NativeCallScope
 {
-    private List<nint>? allocations;
-    private List<NativeCallbackRoot>? registrations;
-    private List<NativeRegistration>? natives;
-    private bool accepted;
+    private readonly State state;
 
-    internal NativeCallScope() { }
+    public NativeCallScope()
+    {
+        state = State.Rent();
+    }
+
+    private sealed class State
+    {
+        // Calls nest when a synchronous callback calls native, so each thread
+        // keeps a stack of free states rather than one.
+        [ThreadStatic]
+        private static State? free;
+
+        private State? next;
+        internal bool rented;
+        internal readonly List<nint> allocations = [];
+        internal readonly List<NativeCallbackRoot> registrations = [];
+        internal readonly List<NativeRegistration> natives = [];
+        internal readonly List<object> arguments = [];
+        internal object? owner;
+        internal bool accepted;
+
+        internal static State Rent()
+        {
+            var state = free ?? new State();
+            free = state.next;
+            state.next = null;
+            state.rented = true;
+            return state;
+        }
+
+        internal void Return()
+        {
+            rented = false;
+            owner = null;
+            accepted = false;
+            next = free;
+            free = this;
+        }
+    }
 
     internal void* Register(object descriptor)
     {
         var root = new NativeCallbackRoot(descriptor);
         try
         {
-            (registrations ??= []).Add(root);
+            state.registrations.Add(root);
         }
         catch
         {
@@ -48,7 +88,7 @@ internal sealed unsafe partial class NativeCallScope : IDisposable
         registration.Claim();
         try
         {
-            (natives ??= []).Add(registration);
+            state.natives.Add(registration);
         }
         catch
         {
@@ -57,7 +97,7 @@ internal sealed unsafe partial class NativeCallScope : IDisposable
         }
     }
 
-    internal void Accept() => accepted = true;
+    internal void Accept() => state.accepted = true;
 
     private T* Allocate<T>(int count)
         where T : unmanaged
@@ -66,7 +106,7 @@ internal sealed unsafe partial class NativeCallScope : IDisposable
         var pointer = (T*)NativeMemory.Alloc((nuint)count, (nuint)sizeof(T));
         try
         {
-            (allocations ??= []).Add((nint)pointer);
+            state.allocations.Add((nint)pointer);
         }
         catch
         {
@@ -168,7 +208,7 @@ internal sealed unsafe partial class NativeCallScope : IDisposable
 
     internal TNative* Array<TNative, TPublic>(
         IReadOnlyList<TPublic> values,
-        Func<TPublic, TNative> convert,
+        ScopedConverter<TPublic, TNative> convert,
         [CallerArgumentExpression(nameof(values))] string? name = null
     )
         where TNative : unmanaged
@@ -176,7 +216,7 @@ internal sealed unsafe partial class NativeCallScope : IDisposable
         ArgumentNullException.ThrowIfNull(values, name);
         var pointer = Allocate<TNative>(values.Count);
         for (var index = 0; index < values.Count; index++)
-            pointer[index] = convert(values[index]);
+            pointer[index] = convert(values[index], this);
         return pointer;
     }
 
@@ -197,20 +237,27 @@ internal sealed unsafe partial class NativeCallScope : IDisposable
 
     public void Dispose()
     {
-        EndOperation();
-        if (!accepted && registrations is not null)
-            foreach (var root in registrations)
+        if (!state.rented)
+            return;
+        if (!state.accepted)
+        {
+            foreach (var root in state.registrations)
                 root.Dispose();
-        registrations = null;
-        if (!accepted && natives is not null)
-            foreach (var registration in natives)
+            foreach (var registration in state.natives)
                 registration.Release();
-        natives = null;
-        if (allocations is not null)
-            foreach (var pointer in allocations)
-                NativeMemory.Free((void*)pointer);
-        allocations = null;
+        }
+        state.registrations.Clear();
+        state.natives.Clear();
+        foreach (var pointer in state.allocations)
+            NativeMemory.Free((void*)pointer);
+        state.allocations.Clear();
+        // The owner and handle arguments stay reachable until the call is over.
+        GC.KeepAlive(state.owner);
+        state.arguments.Clear();
+        state.Return();
     }
-
-    partial void EndOperation();
 }
+
+/// <summary>Converts a value with memory from the scope that it receives.</summary>
+internal delegate TNative ScopedConverter<TPublic, TNative>(TPublic value, NativeCallScope scope)
+    where TNative : unmanaged;

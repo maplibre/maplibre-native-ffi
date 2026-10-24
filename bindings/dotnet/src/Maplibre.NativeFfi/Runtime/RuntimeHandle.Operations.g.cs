@@ -52,11 +52,13 @@ public sealed unsafe partial class RuntimeHandle
     public Task ClearEventHandlerAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_clear_event_handler(Handle, completion, diagnostic),
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_clear_event_handler(
+            Handle,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -69,15 +71,13 @@ public sealed unsafe partial class RuntimeHandle
     public Task ClearHttpHeaderTransformAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_clear_http_header_transform(
-                    Handle,
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_clear_http_header_transform(
+            Handle,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -90,11 +90,13 @@ public sealed unsafe partial class RuntimeHandle
     public Task ClearResourceProviderAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_clear_resource_provider(Handle, completion, diagnostic),
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_clear_resource_provider(
+            Handle,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -107,11 +109,13 @@ public sealed unsafe partial class RuntimeHandle
     public Task ClearResourceTransformAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_clear_resource_transform(Handle, completion, diagnostic),
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_clear_resource_transform(
+            Handle,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -144,17 +148,20 @@ public sealed unsafe partial class RuntimeHandle
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Query<MlnMap, MapHandle>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_create_map(
-                    Handle,
-                    scope.Value(NativeMapOptions(options)),
-                    completion,
-                    diagnostic
-                ),
-            handle => MapHandle.Adopt(this, handle),
-            cancellationToken
+        var nativeOptions = NativeMapOptions(options);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_create_map(
+            Handle,
+            &nativeOptions,
+            NativeCompletion.Start<MapHandle>(
+                &nativeCompletion,
+                nativeResult => MapHandle.Adopt(this, NativeCompletion.Value<MlnMap>(nativeResult)),
+                cancellationToken,
+                out var nativePending
+            ),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -171,20 +178,27 @@ public sealed unsafe partial class RuntimeHandle
     )
     {
         using var scope = new NativeCallScope(this);
+        var nativeDefinition = NativeOfflineRegionDefinition(definition, scope);
         var bufferMetadata = scope.Buffer(metadata);
-        return scope.Query<mln_offline_region_info, OfflineRegionInfo>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_create_offline_region(
-                    Handle,
-                    scope.Value(NativeOfflineRegionDefinition(definition, scope)),
-                    (byte*)bufferMetadata.data,
-                    checked((nuint)bufferMetadata.size),
-                    completion,
-                    diagnostic
-                ),
-            CopyOfflineRegionInfo,
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_create_offline_region(
+            Handle,
+            &nativeDefinition,
+            (byte*)bufferMetadata.data,
+            checked((nuint)bufferMetadata.size),
+            NativeCompletion.Start<OfflineRegionInfo>(
+                &nativeCompletion,
+                static nativeResult =>
+                    NativeCompletion.Single<mln_offline_region_info, OfflineRegionInfo>(
+                        nativeResult,
+                        CopyOfflineRegionInfo
+                    ),
+                cancellationToken,
+                out var nativePending
+            ),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -200,16 +214,14 @@ public sealed unsafe partial class RuntimeHandle
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_delete_offline_region(
-                    Handle,
-                    regionId,
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_delete_offline_region(
+            Handle,
+            regionId,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -240,17 +252,23 @@ public sealed unsafe partial class RuntimeHandle
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.QueryOptionalValue<mln_offline_region_info, OfflineRegionInfo>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_get_offline_region(
-                    Handle,
-                    regionId,
-                    completion,
-                    diagnostic
-                ),
-            CopyOfflineRegionInfo,
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_get_offline_region(
+            Handle,
+            regionId,
+            NativeCompletion.Start<OfflineRegionInfo?>(
+                &nativeCompletion,
+                static nativeResult =>
+                    NativeCompletion.OptionalValue<mln_offline_region_info, OfflineRegionInfo>(
+                        nativeResult,
+                        CopyOfflineRegionInfo
+                    ),
+                cancellationToken,
+                out var nativePending
+            ),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -266,17 +284,23 @@ public sealed unsafe partial class RuntimeHandle
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Query<mln_offline_region_status, OfflineRegionStatus>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_get_offline_region_status(
-                    Handle,
-                    regionId,
-                    completion,
-                    diagnostic
-                ),
-            CopyOfflineRegionStatus,
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_get_offline_region_status(
+            Handle,
+            regionId,
+            NativeCompletion.Start<OfflineRegionStatus>(
+                &nativeCompletion,
+                static nativeResult =>
+                    NativeCompletion.Single<mln_offline_region_status, OfflineRegionStatus>(
+                        nativeResult,
+                        CopyOfflineRegionStatus
+                    ),
+                cancellationToken,
+                out var nativePending
+            ),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -292,16 +316,14 @@ public sealed unsafe partial class RuntimeHandle
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_invalidate_offline_region(
-                    Handle,
-                    regionId,
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_invalidate_offline_region(
+            Handle,
+            regionId,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -316,12 +338,22 @@ public sealed unsafe partial class RuntimeHandle
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.QueryArray<mln_offline_region_info, OfflineRegionInfo>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_list_offline_regions(Handle, completion, diagnostic),
-            CopyOfflineRegionInfo,
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_list_offline_regions(
+            Handle,
+            NativeCompletion.Start<OfflineRegionInfo[]>(
+                &nativeCompletion,
+                static nativeResult =>
+                    NativeCompletion.Array<mln_offline_region_info, OfflineRegionInfo>(
+                        nativeResult,
+                        CopyOfflineRegionInfo
+                    ),
+                cancellationToken,
+                out var nativePending
+            ),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -337,17 +369,23 @@ public sealed unsafe partial class RuntimeHandle
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.QueryArray<mln_offline_region_info, OfflineRegionInfo>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_merge_offline_regions(
-                    Handle,
-                    scope.Utf8(sideDatabasePath),
-                    completion,
-                    diagnostic
-                ),
-            CopyOfflineRegionInfo,
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_merge_offline_regions(
+            Handle,
+            scope.Utf8(sideDatabasePath),
+            NativeCompletion.Start<OfflineRegionInfo[]>(
+                &nativeCompletion,
+                static nativeResult =>
+                    NativeCompletion.Array<mln_offline_region_info, OfflineRegionInfo>(
+                        nativeResult,
+                        CopyOfflineRegionInfo
+                    ),
+                cancellationToken,
+                out var nativePending
+            ),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -367,10 +405,17 @@ public sealed unsafe partial class RuntimeHandle
 
     private mln_status StartRelease(MlnRuntime handle, mln_diagnostic* _)
     {
-        teardown = NativeCompletion.SubmitUnit(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_release(handle, completion, diagnostic)
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_release(
+            handle,
+            NativeCompletion.StartUnit(
+                &nativeCompletion,
+                CancellationToken.None,
+                out var nativePending
+            ),
+            Diagnostic
         );
+        teardown = nativePending.Submitted(nativeStatus);
         return mln_status.MLN_STATUS_OK;
     }
 
@@ -387,16 +432,14 @@ public sealed unsafe partial class RuntimeHandle
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_run_ambient_cache_operation(
-                    Handle,
-                    (uint)operation,
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_run_ambient_cache_operation(
+            Handle,
+            (uint)operation,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -412,16 +455,15 @@ public sealed unsafe partial class RuntimeHandle
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_set_event_handler(
-                    Handle,
-                    scope.Value(NativeRuntimeEventHandler(handler, scope)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        var nativeHandler = NativeRuntimeEventHandler(handler, scope);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_set_event_handler(
+            Handle,
+            &nativeHandler,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -450,16 +492,15 @@ public sealed unsafe partial class RuntimeHandle
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_set_http_header_transform(
-                    Handle,
-                    scope.Value(NativeHttpHeaderTransform(transform, scope)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        var nativeTransform = NativeHttpHeaderTransform(transform, scope);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_set_http_header_transform(
+            Handle,
+            &nativeTransform,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -475,16 +516,14 @@ public sealed unsafe partial class RuntimeHandle
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_set_maximum_ambient_cache_size(
-                    Handle,
-                    size,
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_set_maximum_ambient_cache_size(
+            Handle,
+            size,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -501,17 +540,15 @@ public sealed unsafe partial class RuntimeHandle
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_set_offline_region_download_state(
-                    Handle,
-                    regionId,
-                    (uint)state,
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_set_offline_region_download_state(
+            Handle,
+            regionId,
+            (uint)state,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -528,17 +565,15 @@ public sealed unsafe partial class RuntimeHandle
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_set_offline_region_observed(
-                    Handle,
-                    regionId,
-                    (byte)(observed ? 1 : 0),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_set_offline_region_observed(
+            Handle,
+            regionId,
+            (byte)(observed ? 1 : 0),
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -554,16 +589,15 @@ public sealed unsafe partial class RuntimeHandle
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_set_resource_provider(
-                    Handle,
-                    scope.Value(NativeResourceProvider(provider, scope)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        var nativeProvider = NativeResourceProvider(provider, scope);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_set_resource_provider(
+            Handle,
+            &nativeProvider,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -580,16 +614,15 @@ public sealed unsafe partial class RuntimeHandle
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_set_resource_transform(
-                    Handle,
-                    scope.Value(NativeResourceTransform(transform, scope)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        var nativeTransform = NativeResourceTransform(transform, scope);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_set_resource_transform(
+            Handle,
+            &nativeTransform,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -607,18 +640,24 @@ public sealed unsafe partial class RuntimeHandle
     {
         using var scope = new NativeCallScope(this);
         var bufferMetadata = scope.Buffer(metadata);
-        return scope.Query<mln_offline_region_info, OfflineRegionInfo>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_runtime_update_offline_region_metadata(
-                    Handle,
-                    regionId,
-                    (byte*)bufferMetadata.data,
-                    checked((nuint)bufferMetadata.size),
-                    completion,
-                    diagnostic
-                ),
-            CopyOfflineRegionInfo,
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_update_offline_region_metadata(
+            Handle,
+            regionId,
+            (byte*)bufferMetadata.data,
+            checked((nuint)bufferMetadata.size),
+            NativeCompletion.Start<OfflineRegionInfo>(
+                &nativeCompletion,
+                static nativeResult =>
+                    NativeCompletion.Single<mln_offline_region_info, OfflineRegionInfo>(
+                        nativeResult,
+                        CopyOfflineRegionInfo
+                    ),
+                cancellationToken,
+                out var nativePending
+            ),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 }

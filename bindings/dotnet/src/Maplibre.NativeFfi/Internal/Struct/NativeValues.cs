@@ -1,3 +1,5 @@
+using Maplibre.NativeFfi.Internal.Memory;
+
 namespace Maplibre.NativeFfi.Internal.Struct;
 
 /// <summary>The steps that generated value encoders repeat for each member.</summary>
@@ -46,6 +48,42 @@ internal static class NativeValues
         if (value is null)
             return default;
         slot = encode(value);
+        return bit;
+    }
+
+    /// <inheritdoc cref="Put{T, TFlags}(T?, ref T, TFlags)"/>
+    internal static TFlags Put<TPublic, TNative, TFlags>(
+        TPublic? value,
+        ref TNative slot,
+        TFlags bit,
+        NativeCallScope scope,
+        ScopedConverter<TPublic, TNative> encode
+    )
+        where TPublic : struct
+        where TNative : unmanaged
+        where TFlags : struct, Enum
+    {
+        if (value is not { } present)
+            return default;
+        slot = encode(present, scope);
+        return bit;
+    }
+
+    /// <inheritdoc cref="Put{T, TFlags}(T?, ref T, TFlags)"/>
+    internal static TFlags Put<TPublic, TNative, TFlags>(
+        TPublic? value,
+        ref TNative slot,
+        TFlags bit,
+        NativeCallScope scope,
+        ScopedConverter<TPublic, TNative> encode
+    )
+        where TPublic : class
+        where TNative : unmanaged
+        where TFlags : struct, Enum
+    {
+        if (value is null)
+            return default;
+        slot = encode(value, scope);
         return bit;
     }
 

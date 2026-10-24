@@ -225,13 +225,10 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
     public void Release(GpuSync consumerCompletion)
     {
         using var scope = new NativeCallScope();
+        var nativeConsumerCompletion = scope.Value(NativeGpuSync(consumerCompletion));
         state.Release(
             (live, diagnostic) =>
-                NativeMethods.mln_acquired_frame_release(
-                    live,
-                    scope.Value(NativeGpuSync(consumerCompletion)),
-                    diagnostic
-                )
+                NativeMethods.mln_acquired_frame_release(live, nativeConsumerCompletion, diagnostic)
         );
     }
 }

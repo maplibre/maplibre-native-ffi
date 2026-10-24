@@ -75,34 +75,22 @@ public sealed unsafe class GeneratedCallbackTests
             scope
         );
         var weak = new WeakReference(NativeCallbackRoot.Value(native.user_data));
+        // A generated attachment accepts its registrations once native admits the call, before it
+        // adopts the handle, so a failed adoption leaves them to native.
+        scope.Accept();
         var disposed = false;
         var failure = new FormatException("Owner construction failed.");
         Assert.Same(
             failure,
             Assert.Throws<FormatException>(() =>
-                scope.Attach<MlnRuntime, RuntimeHandle>(
-                    (output, completion, _) =>
+                NativeHandleState<MlnRuntime>.Adopt<RuntimeHandle>(
+                    SyntheticHandles.Runtime(1234),
+                    () => throw failure,
+                    (_, _) =>
                     {
-                        *output = SyntheticHandles.Runtime(1234);
-                        var result = new mln_completion_result
-                        {
-                            size = (uint)sizeof(mln_completion_result),
-                            status = (int)mln_status.MLN_STATUS_OK,
-                        };
-                        completion->callback(completion->user_data, &result);
-                        completion->release_user_data(completion->user_data);
+                        disposed = true;
                         return mln_status.MLN_STATUS_OK;
-                    },
-                    (handle, _) =>
-                        NativeHandleState<MlnRuntime>.Adopt<RuntimeHandle>(
-                            handle,
-                            () => throw failure,
-                            (_, _) =>
-                            {
-                                disposed = true;
-                                return mln_status.MLN_STATUS_OK;
-                            }
-                        )
+                    }
                 )
             )
         );

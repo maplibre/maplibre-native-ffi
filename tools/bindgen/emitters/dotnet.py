@@ -196,11 +196,25 @@ def present_call(plan: OperationPlan, arguments: str) -> str:
     return f"if (!Present({call}, mln_status.{plan.absence.status})) return null;"
 
 
-def submission(function: Function, arguments: str) -> str:
-    """A completion-taking C call as the submission that NativeCallScope runs."""
-    return (
-        f"(completion, diagnostic) => {native_call(function, arguments, 'diagnostic')}"
-    )
+def submitted(function: Function, args: list[str], start: str) -> list[str]:
+    """Calls a completion-taking C function with the completion that `start`
+    fills, leaving the call's task in `nativePending`.
+
+    Arguments convert from left to right, so a conversion that throws does so
+    before the completion starts.
+    """
+    index = args.index("completion")
+    if any(not arg.startswith("&") for arg in args[index + 1 :]):
+        raise Unsupported("an argument after the completion could throw once it starts")
+    arguments = ", ".join([*args[:index], start, *args[index + 1 :]])
+    return [
+        "mln_completion nativeCompletion;",
+        f"var nativeStatus = {native_call(function, arguments, 'Diagnostic')};",
+    ]
+
+
+def unit_start(cancellation: str) -> str:
+    return f"NativeCompletion.StartUnit(&nativeCompletion, {cancellation}, out var nativePending)"
 
 
 def method(signature: str, body: list[str]) -> str:
@@ -213,11 +227,16 @@ def method(signature: str, body: list[str]) -> str:
 
 def completion_query(
     plan: OperationPlan, values: Values, records: set[str], api
-) -> tuple[str, str, str]:
-    """The result type, submission helper, and copy of a completion's value."""
+) -> tuple[str, str]:
+    """The result type of a completion's value, and the converter that copies
+    it, or `Task` and no converter when it carries none.
+
+    Each converter is a static lambda over static methods, which allocates no
+    delegate per call.
+    """
     result = plan.result
     if result is None:
-        return "Task", "Run", ""
+        return "Task", ""
     shape = "array" if result.kind == "array" else "value"
     value = result.element if shape == "array" else result
     native = value.native
@@ -233,17 +252,29 @@ def completion_query(
         )
         copy = f"ValueStructs.{copy}"
         if shape == "array":
-            return f"{public}[]", f"QueryArray<mln_buffer_view, {public}>", copy
+            return (
+                f"{public}[]",
+                f"static nativeResult => NativeCompletion.Array<mln_buffer_view, {public}>(nativeResult, {copy})",
+            )
         if shape == "value":
             if nullable or optional:
-                return f"{public}?", f"QueryOptional<mln_buffer_view, {public}>", copy
-            return public, f"Query<mln_buffer_view, {public}>", copy
+                return (
+                    f"{public}?",
+                    f"static nativeResult => NativeCompletion.Optional<mln_buffer_view, {public}>(nativeResult, {copy})",
+                )
+            return (
+                public,
+                f"static nativeResult => NativeCompletion.Single<mln_buffer_view, {public}>(nativeResult, {copy})",
+            )
         raise Unsupported(f"buffer result shape {shape!r} needs a conversion rule")
     if value.kind == "scalar" and native in PRIMITIVES and shape == "value":
         if nullable:
             raise Unsupported("nullable scalar completion needs a presence conversion")
         scalar = PRIMITIVES[native]
-        return scalar, f"Query<{scalar}, {scalar}>", "static value => value"
+        return (
+            scalar,
+            f"static nativeResult => NativeCompletion.Value<{scalar}>(nativeResult)",
+        )
     if value.kind == "record":
         record = values.record(native)
         values.decoder(record)
@@ -255,18 +286,21 @@ def completion_query(
             else f"Copy{public}"
         )
         if shape == "array":
-            helper = "QueryOptionalArray" if nullable else "QueryArray"
+            helper = "OptionalArray" if nullable else "Array"
             return (
                 f"{public}[]{'?' if nullable else ''}",
-                f"{helper}<{native}, {public}>",
-                copy,
+                f"static nativeResult => NativeCompletion.{helper}<{native}, {public}>(nativeResult, {copy})",
             )
         if not nullable:
-            return public, f"Query<{native}, {public}>", copy
-        helper = (
-            "QueryOptional" if values.declares_class(record) else "QueryOptionalValue"
+            return (
+                public,
+                f"static nativeResult => NativeCompletion.Single<{native}, {public}>(nativeResult, {copy})",
+            )
+        helper = "Optional" if values.declares_class(record) else "OptionalValue"
+        return (
+            f"{public}?",
+            f"static nativeResult => NativeCompletion.{helper}<{native}, {public}>(nativeResult, {copy})",
         )
-        return f"{public}?", f"{helper}<{native}, {public}>", copy
     raise Unsupported(f"result {native!r} with shape {shape!r} needs a conversion rule")
 
 
@@ -329,6 +363,10 @@ def emit_operation(
         and handle_plan.release_inputs
     ):
         declarations, arguments = [], ["live"]
+        # The release runs synchronously, so its scope outlives the call. The
+        # release delegate cannot capture the scope, so the arguments convert
+        # before it.
+        body = ["using var scope = new NativeCallScope();"]
         for parameter in plan.inputs:
             if parameter.name == plan.receiver:
                 continue
@@ -336,20 +374,20 @@ def emit_operation(
             values.supported(value)
             name = camel(parameter.name)
             declarations.append(f"{values.public_type(value)} {name}")
+            local = f"native{pascal(name)}"
             if value.kind == "reference" and value.element:
-                # The release runs synchronously, so its scope outlives the call.
-                arguments.append(f"scope.Value({values.encode(value.element, name)})")
+                body.append(
+                    f"var {local} = scope.Value({values.encode(value.element, name)});"
+                )
             else:
-                arguments.append(values.encode(value, name))
+                body.append(f"var {local} = {values.encode(value, name)};")
+            arguments.append(local)
         call = native_call(function, ", ".join(arguments), "diagnostic")
         return (
             owner_class,
             method(
                 f"public void Release({', '.join(declarations)})",
-                [
-                    "using var scope = new NativeCallScope();",
-                    f"state.Release((live, diagnostic) => {call});",
-                ],
+                [*body, f"state.Release((live, diagnostic) => {call});"],
             ),
             set(values.plans),
         )
@@ -373,7 +411,12 @@ def emit_operation(
                 + method(
                     f"private mln_status StartRelease({native_type} handle, mln_diagnostic* _)",
                     [
-                        f"teardown = NativeCompletion.SubmitUnit({submission(function, 'handle, completion')});",
+                        *submitted(
+                            function,
+                            ["handle", "completion"],
+                            unit_start("CancellationToken.None"),
+                        ),
+                        "teardown = nativePending.Submitted(nativeStatus);",
                         "return mln_status.MLN_STATUS_OK;",
                     ],
                 )
@@ -494,11 +537,8 @@ def emit_operation(
             if owner.handle.native not in owners:
                 raise Unsupported("owned output requires its generated owner")
             native = raw_handle(owner.handle)
-            if asynchronous:
-                args.append("output")
-            else:
-                prologue.append(f"{native} {name} = default;")
-                args.append(f"&{name}")
+            prologue.append(f"{native} {name} = default;")
+            args.append(f"&{name}")
             immediate_owners.append((owner, name, native))
         elif (
             parameter.name in input_plans
@@ -600,11 +640,6 @@ def emit_operation(
                 omittable.add(name)
             element = value_plan.element
             assert element is not None
-            if asynchronous:
-                # A submission closure cannot address a stack local.
-                scoped = True
-                args.append(values.encode(value_plan, name))
-                continue
             scoped |= values.needs_scope(element)
             source = name + (
                 ".Value"
@@ -743,10 +778,10 @@ def emit_operation(
         )
         if asynchronous:
             body = prologue + [
-                f"return scope.Attach<{native}, {result_type}>(",
-                f"    (output, completion, diagnostic) => {native_call(function, arguments, 'diagnostic')},",
-                f"    (handle, attachment) => {result_type}.Adopt({parent}handle, attachment)",
-                ");",
+                *submitted(function, args, unit_start("CancellationToken.None")),
+                "var nativeAttachment = nativePending.Submitted(nativeStatus);",
+                "scope.Accept();",
+                f"return {result_type}.Adopt({parent}{local}, nativeAttachment);",
             ]
         elif plan.absence:
             # The scope accepts its inputs only after a call that publishes.
@@ -784,12 +819,14 @@ def emit_operation(
         name += "Async"
         parameters.append("CancellationToken cancellationToken = default")
         # A handle that arrives after cancellation is disposed, not leaked.
+        adopt = f"nativeResult => {owners[result]}.Adopt({parent}NativeCompletion.Value<{raw_handle(bound.handles[result])}>(nativeResult))"
         body = prologue + [
-            f"return scope.Query<{raw_handle(bound.handles[result])}, {owners[result]}>(",
-            f"    {submission(function, arguments)},",
-            f"    handle => {owners[result]}.Adopt({parent}handle),",
-            "    cancellationToken",
-            ");",
+            *submitted(
+                function,
+                args,
+                f"NativeCompletion.Start<{owners[result]}>(&nativeCompletion, {'' if parent else 'static '}{adopt}, cancellationToken, out var nativePending)",
+            ),
+            "return scope.Accepted(nativePending.Submitted(nativeStatus));",
         ]
     elif not asynchronous:
         if (
@@ -873,25 +910,31 @@ def emit_operation(
     else:
         if discard:
             result_type = "void"
-            call = f"scope.Discard({submission(function, arguments)});"
-        elif execution == "command":
-            if plan.result is not None:
-                raise Unsupported(
-                    "command carries a typed payload that needs its own conversion"
-                )
-            result_type = "Task<CommandCompletion>"
-            call = (
-                f"scope.Command({submission(function, arguments)}, cancellationToken);"
-            )
+            index = args.index("completion")
+            arguments = ", ".join([*args[:index], "null", *args[index + 1 :]])
+            body = prologue + [checked_call(function, arguments), "scope.Accept();"]
         else:
-            value_type, helper, copy = completion_query(plan, values, records, api)
-            result_type = value_type if value_type == "Task" else f"Task<{value_type}>"
-            copy = f", {copy}" if copy else ""
-            call = f"scope.{helper}({submission(function, arguments)}{copy}, cancellationToken);"
-        if not discard:
+            if execution == "command":
+                if plan.result is not None:
+                    raise Unsupported(
+                        "command carries a typed payload that needs its own conversion"
+                    )
+                result_type = "Task<CommandCompletion>"
+                start = "NativeCompletion.StartCommand(&nativeCompletion, cancellationToken, out var nativePending)"
+            else:
+                value_type, converter = completion_query(plan, values, records, api)
+                if value_type == "Task":
+                    result_type = "Task"
+                    start = unit_start("cancellationToken")
+                else:
+                    result_type = f"Task<{value_type}>"
+                    start = f"NativeCompletion.Start<{value_type}>(&nativeCompletion, {converter}, cancellationToken, out var nativePending)"
             parameters.append("CancellationToken cancellationToken = default")
             name += "Async"
-        body = prologue + [call if discard else f"return {call}"]
+            body = prologue + [
+                *submitted(function, args, start),
+                "return scope.Accepted(nativePending.Submitted(nativeStatus));",
+            ]
     return (
         owner_class,
         method(f"{modifiers} {result_type} {name}({', '.join(parameters)})", body),

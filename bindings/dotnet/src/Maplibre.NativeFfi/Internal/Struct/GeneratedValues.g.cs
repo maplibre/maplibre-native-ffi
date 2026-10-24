@@ -567,19 +567,22 @@ internal static unsafe class GeneratedValues
             value.SourceLayerId,
             ref native.source_layer_id,
             MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID,
-            present => scope.Utf8(present)
+            scope,
+            static (present, scope) => scope.Utf8(present)
         );
         native.fields |= Put(
             value.FeatureId,
             ref native.feature_id,
             MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
-            present => scope.Utf8(present)
+            scope,
+            static (present, scope) => scope.Utf8(present)
         );
         native.fields |= Put(
             value.StateKey,
             ref native.state_key,
             MLN_FEATURE_STATE_SELECTOR_STATE_KEY,
-            present => scope.Utf8(present)
+            scope,
+            static (present, scope) => scope.Utf8(present)
         );
         return native;
     }
@@ -699,7 +702,8 @@ internal static unsafe class GeneratedValues
             value.ClusterPropertiesStorage?.Items,
             ref native.cluster_properties,
             MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES,
-            present => scope.Buffer(present)
+            scope,
+            static (present, scope) => scope.Buffer(present)
         );
         native.fields |= Put(value.Buffer, ref native.buffer, MLN_GEOJSON_SOURCE_OPTION_BUFFER);
         native.fields |= Put(
@@ -788,7 +792,7 @@ internal static unsafe class GeneratedValues
         native.url = scope.Utf8(value.Url);
         native.headers = scope.Array<mln_http_header, HttpHeader>(
             value.HeadersStorage.Items,
-            item => NativeHttpHeader(item, scope)
+            static (item, scope) => NativeHttpHeader(item, scope)
         );
         native.header_count = checked((nuint)value.HeadersStorage.Items.Length);
         return native;
@@ -841,7 +845,7 @@ internal static unsafe class GeneratedValues
         }
         native.rules = scope.Array<mln_http_header_rule, HttpHeaderRule>(
             value.RulesStorage.Items,
-            item => NativeHttpHeaderRule(item, scope)
+            static (item, scope) => NativeHttpHeaderRule(item, scope)
         );
         native.rule_count = checked((nuint)value.RulesStorage.Items.Length);
         return native;
@@ -1149,7 +1153,7 @@ internal static unsafe class GeneratedValues
         native.physical_height = value.PhysicalHeight;
         native.textures = scope.Array<mln_metal_borrowed_texture, MetalBorrowedTexture>(
             value.TexturesStorage.Items,
-            item => NativeMetalBorrowedTexture(item)
+            static (item, scope) => NativeMetalBorrowedTexture(item)
         );
         native.texture_count = checked((nuint)value.TexturesStorage.Items.Length);
         return native;
@@ -1395,7 +1399,7 @@ internal static unsafe class GeneratedValues
         native.context = NativeOpenglContextDescriptor(value.Context, scope);
         native.textures = scope.Array<mln_opengl_borrowed_texture, OpenglBorrowedTexture>(
             value.TexturesStorage.Items,
-            item => NativeOpenglBorrowedTexture(item)
+            static (item, scope) => NativeOpenglBorrowedTexture(item)
         );
         native.texture_count = checked((nuint)value.TexturesStorage.Items.Length);
         native.target = value.Target;
@@ -1793,7 +1797,7 @@ internal static unsafe class GeneratedValues
             native.fields |= MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
             native.layer_ids = scope.Array<mln_buffer_view, string>(
                 fieldLayerIds,
-                item => scope.Utf8(item)
+                static (item, scope) => scope.Utf8(item)
             );
             native.layer_id_count = checked((nuint)fieldLayerIds.Length);
         }
@@ -1801,7 +1805,8 @@ internal static unsafe class GeneratedValues
             value.FilterStorage?.Items,
             ref native.filter,
             MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER,
-            present => scope.Buffer(present)
+            scope,
+            static (present, scope) => scope.Buffer(present)
         );
         return native;
     }
@@ -1894,7 +1899,7 @@ internal static unsafe class GeneratedValues
         }
         native.routes = scope.Array<mln_resource_route, ResourceRoute>(
             value.RoutesStorage.Items,
-            item => NativeResourceRoute(item, scope)
+            static (item, scope) => NativeResourceRoute(item, scope)
         );
         native.route_count = checked((nuint)value.RoutesStorage.Items.Length);
         return native;
@@ -2234,7 +2239,7 @@ internal static unsafe class GeneratedValues
         var native = new mln_screen_line_string();
         native.points = scope.Array<mln_screen_point, ScreenPoint>(
             value.PointsStorage.Items,
-            item => NativeScreenPoint(item)
+            static (item, scope) => NativeScreenPoint(item)
         );
         native.point_count = checked((nuint)value.PointsStorage.Items.Length);
         return native;
@@ -2296,7 +2301,7 @@ internal static unsafe class GeneratedValues
             native.fields |= MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
             native.source_layer_ids = scope.Array<mln_buffer_view, string>(
                 fieldSourceLayerIds,
-                item => scope.Utf8(item)
+                static (item, scope) => scope.Utf8(item)
             );
             native.source_layer_id_count = checked((nuint)fieldSourceLayerIds.Length);
         }
@@ -2304,7 +2309,8 @@ internal static unsafe class GeneratedValues
             value.FilterStorage?.Items,
             ref native.filter,
             MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER,
-            present => scope.Buffer(present)
+            scope,
+            static (present, scope) => scope.Buffer(present)
         );
         return native;
     }
@@ -2376,19 +2382,22 @@ internal static unsafe class GeneratedValues
             value.FeatureStorage?.Items,
             ref native.feature,
             MLN_STYLE_EXPRESSION_INPUT_FEATURE,
-            present => scope.Buffer(present)
+            scope,
+            static (present, scope) => scope.Buffer(present)
         );
         native.fields |= Put(
             value.FeatureStateStorage?.Items,
             ref native.feature_state,
             MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE,
-            present => scope.Buffer(present)
+            scope,
+            static (present, scope) => scope.Buffer(present)
         );
         native.fields |= Put(
             value.GlobalStateStorage?.Items,
             ref native.global_state,
             MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE,
-            present => scope.Buffer(present)
+            scope,
+            static (present, scope) => scope.Buffer(present)
         );
         native.fields |= Put(
             value.CanonicalTileId,
@@ -2398,7 +2407,7 @@ internal static unsafe class GeneratedValues
         );
         native.available_images = scope.Array<mln_buffer_view, string>(
             value.AvailableImagesStorage.Items,
-            item => scope.Utf8(item)
+            static (item, scope) => scope.Utf8(item)
         );
         native.available_image_count = checked((nuint)value.AvailableImagesStorage.Items.Length);
         return native;
@@ -2528,7 +2537,7 @@ internal static unsafe class GeneratedValues
             native.fields |= MLN_STYLE_IMAGE_OPTION_STRETCH_X;
             native.stretch_x = scope.Array<mln_image_stretch, ImageStretch>(
                 fieldStretchX,
-                item => NativeImageStretch(item)
+                static (item, scope) => NativeImageStretch(item)
             );
             native.stretch_x_count = checked((nuint)fieldStretchX.Length);
         }
@@ -2537,7 +2546,7 @@ internal static unsafe class GeneratedValues
             native.fields |= MLN_STYLE_IMAGE_OPTION_STRETCH_Y;
             native.stretch_y = scope.Array<mln_image_stretch, ImageStretch>(
                 fieldStretchY,
-                item => NativeImageStretch(item)
+                static (item, scope) => NativeImageStretch(item)
             );
             native.stretch_y_count = checked((nuint)fieldStretchY.Length);
         }
@@ -2765,7 +2774,7 @@ internal static unsafe class GeneratedValues
         native.context = NativeVulkanContextDescriptor(value.Context);
         native.textures = scope.Array<mln_vulkan_borrowed_texture, VulkanBorrowedTexture>(
             value.TexturesStorage.Items,
-            item => NativeVulkanBorrowedTexture(item)
+            static (item, scope) => NativeVulkanBorrowedTexture(item)
         );
         native.texture_count = checked((nuint)value.TexturesStorage.Items.Length);
         native.format = value.Format;
@@ -2963,7 +2972,7 @@ internal static unsafe class GeneratedValues
         native.context = NativeWebgpuContextDescriptor(value.Context);
         native.textures = scope.Array<mln_webgpu_borrowed_texture, WebgpuBorrowedTexture>(
             value.TexturesStorage.Items,
-            item => NativeWebgpuBorrowedTexture(item)
+            static (item, scope) => NativeWebgpuBorrowedTexture(item)
         );
         native.texture_count = checked((nuint)value.TexturesStorage.Items.Length);
         native.format = value.Format;

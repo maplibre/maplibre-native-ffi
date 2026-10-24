@@ -130,11 +130,13 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     public Task BarrierAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_barrier(Handle, completion, diagnostic),
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_barrier(
+            Handle,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -147,11 +149,13 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     public Task ClearDataAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_clear_data(Handle, completion, diagnostic),
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_clear_data(
+            Handle,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -164,11 +168,13 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     public Task DetachAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_detach(Handle, completion, diagnostic),
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_detach(
+            Handle,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -204,11 +210,13 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     public Task DumpDebugLogsAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_dump_debug_logs(Handle, completion, diagnostic),
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_dump_debug_logs(
+            Handle,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -268,21 +276,30 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Query<mln_buffer_view, byte[]>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_query_feature_extensions(
-                    Handle,
-                    scope.Utf8(sourceId),
-                    scope.Buffer(feature),
-                    scope.Utf8(extension),
-                    scope.Utf8(extensionField),
-                    arguments is null ? null : scope.Value(scope.Buffer(arguments)),
-                    completion,
-                    diagnostic
-                ),
-            ValueStructs.CopyBufferView,
-            cancellationToken
+        var nativeArguments = arguments is null
+            ? default(mln_buffer_view)
+            : scope.Buffer(arguments);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_query_feature_extensions(
+            Handle,
+            scope.Utf8(sourceId),
+            scope.Buffer(feature),
+            scope.Utf8(extension),
+            scope.Utf8(extensionField),
+            arguments is null ? null : &nativeArguments,
+            NativeCompletion.Start<byte[]>(
+                &nativeCompletion,
+                static nativeResult =>
+                    NativeCompletion.Single<mln_buffer_view, byte[]>(
+                        nativeResult,
+                        ValueStructs.CopyBufferView
+                    ),
+                cancellationToken,
+                out var nativePending
+            ),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -300,20 +317,28 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.QueryArray<mln_rendered_feature, RenderedFeature>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_query_rendered_features(
-                    Handle,
-                    scope.Value(NativeRenderedQueryGeometry(geometry, scope)),
-                    options is null
-                        ? null
-                        : scope.Value(NativeRenderedFeatureQueryOptions(options, scope)),
-                    completion,
-                    diagnostic
-                ),
-            CopyRenderedFeature,
-            cancellationToken
+        var nativeGeometry = NativeRenderedQueryGeometry(geometry, scope);
+        var nativeOptions = options is null
+            ? default(mln_rendered_feature_query_options)
+            : NativeRenderedFeatureQueryOptions(options, scope);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_query_rendered_features(
+            Handle,
+            &nativeGeometry,
+            options is null ? null : &nativeOptions,
+            NativeCompletion.Start<RenderedFeature[]>(
+                &nativeCompletion,
+                static nativeResult =>
+                    NativeCompletion.Array<mln_rendered_feature, RenderedFeature>(
+                        nativeResult,
+                        CopyRenderedFeature
+                    ),
+                cancellationToken,
+                out var nativePending
+            ),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -330,20 +355,27 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.QueryArray<mln_source_feature, SourceFeature>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_query_source_features(
-                    Handle,
-                    scope.Utf8(sourceId),
-                    options is null
-                        ? null
-                        : scope.Value(NativeSourceFeatureQueryOptions(options, scope)),
-                    completion,
-                    diagnostic
-                ),
-            CopySourceFeature,
-            cancellationToken
+        var nativeOptions = options is null
+            ? default(mln_source_feature_query_options)
+            : NativeSourceFeatureQueryOptions(options, scope);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_query_source_features(
+            Handle,
+            scope.Utf8(sourceId),
+            options is null ? null : &nativeOptions,
+            NativeCompletion.Start<SourceFeature[]>(
+                &nativeCompletion,
+                static nativeResult =>
+                    NativeCompletion.Array<mln_source_feature, SourceFeature>(
+                        nativeResult,
+                        CopySourceFeature
+                    ),
+                cancellationToken,
+                out var nativePending
+            ),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -359,12 +391,22 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Query<mln_texture_readback_result, TextureReadbackResult>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_read_texture(Handle, completion, diagnostic),
-            CopyTextureReadbackResult,
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_read_texture(
+            Handle,
+            NativeCompletion.Start<TextureReadbackResult>(
+                &nativeCompletion,
+                static nativeResult =>
+                    NativeCompletion.Single<mln_texture_readback_result, TextureReadbackResult>(
+                        nativeResult,
+                        CopyTextureReadbackResult
+                    ),
+                cancellationToken,
+                out var nativePending
+            ),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -377,11 +419,13 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     public Task ReduceMemoryUseAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_reduce_memory_use(Handle, completion, diagnostic),
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_reduce_memory_use(
+            Handle,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -433,16 +477,18 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_resize(
-                    Handle,
-                    NativeLogicalExtent(extent),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_resize(
+            Handle,
+            NativeLogicalExtent(extent),
+            NativeCompletion.StartCommand(
+                &nativeCompletion,
+                cancellationToken,
+                out var nativePending
+            ),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -481,16 +527,15 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_set_metal_borrowed_texture_target(
-                    Handle,
-                    scope.Value(NativeMetalBorrowedTextureDescriptor(descriptor, scope)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        var nativeDescriptor = NativeMetalBorrowedTextureDescriptor(descriptor, scope);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_set_metal_borrowed_texture_target(
+            Handle,
+            &nativeDescriptor,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -506,16 +551,15 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_set_metal_surface_target(
-                    Handle,
-                    scope.Value(NativeMetalSurfaceDescriptor(descriptor)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        var nativeDescriptor = NativeMetalSurfaceDescriptor(descriptor);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_set_metal_surface_target(
+            Handle,
+            &nativeDescriptor,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -533,16 +577,15 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_set_opengl_borrowed_texture_target(
-                    Handle,
-                    scope.Value(NativeOpenglBorrowedTextureDescriptor(descriptor, scope)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        var nativeDescriptor = NativeOpenglBorrowedTextureDescriptor(descriptor, scope);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_set_opengl_borrowed_texture_target(
+            Handle,
+            &nativeDescriptor,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -558,16 +601,15 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_set_opengl_surface_target(
-                    Handle,
-                    scope.Value(NativeOpenglSurfaceDescriptor(descriptor, scope)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        var nativeDescriptor = NativeOpenglSurfaceDescriptor(descriptor, scope);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_set_opengl_surface_target(
+            Handle,
+            &nativeDescriptor,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -585,16 +627,15 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_set_vulkan_borrowed_texture_target(
-                    Handle,
-                    scope.Value(NativeVulkanBorrowedTextureDescriptor(descriptor, scope)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        var nativeDescriptor = NativeVulkanBorrowedTextureDescriptor(descriptor, scope);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_set_vulkan_borrowed_texture_target(
+            Handle,
+            &nativeDescriptor,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -610,16 +651,15 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_set_vulkan_surface_target(
-                    Handle,
-                    scope.Value(NativeVulkanSurfaceDescriptor(descriptor)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        var nativeDescriptor = NativeVulkanSurfaceDescriptor(descriptor);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_set_vulkan_surface_target(
+            Handle,
+            &nativeDescriptor,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -637,16 +677,15 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_set_webgpu_borrowed_texture_target(
-                    Handle,
-                    scope.Value(NativeWebgpuBorrowedTextureDescriptor(descriptor, scope)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        var nativeDescriptor = NativeWebgpuBorrowedTextureDescriptor(descriptor, scope);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_set_webgpu_borrowed_texture_target(
+            Handle,
+            &nativeDescriptor,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -662,16 +701,15 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     )
     {
         using var scope = new NativeCallScope(this);
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_render_session_set_webgpu_surface_target(
-                    Handle,
-                    scope.Value(NativeWebgpuSurfaceDescriptor(descriptor)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
+        var nativeDescriptor = NativeWebgpuSurfaceDescriptor(descriptor);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_set_webgpu_surface_target(
+            Handle,
+            &nativeDescriptor,
+            NativeCompletion.StartUnit(&nativeCompletion, cancellationToken, out var nativePending),
+            Diagnostic
         );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -697,15 +735,15 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
-            scope.Discard(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_render_session_resize(
-                        receiverHandle,
-                        NativeLogicalExtent(extent),
-                        completion,
-                        diagnostic
-                    )
+            Check(
+                NativeMethods.mln_render_session_resize(
+                    receiverHandle,
+                    NativeLogicalExtent(extent),
+                    null,
+                    Diagnostic
+                )
             );
+            scope.Accept();
         }
     }
 }

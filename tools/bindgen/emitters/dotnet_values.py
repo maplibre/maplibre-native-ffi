@@ -348,7 +348,7 @@ class Values:
             ) == self.public_type(plan.element):
                 return f"scope.Array<{self.raw_type(plan.element)}>({expression})"
             element = self.encode(plan.element, "item")
-            return f"scope.Array<{self.raw_type(plan.element)}, {self.public_type(plan.element)}>({expression}, item => {element})"
+            return f"scope.Array<{self.raw_type(plan.element)}, {self.public_type(plan.element)}>({expression}, static (item, scope) => {element})"
         raise Unsupported(f"{plan.native}: input requires an allocation scope")
 
     def union_only(self, plan: ValuePlan) -> bool:
@@ -857,10 +857,14 @@ class Values:
         arguments = [expression, f"ref native.{member(field.name)}", presence.bit]
         if encoded != "present":
             group = re.fullmatch(r"(\w+)\(present\)", encoded)
-            arguments.append(
-                group[1]
+            # A scope is a ref struct, so the encoder receives it rather than
+            # capturing it.
+            arguments += (
+                [group[1]]
                 if group
-                else f"{'' if 'scope' in encoded else 'static '}present => {encoded}"
+                else ["scope", f"static (present, scope) => {encoded}"]
+                if "scope" in encoded
+                else [f"static present => {encoded}"]
             )
         return f"        native.{member(presence.mask)} |= Put({', '.join(arguments)});"
 

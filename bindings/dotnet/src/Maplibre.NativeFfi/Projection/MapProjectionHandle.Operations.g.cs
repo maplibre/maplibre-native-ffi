@@ -137,7 +137,10 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         Check(
             NativeMethods.mln_map_projection_lat_lngs_for_pixels(
                 Handle,
-                scope.Array<mln_screen_point, ScreenPoint>(points, item => NativeScreenPoint(item)),
+                scope.Array<mln_screen_point, ScreenPoint>(
+                    points,
+                    static (item, scope) => NativeScreenPoint(item)
+                ),
                 checked((nuint)points.Length),
                 outCoordinates,
                 Diagnostic
@@ -165,7 +168,10 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         Check(
             NativeMethods.mln_map_projection_lat_lngs_for_pixels_unwrapped(
                 Handle,
-                scope.Array<mln_screen_point, ScreenPoint>(points, item => NativeScreenPoint(item)),
+                scope.Array<mln_screen_point, ScreenPoint>(
+                    points,
+                    static (item, scope) => NativeScreenPoint(item)
+                ),
                 checked((nuint)points.Length),
                 outCoordinates,
                 Diagnostic
@@ -238,7 +244,10 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         Check(
             NativeMethods.mln_map_projection_pixels_for_lat_lngs(
                 Handle,
-                scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
+                scope.Array<mln_lat_lng, LatLng>(
+                    coordinates,
+                    static (item, scope) => NativeLatLng(item)
+                ),
                 checked((nuint)coordinates.Length),
                 outPoints,
                 Diagnostic

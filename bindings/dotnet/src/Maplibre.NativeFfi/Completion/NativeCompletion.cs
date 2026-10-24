@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Maplibre.NativeFfi.Internal.C;
@@ -14,10 +15,6 @@ public readonly record struct CommandCompletion(
     string Diagnostic
 );
 
-internal unsafe delegate mln_status CompletionSubmit(
-    mln_completion* completion,
-    mln_diagnostic* diagnostic
-);
 internal unsafe delegate T CompletionConverter<T>(mln_completion_result* result);
 
 internal static unsafe class NativeCompletion
@@ -59,12 +56,49 @@ internal static unsafe class NativeCompletion
         return values;
     }
 
-    internal static Task<CommandCompletion> SubmitCommand(
-        CompletionSubmit submit,
-        CancellationToken cancellationToken
+    /// <summary>Copies the one value of a result.</summary>
+    internal static T Single<TNative, T>(mln_completion_result* result, Func<TNative, T> copy)
+        where TNative : unmanaged => copy(Value<TNative>(result));
+
+    /// <summary>Copies the value of a result that may hold none.</summary>
+    internal static T? Optional<TNative, T>(mln_completion_result* result, Func<TNative, T?> copy)
+        where TNative : unmanaged
+        where T : class => result->value_count == 0 ? null : copy(Value<TNative>(result));
+
+    /// <inheritdoc cref="Optional{TNative, T}"/>
+    internal static T? OptionalValue<TNative, T>(
+        mln_completion_result* result,
+        Func<TNative, T> copy
+    )
+        where TNative : unmanaged
+        where T : struct => result->value_count == 0 ? null : copy(Value<TNative>(result));
+
+    /// <summary>Copies each value of a result's array.</summary>
+    internal static T[] Array<TNative, T>(mln_completion_result* result, Func<TNative, T> copy)
+        where TNative : unmanaged
+    {
+        var values = Values<TNative>(result);
+        var copied = new T[values.Length];
+        for (var index = 0; index < values.Length; index++)
+            copied[index] = copy(values[index]);
+        return copied;
+    }
+
+    /// <summary>Copies each value of a result's array, which may be absent.</summary>
+    internal static T[]? OptionalArray<TNative, T>(
+        mln_completion_result* result,
+        Func<TNative, T> copy
+    )
+        where TNative : unmanaged => result->value == null ? null : Array(result, copy);
+
+    /// <summary>Starts a command completion, which reports a failure as its disposition.</summary>
+    internal static mln_completion* StartCommand(
+        mln_completion* completion,
+        CancellationToken cancellationToken,
+        out Pending<CommandCompletion> pending
     ) =>
-        Submit(
-            submit,
+        Start(
+            completion,
             static result => new CommandCompletion(
                 (CommandDisposition)result->disposition,
                 result->generation,
@@ -73,56 +107,74 @@ internal static unsafe class NativeCompletion
                 ValueStructs.CopyUtf8View(result->diagnostic)
             ),
             cancellationToken,
-            true
+            out pending,
+            acceptErrorStatus: true
         );
 
-    internal static Task SubmitUnit(CompletionSubmit submit) =>
-        Submit(submit, static _ => true, CancellationToken.None);
+    /// <summary>Starts a completion that carries no value.</summary>
+    internal static mln_completion* StartUnit(
+        mln_completion* completion,
+        CancellationToken cancellationToken,
+        out Pending<bool> pending
+    ) => Start(completion, static _ => true, cancellationToken, out pending);
 
     /// <summary>
-    /// Submits a completion-based call and returns the task it resolves.
+    /// Fills <paramref name="completion"/> for one native call and returns it.
+    /// The caller passes the result to <see cref="Pending{T}.Submitted"/>.
     /// </summary>
     /// <remarks>
-    /// Cancelling <paramref name="cancellationToken"/> cancels the task, not
-    /// the native work, which continues to its terminal disposition. A value
-    /// that arrives after cancellation has no receiver, so a disposable one is
-    /// disposed.
+    /// A generated call starts its completion as the last argument that can
+    /// throw, so a started completion always reaches its submission. Cancelling
+    /// <paramref name="cancellationToken"/> cancels the task, not the native
+    /// work, which continues to its terminal disposition. A value that arrives
+    /// after cancellation has no receiver, so a disposable one is disposed.
     /// </remarks>
-    internal static Task<T> Submit<T>(
-        CompletionSubmit submit,
+    internal static mln_completion* Start<T>(
+        mln_completion* completion,
         CompletionConverter<T> convert,
         CancellationToken cancellationToken,
+        out Pending<T> pending,
         bool acceptErrorStatus = false
     )
     {
         var state = new State<T>(convert, acceptErrorStatus, cancellationToken);
         var root = GCHandle.Alloc(state);
-        var completion = new mln_completion
+        *completion = new mln_completion
         {
             size = (uint)sizeof(mln_completion),
             callback = &Complete,
             user_data = (void*)GCHandle.ToIntPtr(root),
             release_user_data = &Release,
         };
-        mln_diagnostic diagnostic;
-        mln_status status;
-        try
+        pending = new Pending<T>(state, root);
+        return completion;
+    }
+
+    /// <summary>A started completion, until the call that took it returns.</summary>
+    internal readonly struct Pending<T>
+    {
+        private readonly State<T> state;
+        private readonly GCHandle root;
+
+        internal Pending(State<T> state, GCHandle root)
         {
-            status = submit(&completion, NativeDiagnostic.Prepare(&diagnostic));
+            this.state = state;
+            this.root = root;
         }
-        catch
+
+        /// <summary>
+        /// Returns the task of an accepted call. A rejected call never runs its
+        /// completion, so this releases it and throws the call's status.
+        /// </summary>
+        internal Task<T> Submitted(mln_status status)
         {
+            if (status == mln_status.MLN_STATUS_OK)
+                return state.Task;
             state.Reject();
             root.Free();
-            throw;
+            NativeStatus.Check(status, NativeDiagnostic.Current);
+            throw new UnreachableException();
         }
-        if (status != mln_status.MLN_STATUS_OK)
-        {
-            state.Reject();
-            root.Free();
-            NativeStatus.Check(status, &diagnostic);
-        }
-        return state.Task;
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -144,12 +196,12 @@ internal static unsafe class NativeCompletion
         GCHandle.FromIntPtr((nint)userData).Free();
     }
 
-    private abstract class StateBase
+    internal abstract class StateBase
     {
         internal abstract void Complete(mln_completion_result* result);
     }
 
-    private sealed class State<T> : StateBase
+    internal sealed class State<T> : StateBase
     {
         private readonly CompletionConverter<T> convert;
         private readonly bool acceptErrorStatus;

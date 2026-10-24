@@ -36,37 +36,33 @@ public sealed class CompletionTests
         Assert.Contains("no value", error.Message, StringComparison.Ordinal);
     }
 
-    // Each fake submission keeps the completion it is handed and plays native's part. The first
+    // Each fake call accepts the completion it is handed, and the test plays native's part. The first
     // gets a result, then a second result that native never sends, then its release. The second
     // gets a result without the value its converter needs.
     private static unsafe (Task<int> Converted, Task<int> Unconverted) DeliverFakeCompletions()
     {
-        mln_completion first = default;
-        var converted = NativeCompletion.Submit(
-            (completion, _) =>
-            {
-                first = *completion;
-                return mln_status.MLN_STATUS_OK;
-            },
-            result => NativeCompletion.Value<int>(result),
-            CancellationToken.None
+        mln_completion first;
+        NativeCompletion.Start(
+            &first,
+            static result => NativeCompletion.Value<int>(result),
+            CancellationToken.None,
+            out var firstPending
         );
+        var converted = firstPending.Submitted(mln_status.MLN_STATUS_OK);
         var seven = 7;
         var eight = 8;
         Deliver(first, &seven, 1);
         Deliver(first, &eight, 1);
         first.release_user_data(first.user_data);
 
-        mln_completion second = default;
-        var unconverted = NativeCompletion.Submit(
-            (completion, _) =>
-            {
-                second = *completion;
-                return mln_status.MLN_STATUS_OK;
-            },
-            result => NativeCompletion.Value<int>(result),
-            CancellationToken.None
+        mln_completion second;
+        NativeCompletion.Start(
+            &second,
+            static result => NativeCompletion.Value<int>(result),
+            CancellationToken.None,
+            out var secondPending
         );
+        var unconverted = secondPending.Submitted(mln_status.MLN_STATUS_OK);
         Deliver(second, null, 0);
         second.release_user_data(second.user_data);
         return (converted, unconverted);
@@ -129,15 +125,18 @@ public sealed class CompletionTests
         var captured = new object();
         var error = Record.Exception(() =>
         {
-            _ = NativeCompletion.Submit(
-                (_, _) => mln_status.MLN_STATUS_INVALID_ARGUMENT,
+            mln_completion completion;
+            NativeCompletion.Start(
+                &completion,
                 _ =>
                 {
                     GC.KeepAlive(captured);
                     return 0;
                 },
-                CancellationToken.None
+                CancellationToken.None,
+                out var pending
             );
+            _ = pending.Submitted(mln_status.MLN_STATUS_INVALID_ARGUMENT);
         });
         return (error, new WeakReference(captured));
     }
@@ -207,22 +206,16 @@ public sealed class CompletionTests
         public void Dispose() => Disposed = true;
     }
 
-    // The fake submission keeps its completion, and the returned delivery plays native's part.
+    // The fake call accepts its completion, and the returned delivery plays native's part.
     private static unsafe (Task<Probe> Task, Func<Probe> Deliver) SubmitHeld(
         CancellationToken cancellationToken
     )
     {
-        mln_completion held = default;
+        mln_completion completion;
         var probe = new Probe();
-        var task = NativeCompletion.Submit(
-            (completion, _) =>
-            {
-                held = *completion;
-                return mln_status.MLN_STATUS_OK;
-            },
-            _ => probe,
-            cancellationToken
-        );
+        NativeCompletion.Start(&completion, _ => probe, cancellationToken, out var pending);
+        var task = pending.Submitted(mln_status.MLN_STATUS_OK);
+        var held = completion;
         return (
             task,
             () =>
