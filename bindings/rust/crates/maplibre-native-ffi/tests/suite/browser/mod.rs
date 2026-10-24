@@ -146,7 +146,11 @@ fn a_provider_answers_a_style_request_in_the_browser() {
         "custom://style.json",
         BACKGROUND_STYLE_JSON,
     )));
-    fixture.map().set_style_url("custom://style.json").unwrap();
+    fixture
+        .map()
+        .discarding()
+        .set_style_url("custom://style.json")
+        .unwrap();
     fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
 }
 

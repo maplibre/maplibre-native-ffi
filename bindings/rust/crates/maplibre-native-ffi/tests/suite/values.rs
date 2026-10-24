@@ -52,7 +52,11 @@ fn host_strings_use_views_and_native_lent_strings_decode() {
 
     // A style URL crosses as a view, and the native-lent provider request
     // decodes to exactly that URL.
-    fixture.map().set_style_url("custom://style.json").unwrap();
+    fixture
+        .map()
+        .discarding()
+        .set_style_url("custom://style.json")
+        .unwrap();
     fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
     assert_eq!(
         wait_for(fixture.map().get_style_url()),

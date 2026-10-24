@@ -150,7 +150,11 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
 
     // The binding catches the panic at the callback boundary, and native
     // fails the request it got no decision for.
-    fixture.map().set_style_url("custom://style.json").unwrap();
+    fixture
+        .map()
+        .discarding()
+        .set_style_url("custom://style.json")
+        .unwrap();
     fixture.await_event_type(RuntimeEventType::MapLoadingFailed);
     assert!(calls.load(Ordering::SeqCst) > 0);
 
@@ -176,6 +180,7 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
     );
     fixture
         .map()
+        .discarding()
         .set_style_url("custom://transformed.json")
         .unwrap();
     // The online source cannot load the untransformed URL.
@@ -198,6 +203,7 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
         );
         fixture
             .map()
+            .discarding()
             .set_style_url(&server.url("/style.json"))
             .unwrap();
         fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
@@ -244,7 +250,11 @@ fn a_provider_hands_its_request_to_another_thread_and_answers_later() {
             })),
     );
 
-    fixture.map().set_style_url("custom://style.json").unwrap();
+    fixture
+        .map()
+        .discarding()
+        .set_style_url("custom://style.json")
+        .unwrap();
     let handle = requests.recv_timeout(timeout()).unwrap();
     std::thread::spawn(move || {
         assert!(!handle.is_cancelled().unwrap());
@@ -280,7 +290,7 @@ fn a_transform_hands_its_request_to_another_thread_and_answers_later() {
             })),
     );
 
-    fixture.map().set_style_url(&original).unwrap();
+    fixture.map().discarding().set_style_url(&original).unwrap();
     let request = requests.recv_timeout(timeout()).unwrap();
     std::thread::spawn(move || {
         request.complete(&rewritten).unwrap();
@@ -332,6 +342,7 @@ fn a_provider_receives_only_the_requests_its_routes_match() {
     // The style and the source it names both match the URL-only route.
     fixture
         .map()
+        .discarding()
         .set_style_url("custom://routed/style.json")
         .unwrap();
     fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
@@ -355,6 +366,7 @@ fn a_provider_receives_only_the_requests_its_routes_match() {
     // provider.
     fixture
         .map()
+        .discarding()
         .set_style_url(&server.url("/native/style.json"))
         .unwrap();
     fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
@@ -403,7 +415,11 @@ fn registering_for_an_already_cancelled_request_reports_it_and_roots_nothing() {
                 ResourceProviderDecision::Handle
             })),
     );
-    fixture.map().set_style_url("custom://style.json").unwrap();
+    fixture
+        .map()
+        .discarding()
+        .set_style_url("custom://style.json")
+        .unwrap();
     let handle = requests.recv_timeout(timeout()).unwrap();
 
     // Releasing the map discards its pending style request, which MapLibre

@@ -17,7 +17,7 @@ maplibre-native-ffi-core.workspace = true
 maplibre-native-ffi-sys.workspace = true
 
 # Re-exported so the render backend is selectable by crates that depend on this
-# crate alone. Enable at most one.
+# crate alone. Enable at most one, and only in the final binary.
 [features]
 metal = ["maplibre-native-ffi-sys/metal"]
 opengl = ["maplibre-native-ffi-sys/opengl"]

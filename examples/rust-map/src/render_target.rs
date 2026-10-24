@@ -154,7 +154,7 @@ impl Session {
             held: None,
             driver_wait: wakes.driver_wait(),
         };
-        if let Err(error) = session.wait_for(&attachment.1) {
+        if let Err(error) = session.wait_for(attachment.1) {
             session.abandon();
             return Err(error);
         }
@@ -215,7 +215,7 @@ impl Session {
     /// map. A session resizes only while the host holds none of its frames.
     pub fn resize(&mut self, viewport: Viewport) -> maplibre_native_ffi::Result<()> {
         self.release_held()?;
-        self.session.resize(extent(viewport))?;
+        self.session.discarding().resize(extent(viewport))?;
         Ok(())
     }
 
@@ -247,7 +247,7 @@ impl Session {
         let detached = self
             .release_held()
             .and_then(|()| self.session.detach())
-            .and_then(|operation| self.wait_for(&operation));
+            .and_then(|operation| self.wait_for(operation));
         if let Err(error) = detached {
             eprintln!("render session detach failed: {error}");
             self.abandon();
@@ -280,20 +280,24 @@ impl Session {
     /// thread, so the wait blocks until the submission completes. A caller
     /// driver completes the submission inside a service call, so startup and
     /// shutdown service it here, between driver wakes.
-    fn wait_for<T>(&self, operation: &NativeFuture<T>) -> maplibre_native_ffi::Result<T> {
-        if self.driver == RenderDriverKind::CoreWorker {
-            operation.wait(Duration::MAX)?;
-            return operation.take();
-        }
-        loop {
-            // A wake that arrives after the clear ends the next wait at once.
-            self.driver_wait.clear();
-            self.session.service_driver_work()?;
-            if operation.is_ready() {
-                return operation.take();
+    fn wait_for<T>(&self, operation: NativeFuture<T>) -> maplibre_native_ffi::Result<T> {
+        if self.driver != RenderDriverKind::CoreWorker {
+            loop {
+                // A wake that arrives after the clear ends the next wait at once.
+                self.driver_wait.clear();
+                self.session.service_driver_work()?;
+                if operation.is_ready() {
+                    break;
+                }
+                self.driver_wait.wait();
             }
-            self.driver_wait.wait();
         }
+        operation.wait(Duration::MAX).unwrap_or_else(|_| {
+            Err(maplibre_native_ffi::Error::new(
+                maplibre_native_ffi::Status::NotReady,
+                "render session submission never completed",
+            ))
+        })
     }
 }
 

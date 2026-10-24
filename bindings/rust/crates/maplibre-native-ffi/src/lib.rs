@@ -13,6 +13,15 @@
 //! [`set_reporter`] installs, as [`Report::CallbackError`], or to standard error
 //! when none is installed. A completion conversion panic resolves its future
 //! with an error. A panic also reaches the standard panic hook as usual.
+//!
+//! The `metal`, `opengl`, `vulkan`, and `webgpu` features pick the one render
+//! backend the native library is built with, so they don't combine. Only the
+//! final binary enables one; a library that depends on this crate leaves them
+//! off.
+//!
+//! In the browser, [`runtime_create`] returns [`Status::WrongThread`] on the
+//! main thread, and [`NativeFuture::wait`] blocks, so a host runs the binding
+//! on a worker, such as the one Emscripten's `-sPROXY_TO_PTHREAD` provides.
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
@@ -30,3 +39,5 @@ pub use maplibre_core::handle::NativeHandleLeak;
 pub use maplibre_core::report::{Report, Reporter, set_reporter};
 pub use maplibre_core::{Error, Result};
 use maplibre_native_ffi_core as maplibre_core;
+/// The raw C declarations, which some calls take or return.
+pub use maplibre_native_ffi_sys as sys;

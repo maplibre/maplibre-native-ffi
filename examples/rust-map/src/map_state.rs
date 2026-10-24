@@ -39,13 +39,12 @@ impl MapState {
             ..MapOptions::default()
         };
         let map = match runtime.create_map(&map_options).and_then(|future| {
-            if !future.wait(Duration::from_secs(30))? {
-                return Err(maplibre_native_ffi::Error::new(
+            future.wait(Duration::from_secs(30)).unwrap_or_else(|_| {
+                Err(maplibre_native_ffi::Error::new(
                     maplibre_native_ffi::Status::NotReady,
                     "map creation timed out",
-                ));
-            }
-            future.take()
+                ))
+            })
         }) {
             Ok(map) => map,
             Err(error) => {
@@ -72,7 +71,7 @@ impl MapState {
     /// Ends any running camera transition, so a starting gesture takes over
     /// from it rather than fighting it.
     pub fn cancel_transitions(&self) -> Result<(), Box<dyn Error>> {
-        self.map.cancel_transitions()?;
+        self.map.discarding().cancel_transitions()?;
         Ok(())
     }
 
@@ -85,7 +84,7 @@ impl MapState {
             },
             ..Default::default()
         };
-        self.map.update_camera(&update)?;
+        self.map.discarding().update_camera(&update)?;
         Ok(())
     }
 
@@ -100,7 +99,7 @@ impl MapState {
             animation: duration_ms.map(animation).unwrap_or_default(),
             ..Default::default()
         };
-        self.map.apply_camera_delta(&delta)?;
+        self.map.discarding().apply_camera_delta(&delta)?;
         Ok(())
     }
 
@@ -116,7 +115,7 @@ impl MapState {
             animation: duration_ms.map(animation).unwrap_or_default(),
             ..Default::default()
         };
-        self.map.apply_camera_delta(&delta)?;
+        self.map.discarding().apply_camera_delta(&delta)?;
         Ok(())
     }
 
@@ -134,7 +133,7 @@ impl MapState {
             animation: duration_ms.map(animation).unwrap_or_default(),
             ..Default::default()
         };
-        self.map.apply_camera_delta(&delta)?;
+        self.map.discarding().apply_camera_delta(&delta)?;
         Ok(())
     }
 
@@ -144,7 +143,7 @@ impl MapState {
         update.camera.pitch = Some(0.0);
         update.mode = CameraUpdateMode::Ease;
         update.animation = animation(duration_ms);
-        self.map.update_camera(&update)?;
+        self.map.discarding().update_camera(&update)?;
         Ok(())
     }
 
@@ -165,9 +164,11 @@ impl MapState {
 
     fn configure(&mut self) -> Result<(), Box<dyn Error>> {
         if crate::smoke_test() {
-            self.map.set_style_json(SMOKE_STYLE_JSON.as_bytes())?;
+            self.map
+                .discarding()
+                .set_style_json(SMOKE_STYLE_JSON.as_bytes())?;
         } else {
-            self.map.set_style_url(STYLE_URL)?;
+            self.map.discarding().set_style_url(STYLE_URL)?;
         }
         let camera = CameraOptions {
             center: Some(LatLng::new(37.7749, -122.4194)),
@@ -180,8 +181,8 @@ impl MapState {
             camera,
             ..Default::default()
         };
-        self.map.update_camera(&update)?;
-        self.map.request_repaint()?;
+        self.map.discarding().update_camera(&update)?;
+        self.map.discarding().request_repaint()?;
         Ok(())
     }
 }
@@ -198,9 +199,8 @@ fn animation(duration_ms: f64) -> AnimationOptions {
 fn close_map(map: MapHandle) -> std::result::Result<(), String> {
     let teardown = map.release().map_err(|error| error.to_string())?;
     match teardown.wait(Duration::from_secs(30)) {
-        Ok(true) => teardown.take().map_err(|error| error.to_string()),
-        Ok(false) => Err("map teardown timed out".to_owned()),
-        Err(error) => Err(error.to_string()),
+        Ok(result) => result.map_err(|error| error.to_string()),
+        Err(_) => Err("map teardown timed out".to_owned()),
     }
 }
 
@@ -209,9 +209,8 @@ fn close_map(map: MapHandle) -> std::result::Result<(), String> {
 fn close_runtime(runtime: RuntimeHandle) -> std::result::Result<(), String> {
     let teardown = runtime.release().map_err(|error| error.to_string())?;
     match teardown.wait(Duration::from_secs(30)) {
-        Ok(true) => teardown.take().map_err(|error| error.to_string()),
-        Ok(false) => Err("runtime teardown timed out".to_owned()),
-        Err(error) => Err(error.to_string()),
+        Ok(result) => result.map_err(|error| error.to_string()),
+        Err(_) => Err("runtime teardown timed out".to_owned()),
     }
 }
 

@@ -39,6 +39,13 @@ struct Bridge<T> {
 }
 
 /// A one-shot native completion exposed as a Rust future.
+///
+/// Native has accepted the operation by the time the call that returns this
+/// future returns, and runs it whether or not anything awaits the result.
+/// Dropping the future doesn't cancel the operation; native still delivers and
+/// frees its result.
+#[must_use = "the operation is already submitted, and dropping its future ignores a failure; \
+              use the owner's `discarding()` view to submit a command without one"]
 pub struct NativeFuture<T> {
     state: Arc<State<T>>,
 }
@@ -57,31 +64,21 @@ impl<T> NativeFuture<T> {
         lock(&self.state.result).is_some()
     }
 
-    /// Blocks for at most `timeout`, for hosts that must pump another service
-    /// loop while waiting rather than run an async executor.
-    pub fn wait(&self, timeout: Duration) -> Result<bool> {
-        let result = lock(&self.state.result);
-        if result.is_some() {
-            return Ok(true);
-        }
-        Ok(self
-            .state
-            .ready
-            .wait_timeout_while(result, timeout, |result| result.is_none())
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .0
-            .is_some())
-    }
-
-    /// Consumes a completed future without an async executor.
-    pub fn take(&self) -> Result<T> {
-        let mut result = lock(&self.state.result);
-        result.take().ok_or_else(|| {
-            Error::new(
-                crate::Status::InvalidState,
-                "native future has not completed",
-            )
-        })?
+    /// Blocks the calling thread for at most `timeout` and returns the result,
+    /// or gives the future back when the timeout ends first. This serves hosts
+    /// that must pump another service loop between waits rather than run an
+    /// async executor.
+    pub fn wait(self, timeout: Duration) -> std::result::Result<Result<T>, Self> {
+        let result = {
+            let result = lock(&self.state.result);
+            self.state
+                .ready
+                .wait_timeout_while(result, timeout, |result| result.is_none())
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .0
+                .take()
+        };
+        result.ok_or(self)
     }
 }
 
@@ -307,6 +304,7 @@ mod tests {
 
     use super::*;
 
+    #[derive(Debug)]
     struct DropProbe(Arc<AtomicBool>);
 
     impl Drop for DropProbe {
@@ -370,6 +368,13 @@ mod tests {
         )
         .unwrap();
         (future, accepted.unwrap())
+    }
+
+    /// Returns the result of a future that native has already completed.
+    fn completed<T>(future: NativeFuture<T>) -> Result<T> {
+        future
+            .wait(Duration::ZERO)
+            .expect("the future has completed")
     }
 
     #[test]
@@ -457,7 +462,7 @@ mod tests {
         );
         accepted.deliver(sys::MLN_STATUS_OK);
         assert_eq!(
-            future.take().unwrap_err().status(),
+            completed(future).unwrap_err().status(),
             crate::Status::NativeError
         );
         assert!(dropped.load(Ordering::Acquire));
@@ -465,19 +470,14 @@ mod tests {
     }
 
     #[test]
-    fn a_future_yields_its_one_result_to_exactly_one_taker() {
+    fn a_wait_gives_the_future_back_until_native_completes_it() {
         let (future, accepted) = accept(unit, false);
 
-        // Nothing has completed, so there is no result to take yet.
-        let error = future.take().unwrap_err();
-        assert_eq!(error.status(), crate::Status::InvalidState);
+        // Nothing has completed, so the wait ends without a result.
+        let future = future.wait(Duration::ZERO).unwrap_err();
 
         accepted.deliver(sys::MLN_STATUS_OK);
-        future.take().unwrap();
-
-        // The result moves out of the future, so a second take finds none.
-        let error = future.take().unwrap_err();
-        assert_eq!(error.status(), crate::Status::InvalidState);
+        completed(future).unwrap();
         accepted.release();
     }
 
@@ -487,7 +487,7 @@ mod tests {
         // rejected command resolves rather than failing the future.
         let (command, accepted) = accept(super::command, true);
         accepted.deliver(sys::MLN_STATUS_INVALID_ARGUMENT);
-        let completion = command.take().unwrap();
+        let completion = completed(command).unwrap();
         assert_eq!(completion.disposition, crate::CommandDisposition::Failed);
         assert_eq!(completion.raw_status, sys::MLN_STATUS_INVALID_ARGUMENT);
         accepted.release();
@@ -495,7 +495,7 @@ mod tests {
         // Every other operation reports a failed completion as an error.
         let (operation, accepted) = accept(unit, false);
         accepted.deliver(sys::MLN_STATUS_INVALID_ARGUMENT);
-        let error = operation.take().unwrap_err();
+        let error = completed(operation).unwrap_err();
         assert_eq!(error.status(), crate::Status::InvalidArgument);
         accepted.release();
     }
@@ -507,7 +507,7 @@ mod tests {
         let (future, accepted) = accept(move |_| Ok(probe), false);
 
         // Nothing has completed, so a bounded wait gives up.
-        assert!(!future.wait(Duration::ZERO).unwrap());
+        let future = future.wait(Duration::ZERO).unwrap_err();
 
         // Dropping the future is how a caller stops waiting. Native still owns
         // the bridge, so the late value lands in it, and native's release

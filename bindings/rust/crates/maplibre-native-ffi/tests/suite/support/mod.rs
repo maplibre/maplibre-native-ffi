@@ -165,12 +165,11 @@ pub fn await_condition(what: &str, mut condition: impl FnMut() -> bool) {
 /// Blocks until a submitted operation completes and returns its value.
 #[track_caller]
 pub fn wait_for<T>(submitted: Result<NativeFuture<T>>) -> T {
-    let future = submitted.expect("the submission failed");
-    assert!(
-        future.wait(timeout()).unwrap(),
-        "the operation never completed"
-    );
-    future.take().expect("the operation failed")
+    submitted
+        .expect("the submission failed")
+        .wait(timeout())
+        .expect("the operation never completed")
+        .expect("the operation failed")
 }
 
 /// Awaits a future, servicing queued driver work before blocking on `signal`.
@@ -457,16 +456,11 @@ impl Drop for Fixture {
         // reported only when the test passed.
         let panicking = std::thread::panicking();
         let release = |future: Result<NativeFuture<()>>| match future {
-            Ok(future) => {
-                if !future.wait(timeout()).unwrap_or(false) && !panicking {
-                    panic!("fixture release never completed");
-                }
-                if let Err(error) = future.take()
-                    && !panicking
-                {
-                    panic!("fixture release failed: {error}");
-                }
-            }
+            Ok(future) => match future.wait(timeout()) {
+                Ok(Err(error)) if !panicking => panic!("fixture release failed: {error}"),
+                Err(_) if !panicking => panic!("fixture release never completed"),
+                _ => {}
+            },
             Err(error) if !panicking => panic!("fixture release was rejected: {error}"),
             Err(_) => {}
         };

@@ -19,7 +19,8 @@ links = "maplibre-native-c"
 repository.workspace = true
 
 # MapLibre Native compiles exactly one renderer per build. Enable at most one;
-# the build script picks a platform default when none is set.
+# the build script picks a platform default when none is set. Only the final
+# binary enables one, so a library that depends on this crate leaves them off.
 [features]
 metal = []
 opengl = []

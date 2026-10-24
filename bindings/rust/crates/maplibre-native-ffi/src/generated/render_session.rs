@@ -565,6 +565,9 @@ impl RenderSessionHandle {
     }
 }
 
+/// Submits [`RenderSessionHandle`] commands without a completion. Each call returns
+/// the same acceptance status as its completing form, and native logs a
+/// command that later fails as a warning through the log handler.
 pub struct RenderSessionHandleDiscarding<'a>(&'a RenderSessionHandle);
 impl RenderSessionHandle {
     pub fn discarding(&self) -> RenderSessionHandleDiscarding<'_> {

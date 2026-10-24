@@ -1802,6 +1802,9 @@ impl MapHandle {
     }
 }
 
+/// Submits [`MapHandle`] commands without a completion. Each call returns
+/// the same acceptance status as its completing form, and native logs a
+/// command that later fails as a warning through the log handler.
 pub struct MapHandleDiscarding<'a>(&'a MapHandle);
 impl MapHandle {
     pub fn discarding(&self) -> MapHandleDiscarding<'_> {

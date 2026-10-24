@@ -792,7 +792,10 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
             owner = rust_owners.owner_name(native)
             view = f"{owner}Discarding"
             files[f"{root}/{module}.rs"] += (
-                f"\npub struct {view}<'a>(&'a {owner});\n"
+                f"\n/// Submits [`{owner}`] commands without a completion. Each call returns\n"
+                "/// the same acceptance status as its completing form, and native logs a\n"
+                "/// command that later fails as a warning through the log handler.\n"
+                f"pub struct {view}<'a>(&'a {owner});\n"
                 f"impl {owner} {{ pub fn discarding(&self) -> {view}<'_> {{ {view}(self) }} }}\n"
                 f"impl {view}<'_> {{\n"
                 + "\n".join(

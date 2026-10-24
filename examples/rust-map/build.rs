@@ -1,5 +1,4 @@
 use std::env;
-use std::fs;
 use std::path::Path;
 use std::process::Command;
 
@@ -16,14 +15,9 @@ fn main() {
             Path::new(&install_dir).display()
         );
     }
-    let descriptor_path = Path::new(&install_dir).join("share/maplibre-native-c/artifact.json");
-    let descriptor = fs::read_to_string(&descriptor_path)
-        .unwrap_or_else(|error| panic!("failed to read {}: {error}", descriptor_path.display()));
-    let backend = ["metal", "opengl", "vulkan"]
-        .into_iter()
-        .find(|backend| descriptor.contains(&format!("\"renderBackend\": \"{backend}\"")))
-        .expect("native artifact descriptor has an unknown render backend");
-    println!("cargo:rerun-if-changed={}", descriptor_path.display());
+    // The sys crate reports the backend of the library it linked.
+    let backend = env::var("DEP_MAPLIBRE_NATIVE_C_RENDER_BACKEND")
+        .expect("maplibre-native-ffi-sys reports its render backend");
     println!("cargo:rustc-cfg=maplibre_render_backend=\"{backend}\"");
 
     if backend != "vulkan" {

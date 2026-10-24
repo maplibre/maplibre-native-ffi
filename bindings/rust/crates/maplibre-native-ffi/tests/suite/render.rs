@@ -185,8 +185,9 @@ fn dropping_a_session_before_its_attachment_completes_reports_no_leak() {
     // The drop races the attachment. Native owns the session either way, so
     // the completion still resolves and nothing leaks.
     drop(session);
-    assert!(attached.wait(timeout()).unwrap());
-    let _ = attached.take();
+    let _ = attached
+        .wait(timeout())
+        .expect("the attachment never completed");
     let (runtime, map) = fixture.into_parts();
     drop(map);
     drop(runtime);
