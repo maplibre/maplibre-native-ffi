@@ -49,7 +49,7 @@ def test_host_strings_use_views_and_native_lent_strings_decode(
         map_handle.set_style_url("custom://bad\0url")
     assert raised.value.status == mln.Status.INVALID_ARGUMENT
     assert "embedded NUL" in raised.value.diagnostic
-    with pytest.raises(TypeError, match="instance of 'bytes'"):
+    with pytest.raises(TypeError, match="bytes-like object"):
         map_handle.add_style_layer_json(typing.cast(typing.Any, layer))
 
 
@@ -182,3 +182,39 @@ def test_caller_sized_text_returns_results_longer_than_its_first_storage() -> No
         assert long.evaluate() == text
     finally:
         long.close()
+
+
+def test_inputs_take_any_sequence_or_byte_buffer_and_require_their_subject(
+    map_handle: mln.MapHandle,
+) -> None:
+    # An input record keeps a tuple and bytes, so it stays hashable.
+    options = mln.RenderedFeatureQueryOptions(layer_ids=["roads"])
+    assert options.layer_ids == ("roads",)
+    hash(options)
+    image = mln.PremultipliedRgba8Image(
+        width=1, height=1, stride=4, pixels=bytearray(b"\xff\x00\x00\xff")
+    )
+    assert image.pixels == b"\xff\x00\x00\xff"
+    hash(image)
+    with pytest.raises(TypeError, match="not str"):
+        mln.RenderedFeatureQueryOptions(layer_ids=typing.cast(typing.Any, "roads"))
+
+    result(map_handle.set_style_json(EMPTY_STYLE))
+    result(
+        map_handle.add_custom_geometry_source(
+            "custom", mln.CustomGeometrySourceOptions(fetch_tile=lambda *_: None)
+        )
+    )
+    tile = mln.CanonicalTileId(z=0, x=0, y=0)
+    features = b'{"type":"FeatureCollection","features":[]}'
+    # A parameter copies a buffer that is not bytes before native reads it.
+    result(
+        map_handle.set_custom_geometry_source_tile_data(
+            "custom", tile, memoryview(bytearray(features))
+        )
+    )
+    with pytest.raises(TypeError, match="not str"):
+        map_handle.camera_for_lat_lngs(typing.cast(typing.Any, "coordinates"))
+    # The extent is the subject of a resize, which has no default.
+    with pytest.raises(TypeError):
+        typing.cast(typing.Any, map_handle).resize()

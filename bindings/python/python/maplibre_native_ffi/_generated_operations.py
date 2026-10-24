@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Buffer, Callable, Sequence
 from concurrent.futures import Future
 from typing import TYPE_CHECKING, NamedTuple, TypeVar
 
@@ -341,8 +341,8 @@ class _MapHandleOperations(GeneratedOperations):
     def add_image_source_image(
         self,
         source_id: str,
-        coordinates: tuple[LatLng, ...],
-        image: PremultipliedRgba8Image | None = None,
+        coordinates: Sequence[LatLng],
+        image: PremultipliedRgba8Image,
     ) -> Future[CommandCompletion]:
         """Adds an image source with inline image pixels.
 
@@ -352,7 +352,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.add_image_source_image(source_id, coordinates, image)
 
     def add_image_source_url(
-        self, source_id: str, coordinates: tuple[LatLng, ...], url: str
+        self, source_id: str, coordinates: Sequence[LatLng], url: str
     ) -> Future[CommandCompletion]:
         """Adds an image source that loads its image from a URL.
 
@@ -381,9 +381,7 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.add_style_source_json(source_id, source_json)
 
-    def apply_camera_delta(
-        self, delta: CameraDelta | None = None
-    ) -> Future[CommandCompletion]:
+    def apply_camera_delta(self, delta: CameraDelta) -> Future[CommandCompletion]:
         """Submits one atomic relative camera update.
 
         See `mln_map_apply_camera_delta` in the
@@ -393,7 +391,7 @@ class _MapHandleOperations(GeneratedOperations):
 
     def attach_metal_borrowed_texture(
         self,
-        descriptor: MetalBorrowedTextureDescriptor | None = None,
+        descriptor: MetalBorrowedTextureDescriptor,
         options: RenderSessionAttachOptions | None = None,
     ) -> MapAttachMetalBorrowedTextureResult:
         """Starts attachment of a ring of caller-owned Metal textures.
@@ -409,7 +407,7 @@ class _MapHandleOperations(GeneratedOperations):
 
     def attach_metal_owned_texture(
         self,
-        descriptor: MetalOwnedTextureDescriptor | None = None,
+        descriptor: MetalOwnedTextureDescriptor,
         options: RenderSessionAttachOptions | None = None,
     ) -> MapAttachMetalOwnedTextureResult:
         """Starts attachment of a session-owned Metal texture ring.
@@ -425,7 +423,7 @@ class _MapHandleOperations(GeneratedOperations):
 
     def attach_metal_surface(
         self,
-        descriptor: MetalSurfaceDescriptor | None = None,
+        descriptor: MetalSurfaceDescriptor,
         options: RenderSessionAttachOptions | None = None,
     ) -> MapAttachMetalSurfaceResult:
         """Starts attachment of a Metal surface target.
@@ -441,7 +439,7 @@ class _MapHandleOperations(GeneratedOperations):
 
     def attach_opengl_borrowed_texture(
         self,
-        descriptor: OpenglBorrowedTextureDescriptor | None = None,
+        descriptor: OpenglBorrowedTextureDescriptor,
         options: RenderSessionAttachOptions | None = None,
     ) -> MapAttachOpenglBorrowedTextureResult:
         """Starts attachment of a ring of caller-owned OpenGL textures.
@@ -457,7 +455,7 @@ class _MapHandleOperations(GeneratedOperations):
 
     def attach_opengl_owned_texture(
         self,
-        descriptor: OpenglOwnedTextureDescriptor | None = None,
+        descriptor: OpenglOwnedTextureDescriptor,
         options: RenderSessionAttachOptions | None = None,
     ) -> MapAttachOpenglOwnedTextureResult:
         """Starts attachment of a session-owned OpenGL texture ring.
@@ -473,7 +471,7 @@ class _MapHandleOperations(GeneratedOperations):
 
     def attach_opengl_surface(
         self,
-        descriptor: OpenglSurfaceDescriptor | None = None,
+        descriptor: OpenglSurfaceDescriptor,
         options: RenderSessionAttachOptions | None = None,
     ) -> MapAttachOpenglSurfaceResult:
         """Starts attachment of an OpenGL surface target.
@@ -489,7 +487,7 @@ class _MapHandleOperations(GeneratedOperations):
 
     def attach_vulkan_borrowed_texture(
         self,
-        descriptor: VulkanBorrowedTextureDescriptor | None = None,
+        descriptor: VulkanBorrowedTextureDescriptor,
         options: RenderSessionAttachOptions | None = None,
     ) -> MapAttachVulkanBorrowedTextureResult:
         """Starts attachment of a ring of caller-owned Vulkan images.
@@ -505,7 +503,7 @@ class _MapHandleOperations(GeneratedOperations):
 
     def attach_vulkan_owned_texture(
         self,
-        descriptor: VulkanOwnedTextureDescriptor | None = None,
+        descriptor: VulkanOwnedTextureDescriptor,
         options: RenderSessionAttachOptions | None = None,
     ) -> MapAttachVulkanOwnedTextureResult:
         """Starts attachment of a session-owned Vulkan texture ring.
@@ -521,7 +519,7 @@ class _MapHandleOperations(GeneratedOperations):
 
     def attach_vulkan_surface(
         self,
-        descriptor: VulkanSurfaceDescriptor | None = None,
+        descriptor: VulkanSurfaceDescriptor,
         options: RenderSessionAttachOptions | None = None,
     ) -> MapAttachVulkanSurfaceResult:
         """Starts attachment of a Vulkan surface target.
@@ -537,7 +535,7 @@ class _MapHandleOperations(GeneratedOperations):
 
     def attach_webgpu_borrowed_texture(
         self,
-        descriptor: WebgpuBorrowedTextureDescriptor | None = None,
+        descriptor: WebgpuBorrowedTextureDescriptor,
         options: RenderSessionAttachOptions | None = None,
     ) -> MapAttachWebgpuBorrowedTextureResult:
         """Starts attachment of a ring of caller-owned WebGPU textures.
@@ -553,7 +551,7 @@ class _MapHandleOperations(GeneratedOperations):
 
     def attach_webgpu_owned_texture(
         self,
-        descriptor: WebgpuOwnedTextureDescriptor | None = None,
+        descriptor: WebgpuOwnedTextureDescriptor,
         options: RenderSessionAttachOptions | None = None,
     ) -> MapAttachWebgpuOwnedTextureResult:
         """Starts attachment of a session-owned WebGPU texture ring.
@@ -569,7 +567,7 @@ class _MapHandleOperations(GeneratedOperations):
 
     def attach_webgpu_surface(
         self,
-        descriptor: WebgpuSurfaceDescriptor | None = None,
+        descriptor: WebgpuSurfaceDescriptor,
         options: RenderSessionAttachOptions | None = None,
     ) -> MapAttachWebgpuSurfaceResult:
         """Starts attachment of a WebGPU surface target.
@@ -619,9 +617,7 @@ class _MapHandleOperations(GeneratedOperations):
         )
 
     def camera_for_lat_lngs(
-        self,
-        coordinates: tuple[LatLng, ...],
-        fit_options: CameraFitOptions | None = None,
+        self, coordinates: Sequence[LatLng], fit_options: CameraFitOptions | None = None
     ) -> Future[CameraOptions]:
         """Starts an ordered query for a camera that fits geographic
         coordinates.
@@ -951,7 +947,7 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.request_still_image()
 
-    def resize(self, extent: LogicalExtent | None = None) -> Future[CommandCompletion]:
+    def resize(self, extent: LogicalExtent) -> Future[CommandCompletion]:
         """Submits the sole post-creation logical extent update.
 
         See `mln_map_resize` in the
@@ -994,7 +990,7 @@ class _MapHandleOperations(GeneratedOperations):
         )
 
     def set_custom_mvt_vector_source_tile_data(
-        self, source_id: str, tile_id: CanonicalTileId, data: bytes
+        self, source_id: str, tile_id: CanonicalTileId, data: Buffer
     ) -> Future[CommandCompletion]:
         """Sets custom MVT vector source data for one canonical tile.
 
@@ -1095,7 +1091,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_global_state_property(property_name, value)
 
     def set_image_source_coordinates(
-        self, source_id: str, coordinates: tuple[LatLng, ...]
+        self, source_id: str, coordinates: Sequence[LatLng]
     ) -> Future[CommandCompletion]:
         """Updates image source coordinates.
 
@@ -1105,7 +1101,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_image_source_coordinates(source_id, coordinates)
 
     def set_image_source_image(
-        self, source_id: str, image: PremultipliedRgba8Image | None = None
+        self, source_id: str, image: PremultipliedRgba8Image
     ) -> Future[CommandCompletion]:
         """Updates an image source with inline image pixels.
 
@@ -1124,9 +1120,7 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.set_image_source_url(source_id, url)
 
-    def set_projection_mode(
-        self, mode: ProjectionMode | None = None
-    ) -> Future[CommandCompletion]:
+    def set_projection_mode(self, mode: ProjectionMode) -> Future[CommandCompletion]:
         """Submits copied axonometric rendering option fields.
 
         See `mln_map_set_projection_mode` in the
@@ -1147,7 +1141,7 @@ class _MapHandleOperations(GeneratedOperations):
     def set_style_image(
         self,
         image_id: str,
-        image: PremultipliedRgba8Image | None = None,
+        image: PremultipliedRgba8Image,
         options: StyleImageOptions | None = None,
     ) -> Future[CommandCompletion]:
         """Sets one runtime style image.
@@ -1243,9 +1237,7 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.set_viewport_options(options)
 
-    def update_camera(
-        self, update: CameraUpdate | None = None
-    ) -> Future[CommandCompletion]:
+    def update_camera(self, update: CameraUpdate) -> Future[CommandCompletion]:
         """Submits one atomic camera update.
 
         See `mln_map_update_camera` in the
@@ -1285,9 +1277,7 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         """
         return LatLng._from_native(self._native.lat_lng_for_pixel_unwrapped(point))
 
-    def lat_lngs_for_pixels(
-        self, points: tuple[ScreenPoint, ...]
-    ) -> tuple[LatLng, ...]:
+    def lat_lngs_for_pixels(self, points: Sequence[ScreenPoint]) -> tuple[LatLng, ...]:
         """Converts screen points to geographic coordinates.
 
         See `mln_map_projection_lat_lngs_for_pixels` in the
@@ -1299,7 +1289,7 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         )
 
     def lat_lngs_for_pixels_unwrapped(
-        self, points: tuple[ScreenPoint, ...]
+        self, points: Sequence[ScreenPoint]
     ) -> tuple[LatLng, ...]:
         """Converts screen points to unwrapped geographic coordinates.
 
@@ -1329,7 +1319,7 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         return ScreenPoint._from_native(self._native.pixel_for_lat_lng(coordinate))
 
     def pixels_for_lat_lngs(
-        self, coordinates: tuple[LatLng, ...]
+        self, coordinates: Sequence[LatLng]
     ) -> tuple[ScreenPoint, ...]:
         """Converts geographic coordinates to screen points.
 
@@ -1548,7 +1538,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return self._native.close()
 
-    def request_frame(self, demand: FrameDemand | None = None) -> None:
+    def request_frame(self, demand: FrameDemand) -> None:
         """Requests a frame without waiting. Every accepted demand produces one
         terminal result record. Caller-driver sessions require service on the
         graphics thread. Core-worker sessions need no host service.
@@ -1558,7 +1548,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return self._native.request_frame(demand)
 
-    def resize(self, extent: LogicalExtent | None = None) -> Future[CommandCompletion]:
+    def resize(self, extent: LogicalExtent) -> Future[CommandCompletion]:
         """Starts an ordered logical resize of the driver and the map. The
         driver applies the extent in order with its other work, and later
         driver work does not wait for the map. The completion runs after both
@@ -1584,7 +1574,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return self._native.service_driver_work()
 
     def set_metal_borrowed_texture_target(
-        self, descriptor: MetalBorrowedTextureDescriptor | None = None
+        self, descriptor: MetalBorrowedTextureDescriptor
     ) -> Future[None]:
         """Starts an ordered replacement of every texture of a caller-owned
         Metal ring.
@@ -1595,7 +1585,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return self._native.set_metal_borrowed_texture_target(descriptor)
 
     def set_metal_surface_target(
-        self, descriptor: MetalSurfaceDescriptor | None = None
+        self, descriptor: MetalSurfaceDescriptor
     ) -> Future[None]:
         """Starts an ordered Metal surface replacement.
 
@@ -1605,7 +1595,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return self._native.set_metal_surface_target(descriptor)
 
     def set_opengl_borrowed_texture_target(
-        self, descriptor: OpenglBorrowedTextureDescriptor | None = None
+        self, descriptor: OpenglBorrowedTextureDescriptor
     ) -> Future[None]:
         """Starts an ordered replacement of every texture of a caller-owned
         OpenGL ring.
@@ -1616,7 +1606,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return self._native.set_opengl_borrowed_texture_target(descriptor)
 
     def set_opengl_surface_target(
-        self, descriptor: OpenglSurfaceDescriptor | None = None
+        self, descriptor: OpenglSurfaceDescriptor
     ) -> Future[None]:
         """Starts an ordered OpenGL surface replacement.
 
@@ -1626,7 +1616,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return self._native.set_opengl_surface_target(descriptor)
 
     def set_vulkan_borrowed_texture_target(
-        self, descriptor: VulkanBorrowedTextureDescriptor | None = None
+        self, descriptor: VulkanBorrowedTextureDescriptor
     ) -> Future[None]:
         """Starts an ordered replacement of every image of a caller-owned Vulkan
         ring.
@@ -1637,7 +1627,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return self._native.set_vulkan_borrowed_texture_target(descriptor)
 
     def set_vulkan_surface_target(
-        self, descriptor: VulkanSurfaceDescriptor | None = None
+        self, descriptor: VulkanSurfaceDescriptor
     ) -> Future[None]:
         """Starts an ordered Vulkan surface replacement.
 
@@ -1647,7 +1637,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return self._native.set_vulkan_surface_target(descriptor)
 
     def set_webgpu_borrowed_texture_target(
-        self, descriptor: WebgpuBorrowedTextureDescriptor | None = None
+        self, descriptor: WebgpuBorrowedTextureDescriptor
     ) -> Future[None]:
         """Starts an ordered replacement of every texture of a caller-owned
         WebGPU ring.
@@ -1658,7 +1648,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return self._native.set_webgpu_borrowed_texture_target(descriptor)
 
     def set_webgpu_surface_target(
-        self, descriptor: WebgpuSurfaceDescriptor | None = None
+        self, descriptor: WebgpuSurfaceDescriptor
     ) -> Future[None]:
         """Starts an ordered WebGPU surface replacement.
 
@@ -1782,7 +1772,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
         return _adopt_future(self._native.create_map(options), "MapHandle", self)
 
     def create_offline_region(
-        self, definition: OfflineRegionDefinition, metadata: bytes
+        self, definition: OfflineRegionDefinition, metadata: Buffer
     ) -> Future[OfflineRegionInfo]:
         """Starts creating an offline region.
 
@@ -1955,7 +1945,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
         return self._native.set_resource_transform(transform)
 
     def update_offline_region_metadata(
-        self, region_id: int, metadata: bytes
+        self, region_id: int, metadata: Buffer
     ) -> Future[OfflineRegionInfo]:
         """Starts updating opaque binary metadata for an offline region.
 
@@ -2016,7 +2006,7 @@ def c_version() -> int:
 
 
 def geojson_source_data_create(
-    data: bytes, options: GeojsonSourceOptions | None = None
+    data: Buffer, options: GeojsonSourceOptions | None = None
 ) -> GeojsonSourceDataHandle:
     """Prepares GeoJSON source data for installation on a map.
 
@@ -2069,7 +2059,7 @@ def log_set_callback(handler: LogHandler) -> None:
 
 
 def logical_extent_physical_size(
-    extent: LogicalExtent | None = None,
+    extent: LogicalExtent,
 ) -> LogicalExtentPhysicalSizeResult:
     """Computes the physical device-pixel size of a logical extent.
 
@@ -2224,8 +2214,8 @@ class MapHandleDiscarding:
     def add_image_source_image(
         self,
         source_id: str,
-        coordinates: tuple[LatLng, ...],
-        image: PremultipliedRgba8Image | None = None,
+        coordinates: Sequence[LatLng],
+        image: PremultipliedRgba8Image,
     ) -> None:
         """Adds an image source with inline image pixels.
 
@@ -2237,7 +2227,7 @@ class MapHandleDiscarding:
         )
 
     def add_image_source_url(
-        self, source_id: str, coordinates: tuple[LatLng, ...], url: str
+        self, source_id: str, coordinates: Sequence[LatLng], url: str
     ) -> None:
         """Adds an image source that loads its image from a URL.
 
@@ -2264,7 +2254,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_add_style_source_json(source_id, source_json)
 
-    def apply_camera_delta(self, delta: CameraDelta | None = None) -> None:
+    def apply_camera_delta(self, delta: CameraDelta) -> None:
         """Submits one atomic relative camera update.
 
         See `mln_map_apply_camera_delta` in the
@@ -2401,7 +2391,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_request_repaint()
 
-    def resize(self, extent: LogicalExtent | None = None) -> None:
+    def resize(self, extent: LogicalExtent) -> None:
         """Submits the sole post-creation logical extent update.
 
         See `mln_map_resize` in the
@@ -2442,7 +2432,7 @@ class MapHandleDiscarding:
         )
 
     def set_custom_mvt_vector_source_tile_data(
-        self, source_id: str, tile_id: CanonicalTileId, data: bytes
+        self, source_id: str, tile_id: CanonicalTileId, data: Buffer
     ) -> None:
         """Sets custom MVT vector source data for one canonical tile.
 
@@ -2539,7 +2529,7 @@ class MapHandleDiscarding:
         return self._native._discard_set_global_state_property(property_name, value)
 
     def set_image_source_coordinates(
-        self, source_id: str, coordinates: tuple[LatLng, ...]
+        self, source_id: str, coordinates: Sequence[LatLng]
     ) -> None:
         """Updates image source coordinates.
 
@@ -2551,7 +2541,7 @@ class MapHandleDiscarding:
         )
 
     def set_image_source_image(
-        self, source_id: str, image: PremultipliedRgba8Image | None = None
+        self, source_id: str, image: PremultipliedRgba8Image
     ) -> None:
         """Updates an image source with inline image pixels.
 
@@ -2568,7 +2558,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_set_image_source_url(source_id, url)
 
-    def set_projection_mode(self, mode: ProjectionMode | None = None) -> None:
+    def set_projection_mode(self, mode: ProjectionMode) -> None:
         """Submits copied axonometric rendering option fields.
 
         See `mln_map_set_projection_mode` in the
@@ -2587,7 +2577,7 @@ class MapHandleDiscarding:
     def set_style_image(
         self,
         image_id: str,
-        image: PremultipliedRgba8Image | None = None,
+        image: PremultipliedRgba8Image,
         options: StyleImageOptions | None = None,
     ) -> None:
         """Sets one runtime style image.
@@ -2677,7 +2667,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_set_viewport_options(options)
 
-    def update_camera(self, update: CameraUpdate | None = None) -> None:
+    def update_camera(self, update: CameraUpdate) -> None:
         """Submits one atomic camera update.
 
         See `mln_map_update_camera` in the
@@ -2693,7 +2683,7 @@ class RenderSessionHandleDiscarding:
     def __init__(self, owner: _RenderSessionHandleOperations):
         self._native = owner._native
 
-    def resize(self, extent: LogicalExtent | None = None) -> None:
+    def resize(self, extent: LogicalExtent) -> None:
         """Starts an ordered logical resize of the driver and the map. The
         driver applies the extent in order with its other work, and later
         driver work does not wait for the map. The completion runs after both

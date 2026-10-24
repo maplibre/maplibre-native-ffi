@@ -160,7 +160,9 @@ class Values:
         else:
             self.outputs.add(plan.native)
 
-    def type(self, plan: ValuePlan) -> str:
+    def type(self, plan: ValuePlan, *, input: bool = False) -> str:
+        """The annotation of a value. An input takes any sequence or byte
+        buffer, and an output is a tuple or bytes."""
         if plan.kind == "scalar":
             result = (
                 "bool"
@@ -183,11 +185,18 @@ class Values:
             if plan.empty_variant:
                 result += " | None"
         elif plan.kind == "buffer":
-            result = "str" if plan.encoding == "utf8" else "bytes"
+            result = (
+                "str"
+                if plan.encoding == "utf8"
+                else "Buffer"
+                if input and plan.encoding == "bytes"
+                else "bytes"
+            )
         elif plan.kind == "reference" and plan.element:
-            result = self.type(plan.element)
+            result = self.type(plan.element, input=input)
         elif plan.kind == "array" and plan.element:
-            result = f"tuple[{self.type(plan.element)}, ...]"
+            element = self.type(plan.element, input=input)
+            result = f"Sequence[{element}]" if input else f"tuple[{element}, ...]"
         else:
             self.fail(plan, "missing public value type")
         return result + (" | None" if optional(plan) else "")
@@ -492,7 +501,7 @@ class Values:
     def sources(self) -> tuple[str, str]:
         rust, python = [], []
         python.append(
-            '@dataclass(frozen=True, slots=True)\nclass UnknownVariant:\n    tag: int\n\n    @property\n    def _tag(self):\n        return self.tag\n\ndef _copy_variant(raw, variants, empty=None):\n    if raw["kind"] is None:\n        return None if raw["tag"] == empty else UnknownVariant(raw["tag"])\n    return variants[raw["kind"]]._from_native(raw["value"])\n\ndef _maybe(convert, raw):\n    return None if raw is None else convert(raw)\n'
+            '@dataclass(frozen=True, slots=True)\nclass UnknownVariant:\n    tag: int\n\n    @property\n    def _tag(self):\n        return self.tag\n\ndef _copy_variant(raw, variants, empty=None):\n    if raw["kind"] is None:\n        return None if raw["tag"] == empty else UnknownVariant(raw["tag"])\n    return variants[raw["kind"]]._from_native(raw["value"])\n\ndef _maybe(convert, raw):\n    return None if raw is None else convert(raw)\n\ndef _sequence(value):\n    if value is None or type(value) is tuple:\n        return value\n    if isinstance(value, str):\n        raise TypeError("expected a sequence, not str")\n    return tuple(value)\n\ndef _bytes(value):\n    return value if value is None or type(value) is bytes else memoryview(value).tobytes()\n'
         )
         for parent in self.records.values():
             for union in (
@@ -552,6 +561,10 @@ class Values:
         name = plan.native
         rust, python = [], []
         fields, copies, public_copies = list(extra_fields), [], []
+        # An input record copies a sequence into a tuple and a byte buffer into
+        # bytes, so it stays immutable and hashable.
+        input = name in self.api.inputs
+        normalized = []
         for member, value, field in self.members(plan):
             if value is None:
                 fields.append(f"    {member}: bool = False")
@@ -560,7 +573,11 @@ class Values:
                 )
                 public_copies.append(f'{member}=raw["{member}"]')
                 continue
-            public_type = self.type(value)
+            public_type = self.type(value, input=input)
+            if input and value.kind == "array":
+                normalized.append((member, "_sequence"))
+            elif input and value.kind == "buffer" and value.encoding == "bytes":
+                normalized.append((member, "_bytes"))
             if (
                 plan.default
                 and not registration
@@ -605,6 +622,11 @@ class Values:
             + "\n".join(sorted(fields, key=lambda line: " = " in line) or ["    pass"])
             + "\n"
         )
+        if normalized:
+            python[-1] += "\n    def __post_init__(self):\n" + "".join(
+                f'        object.__setattr__(self, "{member}", {helper}(self.{member}))\n'
+                for member, helper in normalized
+            )
         if copied:
             python[-1] += (
                 "\n    @classmethod\n    def _from_native(cls, raw):\n        return cls("

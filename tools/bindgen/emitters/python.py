@@ -209,9 +209,14 @@ def operation(
         if (receiver and parameter.name == receiver.name) or parameter.name in counts:
             continue
         value = parameter.value
+        # An options record may be omitted, as may a release's inputs, since
+        # every handle closes with no arguments. Any other record is the
+        # subject of the call, which C requires.
+        record = value.element if value.kind == "reference" else value
         has_default = bool(
-            value.default
-            or (value.kind == "reference" and value.element and value.element.default)
+            record
+            and record.default
+            and (release or exit or record.native.endswith("_options"))
         )
         local = parameter.name
         if not safe_identifier(local) or local in LOCAL_NAMES:
@@ -226,7 +231,7 @@ def operation(
             arguments[parameter.name] = f"{local}_handle"
         else:
             values.supported(value, input=True)
-            public = values.type(value)
+            public = values.type(value, input=True)
         if value.kind == "handle" and value.native in OWNERS:
             pass
         elif value.kind == "scalar":
@@ -947,7 +952,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         + "\n    Ok(())\n}\n"
     )
     files["python/maplibre_native_ffi/_native.pyi"] = (
-        f"# {notice}\nfrom concurrent.futures import Future\nfrom typing import Any, Callable\nfrom ._completion import CommandCompletion\nfrom ._generated_values import *\n\n"
+        f"# {notice}\nfrom collections.abc import Buffer, Sequence\nfrom concurrent.futures import Future\nfrom typing import Any, Callable\nfrom ._completion import CommandCompletion\nfrom ._generated_values import *\n\n"
         + "\n".join(
             f"class _{owner}:\n    _is_closed: bool\n    id: int\n{''.join(methods)}"
             for owner, methods in sorted(stubs.items())
@@ -980,7 +985,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         if not values.records.get(record, values.enums.get(record)).response
     )
     files["python/maplibre_native_ffi/_generated_operations.py"] = (
-        f'"""{notice}"""\n\nfrom __future__ import annotations\n\nfrom concurrent.futures import Future\nfrom dataclasses import dataclass\nfrom typing import TYPE_CHECKING, Any, Callable, NamedTuple, TypeVar\nfrom . import _native\nfrom ._completion import CommandCompletion\nfrom ._future import map_future\nfrom ._operation import GeneratedOperations, _adopt_future, _adopt_value, _with_view\nfrom ._generated_values import _maybe\nR = TypeVar("R")\n{imports}\nif TYPE_CHECKING:\n    from ._generated_owners import {", ".join([*OWNERS.values(), *scope_owners.values()]) or "__name__"}\n\n'
+        f'"""{notice}"""\n\nfrom __future__ import annotations\n\nfrom collections.abc import Buffer, Sequence\nfrom concurrent.futures import Future\nfrom dataclasses import dataclass\nfrom typing import TYPE_CHECKING, Any, Callable, NamedTuple, TypeVar\nfrom . import _native\nfrom ._completion import CommandCompletion\nfrom ._future import map_future\nfrom ._operation import GeneratedOperations, _adopt_future, _adopt_value, _with_view\nfrom ._generated_values import _maybe\nR = TypeVar("R")\n{imports}\nif TYPE_CHECKING:\n    from ._generated_owners import {", ".join([*OWNERS.values(), *scope_owners.values()]) or "__name__"}\n\n'
         + "\n".join(sorted(records))
         + "\n".join(
             f"class _{owner}Operations(GeneratedOperations):\n    _native: _native._{owner}\n\n{chr(10).join(methods)}"
@@ -997,7 +1002,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         for owner, methods in discards.items()
     )
     files["python/maplibre_native_ffi/_generated_values.py"] = (
-        f'"""{notice}"""\n\nfrom __future__ import annotations\nfrom dataclasses import dataclass, field\nfrom enum import IntFlag\nfrom typing import TYPE_CHECKING, Callable\nfrom ._enum import UnknownIntEnum\n'
+        f'"""{notice}"""\n\nfrom __future__ import annotations\nfrom collections.abc import Buffer, Sequence\nfrom dataclasses import dataclass, field\nfrom enum import IntFlag\nfrom typing import TYPE_CHECKING, Callable\nfrom ._enum import UnknownIntEnum\n'
         + (
             "from ._operation import _wrap_response\n"
             if any(value.response for value in values.records.values())

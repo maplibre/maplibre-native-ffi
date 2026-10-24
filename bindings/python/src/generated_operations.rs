@@ -5261,13 +5261,13 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (source_id, coordinates, image=None))]
+    #[pyo3(signature = (source_id, coordinates, image))]
     fn add_image_source_image(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
         coordinates: &Bound<'_, PyAny>,
-        image: Option<Bound<'_, PyAny>>,
+        image: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
@@ -5275,7 +5275,6 @@ impl MapHandle {
         let coordinates_values = generated_items(coordinates, |item| {
             generated_input_mln_lat_lng(&item, storage)
         })?;
-        let image = image.unwrap_or_else(|| py.None().into_bound(py));
         let image_value = generated_input_mln_premultiplied_rgba8_image(&image.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -5292,13 +5291,13 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (source_id, coordinates, image=None))]
+    #[pyo3(signature = (source_id, coordinates, image))]
     fn _discard_add_image_source_image(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
         coordinates: &Bound<'_, PyAny>,
-        image: Option<Bound<'_, PyAny>>,
+        image: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
@@ -5306,7 +5305,6 @@ impl MapHandle {
         let coordinates_values = generated_items(coordinates, |item| {
             generated_input_mln_lat_lng(&item, storage)
         })?;
-        let image = image.unwrap_or_else(|| py.None().into_bound(py));
         let image_value = generated_input_mln_premultiplied_rgba8_image(&image.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -5481,15 +5479,10 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (delta=None))]
-    fn apply_camera_delta(
-        &self,
-        py: Python<'_>,
-        delta: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (delta))]
+    fn apply_camera_delta(&self, py: Python<'_>, delta: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let delta = delta.unwrap_or_else(|| py.None().into_bound(py));
         let delta_value = generated_input_mln_camera_delta(&delta.clone(), storage)?;
         let handle = self.input();
         let future = unsafe {
@@ -5501,15 +5494,14 @@ impl MapHandle {
         self.state().retain_callback_roots(callback_roots);
         Ok(future)
     }
-    #[pyo3(signature = (delta=None))]
+    #[pyo3(signature = (delta))]
     fn _discard_apply_camera_delta(
         &self,
         py: Python<'_>,
-        delta: Option<Bound<'_, PyAny>>,
+        delta: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let delta = delta.unwrap_or_else(|| py.None().into_bound(py));
         let delta_value = generated_input_mln_camera_delta(&delta.clone(), storage)?;
         let handle = self.input();
         let future = unsafe {
@@ -5521,16 +5513,15 @@ impl MapHandle {
         self.state().retain_callback_roots(callback_roots);
         Ok(future)
     }
-    #[pyo3(signature = (descriptor=None, options=None))]
+    #[pyo3(signature = (descriptor, options=None))]
     fn attach_metal_borrowed_texture(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_metal_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
@@ -5565,16 +5556,15 @@ impl MapHandle {
         result.set_item("completion", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor=None, options=None))]
+    #[pyo3(signature = (descriptor, options=None))]
     fn attach_metal_owned_texture(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_metal_owned_texture_descriptor(&descriptor.clone(), storage)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
@@ -5609,16 +5599,15 @@ impl MapHandle {
         result.set_item("completion", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor=None, options=None))]
+    #[pyo3(signature = (descriptor, options=None))]
     fn attach_metal_surface(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_metal_surface_descriptor(&descriptor.clone(), storage)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
@@ -5653,16 +5642,15 @@ impl MapHandle {
         result.set_item("completion", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor=None, options=None))]
+    #[pyo3(signature = (descriptor, options=None))]
     fn attach_opengl_borrowed_texture(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_opengl_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
@@ -5697,16 +5685,15 @@ impl MapHandle {
         result.set_item("completion", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor=None, options=None))]
+    #[pyo3(signature = (descriptor, options=None))]
     fn attach_opengl_owned_texture(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_opengl_owned_texture_descriptor(&descriptor.clone(), storage)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
@@ -5741,16 +5728,15 @@ impl MapHandle {
         result.set_item("completion", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor=None, options=None))]
+    #[pyo3(signature = (descriptor, options=None))]
     fn attach_opengl_surface(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_opengl_surface_descriptor(&descriptor.clone(), storage)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
@@ -5785,16 +5771,15 @@ impl MapHandle {
         result.set_item("completion", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor=None, options=None))]
+    #[pyo3(signature = (descriptor, options=None))]
     fn attach_vulkan_borrowed_texture(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_vulkan_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
@@ -5829,16 +5814,15 @@ impl MapHandle {
         result.set_item("completion", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor=None, options=None))]
+    #[pyo3(signature = (descriptor, options=None))]
     fn attach_vulkan_owned_texture(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_vulkan_owned_texture_descriptor(&descriptor.clone(), storage)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
@@ -5873,16 +5857,15 @@ impl MapHandle {
         result.set_item("completion", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor=None, options=None))]
+    #[pyo3(signature = (descriptor, options=None))]
     fn attach_vulkan_surface(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_vulkan_surface_descriptor(&descriptor.clone(), storage)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
@@ -5917,16 +5900,15 @@ impl MapHandle {
         result.set_item("completion", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor=None, options=None))]
+    #[pyo3(signature = (descriptor, options=None))]
     fn attach_webgpu_borrowed_texture(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_webgpu_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
@@ -5961,16 +5943,15 @@ impl MapHandle {
         result.set_item("completion", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor=None, options=None))]
+    #[pyo3(signature = (descriptor, options=None))]
     fn attach_webgpu_owned_texture(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_webgpu_owned_texture_descriptor(&descriptor.clone(), storage)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
@@ -6005,16 +5986,15 @@ impl MapHandle {
         result.set_item("completion", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor=None, options=None))]
+    #[pyo3(signature = (descriptor, options=None))]
     fn attach_webgpu_surface(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_webgpu_surface_descriptor(&descriptor.clone(), storage)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
@@ -7063,11 +7043,10 @@ impl MapHandle {
             )
         }
     }
-    #[pyo3(signature = (extent=None))]
-    fn resize(&self, py: Python<'_>, extent: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (extent))]
+    fn resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let extent = extent.unwrap_or_else(|| py.None().into_bound(py));
         let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -7076,15 +7055,10 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (extent=None))]
-    fn _discard_resize(
-        &self,
-        py: Python<'_>,
-        extent: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (extent))]
+    fn _discard_resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let extent = extent.unwrap_or_else(|| py.None().into_bound(py));
         let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -7723,17 +7697,16 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (source_id, image=None))]
+    #[pyo3(signature = (source_id, image))]
     fn set_image_source_image(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
-        image: Option<Bound<'_, PyAny>>,
+        image: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let image = image.unwrap_or_else(|| py.None().into_bound(py));
         let image_value = generated_input_mln_premultiplied_rgba8_image(&image.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -7748,17 +7721,16 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (source_id, image=None))]
+    #[pyo3(signature = (source_id, image))]
     fn _discard_set_image_source_image(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
-        image: Option<Bound<'_, PyAny>>,
+        image: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let image = image.unwrap_or_else(|| py.None().into_bound(py));
         let image_value = generated_input_mln_premultiplied_rgba8_image(&image.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -7821,15 +7793,10 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (mode=None))]
-    fn set_projection_mode(
-        &self,
-        py: Python<'_>,
-        mode: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (mode))]
+    fn set_projection_mode(&self, py: Python<'_>, mode: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let mode = mode.unwrap_or_else(|| py.None().into_bound(py));
         let mode_value = generated_input_mln_projection_mode(&mode.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -7838,15 +7805,14 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (mode=None))]
+    #[pyo3(signature = (mode))]
     fn _discard_set_projection_mode(
         &self,
         py: Python<'_>,
-        mode: Option<Bound<'_, PyAny>>,
+        mode: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let mode = mode.unwrap_or_else(|| py.None().into_bound(py));
         let mode_value = generated_input_mln_projection_mode(&mode.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -7887,18 +7853,17 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (image_id, image=None, options=None))]
+    #[pyo3(signature = (image_id, image, options=None))]
     fn set_style_image(
         &self,
         py: Python<'_>,
         image_id: &Bound<'_, PyAny>,
-        image: Option<Bound<'_, PyAny>>,
+        image: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let image_id_value = storage.buffer(image_id.clone(), true)?;
-        let image = image.unwrap_or_else(|| py.None().into_bound(py));
         let image_value = generated_input_mln_premultiplied_rgba8_image(&image.clone(), storage)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_maybe(&options, |options| {
@@ -7918,18 +7883,17 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (image_id, image=None, options=None))]
+    #[pyo3(signature = (image_id, image, options=None))]
     fn _discard_set_style_image(
         &self,
         py: Python<'_>,
         image_id: &Bound<'_, PyAny>,
-        image: Option<Bound<'_, PyAny>>,
+        image: &Bound<'_, PyAny>,
         options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let image_id_value = storage.buffer(image_id.clone(), true)?;
-        let image = image.unwrap_or_else(|| py.None().into_bound(py));
         let image_value = generated_input_mln_premultiplied_rgba8_image(&image.clone(), storage)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_maybe(&options, |options| {
@@ -8299,15 +8263,10 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (update=None))]
-    fn update_camera(
-        &self,
-        py: Python<'_>,
-        update: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (update))]
+    fn update_camera(&self, py: Python<'_>, update: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let update = update.unwrap_or_else(|| py.None().into_bound(py));
         let update_value = generated_input_mln_camera_update(&update.clone(), storage)?;
         let handle = self.input();
         let future = unsafe {
@@ -8319,15 +8278,14 @@ impl MapHandle {
         self.state().retain_callback_roots(callback_roots);
         Ok(future)
     }
-    #[pyo3(signature = (update=None))]
+    #[pyo3(signature = (update))]
     fn _discard_update_camera(
         &self,
         py: Python<'_>,
-        update: Option<Bound<'_, PyAny>>,
+        update: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let update = update.unwrap_or_else(|| py.None().into_bound(py));
         let update_value = generated_input_mln_camera_update(&update.clone(), storage)?;
         let handle = self.input();
         let future = unsafe {
@@ -8907,15 +8865,10 @@ impl RenderSessionHandle {
         reservation.commit();
         Ok(py.None())
     }
-    #[pyo3(signature = (demand=None))]
-    fn request_frame(
-        &self,
-        py: Python<'_>,
-        demand: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (demand))]
+    fn request_frame(&self, py: Python<'_>, demand: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let demand = demand.unwrap_or_else(|| py.None().into_bound(py));
         let demand_value = generated_input_mln_frame_demand(&demand.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -8925,11 +8878,10 @@ impl RenderSessionHandle {
         }?;
         Ok(py.None())
     }
-    #[pyo3(signature = (extent=None))]
-    fn resize(&self, py: Python<'_>, extent: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (extent))]
+    fn resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let extent = extent.unwrap_or_else(|| py.None().into_bound(py));
         let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -8938,15 +8890,10 @@ impl RenderSessionHandle {
             })
         }
     }
-    #[pyo3(signature = (extent=None))]
-    fn _discard_resize(
-        &self,
-        py: Python<'_>,
-        extent: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (extent))]
+    fn _discard_resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let extent = extent.unwrap_or_else(|| py.None().into_bound(py));
         let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -8966,15 +8913,14 @@ impl RenderSessionHandle {
         }?;
         Ok(py.None())
     }
-    #[pyo3(signature = (descriptor=None))]
+    #[pyo3(signature = (descriptor))]
     fn set_metal_borrowed_texture_target(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_metal_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
         let handle = self.input();
@@ -8993,15 +8939,14 @@ impl RenderSessionHandle {
             )
         }
     }
-    #[pyo3(signature = (descriptor=None))]
+    #[pyo3(signature = (descriptor))]
     fn set_metal_surface_target(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_metal_surface_descriptor(&descriptor.clone(), storage)?;
         let handle = self.input();
@@ -9020,15 +8965,14 @@ impl RenderSessionHandle {
             )
         }
     }
-    #[pyo3(signature = (descriptor=None))]
+    #[pyo3(signature = (descriptor))]
     fn set_opengl_borrowed_texture_target(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_opengl_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
         let handle = self.input();
@@ -9047,15 +8991,14 @@ impl RenderSessionHandle {
             )
         }
     }
-    #[pyo3(signature = (descriptor=None))]
+    #[pyo3(signature = (descriptor))]
     fn set_opengl_surface_target(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_opengl_surface_descriptor(&descriptor.clone(), storage)?;
         let handle = self.input();
@@ -9074,15 +9017,14 @@ impl RenderSessionHandle {
             )
         }
     }
-    #[pyo3(signature = (descriptor=None))]
+    #[pyo3(signature = (descriptor))]
     fn set_vulkan_borrowed_texture_target(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_vulkan_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
         let handle = self.input();
@@ -9101,15 +9043,14 @@ impl RenderSessionHandle {
             )
         }
     }
-    #[pyo3(signature = (descriptor=None))]
+    #[pyo3(signature = (descriptor))]
     fn set_vulkan_surface_target(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_vulkan_surface_descriptor(&descriptor.clone(), storage)?;
         let handle = self.input();
@@ -9128,15 +9069,14 @@ impl RenderSessionHandle {
             )
         }
     }
-    #[pyo3(signature = (descriptor=None))]
+    #[pyo3(signature = (descriptor))]
     fn set_webgpu_borrowed_texture_target(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_webgpu_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
         let handle = self.input();
@@ -9155,15 +9095,14 @@ impl RenderSessionHandle {
             )
         }
     }
-    #[pyo3(signature = (descriptor=None))]
+    #[pyo3(signature = (descriptor))]
     fn set_webgpu_surface_target(
         &self,
         py: Python<'_>,
-        descriptor: Option<Bound<'_, PyAny>>,
+        descriptor: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor = descriptor.unwrap_or_else(|| py.None().into_bound(py));
         let descriptor_value =
             generated_input_mln_webgpu_surface_descriptor(&descriptor.clone(), storage)?;
         let handle = self.input();
@@ -10087,14 +10026,10 @@ fn log_set_callback(py: Python<'_>, handler: &Bound<'_, PyAny>) -> PyResult<Py<P
 }
 
 #[pyfunction]
-#[pyo3(signature = (extent=None))]
-fn logical_extent_physical_size(
-    py: Python<'_>,
-    extent: Option<Bound<'_, PyAny>>,
-) -> PyResult<Py<PyAny>> {
+#[pyo3(signature = (extent))]
+fn logical_extent_physical_size(py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py);
     let storage = &mut call.storage;
-    let extent = extent.unwrap_or_else(|| py.None().into_bound(py));
     let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
     let mut out_width: u32 = unsafe { std::mem::zeroed() };
     let mut out_height: u32 = unsafe { std::mem::zeroed() };

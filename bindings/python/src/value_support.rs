@@ -1,4 +1,4 @@
-/// Borrows Python byte storage for one C call and owns native array layouts.
+/// Borrows Python text and bytes for one C call and owns native array layouts.
 ///
 /// Generated converters keep this on the submitting stack. The C contracts
 /// require accepted operations to copy call-lifetime inputs before returning.
@@ -18,6 +18,13 @@ impl<'py> GeneratedInputStorage<'py> {
                 size: 0,
             });
         }
+        // Native reads the buffer with the interpreter detached, so a buffer
+        // that Python code could mutate meanwhile is copied into bytes first.
+        let value = if text || value.is_exact_instance_of::<PyBytes>() {
+            value
+        } else {
+            pyo3::types::PyMemoryView::from(&value)?.call_method0("tobytes")?
+        };
         let bytes = if text {
             value.extract::<&str>()?.as_bytes()
         } else {

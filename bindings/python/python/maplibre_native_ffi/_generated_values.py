@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Buffer, Callable, Sequence
 from dataclasses import dataclass, field
 from enum import IntFlag
 from typing import TYPE_CHECKING
@@ -35,6 +35,20 @@ def _copy_variant(raw, variants, empty=None):
 
 def _maybe(convert, raw):
     return None if raw is None else convert(raw)
+
+
+def _sequence(value):
+    if value is None or type(value) is tuple:
+        return value
+    if isinstance(value, str):
+        raise TypeError("expected a sequence, not str")
+    return tuple(value)
+
+
+def _bytes(value):
+    return (
+        value if value is None or type(value) is bytes else memoryview(value).tobytes()
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1569,12 +1583,15 @@ class HttpHeaderRule:
     url: str = field(default_factory=lambda: HttpHeaderRule.default().url)
     """The URL or glob pattern to compare."""
 
-    headers: tuple[HttpHeader, ...] = field(
+    headers: Sequence[HttpHeader] = field(
         default_factory=lambda: HttpHeaderRule.default().headers
     )
     """The headers to set. Registration validates each one as
     `mln_http_header_transform_response_set_header()` does.
     """
+
+    def __post_init__(self):
+        object.__setattr__(self, "headers", _sequence(self.headers))
 
     @classmethod
     def _from_native(cls, raw):
@@ -1603,8 +1620,11 @@ class HttpHeaderTransform:
     callback: (
         Callable[[ResourceKind, str, HttpHeaderTransformResponseScope], Status] | None
     ) = None
-    rules: tuple[HttpHeaderRule, ...] = ()
+    rules: Sequence[HttpHeaderRule] = ()
     """Header rules for a transform without a callback; empty with one."""
+
+    def __post_init__(self):
+        object.__setattr__(self, "rules", _sequence(self.rules))
 
     def _invoke_callback(self, kind, url, out_response):
         callback = self.callback
@@ -2013,10 +2033,13 @@ class MetalBorrowedTextureDescriptor:
     256.
     """
 
-    textures: tuple[MetalBorrowedTexture, ...] = field(
+    textures: Sequence[MetalBorrowedTexture] = field(
         default_factory=lambda: MetalBorrowedTextureDescriptor.default().textures
     )
     """The ring's textures, one per slot, in slot order. Required."""
+
+    def __post_init__(self):
+        object.__setattr__(self, "textures", _sequence(self.textures))
 
     @classmethod
     def _from_native(cls, raw):
@@ -2409,7 +2432,7 @@ class OpenglBorrowedTextureDescriptor:
     context or a context in the same share group.
     """
 
-    textures: tuple[OpenglBorrowedTexture, ...] = field(
+    textures: Sequence[OpenglBorrowedTexture] = field(
         default_factory=lambda: OpenglBorrowedTextureDescriptor.default().textures
     )
     """The ring's textures, one per slot, in slot order. Required."""
@@ -2418,6 +2441,9 @@ class OpenglBorrowedTextureDescriptor:
         default_factory=lambda: OpenglBorrowedTextureDescriptor.default().target
     )
     """OpenGL texture target of every texture. Must be GL_TEXTURE_2D."""
+
+    def __post_init__(self):
+        object.__setattr__(self, "textures", _sequence(self.textures))
 
     @classmethod
     def _from_native(cls, raw):
@@ -2638,10 +2664,13 @@ class PremultipliedRgba8Image:
     )
     """Bytes per image row. Must be at least width \\* 4."""
 
-    pixels: bytes = field(
+    pixels: Buffer = field(
         default_factory=lambda: PremultipliedRgba8Image.default().pixels
     )
     """Premultiplied RGBA8 pixels. Must not be null for a non-empty image."""
+
+    def __post_init__(self):
+        object.__setattr__(self, "pixels", _bytes(self.pixels))
 
     @classmethod
     def _from_native(cls, raw):
@@ -3084,11 +3113,14 @@ class RenderedFeatureQueryOptions:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
     """
 
-    layer_ids: tuple[str, ...] | None = None
+    layer_ids: Sequence[str] | None = None
     """Optional style layer IDs. When absent, all rendered layers are queried."""
 
     filter: bytes | None = None
     """Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter."""
+
+    def __post_init__(self):
+        object.__setattr__(self, "layer_ids", _sequence(self.layer_ids))
 
     @classmethod
     def _from_native(cls, raw):
@@ -3183,8 +3215,11 @@ class ResourceProvider:
         Callable[[ResourceRequestInfo, ResourceRequestHandle], ResourceProviderDecision]
         | None
     ) = None
-    routes: tuple[ResourceRoute, ...] = ()
+    routes: Sequence[ResourceRoute] = ()
     """The requests that reach the provider; empty to claim every request."""
+
+    def __post_init__(self):
+        object.__setattr__(self, "routes", _sequence(self.routes))
 
     def _invoke_callback(self, request, handle):
         callback = self.callback
@@ -3290,7 +3325,7 @@ class ResourceResponse:
 
     error_reason: ResourceErrorReason
 
-    bytes: bytes
+    bytes: Buffer
     """Response bytes. May be null only when byte_count is 0."""
 
     must_revalidate: bool
@@ -3304,6 +3339,9 @@ class ResourceResponse:
     etag: str | None = None
 
     retry_after_unix_ms: int | None = None
+
+    def __post_init__(self):
+        object.__setattr__(self, "bytes", _bytes(self.bytes))
 
     @classmethod
     def _from_native(cls, raw):
@@ -3637,8 +3675,11 @@ class ScreenLineString:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
     """
 
-    points: tuple[ScreenPoint, ...]
+    points: Sequence[ScreenPoint]
     """Points. Null only when point_count is 0."""
+
+    def __post_init__(self):
+        object.__setattr__(self, "points", _sequence(self.points))
 
     @classmethod
     def _from_native(cls, raw):
@@ -3690,13 +3731,16 @@ class SourceFeatureQueryOptions:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
     """
 
-    source_layer_ids: tuple[str, ...] | None = None
+    source_layer_ids: Sequence[str] | None = None
     """Optional source-layer IDs. Required by vector sources; ignored by
     GeoJSON.
     """
 
     filter: bytes | None = None
     """Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter."""
+
+    def __post_init__(self):
+        object.__setattr__(self, "source_layer_ids", _sequence(self.source_layer_ids))
 
     @classmethod
     def _from_native(cls, raw):
@@ -3769,12 +3813,15 @@ class StyleExpressionInputs:
     expressions need to place its geometry.
     """
 
-    available_images: tuple[str, ...] = field(
+    available_images: Sequence[str] = field(
         default_factory=lambda: StyleExpressionInputs.default().available_images
     )
     """The image IDs that the image expression reports as available. The
     expression reports any other ID as unavailable.
     """
+
+    def __post_init__(self):
+        object.__setattr__(self, "available_images", _sequence(self.available_images))
 
     @classmethod
     def _from_native(cls, raw):
@@ -3919,12 +3966,12 @@ class StyleImageOptions:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
-    stretch_x: tuple[ImageStretch, ...] | None = None
+    stretch_x: Sequence[ImageStretch] | None = None
     """Horizontally stretchable intervals. Borrowed for the call and copied
     before return. May be null only when stretch_x_count is 0.
     """
 
-    stretch_y: tuple[ImageStretch, ...] | None = None
+    stretch_y: Sequence[ImageStretch] | None = None
     """Vertically stretchable intervals. Borrowed for the call and copied before
     return. May be null only when stretch_y_count is 0.
     """
@@ -3943,6 +3990,10 @@ class StyleImageOptions:
 
     sdf: bool | None = None
     """Whether the image is a signed distance field icon. Defaults to false."""
+
+    def __post_init__(self):
+        object.__setattr__(self, "stretch_x", _sequence(self.stretch_x))
+        object.__setattr__(self, "stretch_y", _sequence(self.stretch_y))
 
     @classmethod
     def _from_native(cls, raw):
@@ -4303,7 +4354,7 @@ class VulkanBorrowedTextureDescriptor:
     )
     """Borrowed Vulkan context. All handles are required."""
 
-    textures: tuple[VulkanBorrowedTexture, ...] = field(
+    textures: Sequence[VulkanBorrowedTexture] = field(
         default_factory=lambda: VulkanBorrowedTextureDescriptor.default().textures
     )
     """The ring's images, one per slot, in slot order. Required."""
@@ -4326,6 +4377,9 @@ class VulkanBorrowedTextureDescriptor:
     """Backend-native VkImageLayout value left after rendering succeeds.
     Defaults to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
     """
+
+    def __post_init__(self):
+        object.__setattr__(self, "textures", _sequence(self.textures))
 
     @classmethod
     def _from_native(cls, raw):
@@ -4674,7 +4728,7 @@ class WebgpuBorrowedTextureDescriptor:
     through context.queue or that device's default queue.
     """
 
-    textures: tuple[WebgpuBorrowedTexture, ...] = field(
+    textures: Sequence[WebgpuBorrowedTexture] = field(
         default_factory=lambda: WebgpuBorrowedTextureDescriptor.default().textures
     )
     """The ring's textures, one per slot, in slot order. Required."""
@@ -4685,6 +4739,9 @@ class WebgpuBorrowedTextureDescriptor:
     """Backend-native WGPUTextureFormat value of every texture. Undefined is
     invalid.
     """
+
+    def __post_init__(self):
+        object.__setattr__(self, "textures", _sequence(self.textures))
 
     @classmethod
     def _from_native(cls, raw):

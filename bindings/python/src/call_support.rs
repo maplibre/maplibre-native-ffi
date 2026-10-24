@@ -423,6 +423,12 @@ fn generated_items<'py, T>(
     values: &Bound<'py, PyAny>,
     mut convert: impl FnMut(Bound<'py, PyAny>) -> PyResult<T>,
 ) -> PyResult<Vec<T>> {
+    // A str is iterable, and would otherwise split into its characters.
+    if values.is_instance_of::<pyo3::types::PyString>() {
+        return Err(pyo3::exceptions::PyTypeError::new_err(
+            "expected a sequence, not str",
+        ));
+    }
     values.try_iter()?.map(|item| convert(item?)).collect()
 }
 
