@@ -16,7 +16,7 @@ public sealed record StyleExpressionOptions
     /// result to a string, as a string layer property does; every other type
     /// asserts it. Without it, the expression keeps the type it infers.
     /// </summary>
-    public StyleExpressionType? ExpectedType { get; set; }
+    public StyleExpressionType? ExpectedType { get; init; }
     public static StyleExpressionOptions Default
     {
         get

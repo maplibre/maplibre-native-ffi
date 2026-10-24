@@ -14,22 +14,22 @@ public sealed record FeatureStateSelector
     /// <summary>
     /// Source ID. Required and borrowed for the duration of the call.
     /// </summary>
-    public required string SourceId { get; set; }
+    public required string SourceId { get; init; }
 
     /// <summary>
     /// Optional source layer ID. Required for vector-source disambiguation.
     /// </summary>
-    public string? SourceLayerId { get; set; }
+    public string? SourceLayerId { get; init; }
 
     /// <summary>
     /// Optional feature ID. Required by set and get, optional for remove. A
     /// numeric feature ID matches its decimal text, such as "7" for the GeoJSON
     /// id 7.
     /// </summary>
-    public string? FeatureId { get; set; }
+    public string? FeatureId { get; init; }
 
     /// <summary>
     /// Optional state key. Used only by remove and requires feature_id.
     /// </summary>
-    public string? StateKey { get; set; }
+    public string? StateKey { get; init; }
 }

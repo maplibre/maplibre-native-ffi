@@ -14,18 +14,18 @@ public sealed record StyleExpressionInputs
     /// <summary>
     /// The value of the zoom expression.
     /// </summary>
-    public double? Zoom { get; set; }
+    public double? Zoom { get; init; }
 
     /// <summary>
     /// The value of the heatmap-density and line-progress expressions, and of
     /// the elevation expression in a color-relief layer.
     /// </summary>
-    public double? ColorRampParameter { get; set; }
+    public double? ColorRampParameter { get; init; }
 
     /// <summary>
     /// The value of the elevation expression outside a color-relief layer.
     /// </summary>
-    public double? Elevation { get; set; }
+    public double? Elevation { get; init; }
 
     /// <summary>
     /// One UTF-8 GeoJSON Feature that feature data expressions read.
@@ -33,9 +33,9 @@ public sealed record StyleExpressionInputs
     public byte[]? Feature
     {
         get => FeatureStorage?.ToArray();
-        set => FeatureStorage = ValueArray.CopyOptional(value);
+        init => FeatureStorage = ValueArray.CopyOptional(value);
     }
-    internal ValueArray<byte>? FeatureStorage { get; set; }
+    internal ValueArray<byte>? FeatureStorage { get; init; }
 
     /// <summary>
     /// A UTF-8 JSON object that the feature-state expression reads.
@@ -43,9 +43,9 @@ public sealed record StyleExpressionInputs
     public byte[]? FeatureState
     {
         get => FeatureStateStorage?.ToArray();
-        set => FeatureStateStorage = ValueArray.CopyOptional(value);
+        init => FeatureStateStorage = ValueArray.CopyOptional(value);
     }
-    internal ValueArray<byte>? FeatureStateStorage { get; set; }
+    internal ValueArray<byte>? FeatureStateStorage { get; init; }
 
     /// <summary>
     /// A UTF-8 JSON object that the global-state expression reads.
@@ -53,15 +53,15 @@ public sealed record StyleExpressionInputs
     public byte[]? GlobalState
     {
         get => GlobalStateStorage?.ToArray();
-        set => GlobalStateStorage = ValueArray.CopyOptional(value);
+        init => GlobalStateStorage = ValueArray.CopyOptional(value);
     }
-    internal ValueArray<byte>? GlobalStateStorage { get; set; }
+    internal ValueArray<byte>? GlobalStateStorage { get; init; }
 
     /// <summary>
     /// The tile that holds the feature, which the within and distance
     /// expressions need to place its geometry.
     /// </summary>
-    public CanonicalTileId? CanonicalTileId { get; set; }
+    public CanonicalTileId? CanonicalTileId { get; init; }
 
     /// <summary>
     /// The image IDs that the image expression reports as available. The
@@ -70,9 +70,9 @@ public sealed record StyleExpressionInputs
     public string[] AvailableImages
     {
         get => AvailableImagesStorage.ToArray();
-        set => AvailableImagesStorage = ValueArray.Copy(value);
+        init => AvailableImagesStorage = ValueArray.Copy(value);
     }
-    internal ValueArray<string> AvailableImagesStorage { get; set; }
+    internal ValueArray<string> AvailableImagesStorage { get; init; }
     public static StyleExpressionInputs Default
     {
         get

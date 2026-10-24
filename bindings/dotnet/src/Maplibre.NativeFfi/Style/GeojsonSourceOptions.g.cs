@@ -15,22 +15,22 @@ public sealed record GeojsonSourceOptions
     /// <summary>
     /// Minimum tiling zoom. Defaults to 0.
     /// </summary>
-    public double? MinZoom { get; set; }
+    public double? MinZoom { get; init; }
 
     /// <summary>
     /// Maximum tiling zoom, an integer within [0, 24]. Defaults to 18.
     /// </summary>
-    public double? MaxZoom { get; set; }
+    public double? MaxZoom { get; init; }
 
     /// <summary>
     /// Douglas-Peucker simplification tolerance. Defaults to 0.375.
     /// </summary>
-    public double? Tolerance { get; set; }
+    public double? Tolerance { get; init; }
 
     /// <summary>
     /// Highest zoom that clusters points. Defaults to 17.
     /// </summary>
-    public double? ClusterMaxZoom { get; set; }
+    public double? ClusterMaxZoom { get; init; }
 
     /// <summary>
     /// Cluster aggregation expressions keyed by property name, as a JSON object
@@ -40,40 +40,40 @@ public sealed record GeojsonSourceOptions
     public byte[]? ClusterProperties
     {
         get => ClusterPropertiesStorage?.ToArray();
-        set => ClusterPropertiesStorage = ValueArray.CopyOptional(value);
+        init => ClusterPropertiesStorage = ValueArray.CopyOptional(value);
     }
-    internal ValueArray<byte>? ClusterPropertiesStorage { get; set; }
+    internal ValueArray<byte>? ClusterPropertiesStorage { get; init; }
 
     /// <summary>
     /// Tile buffer in pixels within [0, 512]. Defaults to 128.
     /// </summary>
-    public uint? Buffer { get; set; }
+    public uint? Buffer { get; init; }
 
     /// <summary>
     /// Cluster radius in pixels within [0, 4095]. Defaults to 50.
     /// </summary>
-    public uint? ClusterRadius { get; set; }
+    public uint? ClusterRadius { get; init; }
 
     /// <summary>
     /// Points required to form a cluster. Defaults to 2.
     /// </summary>
-    public uint? ClusterMinPoints { get; set; }
+    public uint? ClusterMinPoints { get; init; }
 
     /// <summary>
     /// Adds line distance metrics to line features. Defaults to false.
     /// </summary>
-    public bool? LineMetrics { get; set; }
+    public bool? LineMetrics { get; init; }
 
     /// <summary>
     /// Clusters point features. Defaults to false.
     /// </summary>
-    public bool? Cluster { get; set; }
+    public bool? Cluster { get; init; }
 
     /// <summary>
     /// Tiles the data for the next render update instead of in the background.
     /// Defaults to false.
     /// </summary>
-    public bool? SynchronousTiling { get; set; }
+    public bool? SynchronousTiling { get; init; }
     public static GeojsonSourceOptions Default
     {
         get

@@ -17,9 +17,9 @@ public sealed record RenderedFeatureQueryOptions
     public string[]? LayerIds
     {
         get => LayerIdsStorage?.ToArray();
-        set => LayerIdsStorage = ValueArray.CopyOptional(value);
+        init => LayerIdsStorage = ValueArray.CopyOptional(value);
     }
-    internal ValueArray<string>? LayerIdsStorage { get; set; }
+    internal ValueArray<string>? LayerIdsStorage { get; init; }
 
     /// <summary>
     /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
@@ -27,9 +27,9 @@ public sealed record RenderedFeatureQueryOptions
     public byte[]? Filter
     {
         get => FilterStorage?.ToArray();
-        set => FilterStorage = ValueArray.CopyOptional(value);
+        init => FilterStorage = ValueArray.CopyOptional(value);
     }
-    internal ValueArray<byte>? FilterStorage { get; set; }
+    internal ValueArray<byte>? FilterStorage { get; init; }
     public static RenderedFeatureQueryOptions Default
     {
         get

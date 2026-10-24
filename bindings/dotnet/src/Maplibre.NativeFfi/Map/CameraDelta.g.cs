@@ -14,30 +14,30 @@ public sealed record CameraDelta
     /// <summary>
     /// Pan in logical map pixels; the content moves by this offset.
     /// </summary>
-    public ScreenPoint? Offset { get; set; }
+    public ScreenPoint? Offset { get; init; }
 
     /// <summary>
     /// Positive zoom factor; 2 zooms in one level.
     /// </summary>
-    public double? Scale { get; set; }
+    public double? Scale { get; init; }
 
     /// <summary>
     /// Degrees added to the bearing.
     /// </summary>
-    public double? Bearing { get; set; }
+    public double? Bearing { get; init; }
 
     /// <summary>
     /// Degrees added to the pitch; positive tilts further from straight down.
     /// </summary>
-    public double? Pitch { get; set; }
+    public double? Pitch { get; init; }
 
     /// <summary>
     /// Screen point in logical map pixels that scale, bearing, and pitch keep
     /// fixed.
     /// </summary>
-    public ScreenPoint? Anchor { get; set; }
-    public required AnimationOptions Animation { get; set; }
-    public GesturePhase GesturePhase { get; set; }
+    public ScreenPoint? Anchor { get; init; }
+    public required AnimationOptions Animation { get; init; }
+    public GesturePhase GesturePhase { get; init; }
     public static CameraDelta Default
     {
         get

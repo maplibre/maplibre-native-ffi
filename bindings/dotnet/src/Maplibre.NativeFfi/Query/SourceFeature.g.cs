@@ -14,8 +14,8 @@ public sealed record SourceFeature
     public byte[] Feature
     {
         get => FeatureStorage.ToArray();
-        set => FeatureStorage = ValueArray.Copy(value);
+        init => FeatureStorage = ValueArray.Copy(value);
     }
-    internal ValueArray<byte> FeatureStorage { get; set; }
-    public string? SourceLayerId { get; set; }
+    internal ValueArray<byte> FeatureStorage { get; init; }
+    public string? SourceLayerId { get; init; }
 }

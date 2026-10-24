@@ -7,26 +7,26 @@ public sealed record ResourceRequestInfo
     /// <summary>
     /// URL entering the network layer, before tile server normalization.
     /// </summary>
-    public string? RequestedUrl { get; set; }
+    public string? RequestedUrl { get; init; }
 
     /// <summary>
     /// URL to fetch, after resource-kind normalization against the runtime's
     /// tile server options and API key.
     /// </summary>
-    public string? ResolvedUrl { get; set; }
-    public ResourceKind Kind { get; set; }
-    public ResourceLoadingMethod LoadingMethod { get; set; }
-    public ResourcePriority Priority { get; set; }
-    public ResourceUsage Usage { get; set; }
-    public ResourceStoragePolicy StoragePolicy { get; set; }
-    public ResourceRange? Range { get; set; }
-    public long? PriorModifiedUnixMs { get; set; }
-    public long? PriorExpiresUnixMs { get; set; }
-    public string? PriorEtag { get; set; }
+    public string? ResolvedUrl { get; init; }
+    public ResourceKind Kind { get; init; }
+    public ResourceLoadingMethod LoadingMethod { get; init; }
+    public ResourcePriority Priority { get; init; }
+    public ResourceUsage Usage { get; init; }
+    public ResourceStoragePolicy StoragePolicy { get; init; }
+    public ResourceRange? Range { get; init; }
+    public long? PriorModifiedUnixMs { get; init; }
+    public long? PriorExpiresUnixMs { get; init; }
+    public string? PriorEtag { get; init; }
     public byte[] PriorData
     {
         get => PriorDataStorage.ToArray();
-        set => PriorDataStorage = ValueArray.Copy(value);
+        init => PriorDataStorage = ValueArray.Copy(value);
     }
-    internal ValueArray<byte> PriorDataStorage { get; set; }
+    internal ValueArray<byte> PriorDataStorage { get; init; }
 }

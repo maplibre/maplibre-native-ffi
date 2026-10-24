@@ -14,17 +14,17 @@ public sealed record ProjectionMode
     /// <summary>
     /// Enables a non-perspective axonometric render transform.
     /// </summary>
-    public bool? Axonometric { get; set; }
+    public bool? Axonometric { get; init; }
 
     /// <summary>
     /// X-skew factor of the axonometric transform.
     /// </summary>
-    public double? XSkew { get; set; }
+    public double? XSkew { get; init; }
 
     /// <summary>
     /// Y-skew factor of the axonometric transform.
     /// </summary>
-    public double? YSkew { get; set; }
+    public double? YSkew { get; init; }
     public static ProjectionMode Default
     {
         get

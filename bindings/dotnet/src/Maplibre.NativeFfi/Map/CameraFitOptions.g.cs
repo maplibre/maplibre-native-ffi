@@ -11,9 +11,9 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record CameraFitOptions
 {
-    public EdgeInsets? Padding { get; set; }
-    public double? Bearing { get; set; }
-    public double? Pitch { get; set; }
+    public EdgeInsets? Padding { get; init; }
+    public double? Bearing { get; init; }
+    public double? Pitch { get; init; }
     public static CameraFitOptions Default
     {
         get

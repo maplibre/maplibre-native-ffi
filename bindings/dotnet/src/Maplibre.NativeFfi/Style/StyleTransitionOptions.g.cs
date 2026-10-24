@@ -15,18 +15,18 @@ public sealed record StyleTransitionOptions
     /// Transition duration in milliseconds. Must be finite, non-negative, and
     /// short enough to represent as a duration.
     /// </summary>
-    public double? DurationMs { get; set; }
+    public double? DurationMs { get; init; }
 
     /// <summary>
     /// Transition delay in milliseconds. Must be finite, non-negative, and
     /// short enough to represent as a duration.
     /// </summary>
-    public double? DelayMs { get; set; }
+    public double? DelayMs { get; init; }
 
     /// <summary>
     /// Whether symbol placement changes cross-fade.
     /// </summary>
-    public bool? EnablePlacementTransitions { get; set; }
+    public bool? EnablePlacementTransitions { get; init; }
     public static StyleTransitionOptions Default
     {
         get

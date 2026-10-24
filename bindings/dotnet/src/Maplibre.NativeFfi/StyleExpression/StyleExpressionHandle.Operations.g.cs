@@ -54,7 +54,10 @@ public sealed unsafe partial class StyleExpressionHandle
     /// See <c>mln_style_expression_create</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html">C API reference</see>.
     /// </remarks>
-    public static StyleExpressionHandle Create(byte[] expression, StyleExpressionOptions? options)
+    public static StyleExpressionHandle Create(
+        byte[] expression,
+        StyleExpressionOptions? options = null
+    )
     {
         using var scope = new NativeCallScope(null);
         var nativeOptions = options is null
@@ -80,7 +83,7 @@ public sealed unsafe partial class StyleExpressionHandle
     /// See <c>mln_style_expression_evaluate</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html">C API reference</see>.
     /// </remarks>
-    public byte[] Evaluate(StyleExpressionInputs? inputs)
+    public byte[] Evaluate(StyleExpressionInputs? inputs = null)
     {
         using var scope = new NativeCallScope(this);
         var nativeInputs = inputs is null

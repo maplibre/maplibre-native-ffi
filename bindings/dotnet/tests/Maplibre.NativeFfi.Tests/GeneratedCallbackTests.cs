@@ -11,7 +11,7 @@ namespace Maplibre.NativeFfi.Tests;
 public sealed unsafe class GeneratedCallbackTests
 {
     [Fact]
-    public void GeneratedCallbacksSnapshotDelegatesCopyArgumentsAndContainFailures()
+    public void GeneratedCallbacksCopyArgumentsAndContainFailures()
     {
         CanonicalTileId? fetched = null;
         var options = new CustomGeometrySourceOptions
@@ -21,7 +21,6 @@ public sealed unsafe class GeneratedCallbackTests
         };
         using var scope = new NativeCallScope();
         var native = GeneratedValues.NativeCustomGeometrySourceOptions(options, scope);
-        options.FetchTile = _ => throw new InvalidOperationException("mutated descriptor");
         var tile = new mln_canonical_tile_id
         {
             z = 1,

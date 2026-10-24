@@ -14,16 +14,16 @@ public sealed record RenderedFeature
     public byte[] Feature
     {
         get => FeatureStorage.ToArray();
-        set => FeatureStorage = ValueArray.Copy(value);
+        init => FeatureStorage = ValueArray.Copy(value);
     }
-    internal ValueArray<byte> FeatureStorage { get; set; }
-    public required string LayerId { get; set; }
-    public string? SourceId { get; set; }
-    public string? SourceLayerId { get; set; }
+    internal ValueArray<byte> FeatureStorage { get; init; }
+    public required string LayerId { get; init; }
+    public string? SourceId { get; init; }
+    public string? SourceLayerId { get; init; }
     public byte[]? State
     {
         get => StateStorage?.ToArray();
-        set => StateStorage = ValueArray.CopyOptional(value);
+        init => StateStorage = ValueArray.CopyOptional(value);
     }
-    internal ValueArray<byte>? StateStorage { get; set; }
+    internal ValueArray<byte>? StateStorage { get; init; }
 }

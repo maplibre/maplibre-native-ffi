@@ -11,19 +11,19 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record CameraOptions
 {
-    public LatLng? Center { get; set; }
-    public double? CenterAltitude { get; set; }
-    public EdgeInsets? Padding { get; set; }
+    public LatLng? Center { get; init; }
+    public double? CenterAltitude { get; init; }
+    public EdgeInsets? Padding { get; init; }
 
     /// <summary>
     /// Optional screen-space focal point in logical map pixels.
     /// </summary>
-    public ScreenPoint? Anchor { get; set; }
-    public double? Zoom { get; set; }
-    public double? Bearing { get; set; }
-    public double? Pitch { get; set; }
-    public double? Roll { get; set; }
-    public double? FieldOfView { get; set; }
+    public ScreenPoint? Anchor { get; init; }
+    public double? Zoom { get; init; }
+    public double? Bearing { get; init; }
+    public double? Pitch { get; init; }
+    public double? Roll { get; init; }
+    public double? FieldOfView { get; init; }
     public static CameraOptions Default
     {
         get

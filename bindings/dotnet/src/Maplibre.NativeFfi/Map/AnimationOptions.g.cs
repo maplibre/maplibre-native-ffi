@@ -15,7 +15,7 @@ public sealed record AnimationOptions
     /// Duration in milliseconds. Must be finite, non-negative, and short enough
     /// to represent as a duration.
     /// </summary>
-    public double? DurationMs { get; set; }
+    public double? DurationMs { get; init; }
 
     /// <summary>
     /// Average fly velocity in screenfuls per second. Must be positive and
@@ -23,24 +23,24 @@ public sealed record AnimationOptions
     /// too long to represent fails its completion with
     /// <c>MLN_STATUS_NATIVE_ERROR</c>. An explicit duration overrides velocity.
     /// </summary>
-    public double? Velocity { get; set; }
+    public double? Velocity { get; init; }
 
     /// <summary>
     /// Peak zoom for flyTo transitions.
     /// </summary>
-    public double? MinZoom { get; set; }
-    public UnitBezier? Easing { get; set; }
+    public double? MinZoom { get; init; }
+    public UnitBezier? Easing { get; init; }
 
     /// <summary>
     /// Caller-chosen identity of the command that these options animate, which
     /// <c>mln_map_cancel_camera_transition()</c> matches.
     /// </summary>
-    public ulong? TransitionId { get; set; }
+    public ulong? TransitionId { get; init; }
 
     /// <summary>
     /// Reports the end of the command's transitions. Disabled by default.
     /// </summary>
-    public CameraTransitionHandler EndHandler { get; set; }
+    public CameraTransitionHandler EndHandler { get; init; }
     public static AnimationOptions Default
     {
         get

@@ -13,15 +13,14 @@ public sealed class GeneratedValueTests
     public void CallerSizedTextReturnsResultsLongerThanItsFirstStorage()
     {
         using var zoom = StyleExpressionHandle.Create(
-            """["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"""u8.ToArray(),
-            null
+            """["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"""u8.ToArray()
         );
         Assert.Equal("50.0"u8.ToArray(), zoom.Evaluate(new StyleExpressionInputs { Zoom = 5 }));
 
         // The result outgrows the call's first storage, so the call runs again.
         var text = Encoding.UTF8.GetBytes($"\"{new string('a', 1000)}\"");
-        using var expression = StyleExpressionHandle.Create(text, null);
-        Assert.Equal(text, expression.Evaluate(null));
+        using var expression = StyleExpressionHandle.Create(text);
+        Assert.Equal(text, expression.Evaluate());
     }
 
     [Fact]
@@ -66,6 +65,13 @@ public sealed class GeneratedValueTests
         Assert.Equal(CommandDisposition.Committed, added.Disposition);
         Assert.NotNull(await fixture.Map.GetStyleSourceAsync("before\0after", TestWaits.Token));
         Assert.Null(await fixture.Map.GetStyleSourceAsync("before", TestWaits.Token));
+
+        // An omitted optional ID crosses as the empty view, which appends the layer.
+        var appended = await fixture.Map.AddStyleLayerJsonAsync(
+            """{"id":"last","type":"background"}"""u8.ToArray(),
+            cancellationToken: TestWaits.Token
+        );
+        Assert.Equal(CommandDisposition.Committed, appended.Disposition);
 
         // Native rejects a NUL in a URL view before a C-string consumer reads it.
         var error = Assert.Throws<MaplibreException>(() =>

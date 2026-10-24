@@ -14,16 +14,16 @@ public sealed record MapTileOptions
     /// <summary>
     /// Prefetch zoom delta, at most 255.
     /// </summary>
-    public uint? PrefetchZoomDelta { get; set; }
-    public double? LodMinRadius { get; set; }
-    public double? LodScale { get; set; }
-    public double? LodPitchThreshold { get; set; }
-    public double? LodZoomShift { get; set; }
+    public uint? PrefetchZoomDelta { get; init; }
+    public double? LodMinRadius { get; init; }
+    public double? LodScale { get; init; }
+    public double? LodPitchThreshold { get; init; }
+    public double? LodZoomShift { get; init; }
 
     /// <summary>
     /// One of <c>mln_tile_lod_mode</c>.
     /// </summary>
-    public TileLodMode? LodMode { get; set; }
+    public TileLodMode? LodMode { get; init; }
     public static MapTileOptions Default
     {
         get

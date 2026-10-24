@@ -18,9 +18,9 @@ public sealed record SourceFeatureQueryOptions
     public string[]? SourceLayerIds
     {
         get => SourceLayerIdsStorage?.ToArray();
-        set => SourceLayerIdsStorage = ValueArray.CopyOptional(value);
+        init => SourceLayerIdsStorage = ValueArray.CopyOptional(value);
     }
-    internal ValueArray<string>? SourceLayerIdsStorage { get; set; }
+    internal ValueArray<string>? SourceLayerIdsStorage { get; init; }
 
     /// <summary>
     /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
@@ -28,9 +28,9 @@ public sealed record SourceFeatureQueryOptions
     public byte[]? Filter
     {
         get => FilterStorage?.ToArray();
-        set => FilterStorage = ValueArray.CopyOptional(value);
+        init => FilterStorage = ValueArray.CopyOptional(value);
     }
-    internal ValueArray<byte>? FilterStorage { get; set; }
+    internal ValueArray<byte>? FilterStorage { get; init; }
     public static SourceFeatureQueryOptions Default
     {
         get

@@ -130,7 +130,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     public Task<CommandCompletion> AddGeojsonSourceUrlAsync(
         string sourceId,
         string url,
-        GeojsonSourceOptions? options,
+        GeojsonSourceOptions? options = null,
         CancellationToken cancellationToken = default
     )
     {
@@ -220,7 +220,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CommandCompletion> AddStyleLayerJsonAsync(
         byte[] layerJson,
-        string beforeLayerId,
+        string? beforeLayerId = null,
         CancellationToken cancellationToken = default
     )
     {
@@ -230,7 +230,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 NativeMethods.mln_map_add_style_layer_json(
                     Handle,
                     scope.Buffer(layerJson),
-                    scope.Utf8(beforeLayerId),
+                    scope.Utf8(beforeLayerId ?? ""),
                     completion,
                     diagnostic
                 ),
@@ -643,7 +643,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CameraOptions> CameraForGeometryAsync(
         byte[] geometry,
-        CameraFitOptions? fitOptions,
+        CameraFitOptions? fitOptions = null,
         CancellationToken cancellationToken = default
     )
     {
@@ -671,7 +671,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CameraOptions> CameraForLatLngBoundsAsync(
         LatLngBounds bounds,
-        CameraFitOptions? fitOptions,
+        CameraFitOptions? fitOptions = null,
         CancellationToken cancellationToken = default
     )
     {
@@ -699,7 +699,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CameraOptions> CameraForLatLngsAsync(
         LatLng[] coordinates,
-        CameraFitOptions? fitOptions,
+        CameraFitOptions? fitOptions = null,
         CancellationToken cancellationToken = default
     )
     {
@@ -1302,7 +1302,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CommandCompletion> MoveStyleLayerAsync(
         string layerId,
-        string beforeLayerId,
+        string? beforeLayerId = null,
         CancellationToken cancellationToken = default
     )
     {
@@ -1312,7 +1312,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 NativeMethods.mln_map_move_style_layer(
                     Handle,
                     scope.Utf8(layerId),
-                    scope.Utf8(beforeLayerId),
+                    scope.Utf8(beforeLayerId ?? ""),
                     completion,
                     diagnostic
                 ),
@@ -1993,7 +1993,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     public Task<CommandCompletion> SetStyleImageAsync(
         string imageId,
         PremultipliedRgba8Image image,
-        StyleImageOptions? options,
+        StyleImageOptions? options = null,
         CancellationToken cancellationToken = default
     )
     {
@@ -2339,7 +2339,11 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             );
         }
 
-        public void AddGeojsonSourceUrl(string sourceId, string url, GeojsonSourceOptions? options)
+        public void AddGeojsonSourceUrl(
+            string sourceId,
+            string url,
+            GeojsonSourceOptions? options = null
+        )
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
@@ -2398,7 +2402,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             );
         }
 
-        public void AddStyleLayerJson(byte[] layerJson, string beforeLayerId)
+        public void AddStyleLayerJson(byte[] layerJson, string? beforeLayerId = null)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
@@ -2407,7 +2411,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                     NativeMethods.mln_map_add_style_layer_json(
                         receiverHandle,
                         scope.Buffer(layerJson),
-                        scope.Utf8(beforeLayerId),
+                        scope.Utf8(beforeLayerId ?? ""),
                         completion,
                         diagnostic
                     )
@@ -2552,7 +2556,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             );
         }
 
-        public void MoveStyleLayer(string layerId, string beforeLayerId)
+        public void MoveStyleLayer(string layerId, string? beforeLayerId = null)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
@@ -2561,7 +2565,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                     NativeMethods.mln_map_move_style_layer(
                         receiverHandle,
                         scope.Utf8(layerId),
-                        scope.Utf8(beforeLayerId),
+                        scope.Utf8(beforeLayerId ?? ""),
                         completion,
                         diagnostic
                     )
@@ -2959,7 +2963,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetStyleImage(
             string imageId,
             PremultipliedRgba8Image image,
-            StyleImageOptions? options
+            StyleImageOptions? options = null
         )
         {
             var receiverHandle = owner.Handle;

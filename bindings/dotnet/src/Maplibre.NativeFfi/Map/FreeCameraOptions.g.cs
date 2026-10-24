@@ -11,8 +11,8 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record FreeCameraOptions
 {
-    public Vec3? Position { get; set; }
-    public Quaternion? Orientation { get; set; }
+    public Vec3? Position { get; init; }
+    public Quaternion? Orientation { get; init; }
     public static FreeCameraOptions Default
     {
         get

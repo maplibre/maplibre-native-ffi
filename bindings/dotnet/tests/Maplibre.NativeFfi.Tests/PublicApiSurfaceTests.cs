@@ -70,10 +70,11 @@ public sealed class PublicApiSurfaceTests
         Assert.Empty(violations);
     }
 
-    // Optional cancellation tokens follow the .NET asynchronous API convention. Other default
+    // Optional cancellation tokens follow the .NET asynchronous API convention, and a value that
+    // C lets the caller omit defaults to null, as in Kotlin and TypeScript. Other default
     // parameter values would create shortcut workflows outside the C API shape.
     [Fact]
-    public void PublicSurfaceUsesDefaultsOnlyForCancellationTokens()
+    public void PublicSurfaceDefaultsOnlyCancellationTokensAndOmittableValues()
     {
         var violations = new List<string>();
         foreach (var type in typeof(Maplibre).Assembly.GetExportedTypes())
@@ -202,6 +203,7 @@ public sealed class PublicApiSurfaceTests
             if (
                 (parameter.HasDefaultValue || parameter.IsOptional)
                 && parameter.ParameterType != typeof(CancellationToken)
+                && parameter.DefaultValue is not null
             )
             {
                 violations.Add(

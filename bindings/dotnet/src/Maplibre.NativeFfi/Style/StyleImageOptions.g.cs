@@ -18,9 +18,9 @@ public sealed record StyleImageOptions
     public ImageStretch[]? StretchX
     {
         get => StretchXStorage?.ToArray();
-        set => StretchXStorage = ValueArray.CopyOptional(value);
+        init => StretchXStorage = ValueArray.CopyOptional(value);
     }
-    internal ValueArray<ImageStretch>? StretchXStorage { get; set; }
+    internal ValueArray<ImageStretch>? StretchXStorage { get; init; }
 
     /// <summary>
     /// Vertically stretchable intervals. Borrowed for the call and copied
@@ -29,34 +29,34 @@ public sealed record StyleImageOptions
     public ImageStretch[]? StretchY
     {
         get => StretchYStorage?.ToArray();
-        set => StretchYStorage = ValueArray.CopyOptional(value);
+        init => StretchYStorage = ValueArray.CopyOptional(value);
     }
-    internal ValueArray<ImageStretch>? StretchYStorage { get; set; }
+    internal ValueArray<ImageStretch>? StretchYStorage { get; init; }
 
     /// <summary>
     /// Content box used when icon-text-fit applies.
     /// </summary>
-    public ImageContent? Content { get; set; }
+    public ImageContent? Content { get; init; }
 
     /// <summary>
     /// One of <c>mln_style_image_text_fit</c>. Defaults to STRETCH_OR_SHRINK.
     /// </summary>
-    public StyleImageTextFit? TextFitWidth { get; set; }
+    public StyleImageTextFit? TextFitWidth { get; init; }
 
     /// <summary>
     /// One of <c>mln_style_image_text_fit</c>. Defaults to STRETCH_OR_SHRINK.
     /// </summary>
-    public StyleImageTextFit? TextFitHeight { get; set; }
+    public StyleImageTextFit? TextFitHeight { get; init; }
 
     /// <summary>
     /// Sprite pixel ratio. Defaults to 1.
     /// </summary>
-    public float? PixelRatio { get; set; }
+    public float? PixelRatio { get; init; }
 
     /// <summary>
     /// Whether the image is a signed distance field icon. Defaults to false.
     /// </summary>
-    public bool? Sdf { get; set; }
+    public bool? Sdf { get; init; }
     public static StyleImageOptions Default
     {
         get

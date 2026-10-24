@@ -14,50 +14,50 @@ public sealed record StyleSourceInfo
     /// <summary>
     /// Source ID.
     /// </summary>
-    public required string Id { get; set; }
+    public required string Id { get; init; }
 
     /// <summary>
     /// One of <c>mln_style_source_type</c>.
     /// </summary>
-    public StyleSourceType Type { get; set; }
+    public StyleSourceType Type { get; init; }
 
     /// <summary>
     /// Whether the source is marked volatile.
     /// </summary>
-    public bool IsVolatile { get; set; }
+    public bool IsVolatile { get; init; }
 
     /// <summary>
     /// Attribution string, when the source sets one. It may be empty.
     /// </summary>
-    public string? Attribution { get; set; }
+    public string? Attribution { get; init; }
 
     /// <summary>
     /// URL that the source loads from, when it has one.
     /// </summary>
-    public string? Url { get; set; }
+    public string? Url { get; init; }
 
     /// <summary>
     /// Inline TileJSON metadata, when the source was defined with it.
     /// </summary>
-    public StyleSourceTileInfo? Tilejson { get; set; }
+    public StyleSourceTileInfo? Tilejson { get; init; }
 
     /// <summary>
     /// Geographic bounds, when inline TileJSON sets them.
     /// </summary>
-    public LatLngBounds? Bounds { get; set; }
+    public LatLngBounds? Bounds { get; init; }
 
     /// <summary>
     /// Tile size in pixels, for a tile source.
     /// </summary>
-    public uint? TileSize { get; set; }
+    public uint? TileSize { get; init; }
 
     /// <summary>
     /// Vector tile encoding, for a vector source.
     /// </summary>
-    public StyleVectorTileEncoding? VectorEncoding { get; set; }
+    public StyleVectorTileEncoding? VectorEncoding { get; init; }
 
     /// <summary>
     /// DEM raster encoding, when inline TileJSON sets one.
     /// </summary>
-    public StyleRasterDemEncoding? RasterEncoding { get; set; }
+    public StyleRasterDemEncoding? RasterEncoding { get; init; }
 }

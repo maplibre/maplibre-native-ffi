@@ -1004,7 +1004,6 @@ class Values:
             field.presence and field.presence.mask for field in self.fields(plan)
         )
         name = public_name(plan.native)
-        accessor = "set" if masked else "init"
         properties, parameters, assignments = [], [], []
         for member, field in members:
             type_ = self.member_type(plan, member, field)
@@ -1020,8 +1019,8 @@ class Values:
                 properties.extend(
                     [
                         self.member_doc(plan, field)
-                        + f"    public {type_} {member} {{ get => {member}Storage{'?' if optional else ''}.ToArray(); {accessor} => {member}Storage = {copy}(value); }}",
-                        f"    internal {storage} {member}Storage {{ get; {accessor}; }}",
+                        + f"    public {type_} {member} {{ get => {member}Storage{'?' if optional else ''}.ToArray(); init => {member}Storage = {copy}(value); }}",
+                        f"    internal {storage} {member}Storage {{ get; init; }}",
                     ]
                 )
                 continue
@@ -1034,7 +1033,7 @@ class Values:
             )
             properties.append(
                 self.member_doc(plan, field)
-                + f"    public {required}{type_} {member} {{ get; {accessor}; }}"
+                + f"    public {required}{type_} {member} {{ get; init; }}"
             )
         declaration = f"public {'sealed record' if masked else 'readonly record struct'} {name}\n{{\n"
         if not masked:
@@ -1191,11 +1190,11 @@ class Values:
                 )
                 properties.append(
                     self.member_doc(plan, field)
-                    + f"    public {required}{type_} {name} {{ get; set; }}"
+                    + f"    public {required}{type_} {name} {{ get; init; }}"
                 )
             properties.extend(
                 docs.xml_comment(self.bound.doc(flag.name), "    ")
-                + f"    public bool {self.flag_name(flag)} {{ get; set; }}"
+                + f"    public bool {self.flag_name(flag)} {{ get; init; }}"
                 for flag in plan.mask_flags
             )
             return (

@@ -395,6 +395,8 @@ def emit_operation(
     records: set[str] = {receiver} if plan.scoped_receiver else set()
     args = ["Pointer" if plan.scoped_receiver else "Handle"] if receiver else []
     parameters = []
+    # Parameters that may be absent, which default to null when trailing.
+    omittable: set[str] = set()
     prologue: list[str] = []
     outputs = []
     scoped = False
@@ -559,10 +561,11 @@ def emit_operation(
             and value_plan.buffer_form == "view"
             and value_plan.encoding in {"bytes", "json", "utf8"}
         ):
-            utf8 = value_plan.encoding == "utf8"
-            parameters.append(f"{'string' if utf8 else 'byte[]'} {name}")
+            parameters.append(f"{values.public_type(value_plan)} {name}")
+            if value_plan.optional or value_plan.nullable:
+                omittable.add(name)
             scoped = True
-            args.append(f"scope.{'Utf8' if utf8 else 'Buffer'}({name})")
+            args.append(values.encode(value_plan, name))
         elif (
             value_plan
             and value_plan.buffer_form == "pointer"
@@ -593,6 +596,8 @@ def emit_operation(
             if not values.can_encode(value_plan):
                 raise Unsupported("reference element requires an input converter")
             parameters.append(f"{values.public_type(value_plan)} {name}")
+            if value_plan.nullable:
+                omittable.add(name)
             element = value_plan.element
             assert element is not None
             if asynchronous:
@@ -660,6 +665,10 @@ def emit_operation(
             raise Unsupported(
                 f"parameter {parameter.name}: {parameter.type.spelling} needs a conversion rule"
             )
+    for index in reversed(range(len(parameters))):
+        if parameters[index].rsplit(" ", 1)[1] not in omittable:
+            break
+        parameters[index] += " = null"
     reads = bool(
         handle_plan
         and handle_plan.native == "mln_render_frame_batch"

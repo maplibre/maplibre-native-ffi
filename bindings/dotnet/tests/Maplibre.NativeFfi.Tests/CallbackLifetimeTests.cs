@@ -97,14 +97,16 @@ public sealed class CallbackLifetimeTests
     )
     {
         var captured = new object();
-        var animation = AnimationOptions.Default;
-        animation.DurationMs = 60000;
-        animation.TransitionId = ulong.MaxValue;
-        animation.EndHandler = new CameraTransitionHandler(end =>
+        var animation = AnimationOptions.Default with
         {
-            GC.KeepAlive(captured);
-            ends.Enqueue(end);
-        });
+            DurationMs = 60000,
+            TransitionId = ulong.MaxValue,
+            EndHandler = new CameraTransitionHandler(end =>
+            {
+                GC.KeepAlive(captured);
+                ends.Enqueue(end);
+            }),
+        };
         var started = map.UpdateCameraAsync(
             CameraUpdate.Default with
             {
@@ -123,11 +125,14 @@ public sealed class CallbackLifetimeTests
     )
     {
         var captured = new object();
-        var animation = AnimationOptions.Default;
-        animation.EndHandler = new CameraTransitionHandler(_ => GC.KeepAlive(captured));
-        var delta = CameraDelta.Default;
-        delta.Scale = -1;
-        delta.Animation = animation;
+        var delta = CameraDelta.Default with
+        {
+            Scale = -1,
+            Animation = AnimationOptions.Default with
+            {
+                EndHandler = new CameraTransitionHandler(_ => GC.KeepAlive(captured)),
+            },
+        };
         var rejection = Record.Exception(() =>
         {
             _ = map.ApplyCameraDeltaAsync(delta, TestWaits.Token);

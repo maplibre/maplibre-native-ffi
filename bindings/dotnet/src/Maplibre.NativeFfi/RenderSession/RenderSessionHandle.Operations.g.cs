@@ -263,7 +263,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         byte[] feature,
         string extension,
         string extensionField,
-        byte[]? arguments,
+        byte[]? arguments = null,
         CancellationToken cancellationToken = default
     )
     {
@@ -295,7 +295,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public Task<RenderedFeature[]> QueryRenderedFeaturesAsync(
         RenderedQueryGeometry geometry,
-        RenderedFeatureQueryOptions? options,
+        RenderedFeatureQueryOptions? options = null,
         CancellationToken cancellationToken = default
     )
     {
@@ -325,7 +325,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// </remarks>
     public Task<SourceFeature[]> QuerySourceFeaturesAsync(
         string sourceId,
-        SourceFeatureQueryOptions? options,
+        SourceFeatureQueryOptions? options = null,
         CancellationToken cancellationToken = default
     )
     {

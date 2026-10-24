@@ -14,11 +14,11 @@ public sealed record BoundOptions
     /// <summary>
     /// Read when fields contains <c>MLN_BOUND_OPTION_BOUNDS</c>.
     /// </summary>
-    public LatLngBounds? Bounds { get; set; }
-    public double? MinZoom { get; set; }
-    public double? MaxZoom { get; set; }
-    public double? MinPitch { get; set; }
-    public double? MaxPitch { get; set; }
+    public LatLngBounds? Bounds { get; init; }
+    public double? MinZoom { get; init; }
+    public double? MaxZoom { get; init; }
+    public double? MinPitch { get; init; }
+    public double? MaxPitch { get; init; }
 
     /// <summary>
     /// Selects the unbounded geographic constraint, which leaves every camera
@@ -28,7 +28,7 @@ public sealed record BoundOptions
     /// <c>MLN_BOUND_OPTION_BOUNDS</c>, and leaves
     /// <c>mln_bound_options.bounds</c> unread.
     /// </summary>
-    public bool Unbounded { get; set; }
+    public bool Unbounded { get; init; }
     public static BoundOptions Default
     {
         get

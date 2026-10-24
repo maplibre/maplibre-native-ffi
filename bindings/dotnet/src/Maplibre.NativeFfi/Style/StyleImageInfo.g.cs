@@ -14,12 +14,12 @@ public sealed record StyleImageInfo
     /// <summary>
     /// Image width in pixels.
     /// </summary>
-    public uint Width { get; set; }
+    public uint Width { get; init; }
 
     /// <summary>
     /// Image height in pixels.
     /// </summary>
-    public uint Height { get; set; }
+    public uint Height { get; init; }
 
     /// <summary>
     /// Premultiplied RGBA8 pixels in tightly packed rows of width * 4 bytes,
@@ -28,9 +28,9 @@ public sealed record StyleImageInfo
     public byte[] Pixels
     {
         get => PixelsStorage.ToArray();
-        set => PixelsStorage = ValueArray.Copy(value);
+        init => PixelsStorage = ValueArray.Copy(value);
     }
-    internal ValueArray<byte> PixelsStorage { get; set; }
+    internal ValueArray<byte> PixelsStorage { get; init; }
 
     /// <summary>
     /// Horizontally stretchable intervals.
@@ -38,9 +38,9 @@ public sealed record StyleImageInfo
     public ImageStretch[] StretchX
     {
         get => StretchXStorage.ToArray();
-        set => StretchXStorage = ValueArray.Copy(value);
+        init => StretchXStorage = ValueArray.Copy(value);
     }
-    internal ValueArray<ImageStretch> StretchXStorage { get; set; }
+    internal ValueArray<ImageStretch> StretchXStorage { get; init; }
 
     /// <summary>
     /// Vertically stretchable intervals.
@@ -48,32 +48,32 @@ public sealed record StyleImageInfo
     public ImageStretch[] StretchY
     {
         get => StretchYStorage.ToArray();
-        set => StretchYStorage = ValueArray.Copy(value);
+        init => StretchYStorage = ValueArray.Copy(value);
     }
-    internal ValueArray<ImageStretch> StretchYStorage { get; set; }
+    internal ValueArray<ImageStretch> StretchYStorage { get; init; }
 
     /// <summary>
     /// Content box, when the image sets one.
     /// </summary>
-    public ImageContent? Content { get; set; }
+    public ImageContent? Content { get; init; }
 
     /// <summary>
     /// How the image fits text horizontally, when it sets this.
     /// </summary>
-    public StyleImageTextFit? TextFitWidth { get; set; }
+    public StyleImageTextFit? TextFitWidth { get; init; }
 
     /// <summary>
     /// How the image fits text vertically, when it sets this.
     /// </summary>
-    public StyleImageTextFit? TextFitHeight { get; set; }
+    public StyleImageTextFit? TextFitHeight { get; init; }
 
     /// <summary>
     /// Sprite pixel ratio.
     /// </summary>
-    public float PixelRatio { get; set; }
+    public float PixelRatio { get; init; }
 
     /// <summary>
     /// Whether the image is a signed distance field icon.
     /// </summary>
-    public bool Sdf { get; set; }
+    public bool Sdf { get; init; }
 }

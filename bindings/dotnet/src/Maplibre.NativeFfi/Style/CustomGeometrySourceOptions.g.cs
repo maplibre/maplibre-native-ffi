@@ -14,19 +14,19 @@ public sealed record CustomGeometrySourceOptions
     /// <summary>
     /// Tile fetch callback. Required in callback mode; null in queue mode.
     /// </summary>
-    public Action<CanonicalTileId>? FetchTile { get; set; }
+    public Action<CanonicalTileId>? FetchTile { get; init; }
 
     /// <summary>
     /// Optional best-effort tile cancel callback. Null in queue mode.
     /// </summary>
-    public Action<CanonicalTileId>? CancelTile { get; set; }
-    public double? MinZoom { get; set; }
-    public double? MaxZoom { get; set; }
-    public double? Tolerance { get; set; }
-    public uint? TileSize { get; set; }
-    public uint? Buffer { get; set; }
-    public bool? Clip { get; set; }
-    public bool? Wrap { get; set; }
+    public Action<CanonicalTileId>? CancelTile { get; init; }
+    public double? MinZoom { get; init; }
+    public double? MaxZoom { get; init; }
+    public double? Tolerance { get; init; }
+    public uint? TileSize { get; init; }
+    public uint? Buffer { get; init; }
+    public bool? Clip { get; init; }
+    public bool? Wrap { get; init; }
     public static CustomGeometrySourceOptions Default
     {
         get

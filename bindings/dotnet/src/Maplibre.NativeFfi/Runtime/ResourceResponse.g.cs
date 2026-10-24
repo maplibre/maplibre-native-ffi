@@ -11,8 +11,8 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record ResourceResponse
 {
-    public ResourceResponseStatus Status { get; set; }
-    public ResourceErrorReason ErrorReason { get; set; }
+    public ResourceResponseStatus Status { get; init; }
+    public ResourceErrorReason ErrorReason { get; init; }
 
     /// <summary>
     /// Response bytes. May be null only when byte_count is 0.
@@ -20,13 +20,13 @@ public sealed record ResourceResponse
     public byte[] Bytes
     {
         get => BytesStorage.ToArray();
-        set => BytesStorage = ValueArray.Copy(value);
+        init => BytesStorage = ValueArray.Copy(value);
     }
-    internal ValueArray<byte> BytesStorage { get; set; }
-    public string? ErrorMessage { get; set; }
-    public bool MustRevalidate { get; set; }
-    public long? ModifiedUnixMs { get; set; }
-    public long? ExpiresUnixMs { get; set; }
-    public string? Etag { get; set; }
-    public long? RetryAfterUnixMs { get; set; }
+    internal ValueArray<byte> BytesStorage { get; init; }
+    public string? ErrorMessage { get; init; }
+    public bool MustRevalidate { get; init; }
+    public long? ModifiedUnixMs { get; init; }
+    public long? ExpiresUnixMs { get; init; }
+    public string? Etag { get; init; }
+    public long? RetryAfterUnixMs { get; init; }
 }
