@@ -324,7 +324,12 @@ def render_attachments(bound, lowered: list[Lowered]) -> list[str]:
             f"export interface {name} {{\n"
             f"  /** The {member}, usable at once while attachment completes. */\n"
             f"  readonly {member}: {owner_class(entry.owned.handle)};\n"
-            "  /** Settles after native attachment finishes. */\n"
+            "  /**\n"
+            "   * Settles after native attachment finishes. It rejects with a\n"
+            "   * `MaplibreError` when target initialization fails or the session is\n"
+            "   * abandoned first, so await it or attach a rejection handler: an\n"
+            "   * unhandled rejection ends a Node process by default.\n"
+            "   */\n"
             "  readonly completed: Promise<void>;\n}\n"
         )
     return [chunks[name] for name in sorted(chunks)]

@@ -17,7 +17,7 @@ import {
   hooks,
   native,
 } from "./addon.ts";
-import { MaplibreError, reportError } from "./errors.ts";
+import { MaplibreError } from "./errors.ts";
 import { takeNativeRegistration } from "./native_registrations.ts";
 
 // The kinds of message that the addon's wake shim posts.
@@ -222,6 +222,21 @@ function dispatch(entry: DrainedEntry, index: number): void {
     handler(target, payload, index);
   } catch (thrown) {
     reportError(thrown);
+  }
+}
+
+/**
+ * Reports an error that a host callback threw through the global
+ * `reportError`, or the entry point's hook where the global scope has none.
+ */
+function reportError(error: unknown): void {
+  const report =
+    (globalThis as { reportError?: (error: unknown) => void }).reportError ??
+    hooks.reportError;
+  if (report) {
+    report(error);
+  } else {
+    console.error(error);
   }
 }
 

@@ -62,6 +62,11 @@ export interface HostHooks {
    * report goes to `console.warn`.
    */
   warnLeak?: (message: string) => void;
+  /**
+   * Reports an error that a host callback threw, where the global scope has
+   * no `reportError`. Without this hook, the report goes to `console.error`.
+   */
+  reportError?: (error: unknown) => void;
 }
 
 export let native: Addon = undefined as never;

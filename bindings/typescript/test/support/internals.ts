@@ -81,15 +81,23 @@ export function captureLeaks(): string[] {
 /**
  * Collects the errors that the binding reports for a throwing host callback
  * during the running case. Bun and Deno define `reportError`, which their test
- * runners treat as an uncaught error, and Node does not, so the binding writes
- * to `console.error` there.
+ * runners treat as an uncaught error. Node does not, so the binding rethrows
+ * the error as an uncaught exception there, and ArkTS writes it to
+ * `console.error`.
  */
 export function captureReportedErrors(): string[] {
   const scope = globalThis as { reportError?: (error: unknown) => void };
-  if (typeof scope.reportError !== "function") {
-    return captureConsole("error");
-  }
   const errors: string[] = [];
+  if (typeof scope.reportError !== "function") {
+    if (capabilities.host === "arkts") {
+      return captureConsole("error");
+    }
+    process.setUncaughtExceptionCaptureCallback((error) =>
+      errors.push(String(error)),
+    );
+    teardown(() => process.setUncaughtExceptionCaptureCallback(null));
+    return errors;
+  }
   const original = scope.reportError;
   scope.reportError = (error) => errors.push(String(error));
   teardown(() => {

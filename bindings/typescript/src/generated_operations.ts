@@ -4696,7 +4696,12 @@ defineDisposers(StyleExpressionHandle, undefined, "close");
 export interface RenderSessionAttachment {
   /** The session, usable at once while attachment completes. */
   readonly session: RenderSessionHandle;
-  /** Settles after native attachment finishes. */
+  /**
+   * Settles after native attachment finishes. It rejects with a
+   * `MaplibreError` when target initialization fails or the session is
+   * abandoned first, so await it or attach a rejection handler: an
+   * unhandled rejection ends a Node process by default.
+   */
   readonly completed: Promise<void>;
 }
 

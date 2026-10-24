@@ -21,6 +21,10 @@
  * registration or a wake does not. To wait for a callback, call the `wake`
  * member of an {@link AwaitableWake} from it and await `next()`.
  *
+ * Every 64-bit C integer, such as a generation, a timestamp, or a 64-bit mask,
+ * is a `bigint`, so it keeps its full range. `JSON.stringify` throws a
+ * `TypeError` on a `bigint` unless a replacer converts it.
+ *
  * A realm runs on one thread, so it can drive a caller-driven render session:
  * make its context current on the JavaScript thread and call
  * `serviceDriverWork()` when the driver-work wake arrives. A realm loads one
@@ -67,6 +71,12 @@ bindAddon(
   loadAddon(),
   {
     ...(mainRealm && { onExit }),
+    // Node has no global reportError. An error rethrown from a microtask
+    // reaches uncaughtException, as a throwing EventEmitter listener does.
+    reportError: (error) =>
+      queueMicrotask(() => {
+        throw error;
+      }),
     // A process warning, unlike console output, is what --no-warnings and
     // process.on("warning") filter.
     warnLeak: (message) =>

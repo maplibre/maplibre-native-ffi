@@ -47,14 +47,3 @@ export class AbiVersionMismatchError extends MaplibreError {
     this.name = "AbiVersionMismatchError";
   }
 }
-
-/** Reports an error that a host callback threw. */
-export function reportError(error: unknown): void {
-  const report = (globalThis as { reportError?: (error: unknown) => void })
-    .reportError;
-  if (typeof report === "function") {
-    report(error);
-  } else {
-    console.error(error);
-  }
-}
