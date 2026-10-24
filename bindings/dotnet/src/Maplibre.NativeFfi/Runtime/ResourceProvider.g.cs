@@ -13,7 +13,7 @@ public readonly record struct ResourceProvider
 {
     public ResourceProvider(
         Func<ResourceRequestInfo, ResourceRequestHandle, ResourceProviderDecision>? Callback,
-        ResourceRoute[] Routes
+        ImmutableArray<ResourceRoute> Routes
     )
     {
         this.Callback = Callback;
@@ -32,10 +32,10 @@ public readonly record struct ResourceProvider
     /// <summary>
     /// The requests that reach the provider; empty to claim every request.
     /// </summary>
-    public ResourceRoute[] Routes
+    public ImmutableArray<ResourceRoute> Routes
     {
-        get => RoutesStorage.ToArray();
-        init => RoutesStorage = ValueArray.Copy(value);
+        get => RoutesStorage.AsImmutable();
+        init => RoutesStorage = ValueArray.From(value);
     }
     internal ValueArray<ResourceRoute> RoutesStorage { get; init; }
 }

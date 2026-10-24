@@ -16,7 +16,12 @@ public readonly record struct PremultipliedRgba8Image
         this = Default;
     }
 
-    public PremultipliedRgba8Image(uint Width, uint Height, uint Stride, byte[] Pixels)
+    public PremultipliedRgba8Image(
+        uint Width,
+        uint Height,
+        uint Stride,
+        ImmutableArray<byte> Pixels
+    )
     {
         this.Width = Width;
         this.Height = Height;
@@ -35,10 +40,10 @@ public readonly record struct PremultipliedRgba8Image
     /// <summary>
     /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
     /// </summary>
-    public byte[] Pixels
+    public ImmutableArray<byte> Pixels
     {
-        get => PixelsStorage.ToArray();
-        init => PixelsStorage = ValueArray.Copy(value);
+        get => PixelsStorage.AsImmutable();
+        init => PixelsStorage = ValueArray.From(value);
     }
     internal ValueArray<byte> PixelsStorage { get; init; }
     public static PremultipliedRgba8Image Default

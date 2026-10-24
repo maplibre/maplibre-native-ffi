@@ -20,7 +20,7 @@ public readonly record struct HttpHeaderRule
         ResourceKindMask Kinds,
         UrlMatchFlags Flags,
         string Url,
-        HttpHeader[] Headers
+        ImmutableArray<HttpHeader> Headers
     )
     {
         this.Kinds = Kinds;
@@ -48,10 +48,10 @@ public readonly record struct HttpHeaderRule
     /// The headers to set. Registration validates each one as
     /// <c>mln_http_header_transform_response_set_header()</c> does.
     /// </summary>
-    public HttpHeader[] Headers
+    public ImmutableArray<HttpHeader> Headers
     {
-        get => HeadersStorage.ToArray();
-        init => HeadersStorage = ValueArray.Copy(value);
+        get => HeadersStorage.AsImmutable();
+        init => HeadersStorage = ValueArray.From(value);
     }
     internal ValueArray<HttpHeader> HeadersStorage { get; init; }
     public static HttpHeaderRule Default

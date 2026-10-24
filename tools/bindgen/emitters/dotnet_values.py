@@ -996,6 +996,16 @@ class Values:
         optional = bool(field.presence and field.presence.mask) or type_.endswith("?")
         return type_.removesuffix("?").endswith("[]"), optional
 
+    def property_type(self, plan: ValuePlan, name: str, field: FieldPlan) -> str:
+        """The type of a member's property, where an array is an ImmutableArray
+        that shares the value's storage."""
+        type_ = self.member_type(plan, name, field)
+        array, optional = self.array_member(plan, name, field)
+        if not array:
+            return type_
+        element = type_.removesuffix("?").removesuffix("[]")
+        return f"ImmutableArray<{element}>{'?' if optional else ''}"
+
     def array_declaration(self, plan: ValuePlan) -> str:
         """A value with array members, which keep their elements in ValueArray
         storage so that record synthesis compares them element by element."""
@@ -1006,20 +1016,20 @@ class Values:
         name = public_name(plan.native)
         properties, parameters, assignments = [], [], []
         for member, field in members:
-            type_ = self.member_type(plan, member, field)
+            type_ = self.property_type(plan, member, field)
             array, optional = self.array_member(plan, member, field)
             if optional and not type_.endswith("?"):
                 type_ += "?"
             parameters.append(f"{type_} {member}")
             assignments.append(f"        this.{member} = {member};")
             if array:
-                element = type_.removesuffix("?").removesuffix("[]")
+                element = type_.removesuffix("?").removeprefix("ImmutableArray<")[:-1]
                 storage = f"ValueArray<{element}>{'?' if optional else ''}"
-                copy = "ValueArray.CopyOptional" if optional else "ValueArray.Copy"
+                adopt = "ValueArray.FromOptional" if optional else "ValueArray.From"
                 properties.extend(
                     [
                         self.member_doc(plan, field)
-                        + f"    public {type_} {member} {{ get => {member}Storage{'?' if optional else ''}.ToArray(); init => {member}Storage = {copy}(value); }}",
+                        + f"    public {type_} {member} {{ get => {member}Storage{'?' if optional else ''}.AsImmutable(); init => {member}Storage = {adopt}(value); }}",
                         f"    internal {storage} {member}Storage {{ get; init; }}",
                     ]
                 )

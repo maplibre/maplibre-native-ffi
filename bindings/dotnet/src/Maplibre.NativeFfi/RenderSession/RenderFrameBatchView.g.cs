@@ -11,7 +11,7 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public readonly record struct RenderFrameBatchView
 {
-    public RenderFrameBatchView(RenderFrameResult[] Results)
+    public RenderFrameBatchView(ImmutableArray<RenderFrameResult> Results)
     {
         this.Results = Results;
     }
@@ -20,10 +20,10 @@ public readonly record struct RenderFrameBatchView
     /// Borrowed array of result_count terminal frame results in completion
     /// order.
     /// </summary>
-    public RenderFrameResult[] Results
+    public ImmutableArray<RenderFrameResult> Results
     {
-        get => ResultsStorage.ToArray();
-        init => ResultsStorage = ValueArray.Copy(value);
+        get => ResultsStorage.AsImmutable();
+        init => ResultsStorage = ValueArray.From(value);
     }
     internal ValueArray<RenderFrameResult> ResultsStorage { get; init; }
 }

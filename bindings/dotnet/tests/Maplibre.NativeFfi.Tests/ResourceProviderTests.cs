@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Memory;
@@ -13,7 +14,7 @@ public sealed class ResourceProviderTests
     private const string StyleUrl = "provider-test://é/style.json";
 
     private static ResourceResponse StyleResponse() =>
-        new() { Status = ResourceResponseStatus.Ok, Bytes = NativeFixture.EmptyStyle };
+        new() { Status = ResourceResponseStatus.Ok, Bytes = [.. NativeFixture.EmptyStyle] };
 
     [Fact]
     public async Task AProviderCanAnswerLaterThroughItsDecisionHandle()
@@ -50,7 +51,7 @@ public sealed class ResourceProviderTests
         var sourceRequested = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
-        ResourceRoute[] routes =
+        ImmutableArray<ResourceRoute> routes =
         [
             // Another kind: claims no style.
             new ResourceRoute(ResourceKindMask.Tile, UrlMatchFlags.Glob, "unrouted-test://**"),
@@ -67,7 +68,7 @@ public sealed class ResourceProviderTests
                             ? new ResourceResponse
                             {
                                 Status = ResourceResponseStatus.Ok,
-                                Bytes = style,
+                                Bytes = [.. style],
                             }
                             : new ResourceResponse
                             {
@@ -83,9 +84,6 @@ public sealed class ResourceProviderTests
                 Routes = routes,
             }
         );
-
-        // Changing the host array after registration leaves the native routes intact.
-        Array.Fill(routes, new ResourceRoute { Flags = UrlMatchFlags.Glob, Url = "**" });
 
         await fixture.Map.SetStyleUrlAsync("unrouted-test://maps/style.json", TestWaits.Token);
         await fixture.WaitForMapEventAsync(RuntimeEventType.MapLoadingFailed);

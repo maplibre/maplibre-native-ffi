@@ -13,7 +13,7 @@ public readonly record struct OfflineGeometryRegionDefinition
 {
     public OfflineGeometryRegionDefinition(
         string StyleUrl,
-        byte[] Geometry,
+        ImmutableArray<byte> Geometry,
         double MinZoom,
         double MaxZoom,
         float PixelRatio,
@@ -36,10 +36,10 @@ public readonly record struct OfflineGeometryRegionDefinition
     /// <summary>
     /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
     /// </summary>
-    public byte[] Geometry
+    public ImmutableArray<byte> Geometry
     {
-        get => GeometryStorage.ToArray();
-        init => GeometryStorage = ValueArray.Copy(value);
+        get => GeometryStorage.AsImmutable();
+        init => GeometryStorage = ValueArray.From(value);
     }
     internal ValueArray<byte> GeometryStorage { get; init; }
     public double MinZoom { get; init; }

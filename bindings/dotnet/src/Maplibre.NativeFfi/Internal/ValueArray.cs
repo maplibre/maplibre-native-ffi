@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace Maplibre.NativeFfi.Internal;
 
 /// <summary>
@@ -5,17 +7,18 @@ namespace Maplibre.NativeFfi.Internal;
 /// element so that record synthesis gives the value structural equality.
 /// </summary>
 /// <remarks>
-/// A value copies an array on the way in and out, so a caller never shares
-/// storage with it; generated converters read and adopt the storage directly.
-/// A default instance holds the empty array. An optional member stores a
-/// nullable instance, which keeps an absent array distinct from an empty one.
+/// A value takes and gives its elements as an ImmutableArray over this storage,
+/// which nothing mutates, so neither direction copies. Generated converters
+/// read and adopt the storage directly. A default instance holds the empty
+/// array. An optional member stores a nullable instance, which keeps an absent
+/// array distinct from an empty one.
 /// </remarks>
 internal readonly struct ValueArray<T>(T[]? items) : IEquatable<ValueArray<T>>
 {
     /// <summary>The adopted elements, which a converter must not mutate.</summary>
     internal T[] Items => items ?? [];
 
-    internal T[] ToArray() => items is null ? [] : [.. items];
+    internal ImmutableArray<T> AsImmutable() => ImmutableCollectionsMarshal.AsImmutableArray(Items);
 
     public bool Equals(ValueArray<T> other) =>
         Items.AsSpan().SequenceEqual(other.Items, EqualityComparer<T>.Default);
@@ -34,12 +37,13 @@ internal readonly struct ValueArray<T>(T[]? items) : IEquatable<ValueArray<T>>
 
 internal static class ValueArray
 {
-    /// <summary>Copies a caller's array into storage that the caller cannot mutate.</summary>
-    internal static ValueArray<T> Copy<T>(T[]? items) => new(items is null ? null : [.. items]);
+    /// <summary>Adopts a caller's elements, which an ImmutableArray never changes.</summary>
+    internal static ValueArray<T> From<T>(ImmutableArray<T> items) =>
+        new(ImmutableCollectionsMarshal.AsArray(items));
 
-    /// <summary>Copies a caller's optional array, keeping an absent array absent.</summary>
-    internal static ValueArray<T>? CopyOptional<T>(T[]? items) =>
-        items is null ? null : new ValueArray<T>([.. items]);
+    /// <summary>Adopts a caller's optional elements, keeping an absent array absent.</summary>
+    internal static ValueArray<T>? FromOptional<T>(ImmutableArray<T>? items) =>
+        items is { } value ? From(value) : null;
 
     /// <summary>Adopts an optional array that a converter just copied from native memory.</summary>
     internal static ValueArray<T>? Optional<T>(T[]? items) =>

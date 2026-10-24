@@ -11,7 +11,7 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public readonly record struct ScreenLineString
 {
-    public ScreenLineString(ScreenPoint[] Points)
+    public ScreenLineString(ImmutableArray<ScreenPoint> Points)
     {
         this.Points = Points;
     }
@@ -19,10 +19,10 @@ public readonly record struct ScreenLineString
     /// <summary>
     /// Points. Null only when point_count is 0.
     /// </summary>
-    public ScreenPoint[] Points
+    public ImmutableArray<ScreenPoint> Points
     {
-        get => PointsStorage.ToArray();
-        init => PointsStorage = ValueArray.Copy(value);
+        get => PointsStorage.AsImmutable();
+        init => PointsStorage = ValueArray.From(value);
     }
     internal ValueArray<ScreenPoint> PointsStorage { get; init; }
 }

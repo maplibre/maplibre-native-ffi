@@ -12,7 +12,7 @@ namespace Maplibre.NativeFfi;
 public readonly record struct StyleSourceTileInfo
 {
     public StyleSourceTileInfo(
-        string[] TileUrls,
+        ImmutableArray<string> TileUrls,
         double MinZoom,
         double MaxZoom,
         StyleTileScheme Scheme
@@ -27,10 +27,10 @@ public readonly record struct StyleSourceTileInfo
     /// <summary>
     /// Tile URL templates in TileJSON order.
     /// </summary>
-    public string[] TileUrls
+    public ImmutableArray<string> TileUrls
     {
-        get => TileUrlsStorage.ToArray();
-        init => TileUrlsStorage = ValueArray.Copy(value);
+        get => TileUrlsStorage.AsImmutable();
+        init => TileUrlsStorage = ValueArray.From(value);
     }
     internal ValueArray<string> TileUrlsStorage { get; init; }
 

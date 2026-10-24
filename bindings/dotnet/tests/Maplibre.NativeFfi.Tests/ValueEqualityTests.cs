@@ -1,37 +1,36 @@
+using System.Collections.Immutable;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
 
 /// <summary>
-/// Records that hold a byte array or a list snapshot it, hand out copies, and compare contents.
+/// Records that hold a byte array or a list compare its contents, and share its elements
+/// without a copy.
 /// </summary>
 public sealed class ValueEqualityTests
 {
-    private static readonly byte[] Bytes = [1, 2, 3, 4, 5, 6, 7, 8];
+    private static readonly ImmutableArray<byte> Bytes = [1, 2, 3, 4, 5, 6, 7, 8];
 
     [Fact]
-    public void AByteValuedRecordOwnsAndComparesItsBytes()
+    public void AByteValuedRecordComparesAndSharesItsBytes()
     {
-        var source = Bytes.ToArray();
-        var value = new PremultipliedRgba8Image(2, 1, 8, source);
-        source[0] = 99;
+        var value = new PremultipliedRgba8Image(2, 1, 8, Bytes);
 
-        Assert.Equal(new PremultipliedRgba8Image(2, 1, 8, Bytes), value);
+        Assert.Equal(new PremultipliedRgba8Image(2, 1, 8, [1, 2, 3, 4, 5, 6, 7, 8]), value);
         Assert.Equal(
-            new PremultipliedRgba8Image(2, 1, 8, Bytes).GetHashCode(),
+            new PremultipliedRgba8Image(2, 1, 8, [1, 2, 3, 4, 5, 6, 7, 8]).GetHashCode(),
             value.GetHashCode()
         );
         Assert.NotEqual(new PremultipliedRgba8Image(2, 1, 8, [1, 2, 3, 4, 5, 6, 7, 9]), value);
-        value.Pixels[1] = 99;
-        Assert.Equal(Bytes, value.Pixels);
+        // The same underlying array, not a copy of it.
+        Assert.True(value.Pixels == Bytes);
     }
 
     [Fact]
-    public void AListValuedRecordOwnsAndComparesItsElements()
+    public void AListValuedRecordComparesAndSharesItsElements()
     {
-        var source = new[] { "a", "b" };
-        var value = new StyleSourceTileInfo { TileUrls = source };
-        source[0] = "z";
+        ImmutableArray<string> urls = ["a", "b"];
+        var value = new StyleSourceTileInfo { TileUrls = urls };
 
         Assert.Equal(new StyleSourceTileInfo { TileUrls = ["a", "b"] }, value);
         Assert.Equal(
@@ -39,7 +38,6 @@ public sealed class ValueEqualityTests
             value.GetHashCode()
         );
         Assert.NotEqual(new StyleSourceTileInfo { TileUrls = ["a"] }, value);
-        value.TileUrls[1] = "z";
-        Assert.Equal(["a", "b"], value.TileUrls);
+        Assert.True(value.TileUrls == urls);
     }
 }

@@ -21,7 +21,7 @@ public readonly record struct WebgpuBorrowedTextureDescriptor
         uint PhysicalWidth,
         uint PhysicalHeight,
         WebgpuContextDescriptor Context,
-        WebgpuBorrowedTexture[] Textures,
+        ImmutableArray<WebgpuBorrowedTexture> Textures,
         uint Format
     )
     {
@@ -59,10 +59,10 @@ public readonly record struct WebgpuBorrowedTextureDescriptor
     /// <summary>
     /// The ring's textures, one per slot, in slot order. Required.
     /// </summary>
-    public WebgpuBorrowedTexture[] Textures
+    public ImmutableArray<WebgpuBorrowedTexture> Textures
     {
-        get => TexturesStorage.ToArray();
-        init => TexturesStorage = ValueArray.Copy(value);
+        get => TexturesStorage.AsImmutable();
+        init => TexturesStorage = ValueArray.From(value);
     }
     internal ValueArray<WebgpuBorrowedTexture> TexturesStorage { get; init; }
 

@@ -14,20 +14,20 @@ public sealed record RenderedFeatureQueryOptions
     /// <summary>
     /// Optional style layer IDs. When absent, all rendered layers are queried.
     /// </summary>
-    public string[]? LayerIds
+    public ImmutableArray<string>? LayerIds
     {
-        get => LayerIdsStorage?.ToArray();
-        init => LayerIdsStorage = ValueArray.CopyOptional(value);
+        get => LayerIdsStorage?.AsImmutable();
+        init => LayerIdsStorage = ValueArray.FromOptional(value);
     }
     internal ValueArray<string>? LayerIdsStorage { get; init; }
 
     /// <summary>
     /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
     /// </summary>
-    public byte[]? Filter
+    public ImmutableArray<byte>? Filter
     {
-        get => FilterStorage?.ToArray();
-        init => FilterStorage = ValueArray.CopyOptional(value);
+        get => FilterStorage?.AsImmutable();
+        init => FilterStorage = ValueArray.FromOptional(value);
     }
     internal ValueArray<byte>? FilterStorage { get; init; }
     public static RenderedFeatureQueryOptions Default

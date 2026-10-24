@@ -11,19 +11,19 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record RenderedFeature
 {
-    public byte[] Feature
+    public ImmutableArray<byte> Feature
     {
-        get => FeatureStorage.ToArray();
-        init => FeatureStorage = ValueArray.Copy(value);
+        get => FeatureStorage.AsImmutable();
+        init => FeatureStorage = ValueArray.From(value);
     }
     internal ValueArray<byte> FeatureStorage { get; init; }
     public required string LayerId { get; init; }
     public string? SourceId { get; init; }
     public string? SourceLayerId { get; init; }
-    public byte[]? State
+    public ImmutableArray<byte>? State
     {
-        get => StateStorage?.ToArray();
-        init => StateStorage = ValueArray.CopyOptional(value);
+        get => StateStorage?.AsImmutable();
+        init => StateStorage = ValueArray.FromOptional(value);
     }
     internal ValueArray<byte>? StateStorage { get; init; }
 }

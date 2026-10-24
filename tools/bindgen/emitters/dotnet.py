@@ -1069,6 +1069,7 @@ def emit(api: Api | BoundApi) -> Emission:
     }
     files["GlobalUsings.g.cs"] = (
         "// Generated from the C headers by tools/bindgen. Do not edit.\n"
+        + "global using System.Collections.Immutable;\n"
         + "global using Maplibre.NativeFfi.Internal;\n"
         + "".join(
             f"global using Maplibre.NativeFfi.Internal.{namespace};\n"
@@ -1232,7 +1233,7 @@ def emit(api: Api | BoundApi) -> Emission:
         name = public_type(native)
         directory = directory_for(api.records_by_name[native].location.path)
         properties = "".join(
-            f"    public {values.member_type(value, member, field)} {member} => scope.Active(value).{member};\n"
+            f"    public {values.property_type(value, member, field)} {member} => scope.Active(value).{member};\n"
             for member, field in values.members(value)
         )
         files[f"{directory}/{name}View.g.cs"] = (

@@ -15,10 +15,10 @@ public sealed record StyleImageOptions
     /// Horizontally stretchable intervals. Borrowed for the call and copied
     /// before return. May be null only when stretch_x_count is 0.
     /// </summary>
-    public ImageStretch[]? StretchX
+    public ImmutableArray<ImageStretch>? StretchX
     {
-        get => StretchXStorage?.ToArray();
-        init => StretchXStorage = ValueArray.CopyOptional(value);
+        get => StretchXStorage?.AsImmutable();
+        init => StretchXStorage = ValueArray.FromOptional(value);
     }
     internal ValueArray<ImageStretch>? StretchXStorage { get; init; }
 
@@ -26,10 +26,10 @@ public sealed record StyleImageOptions
     /// Vertically stretchable intervals. Borrowed for the call and copied
     /// before return. May be null only when stretch_y_count is 0.
     /// </summary>
-    public ImageStretch[]? StretchY
+    public ImmutableArray<ImageStretch>? StretchY
     {
-        get => StretchYStorage?.ToArray();
-        init => StretchYStorage = ValueArray.CopyOptional(value);
+        get => StretchYStorage?.AsImmutable();
+        init => StretchYStorage = ValueArray.FromOptional(value);
     }
     internal ValueArray<ImageStretch>? StretchYStorage { get; init; }
 

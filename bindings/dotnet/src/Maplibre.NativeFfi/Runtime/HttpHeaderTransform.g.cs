@@ -13,7 +13,7 @@ public readonly record struct HttpHeaderTransform
 {
     public HttpHeaderTransform(
         Action<ResourceKind, string, HttpHeaderTransformResponse>? Callback,
-        HttpHeaderRule[] Rules
+        ImmutableArray<HttpHeaderRule> Rules
     )
     {
         this.Callback = Callback;
@@ -28,10 +28,10 @@ public readonly record struct HttpHeaderTransform
     /// <summary>
     /// Header rules for a transform without a callback; empty with one.
     /// </summary>
-    public HttpHeaderRule[] Rules
+    public ImmutableArray<HttpHeaderRule> Rules
     {
-        get => RulesStorage.ToArray();
-        init => RulesStorage = ValueArray.Copy(value);
+        get => RulesStorage.AsImmutable();
+        init => RulesStorage = ValueArray.From(value);
     }
     internal ValueArray<HttpHeaderRule> RulesStorage { get; init; }
 }

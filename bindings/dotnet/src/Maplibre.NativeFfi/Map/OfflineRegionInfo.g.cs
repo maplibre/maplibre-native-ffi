@@ -11,7 +11,11 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public readonly record struct OfflineRegionInfo
 {
-    public OfflineRegionInfo(long Id, OfflineRegionDefinition Definition, byte[] Metadata)
+    public OfflineRegionInfo(
+        long Id,
+        OfflineRegionDefinition Definition,
+        ImmutableArray<byte> Metadata
+    )
     {
         this.Id = Id;
         this.Definition = Definition;
@@ -24,10 +28,10 @@ public readonly record struct OfflineRegionInfo
     /// <summary>
     /// Metadata bytes.
     /// </summary>
-    public byte[] Metadata
+    public ImmutableArray<byte> Metadata
     {
-        get => MetadataStorage.ToArray();
-        init => MetadataStorage = ValueArray.Copy(value);
+        get => MetadataStorage.AsImmutable();
+        init => MetadataStorage = ValueArray.From(value);
     }
     internal ValueArray<byte> MetadataStorage { get; init; }
 }

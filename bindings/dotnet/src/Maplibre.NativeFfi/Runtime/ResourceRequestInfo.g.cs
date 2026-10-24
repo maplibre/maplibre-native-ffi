@@ -23,10 +23,10 @@ public sealed record ResourceRequestInfo
     public long? PriorModifiedUnixMs { get; init; }
     public long? PriorExpiresUnixMs { get; init; }
     public string? PriorEtag { get; init; }
-    public byte[] PriorData
+    public ImmutableArray<byte> PriorData
     {
-        get => PriorDataStorage.ToArray();
-        init => PriorDataStorage = ValueArray.Copy(value);
+        get => PriorDataStorage.AsImmutable();
+        init => PriorDataStorage = ValueArray.From(value);
     }
     internal ValueArray<byte> PriorDataStorage { get; init; }
 }

@@ -25,30 +25,30 @@ public sealed record StyleImageInfo
     /// Premultiplied RGBA8 pixels in tightly packed rows of width * 4 bytes,
     /// top row first.
     /// </summary>
-    public byte[] Pixels
+    public ImmutableArray<byte> Pixels
     {
-        get => PixelsStorage.ToArray();
-        init => PixelsStorage = ValueArray.Copy(value);
+        get => PixelsStorage.AsImmutable();
+        init => PixelsStorage = ValueArray.From(value);
     }
     internal ValueArray<byte> PixelsStorage { get; init; }
 
     /// <summary>
     /// Horizontally stretchable intervals.
     /// </summary>
-    public ImageStretch[] StretchX
+    public ImmutableArray<ImageStretch> StretchX
     {
-        get => StretchXStorage.ToArray();
-        init => StretchXStorage = ValueArray.Copy(value);
+        get => StretchXStorage.AsImmutable();
+        init => StretchXStorage = ValueArray.From(value);
     }
     internal ValueArray<ImageStretch> StretchXStorage { get; init; }
 
     /// <summary>
     /// Vertically stretchable intervals.
     /// </summary>
-    public ImageStretch[] StretchY
+    public ImmutableArray<ImageStretch> StretchY
     {
-        get => StretchYStorage.ToArray();
-        init => StretchYStorage = ValueArray.Copy(value);
+        get => StretchYStorage.AsImmutable();
+        init => StretchYStorage = ValueArray.From(value);
     }
     internal ValueArray<ImageStretch> StretchYStorage { get; init; }
 

@@ -30,30 +30,30 @@ public sealed record StyleExpressionInputs
     /// <summary>
     /// One UTF-8 GeoJSON Feature that feature data expressions read.
     /// </summary>
-    public byte[]? Feature
+    public ImmutableArray<byte>? Feature
     {
-        get => FeatureStorage?.ToArray();
-        init => FeatureStorage = ValueArray.CopyOptional(value);
+        get => FeatureStorage?.AsImmutable();
+        init => FeatureStorage = ValueArray.FromOptional(value);
     }
     internal ValueArray<byte>? FeatureStorage { get; init; }
 
     /// <summary>
     /// A UTF-8 JSON object that the feature-state expression reads.
     /// </summary>
-    public byte[]? FeatureState
+    public ImmutableArray<byte>? FeatureState
     {
-        get => FeatureStateStorage?.ToArray();
-        init => FeatureStateStorage = ValueArray.CopyOptional(value);
+        get => FeatureStateStorage?.AsImmutable();
+        init => FeatureStateStorage = ValueArray.FromOptional(value);
     }
     internal ValueArray<byte>? FeatureStateStorage { get; init; }
 
     /// <summary>
     /// A UTF-8 JSON object that the global-state expression reads.
     /// </summary>
-    public byte[]? GlobalState
+    public ImmutableArray<byte>? GlobalState
     {
-        get => GlobalStateStorage?.ToArray();
-        init => GlobalStateStorage = ValueArray.CopyOptional(value);
+        get => GlobalStateStorage?.AsImmutable();
+        init => GlobalStateStorage = ValueArray.FromOptional(value);
     }
     internal ValueArray<byte>? GlobalStateStorage { get; init; }
 
@@ -67,10 +67,10 @@ public sealed record StyleExpressionInputs
     /// The image IDs that the image expression reports as available. The
     /// expression reports any other ID as unavailable.
     /// </summary>
-    public string[] AvailableImages
+    public ImmutableArray<string> AvailableImages
     {
-        get => AvailableImagesStorage.ToArray();
-        init => AvailableImagesStorage = ValueArray.Copy(value);
+        get => AvailableImagesStorage.AsImmutable();
+        init => AvailableImagesStorage = ValueArray.From(value);
     }
     internal ValueArray<string> AvailableImagesStorage { get; init; }
     public static StyleExpressionInputs Default

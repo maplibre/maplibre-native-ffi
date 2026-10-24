@@ -342,7 +342,9 @@ namespace Maplibre.NativeFfi.Internal.Callback {
 <TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType>
 <AllowUnsafeBlocks>true</AllowUnsafeBlocks><ImplicitUsings>enable</ImplicitUsings>
 <Nullable>enable</Nullable>
-</PropertyGroup></Project>
+</PropertyGroup>
+<!-- The binding's GlobalUsings.g.cs imports this namespace. -->
+<ItemGroup><Using Include="System.Collections.Immutable" /></ItemGroup></Project>
 """)
             source = ROOT / "bindings/dotnet/src/Maplibre.NativeFfi"
             for path in (

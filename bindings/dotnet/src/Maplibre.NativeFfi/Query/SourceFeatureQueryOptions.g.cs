@@ -15,20 +15,20 @@ public sealed record SourceFeatureQueryOptions
     /// Optional source-layer IDs. Required by vector sources; ignored by
     /// GeoJSON.
     /// </summary>
-    public string[]? SourceLayerIds
+    public ImmutableArray<string>? SourceLayerIds
     {
-        get => SourceLayerIdsStorage?.ToArray();
-        init => SourceLayerIdsStorage = ValueArray.CopyOptional(value);
+        get => SourceLayerIdsStorage?.AsImmutable();
+        init => SourceLayerIdsStorage = ValueArray.FromOptional(value);
     }
     internal ValueArray<string>? SourceLayerIdsStorage { get; init; }
 
     /// <summary>
     /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
     /// </summary>
-    public byte[]? Filter
+    public ImmutableArray<byte>? Filter
     {
-        get => FilterStorage?.ToArray();
-        init => FilterStorage = ValueArray.CopyOptional(value);
+        get => FilterStorage?.AsImmutable();
+        init => FilterStorage = ValueArray.FromOptional(value);
     }
     internal ValueArray<byte>? FilterStorage { get; init; }
     public static SourceFeatureQueryOptions Default

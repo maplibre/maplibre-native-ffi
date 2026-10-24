@@ -20,7 +20,7 @@ public readonly record struct MetalBorrowedTextureDescriptor
         LogicalExtent Extent,
         uint PhysicalWidth,
         uint PhysicalHeight,
-        MetalBorrowedTexture[] Textures
+        ImmutableArray<MetalBorrowedTexture> Textures
     )
     {
         this.Extent = Extent;
@@ -51,10 +51,10 @@ public readonly record struct MetalBorrowedTextureDescriptor
     /// <summary>
     /// The ring's textures, one per slot, in slot order. Required.
     /// </summary>
-    public MetalBorrowedTexture[] Textures
+    public ImmutableArray<MetalBorrowedTexture> Textures
     {
-        get => TexturesStorage.ToArray();
-        init => TexturesStorage = ValueArray.Copy(value);
+        get => TexturesStorage.AsImmutable();
+        init => TexturesStorage = ValueArray.From(value);
     }
     internal ValueArray<MetalBorrowedTexture> TexturesStorage { get; init; }
     public static MetalBorrowedTextureDescriptor Default

@@ -11,7 +11,7 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public readonly record struct TextureReadbackResult
 {
-    public TextureReadbackResult(byte[] Data, TextureImageInfo Info)
+    public TextureReadbackResult(ImmutableArray<byte> Data, TextureImageInfo Info)
     {
         this.Data = Data;
         this.Info = Info;
@@ -20,10 +20,10 @@ public readonly record struct TextureReadbackResult
     /// <summary>
     /// Borrowed pixel bytes, valid only during the callback.
     /// </summary>
-    public byte[] Data
+    public ImmutableArray<byte> Data
     {
-        get => DataStorage.ToArray();
-        init => DataStorage = ValueArray.Copy(value);
+        get => DataStorage.AsImmutable();
+        init => DataStorage = ValueArray.From(value);
     }
     internal ValueArray<byte> DataStorage { get; init; }
     public TextureImageInfo Info { get; init; }

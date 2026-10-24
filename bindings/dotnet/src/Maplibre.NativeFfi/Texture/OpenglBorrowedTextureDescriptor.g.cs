@@ -21,7 +21,7 @@ public readonly record struct OpenglBorrowedTextureDescriptor
         uint PhysicalWidth,
         uint PhysicalHeight,
         OpenglContextDescriptor Context,
-        OpenglBorrowedTexture[] Textures,
+        ImmutableArray<OpenglBorrowedTexture> Textures,
         uint Target
     )
     {
@@ -61,10 +61,10 @@ public readonly record struct OpenglBorrowedTextureDescriptor
     /// <summary>
     /// The ring's textures, one per slot, in slot order. Required.
     /// </summary>
-    public OpenglBorrowedTexture[] Textures
+    public ImmutableArray<OpenglBorrowedTexture> Textures
     {
-        get => TexturesStorage.ToArray();
-        init => TexturesStorage = ValueArray.Copy(value);
+        get => TexturesStorage.AsImmutable();
+        init => TexturesStorage = ValueArray.From(value);
     }
     internal ValueArray<OpenglBorrowedTexture> TexturesStorage { get; init; }
 

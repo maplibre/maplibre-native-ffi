@@ -21,7 +21,7 @@ public readonly record struct VulkanBorrowedTextureDescriptor
         uint PhysicalWidth,
         uint PhysicalHeight,
         VulkanContextDescriptor Context,
-        VulkanBorrowedTexture[] Textures,
+        ImmutableArray<VulkanBorrowedTexture> Textures,
         uint Format,
         uint InitialLayout,
         uint FinalLayout
@@ -64,10 +64,10 @@ public readonly record struct VulkanBorrowedTextureDescriptor
     /// <summary>
     /// The ring's images, one per slot, in slot order. Required.
     /// </summary>
-    public VulkanBorrowedTexture[] Textures
+    public ImmutableArray<VulkanBorrowedTexture> Textures
     {
-        get => TexturesStorage.ToArray();
-        init => TexturesStorage = ValueArray.Copy(value);
+        get => TexturesStorage.AsImmutable();
+        init => TexturesStorage = ValueArray.From(value);
     }
     internal ValueArray<VulkanBorrowedTexture> TexturesStorage { get; init; }
 

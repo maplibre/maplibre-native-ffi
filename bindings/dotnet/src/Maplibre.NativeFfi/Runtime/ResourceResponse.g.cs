@@ -17,10 +17,10 @@ public sealed record ResourceResponse
     /// <summary>
     /// Response bytes. May be null only when byte_count is 0.
     /// </summary>
-    public byte[] Bytes
+    public ImmutableArray<byte> Bytes
     {
-        get => BytesStorage.ToArray();
-        init => BytesStorage = ValueArray.Copy(value);
+        get => BytesStorage.AsImmutable();
+        init => BytesStorage = ValueArray.From(value);
     }
     internal ValueArray<byte> BytesStorage { get; init; }
     public string? ErrorMessage { get; init; }

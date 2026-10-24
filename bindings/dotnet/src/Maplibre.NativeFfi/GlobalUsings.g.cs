@@ -1,4 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
+global using System.Collections.Immutable;
 global using Maplibre.NativeFfi.Internal;
 global using Maplibre.NativeFfi.Internal.C;
 global using static Maplibre.NativeFfi.Internal.C.mln_animation_option_field;

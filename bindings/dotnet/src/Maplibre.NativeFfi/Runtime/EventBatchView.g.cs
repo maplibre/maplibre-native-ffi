@@ -11,7 +11,7 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public readonly record struct EventBatchView
 {
-    public EventBatchView(RuntimeEvent[] Events)
+    public EventBatchView(ImmutableArray<RuntimeEvent> Events)
     {
         this.Events = Events;
     }
@@ -19,10 +19,10 @@ public readonly record struct EventBatchView
     /// <summary>
     /// Borrowed array of event_count events in queue order.
     /// </summary>
-    public RuntimeEvent[] Events
+    public ImmutableArray<RuntimeEvent> Events
     {
-        get => EventsStorage.ToArray();
-        init => EventsStorage = ValueArray.Copy(value);
+        get => EventsStorage.AsImmutable();
+        init => EventsStorage = ValueArray.From(value);
     }
     internal ValueArray<RuntimeEvent> EventsStorage { get; init; }
 }

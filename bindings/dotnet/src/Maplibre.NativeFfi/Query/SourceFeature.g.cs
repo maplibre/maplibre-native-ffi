@@ -11,10 +11,10 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record SourceFeature
 {
-    public byte[] Feature
+    public ImmutableArray<byte> Feature
     {
-        get => FeatureStorage.ToArray();
-        init => FeatureStorage = ValueArray.Copy(value);
+        get => FeatureStorage.AsImmutable();
+        init => FeatureStorage = ValueArray.From(value);
     }
     internal ValueArray<byte> FeatureStorage { get; init; }
     public string? SourceLayerId { get; init; }

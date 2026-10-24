@@ -37,10 +37,10 @@ public sealed record GeojsonSourceOptions
     /// whose members follow the MapLibre Style Spec clusterProperties form. The
     /// UTF-8 bytes are borrowed for the call.
     /// </summary>
-    public byte[]? ClusterProperties
+    public ImmutableArray<byte>? ClusterProperties
     {
-        get => ClusterPropertiesStorage?.ToArray();
-        init => ClusterPropertiesStorage = ValueArray.CopyOptional(value);
+        get => ClusterPropertiesStorage?.AsImmutable();
+        init => ClusterPropertiesStorage = ValueArray.FromOptional(value);
     }
     internal ValueArray<byte>? ClusterPropertiesStorage { get; init; }
 
