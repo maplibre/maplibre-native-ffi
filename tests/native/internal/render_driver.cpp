@@ -1301,6 +1301,8 @@ void probe_results(void* context, const mln_completion_result*) {
 
 // Releases that quarantine the last slot leave a demand accepted after
 // maintenance to end in its own turn on the driver, after the maintenance.
+// The driver is held until the demand is accepted, since a ring the releases
+// already quarantined rejects the demand.
 void a_quarantined_ring_ends_a_demand_in_driver_order() {
   auto fixture = Fixture{};
   create_fixture(fixture);
@@ -1308,6 +1310,8 @@ void a_quarantined_ring_ends_a_demand_in_driver_order() {
   install_frame_failure(fixture, FrameFailure::Release);
   auto first = mln_test_render_and_acquire(&fixture.render, 181);
   auto second = mln_test_render_and_acquire(&fixture.render, 182);
+  auto blocker = DriverBlocker{};
+  block_driver(fixture, blocker);
   const auto fenced = mln_gpu_sync{
     .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_OPENGL_FENCE, .object = 1
   };
@@ -1324,6 +1328,7 @@ void a_quarantined_ring_ends_a_demand_in_driver_order() {
     fixture.render.session, &maintenance, nullptr
   ));
   mln_test_render_request_forced(&fixture.render, 183);
+  MLN_TEST_OK(blocker.finish(fixture.render));
   service_until(fixture, probe.done);
   TEST_ASSERT_FALSE(probe.results_queued);
   const auto batch = wait_for_results(fixture);
