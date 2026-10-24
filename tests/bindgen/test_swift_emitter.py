@@ -105,8 +105,10 @@ class SwiftEmitterTests(unittest.TestCase):
                 sources.append(root / "generated" / path)
                 sources[-1].parent.mkdir(parents=True, exist_ok=True)
                 sources[-1].write_text(text)
+            # Platform extensions extend the real API's generated records,
+            # which the probe API lacks.
             for path in RUNTIME.rglob("*.swift"):
-                if "Generated" not in path.relative_to(RUNTIME).parts:
+                if not {"Generated", "Platform"} & set(path.relative_to(RUNTIME).parts):
                     sources.append(path)
             sources.append(FIXTURES / "probes/swift/main.swift")
             stub = root / "protocols_stub.o"

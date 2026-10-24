@@ -17,11 +17,7 @@ final class MetalGraphicsContext {
   }
 
   var contextDescriptor: MetalContextDescriptor {
-    MetalContextDescriptor(device: nativePointer(device as AnyObject))
-  }
-
-  var layerPointer: NativePointer {
-    nativePointer(layer)
+    MetalContextDescriptor(device: device)
   }
 
   /// Follows a new viewport. The session sets the layer's drawable size, so
@@ -70,7 +66,7 @@ final class MetalRenderTarget {
       descriptor: MetalSurfaceDescriptor(
         extent: viewport.extent,
         context: graphics.contextDescriptor,
-        layer: graphics.layerPointer
+        layer: graphics.layer
       ),
       options: .init(driver: .coreWorker, frameWake: frameWake)
     )
@@ -138,12 +134,6 @@ final class MetalRenderTarget {
     _ = try? session.abandon()
     try? session.dispose()
   }
-}
-
-private func nativePointer(_ object: AnyObject) -> NativePointer {
-  NativePointer(
-    bitPattern: UInt(bitPattern: Unmanaged.passUnretained(object).toOpaque())
-  )
 }
 
 private func metalError(_ message: String) -> MaplibreError {

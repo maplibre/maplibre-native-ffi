@@ -2,6 +2,9 @@ import Foundation
 import GraphicsSupport
 @testable import MaplibreNativeFFI
 import Testing
+#if canImport(Metal)
+  import Metal
+#endif
 
 /// A device or context from tests/graphics for the backend this build of the
 /// native library provides. A build provides one native backend, so every
@@ -57,16 +60,18 @@ final class TestGraphics: @unchecked Sendable {
   ) throws -> RenderSessionAttachment {
     switch backend {
     case MLN_TEST_GRAPHICS_BACKEND_METAL:
-      return try map.attachMetalOwnedTexture(
-        descriptor: MetalOwnedTextureDescriptor(
-          extent: extent,
-          context: MetalContextDescriptor(device: pointer(context
-              .metal_device)),
-          // MTLPixelFormatBGRA8Unorm.
-          pixelFormat: 80
-        ),
-        options: options
-      )
+      #if canImport(Metal)
+        return try map.attachMetalOwnedTexture(
+          descriptor: MetalOwnedTextureDescriptor(
+            extent: extent,
+            context: MetalContextDescriptor(device: metalDevice),
+            pixelFormat: .bgra8Unorm
+          ),
+          options: options
+        )
+      #else
+        throw FixtureError("a Metal backend needs the Metal framework")
+      #endif
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
       return try map.attachVulkanOwnedTexture(
         descriptor: VulkanOwnedTextureDescriptor(
@@ -117,6 +122,14 @@ final class TestGraphics: @unchecked Sendable {
       try frame.withOpenglTexture { try body($0) }
     }
   }
+
+  #if canImport(Metal)
+    /// The fixture's Metal device, which the fixture owns.
+    var metalDevice: any MTLDevice {
+      Unmanaged<AnyObject>.fromOpaque(context.metal_device!)
+        .takeUnretainedValue() as! any MTLDevice
+    }
+  #endif
 
   private func pointer(_ address: UnsafeMutableRawPointer?) -> NativePointer {
     NativePointer(bitPattern: UInt(bitPattern: address))

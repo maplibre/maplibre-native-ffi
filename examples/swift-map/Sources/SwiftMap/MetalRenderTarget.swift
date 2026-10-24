@@ -18,11 +18,7 @@ final class MetalGraphicsContext {
   }
 
   var contextDescriptor: MetalContextDescriptor {
-    MetalContextDescriptor(device: nativePointer(device as AnyObject))
-  }
-
-  var layerPointer: NativePointer {
-    nativePointer(layer)
+    MetalContextDescriptor(device: device)
   }
 
   /// Follows a new viewport. A surface session sets the layer's drawable
@@ -103,7 +99,7 @@ final class MetalRenderTarget {
           descriptor: MetalOwnedTextureDescriptor(
             extent: viewport.extent,
             context: graphics.contextDescriptor,
-            pixelFormat: UInt64(MTLPixelFormat.bgra8Unorm.rawValue)
+            pixelFormat: .bgra8Unorm
           ),
           options: options
         )
@@ -135,7 +131,7 @@ final class MetalRenderTarget {
           descriptor: MetalSurfaceDescriptor(
             extent: viewport.extent,
             context: graphics.contextDescriptor,
-            layer: graphics.layerPointer
+            layer: graphics.layer
           ),
           options: options
         )
@@ -304,7 +300,7 @@ final class MetalTextureCompositor {
   func draw(frame: AcquiredFrameHandle) throws -> Bool {
     try frame.withProducerSync { synchronization in
       try frame.withMetalTexture { value in
-        let texture = try metalTexture(address: value.texture.addressBitPattern)
+        let texture = try value.mtlTexture
         return try draw(
           texture: texture,
           producerSynchronization: synchronization
@@ -428,30 +424,11 @@ final class MetalBorrowedTexture {
       physicalHeight: viewport.physicalHeight,
       textures: ring.map {
         MaplibreNativeFFI.MetalBorrowedTexture(
-          texture: nativePointer($0.texture as AnyObject)
+          texture: $0.texture
         )
       }
     )
   }
-}
-
-private func metalTexture(address: UInt) throws -> any MTLTexture {
-  guard let pointer = UnsafeRawPointer(bitPattern: address) else {
-    throw metalError("Metal texture frame has a null texture")
-  }
-  let object = Unmanaged<AnyObject>.fromOpaque(pointer).takeUnretainedValue()
-  guard let texture = object as? any MTLTexture else {
-    throw metalError(
-      "Metal texture frame pointer did not contain an MTLTexture"
-    )
-  }
-  return texture
-}
-
-private func nativePointer(_ object: AnyObject) -> NativePointer {
-  NativePointer(
-    bitPattern: UInt(bitPattern: Unmanaged.passUnretained(object).toOpaque())
-  )
 }
 
 private func metalError(_ message: String) -> MaplibreError {

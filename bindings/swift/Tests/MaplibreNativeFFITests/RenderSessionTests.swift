@@ -2,6 +2,9 @@ import Foundation
 import GraphicsSupport
 @testable import MaplibreNativeFFI
 import Testing
+#if canImport(Metal)
+  import Metal
+#endif
 
 /// A render fixture: an owned-texture session attached on the map of a map
 /// fixture, with a context from tests/graphics for the build's backend.
@@ -133,6 +136,28 @@ private func attachOwnedTextureSession(
     })
   }
 }
+
+#if canImport(Metal)
+  /// A Metal frame view lends its texture, device, and pixel format as Metal
+  /// types: the texture the session rendered, on the device it attached with.
+  @Test func aMetalFrameLendsTypedObjects() async throws {
+    try await withOwnedTextureSession { rendered in
+      // The build's backend decides whether the session renders with Metal.
+      guard rendered.graphics.backend == MLN_TEST_GRAPHICS_BACKEND_METAL
+      else { return }
+      try await rendered.session.awaitRenderedFrame()
+      let frame = try #require(try rendered.session.acquireFrame())
+      try frame.withMetalTexture { view in
+        let texture = try view.mtlTexture
+        #expect(texture.width == 32)
+        #expect(try view.mtlPixelFormat == .bgra8Unorm)
+        #expect(try view.mtlDevice === rendered.graphics.metalDevice)
+        #expect(texture.device === rendered.graphics.metalDevice)
+      }
+      try frame.release(consumerCompletion: .default)
+    }
+  }
+#endif
 
 /// Before any demand, native reports the drain and the acquire as not ready,
 /// which reads as nil.
