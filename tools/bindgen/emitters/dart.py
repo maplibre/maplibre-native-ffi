@@ -251,27 +251,15 @@ def lower_function(
                 if output.kind == "record" or output.buffer_form == "view"
                 else "value"
             )
-            if plan.view:
-                if (
-                    output.kind != "record"
-                    or not plan.view.owner.view_begin
-                    or not plan.view.owner.view_end
-                ):
-                    raise Unsupported(
-                        "borrowed view requires native scope operations and record output"
-                    )
-                returns.append(
-                    (
-                        "Scoped" + values.public(output),
-                        "Scoped"
-                        + values.public(output)
-                        + "._(this, "
-                        + values.copy(output, expression)
-                        + ")",
-                    )
+            if plan.view and (
+                output.kind != "record"
+                or not plan.view.owner.view_begin
+                or not plan.view.owner.view_end
+            ):
+                raise Unsupported(
+                    "borrowed view requires native scope operations and record output"
                 )
-            else:
-                returns.append((values.public(output), values.copy(output, expression)))
+            returns.append((values.public(output), values.copy(output, expression)))
             continue
         if parameter.name not in inputs:
             raise Unsupported("parameter missing a resolved input contract")
@@ -397,6 +385,8 @@ def lower_function(
         ]
         if result:
             body.append(f"return {result};")
+        if plan.view:
+            return owner, scoped_view(plan, name, signature, public, body)
         return owner, f"  {public} {name}({', '.join(signature)}) {method_body(body)}\n"
     start = f"(arena, completion) {block(setup + [f'return {call};'])}"
     if discard:
@@ -470,6 +460,21 @@ def lower_function(
             f"  Future<CommandCompletion> {name}({', '.join(signature)}) => {operation};\n",
         )
     return owner, f"  Future<{public}> {name}({', '.join(signature)}) => {operation};\n"
+
+
+def scoped_view(plan, name, signature, public, body):
+    """A `with` method that holds the owner's view scope open while its
+    callback reads the copied record, whose pointers stay valid only then."""
+    if signature or plan.absence:
+        raise Unsupported("a borrowed view takes no inputs and is always present")
+    reader = "_" + name
+    owner = plan.view.owner
+    return (
+        f"  T with{name.removeprefix('get')}<T>(T Function(Scoped{public} view) use) => "
+        f"_NativeViewScope(_state, raw.{owner.view_begin}, raw.{owner.view_end})"
+        f".use((scope) => use(Scoped{public}._(scope, {reader}())));\n\n"
+        f"  {public} {reader}() {method_body(body)}\n"
+    )
 
 
 def block(body: list[str]) -> str:
@@ -583,8 +588,11 @@ def render_scoped_views(bound, generated, values):
             getters.append(
                 f"  {'ScopedNativePointer' if native_pointer else typ} get {name} => {result};"
             )
+        method = "with" + camel(plan.member).removeprefix("get")
         chunks.append(
-            f"final class Scoped{public} {{\n  Scoped{public}._({owner_names(plan.view.owner)[0]} owner, this._value) : _scope = _NativeViewScope(owner._state, raw.{plan.view.owner.view_begin}, raw.{plan.view.owner.view_end});\n  final {public} _value;\n  final _NativeViewScope _scope;\n  T withView<T>(T Function(Scoped{public}) use) => _scope.use(() => use(this));\n"
+            f"/// A `{public}` that is readable only while the callback of\n"
+            f"/// `{owner_names(plan.view.owner)[0]}.{method}` runs.\n"
+            f"final class Scoped{public} {{\n  Scoped{public}._(this._scope, this._value);\n  final {public} _value;\n  final _NativeViewScope _scope;\n"
             + "\n".join(getters)
             + "\n}\n"
         )
@@ -652,7 +660,10 @@ def render_attachments(bound, generated):
                 f"  const {name}(this.{field}, this.completed);\n\n"
                 f"  /// The {field}, usable at once while attachment completes.\n"
                 f"  final {owner_names(owned.handle)[0]} {field};\n\n"
-                "  /// Completes after native attachment finishes.\n"
+                "  /// Completes after native attachment finishes, or fails with its\n"
+                "  /// status, such as `Status.targetLost` when the session is disposed\n"
+                "  /// first. Await it or call `ignore()`, because the zone reports a\n"
+                "  /// failure that nothing handles.\n"
                 "  final Future<void> completed;\n}\n"
             )
     return [chunks[name] for name in sorted(chunks)]

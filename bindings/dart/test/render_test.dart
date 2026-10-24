@@ -159,7 +159,7 @@ int Function() _openFrameView(
   final backends = supportedRenderBackendMask();
   if (backends.contains(RenderBackendFlag.metal)) {
     late ScopedMetalTextureFrame escaped;
-    frame.getMetalTexture().withView((view) {
+    frame.withMetalTexture((view) {
       escaped = view;
       inside(view.width);
     });
@@ -167,7 +167,7 @@ int Function() _openFrameView(
   }
   if (backends.contains(RenderBackendFlag.vulkan)) {
     late ScopedVulkanTextureFrame escaped;
-    frame.getVulkanTexture().withView((view) {
+    frame.withVulkanTexture((view) {
       escaped = view;
       inside(view.width);
     });

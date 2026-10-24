@@ -3968,7 +3968,16 @@ final class AcquiredFrameHandle implements Finalizable {
   ///
   /// See `mln_acquired_frame_get_metal_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  ScopedMetalTextureFrame getMetalTexture() => withNativeArena((arena) {
+  T withMetalTexture<T>(T Function(ScopedMetalTextureFrame view) use) =>
+      _NativeViewScope(
+        _state,
+        raw.mln_acquired_frame_view_begin,
+        raw.mln_acquired_frame_view_end,
+      ).use(
+        (scope) => use(ScopedMetalTextureFrame._(scope, _getMetalTexture())),
+      );
+
+  MetalTextureFrame _getMetalTexture() => withNativeArena((arena) {
     final outFrame = arena<raw.mln_metal_texture_frame>();
     outFrame.ref.size = sizeOf<raw.mln_metal_texture_frame>();
     _check(
@@ -3978,17 +3987,23 @@ final class AcquiredFrameHandle implements Finalizable {
         nativeDiagnostic,
       ),
     );
-    return ScopedMetalTextureFrame._(
-      this,
-      _readMetalTextureFrame(outFrame.ref),
-    );
+    return _readMetalTextureFrame(outFrame.ref);
   });
 
   /// Copies OpenGL-native metadata from an acquired frame.
   ///
   /// See `mln_acquired_frame_get_opengl_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  ScopedOpenglTextureFrame getOpenglTexture() => withNativeArena((arena) {
+  T withOpenglTexture<T>(T Function(ScopedOpenglTextureFrame view) use) =>
+      _NativeViewScope(
+        _state,
+        raw.mln_acquired_frame_view_begin,
+        raw.mln_acquired_frame_view_end,
+      ).use(
+        (scope) => use(ScopedOpenglTextureFrame._(scope, _getOpenglTexture())),
+      );
+
+  OpenglTextureFrame _getOpenglTexture() => withNativeArena((arena) {
     final outFrame = arena<raw.mln_opengl_texture_frame>();
     outFrame.ref.size = sizeOf<raw.mln_opengl_texture_frame>();
     _check(
@@ -3998,17 +4013,20 @@ final class AcquiredFrameHandle implements Finalizable {
         nativeDiagnostic,
       ),
     );
-    return ScopedOpenglTextureFrame._(
-      this,
-      _readOpenglTextureFrame(outFrame.ref),
-    );
+    return _readOpenglTextureFrame(outFrame.ref);
   });
 
   /// Copies the producer synchronization for an acquired texture frame.
   ///
   /// See `mln_acquired_frame_get_producer_sync` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  ScopedGpuSync getProducerSync() => withNativeArena((arena) {
+  T withProducerSync<T>(T Function(ScopedGpuSync view) use) => _NativeViewScope(
+    _state,
+    raw.mln_acquired_frame_view_begin,
+    raw.mln_acquired_frame_view_end,
+  ).use((scope) => use(ScopedGpuSync._(scope, _getProducerSync())));
+
+  GpuSync _getProducerSync() => withNativeArena((arena) {
     final outSync = arena<raw.mln_gpu_sync>();
     outSync.ref = raw.mln_gpu_sync_default();
     _check(
@@ -4018,7 +4036,7 @@ final class AcquiredFrameHandle implements Finalizable {
         nativeDiagnostic,
       ),
     );
-    return ScopedGpuSync._(this, _readGpuSync(outSync.ref));
+    return _readGpuSync(outSync.ref);
   });
 
   /// Copies common metadata for an acquired frame.
@@ -4042,7 +4060,16 @@ final class AcquiredFrameHandle implements Finalizable {
   ///
   /// See `mln_acquired_frame_get_vulkan_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  ScopedVulkanTextureFrame getVulkanTexture() => withNativeArena((arena) {
+  T withVulkanTexture<T>(T Function(ScopedVulkanTextureFrame view) use) =>
+      _NativeViewScope(
+        _state,
+        raw.mln_acquired_frame_view_begin,
+        raw.mln_acquired_frame_view_end,
+      ).use(
+        (scope) => use(ScopedVulkanTextureFrame._(scope, _getVulkanTexture())),
+      );
+
+  VulkanTextureFrame _getVulkanTexture() => withNativeArena((arena) {
     final outFrame = arena<raw.mln_vulkan_texture_frame>();
     outFrame.ref.size = sizeOf<raw.mln_vulkan_texture_frame>();
     _check(
@@ -4052,17 +4079,23 @@ final class AcquiredFrameHandle implements Finalizable {
         nativeDiagnostic,
       ),
     );
-    return ScopedVulkanTextureFrame._(
-      this,
-      _readVulkanTextureFrame(outFrame.ref),
-    );
+    return _readVulkanTextureFrame(outFrame.ref);
   });
 
   /// Copies WebGPU-native metadata from an acquired frame.
   ///
   /// See `mln_acquired_frame_get_webgpu_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  ScopedWebgpuTextureFrame getWebgpuTexture() => withNativeArena((arena) {
+  T withWebgpuTexture<T>(T Function(ScopedWebgpuTextureFrame view) use) =>
+      _NativeViewScope(
+        _state,
+        raw.mln_acquired_frame_view_begin,
+        raw.mln_acquired_frame_view_end,
+      ).use(
+        (scope) => use(ScopedWebgpuTextureFrame._(scope, _getWebgpuTexture())),
+      );
+
+  WebgpuTextureFrame _getWebgpuTexture() => withNativeArena((arena) {
     final outFrame = arena<raw.mln_webgpu_texture_frame>();
     outFrame.ref.size = sizeOf<raw.mln_webgpu_texture_frame>();
     _check(
@@ -4072,10 +4105,7 @@ final class AcquiredFrameHandle implements Finalizable {
         nativeDiagnostic,
       ),
     );
-    return ScopedWebgpuTextureFrame._(
-      this,
-      _readWebgpuTextureFrame(outFrame.ref),
-    );
+    return _readWebgpuTextureFrame(outFrame.ref);
   });
 
   /// Releases an acquired frame after the host's GPU work that reads it.
@@ -7694,21 +7724,19 @@ final class RenderSessionAttachment {
   /// The session, usable at once while attachment completes.
   final RenderSessionHandle session;
 
-  /// Completes after native attachment finishes.
+  /// Completes after native attachment finishes, or fails with its
+  /// status, such as `Status.targetLost` when the session is disposed
+  /// first. Await it or call `ignore()`, because the zone reports a
+  /// failure that nothing handles.
   final Future<void> completed;
 }
 
+/// A `MetalTextureFrame` that is readable only while the callback of
+/// `AcquiredFrameHandle.withMetalTexture` runs.
 final class ScopedMetalTextureFrame {
-  ScopedMetalTextureFrame._(AcquiredFrameHandle owner, this._value)
-    : _scope = _NativeViewScope(
-        owner._state,
-        raw.mln_acquired_frame_view_begin,
-        raw.mln_acquired_frame_view_end,
-      );
+  ScopedMetalTextureFrame._(this._scope, this._value);
   final MetalTextureFrame _value;
   final _NativeViewScope _scope;
-  T withView<T>(T Function(ScopedMetalTextureFrame) use) =>
-      _scope.use(() => use(this));
   int get generation => _scope.active(_value).generation;
   int get width => _scope.active(_value).width;
   int get height => _scope.active(_value).height;
@@ -7728,17 +7756,12 @@ final class ScopedMetalTextureFrame {
   int get pixelFormat => _scope.active(_value).pixelFormat;
 }
 
+/// A `OpenglTextureFrame` that is readable only while the callback of
+/// `AcquiredFrameHandle.withOpenglTexture` runs.
 final class ScopedOpenglTextureFrame {
-  ScopedOpenglTextureFrame._(AcquiredFrameHandle owner, this._value)
-    : _scope = _NativeViewScope(
-        owner._state,
-        raw.mln_acquired_frame_view_begin,
-        raw.mln_acquired_frame_view_end,
-      );
+  ScopedOpenglTextureFrame._(this._scope, this._value);
   final OpenglTextureFrame _value;
   final _NativeViewScope _scope;
-  T withView<T>(T Function(ScopedOpenglTextureFrame) use) =>
-      _scope.use(() => use(this));
   int get generation => _scope.active(_value).generation;
   int get width => _scope.active(_value).width;
   int get height => _scope.active(_value).height;
@@ -7752,31 +7775,22 @@ final class ScopedOpenglTextureFrame {
   int get type => _scope.active(_value).type;
 }
 
+/// A `GpuSync` that is readable only while the callback of
+/// `AcquiredFrameHandle.withProducerSync` runs.
 final class ScopedGpuSync {
-  ScopedGpuSync._(AcquiredFrameHandle owner, this._value)
-    : _scope = _NativeViewScope(
-        owner._state,
-        raw.mln_acquired_frame_view_begin,
-        raw.mln_acquired_frame_view_end,
-      );
+  ScopedGpuSync._(this._scope, this._value);
   final GpuSync _value;
   final _NativeViewScope _scope;
-  T withView<T>(T Function(ScopedGpuSync) use) => _scope.use(() => use(this));
   GpuSyncKind get kind => _scope.active(_value).kind;
   int get object => _scope.active(_value).object;
 }
 
+/// A `VulkanTextureFrame` that is readable only while the callback of
+/// `AcquiredFrameHandle.withVulkanTexture` runs.
 final class ScopedVulkanTextureFrame {
-  ScopedVulkanTextureFrame._(AcquiredFrameHandle owner, this._value)
-    : _scope = _NativeViewScope(
-        owner._state,
-        raw.mln_acquired_frame_view_begin,
-        raw.mln_acquired_frame_view_end,
-      );
+  ScopedVulkanTextureFrame._(this._scope, this._value);
   final VulkanTextureFrame _value;
   final _NativeViewScope _scope;
-  T withView<T>(T Function(ScopedVulkanTextureFrame) use) =>
-      _scope.use(() => use(this));
   int get generation => _scope.active(_value).generation;
   int get width => _scope.active(_value).width;
   int get height => _scope.active(_value).height;
@@ -7794,17 +7808,12 @@ final class ScopedVulkanTextureFrame {
   int get layout => _scope.active(_value).layout;
 }
 
+/// A `WebgpuTextureFrame` that is readable only while the callback of
+/// `AcquiredFrameHandle.withWebgpuTexture` runs.
 final class ScopedWebgpuTextureFrame {
-  ScopedWebgpuTextureFrame._(AcquiredFrameHandle owner, this._value)
-    : _scope = _NativeViewScope(
-        owner._state,
-        raw.mln_acquired_frame_view_begin,
-        raw.mln_acquired_frame_view_end,
-      );
+  ScopedWebgpuTextureFrame._(this._scope, this._value);
   final WebgpuTextureFrame _value;
   final _NativeViewScope _scope;
-  T withView<T>(T Function(ScopedWebgpuTextureFrame) use) =>
-      _scope.use(() => use(this));
   int get generation => _scope.active(_value).generation;
   int get width => _scope.active(_value).width;
   int get height => _scope.active(_value).height;

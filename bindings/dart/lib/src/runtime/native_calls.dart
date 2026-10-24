@@ -214,21 +214,21 @@ final class _NativeRegistrations {
   }
 }
 
-/// The borrowed-view scope of an owner, which native code holds open while a
-/// synchronous `withView` callback reads a view. Native keeps the frame alive
-/// and reports busy if a release overlaps the scope.
+/// One borrowed-view scope of an owner, which native code holds open while a
+/// synchronous `with` callback reads a view. Native keeps the frame alive and
+/// reports busy if a release overlaps the scope.
 final class _NativeViewScope {
   _NativeViewScope(this.owner, this.begin, this.end);
   final NativeHandleState<NativeHandle> owner;
   final int Function(int, Pointer<Pointer<Void>>, Pointer<raw.mln_diagnostic>)
   begin;
   final void Function(Pointer<Void>) end;
-  int _active = 0;
+  bool _open = false;
 
   void checkActive() {
-    if (_active == 0) {
+    if (!_open) {
       throwInvalidState(
-        'borrowed native value requires an active withView callback',
+        'a borrowed native view is readable only in its callback',
       );
     }
   }
@@ -238,21 +238,23 @@ final class _NativeViewScope {
     return value;
   }
 
-  T use<T>(T Function() callback) => withNativeArena((arena) {
-    final token = arena<Pointer<Void>>();
-    _check(begin(owner.handle.raw, token, nativeDiagnostic));
-    _active++;
-    try {
-      final result = callback();
-      if (result is Future) {
-        throwInvalidArgument('withView callback must complete synchronously');
-      }
-      return result;
-    } finally {
-      _active--;
-      end(token.value);
-    }
-  });
+  /// Opens the scope, runs [callback] with it, and closes it.
+  T use<T>(T Function(_NativeViewScope scope) callback) =>
+      withNativeArena((arena) {
+        final token = arena<Pointer<Void>>();
+        _check(begin(owner.handle.raw, token, nativeDiagnostic));
+        _open = true;
+        try {
+          final result = callback(this);
+          if (result is Future) {
+            throwInvalidArgument('a view callback must complete synchronously');
+          }
+          return result;
+        } finally {
+          _open = false;
+          end(token.value);
+        }
+      });
 }
 
 int _nativeInteger(int value, int minimum, int maximum) {
