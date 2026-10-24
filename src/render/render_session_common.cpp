@@ -4497,6 +4497,7 @@ auto dispose_render_session(
     };
     live->worker_condition.notify_all();
   }
+  map_dispose_render_target_session(live->map, live.get());
   if (!detach_on_worker) session_teardown_lane().submit(live->disposal_task);
 }
 }  // namespace

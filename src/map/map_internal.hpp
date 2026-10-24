@@ -74,6 +74,9 @@ struct MapObject {
   // Guarded by the map handle table's mutex; a render session on another thread
   // clears it from map_detach_render_target_session().
   void* render_target_session = nullptr;
+  // Whether the host disposed the attached session, which then still holds
+  // the map until it retires. Guarded by the map handle table's mutex.
+  bool render_target_session_disposed = false;
 
   MapObject() = default;
   MapObject(const MapObject&) = delete;

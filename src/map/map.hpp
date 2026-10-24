@@ -630,5 +630,10 @@ auto map_attach_render_target_session(
   mln_map map, void* session, MapObject*& out_map
 ) -> mln_status;
 auto map_detach_render_target_session(mln_map map, void* session) -> mln_status;
+// Records that the host disposed `session`, so that release accepts the map
+// and retires it once the session detaches. Does nothing unless `session` is
+// the map's attached session.
+auto map_dispose_render_target_session(mln_map map, void* session) noexcept
+  -> void;
 
 }  // namespace mln::core

@@ -3689,11 +3689,18 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
     if (handle_table<MapObject>().resolve_locked(map) != owned.get()) {
       return recorded_handle_fault_status();
     }
-    if (owned->render_target_session != nullptr) {
+    // The attached session is the map's only child. Once the host disposed
+    // it, only its own retirement can detach it, so the map's retirement
+    // waits for that.
+    if (
+      owned->render_target_session != nullptr &&
+      !owned->render_target_session_disposed
+    ) {
       set_thread_error("map still has an attached render session");
       return MLN_STATUS_INVALID_STATE;
     }
-    const auto close_status = owned->control.begin_close();
+    const auto close_status =
+      owned->control.begin_close(owned->render_target_session != nullptr);
     if (close_status != MLN_STATUS_OK) {
       return close_status;
     }
@@ -3967,9 +3974,19 @@ auto map_detach_render_target_session(mln_map map, void* session)
       return MLN_STATUS_INVALID_STATE;
     }
     live->render_target_session = nullptr;
+    live->render_target_session_disposed = false;
   }
   live->control.release_child();
   return MLN_STATUS_OK;
+}
+
+auto map_dispose_render_target_session(mln_map map, void* session) noexcept
+  -> void {
+  const auto live = handle_table<MapObject>().try_lease(map);
+  if (live == nullptr) return;
+  const auto lock = std::scoped_lock{handle_table<MapObject>().mutex()};
+  if (live->render_target_session == session && session != nullptr)
+    live->render_target_session_disposed = true;
 }
 
 auto map_set_style_url(MapObject& live, const char* url) -> mln_status {

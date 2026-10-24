@@ -215,16 +215,25 @@ mln_status mln_test_map_create_status(
   return status;
 }
 
-mln_status mln_test_map_close(mln_map map) {
-  mln_test_completion teardown = mln_test_completion_default(0);
+mln_status mln_test_map_start_close(
+  mln_map map, mln_test_completion* teardown
+) {
+  *teardown = mln_test_completion_default(0);
   const mln_status status =
-    mln_map_release(map, &teardown.descriptor, MLN_TEST_DIAGNOSTIC);
+    mln_map_release(map, &teardown->descriptor, MLN_TEST_DIAGNOSTIC);
   if (status != MLN_STATUS_OK) {
-    mln_test_completion_reject(&teardown);
-    mln_test_completion_destroy(&teardown);
+    mln_test_completion_reject(teardown);
+    mln_test_completion_destroy(teardown);
     return status;
   }
   untrack_map(map);
+  return MLN_STATUS_OK;
+}
+
+mln_status mln_test_map_close(mln_map map) {
+  mln_test_completion teardown;
+  const mln_status status = mln_test_map_start_close(map, &teardown);
+  if (status != MLN_STATUS_OK) return status;
   const bool completed = mln_test_completion_wait(&teardown, -1);
   const mln_status teardown_status = mln_test_completion_status(&teardown);
   mln_test_completion_destroy(&teardown);

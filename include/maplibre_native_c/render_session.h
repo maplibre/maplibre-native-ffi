@@ -729,15 +729,15 @@ MLN_API mln_status mln_render_session_release(
  * core-worker session with no acquired frame detaches after in-flight driver
  * work ends. Every other session is abandoned after in-flight driver work and
  * scopes from mln_acquired_frame_view_begin() end, following
- * mln_render_session_abandon(). Retirement releases the map attachment. The
- * host keeps its graphics objects alive until the session's wake release
- * callbacks run. Disposal reports nothing about what it keeps, so a Vulkan host
- * keeps its VkDevice and VkSurfaceKHR, and their VkInstance, until the process
- * exits. The exception is a session whose target an earlier detach or abandon
- * already released: the rules of that call apply. Acquired frame accessors
- * report target loss after acceptance; their owners still release or dispose
- * those frames. Teardown may allocate; allocation failure after acceptance
- * terminates the process.
+ * mln_render_session_abandon(). Retirement releases the map attachment, and
+ * mln_map_release() accepts the map before it does. The host keeps its graphics
+ * objects alive until the session's wake release callbacks run. Disposal
+ * reports nothing about what it keeps, so a Vulkan host keeps its VkDevice and
+ * VkSurfaceKHR, and their VkInstance, until the process exits. The exception
+ * is a session whose target an earlier detach or abandon already released: the
+ * rules of that call apply. Acquired frame accessors report target loss after
+ * acceptance; their owners still release or dispose those frames. Teardown may
+ * allocate; allocation failure after acceptance terminates the process.
  *
  * Returns MLN_STATUS_OK on acceptance, MLN_STATUS_INVALID_ARGUMENT for an
  * invalid handle, or MLN_STATUS_INVALID_STATE for a session that has been

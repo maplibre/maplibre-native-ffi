@@ -87,6 +87,9 @@ mln_status mln_test_map_create_status(
 // Releases the map and waits for its release completion, after which the map's
 // callbacks have released their user data.
 mln_status mln_test_map_close(mln_map map);
+// Releases the map with `teardown`'s descriptor, without waiting for it. On
+// MLN_STATUS_OK the case settles `teardown`; otherwise it is destroyed.
+mln_status mln_test_map_start_close(mln_map map, mln_test_completion* teardown);
 mln_status mln_test_map_get_event_mask(mln_map map, uint64_t* out_mask);
 mln_status mln_test_map_get_camera(mln_map map, mln_camera_options* out_camera);
 // Creates a projection of the view in the map's latest published snapshot.

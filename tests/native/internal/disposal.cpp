@@ -438,6 +438,44 @@ void disposal_detaches_an_attached_core_worker_session() {
   mln_test_destroy_runtime(runtime);
 }
 
+// A map releases as soon as its session is disposed, which reverse-order
+// scoped cleanup does, and its release completes once the session has released
+// its attachment. A core worker keeps the attachment until its driver call
+// ends; a caller driver's session is abandoned on the teardown lane.
+void a_map_releases_while_its_disposed_session_retires() {
+  const auto runtime = mln_test_create_runtime();
+  const auto map = mln_test_create_map(runtime);
+  const auto other = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(map);
+  auto released = std::atomic_bool{false};
+  auto fixture = mln_test_render_fixture{};
+  attach_observed(map, fixture, released);
+  const auto core_worker = fixture.driver == MLN_RENDER_DRIVER_CORE_WORKER;
+  auto blocker = DriverBlocker{};
+  MLN_TEST_OK(blocker.submit(fixture.session));
+  if (core_worker)
+    TEST_ASSERT_TRUE(mln_test_gate_wait_entered(blocker.gate.get()));
+  MLN_TEST_OK(mln_render_session_dispose(fixture.session, nullptr));
+  auto release = mln_test_completion{};
+  MLN_TEST_OK(mln_test_map_start_close(map, &release));
+  // The runtime worker begins map retirements in order, so the other map's
+  // release completing means this one already found its session attached.
+  MLN_TEST_OK(mln_test_map_close(other));
+  if (core_worker) {
+    TEST_ASSERT_FALSE_MESSAGE(
+      mln_test_completion_poll(&release),
+      "a map released before its disposed session detached"
+    );
+  }
+  mln_test_gate_release(blocker.gate.get());
+  static_cast<void>(mln_test_completion_settle(&blocker.completion));
+  blocker.submitted = false;
+  MLN_TEST_OK(mln_test_completion_settle(&release));
+  TEST_ASSERT_TRUE(wake_released(released));
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_runtime(runtime);
+}
+
 // A destroy that leased its session before a dispose released the handle finds
 // the handle released, without waiting for the session's driver. Disposal
 // starts no abandonment when the session's detach finishes first, so a destroy
@@ -632,6 +670,36 @@ void a_held_view_parks_its_retirements_without_stalling_others() {
   TEST_ASSERT_TRUE(expired(held_weak));
   MLN_TEST_OK(mln_map_dispose(held_map, nullptr));
   MLN_TEST_OK(mln_map_dispose(other_map, nullptr));
+  MLN_TEST_OK(mln_runtime_dispose(runtime, nullptr));
+}
+
+// A parked retirement also holds the release of its session's map, which the
+// host may start as soon as the session is disposed.
+void a_held_view_holds_the_release_of_its_disposed_sessions_map() {
+  const auto runtime = create_runtime();
+  const auto held_map = create_map(runtime);
+  const auto other_map = create_map(runtime);
+  auto held = attach_fake_texture_session(held_map);
+  void* scope = nullptr;
+  MLN_TEST_OK(mln_acquired_frame_view_begin(held.frame, &scope, nullptr));
+  MLN_TEST_OK(mln_acquired_frame_dispose(held.frame, nullptr));
+  MLN_TEST_OK(mln_render_session_dispose(held.session->self, nullptr));
+  held.session.reset();
+  auto held_release = Result{};
+  const auto held_completion = descriptor(held_release);
+  MLN_TEST_OK(mln_map_release(held_map, &held_completion, nullptr));
+  // The runtime worker begins map retirements in order.
+  auto other_release = Result{};
+  const auto other_completion = descriptor(other_release);
+  MLN_TEST_OK(mln_map_release(other_map, &other_completion, nullptr));
+  TEST_ASSERT_TRUE(released(other_release));
+  TEST_ASSERT_EQUAL_UINT_MESSAGE(
+    0, held_release.releases.load(),
+    "a map released before its disposed session detached"
+  );
+  mln_acquired_frame_view_end(scope);
+  TEST_ASSERT_TRUE(released(held_release));
+  MLN_TEST_OK(held_release.status.load());
   MLN_TEST_OK(mln_runtime_dispose(runtime, nullptr));
 }
 
@@ -847,10 +915,12 @@ MLN_TEST_GROUP {
   RUN_TEST(discarded_commands_keep_the_graph_alive_until_the_worker_drains);
   RUN_TEST(a_view_and_its_own_abandonment_keep_a_session_busy);
   RUN_TEST(a_held_view_parks_its_retirements_without_stalling_others);
+  RUN_TEST(a_held_view_holds_the_release_of_its_disposed_sessions_map);
   RUN_TEST(a_running_driver_call_parks_its_retirement_without_stalling_others);
   RUN_TEST(a_serviced_driver_call_parks_its_retirement_without_stalling_others);
   RUN_TEST(disposal_retires_an_attached_graph_after_driver_quiescence);
   RUN_TEST(disposal_detaches_an_attached_core_worker_session);
+  RUN_TEST(a_map_releases_while_its_disposed_session_retires);
   RUN_TEST(disposal_abandons_a_session_with_an_acquired_frame);
   RUN_TEST(a_destroy_that_races_dispose_finds_the_handle_released);
   RUN_TEST(finalization_abandons_an_attached_session);
