@@ -105,9 +105,8 @@ typedef struct mln_queue_lock {
  * on entry. MLN_STATUS_OK transfers an ATTACHING session to the caller and
  * accepts its completion. A non-OK return leaves *out_session unchanged and
  * invokes no completion. Hosts may service caller-driver work before
- * attachment completes. A failed completion still requires
- * mln_render_session_detach() or mln_render_session_abandon() before
- * mln_render_session_release().
+ * attachment completes. After a failed completion, the host still disposes
+ * the session with mln_render_session_dispose().
  */
 typedef struct mln_render_session_attach_options {
   uint32_t size;

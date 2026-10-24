@@ -4819,7 +4819,8 @@ unsafe extern "C" fn generated_dispose_mln_map(handle: sys::mln_map) -> sys::mln
 unsafe extern "C" fn generated_dispose_mln_map_projection(
     handle: sys::mln_map_projection,
 ) -> sys::mln_status {
-    unsafe { sys::mln_map_projection_release(handle, std::ptr::null_mut()) }
+    unsafe { sys::mln_map_projection_release(handle) };
+    sys::MLN_STATUS_OK
 }
 
 unsafe extern "C" fn generated_dispose_mln_render_frame_batch(
@@ -4832,7 +4833,7 @@ unsafe extern "C" fn generated_dispose_mln_render_frame_batch(
 unsafe extern "C" fn generated_dispose_mln_render_session(
     handle: sys::mln_render_session,
 ) -> sys::mln_status {
-    unsafe { sys::mln_render_session_dispose(handle, std::ptr::null_mut()) }
+    unsafe { sys::mln_render_session_dispose(handle, std::ptr::null(), std::ptr::null_mut()) }
 }
 
 unsafe extern "C" fn generated_dispose_mln_resource_request(
@@ -8495,7 +8496,7 @@ impl MapProjectionHandle {
             return Ok(py.None());
         };
         let handle = reservation.handle();
-        unsafe { call.status(|diagnostic| sys::mln_map_projection_release(handle, diagnostic)) }?;
+        unsafe { call.run(|| sys::mln_map_projection_release(handle)) };
         reservation.commit();
         Ok(py.None())
     }
@@ -8506,7 +8507,7 @@ impl MapProjectionHandle {
             return Ok(py.None());
         };
         let handle = reservation.handle();
-        unsafe { call.status(|diagnostic| sys::mln_map_projection_release(handle, diagnostic)) }?;
+        unsafe { call.run(|| sys::mln_map_projection_release(handle)) };
         reservation.commit();
         Ok(py.None())
     }
@@ -8648,9 +8649,32 @@ impl RenderSessionHandle {
             return Ok(py.None());
         };
         let handle = reservation.handle();
-        unsafe { call.status(|diagnostic| sys::mln_render_session_dispose(handle, diagnostic)) }?;
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_render_session_dispose(handle, std::ptr::null(), diagnostic)
+            })
+        }?;
         reservation.commit();
         Ok(py.None())
+    }
+    #[pyo3(signature = ())]
+    fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(false)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        let convert = py_none;
+        let future = unsafe {
+            call.complete(
+                |completion, diagnostic| {
+                    sys::mln_render_session_dispose(handle, completion, diagnostic)
+                },
+                convert,
+            )
+        }?;
+        reservation.commit();
+        Ok(future)
     }
     #[pyo3(signature = ())]
     fn drain_frame_results(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -8855,17 +8879,6 @@ impl RenderSessionHandle {
                 convert,
             )
         }
-    }
-    #[pyo3(signature = ())]
-    fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve(true)? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        unsafe { call.status(|diagnostic| sys::mln_render_session_release(handle, diagnostic)) }?;
-        reservation.commit();
-        Ok(py.None())
     }
     #[pyo3(signature = (demand))]
     fn request_frame(&self, py: Python<'_>, demand: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {

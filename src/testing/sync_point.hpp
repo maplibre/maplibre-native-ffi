@@ -87,10 +87,6 @@ enum class SyncPoint : std::uint8_t {
   // lane. It fires only when disposal detaches rather than quarantines. No
   // lock is held.
   RenderDisposalDetached,
-  // A host's destroy has leased its render session and is about to take the
-  // session's control lock. No lock is held, so a dispose can release the
-  // handle while a destroying thread is parked here.
-  RenderDestroyLeased,
   // A map's run loop handed MapLibre a finished frame of an update older than
   // the map's pending still-image request, reported as partial so that it
   // cannot complete the image.

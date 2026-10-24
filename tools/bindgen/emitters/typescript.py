@@ -72,14 +72,16 @@ class Lowered:
 
 
 def simple_disposer(bound: BoundApi, native: str | None) -> bool:
-    """Whether a handle's disposal is an immediate call on the handle alone."""
+    """Whether a handle's disposal is an immediate call on the handle alone,
+    passing no completion when the dispose takes an optional one."""
     if not native:
         return False
     plan = bound.operations_by_name.get(native)
+    optional = bool(plan and plan.completion and plan.completion.optional)
     return bool(
         plan
-        and not plan.completion
-        and len(plan.function.parameters) == 1
+        and (not plan.completion or optional)
+        and len(plan.function.parameters) == 1 + optional
         and plan.consumes
     )
 
@@ -425,8 +427,9 @@ def lower_function(
             raise Unsupported("asynchronous operation requires admission status")
         local = f"arg_{completion.parameter}"
         token = f"call->argv[{index}]"
+        nullable = completion.discardable or completion.optional
         lowered.native_parameters.append(
-            ("completion", "number | undefined" if completion.discardable else "number")
+            ("completion", "number | undefined" if nullable else "number")
         )
         lowered.discardable = completion.discardable and receiver is not None
         if completion.immediate_owners:
@@ -467,7 +470,7 @@ def lower_function(
                 ts += " | undefined"
             lowered.shape, lowered.returns = "query", f"Promise<{ts}>"
         body.append(
-            f"if (!mln_ts_read_completion(call, {token}, {'true' if completion.discardable else 'false'}, &{local}, &present_{completion.parameter})) goto done;"
+            f"if (!mln_ts_read_completion(call, {token}, {'true' if nullable else 'false'}, &{local}, &present_{completion.parameter})) goto done;"
         )
     call_arguments = ", ".join(args + (["&diagnostic"] if function.diagnostic else []))
     if function.diagnostic:

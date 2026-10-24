@@ -183,6 +183,17 @@ def native_call(function: Function, arguments: str, diagnostic: str) -> str:
     return f"NativeMethods.{function.name}({arguments})"
 
 
+def disposer_arguments(handle: HandlePlan, function: Function, live: str) -> str:
+    """The arguments of a handle's disposer: the handle, and a null completion
+    when the dispose is also the release."""
+    arguments = [live]
+    for parameter in function.parameters[1:]:
+        if parameter.name != handle.dispose_completion:
+            raise Unsupported(f"{function.name} disposes with more than its handle")
+        arguments.append("null")
+    return ", ".join(arguments)
+
+
 def checked_call(function: Function, arguments: str) -> str:
     """Checks a synchronous call against the calling thread's diagnostic."""
     if not function.diagnostic:
@@ -1088,11 +1099,13 @@ def emit(api: Api | BoundApi) -> Emission:
         adopt_extra = ", Task completion" if immediate_completion else ""
         cleanup = handle.cleanup or handle.release
         cleanup_function = api.functions_by_name[cleanup]
-        # Abandon disposes a handle that no owner can close any more.
+        # Abandon disposes a handle that no owner can close any more. A dispose
+        # that is also the release passes no completion.
+        cleanup_arguments = disposer_arguments(handle, cleanup_function, "live")
         abandon = (
-            f"=> {native_call(cleanup_function, 'live', 'diagnostic')};"
+            f"=> {native_call(cleanup_function, cleanup_arguments, 'diagnostic')};"
             if cleanup_function.diagnostic
-            else f"{{ NativeMethods.{cleanup}(live); return mln_status.MLN_STATUS_OK; }}"
+            else f"{{ NativeMethods.{cleanup}({cleanup_arguments}); return mln_status.MLN_STATUS_OK; }}"
         )
         destroy = (
             "StartRelease"

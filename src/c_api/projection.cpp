@@ -15,12 +15,9 @@ auto mln_map_projection_create(
   });
 }
 
-auto mln_map_projection_release(
-  mln_map_projection projection, mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::map_projection_release(projection);
-  });
+auto mln_map_projection_release(mln_map_projection projection) noexcept
+  -> void {
+  mln::core::map_projection_release(projection);
 }
 
 auto mln_map_projection_get_camera(

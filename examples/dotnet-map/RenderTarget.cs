@@ -134,7 +134,7 @@ internal abstract class RenderTarget : IDisposable
             }
             finally
             {
-                Session.Close();
+                Session.Dispose();
             }
             throw;
         }
@@ -256,7 +256,7 @@ internal abstract class RenderTarget : IDisposable
         }
         finally
         {
-            Session.Close();
+            Session.Dispose();
             DisposeHost();
         }
     }

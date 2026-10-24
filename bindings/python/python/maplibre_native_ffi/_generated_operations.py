@@ -1423,6 +1423,15 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return self._native.detach()
 
+    def close(self) -> Future[None]:
+        """Consumes a session in any state and retires it, then runs completion,
+        if given, once the host may destroy the target's graphics objects.
+
+        See `mln_render_session_dispose` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+        """
+        return self._native.close()
+
     def drain_frame_results(self) -> RenderFrameBatchHandle | None:
         """Drains every currently queued terminal frame result into an
         independently owned batch. The records remain stable until the batch
@@ -1528,18 +1537,6 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
         """
         return self._native.reduce_memory_use()
-
-    def close(self) -> None:
-        """Retires a detached or abandoned session handle. The call is CPU-only
-        and may run on any native thread, including from one of the session's
-        own completions. If an abandonment is still in progress on another
-        thread, this waits for it to finish before consuming the session
-        owner.
-
-        See `mln_render_session_release` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-        """
-        return self._native.close()
 
     def request_frame(self, demand: FrameDemand) -> None:
         """Requests a frame without waiting. Every accepted demand produces one

@@ -77,9 +77,10 @@ window or view.
 <Code code={region(renderTarget, "set-target")} lang="c" title="render-target.c" />
 
 To shut down, release acquired frames, detach the session, and keep servicing a
-caller driver until detach completes. Then destroy the session and the host's
-graphics resources. Abandon a session whose graphics work can no longer be
-serviced; the
+caller driver until detach completes. Then dispose the session, and destroy the
+host's graphics resources once its completion runs. Disposing an attached
+session detaches or abandons it for you. Abandon a session whose graphics work
+can no longer be serviced; the
 [session reference](/maplibre-native-ffi/reference/c/render__session_8h.html)
 states what it keeps until the process exits.
 

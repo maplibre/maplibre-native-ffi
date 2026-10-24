@@ -1103,13 +1103,10 @@ static jint mln_map_projection_pixels_for_lat_lngs_jni(
   );
 }
 
-static jint mln_map_projection_release_jni(
-  JNIEnv* env, jclass type, jlong projection, jlong out_diagnostic
+static void mln_map_projection_release_jni(
+  JNIEnv* env, jclass type, jlong projection
 ) {
-  return (jint)mln_map_projection_release(
-    (mln_map_projection)projection,
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
+  mln_map_projection_release((mln_map_projection)projection);
 }
 
 static jint mln_map_projection_set_camera_jni(
@@ -1781,10 +1778,12 @@ static jint mln_render_session_detach_jni(
 }
 
 static jint mln_render_session_dispose_jni(
-  JNIEnv* env, jclass type, jlong session, jlong out_diagnostic
+  JNIEnv* env, jclass type, jlong session, jlong completion,
+  jlong out_diagnostic
 ) {
   return (jint)mln_render_session_dispose(
     (mln_render_session)session,
+    MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -1907,15 +1906,6 @@ static jint mln_render_session_reduce_memory_use_jni(
   return (jint)mln_render_session_reduce_memory_use(
     (mln_render_session)session,
     MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_render_session_release_jni(
-  JNIEnv* env, jclass type, jlong session, jlong out_diagnostic
-) {
-  return (jint)mln_render_session_release(
-    (mln_render_session)session,
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -2774,8 +2764,7 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_projection_pixel_for_lat_lng_jni},
   {"mln_map_projection_pixels_for_lat_lngs", "(JJJJJ)I",
    (void*)mln_map_projection_pixels_for_lat_lngs_jni},
-  {"mln_map_projection_release", "(JJ)I",
-   (void*)mln_map_projection_release_jni},
+  {"mln_map_projection_release", "(J)V", (void*)mln_map_projection_release_jni},
   {"mln_map_projection_set_camera", "(JJJ)I",
    (void*)mln_map_projection_set_camera_jni},
   {"mln_map_release", "(JJJ)I", (void*)mln_map_release_jni},
@@ -2885,7 +2874,7 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_render_session_clear_data", "(JJJ)I",
    (void*)mln_render_session_clear_data_jni},
   {"mln_render_session_detach", "(JJJ)I", (void*)mln_render_session_detach_jni},
-  {"mln_render_session_dispose", "(JJ)I",
+  {"mln_render_session_dispose", "(JJJ)I",
    (void*)mln_render_session_dispose_jni},
   {"mln_render_session_drain_frame_results", "(JJJ)I",
    (void*)mln_render_session_drain_frame_results_jni},
@@ -2905,8 +2894,6 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_render_session_read_texture_jni},
   {"mln_render_session_reduce_memory_use", "(JJJ)I",
    (void*)mln_render_session_reduce_memory_use_jni},
-  {"mln_render_session_release", "(JJ)I",
-   (void*)mln_render_session_release_jni},
   {"mln_render_session_request_frame", "(JJJ)I",
    (void*)mln_render_session_request_frame_jni},
   {"mln_render_session_resize", "(JJJJ)I",
@@ -3211,8 +3198,7 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_projection_pixel_for_lat_lng_jni},
   {"mln_map_projection_pixels_for_lat_lngs", "(JJJJJ)I",
    (void*)mln_map_projection_pixels_for_lat_lngs_jni},
-  {"mln_map_projection_release", "(JJ)I",
-   (void*)mln_map_projection_release_jni},
+  {"mln_map_projection_release", "(J)V", (void*)mln_map_projection_release_jni},
   {"mln_map_projection_set_camera", "(JJJ)I",
    (void*)mln_map_projection_set_camera_jni},
   {"mln_map_release", "(JJJ)I", (void*)mln_map_release_jni},
@@ -3322,7 +3308,7 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_render_session_clear_data", "(JJJ)I",
    (void*)mln_render_session_clear_data_jni},
   {"mln_render_session_detach", "(JJJ)I", (void*)mln_render_session_detach_jni},
-  {"mln_render_session_dispose", "(JJ)I",
+  {"mln_render_session_dispose", "(JJJ)I",
    (void*)mln_render_session_dispose_jni},
   {"mln_render_session_drain_frame_results", "(JJJ)I",
    (void*)mln_render_session_drain_frame_results_critical},
@@ -3342,8 +3328,6 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_render_session_read_texture_jni},
   {"mln_render_session_reduce_memory_use", "(JJJ)I",
    (void*)mln_render_session_reduce_memory_use_jni},
-  {"mln_render_session_release", "(JJ)I",
-   (void*)mln_render_session_release_jni},
   {"mln_render_session_request_frame", "(JJJ)I",
    (void*)mln_render_session_request_frame_jni},
   {"mln_render_session_resize", "(JJJJ)I",

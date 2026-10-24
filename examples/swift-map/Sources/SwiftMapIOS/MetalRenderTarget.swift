@@ -80,7 +80,7 @@ final class MetalRenderTarget {
       return MetalRenderTarget(session: session)
     } catch {
       _ = try? session.abandon()
-      try? session.close()
+      try? session.dispose()
       throw error
     }
   }
@@ -127,7 +127,7 @@ final class MetalRenderTarget {
   func close() async throws {
     do {
       try await session.detach()
-      try session.close()
+      try await session.close()
     } catch {
       abandon()
       throw error
@@ -136,7 +136,7 @@ final class MetalRenderTarget {
 
   func abandon() {
     _ = try? session.abandon()
-    try? session.close()
+    try? session.dispose()
   }
 }
 

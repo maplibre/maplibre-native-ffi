@@ -1185,7 +1185,7 @@ export class MapHandle extends Owner {
             handle,
             () => new RenderSessionHandle(ADOPT, handle, this, registrations),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
+              native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
       );
       return { session, completed };
@@ -1216,7 +1216,7 @@ export class MapHandle extends Owner {
             handle,
             () => new RenderSessionHandle(ADOPT, handle, this, registrations),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
+              native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
       );
       return { session, completed };
@@ -1247,7 +1247,7 @@ export class MapHandle extends Owner {
             handle,
             () => new RenderSessionHandle(ADOPT, handle, this, registrations),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
+              native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
       );
       return { session, completed };
@@ -1278,7 +1278,7 @@ export class MapHandle extends Owner {
             handle,
             () => new RenderSessionHandle(ADOPT, handle, this, registrations),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
+              native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
       );
       return { session, completed };
@@ -1309,7 +1309,7 @@ export class MapHandle extends Owner {
             handle,
             () => new RenderSessionHandle(ADOPT, handle, this, registrations),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
+              native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
       );
       return { session, completed };
@@ -1340,7 +1340,7 @@ export class MapHandle extends Owner {
             handle,
             () => new RenderSessionHandle(ADOPT, handle, this, registrations),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
+              native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
       );
       return { session, completed };
@@ -1371,7 +1371,7 @@ export class MapHandle extends Owner {
             handle,
             () => new RenderSessionHandle(ADOPT, handle, this, registrations),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
+              native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
       );
       return { session, completed };
@@ -1402,7 +1402,7 @@ export class MapHandle extends Owner {
             handle,
             () => new RenderSessionHandle(ADOPT, handle, this, registrations),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
+              native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
       );
       return { session, completed };
@@ -1433,7 +1433,7 @@ export class MapHandle extends Owner {
             handle,
             () => new RenderSessionHandle(ADOPT, handle, this, registrations),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
+              native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
       );
       return { session, completed };
@@ -1464,7 +1464,7 @@ export class MapHandle extends Owner {
             handle,
             () => new RenderSessionHandle(ADOPT, handle, this, registrations),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
+              native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
       );
       return { session, completed };
@@ -1495,7 +1495,7 @@ export class MapHandle extends Owner {
             handle,
             () => new RenderSessionHandle(ADOPT, handle, this, registrations),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
+              native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
       );
       return { session, completed };
@@ -1526,7 +1526,7 @@ export class MapHandle extends Owner {
             handle,
             () => new RenderSessionHandle(ADOPT, handle, this, registrations),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
+              native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
       );
       return { session, completed };
@@ -3584,7 +3584,7 @@ export class RenderSessionHandle extends Owner {
     return new RenderSessionHandleDiscarding(ADOPT, this);
   }
   /**
-   * Calls `dispose()`, for `await using`.
+   * Calls `close()`, for `await using`.
    * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
    */
   declare [Symbol.asyncDispose]: () => Promise<void>;
@@ -3652,17 +3652,17 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Retires a detached or abandoned session handle. The call is CPU-only and
-   * may run on any native thread, including from one of the session's own
-   * completions. If an abandonment is still in progress on another thread, this
-   * waits for it to finish before consuming the session owner.
+   * Consumes a session in any state and retires it, then runs completion, if
+   * given, once the host may destroy the target's graphics objects.
    *
-   * See `mln_render_session_release` in the
+   * See `mln_render_session_dispose` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
-  close(): void {
-    closeSync(this, (handle, token) =>
-      native.mln_render_session_release(handle, token),
+  close(): Promise<void> {
+    return closeAsync(this, (handle, token) =>
+      submitRun((completion) =>
+        native.mln_render_session_dispose(handle, token, completion),
+      ),
     );
   }
 
@@ -3679,14 +3679,15 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Consumes a session and schedules its retirement and destruction.
+   * Consumes a session in any state and retires it, then runs completion, if
+   * given, once the host may destroy the target's graphics objects.
    *
    * See `mln_render_session_dispose` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   dispose(): void {
     closeSync(this, (handle, token) =>
-      native.mln_render_session_dispose(handle, token),
+      native.mln_render_session_dispose(handle, token, undefined),
     );
   }
 
@@ -4030,7 +4031,7 @@ export class RenderSessionHandle extends Owner {
     );
   }
 }
-defineDisposers(RenderSessionHandle, undefined, "dispose");
+defineDisposers(RenderSessionHandle, "close", "dispose");
 
 /**
  * The commands of a {@link RenderSessionHandle} that discard their outcomes:

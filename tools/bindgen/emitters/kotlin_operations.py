@@ -510,6 +510,17 @@ def disposal_method(handle):
     return identifier(handle.cleanup.removeprefix(handle.native + "_"))
 
 
+def disposer_arguments(handle, function, receiver, null):
+    """The arguments before the diagnostic of [function] when it disposes [handle].
+
+    A disposer reports nothing, so it passes [null] for a dispose's optional
+    completion.
+    """
+    if handle.dispose_completion and function.name == handle.dispose:
+        return [receiver, null]
+    return [receiver]
+
+
 def disposal(handle):
     family = name(handle.native)
     return "GeneratedOwnerDisposal::" + family[0].lower() + family[1:]
@@ -643,18 +654,29 @@ def lifecycle(plan, values, native):
             f"val holder = {values.storage(slot)}.also {{ writeI64(it, handle) }}"
         )
         arguments[receiver_index] = "holder"
-    if plan.completion:
-        arguments.append("completion")
-    setup.append(native.checked(plan.function, arguments))
-    body = encodings(plan) + "; ".join(setup)
-    if plan.completion:
-        return (
-            f"  public fun {method}({declaration(params, defaults)}): Deferred<Unit> = "
-            f"nativeRetire(this, binding) {{ {body} }}\n"
-        )
+    parameters = declaration(params, defaults)
+
+    def body(*completion):
+        call = native.checked(plan.function, [*arguments, *completion])
+        return encodings(plan) + "; ".join([*setup, call])
+
+    if not plan.completion:
+        return f"  public fun {method}({parameters}): Unit = nativeClose(this, binding) {{ {body()} }}\n"
+    retire = (
+        f"  public fun {method}({parameters}): Deferred<Unit> = "
+        f"nativeRetire(this, binding) {{ {body('completion')} }}\n"
+    )
+    if not plan.completion.optional:
+        return retire
+    # The release is also the handle's dispose, which passes no completion.
+    from .kotlin import operation_doc
+
+    dispose = disposal_method(receiver_value(plan).handle)
     return (
-        f"  public fun {method}({declaration(params, defaults)}): Unit = "
-        f"nativeClose(this, binding) {{ {body} }}\n"
+        retire
+        + "\n"
+        + operation_doc(values.bound, plan, "  ")
+        + f"  public fun {dispose}({parameters}): Unit = nativeClose(this, binding) {{ {body('0L')} }}\n"
     )
 
 
@@ -686,10 +708,11 @@ def owner_disposal(bound, native):
         method = name(handle.native)
         method = method[0].lower() + method[1:]
         function = bound.source.functions_by_name[handle.cleanup]
+        arguments = disposer_arguments(handle, function, "handle", "0L")
         call = (
-            native.call(function, ["handle"])
+            native.call(function, arguments)
             if not function.diagnostic
-            else native.status(function, ["handle"])
+            else native.status(function, arguments)
         )
         if function.diagnostic:
             call = "NativeDiagnostics.check { diagnostic -> " + call + " }"

@@ -584,9 +584,10 @@ impl Session {
         self.drive(self.handle.read_texture().unwrap()).unwrap()
     }
 
-    /// Detaches and releases the session.
+    /// Detaches and releases the session, and waits until it retires, after
+    /// which the host may destroy its graphics objects.
     pub fn close(self) {
         self.drive(self.handle.detach().unwrap()).unwrap();
-        self.handle.release().unwrap();
+        self.drive(self.handle.release().unwrap()).unwrap();
     }
 }

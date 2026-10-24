@@ -140,10 +140,44 @@ test "disposing a parent graph retires its acquired frame and session" {
     fixture.map_open = false;
     try maplibre.acquiredFrameDiscard(frame, null);
     owned.session.deinit();
-    owned.attached = false;
+    owned.open = false;
     try testing.expectError(error.InvalidState, maplibre.acquiredFrameGetResult(frame, null));
     try testing.expectError(error.InvalidState, maplibre.renderSessionGetSnapshot(owned.session, null));
     // The graphics context outlives the session, so the test waits for the
     // runtime to retire everything before the deferred teardown destroys it.
     try fixture.releaseRuntimeWhenChildless();
+}
+
+// A release completes once the session has retired, so the host may destroy
+// the graphics context while the map stays open.
+test "a released session lets the host destroy its graphics context" {
+    const fixture = try createFixture();
+    defer fixture.destroy();
+    const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
+    errdefer owned.close();
+    _ = try owned.renderUntilRendered();
+    const retired = try maplibre.renderSessionRelease(owned.session, null);
+    owned.open = false;
+    try support.resolve(retired);
+    owned.close();
+}
+
+// Scoped cleanup disposes an attached session without reporting retirement.
+// The map's release completes after the session releases its map attachment,
+// so the host may destroy the graphics context then.
+test "a session that scoped cleanup disposes retires before its map releases" {
+    const fixture = try createFixture();
+    defer fixture.destroy();
+    const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
+    owned.open = false;
+    errdefer {
+        fixture.closeMap() catch {};
+        owned.close();
+    }
+    {
+        defer owned.session.deinit();
+        _ = try owned.renderUntilRendered();
+    }
+    try fixture.closeMap();
+    owned.close();
 }

@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 from support import (
     FIXTURES,
     ROOT,
+    parse,
     parse_sources,
     protocol_header,
     require_tool,
@@ -20,6 +21,33 @@ BINDING = ROOT / "bindings/zig"
 
 
 class ZigEmitterTests(unittest.TestCase):
+    def test_a_dispose_with_a_completion_releases_and_disposes(self):
+        api = parse(
+            """
+typedef unsigned long long mln_session BIND("kind=handle;release=mln_session_dispose;dispose=mln_session_dispose");
+BIND("execution=lifecycle")
+mln_status mln_session_dispose(mln_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic);
+""",
+            defines=("MLN_PROTOCOL_COMPLETION_RUNTIME",),
+        )
+        validate(api)
+        self.assertEqual(zig.coverage(api)["unsupported"], {})
+        source = zig.generate(api)["maplibre_native_ffi.zig"]
+        # deinit and the sync dispose pass no completion; the release passes one.
+        self.assertIn(
+            "try status.call(c.mln_session_dispose, .{ raw, null }, null);", source
+        )
+        self.assertIn(
+            'pub fn sessionRelease(@"session": Session, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {\n'
+            '    return call.submit("mln_session_dispose",',
+            source,
+        )
+        self.assertIn(
+            'pub fn sessionDispose(@"session": Session, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {\n'
+            '    return call.discard("mln_session_dispose",',
+            source,
+        )
+
     def test_generated_values_and_keyword_parameters_round_trip(self):
         zig_tool = require_tool(self, "zig", BINDING)
         header = protocol_header(

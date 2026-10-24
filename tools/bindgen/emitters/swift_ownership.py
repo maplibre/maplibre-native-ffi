@@ -55,37 +55,49 @@ def consumed(plan, owner, values):
 """,
             None,
         )
-    is_release = function.name == handle.release
+    # A release that is also the dispose closes asynchronously, so its
+    # synchronous form is the dispose.
     method = (
         "close"
-        if is_release
+        if function.name == handle.release and not handle.dispose_completion
         else "discard"
         if function.name == handle.discard
         else "dispose"
     )
+    # The closure's parameters select the overload: a status-returning close
+    # takes the diagnostic, so its status is always checked.
+    call = native_call(function, *disposer_arguments(handle, function, "raw"))
+    parameters = "raw" if function.return_type.kind == "void" else "raw, diagnostic"
+    synchronous = f"""{documented}func {method}() throws {{
+  try nativeClose {{ {parameters} in {call} }}
+}}
+"""
     if plan.completion:
-        return (
-            f"""{documented}func close() async throws {{
+        asynchronous = f"""{documented}func close() async throws {{
   guard let future = try startClose() else {{ return }}
   try await future.value()
 }}
 internal func startClose() throws -> NativeFuture<Void>? {{
   try nativeStartClose {{ raw, completion, diagnostic in {native_call(function, "raw", "completion")} }}
 }}
-""",
-            owner,
-        )
-    # The closure's parameters select the overload: a status-returning close
-    # takes the diagnostic, so its status is always checked.
-    call = native_call(function, "raw")
-    parameters = "raw" if function.return_type.kind == "void" else "raw, diagnostic"
-    return (
-        f"""{documented}func {method}() throws {{
-  try nativeClose {{ {parameters} in {call} }}
-}}
-""",
-        owner,
-    )
+"""
+        # A release that is also the dispose passes a completion, and the
+        # dispose passes none.
+        if plan.completion.optional:
+            return asynchronous + synchronous, owner
+        return asynchronous, owner
+    return synchronous, owner
+
+
+def disposer_arguments(handle, function, raw):
+    """The arguments before the diagnostic of `function` when it disposes `handle`.
+
+    A disposer reports nothing, so it passes nil for a dispose's optional
+    completion.
+    """
+    if handle.dispose_completion and function.name == handle.dispose:
+        return [raw, "nil"]
+    return [raw]
 
 
 def owner_name(handle):
@@ -119,7 +131,10 @@ def owner_declarations(bound):
         cleanup = handle.cleanup or handle.release
         function = bound.source.functions_by_name[cleanup]
         # Abandoned disposal has no caller to report a diagnostic to.
-        expression = f"{cleanup}(raw{', nil' if function.diagnostic else ''})"
+        arguments = disposer_arguments(handle, function, "raw")
+        if function.diagnostic:
+            arguments.append("nil")
+        expression = f"{cleanup}({', '.join(arguments)})"
         body = (
             f"{expression}; return true"
             if function.return_type.kind == "void"

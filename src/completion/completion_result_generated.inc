@@ -208,6 +208,10 @@ struct CompletionResult<&mln_render_session_detach> {
   static constexpr bool has_value = false;
 };
 template <>
+struct CompletionResult<&mln_render_session_dispose> {
+  static constexpr bool has_value = false;
+};
+template <>
 struct CompletionResult<&mln_render_session_dump_debug_logs> {
   static constexpr bool has_value = false;
 };

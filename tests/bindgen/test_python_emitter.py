@@ -186,13 +186,15 @@ mln_status mln_host_id(mln_host host, bool *out BIND("direction=out"), mln_diagn
             block = native.split(f"\nimpl {owner} {{\n", 1)[1].split("\n}\n", 1)[0]
             return block.split(f"fn {name}(", 1)[1].split("#[pyo3", 1)[0]
 
-        # A session's release refuses an attached session, so its scope
-        # disposes it; its explicit close stays a release.
+        # A session's dispose is also its release: its explicit close passes
+        # a completion, and its scope passes none.
         self.assertIn(
-            "mln_render_session_dispose", method("RenderSessionHandle", "_exit")
+            "mln_render_session_dispose(handle, std::ptr::null(), diagnostic)",
+            method("RenderSessionHandle", "_exit"),
         )
         self.assertIn(
-            "mln_render_session_release", method("RenderSessionHandle", "close")
+            "mln_render_session_dispose(handle, completion, diagnostic)",
+            method("RenderSessionHandle", "close"),
         )
         # A release that reports teardown through a completion would hand the
         # scope a future it drops, so the scope disposes the map instead.
@@ -203,6 +205,31 @@ mln_status mln_host_id(mln_host host, bool *out BIND("direction=out"), mln_diagn
         # while a repeated explicit close still reaches native.
         self.assertIn("self.reserve(true)", method("MapHandle", "_exit"))
         self.assertIn("self.reserve(false)", method("MapHandle", "close"))
+
+    def test_a_dispose_that_is_the_release_closes_with_a_completion(self):
+        api = self.parse("""
+typedef unsigned long long mln_lease BIND("kind=handle;release=mln_lease_dispose;dispose=mln_lease_dispose");
+BIND("execution=lifecycle")
+mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, mln_diagnostic *out_diagnostic);
+""")
+        self.assertEqual(python.coverage(api)["generated"], ["mln_lease_dispose"])
+        files = python.generate(api)
+        native = files["src/generated_operations.rs"]
+        block = native.split("\nimpl LeaseHandle {\n", 1)[1].split("\n}\n", 1)[0]
+        close = block.split("fn close(", 1)[1].split("#[pyo3", 1)[0]
+        exit = block.split("fn _exit(", 1)[1].split("#[pyo3", 1)[0]
+        # The close returns a future; the scope and every disposer pass a
+        # null completion.
+        self.assertIn("mln_lease_dispose(handle, completion, diagnostic)", close)
+        self.assertIn("mln_lease_dispose(handle, std::ptr::null(), diagnostic)", exit)
+        self.assertIn(
+            "mln_lease_dispose(handle, std::ptr::null(), std::ptr::null_mut())",
+            native.split("fn generated_dispose_mln_lease(", 1)[1].split("\n}", 1)[0],
+        )
+        self.assertIn(
+            "def close(self) -> Future[None]:",
+            files["python/maplibre_native_ffi/_generated_operations.py"],
+        )
 
     def test_tagged_union_wrapper_keeps_payload_record_and_unknown_tag(self):
         api = self.parse(groups=("tagged_union",))

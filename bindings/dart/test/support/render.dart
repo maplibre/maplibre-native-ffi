@@ -84,15 +84,10 @@ final class WorkerSession {
   }
 }
 
-/// Abandons [session] unless it already released its target, then closes it.
-void releaseSession(RenderSessionHandle session) {
-  try {
-    session.abandon();
-  } on MaplibreException {
-    // A detached or abandoned session has nothing left to abandon.
-  }
-  session.close();
-}
+/// Closes [session] in any state unless a test already did, and waits until
+/// it retires, so a teardown that runs later may destroy its graphics.
+Future<void> releaseSession(RenderSessionHandle session) =>
+    closeIfLive(session.close);
 
 /// Demands a forced frame, which renders whether or not the map changed.
 BigInt _requestFrame(RenderSessionHandle session, int value) {

@@ -407,6 +407,8 @@ pub const OwnedTexture = struct {
     graphics: Graphics,
     session: maplibre.RenderSession,
     caller_driven: bool,
+    /// Whether the session handle is unconsumed, so close releases it.
+    open: bool = true,
     attached: bool = true,
     next_token: u64 = 1,
 
@@ -442,30 +444,38 @@ pub const OwnedTexture = struct {
             break :attachment try maplibre.mapAttachOpenglOwnedTexture(testing.allocator, map, descriptor.value, options, null);
         };
         self.session = attachment.session;
-        errdefer {
-            _ = maplibre.renderSessionAbandon(self.session, null) catch {};
-            maplibre.renderSessionRelease(self.session, null) catch {};
-        }
+        errdefer self.release();
         try self.resolve(attachment.ready);
         return self;
     }
 
-    /// Detaches and destroys the session unless the test already did, then
-    /// releases the graphics context. A failed detach logs an error, which
-    /// fails the test, and abandons the session instead.
+    /// Detaches and releases the session unless the test already did, then
+    /// destroys the graphics context. A failed detach logs an error, which
+    /// fails the test, and the release abandons the session instead.
     pub fn close(self: *OwnedTexture) void {
-        if (self.attached) {
-            self.detach() catch |err| {
+        if (self.open) {
+            if (self.attached) self.detach() catch |err| {
                 std.log.err("render session detach failed: {s}", .{@errorName(err)});
-                _ = maplibre.renderSessionAbandon(self.session, null) catch {};
             };
-            maplibre.renderSessionRelease(self.session, null) catch |err| {
-                std.log.err("render session destroy failed: {s}", .{@errorName(err)});
-                self.session.deinit();
-            };
+            self.release();
         }
         self.graphics.destroy();
         testing.allocator.destroy(self);
+    }
+
+    /// Releases the session and waits until it retires, after which the host
+    /// may destroy its graphics objects. A failure logs an error, which fails
+    /// the test.
+    fn release(self: *OwnedTexture) void {
+        var retired = maplibre.renderSessionRelease(self.session, null) catch |err| {
+            std.log.err("render session release failed: {s}", .{@errorName(err)});
+            return;
+        };
+        defer retired.deinit();
+        self.open = false;
+        retired.wait(null) catch |err| {
+            std.log.err("render session retirement failed: {s}", .{@errorName(err)});
+        };
     }
 
     pub fn detach(self: *OwnedTexture) !void {

@@ -155,8 +155,7 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
    * See `mln_map_projection_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
-  public fun release(): Unit =
-    nativeClose(this, binding) { check(C.mln_map_projection_release(handle, diagnostic)) }
+  public fun release(): Unit = nativeClose(this, binding) { C.mln_map_projection_release(handle) }
 
   /**
    * Applies a camera update to a standalone projection.

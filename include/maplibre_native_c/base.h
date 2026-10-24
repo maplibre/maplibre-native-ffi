@@ -156,7 +156,7 @@ typedef uint64_t mln_resource_transform_request MLN_BINDING(
 );
 /** A render session, which renders one map to one render target. */
 typedef uint64_t mln_render_session MLN_BINDING(
-  "kind=handle;release=mln_render_session_release;parent=mln_map;"
+  "kind=handle;release=mln_render_session_dispose;parent=mln_map;"
   "abandon=mln_render_session_abandon;dispose=mln_render_session_dispose"
 );
 /** A rendered frame that a render session lends until its release. */

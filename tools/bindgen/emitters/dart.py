@@ -32,6 +32,17 @@ def native_call(function, arguments):
     return f"raw.{function.name}({', '.join(arguments)})"
 
 
+def disposer_arguments(handle, function, live):
+    """The arguments of a handle's disposer: the handle, and a null completion
+    when the dispose is also the release."""
+    arguments = [live]
+    for parameter in function.parameters[1:]:
+        if parameter.name != handle.dispose_completion:
+            raise Unsupported(f"{function.name} disposes with more than its handle")
+        arguments.append("nullptr")
+    return arguments
+
+
 def adopt_owner(owned, expression, receiver, function, values):
     if owned.handle.native not in values.bound.public_handles:
         raise Unsupported("owned output requires a generated class")
@@ -48,7 +59,7 @@ def adopt_owner(owned, expression, receiver, function, values):
     if not owned.handle.cleanup:
         raise Unsupported("owned adoption requires a native disposer")
     dispose = values.bound.source.functions_by_name[owned.handle.cleanup]
-    cleanup = native_call(dispose, ["handle"])
+    cleanup = native_call(dispose, disposer_arguments(owned.handle, dispose, "handle"))
     if dispose.return_type.kind != "void":
         cleanup = f"_check({cleanup})"
     result = f"_adoptOwned({expression}, () => {result}, (handle) {{ {cleanup}; }})"
@@ -56,9 +67,15 @@ def adopt_owner(owned, expression, receiver, function, values):
 
 
 def lower_function(
-    plan: OperationPlan, values: Values, *, discard=False
+    plan: OperationPlan, values: Values, *, discard=False, dispose=False
 ) -> tuple[str, str]:
     function = plan.function
+    # A dispose that is also the release passes no completion, so it consumes
+    # synchronously, as a separate dispose does.
+    disposed = None
+    if dispose:
+        disposed = plan.completion.parameter
+        plan = replace(plan, completion=None)
     if plan.consumes == "always" and (
         plan.completion or function.return_type.kind != "void"
     ):
@@ -104,6 +121,8 @@ def lower_function(
         and not handle_plan.release_inputs
     ):
         name = "close"
+    if dispose:
+        name = "dispose"
     if name in KEYWORDS["dart"]:
         name += "Value"
     inputs = {p.name: p for p in plan.inputs}
@@ -144,6 +163,9 @@ def lower_function(
     for parameter in function.parameters[1 if receiver else 0 :]:
         if plan.completion and parameter.name == plan.completion.parameter:
             args.append("completion")
+            continue
+        if parameter.name == disposed:
+            args.append("nullptr")
             continue
         local = camel(parameter.name)
         if (
@@ -515,6 +537,9 @@ def lower(api: Api | BoundApi):
             if plan.receiver and plan.completion and plan.completion.discardable:
                 _, discarded = lower_function(plan, local_values, discard=True)
                 methods[owner + "Discarding"].append(discarded)
+            if plan.receiver and plan.completion and plan.completion.optional:
+                _, disposed = lower_function(plan, local_values, dispose=True)
+                methods[owner].append(doc(bound, plan.name, "  ") + disposed)
             generated.append(plan.name)
             if owner != "Globals" and plan.registrations and not plan.owned_outputs:
                 root_owners.add(owner)

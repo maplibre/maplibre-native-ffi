@@ -27,8 +27,16 @@ Pick the execution category that describes the native operation:
 Name a function `mln_<owner>_<verb>[_<object>]`, where the owner is the handle
 in its first parameter, as in `mln_map_get_style_layer`. A read uses `get_`, a
 read of every object uses `list_`, and a predicate uses `is_`. A function
-without a handle names its subsystem or record, as in `mln_log_set_callback`. A
-handle's teardown is `_release`.
+without a handle names its subsystem or record, as in `mln_log_set_callback`.
+
+A handle has at most two teardown functions. `_release` returns void when
+teardown cannot fail, as `mln_style_expression_release()` does, or takes a
+completion when the host must observe teardown, as `mln_map_release()` does.
+`_dispose` accepts the handle in any state and is fire-and-forget, as
+`mln_map_dispose()` is. A handle that has only `_dispose` gives it a nullable
+completion that reports retirement, as `mln_render_session_dispose()` does.
+`mln_acquired_frame_release()` alone returns a status, because it checks the
+consumer sync that it takes.
 
 Follow these rules, which keep the ABI open to growth:
 

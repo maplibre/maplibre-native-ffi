@@ -71,6 +71,53 @@ mln_status mln_measurement_change(mln_measurement measurement, const mln_complet
 """)
         self.assertIn("mln_measurement_change", dart.coverage(api)["generated"])
 
+    def test_a_dispose_that_is_the_release_closes_with_a_completion_and_disposes_without(
+        self,
+    ):
+        api = self.parse("""
+typedef unsigned long long mln_measurement BIND("kind=handle;release=mln_measurement_dispose;dispose=mln_measurement_dispose");
+BIND("execution=lifecycle")
+mln_status mln_measurement_dispose(mln_measurement measurement, const mln_completion *completion, mln_diagnostic *out_diagnostic);
+mln_status mln_measurement_create(mln_measurement *out_measurement BIND("direction=out"), mln_diagnostic *out_diagnostic);
+""")
+        generated = dart.generate(api)
+        # The release passes a completion, as an asynchronous release does.
+        self.assertIn(
+            "Future<void> close() => _state.closeAsync((handle) => _run((arena, completion) => "
+            "raw.mln_measurement_dispose(handle.raw, completion, nativeDiagnostic)));",
+            generated,
+        )
+        # The dispose and every disposer pass none.
+        self.assertIn(
+            "void dispose() => _state.close((handle) => "
+            "raw.mln_measurement_dispose(handle.raw, nullptr, nativeDiagnostic));",
+            generated,
+        )
+        self.assertIn(
+            "_check(raw.mln_measurement_dispose(handle, nullptr, nativeDiagnostic));",
+            generated,
+        )
+
+        operations = dotnet.generate(api)["Metrics/MeasurementHandle.Operations.g.cs"]
+        self.assertIn("IDisposable, IAsyncDisposable", operations)
+        self.assertIn("public Task CloseAsync()", operations)
+        self.assertIn(
+            "public ValueTask DisposeAsync() => state.Close() ? new(teardown) : default;",
+            operations,
+        )
+        self.assertIn(
+            "NativeMethods.mln_measurement_dispose(handle, "
+            "NativeCompletion.StartUnit(&nativeCompletion, out var nativePending), Diagnostic);",
+            operations,
+        )
+        # Dispose, finalization, and adoption retire through the abandon disposer.
+        self.assertIn("public void Dispose() { state.Retire(); }", operations)
+        self.assertIn(
+            "Abandon(MlnMeasurement live, mln_diagnostic* diagnostic) => "
+            "NativeMethods.mln_measurement_dispose(live, null, diagnostic);",
+            operations,
+        )
+
     def test_dart_generates_callback_registrations_only_with_queue_delivery(
         self,
     ):

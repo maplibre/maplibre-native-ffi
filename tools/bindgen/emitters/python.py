@@ -143,8 +143,13 @@ def operation(
     plan: OperationPlan, values: Values, *, discard=False, exit=False
 ) -> tuple[str, str, str, str, str | None]:
     """Lower one operation. `exit` lowers a handle's scoped release as the
-    private `_exit` that `__exit__` calls, which skips a released handle."""
+    private `_exit` that `__exit__` calls, which skips a released handle and
+    passes a null completion to a release that takes an optional one."""
     function = plan.function
+    dropped_completion = None
+    if exit and plan.completion and plan.completion.optional:
+        dropped_completion = plan.completion.parameter
+        plan = replace(plan, completion=None)
     if plan.role == "support" and not exit:
         raise unsupported(
             function, "support operation is consumed by the value/runtime compiler"
@@ -542,6 +547,8 @@ def operation(
                 if converted != "value":
                     expression = f"map_future({expression}, lambda value: {converted})"
     else:
+        if dropped_completion:
+            arguments[dropped_completion] = "std::ptr::null()"
         call = native_call(function, [arguments[p.name] for p in function.parameters])
         if text:
             call = f"generated_caller_sized_text(&mut {text.name}, |{text.name}, {text.value.length}, {text.result_length}| {call})"
@@ -735,12 +742,24 @@ def scoped_release(handle: HandlePlan, bound: BoundApi) -> str:
 
     A release that reports teardown through a completion would return a future
     that leaving the block drops, so the block disposes the handle instead, as
-    it does a handle whose release refuses some states.
+    it does a handle whose release refuses some states. A dispose that is also
+    the release disposes with a null completion.
     """
     release = bound.operations_by_name.get(handle.release)
     if handle.dispose and release is not None and release.completion is not None:
         return handle.dispose
     return handle.scoped_release
+
+
+def disposal(bound: BoundApi, handle: HandlePlan, name: str, receiver: str) -> str:
+    """A native call that disposes `receiver` with `name`, passing a null
+    completion to a dispose that is also the release, and a null diagnostic."""
+    function = bound.source.functions_by_name[name]
+    arguments = [
+        "std::ptr::null()" if p.name == handle.dispose_completion else receiver
+        for p in function.parameters
+    ]
+    return native_call(function, arguments, diagnostic="std::ptr::null_mut()")
 
 
 def compact(body: list[str]) -> list[str]:
@@ -897,7 +916,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         if support and isinstance(support.support, DisposeSupport):
             errors.pop(handle.cleanup, None)
         disposer = bound.source.functions_by_name[handle.cleanup]
-        call = f"unsafe {{ {native_call(disposer, ['handle'], diagnostic='std::ptr::null_mut()')} }}"
+        call = f"unsafe {{ {disposal(bound, handle, handle.cleanup, 'handle')} }}"
         if ctype(disposer.return_type) == "void":
             call += "; sys::MLN_STATUS_OK"
         rust_values += f'\nunsafe extern "C" fn generated_dispose_{handle.native}(handle: sys::{handle.native}) -> sys::mln_status {{ {call} }}\n'

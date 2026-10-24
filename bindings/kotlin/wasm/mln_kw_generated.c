@@ -900,12 +900,8 @@ int32_t mln_kw_mln_map_projection_pixels_for_lat_lngs(
   );
 }
 
-int32_t mln_kw_mln_map_projection_release(
-  int64_t projection, uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_map_projection_release(
-    (mln_map_projection)projection, (mln_diagnostic*)out_diagnostic
-  );
+void mln_kw_mln_map_projection_release(int64_t projection) {
+  mln_map_projection_release((mln_map_projection)projection);
 }
 
 int32_t mln_kw_mln_map_projection_set_camera(
@@ -1436,10 +1432,11 @@ int32_t mln_kw_mln_render_session_detach(
 }
 
 int32_t mln_kw_mln_render_session_dispose(
-  int64_t session, uintptr_t out_diagnostic
+  int64_t session, uintptr_t completion, uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_render_session_dispose(
-    (mln_render_session)session, (mln_diagnostic*)out_diagnostic
+    (mln_render_session)session, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
   );
 }
 
@@ -1532,14 +1529,6 @@ int32_t mln_kw_mln_render_session_reduce_memory_use(
   return (int32_t)mln_render_session_reduce_memory_use(
     (mln_render_session)session, (const mln_completion*)completion,
     (mln_diagnostic*)out_diagnostic
-  );
-}
-
-int32_t mln_kw_mln_render_session_release(
-  int64_t session, uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_render_session_release(
-    (mln_render_session)session, (mln_diagnostic*)out_diagnostic
   );
 }
 

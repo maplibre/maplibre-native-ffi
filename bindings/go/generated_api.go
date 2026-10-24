@@ -6290,7 +6290,7 @@ func (handle *MapHandle) owner() *bindingOwner {
 type MapProjectionHandle struct{ *bindingOwner }
 
 func adoptMapProjectionHandle(raw uint64, parent any) *MapProjectionHandle {
-	owner := &MapProjectionHandle{bindingAdopt(raw, parent, "MapProjectionHandle", false, func(raw uint64) { C.mln_map_projection_release(C.mln_map_projection(raw), nil) })}
+	owner := &MapProjectionHandle{bindingAdopt(raw, parent, "MapProjectionHandle", false, func(raw uint64) { C.mln_map_projection_release(C.mln_map_projection(raw)) })}
 	return owner
 }
 
@@ -6330,7 +6330,7 @@ func (handle *RenderFrameBatchHandle) owner() *bindingOwner {
 type RenderSessionHandle struct{ *bindingOwner }
 
 func adoptRenderSessionHandle(raw uint64, parent any) *RenderSessionHandle {
-	owner := &RenderSessionHandle{bindingAdopt(raw, parent, "RenderSessionHandle", false, func(raw uint64) { C.mln_render_session_dispose(C.mln_render_session(raw), nil) })}
+	owner := &RenderSessionHandle{bindingAdopt(raw, parent, "RenderSessionHandle", false, func(raw uint64) { C.mln_render_session_dispose(C.mln_render_session(raw), nil, nil) })}
 	return owner
 }
 
@@ -7478,9 +7478,11 @@ func (receiver *MapProjectionHandle) PixelsForLatLngs(coordinates []LatLng) ([]S
 // See mln_map_projection_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
 func (receiver *MapProjectionHandle) Close() error {
-	return bindingDo(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_projection_release(C.mln_map_projection(raw), diagnostic))
+	_, err := bindingDirect(bindingConsuming(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
+		C.mln_map_projection_release(C.mln_map_projection(raw))
+		return struct{}{}
 	})
+	return err
 }
 
 // SetCamera applies a camera update to a standalone projection.
@@ -8021,6 +8023,17 @@ func (receiver *RenderSessionHandle) Detach() (*Future[struct{}], error) {
 	}, completionUnit, false)
 }
 
+// Close consumes a session in any state and retires it, then runs completion,
+// if given, once the host may destroy the target's graphics objects.
+//
+// See mln_render_session_dispose in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+func (receiver *RenderSessionHandle) Close() (*Future[struct{}], error) {
+	return bindingStart(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_dispose(C.mln_render_session(raw), completion, diagnostic))
+	}, completionUnit, false)
+}
+
 // DrainFrameResults drains every currently queued terminal frame result into an
 // independently owned batch. The records remain stable until the batch is
 // released.
@@ -8128,19 +8141,6 @@ func (receiver *RenderSessionHandle) ReduceMemoryUse() (*Future[struct{}], error
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_reduce_memory_use(C.mln_render_session(raw), completion, diagnostic))
 	}, completionUnit, false)
-}
-
-// Close retires a detached or abandoned session handle. The call is CPU-only
-// and may run on any native thread, including from one of the session's own
-// completions. If an abandonment is still in progress on another thread, this
-// waits for it to finish before consuming the session owner.
-//
-// See mln_render_session_release in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-func (receiver *RenderSessionHandle) Close() error {
-	return bindingDo(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_release(C.mln_render_session(raw), diagnostic))
-	})
 }
 
 // RequestFrame requests a frame without waiting. Every accepted demand produces

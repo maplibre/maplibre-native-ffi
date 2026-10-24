@@ -297,6 +297,14 @@ class OwnedTexture:
             if time.monotonic() > deadline:
                 raise AssertionError("timed out waiting for a red frame")
 
+    def stop_service(self) -> None:
+        """Stop servicing the session, if the graphics thread services it."""
+        if self._service is not None:
+            self._stopping = True
+            self._work.set()
+            if not self._stopped.wait(TIMEOUT):
+                raise AssertionError("the graphics thread did not stop")
+
     def _teardown(self, release: bool) -> None:
         """Stop servicing, destroy the session and map, then the graphics.
 
@@ -304,15 +312,11 @@ class OwnedTexture:
         so everything is left alive rather than destroyed under it.
         """
         self._closed = True
-        if self._service is not None:
-            self._stopping = True
-            self._work.set()
-            if not self._stopped.wait(TIMEOUT):
-                raise AssertionError("the graphics thread did not stop")
+        self.stop_service()
         # No driver call is in flight once servicing stops, so the session
-        # can be destroyed.
+        # can be destroyed, and it has retired once its close completes.
         if release and self.session is not None:
-            self.session.close()
+            result(self.session.close())
         if release and self.map is not None:
             close_if_live(self.map)
         if self._service is not None:
@@ -583,6 +587,24 @@ def test_a_native_wake_reaches_native_and_the_first_call_consumes_it(
     # Native code releases the accepted wake once the session is gone.
     assert frames.released.wait(TIMEOUT)
     assert frames.releases == [frames.user_data]
+
+
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_leaving_an_attached_sessions_scope_disposes_it(
+    harness: Harness, backend: str
+) -> None:
+    frames = _NativeCode(user_data=0x5C0)
+    driver = _default_driver(backend)
+    with OwnedTexture(harness, backend, driver, frame_wake=frames.wake) as target:
+        assert target.session is not None
+        with target.session:
+            target.render()
+            # Nothing services the session once its scope disposes it.
+            target.stop_service()
+            target.session = None
+        # Native code releases the wakes once the session retires, after
+        # which the map releases and the host destroys the graphics objects.
+        assert frames.released.wait(TIMEOUT)
 
 
 @pytest.mark.parametrize("backend", BACKENDS)

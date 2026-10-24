@@ -1,5 +1,5 @@
-// Owned-texture sessions on a core worker: rendering and readback, and the
-// scope of a borrowed frame view.
+// Owned-texture sessions on a core worker: rendering and readback, teardown
+// before the graphics go, and the scope of a borrowed frame view.
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:test/test.dart';
 
@@ -10,6 +10,12 @@ import 'support/render.dart';
 const _redStyleJson =
     '{"version":8,"sources":{},"layers":[{"id":"background",'
     '"type":"background","paint":{"background-color":"#ff0000"}}]}';
+
+final _extent = LogicalExtent(
+  width: renderSize,
+  height: renderSize,
+  scaleFactor: 1,
+);
 
 void _expectRed(TextureReadbackResult image) {
   expect(image.info.width, renderSize);
@@ -46,12 +52,52 @@ void main() {
     // Nothing services driver work, so only a core-worker default completes.
     final attachment = TestGraphics.open().attachOwnedTexture(
       map,
-      LogicalExtent(width: renderSize, height: renderSize, scaleFactor: 1),
+      _extent,
       RenderSessionAttachOptions(),
     );
     addTearDown(() => releaseSession(attachment.session));
     await within(attachment.completed, 'attachment');
   }, skip: _wglSkip);
+
+  test(
+    'a disposed attached session lets its map release before its graphics go',
+    () async {
+      final map = await openRenderMap(emptyStyleJson);
+      final graphics = TestGraphics.open();
+      final attachment = graphics.attachOwnedTexture(
+        map,
+        _extent,
+        RenderSessionAttachOptions(),
+      );
+      addTearDown(() => releaseSession(attachment.session));
+      await within(attachment.completed, 'attachment');
+
+      attachment.session.dispose();
+      // A dispose reports no retirement, so the map's release waits for it.
+      await within(map.close(), 'map close');
+      graphics.close();
+    },
+    skip: _wglSkip,
+  );
+
+  test(
+    'closing an attached session completes once its graphics may go',
+    () async {
+      final map = await openRenderMap(emptyStyleJson);
+      final graphics = TestGraphics.open();
+      final attachment = graphics.attachOwnedTexture(
+        map,
+        _extent,
+        RenderSessionAttachOptions(),
+      );
+      addTearDown(() => releaseSession(attachment.session));
+      await within(attachment.completed, 'attachment');
+
+      await within(attachment.session.close(), 'session close');
+      graphics.close();
+    },
+    skip: _wglSkip,
+  );
 
   test('a drain before any demand returns no batch', () async {
     final map = await openRenderMap(_redStyleJson);

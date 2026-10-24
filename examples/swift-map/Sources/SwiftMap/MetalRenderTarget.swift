@@ -228,10 +228,10 @@ final class MetalRenderTarget {
     do {
       try releaseHeldFrame()
       try await session.detach()
-      try session.close()
+      try await session.close()
     } catch {
       _ = try? session.abandon()
-      try? session.close()
+      try? session.dispose()
       throw error
     }
   }
@@ -263,7 +263,7 @@ final class MetalRenderTarget {
       return try make(MetalTextureCompositor(graphics: graphics))
     } catch {
       _ = try? session.abandon()
-      try? session.close()
+      try? session.dispose()
       throw error
     }
   }
@@ -277,7 +277,7 @@ final class MetalRenderTarget {
       return session
     } catch {
       _ = try? session.abandon()
-      try? session.close()
+      try? session.dispose()
       throw error
     }
   }

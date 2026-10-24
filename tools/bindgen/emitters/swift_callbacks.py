@@ -205,10 +205,15 @@ def descriptor(values, plan):
             f"  guard let {identifier(parameter.name)} else {{ {fail or 'return'} }}\n  let response{name(parameter.name)} = {values.public(parameter.value.element)}(pointer: {identifier(parameter.name)})\n  defer {{ response{name(parameter.name)}.expire() }}\n"
             for parameter in responses
         )
-        from .swift_ownership import owner_name
+        from .swift_ownership import disposer_arguments, owner_name
 
         for parameter in owned:
-            setup += f"  guard let owned{name(parameter.name)} = try? {owner_name(parameter.value.handle)}(adopting: {identifier(parameter.name)}) else {{ {parameter.value.handle.release}({identifier(parameter.name)}); {fail or 'return'} }}\n"
+            handle = parameter.value.handle
+            release = values.bound.source.functions_by_name[handle.release]
+            arguments = disposer_arguments(handle, release, identifier(parameter.name))
+            if release.diagnostic:
+                arguments.append("nil")
+            setup += f"  guard let owned{name(parameter.name)} = try? {owner_name(handle)}(adopting: {identifier(parameter.name)}) else {{ {handle.release}({', '.join(arguments)}); {fail or 'return'} }}\n"
         if callback.decision:
             decision = callback.decision
             setup += f"  guard let decisionOwner = try? {owner_name(decision.handle)}(adopting: {identifier(decision.parameter)}) else {{ {fail} }}\n"
@@ -227,9 +232,12 @@ def descriptor(values, plan):
         if responses:
             invoke += f"; return MLN_STATUS_OK{suffix}"
         if owned:
-            fail = " ".join(f"try? owned{name(p.name)}.close();" for p in owned) + (
-                " " + fail if fail else ""
-            )
+            # The synchronous release of a handle whose release is also its
+            # dispose is the dispose.
+            fail = " ".join(
+                f"try? owned{name(p.name)}.{'dispose' if p.value.handle.dispose_completion else 'close'}();"
+                for p in owned
+            ) + (" " + fail if fail else "")
         body = (
             f'  do {{ {invoke} }} catch {{ reportToStandardError("{callback.native} failed and native received its fallback: \\(error)\\n"); {fail} }}'
             if "try " in invoke

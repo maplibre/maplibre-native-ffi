@@ -195,15 +195,17 @@ internal sealed class RenderFixture : IDisposable
     {
         try
         {
+            // Dispose accepts the session in any state, and a test may already have disposed it.
             if (Session is not null)
-                DetachAndClose();
+                Session.Dispose();
         }
         finally
         {
             try
             {
+                // The map's release completes once its session has retired.
                 if (Map is not null)
-                    Complete(Map.CloseAsync());
+                    Complete(Map.DisposeAsync().AsTask());
             }
             finally
             {
@@ -219,33 +221,6 @@ internal sealed class RenderFixture : IDisposable
                 }
             }
         }
-    }
-
-    private void DetachAndClose()
-    {
-        if (
-            Session.GetSnapshot().State
-            is not (RenderSessionState.Detached or RenderSessionState.Abandoned)
-        )
-        {
-            try
-            {
-                Await(Session.DetachAsync(), "the session to detach");
-            }
-            catch
-            {
-                try
-                {
-                    Session.Abandon();
-                }
-                finally
-                {
-                    Session.Close();
-                }
-                throw;
-            }
-        }
-        Session.Close();
     }
 
     private IReadOnlyList<RenderFrameResult> DrainFrames()
@@ -335,7 +310,7 @@ internal sealed class RenderFixture : IDisposable
 
     private static NativePointer Borrow(nint address) => NativePointer.FromBorrowedAddress(address);
 
-    private static void Complete(Task operation) =>
+    internal static void Complete(Task operation) =>
         Assert.True(operation.Wait(TestWaits.Deadline), "A native operation did not complete.");
 
     private static T Complete<T>(Task<T> operation)

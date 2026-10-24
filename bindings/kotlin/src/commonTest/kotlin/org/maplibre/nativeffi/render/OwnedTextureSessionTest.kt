@@ -5,12 +5,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import org.maplibre.nativeffi.assertFailsWithStatus
+import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.generated.GpuSync
 import org.maplibre.nativeffi.generated.RenderResult
 import org.maplibre.nativeffi.generated.RenderSessionState
 import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.runSuspendTest
+import org.maplibre.nativeffi.runtime.use as useAndAwaitRelease
 
 /**
  * The render session shapes over an owned texture on the build's backend, which the caller drives
@@ -87,6 +90,32 @@ class OwnedTextureSessionTest {
       assertFailsWith<IllegalStateException> { escaped!!.kind }
       frame.release()
       assertFailsWithStatus(Status.INVALID_STATE) { frame.withProducerSync {} }
+    }
+  }
+
+  @Test
+  fun useDisposesAnAttachedSessionAndItsMapReleasesAfterIt() = runSuspendTest {
+    withOwnedTexture {
+      session.use {
+        setStyle(RED_BACKGROUND_STYLE)
+        renderStill()
+      }
+      assertTrue(session.isClosed)
+      // The dispose reports nothing, and the map release completes once the session has retired.
+      mapFixture.map.release().awaitWithin("the map release")
+    }
+  }
+
+  @Test
+  fun suspendingUseAwaitsTheReleaseOfAnAttachedSession() = runSuspendTest {
+    withOwnedTexture {
+      // The suspending `use`, imported under another name so `use` stays AutoCloseable's.
+      session.useAndAwaitRelease {
+        setStyle(RED_BACKGROUND_STYLE)
+        renderStill()
+      }
+      assertTrue(session.isClosed)
+      mapFixture.map.release().awaitWithin("the map release")
     }
   }
 

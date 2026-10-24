@@ -14,6 +14,7 @@ import {
 import { expectCommitted, openRuntime } from "./support/fixture.ts";
 import {
   attachSession,
+  attachSessionOverOwnGraphics,
   backend,
   centerPixel,
   NativeProbe,
@@ -48,6 +49,39 @@ test("an owned texture renders a frame that reads back as pixels", async () => {
   assert.equal(image.info.height, renderSize);
   assert.deepEqual(centerPixel(image), red);
 });
+
+test(
+  "using disposes an attached session, and the map's release then lets the host destroy its graphics objects",
+  async () => {
+    const map = await openRenderMap();
+    const { session, completed, destroyGraphics } =
+      attachSessionOverOwnGraphics(map);
+    await bounded(completed, "the attachment");
+    requestFrame(session, 1n);
+    session[Symbol.dispose]();
+    session[Symbol.dispose]();
+    assert.throws(() => requestFrame(session, 2n), MaplibreError);
+    await bounded(map.close(), "the map release");
+    destroyGraphics();
+  },
+  { needs: ["disposers"] },
+);
+
+test(
+  "await using waits until an attached session has retired, so the host may destroy its graphics objects",
+  async () => {
+    const map = await openRenderMap();
+    const { session, completed, destroyGraphics } =
+      attachSessionOverOwnGraphics(map);
+    await bounded(completed, "the attachment");
+    requestFrame(session, 1n);
+    await bounded(session[Symbol.asyncDispose](), "the disposal");
+    await session[Symbol.asyncDispose]();
+    destroyGraphics();
+    await bounded(map.close(), "the map release");
+  },
+  { needs: ["disposers"] },
+);
 
 test("a drain before any demand returns no batch", async () => {
   const map = await openRenderMap();
@@ -157,7 +191,7 @@ test("a native registration reaches native unchanged, a call consumes it, and a 
 
   // Native code releases the context that it accepted once the session ends.
   await bounded(session.detach(), "the detach");
-  session.close();
+  session.dispose();
   await probe.arrival("release");
 
   // Native code refuses a disabled wake that carries a release, so the
@@ -209,7 +243,7 @@ test("a native queue lock reaches a session whose target takes one", async () =>
   requestFrame(session, 1n);
   await probe.arrival("unlock");
   await bounded(session.detach(), "the detach");
-  session.close();
+  session.dispose();
   await probe.arrival("release");
   assert.equal(probe.events.at(-1), "release");
 });

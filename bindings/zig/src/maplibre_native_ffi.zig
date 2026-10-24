@@ -58,7 +58,7 @@ pub const Map = owner.Handle("mln_map", struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub const MapProjection = owner.Handle("mln_map_projection", struct {
     fn dispose(raw: u64) status.Error!void {
-        try status.call(c.mln_map_projection_release, .{raw}, null);
+        c.mln_map_projection_release(raw);
     }
 }.dispose);
 /// An owned batch of frame results from one drain.
@@ -76,7 +76,7 @@ pub const RenderFrameBatch = owner.Handle("mln_render_frame_batch", struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub const RenderSession = owner.Handle("mln_render_session", struct {
     fn dispose(raw: u64) status.Error!void {
-        try status.call(c.mln_render_session_dispose, .{raw}, null);
+        try status.call(c.mln_render_session_dispose, .{ raw, null }, null);
     }
 }.dispose);
 /// A resource request that a resource provider handles.
@@ -5706,8 +5706,8 @@ pub fn mapProjectionPixelsForLatLngs(allocator: std.mem.Allocator, projection: M
 ///
 /// See `mln_map_projection_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-pub fn mapProjectionRelease(projection: MapProjection, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_map_projection_release", .handle, projection, null, diagnostic, .{});
+pub fn mapProjectionRelease(projection: MapProjection) status.Error!void {
+    return call.direct("mln_map_projection_release", .handle, projection, void, null, .{});
 }
 
 /// Applies a camera update to a standalone projection.
@@ -6206,12 +6206,22 @@ pub fn renderSessionDetach(session: RenderSession, diagnostic: ?*diagnostics.Dia
     return call.submit("mln_render_session_detach", .handle, session, call.unit, null, diagnostic, .{});
 }
 
-/// Consumes a session and schedules its retirement and destruction.
+/// Consumes a session in any state and retires it, then runs completion, if
+/// given, once the host may destroy the target's graphics objects.
+///
+/// See `mln_render_session_dispose` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+pub fn renderSessionRelease(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    return call.submit("mln_render_session_dispose", .handle, session, call.unit, null, diagnostic, .{});
+}
+
+/// Consumes a session in any state and retires it, then runs completion, if
+/// given, once the host may destroy the target's graphics objects.
 ///
 /// See `mln_render_session_dispose` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub fn renderSessionDispose(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_render_session_dispose", .handle, session, null, diagnostic, .{});
+    return call.discard("mln_render_session_dispose", .handle, session, null, diagnostic, .{});
 }
 
 /// Drains every currently queued terminal frame result into an independently
@@ -6288,17 +6298,6 @@ pub fn renderSessionReadTexture(allocator: std.mem.Allocator, session: RenderSes
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub fn renderSessionReduceMemoryUse(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     return call.submit("mln_render_session_reduce_memory_use", .handle, session, call.unit, null, diagnostic, .{});
-}
-
-/// Retires a detached or abandoned session handle. The call is CPU-only and may
-/// run on any native thread, including from one of the session's own
-/// completions. If an abandonment is still in progress on another thread, this
-/// waits for it to finish before consuming the session owner.
-///
-/// See `mln_render_session_release` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn renderSessionRelease(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_render_session_release", .handle, session, null, diagnostic, .{});
 }
 
 /// Requests a frame without waiting. Every accepted demand produces one

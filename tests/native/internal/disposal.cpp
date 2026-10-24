@@ -421,7 +421,7 @@ void disposal_detaches_an_attached_core_worker_session() {
   MLN_TEST_OK(mln_render_session_reduce_memory_use(
     fixture.session, &queued.descriptor, nullptr
   ));
-  MLN_TEST_OK(mln_render_session_dispose(fixture.session, nullptr));
+  MLN_TEST_OK(mln_render_session_dispose(fixture.session, nullptr, nullptr));
   mln_test_gate_release(blocker.gate.get());
   MLN_TEST_STATUS(
     core_worker ? MLN_STATUS_OK : MLN_STATUS_TARGET_LOST,
@@ -455,7 +455,7 @@ void a_map_releases_while_its_disposed_session_retires() {
   MLN_TEST_OK(blocker.submit(fixture.session));
   if (core_worker)
     TEST_ASSERT_TRUE(mln_test_gate_wait_entered(blocker.gate.get()));
-  MLN_TEST_OK(mln_render_session_dispose(fixture.session, nullptr));
+  MLN_TEST_OK(mln_render_session_dispose(fixture.session, nullptr, nullptr));
   auto release = mln_test_completion{};
   MLN_TEST_OK(mln_test_map_start_close(map, &release));
   // The runtime worker begins map retirements in order, so the other map's
@@ -476,50 +476,6 @@ void a_map_releases_while_its_disposed_session_retires() {
   mln_test_destroy_runtime(runtime);
 }
 
-// A destroy that leased its session before a dispose released the handle finds
-// the handle released, without waiting for the session's driver. Disposal
-// starts no abandonment when the session's detach finishes first, so a destroy
-// that waited for one could wait forever.
-void a_destroy_that_races_dispose_finds_the_handle_released() {
-  auto sync_points = SyncPointScope{};
-  const auto runtime = mln_test_create_runtime();
-  const auto map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(map);
-  auto released = std::atomic_bool{false};
-  auto fixture = mln_test_render_fixture{};
-  attach_observed(map, fixture, released);
-  const auto core_worker = fixture.driver == MLN_RENDER_DRIVER_CORE_WORKER;
-  // The detach queues behind the blocker, so the session stays detaching.
-  auto blocker = DriverBlocker{};
-  MLN_TEST_OK(blocker.submit(fixture.session));
-  if (core_worker)
-    TEST_ASSERT_TRUE(mln_test_gate_wait_entered(blocker.gate.get()));
-  auto detach = mln_test_completion_default(0);
-  MLN_TEST_OK(
-    mln_render_session_detach(fixture.session, &detach.descriptor, nullptr)
-  );
-  sync_points.hold(SyncPoint::RenderDestroyLeased);
-  auto destroyed = std::atomic_int{MLN_STATUS_OK};
-  auto destroyer = std::thread{[&] {
-    destroyed = mln_render_session_release(fixture.session, nullptr);
-  }};
-  TEST_ASSERT_TRUE(
-    sync_points.wait_for_hits(SyncPoint::RenderDestroyLeased, 1)
-  );
-  MLN_TEST_OK(mln_render_session_dispose(fixture.session, nullptr));
-  sync_points.release(SyncPoint::RenderDestroyLeased);
-  destroyer.join();
-  MLN_TEST_STATUS(MLN_STATUS_INVALID_STATE, destroyed.load());
-  mln_test_gate_release(blocker.gate.get());
-  static_cast<void>(mln_test_completion_settle(&blocker.completion));
-  blocker.submitted = false;
-  static_cast<void>(mln_test_completion_settle(&detach));
-  TEST_ASSERT_TRUE(wake_released(released));
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 // A session whose frame the host still holds keeps its target in the host's
 // hands, so disposal abandons it on every driver. The abandon keeps the ring,
 // and a kept Vulkan ring is a child of the host's device.
@@ -532,7 +488,7 @@ void disposal_abandons_a_session_with_an_acquired_frame() {
   auto fixture = mln_test_render_fixture{};
   attach_observed(map, fixture, released);
   auto frame = mln_test_render_and_acquire(&fixture, 1);
-  MLN_TEST_OK(mln_render_session_dispose(fixture.session, nullptr));
+  MLN_TEST_OK(mln_render_session_dispose(fixture.session, nullptr, nullptr));
   MLN_TEST_OK(mln_acquired_frame_discard(frame, nullptr));
   TEST_ASSERT_TRUE(wake_released(released));
   TEST_ASSERT_EQUAL_INT(0, sync_points.hits(SyncPoint::RenderDisposalDetached));
@@ -602,20 +558,24 @@ auto session_state(const mln_render_session_object& session) -> uint32_t {
   return session.state;
 }
 
-// A view keeps its session busy: abandon reports busy until the view ends,
-// and a release from work that the abandon delivers is busy rather than
-// waiting for its own abandonment.
+// A view keeps its session busy: abandon reports busy until the view ends. A
+// dispose from work that the abandon delivers is accepted, and the session
+// retires once that abandon returns rather than waiting for its own
+// abandonment.
 void a_view_and_its_own_abandonment_keep_a_session_busy() {
   const auto runtime = create_runtime();
   const auto map = create_map(runtime);
   auto fake = attach_fake_texture_session(map);
   const auto session = fake.session->self;
-  auto reentrant_destroy_status = std::atomic_int{MLN_STATUS_OK};
+  auto disposed = mln_test_completion_default(0);
+  const auto disposal = disposed.descriptor;
+  auto reentrant_dispose_status = std::atomic_int{MLN_STATUS_NATIVE_ERROR};
   fake.session->driver_work.push_back(
     mln::core::RenderDriverWork{
       .execute = {},
-      .abandon = [session, &reentrant_destroy_status] {
-        reentrant_destroy_status = mln_render_session_release(session, nullptr);
+      .abandon = [session, disposal, &reentrant_dispose_status] {
+        reentrant_dispose_status =
+          mln_render_session_dispose(session, &disposal, nullptr);
       },
     }
   );
@@ -632,11 +592,8 @@ void a_view_and_its_own_abandonment_keep_a_session_busy() {
   auto sync = mln_gpu_sync_default();
   MLN_TEST_OK(mln_acquired_frame_release(fake.frame, &sync, nullptr));
   MLN_TEST_OK(mln_render_session_abandon(session, &result, nullptr));
-  MLN_TEST_OK(mln_render_session_release(session, nullptr));
-  TEST_ASSERT_EQUAL_INT_MESSAGE(
-    MLN_STATUS_BUSY, reentrant_destroy_status.load(),
-    "an abandonment callback waited for its own retirement"
-  );
+  MLN_TEST_OK(reentrant_dispose_status.load());
+  MLN_TEST_OK(mln_test_completion_settle(&disposed));
   MLN_TEST_OK(mln_map_dispose(map, nullptr));
   MLN_TEST_OK(mln_runtime_dispose(runtime, nullptr));
 }
@@ -654,9 +611,11 @@ void a_held_view_parks_its_retirements_without_stalling_others() {
   void* scope = nullptr;
   MLN_TEST_OK(mln_acquired_frame_view_begin(held.frame, &scope, nullptr));
   MLN_TEST_OK(mln_acquired_frame_discard(held.frame, nullptr));
-  MLN_TEST_OK(mln_render_session_dispose(held.session->self, nullptr));
+  MLN_TEST_OK(mln_render_session_dispose(held.session->self, nullptr, nullptr));
   MLN_TEST_OK(mln_acquired_frame_discard(other.frame, nullptr));
-  MLN_TEST_OK(mln_render_session_dispose(other.session->self, nullptr));
+  MLN_TEST_OK(
+    mln_render_session_dispose(other.session->self, nullptr, nullptr)
+  );
   other.session.reset();
   // The lane runs in submission order, so the other session retiring means
   // the held session's retirement already ran.
@@ -683,7 +642,7 @@ void a_held_view_holds_the_release_of_its_disposed_sessions_map() {
   void* scope = nullptr;
   MLN_TEST_OK(mln_acquired_frame_view_begin(held.frame, &scope, nullptr));
   MLN_TEST_OK(mln_acquired_frame_discard(held.frame, nullptr));
-  MLN_TEST_OK(mln_render_session_dispose(held.session->self, nullptr));
+  MLN_TEST_OK(mln_render_session_dispose(held.session->self, nullptr, nullptr));
   held.session.reset();
   auto held_release = Result{};
   const auto held_completion = descriptor(held_release);
@@ -747,9 +706,11 @@ void a_running_driver_call_parks_its_retirement_without_stalling_others() {
   TEST_ASSERT_TRUE(await([&] { return driver.entered.load(); }, "the driver"));
   auto other = attach_fake_texture_session(other_map);
   auto other_weak = std::weak_ptr{other.session};
-  MLN_TEST_OK(mln_render_session_dispose(busy_id, nullptr));
+  MLN_TEST_OK(mln_render_session_dispose(busy_id, nullptr, nullptr));
   MLN_TEST_OK(mln_acquired_frame_discard(other.frame, nullptr));
-  MLN_TEST_OK(mln_render_session_dispose(other.session->self, nullptr));
+  MLN_TEST_OK(
+    mln_render_session_dispose(other.session->self, nullptr, nullptr)
+  );
   other.session.reset();
   TEST_ASSERT_TRUE(expired(other_weak));
   TEST_ASSERT_FALSE_MESSAGE(
@@ -834,10 +795,11 @@ void a_serviced_driver_call_parks_its_retirement_without_stalling_others() {
     await([&] { return driver.entered.load(); }, "the driver call");
   auto other = attach_fake_texture_session(other_map);
   auto other_weak = std::weak_ptr{other.session};
-  const auto busy_disposed = mln_render_session_dispose(busy_id, nullptr);
+  const auto busy_disposed =
+    mln_render_session_dispose(busy_id, nullptr, nullptr);
   const auto frame_discarded = mln_acquired_frame_discard(other.frame, nullptr);
   const auto other_disposed =
-    mln_render_session_dispose(other.session->self, nullptr);
+    mln_render_session_dispose(other.session->self, nullptr, nullptr);
   other.session.reset();
   const auto other_retired = expired(other_weak);
   const auto busy_retired_early = busy_weak.expired();
@@ -922,7 +884,6 @@ MLN_TEST_GROUP {
   RUN_TEST(disposal_detaches_an_attached_core_worker_session);
   RUN_TEST(a_map_releases_while_its_disposed_session_retires);
   RUN_TEST(disposal_abandons_a_session_with_an_acquired_frame);
-  RUN_TEST(a_destroy_that_races_dispose_finds_the_handle_released);
   RUN_TEST(finalization_abandons_an_attached_session);
   RUN_TEST(disposal_drains_queued_work_and_map_cleanup);
   RUN_TEST(failed_creation_releases_parent_reservation);

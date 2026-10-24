@@ -2207,10 +2207,7 @@ unsafe extern "C" {
         out_points: *mut mln_screen_point,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_projection_release(
-        projection: mln_map_projection,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
+    pub fn mln_map_projection_release(projection: mln_map_projection);
     pub fn mln_map_projection_set_camera(
         projection: mln_map_projection,
         camera: *const mln_camera_options,
@@ -2514,6 +2511,7 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_render_session_dispose(
         session: mln_render_session,
+        completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_drain_frame_results(
@@ -2568,10 +2566,6 @@ unsafe extern "C" {
     pub fn mln_render_session_reduce_memory_use(
         session: mln_render_session,
         completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_render_session_release(
-        session: mln_render_session,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_request_frame(

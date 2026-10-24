@@ -8,7 +8,7 @@ native_owner! {
     ///
     /// See `mln_map_projection` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    pub struct MapProjectionHandle(mln_map_projection) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_map_projection_release(raw, out_diagnostic) }), counted false;
+    pub struct MapProjectionHandle(mln_map_projection) dispose |raw| { unsafe { sys::mln_map_projection_release(raw) }; Ok(()) }, counted false;
 }
 
 impl MapProjectionHandle {
@@ -187,9 +187,8 @@ impl MapProjectionHandle {
     pub fn release(&self) -> Result<()> {
         self.inner.close(|projection| {
             let mut call = Call::new(projection, None);
-            call.status(|projection, out_diagnostic| unsafe {
-                sys::mln_map_projection_release(projection, out_diagnostic)
-            })
+            call.run(|projection| unsafe { sys::mln_map_projection_release(projection) });
+            Ok(())
         })
     }
 

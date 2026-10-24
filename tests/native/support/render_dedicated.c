@@ -119,7 +119,7 @@ static bool finish_dedicated_attach(
     (void)mln_render_session_abandon(
       fixture->session, &abandoned, MLN_TEST_DIAGNOSTIC
     );
-    (void)mln_render_session_release(fixture->session, MLN_TEST_DIAGNOSTIC);
+    (void)mln_test_render_session_dispose(fixture->session);
   }
   destroy_dedicated_state(state);
   *fixture = (mln_test_render_fixture){0};
@@ -150,7 +150,7 @@ static void destroy_dedicated_fixture(mln_test_render_fixture* fixture) {
         fixture->session, &abandoned, MLN_TEST_DIAGNOSTIC
       );
     }
-    (void)mln_render_session_release(fixture->session, MLN_TEST_DIAGNOSTIC);
+    (void)mln_test_render_session_dispose(fixture->session);
   }
   destroy_dedicated_state(fixture->backend_state);
   *fixture = (mln_test_render_fixture){0};

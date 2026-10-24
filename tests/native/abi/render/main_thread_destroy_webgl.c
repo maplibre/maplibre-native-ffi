@@ -1,7 +1,7 @@
 // A core-worker session that the browser main thread attaches, abandons, and
-// destroys in one turn, while the pre-spawned pthread pool is empty. The
-// session's worker then starts only after the main thread yields, so destroy
-// must not wait for it.
+// disposes in one turn, while the pre-spawned pthread pool is empty. The
+// session's worker then starts only after the main thread yields, so neither
+// call may wait for it.
 //
 // The suite runs main() on a pthread, so the browser main thread is free to
 // run a call proxied to it.
@@ -63,12 +63,13 @@ typedef struct main_thread_session {
   mln_map map;
   pool_hold* hold;
   mln_completion attach_completion;
+  mln_completion dispose_completion;
   mln_status attach_status;
   mln_status abandon_status;
-  mln_status destroy_status;
+  mln_status dispose_status;
 } main_thread_session;
 
-static void attach_and_destroy_here(void* context) {
+static void attach_and_dispose_here(void* context) {
   main_thread_session* run = context;
 
   // Each pthread_create() here takes a pre-spawned Worker, so the session's
@@ -112,10 +113,11 @@ static void attach_and_destroy_here(void* context) {
     .size = sizeof(mln_render_abandon_result)
   };
   run->abandon_status = mln_render_session_abandon(session, &abandoned, NULL);
-  run->destroy_status = mln_render_session_release(session, NULL);
+  run->dispose_status =
+    mln_render_session_dispose(session, &run->dispose_completion, NULL);
 }
 
-static void destroy_on_main_thread_leaves_unstarted_worker(void) {
+static void dispose_on_main_thread_leaves_unstarted_worker(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   pool_hold hold = {
@@ -123,19 +125,21 @@ static void destroy_on_main_thread_leaves_unstarted_worker(void) {
     .condition = PTHREAD_COND_INITIALIZER,
   };
   mln_test_completion attach = mln_test_completion_default(0);
+  mln_test_completion dispose = mln_test_completion_default(0);
   main_thread_session run = {
     .map = map,
     .hold = &hold,
     .attach_completion = attach.descriptor,
+    .dispose_completion = dispose.descriptor,
     .attach_status = MLN_STATUS_NATIVE_ERROR,
     .abandon_status = MLN_STATUS_NATIVE_ERROR,
-    .destroy_status = MLN_STATUS_NATIVE_ERROR,
+    .dispose_status = MLN_STATUS_NATIVE_ERROR,
   };
 
   TEST_ASSERT_EQUAL_INT(
     1, emscripten_proxy_sync(
          emscripten_proxy_get_system_queue(),
-         emscripten_main_runtime_thread_id(), attach_and_destroy_here, &run
+         emscripten_main_runtime_thread_id(), attach_and_dispose_here, &run
        )
   );
 
@@ -150,13 +154,14 @@ static void destroy_on_main_thread_leaves_unstarted_worker(void) {
 
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, run.attach_status);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, run.abandon_status);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, run.destroy_status);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, run.dispose_status);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_TARGET_LOST, mln_test_completion_settle(&attach)
   );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&dispose));
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
-MLN_TEST_GROUP { RUN_TEST(destroy_on_main_thread_leaves_unstarted_worker); }
+MLN_TEST_GROUP { RUN_TEST(dispose_on_main_thread_leaves_unstarted_worker); }

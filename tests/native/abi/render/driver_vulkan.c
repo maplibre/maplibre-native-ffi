@@ -64,14 +64,13 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_SESSION_STATE_TARGET_LOST, snapshot.state
   );
-  MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE, mln_render_session_release(session, NULL)
-  );
   mln_render_abandon_result abandoned = {
     .size = sizeof(mln_render_abandon_result)
   };
   MLN_TEST_OK(mln_render_session_abandon(session, &abandoned, NULL));
-  MLN_TEST_OK(mln_render_session_release(session, NULL));
+  MLN_TEST_AWAIT_OK(
+    mln_render_session_dispose(session, &completion.descriptor, NULL)
+  );
 
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));

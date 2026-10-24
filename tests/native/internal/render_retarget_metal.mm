@@ -54,11 +54,15 @@ auto teardown(mln_render_session session, const char* failure) -> const char* {
   } else if (!finish(detach) && failure == nullptr) {
     failure = "the session detach failed";
   }
+  auto disposed = mln_test_completion_default(0);
   if (
-    mln_render_session_release(session, nullptr) != MLN_STATUS_OK &&
-    failure == nullptr
+    mln_render_session_dispose(session, &disposed.descriptor, nullptr) !=
+    MLN_STATUS_OK
   ) {
-    failure = "the session release was rejected";
+    discard(disposed);
+    if (failure == nullptr) failure = "the session dispose was rejected";
+  } else if (!finish(disposed) && failure == nullptr) {
+    failure = "the session dispose failed";
   }
   return failure;
 }

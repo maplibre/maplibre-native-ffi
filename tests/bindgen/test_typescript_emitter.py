@@ -122,6 +122,27 @@ class TypeScriptEmitterTests(unittest.TestCase):
         self.assertIn("queue_lock", members)
         self.assertTrue(self.values.member_optional(options, members["queue_lock"]))
 
+    def test_a_dispose_that_is_also_the_release_closes_both_ways(self):
+        # The session's release is its dispose with a completion, so close()
+        # awaits retirement, while dispose(), `using`, and an adopted handle's
+        # cleanup pass no completion.
+        text = next(
+            text
+            for name, text in typescript.generate(self.api).items()
+            if name.endswith("generated_operations.ts")
+        )
+        self.assertIn('defineDisposers(RenderSessionHandle, "close", "dispose");', text)
+        self.assertIn(
+            "native.mln_render_session_dispose(handle, token, completion)", text
+        )
+        self.assertIn(
+            "native.mln_render_session_dispose(handle, token, undefined)", text
+        )
+        self.assertIn(
+            "native.mln_render_session_dispose(disposed, undefined, undefined)",
+            text,
+        )
+
     def test_only_synchronous_categories_return_without_a_promise(self):
         # An operation that the headers complete later returns a Promise or an
         # attachment, so only the categories that return synchronously can

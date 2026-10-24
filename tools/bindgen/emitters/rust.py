@@ -575,6 +575,10 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
                 f"parameter {parameter.name}: {parameter.type.spelling} needs ownership/shape lowering"
             )
     method = plan.member
+    if discard and plan.completion.optional:
+        # The release passes the completion, and the dispose, which keeps the
+        # C name, passes none.
+        method = function.name.removeprefix(f"{receiver}_")
     if method in {"native", "submit_command", "submit_query", "drop", "adopt"} or (
         method == "close" and not consuming
     ):
@@ -757,6 +761,8 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
             module, code = operation(plan, value_types)
             if code:
                 chunks[module].append(code)
+            if plan.completion and plan.completion.optional:
+                chunks[module].append(operation(plan, value_types, discard=True)[1])
             generated.append(function.name)
         except Unsupported as error:
             value_types.used = previous_values

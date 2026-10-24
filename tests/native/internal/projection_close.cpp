@@ -56,9 +56,8 @@ void close_waits_for_a_running_conversion() {
   Conversion conversion(projection);
   const auto running =
     sync.wait_for_hits(SyncPoint::ProjectionCallRunning, calls + 1);
-  auto close_status = std::atomic_int{-1};
   auto close = std::thread([&] {
-    close_status = mln_map_projection_release(projection, nullptr);
+    mln_map_projection_release(projection);
     mln_test_pulse();
   });
   const auto waited = sync.wait_for_hits(SyncPoint::ProjectionCloseWaits, 1);
@@ -68,7 +67,6 @@ void close_waits_for_a_running_conversion() {
 
   TEST_ASSERT_TRUE_MESSAGE(running, "the conversion never ran");
   TEST_ASSERT_TRUE_MESSAGE(waited, "the close did not wait for the conversion");
-  MLN_TEST_OK(close_status.load());
   MLN_TEST_OK_MESSAGE(conversion.status.load(), conversion.diagnostic.message);
   TEST_ASSERT_EQUAL_DOUBLE(expected.x, conversion.point.x);
   TEST_ASSERT_EQUAL_DOUBLE(expected.y, conversion.point.y);
@@ -90,12 +88,11 @@ void a_conversion_that_leased_before_close_reports_a_stale_handle() {
   sync.hold(SyncPoint::ProjectionCallLeased);
   Conversion conversion(projection);
   const auto leased = sync.wait_for_hits(SyncPoint::ProjectionCallLeased, 1);
-  const auto close_status = mln_map_projection_release(projection, nullptr);
+  mln_map_projection_release(projection);
   sync.release(SyncPoint::ProjectionCallLeased);
   conversion.thread.join();
 
   TEST_ASSERT_TRUE_MESSAGE(leased, "the conversion never leased the handle");
-  MLN_TEST_OK(close_status);
   MLN_TEST_INVALID_STATE(conversion.status.load());
   TEST_ASSERT_NOT_NULL_MESSAGE(
     std::strstr(conversion.diagnostic.message, "stale"),

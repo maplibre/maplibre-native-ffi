@@ -122,7 +122,7 @@ void main() {
 
       // Native code releases the wake that it accepted once the session can
       // no longer call it.
-      releaseSession(session);
+      await within(session.close(), 'session close');
       await releases.wait('the release of the accepted wake');
       expect(releases.contexts, [1, 2]);
       wakes.close();
@@ -153,7 +153,7 @@ void main() {
       );
       addTearDown(() => releaseSession(attachment.session));
       await within(attachment.completed, 'attachment');
-      releaseSession(attachment.session);
+      await within(attachment.session.close(), 'session close');
       await releases.wait('the release of the accepted queue lock');
     } else {
       // Only a Vulkan target takes a lock. Native code reaches that check

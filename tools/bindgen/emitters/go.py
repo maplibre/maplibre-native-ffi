@@ -97,9 +97,15 @@ def lower(api):
             raise ModelError(
                 [f"{native}: automatic ownership requires an unconditional disposer"]
             )
+        # A dispose that is also the release takes a completion, which a
+        # disposer leaves null.
+        function = bound.source.functions_by_name[disposer]
         dispose = native_call(
-            bound.source.functions_by_name[disposer],
-            f"C.{native}(raw)",
+            function,
+            *(
+                "nil" if p.name == handle.dispose_completion else f"C.{native}(raw)"
+                for p in function.parameters
+            ),
             diagnostic="nil",
         )
         owners.append(

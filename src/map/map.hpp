@@ -501,7 +501,7 @@ auto map_view_from_transform(
 auto map_projection_create(
   const mln_map_view* view, mln_map_projection* out_projection
 ) -> mln_status;
-auto map_projection_release(mln_map_projection projection) -> mln_status;
+auto map_projection_release(mln_map_projection projection) -> void;
 auto map_projection_get_camera(
   mln_map_projection projection, mln_camera_options* out_camera
 ) -> mln_status;

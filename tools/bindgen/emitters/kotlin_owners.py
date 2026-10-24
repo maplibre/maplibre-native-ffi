@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from .kotlin_operations import method_name, needs_read, receiver_value
+from .kotlin_operations import disposal_method, method_name, needs_read, receiver_value
 from .kotlin_values import doc, generated_owners, name, owner_name
 
 ASYNC_RELEASABLE = "org.maplibre.nativeffi.runtime.AsyncReleasable"
@@ -33,27 +33,35 @@ def state_type(native, plans):
     )
 
 
-def release(bound, native, plans):
-    """Map the scoped release onto AutoCloseable or AsyncReleasable, when a host can call it bare."""
+def releases(bound, native, plans):
+    """Map the scoped release onto AutoCloseable or AsyncReleasable, when a host can call it bare.
+
+    A dispose that is also the release, with a completion that may be null,
+    maps onto both: `use` disposes, and the suspending `use` awaits the
+    release.
+    """
     handle = bound.handles[native]
     plan = next(
         (p for p in plans if p.name == handle.scoped_release and receives(p, native)),
         None,
     )
     if plan is None:
-        return None
+        return []
     extra = [p for p in plan.inputs if p.name != plan.receiver]
     method = method_name(plan)
     if plan.completion:
-        result = Release(ASYNC_RELEASABLE, "release", method)
+        result = [Release(ASYNC_RELEASABLE, "release", method)]
+        if plan.completion.optional:
+            result.append(Release("AutoCloseable", "close", disposal_method(handle)))
     elif all(defaulted(p) for p in extra):
-        result = Release("AutoCloseable", "close", method)
+        result = [Release("AutoCloseable", "close", method)]
     else:
-        return None
-    if extra and result.inherited:
-        raise ValueError(
-            f"{plan.name}: a release with parameters cannot implement {result.member}()"
-        )
+        return []
+    for closes in result:
+        if extra and closes.inherited:
+            raise ValueError(
+                f"{plan.name}: a release with parameters cannot implement {closes.member}()"
+            )
     return result
 
 
@@ -75,10 +83,9 @@ def owner(bound, native, plans):
     handle = bound.handles[native]
     family = name(native)
     owner_class = owner_name(handle)
-    closes = release(bound, native, plans)
+    closes = releases(bound, native, plans)
     supertypes = [f"Generated{family}Operations()"]
-    if closes:
-        supertypes.append(closes.interface)
+    supertypes.extend(release.interface for release in closes)
     parameters = ["handle: Long"]
     if handle.parent:
         # The owner, not its state, keeps the parent reachable, so leak cleanup
@@ -98,20 +105,17 @@ def owner(bound, native, plans):
             "  public val id: ULong get() = binding.handle.toULong()"
         ),
     ]
-    if closes and closes.interface == ASYNC_RELEASABLE:
+    if any(release.interface == ASYNC_RELEASABLE for release in closes):
         body.append(
             "  public override val isClosed: Boolean get() = binding.isReleased"
         )
-    elif native == "mln_render_session":
+    for release in closes:
+        if release.inherited:
+            continue
         body.append(
-            "  /** Whether a release or dispose has ended the handle. */\n"
-            "  public val isClosed: Boolean get() = binding.isReleased"
-        )
-    if closes and not closes.inherited:
-        body.append(
-            f"  public override fun close() {{ {closes.method}() }}"
-            if closes.member == "close"
-            else f"  public override fun release(): kotlinx.coroutines.Deferred<Unit> = {closes.method}()"
+            f"  public override fun close() {{ {release.method}() }}"
+            if release.member == "close"
+            else f"  public override fun release(): kotlinx.coroutines.Deferred<Unit> = {release.method}()"
         )
     body.append(
         f'  override fun toString(): String = "{owner_class}(id=0x${{binding.handle.toString(16)}}, closed=${{binding.isReleased}})"'

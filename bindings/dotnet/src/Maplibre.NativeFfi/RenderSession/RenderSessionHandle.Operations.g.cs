@@ -16,9 +16,13 @@ namespace Maplibre.NativeFfi;
 /// <para>See <c>mln_render_session</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.</para>
 /// </remarks>
-public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwner<MlnRenderSession>
+public sealed unsafe partial class RenderSessionHandle
+    : IDisposable,
+        IAsyncDisposable,
+        INativeOwner<MlnRenderSession>
 {
     private readonly NativeHandleState<MlnRenderSession> state;
+    private volatile Task teardown = Task.CompletedTask;
 
     /// <summary>
     /// Completes once the driver owns the target, and faults with a
@@ -43,7 +47,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
             .Unwrap();
         state = new(
             handle,
-            static (live, diagnostic) => NativeMethods.mln_render_session_release(live, diagnostic),
+            StartRelease,
             nameof(RenderSessionHandle),
             Abandon,
             retainedParent: parent
@@ -62,7 +66,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         );
 
     private static mln_status Abandon(MlnRenderSession live, mln_diagnostic* diagnostic) =>
-        NativeMethods.mln_render_session_dispose(live, diagnostic);
+        NativeMethods.mln_render_session_dispose(live, null, diagnostic);
 
     NativeHandleState<MlnRenderSession> INativeOwner<MlnRenderSession>.State => state;
     internal MlnRenderSession Handle => state.Handle;
@@ -175,6 +179,34 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
+    }
+
+    /// <summary>
+    /// Consumes a session in any state and retires it, then runs completion, if
+    /// given, once the host may destroy the target's graphics objects.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_render_session_dispose</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task CloseAsync()
+    {
+        state.Close(idempotent: false);
+        return teardown;
+    }
+
+    public ValueTask DisposeAsync() => state.Close() ? new(teardown) : default;
+
+    private mln_status StartRelease(MlnRenderSession handle, mln_diagnostic* _)
+    {
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_dispose(
+            handle,
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        teardown = nativePending.Submitted(nativeStatus);
+        return mln_status.MLN_STATUS_OK;
     }
 
     /// <summary>
@@ -417,21 +449,6 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
-    /// Retires a detached or abandoned session handle. The call is CPU-only and
-    /// may run on any native thread, including from one of the session's own
-    /// completions. If an abandonment is still in progress on another thread,
-    /// this waits for it to finish before consuming the session owner.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_render_session_release</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
-    /// </remarks>
-    public void Close()
-    {
-        state.Close();
     }
 
     /// <summary>

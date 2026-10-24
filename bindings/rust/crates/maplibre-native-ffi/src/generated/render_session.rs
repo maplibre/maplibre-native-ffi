@@ -8,7 +8,7 @@ native_owner! {
     ///
     /// See `mln_render_session` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    pub struct RenderSessionHandle(mln_render_session) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_render_session_dispose(raw, out_diagnostic) }), counted false;
+    pub struct RenderSessionHandle(mln_render_session) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_render_session_dispose(raw, std::ptr::null(), out_diagnostic) }), counted false;
 }
 
 impl RenderSessionHandle {
@@ -93,15 +93,33 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Consumes a session and schedules its retirement and destruction.
+    /// Consumes a session in any state and retires it, then runs completion, if
+    /// given, once the host may destroy the target's graphics objects.
+    ///
+    /// See `mln_render_session_dispose` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    pub fn release(&self) -> Result<NativeFuture<()>> {
+        self.inner.close(|session| {
+            let call = Call::new(session, None);
+            call.complete(
+                |session, completion, out_diagnostic| unsafe {
+                    sys::mln_render_session_dispose(session, completion, out_diagnostic)
+                },
+                completion::unit,
+            )
+        })
+    }
+
+    /// Consumes a session in any state and retires it, then runs completion, if
+    /// given, once the host may destroy the target's graphics objects.
     ///
     /// See `mln_render_session_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn dispose(&self) -> Result<()> {
         self.inner.close(|session| {
-            let mut call = Call::new(session, None);
-            call.status(|session, out_diagnostic| unsafe {
-                sys::mln_render_session_dispose(session, out_diagnostic)
+            let call = Call::new(session, None);
+            call.discard(|session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_dispose(session, completion, out_diagnostic)
             })
         })
     }
@@ -286,22 +304,6 @@ impl RenderSessionHandle {
             },
             completion::unit,
         )
-    }
-
-    /// Retires a detached or abandoned session handle. The call is CPU-only and
-    /// may run on any native thread, including from one of the session's own
-    /// completions. If an abandonment is still in progress on another thread,
-    /// this waits for it to finish before consuming the session owner.
-    ///
-    /// See `mln_render_session_release` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn release(&self) -> Result<()> {
-        self.inner.close(|session| {
-            let mut call = Call::new(session, None);
-            call.status(|session, out_diagnostic| unsafe {
-                sys::mln_render_session_release(session, out_diagnostic)
-            })
-        })
     }
 
     /// Requests a frame without waiting. Every accepted demand produces one

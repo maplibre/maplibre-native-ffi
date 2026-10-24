@@ -13,7 +13,10 @@ public class RenderSessionHandle
 internal constructor(
   handle: Long,
   @Suppress("unused") private val parent: MapHandle,
-) : GeneratedRenderSessionOperations(), AutoCloseable {
+) :
+  GeneratedRenderSessionOperations(),
+  org.maplibre.nativeffi.runtime.AsyncReleasable,
+  AutoCloseable {
   internal override val binding =
     HandleState("RenderSessionHandle", handle, GeneratedOwnerDisposal::renderSession)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
@@ -24,8 +27,7 @@ internal constructor(
   public val id: ULong
     get() = binding.handle.toULong()
 
-  /** Whether a release or dispose has ended the handle. */
-  public val isClosed: Boolean
+  public override val isClosed: Boolean
     get() = binding.isReleased
 
   public override fun close() {

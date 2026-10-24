@@ -706,50 +706,50 @@ MLN_API mln_status mln_render_session_abandon(
 ) MLN_NOEXCEPT;
 
 /**
- * Retires a detached or abandoned session handle. The call is CPU-only and may
- * run on any native thread, including from one of the session's own
- * completions. If an abandonment is still in progress on another thread, this
- * waits for it to finish before consuming the session owner.
+ * Consumes a session in any state and retires it, then runs completion, if
+ * given, once the host may destroy the target's graphics objects.
  *
- * Returns:
- * - MLN_STATUS_OK when the handle is retired.
- * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle.
- * - MLN_STATUS_INVALID_STATE when session has been released, including by a
- *   dispose that runs during this call, or is neither detached nor abandoned,
- *   or a detached session still has an acquired frame.
- * - MLN_STATUS_BUSY when pending abandonment still waits on a scope from
- *   mln_acquired_frame_view_begin() or on driver work, or the calling thread is
- *   the one abandoning the session, as in a completion that the abandonment
- *   delivers. The session owner remains live.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- */
-MLN_API mln_status mln_render_session_release(
-  mln_render_session session, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Consumes a session and schedules its retirement and destruction.
+ * A null completion disposes without reporting retirement, as a command
+ * discards its outcome. The call is CPU-only and may run on any native thread,
+ * including from the session's own completions and driver calls.
  *
  * Queued driver work completes with MLN_STATUS_TARGET_LOST. An attached
  * core-worker session with no acquired frame detaches after in-flight driver
- * work ends. Every other session is abandoned after in-flight driver work and
- * scopes from mln_acquired_frame_view_begin() end, following
- * mln_render_session_abandon(). Retirement releases the map attachment, and
- * mln_map_release() accepts the map before it does. The host keeps its graphics
- * objects alive until the session's wake release callbacks run. Disposal
- * reports nothing about what it keeps, so a Vulkan host keeps its VkDevice and
- * VkSurfaceKHR, and their VkInstance, until the process exits. The exception
- * is a session whose target an earlier detach or abandon already released: the
- * rules of that call apply. Acquired frame accessors report target loss after
- * acceptance; their owners still release or dispose those frames. Teardown may
- * allocate; allocation failure after acceptance terminates the process.
+ * work ends, following mln_render_session_detach(). Every other session that
+ * holds its target is abandoned after in-flight driver work and scopes from
+ * mln_acquired_frame_view_begin() end, following mln_render_session_abandon().
+ * A session whose target an earlier detach or abandon released follows the
+ * rules of that call, and retires once an abandon still running on another
+ * thread returns. Acquired frame accessors report target loss after
+ * acceptance; their owners still release or discard those frames.
  *
- * Returns MLN_STATUS_OK on acceptance, MLN_STATUS_INVALID_ARGUMENT for an
- * invalid handle, or MLN_STATUS_INVALID_STATE for a session that has been
- * released.
+ * Retirement releases the map attachment once no library thread touches the
+ * target's graphics objects. mln_map_release() accepts the map before that and
+ * completes after it, and the session's wake release callbacks and this
+ * completion also run after it, so the host may destroy its graphics objects
+ * once any of them runs. Disposal keeps what that detach or abandon keeps and
+ * reports nothing about it. A Vulkan session keeps its session-owned texture
+ * ring while a frame of it is acquired or a slot is quarantined, and every
+ * object once the process has begun to exit or its queue fails to drain; the
+ * host then keeps their VkDevice, a kept swapchain's VkSurfaceKHR, and their
+ * VkInstance until the process exits. Release acquired frames, rather than
+ * discard them, before disposing to let a Vulkan host destroy its device.
+ * Teardown may allocate; allocation failure after acceptance terminates the
+ * process.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the disposal is accepted and the handle is consumed.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
+ *   completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when session has been released.
+ * - MLN_STATUS_NATIVE_ERROR when the completion could not be allocated.
+ *
+ * Completes with MLN_STATUS_OK once the session has retired.
  */
+MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_render_session_dispose(
-  mln_render_session session, mln_diagnostic* out_diagnostic
+  mln_render_session session, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**

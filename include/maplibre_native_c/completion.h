@@ -95,7 +95,8 @@ typedef void (*mln_completion_callback)(
  * acceptance order, publishes its snapshot generation, and queues its events.
  * A discarded command that fails logs its status and diagnostic as a warning
  * through the log handler. Queries, operations, and lifecycle functions require
- * a completion.
+ * a completion, except mln_render_session_dispose(), which accepts null to
+ * dispose without reporting retirement.
  *
  * A later completion fences discarded commands. The completion of a later
  * command or query on the same map follows every earlier discarded command,

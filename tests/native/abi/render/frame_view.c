@@ -76,7 +76,7 @@ static mln_screen_point pixel_for(
   MLN_TEST_OK(
     mln_map_projection_pixel_for_lat_lng(projection, coordinate, &point, NULL)
   );
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
+  mln_map_projection_release(projection);
   return point;
 }
 
@@ -209,7 +209,7 @@ static void expect_matches(
   MLN_TEST_OK(mln_map_projection_lat_lng_for_pixel_unwrapped(
     projection, drawn, &unwrapped, NULL
   ));
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
+  mln_map_projection_release(projection);
   const double pixel = degrees(1.0, row->zoom);
   TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
     pixel, visible_dot.longitude, unwrapped.longitude, row->label

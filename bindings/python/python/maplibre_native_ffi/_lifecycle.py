@@ -33,8 +33,7 @@ class NativeHandleMixin:
         A handle whose release reports asynchronous teardown returns a future
         here, and a host that must observe teardown calls ``close`` itself and
         waits. Leaving the ``with`` block disposes such a handle instead,
-        without observing teardown, as it does a render session, whose release
-        refuses an attached session. Leaving the block after an explicit close
+        without observing teardown. Leaving the block after an explicit close
         does nothing.
         """
         return self._native.close()

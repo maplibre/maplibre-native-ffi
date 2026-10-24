@@ -80,7 +80,7 @@ static void conversions_agree_singly_and_in_batches_and_invert(void) {
     );
   }
 
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
+  mln_map_projection_release(projection);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -102,7 +102,7 @@ static void empty_batches_convert_to_empty_results(void) {
     projection, NULL, 0, NULL, NULL
   ));
 
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
+  mln_map_projection_release(projection);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }

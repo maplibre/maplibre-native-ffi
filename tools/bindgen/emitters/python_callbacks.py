@@ -112,7 +112,7 @@ def input_source(plan, values):
 
 
 def sources(values, plan):
-    from .python import OWNERS, owned_native
+    from .python import OWNERS, disposal, owned_native
 
     rust, python = [], []
     descriptor = plan.registration
@@ -206,7 +206,7 @@ def sources(values, plan):
             for p in owned
         )
         unadopted = "".join(
-            f"if !{rust_field(p.name)}_adopted.get() {{ unsafe {{ sys::{p.value.handle.release}({rust_field(p.name)}) }}; }} "
+            f"if !{rust_field(p.name)}_adopted.get() {{ unsafe {{ {disposal(values.api, p.value.handle, p.value.handle.release, rust_field(p.name))} }}; }} "
             for p in owned
         )
         if len(parameters) == 1:

@@ -3587,7 +3587,7 @@ MapProjectionHandle mapProjectionCreate(MapView view) =>
         outProjection.value,
         () => MapProjectionHandle._(NativeMapProjection(outProjection.value)),
         (handle) {
-          _check(raw.mln_map_projection_release(handle, nativeDiagnostic));
+          raw.mln_map_projection_release(handle);
         },
       );
     });
@@ -4952,7 +4952,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+          _check(
+            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
+          );
         },
       ),
       RenderSessionAttachment.new,
@@ -4985,7 +4987,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+          _check(
+            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
+          );
         },
       ),
       RenderSessionAttachment.new,
@@ -5018,7 +5022,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+          _check(
+            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
+          );
         },
       ),
       RenderSessionAttachment.new,
@@ -5051,7 +5057,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+          _check(
+            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
+          );
         },
       ),
       RenderSessionAttachment.new,
@@ -5084,7 +5092,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+          _check(
+            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
+          );
         },
       ),
       RenderSessionAttachment.new,
@@ -5117,7 +5127,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+          _check(
+            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
+          );
         },
       ),
       RenderSessionAttachment.new,
@@ -5150,7 +5162,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+          _check(
+            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
+          );
         },
       ),
       RenderSessionAttachment.new,
@@ -5183,7 +5197,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+          _check(
+            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
+          );
         },
       ),
       RenderSessionAttachment.new,
@@ -5216,7 +5232,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+          _check(
+            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
+          );
         },
       ),
       RenderSessionAttachment.new,
@@ -5249,7 +5267,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+          _check(
+            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
+          );
         },
       ),
       RenderSessionAttachment.new,
@@ -5282,7 +5302,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+          _check(
+            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
+          );
         },
       ),
       RenderSessionAttachment.new,
@@ -5315,7 +5337,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+          _check(
+            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
+          );
         },
       ),
       RenderSessionAttachment.new,
@@ -6538,9 +6562,10 @@ final class MapProjectionHandle implements Finalizable {
   ///
   /// See `mln_map_projection_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  void close() => _state.close(
-    (handle) => raw.mln_map_projection_release(handle.raw, nativeDiagnostic),
-  );
+  void close() => _state.close((handle) {
+    raw.mln_map_projection_release(handle.raw);
+    return nativeStatusOk;
+  });
 
   /// Applies a camera update to a standalone projection.
   ///
@@ -6719,12 +6744,29 @@ final class RenderSessionHandle implements Finalizable {
     ),
   );
 
-  /// Consumes a session and schedules its retirement and destruction.
+  /// Consumes a session in any state and retires it, then runs completion, if
+  /// given, once the host may destroy the target's graphics objects.
+  ///
+  /// See `mln_render_session_dispose` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  Future<void> close() => _state.closeAsync(
+    (handle) => _run(
+      (arena, completion) => raw.mln_render_session_dispose(
+        handle.raw,
+        completion,
+        nativeDiagnostic,
+      ),
+    ),
+  );
+
+  /// Consumes a session in any state and retires it, then runs completion, if
+  /// given, once the host may destroy the target's graphics objects.
   ///
   /// See `mln_render_session_dispose` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   void dispose() => _state.close(
-    (handle) => raw.mln_render_session_dispose(handle.raw, nativeDiagnostic),
+    (handle) =>
+        raw.mln_render_session_dispose(handle.raw, nullptr, nativeDiagnostic),
   );
 
   /// Drains every currently queued terminal frame result into an independently
@@ -6895,17 +6937,6 @@ final class RenderSessionHandle implements Finalizable {
       completion,
       nativeDiagnostic,
     ),
-  );
-
-  /// Retires a detached or abandoned session handle. The call is CPU-only and
-  /// may run on any native thread, including from one of the session's own
-  /// completions. If an abandonment is still in progress on another thread,
-  /// this waits for it to finish before consuming the session owner.
-  ///
-  /// See `mln_render_session_release` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  void close() => _state.close(
-    (handle) => raw.mln_render_session_release(handle.raw, nativeDiagnostic),
   );
 
   /// Requests a frame without waiting. Every accepted demand produces one

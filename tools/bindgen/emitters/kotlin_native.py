@@ -629,6 +629,16 @@ class NativeShims:
             return f"MLN_JNI_POINTER({spelling}, {parameter.c_name})"
         return f"({spelling}){parameter.c_name}"
 
+    def release(self, handle, local):
+        """The C statement that releases a handle a callback owns when its host throws."""
+        from .kotlin_operations import disposer_arguments
+
+        function = self.bound.source.functions_by_name[handle.release]
+        arguments = disposer_arguments(handle, function, local, "NULL")
+        if function.diagnostic:
+            arguments.append("NULL")
+        return f"{handle.release}({', '.join(arguments)});"
+
     def jni(self):
         functions, methods, critical_methods = [], [], []
         for s in self.signatures:
@@ -694,7 +704,7 @@ class NativeShims:
                 callback = self.bound.callbacks.get(site.callback)
                 releases = (
                     [
-                        f"{parameter.value.handle.release}({identifier(parameter.name)});"
+                        self.release(parameter.value.handle, identifier(parameter.name))
                         for parameter in callback.arguments
                         if parameter.value.kind == "handle"
                         and parameter.value.ownership == "owned"

@@ -145,6 +145,32 @@ fn a_caller_driven_session_is_serviced_from_the_thread_that_claimed_it() {
 }
 
 #[test]
+fn a_released_session_lets_the_host_destroy_its_graphics_objects() {
+    let graphics = Graphics::new();
+    let (_fixture, session) = rendering_fixture(&graphics);
+    assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
+    // The release completes once the attached session has retired, so the
+    // device may go while the map stays open.
+    session.drive(session.handle.release().unwrap()).unwrap();
+    drop(graphics);
+}
+
+#[test]
+fn a_session_dropped_while_attached_retires_before_its_map_releases() {
+    let graphics = Graphics::new();
+    let (fixture, session) = rendering_fixture(&graphics);
+    assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
+    // Drop disposes the attached session without reporting its retirement.
+    drop(session);
+    let (runtime, map) = fixture.into_parts();
+    // The map's release completes after the session releases its map
+    // attachment, once no library thread touches the device.
+    wait_for(map.release());
+    drop(graphics);
+    wait_for(runtime.release());
+}
+
+#[test]
 fn dropping_an_attached_session_and_its_parents_disposes_the_graph() {
     let _global = global_state();
     let reports = capture_reports();

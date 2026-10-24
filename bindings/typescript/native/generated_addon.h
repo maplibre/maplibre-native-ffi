@@ -19,7 +19,7 @@
 #include "maplibre_native_c/texture.h"
 #include "runtime.h"
 
-#define MLN_TS_ABI_DIGEST "95ee89c36d540d12"
+#define MLN_TS_ABI_DIGEST "9d73cb2ac5fafbd8"
 
 napi_value mln_ts_decode_buffer_view(
   napi_env env, const mln_completion_result* result

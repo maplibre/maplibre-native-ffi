@@ -18,12 +18,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
 
     internal MapProjectionHandle(MlnMapProjection handle)
     {
-        state = new(
-            handle,
-            static (live, diagnostic) => NativeMethods.mln_map_projection_release(live, diagnostic),
-            nameof(MapProjectionHandle),
-            Abandon
-        );
+        state = new(handle, Abandon, nameof(MapProjectionHandle), Abandon);
     }
 
     internal static MapProjectionHandle Adopt(MlnMapProjection handle) =>
@@ -33,8 +28,11 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
             Abandon
         );
 
-    private static mln_status Abandon(MlnMapProjection live, mln_diagnostic* diagnostic) =>
-        NativeMethods.mln_map_projection_release(live, diagnostic);
+    private static mln_status Abandon(MlnMapProjection live, mln_diagnostic* diagnostic)
+    {
+        NativeMethods.mln_map_projection_release(live);
+        return mln_status.MLN_STATUS_OK;
+    }
 
     NativeHandleState<MlnMapProjection> INativeOwner<MlnMapProjection>.State => state;
     internal MlnMapProjection Handle => state.Handle;

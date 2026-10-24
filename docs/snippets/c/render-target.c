@@ -121,15 +121,26 @@ static void map_released(void* user_data, const mln_completion_result* result) {
   (void)result;
 }
 
-static void detached(void* user_data, const mln_completion_result* result) {
+static void retired(void* user_data, const mln_completion_result* result) {
   teardown_state* state = user_data;
-  if (result->status != MLN_STATUS_OK) return;
-  mln_render_session_release(state->session, NULL);
+  (void)result;
+  // The host may destroy the target's graphics objects from here on.
   const mln_completion completion = {
     .size = sizeof(mln_completion),
     .callback = map_released,
   };
   (void)mln_map_release(state->map, &completion, NULL);
+}
+
+static void detached(void* user_data, const mln_completion_result* result) {
+  teardown_state* state = user_data;
+  if (result->status != MLN_STATUS_OK) return;
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = retired,
+    .user_data = state,
+  };
+  (void)mln_render_session_dispose(state->session, &completion, NULL);
 }
 
 mln_status release_map(

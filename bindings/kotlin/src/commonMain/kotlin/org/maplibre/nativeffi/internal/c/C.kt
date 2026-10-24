@@ -488,7 +488,7 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_projection_release(projection: Long, outDiagnostic: Long): Int
+  fun mln_map_projection_release(projection: Long): Unit
 
   fun mln_map_projection_set_camera(projection: Long, camera: Long, outDiagnostic: Long): Int
 
@@ -760,7 +760,7 @@ internal expect object C {
 
   fun mln_render_session_detach(session: Long, completion: Long, outDiagnostic: Long): Int
 
-  fun mln_render_session_dispose(session: Long, outDiagnostic: Long): Int
+  fun mln_render_session_dispose(session: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_render_session_drain_frame_results(
     session: Long,
@@ -812,8 +812,6 @@ internal expect object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int
-
-  fun mln_render_session_release(session: Long, outDiagnostic: Long): Int
 
   fun mln_render_session_request_frame(session: Long, demand: Long, outDiagnostic: Long): Int
 

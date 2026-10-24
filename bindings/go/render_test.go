@@ -114,8 +114,9 @@ func (r *renderFixture) attach(t *testing.T) {
 	await(t, r.attached)
 }
 
-// teardown detaches the session on this thread, or abandons it when it cannot
-// detach, and destroys it. A later teardown does nothing.
+// teardown detaches the session on this thread when it can, then closes it
+// and waits for its retirement, after which the cleanups release the map and
+// destroy the graphics objects. A later teardown does nothing.
 func (r *renderFixture) teardown(t *testing.T) {
 	if r.closed {
 		return
@@ -123,12 +124,8 @@ func (r *renderFixture) teardown(t *testing.T) {
 	r.closed = true
 	if detach, err := r.session.Detach(); err == nil {
 		r.service(t, detach.Done(), "the detach")
-	} else if _, err := r.session.Abandon(); err != nil {
-		t.Errorf("Abandon: %v", err)
 	}
-	if err := r.session.Close(); err != nil {
-		t.Errorf("session close: %v", err)
-	}
+	await(t, submitted(r.session.Close()))
 }
 
 // service runs the session's driver work until done closes, blocking on the
@@ -224,6 +221,18 @@ func TestCallerDriverIsServicedFromAGoroutine(t *testing.T) {
 		t.Fatalf("capabilities = %+v, %v; want the caller driver", capabilities, err)
 	}
 	r.renderFrame(t)
+}
+
+// Closing an attached session retires it without a detach. Once the close
+// completes, the map releases and the host destroys the graphics objects.
+func TestCloseRetiresAnAttachedSession(t *testing.T) {
+	r := newRenderFixture(t)
+	r.attach(t)
+	r.renderFrame(t)
+	r.closed = true
+	await(t, submitted(r.session.Close()))
+	await(t, submitted(r.m.Close()))
+	r.graphics.Close()
 }
 
 // Before any demand, no frame result is queued and no frame has rendered,

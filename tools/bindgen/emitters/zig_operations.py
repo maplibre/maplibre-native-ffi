@@ -8,10 +8,10 @@ retains callback roots, and decodes outputs and completion results.
 
 from dataclasses import replace
 
+from ..names import camel
 from ..semantic import output_member
 from .zig import (
     DIAGNOSTIC_PARAMETER,
-    camel,
     failure,
     identifier,
 )
@@ -91,6 +91,23 @@ def copier(plan, values):
     if result.optional == "empty":
         raise failure(plan.function, "empty completion requires a copier")
     return copy, public
+
+
+def function_name(plan, values, *, discard=False):
+    """The public function's name: the C name without `mln_`, or the member
+    name on a command's discarding view.
+
+    A dispose that is also its handle's release keeps the C name for the call
+    that passes no completion, and takes the release's name, as `mapRelease`
+    has, for the call that passes one.
+    """
+    optional = plan.completion and plan.completion.optional
+    if optional and not discard:
+        receiver = next(p.value.native for p in plan.inputs if p.name == plan.receiver)
+        return camel(f"{values.bound.handles[receiver].stem}_{plan.member}")
+    if discard and not optional:
+        return camel(plan.member)
+    return camel(plan.name.removeprefix("mln_"))
 
 
 def operation(plan, values, *, discard=False):
@@ -294,9 +311,8 @@ def operation(plan, values, *, discard=False):
         signature.insert(0, "allocator: std.mem.Allocator")
     if function.diagnostic:
         signature.append(DIAGNOSTIC_PARAMETER)
-    method = camel(plan.name.removeprefix("mln_"))
-    if discard:
-        method = camel(plan.member)
+    method = function_name(plan, values, discard=discard)
+    if discard and not completion.optional:
         receiver_parameter = next(
             i
             for i, p in enumerate(signature)

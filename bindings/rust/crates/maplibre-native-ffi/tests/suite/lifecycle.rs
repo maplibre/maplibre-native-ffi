@@ -9,12 +9,7 @@ use crate::support::*;
 
 #[test]
 fn releasing_a_handle_twice_reaches_native() {
-    let fixture = Fixture::new();
-    let projection = map_projection_create(&fixture.map().get_snapshot().unwrap().view).unwrap();
-    projection.release().unwrap();
-    let error = projection.release().unwrap_err();
-    assert_eq!(error.status(), Status::InvalidState);
-    let (runtime, map) = fixture.into_parts();
+    let (runtime, map) = Fixture::new().into_parts();
     wait_for(map.release());
     assert_eq!(map.release().unwrap_err().status(), Status::InvalidState);
     wait_for(runtime.release());

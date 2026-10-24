@@ -120,7 +120,7 @@ app_error render_session_finish_attach(
   awaited_completion_deinit(attached);
   if (status != MLN_STATUS_OK) {
     abandon(session);
-    (void)mln_render_session_release(session->handle, NULL);
+    (void)mln_render_session_dispose(session->handle, NULL, NULL);
     session->handle = MLN_HANDLE_NULL;
     return log_failure(
       APP_ERROR_ATTACH_FAILED, "render target attach failed", status, NULL
@@ -150,7 +150,7 @@ void render_session_close(render_session* session) {
   if (!detached) {
     abandon(session);
   }
-  (void)mln_render_session_release(session->handle, NULL);
+  (void)mln_render_session_dispose(session->handle, NULL, NULL);
   *session = (render_session){.handle = MLN_HANDLE_NULL};
 }
 

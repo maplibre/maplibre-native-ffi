@@ -263,7 +263,7 @@ bool mln_test_transferred_webgl_surface_create(
       (void)mln_render_session_abandon(
         fixture->session, &abandoned, MLN_TEST_DIAGNOSTIC
       );
-      (void)mln_render_session_release(fixture->session, MLN_TEST_DIAGNOSTIC);
+      (void)mln_test_render_session_dispose(fixture->session);
     }
     destroy_backend_state(fixture->backend_state);
     *fixture = (mln_test_render_fixture){0};

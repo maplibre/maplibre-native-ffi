@@ -81,6 +81,48 @@ public sealed class RenderTests
 
     [Theory]
     [MemberData(nameof(Backends))]
+    public void AScopeDisposesAnAttachedSessionSoItsMapReleasesBeforeTheGraphicsGo(
+        TestGraphicsBackend backend
+    )
+    {
+        RenderFixture.Run(
+            backend,
+            fixture =>
+            {
+                using (var session = fixture.Session)
+                    fixture.Await(session.Attached, "the attachment");
+
+                // A disposal reports no retirement, so the map's release waits for it.
+                RenderFixture.Complete(fixture.Map.CloseAsync());
+                fixture.Graphics.Dispose();
+            }
+        );
+    }
+
+    [Theory]
+    [MemberData(nameof(Backends))]
+    public void AnAsyncScopeAwaitsTheRetirementOfAnAttachedSession(TestGraphicsBackend backend)
+    {
+        RenderFixture.Run(
+            backend,
+            fixture =>
+            {
+                fixture.Await(fixture.Session.Attached, "the attachment");
+
+                RenderFixture.Complete(DisposeInScope(fixture.Session));
+                // The session has retired, so its graphics objects may go before its map does.
+                fixture.Graphics.Dispose();
+            }
+        );
+
+        static async Task DisposeInScope(RenderSessionHandle session)
+        {
+            await using (session) { }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Backends))]
     public void ABorrowedFrameViewExpiresWithItsScope(TestGraphicsBackend backend)
     {
         RenderFixture.Run(

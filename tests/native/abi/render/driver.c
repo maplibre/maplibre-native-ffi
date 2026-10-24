@@ -40,7 +40,7 @@ static void service_from_foreign_thread(void* argument) {
 // graphics thread; a core worker drives itself. While attached, the session
 // holds its map, which takes no second session and refuses its release, and
 // refuses destroy, which ends only a detached or abandoned session.
-static void an_attached_session_holds_its_map_and_refuses_destroy(void) {
+static void an_attached_session_holds_its_map(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_prepare_map(map);
@@ -118,14 +118,6 @@ static void an_attached_session_holds_its_map_and_refuses_destroy(void) {
   );
   MLN_TEST_OK(mln_test_map_request_repaint(map));
 
-  MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE,
-    mln_render_session_release(fixture.session, MLN_TEST_DIAGNOSTIC)
-  );
-  TEST_ASSERT_NOT_NULL(strstr(
-    mln_test_last_error(),
-    "must be detached or abandoned before it is destroyed"
-  ));
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_SESSION_STATE_ATTACHED, read_snapshot(fixture.session).state
   );
@@ -228,7 +220,7 @@ static void a_detached_session_frees_its_map_and_refuses_work(void) {
   MLN_TEST_INVALID_STATE(
     mln_render_session_get_snapshot(detached, &snapshot, NULL)
   );
-  MLN_TEST_INVALID_STATE(mln_render_session_release(detached, NULL));
+  MLN_TEST_INVALID_STATE(mln_render_session_dispose(detached, NULL, NULL));
   MLN_TEST_INVALID(
     mln_render_session_reduce_memory_use(MLN_HANDLE_NULL, &discard, NULL)
   );
@@ -642,7 +634,7 @@ static void a_session_disposed_while_attaching_frees_the_map(void) {
   MLN_TEST_OK(mln_test_render_fixture_start_attach(
     map, &options, &attach.descriptor, &fixture
   ));
-  MLN_TEST_OK(mln_render_session_dispose(fixture.session, NULL));
+  MLN_TEST_OK(mln_render_session_dispose(fixture.session, NULL, NULL));
 
   TEST_ASSERT_TRUE(mln_test_completion_wait(&attach, -1));
   const mln_status attach_status = mln_test_completion_status(&attach);
@@ -700,7 +692,7 @@ static void a_disposed_attached_session_releases_its_wakes_before_the_device(
   MLN_TEST_OK(mln_render_session_reduce_memory_use(
     fixture.session, &queued.descriptor, NULL
   ));
-  MLN_TEST_OK(mln_render_session_dispose(fixture.session, NULL));
+  MLN_TEST_OK(mln_render_session_dispose(fixture.session, NULL, NULL));
   // A core worker may run the command before it sees the disposal.
   const mln_status queued_status = mln_test_completion_settle(&queued);
   TEST_ASSERT_TRUE(
@@ -712,6 +704,95 @@ static void a_disposed_attached_session_releases_its_wakes_before_the_device(
   mln_test_render_fixture other = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &other));
   mln_test_render_fixture_destroy(&other);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// How a disposal case leaves its session before disposing it.
+typedef enum disposed_state {
+  DISPOSED_ATTACHED,
+  DISPOSED_DETACHED,
+  DISPOSED_ABANDONED,
+} disposed_state;
+
+// A disposal's completion reports retirement whatever state the session was
+// in. By then the map has its session slot back and the host may destroy the
+// target's graphics objects, which the fixture's teardown does.
+static void dispose_completes_once_the_session_has_retired(
+  disposed_state state
+) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(map);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  mln_test_render_request_forced(&fixture, 1);
+  mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
+  if (state == DISPOSED_DETACHED) {
+    MLN_TEST_RENDER_AWAIT(
+      MLN_STATUS_OK, &fixture,
+      mln_render_session_detach(fixture.session, &completion.descriptor, NULL)
+    );
+  } else if (state == DISPOSED_ABANDONED) {
+    mln_render_abandon_result abandoned = {
+      .size = sizeof(mln_render_abandon_result)
+    };
+    MLN_TEST_OK(mln_render_session_abandon(fixture.session, &abandoned, NULL));
+  }
+
+  mln_test_completion disposed = mln_test_completion_default(0);
+  MLN_TEST_OK(
+    mln_render_session_dispose(fixture.session, &disposed.descriptor, NULL)
+  );
+  mln_render_session_snapshot snapshot = {.size = sizeof(snapshot)};
+  MLN_TEST_INVALID_STATE(
+    mln_render_session_get_snapshot(fixture.session, &snapshot, NULL)
+  );
+  MLN_TEST_OK(mln_test_completion_settle(&disposed));
+  mln_test_render_fixture_destroy(&fixture);
+
+  mln_test_render_fixture other = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &other));
+  mln_test_render_fixture_destroy(&other);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void dispose_completes_after_retiring_an_attached_session(void) {
+  dispose_completes_once_the_session_has_retired(DISPOSED_ATTACHED);
+}
+
+static void dispose_completes_after_retiring_a_detached_session(void) {
+  dispose_completes_once_the_session_has_retired(DISPOSED_DETACHED);
+}
+
+static void dispose_completes_after_retiring_an_abandoned_session(void) {
+  dispose_completes_once_the_session_has_retired(DISPOSED_ABANDONED);
+}
+
+// A completion that dispose rejects leaves the session live, and a second
+// dispose of a consumed session runs no completion.
+static void dispose_rejects_an_invalid_completion_and_a_released_session(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  const mln_completion undersized = {0};
+  MLN_TEST_INVALID(
+    mln_render_session_dispose(fixture.session, &undersized, NULL)
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_SESSION_STATE_ATTACHED, read_snapshot(fixture.session).state
+  );
+
+  MLN_TEST_OK(mln_test_render_session_dispose(fixture.session));
+  mln_test_completion again = mln_test_completion_default(0);
+  MLN_TEST_INVALID_STATE(
+    mln_render_session_dispose(fixture.session, &again.descriptor, NULL)
+  );
+  mln_test_completion_reject(&again);
+  mln_test_completion_destroy(&again);
+  mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -748,7 +829,7 @@ static void parent_first_disposal_retires_a_native_render_attachment(void) {
   MLN_TEST_OK(mln_runtime_dispose(runtime, NULL));
   MLN_TEST_OK(mln_map_dispose(map, NULL));
   TEST_ASSERT_FALSE(atomic_load(&retired));
-  MLN_TEST_OK(mln_render_session_dispose(fixture.session, NULL));
+  MLN_TEST_OK(mln_render_session_dispose(fixture.session, NULL, NULL));
   mln_render_session_snapshot snapshot = {.size = sizeof(snapshot)};
   MLN_TEST_INVALID_STATE(
     mln_render_session_get_snapshot(fixture.session, &snapshot, NULL)
@@ -989,7 +1070,7 @@ static void a_target_scale_that_differs_from_the_map_attaches_with_a_warning(
 }
 
 MLN_TEST_GROUP {
-  RUN_TEST(an_attached_session_holds_its_map_and_refuses_destroy);
+  RUN_TEST(an_attached_session_holds_its_map);
   RUN_TEST(a_detached_session_frees_its_map_and_refuses_work);
   RUN_TEST(maintenance_commands_run_in_order_with_frames);
   RUN_TEST(abandon_completes_pending_work_and_invalidates_accessors);
@@ -998,6 +1079,10 @@ MLN_TEST_GROUP {
   RUN_TEST(abandon_from_an_attach_completion_is_busy);
   RUN_TEST(a_session_disposed_while_attaching_frees_the_map);
   RUN_TEST(a_disposed_attached_session_releases_its_wakes_before_the_device);
+  RUN_TEST(dispose_completes_after_retiring_an_attached_session);
+  RUN_TEST(dispose_completes_after_retiring_a_detached_session);
+  RUN_TEST(dispose_completes_after_retiring_an_abandoned_session);
+  RUN_TEST(dispose_rejects_an_invalid_completion_and_a_released_session);
   RUN_TEST(parent_first_disposal_retires_a_native_render_attachment);
   RUN_TEST(wakes_may_call_back_into_the_session);
   RUN_TEST(attach_checks_the_queue_lock);

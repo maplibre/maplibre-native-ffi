@@ -7,7 +7,7 @@ import re
 from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
-from tools.bindgen.names import camel, pascal
+from tools.bindgen.names import pascal
 from tools.bindgen.semantic import BoundApi
 
 SCALARS = {
@@ -66,9 +66,9 @@ def documented(bound: BoundApi, native: str, code: str, marker: str) -> str:
     return code[:start] + doc(bound, native) + code[start:]
 
 
-def expose_parameter_names(plan, code):
+def expose_parameter_names(plan, code, name):
     """Keep generated temporaries private while naming parameters from the header."""
-    marker = f"pub fn {camel(plan.name.removeprefix('mln_'))}("
+    marker = f"pub fn {name}("
     start = code.index(marker) + len(marker)
     end = code.index("\n", start)
     signature = code[start:end]
@@ -97,6 +97,7 @@ def expose_parameter_names(plan, code):
 def lower(api: Api | BoundApi) -> tuple[list[str], list[str], dict[str, str]]:
     chunks, generated, unsupported = [], [], {}
     bound = compile_api(api)
+    from .zig_operations import function_name
     from .zig_operations import operation as lower_operation
     from .zig_values import Values
 
@@ -111,15 +112,23 @@ def lower(api: Api | BoundApi) -> tuple[list[str], list[str], dict[str, str]]:
         function = plan.function
         previous = dict(value_types.used)
         try:
-            code = lower_operation(plan, value_types)
-            chunks.append(
-                documented(
-                    bound,
-                    function.name,
-                    expose_parameter_names(plan, code),
-                    f"pub fn {camel(plan.name.removeprefix('mln_'))}(",
+            # A dispose that takes an optional completion is also its handle's
+            # release; its dispose passes none, as every disposer does.
+            for discard in (
+                [False, True]
+                if plan.completion and plan.completion.optional
+                else [False]
+            ):
+                code = lower_operation(plan, value_types, discard=discard)
+                name = function_name(plan, value_types, discard=discard)
+                chunks.append(
+                    documented(
+                        bound,
+                        function.name,
+                        expose_parameter_names(plan, code, name),
+                        f"pub fn {name}(",
+                    )
                 )
-            )
             generated.append(function.name)
         except ModelError as error:
             value_types.used = previous
@@ -151,10 +160,19 @@ pub const OwnedValue = marshal.OwnedValue;
         calls = []
         for finalizer in handle.finalize:
             function = bound.operations_by_name[finalizer].function
+            # A dispose that takes a completion gets a null one.
+            arguments = [
+                "raw",
+                *(
+                    ["null"]
+                    if handle.dispose_completion and finalizer == handle.dispose
+                    else []
+                ),
+            ]
             calls.append(
-                f"c.{finalizer}(raw);"
+                f"c.{finalizer}({', '.join(arguments)});"
                 if function.return_type.kind == "void"
-                else status_call(function, ["raw"], "null")
+                else status_call(function, arguments, "null")
             )
         public = pascal(handle.native.removeprefix("mln_"))
         dispose = (

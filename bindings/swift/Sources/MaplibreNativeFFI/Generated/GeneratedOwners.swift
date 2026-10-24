@@ -88,11 +88,10 @@ public final class MapHandle: @unchecked Sendable, NativeReceiver {
 }
 
 struct NativeMapProjectionHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned() -> Bool {
-    mln_map_projection_release(
-      raw,
-      nil
-    ) == MLN_STATUS_OK
+  let raw: UInt64; func disposeAbandoned()
+    -> Bool
+  {
+    mln_map_projection_release(raw); return true
   }
 }
 
@@ -145,6 +144,7 @@ struct NativeRenderSessionHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned() -> Bool {
     mln_render_session_dispose(
       raw,
+      nil,
       nil
     ) == MLN_STATUS_OK
   }

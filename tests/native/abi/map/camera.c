@@ -54,7 +54,7 @@ static mln_lat_lng coordinate_at(mln_map map, mln_screen_point point) {
   MLN_TEST_OK(
     mln_map_projection_lat_lng_for_pixel(projection, point, &coordinate, NULL)
   );
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
+  mln_map_projection_release(projection);
   return coordinate;
 }
 
@@ -528,7 +528,7 @@ static void an_immediate_anchored_pan_keeps_the_dragged_coordinate(void) {
   const mln_screen_point kept = projected_pixel(projection, dragged);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, anchor.x, kept.x);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, anchor.y, kept.y);
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
+  mln_map_projection_release(projection);
 
   MLN_TEST_OK(mln_test_map_fence(map));
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};

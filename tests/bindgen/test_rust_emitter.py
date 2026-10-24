@@ -51,8 +51,34 @@ int mln_map_move(uint64_t map, point call, point value, point future,
 }
 """
 
+# A dispose that is also its handle's release and takes an optional completion.
+DISPOSE_WITH_COMPLETION = """
+typedef unsigned long long mln_session BIND("kind=handle;release=mln_session_dispose;dispose=mln_session_dispose");
+BIND("execution=lifecycle")
+mln_status mln_session_dispose(mln_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic);
+"""
+
 
 class RustEmitterTests(unittest.TestCase):
+    def test_a_dispose_with_a_completion_releases_and_disposes(self):
+        api = parse(
+            DISPOSE_WITH_COMPLETION, defines=("MLN_PROTOCOL_COMPLETION_RUNTIME",)
+        )
+        validate(api)
+        self.assertEqual(rust.coverage(api)["unsupported"], {})
+        source = rust.generate(api)[
+            "crates/maplibre-native-ffi/src/generated/session.rs"
+        ]
+        # Drop and the sync dispose pass no completion; the release passes one.
+        self.assertIn(
+            "dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_session_dispose(raw, std::ptr::null(), out_diagnostic) })",
+            source,
+        )
+        self.assertIn("pub fn release(&self) -> Result<NativeFuture<()>>", source)
+        self.assertIn("call.complete(", source)
+        self.assertIn("pub fn dispose(&self) -> Result<()>", source)
+        self.assertIn("call.discard(", source)
+
     def test_generated_bindings_run_with_the_handwritten_runtime(self):
         defines = (
             "MLN_PROTOCOL_MAP_RELEASE",

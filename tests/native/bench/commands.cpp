@@ -242,7 +242,7 @@ class Host {
 
       check(mln_render_session_service_driver_work(session_, nullptr));
     }
-    check(mln_render_session_release(session_, nullptr));
+    check(mln_render_session_dispose(session_, nullptr, nullptr));
     mln_test_graphics_destroy(graphics);
   }
   mln_map map_;

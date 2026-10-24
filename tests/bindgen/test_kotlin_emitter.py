@@ -18,6 +18,26 @@ from support import (
 from tools.bindgen.emitters import kotlin, kotlin_callbacks
 from tools.bindgen.emitters.kotlin_abi import Abi, LayoutError
 
+GENERATED = "src/commonMain/kotlin/org/maplibre/nativeffi/generated"
+
+# A handle whose dispose is also its release and takes an optional completion,
+# as the render session's does.
+DISPOSE_WITH_COMPLETION = """
+typedef unsigned long long mln_lease BIND(
+  "kind=handle;release=mln_lease_dispose;abandon=mln_lease_abandon;"
+  "dispose=mln_lease_dispose"
+);
+mln_status mln_lease_open(
+  mln_lease* out_lease BIND("direction=out"), mln_diagnostic* out_diagnostic
+);
+mln_status mln_lease_abandon(mln_lease lease, mln_diagnostic* out_diagnostic);
+BIND("execution=lifecycle")
+mln_status mln_lease_dispose(
+  mln_lease lease, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
+);
+"""
+
 # One target per data model a Kotlin target uses: Android ARM32 is ILP32, and
 # every other target is LP64.
 TARGETS = {32: "armv7a-linux-androideabi24", 64: "aarch64-linux-android24"}
@@ -153,17 +173,43 @@ class KotlinLayoutTests(unittest.TestCase):
                 ROOT,
             )
 
-    def test_auto_closeable_disposes_a_handle_that_releases_only_after_abandon(self):
+    def test_a_frame_has_no_scoped_cleanup(self):
         owners = kotlin.generate(real_api())
-        owner = "src/commonMain/kotlin/org/maplibre/nativeffi/generated/{}.kt"
-        # A session's release refuses an attached session, so `use` disposes it.
-        self.assertIn(
-            "override fun close() { dispose() }",
-            owners[owner.format("RenderSessionHandle")],
-        )
         # A frame's release needs the host's consumer sync and its discard
         # quarantines a slot, so a frame has no `use`.
-        self.assertNotIn("AutoCloseable", owners[owner.format("AcquiredFrameHandle")])
+        self.assertNotIn(
+            "AutoCloseable",
+            owners[f"{GENERATED}/AcquiredFrameHandle.kt"],
+        )
+
+    def test_a_dispose_with_a_completion_is_the_release_and_the_dispose(self):
+        outputs = kotlin.generate(parse(DISPOSE_WITH_COMPLETION))
+        operations = outputs[f"{GENERATED}/GeneratedLeaseOperations.kt"]
+        # The release reports retirement through the completion, and the
+        # dispose, like every disposer, passes none.
+        self.assertIn(
+            "public fun release(): Deferred<Unit> = nativeRetire(this, binding) "
+            "{ check(C.mln_lease_dispose(handle, completion, diagnostic)) }",
+            operations,
+        )
+        self.assertIn(
+            "public fun dispose(): Unit = nativeClose(this, binding) "
+            "{ check(C.mln_lease_dispose(handle, 0L, diagnostic)) }",
+            operations,
+        )
+        self.assertIn(
+            "C.mln_lease_dispose(handle, 0L, diagnostic)",
+            outputs[f"{GENERATED}/GeneratedOwnerDisposal.kt"],
+        )
+        # The suspending `use` awaits the release, and `use` disposes.
+        owner = outputs[f"{GENERATED}/LeaseHandle.kt"]
+        self.assertIn(
+            "GeneratedLeaseOperations(), org.maplibre.nativeffi.runtime.AsyncReleasable, "
+            "AutoCloseable {",
+            owner,
+        )
+        self.assertIn("public override val isClosed: Boolean", owner)
+        self.assertIn("public override fun close() { dispose() }", owner)
 
     def test_split_registrations_take_a_form_per_target(self):
         _functions, _unsupported, bodies, split, values, _native = kotlin.lowered(

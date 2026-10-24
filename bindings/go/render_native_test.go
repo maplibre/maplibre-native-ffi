@@ -5,6 +5,7 @@ package maplibre
 import (
 	"errors"
 	"testing"
+	"weak"
 )
 
 // Native wakes reach the session unchanged: their C callbacks service the
@@ -74,4 +75,26 @@ func TestNativeQueueLockReachesTheAttach(t *testing.T) {
 	if releases := lock.releases.Load(); releases != 1 {
 		t.Errorf("the queue lock was released %d times, want once", releases)
 	}
+}
+
+// The collector disposes an attached session nobody closed. Native code
+// releases the session's wakes once it retires, after which the map releases
+// and the host destroys the graphics objects.
+func TestCollectorDisposesADroppedSession(t *testing.T) {
+	r := newGraphicsFixture(t)
+	frames := newNativeRecorderForTest(r.frames)
+	driverWork := newNativeRecorderForTest(r.driverWork)
+	options := r.options()
+	options.FrameWake = frames.wake()
+	options.DriverWorkWake = driverWork.wake()
+	r.start(t, options)
+	r.attach(t)
+	r.closed = true
+	dropped := weak.Make(r.session.bindingOwner)
+	r.session = nil
+	awaitUnreachable(t, dropped, "the dropped session")
+	receive(t, frames.released, "the release of the frame wake")
+	receive(t, driverWork.released, "the release of the driver-work wake")
+	await(t, submitted(r.m.Close()))
+	r.graphics.Close()
 }

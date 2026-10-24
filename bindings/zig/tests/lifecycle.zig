@@ -15,8 +15,7 @@ test "copied handles report native invalid state after release" {
     const projection = try maplibre.mapProjectionCreate(testing.allocator, (try maplibre.mapGetSnapshot(fixture.map, null)).view, null);
     const projection_copy = projection;
 
-    try maplibre.mapProjectionRelease(projection, null);
-    try testing.expectError(error.InvalidState, maplibre.mapProjectionRelease(projection_copy, null));
+    try maplibre.mapProjectionRelease(projection);
     try testing.expectError(error.InvalidState, maplibre.mapProjectionGetCamera(projection_copy, null));
 
     try fixture.closeMap();

@@ -60,6 +60,10 @@ class HandlePlan:
     # Whether the handle is a root whose release is a lifecycle operation that
     # reports retirement through its completion, so a host can wait for it.
     observable_root_release: bool = False
+    # The completion parameter of a dispose that is also the handle's release.
+    # The release passes a completion that reports retirement, and the dispose,
+    # like every disposer, passes none.
+    dispose_completion: str | None = None
 
     @property
     def stem(self) -> str:
@@ -100,6 +104,9 @@ class CompletionPlan:
     result_owned: bool
     result_owner: OwnedOutputPlan | None = None
     discardable: bool = False
+    # Whether the completion may be null without being a command's discard: the
+    # function is also its handle's dispose, which passes none.
+    optional: bool = False
 
 
 @dataclass(frozen=True)
@@ -622,11 +629,18 @@ class Binder:
                 view_end=typedef.metadata.get("view_end"),
                 discard=typedef.metadata.get("discard"),
                 observable_root_release=self.observable_root_release(typedef),
+                dispose_completion=self.dispose_completion(typedef),
             )
             for name, typedef in self.typedefs.items()
             if typedef.metadata.get("kind") == "handle"
             and "release" in typedef.metadata
         }
+
+    def dispose_completion(self, typedef) -> str | None:
+        if typedef.metadata.get("dispose") != typedef.metadata["release"]:
+            return None
+        release = self.api.functions_by_name[typedef.metadata["release"]]
+        return next((p.name for p in release.parameters if is_completion(p.type)), None)
 
     def observable_root_release(self, typedef) -> bool:
         release = self.api.functions_by_name[typedef.metadata["release"]]
@@ -1192,6 +1206,11 @@ class Binder:
                 bool(result and result.ownership == "owned"),
                 result_owner=result_owner,
                 discardable=metadata["execution"] == "command",
+                optional=any(
+                    handle.dispose_completion == completion_parameter
+                    and handle.dispose == function.name
+                    for handle in self.handles.values()
+                ),
             )
         consumes = None
         for handle in self.handles.values():
@@ -1356,8 +1375,14 @@ class Binder:
 
         An operation on a handle, or on a callback response, drops its
         receiver's prefix when its name starts with it; every other name drops
-        `mln_`.
+        `mln_`. A dispose that is also its handle's release is named for the
+        release, which passes the completion, because the dispose passes none.
         """
+        if any(
+            handle.dispose_completion and handle.release == function.name
+            for handle in self.handles.values()
+        ):
+            return "release"
         if receiver is not None:
             parameter = next(p for p in function.parameters if p.name == receiver)
             owner = type_name(parameter.type.pointee or parameter.type)

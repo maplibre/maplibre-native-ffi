@@ -157,6 +157,19 @@ mln_status mln_test_render_fixture_finish_operation(
   return mln_test_completion_status(completion);
 }
 
+mln_status mln_test_render_session_dispose(mln_render_session session) {
+  mln_test_completion completion = mln_test_completion_default(0);
+  const mln_status status = mln_render_session_dispose(
+    session, &completion.descriptor, MLN_TEST_DIAGNOSTIC
+  );
+  if (status != MLN_STATUS_OK) {
+    completion.descriptor.release_user_data(completion.descriptor.user_data);
+    mln_test_completion_destroy(&completion);
+    return status;
+  }
+  return mln_test_completion_settle(&completion);
+}
+
 bool mln_test_render_fixture_create(
   mln_map map, mln_test_render_fixture* fixture
 ) {
@@ -238,7 +251,7 @@ static bool create_fixture(
       (void)mln_render_session_abandon(
         fixture->session, &abandoned, MLN_TEST_DIAGNOSTIC
       );
-      (void)mln_render_session_release(fixture->session, MLN_TEST_DIAGNOSTIC);
+      (void)mln_test_render_session_dispose(fixture->session);
     }
     mln_test_backend_destroy(fixture->backend_state);
     *fixture = (mln_test_render_fixture){0};
@@ -317,9 +330,7 @@ void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
         MLN_TEST_STATUS(MLN_STATUS_INVALID_STATE, detach_status);
       }
       mln_test_completion_destroy(&detach);
-      MLN_TEST_OK(
-        mln_render_session_release(fixture->session, MLN_TEST_DIAGNOSTIC)
-      );
+      MLN_TEST_OK(mln_test_render_session_dispose(fixture->session));
     } else {
       MLN_TEST_STATUS(MLN_STATUS_INVALID_STATE, liveness);
     }
@@ -341,7 +352,7 @@ bool mln_test_render_reclaim_thread_sessions(void) {
       (void)mln_render_session_abandon(
         entry.session, &abandoned, MLN_TEST_DIAGNOSTIC
       );
-      (void)mln_render_session_release(entry.session, MLN_TEST_DIAGNOSTIC);
+      (void)mln_test_render_session_dispose(entry.session);
     }
     mln_test_backend_destroy(entry.backend_state);
     reclaimed = true;

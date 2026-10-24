@@ -4636,27 +4636,18 @@ auto map_projection_create(
   return MLN_STATUS_OK;
 }
 
-auto map_projection_release(mln_map_projection projection) -> mln_status {
-  auto& table = handle_table<MapProjectionObject>();
-  std::shared_ptr<MapProjectionObject> owned;
-  {
-    const std::scoped_lock lock(table.mutex());
-    owned = table.lease_locked(projection);
-    if (owned == nullptr) return recorded_handle_fault_status();
-    static_cast<void>(table.remove_locked(projection));
+auto map_projection_release(mln_map_projection projection) -> void {
+  const auto owned = handle_table<MapProjectionObject>().remove(projection);
+  if (owned == nullptr) return;
+  // Waits for projection calls already running on other threads, then
+  // destroys the projection. A racing call that leased the handle before the
+  // removal observes the null projection and reports a stale handle.
+  auto call_lock = std::unique_lock(owned->call_mutex, std::try_to_lock);
+  if (!call_lock.owns_lock()) {
+    mln::testing::hit(mln::testing::SyncPoint::ProjectionCloseWaits);
+    call_lock.lock();
   }
-  {
-    // Waits for projection calls already running on other threads, then
-    // destroys the projection. A racing call that leased the handle before the
-    // removal observes the null projection and reports a stale handle.
-    auto call_lock = std::unique_lock(owned->call_mutex, std::try_to_lock);
-    if (!call_lock.owns_lock()) {
-      mln::testing::hit(mln::testing::SyncPoint::ProjectionCloseWaits);
-      call_lock.lock();
-    }
-    owned->projection.reset();
-  }
-  return MLN_STATUS_OK;
+  owned->projection.reset();
 }
 
 auto map_projection_get_camera(

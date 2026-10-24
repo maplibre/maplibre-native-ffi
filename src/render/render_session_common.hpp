@@ -755,6 +755,9 @@ struct mln_render_session_object
   std::atomic_bool disposal_requested = false;
   mln::core::RetirementTask disposal_task;
   std::shared_ptr<mln_render_session_object> disposal_owner;
+  // The disposal's completion, if the host passed one; it runs once the
+  // session has retired.
+  std::shared_ptr<mln::core::OperationObject> disposal_completion;
   mln_map map = MLN_HANDLE_NULL;
   // The map object while `attached` holds, for the render-facing map helpers.
   // Set by attach and cleared by detach, on the thread that claims or releases
@@ -1104,8 +1107,9 @@ auto enqueue_surface_retarget(
   RenderTargetReplacer replace, std::shared_ptr<Completion> completion,
   ValuelessCompletion valueless
 ) -> mln_status;
-auto render_session_release(mln_render_session session) -> mln_status;
-auto render_session_dispose(mln_render_session session) -> mln_status;
+auto render_session_dispose(
+  mln_render_session session, const mln_completion* completion
+) -> mln_status;
 // Disposes a session as render_session_dispose does, except that retirement
 // quarantines its graphics resources instead of detaching it, so it makes no
 // graphics call after the one in flight. A finalizer that can run while the

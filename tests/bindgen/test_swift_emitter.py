@@ -8,6 +8,7 @@ from support import (
     FIXTURES,
     PROTOCOLS_STUB,
     ROOT,
+    parse,
     parse_sources,
     protocol_header,
     require_tool,
@@ -19,8 +20,48 @@ from tools.bindgen.schema import validate
 
 RUNTIME = ROOT / "bindings/swift/Sources/MaplibreNativeFFI"
 
+# A handle whose dispose is also its release and takes an optional completion,
+# as the render session's does.
+DISPOSE_WITH_COMPLETION = """
+typedef unsigned long long mln_lease BIND(
+  "kind=handle;release=mln_lease_dispose;abandon=mln_lease_abandon;"
+  "dispose=mln_lease_dispose"
+);
+mln_status mln_lease_open(
+  mln_lease* out_lease BIND("direction=out"), mln_diagnostic* out_diagnostic
+);
+mln_status mln_lease_abandon(mln_lease lease, mln_diagnostic* out_diagnostic);
+BIND("execution=lifecycle")
+mln_status mln_lease_dispose(
+  mln_lease lease, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
+);
+"""
+
 
 class SwiftEmitterTests(unittest.TestCase):
+    def test_a_dispose_with_a_completion_is_the_close_and_the_dispose(self):
+        outputs = swift.generate(parse(DISPOSE_WITH_COMPLETION))
+        operations = outputs["Generated/Operations/GeneratedApiLeaseOperations.swift"]
+        # The close reports retirement through the completion, and the
+        # dispose, like every disposer, passes none.
+        self.assertEqual(operations.count("func close("), 1)
+        self.assertIn("func close() async throws {", operations)
+        self.assertIn(
+            "nativeStartClose { raw, completion, diagnostic in "
+            "mln_lease_dispose(raw, completion, diagnostic) }",
+            operations,
+        )
+        self.assertIn(
+            "func dispose() throws {\n"
+            "  try nativeClose { raw, diagnostic in mln_lease_dispose(raw, nil, diagnostic) }",
+            operations,
+        )
+        self.assertIn(
+            "mln_lease_dispose(raw, nil, nil) == MLN_STATUS_OK",
+            outputs["Generated/GeneratedOwners.swift"],
+        )
+
     def test_generated_values_and_keyword_parameters_round_trip(self):
         swiftc = require_tool(self, "swiftc", ROOT / "bindings/swift")
         clang = require_tool(self, "clang")

@@ -161,7 +161,7 @@ test "synchronous calls fill caller-sized outputs in input order" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
     const projection = try maplibre.mapProjectionCreate(testing.allocator, (try maplibre.mapGetSnapshot(fixture.map, null)).view, null);
-    defer maplibre.mapProjectionRelease(projection, null) catch unreachable;
+    defer maplibre.mapProjectionRelease(projection) catch unreachable;
     const coordinates = [_]maplibre.LatLng{ .{ .latitude = 0, .longitude = 0 }, .{ .latitude = 10, .longitude = 20 }, .{ .latitude = -12, .longitude = -30 } };
     var points = try maplibre.mapProjectionPixelsForLatLngs(testing.allocator, projection, &coordinates, null);
     defer points.deinit();

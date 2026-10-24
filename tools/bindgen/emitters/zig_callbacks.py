@@ -2,7 +2,8 @@
 
 import re
 
-from .zig import camel, identifier
+from ..names import camel
+from .zig import identifier
 from .zig_dynamic_values import decode
 
 

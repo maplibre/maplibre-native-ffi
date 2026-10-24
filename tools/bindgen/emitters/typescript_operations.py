@@ -62,8 +62,21 @@ def construct(bound, entry: Lowered, owned, handle_expression: str) -> str:
 
 
 def disposer(handle) -> str:
-    # The handle has no owner yet, so the disposal passes no owner token.
-    return f"(disposed) => native.{handle.cleanup}(disposed, undefined)"
+    # The handle has no owner yet, so the disposal passes no owner token, and
+    # it passes no completion to a dispose that takes one.
+    completion = ", undefined" if handle.dispose_completion else ""
+    return f"(disposed) => native.{handle.cleanup}(disposed, undefined{completion})"
+
+
+def render_dispose(bound, handle, indent: str) -> str:
+    """The synchronous dispose of a handle whose dispose is also its release:
+    the release passes a completion, and this passes none."""
+    text = doc(bound, handle.dispose, indent)
+    text += f"{indent}dispose(): void {{\n"
+    text += f"{indent}  closeSync(this, (handle, token) =>\n"
+    text += f"{indent}    native.{handle.dispose}(handle, token, undefined),\n"
+    text += f"{indent}  );\n"
+    return text + f"{indent}}}\n"
 
 
 def holder(entry: Lowered) -> str:
@@ -235,16 +248,21 @@ def render_owner(bound, values, natives, native: str, handle, methods) -> str:
     # A handle without scoped cleanup gets neither `using` nor `await using`.
     scoped = [] if handle.scoped_release is None else methods
     asynchronous = next((e.method for e in scoped if e.shape == "close_async"), None)
-    synchronous = next(
-        (e.method for e in scoped if e.shape == "close" and e.method == "dispose"),
-        None,
-    ) or next(
-        (
-            e.method
-            for e in scoped
-            if e.shape == "close" and all(d == "undefined" for _, _, d in e.parameters)
-        ),
-        None,
+    synchronous = (
+        ("dispose" if scoped and handle.dispose_completion else None)
+        or next(
+            (e.method for e in scoped if e.shape == "close" and e.method == "dispose"),
+            None,
+        )
+        or next(
+            (
+                e.method
+                for e in scoped
+                if e.shape == "close"
+                and all(d == "undefined" for _, _, d in e.parameters)
+            ),
+            None,
+        )
     )
     # defineDisposers() installs these when the host defines their symbols.
     if asynchronous or synchronous:
@@ -261,8 +279,14 @@ def render_owner(bound, values, natives, native: str, handle, methods) -> str:
             "   */\n"
             "  declare [Symbol.dispose]: () => void;\n"
         )
-    for entry in sorted(methods, key=lambda e: e.method):
-        text += "\n" + render_method(bound, values, natives, entry, "  ")
+    rendered = [
+        (entry.method, render_method(bound, values, natives, entry, "  "))
+        for entry in methods
+    ]
+    if handle.dispose_completion:
+        rendered.append(("dispose", render_dispose(bound, handle, "  ")))
+    for _, method in sorted(rendered, key=lambda item: item[0]):
+        text += "\n" + method
     text += "}\n"
     text += (
         f"defineDisposers({public}, "

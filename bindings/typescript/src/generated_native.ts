@@ -79,7 +79,7 @@ import type {
 } from "./generated_values.ts";
 
 /** The digest of the C headers that this facade and its addon came from. */
-export const ABI_DIGEST = "95ee89c36d540d12";
+export const ABI_DIGEST = "9d73cb2ac5fafbd8";
 
 /** The index of each completion decoder in the addon's decoder table. */
 export const Decoder = {
@@ -659,7 +659,11 @@ export interface NativeOperations {
   mln_render_session_barrier(session: bigint, completion: number): void;
   mln_render_session_clear_data(session: bigint, completion: number): void;
   mln_render_session_detach(session: bigint, completion: number): void;
-  mln_render_session_dispose(session: bigint, token: object | undefined): void;
+  mln_render_session_dispose(
+    session: bigint,
+    token: object | undefined,
+    completion: number | undefined,
+  ): void;
   mln_render_session_drain_frame_results(session: bigint): bigint | undefined;
   mln_render_session_dump_debug_logs(session: bigint, completion: number): void;
   mln_render_session_get_capabilities(
@@ -692,7 +696,6 @@ export interface NativeOperations {
     session: bigint,
     completion: number,
   ): void;
-  mln_render_session_release(session: bigint, token: object | undefined): void;
   mln_render_session_request_frame(
     session: bigint,
     demand: FrameDemand | undefined,

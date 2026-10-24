@@ -87,16 +87,25 @@ func (driver *callerDriver) attachOptions(ringDepth uint32) maplibre.RenderSessi
 }
 
 // attach services the attachment until it completes. A failed attachment
-// abandons its session.
+// closes its session.
 func (driver *callerDriver) attach(session *maplibre.RenderSessionHandle, completion *maplibre.Future[struct{}]) error {
 	driver.session = session
 	if err := driver.await(completion); err != nil {
-		_, abandonErr := driver.session.Abandon()
-		err = errors.Join(err, abandonErr, driver.session.Close())
-		driver.session = nil
-		return err
+		return errors.Join(err, driver.closeSession())
 	}
 	return nil
+}
+
+// closeSession closes the session in any state and waits until it retires,
+// after which the caller may destroy the target's graphics objects.
+func (driver *callerDriver) closeSession() error {
+	future, err := driver.session.Close()
+	driver.session = nil
+	if err != nil {
+		return err
+	}
+	_, err = future.Await(context.Background())
+	return err
 }
 
 // await services driver work on the SDL thread until future completes,
@@ -238,9 +247,7 @@ func (driver *callerDriver) Close() error {
 		}
 		err = errors.Join(err, abandonErr)
 	}
-	err = errors.Join(err, driver.session.Close())
-	driver.session = nil
-	return err
+	return errors.Join(err, driver.closeSession())
 }
 
 // reportFailure logs a command that fails. Nothing waits on its completion.

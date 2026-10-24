@@ -88,6 +88,10 @@ mln_status mln_test_render_fixture_finish_operation(
     mln_test_completion_destroy(&completion);                                \
   } while (false)
 
+// Disposes `session` and waits until it retires. Returns the completion's
+// status, or the status that rejected the disposal.
+mln_status mln_test_render_session_dispose(mln_render_session session);
+
 // Releases the graphics device this thread cached. Every thread must call this
 // before its entry function returns: on browser WebGPU a live GPUDevice pins an
 // Emscripten keepalive and pthread_join on that thread blocks forever. A no-op

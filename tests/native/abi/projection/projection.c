@@ -22,10 +22,11 @@ static void projection_outlives_its_source_map_and_runtime(void) {
   const mln_camera_options source_camera = read_camera(projection);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, source_camera.center.latitude);
 
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
+  mln_map_projection_release(projection);
 
-  // Every call with the retired handle reports invalid state.
-  MLN_TEST_INVALID_STATE(mln_map_projection_release(projection, NULL));
+  // A second release is a no-op, and every other call with the retired handle
+  // reports invalid state.
+  mln_map_projection_release(projection);
   mln_camera_options camera = mln_camera_options_default();
   MLN_TEST_INVALID_STATE(
     mln_map_projection_get_camera(projection, &camera, NULL)
@@ -75,7 +76,7 @@ static void creation_observes_earlier_map_camera_commands(void) {
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 34.0, camera.center.longitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 4.0, camera.zoom);
 
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
+  mln_map_projection_release(projection);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -162,8 +163,8 @@ static void projection_follows_committed_extent_viewport_and_mode(void) {
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, initial.view.extent.width / 2.0, earlier.x);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, initial.view.extent.height / 2.0, earlier.y);
 
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
-  MLN_TEST_OK(mln_map_projection_release(before, NULL));
+  mln_map_projection_release(projection);
+  mln_map_projection_release(before);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -228,7 +229,7 @@ static mln_status submit_projection(
     call->null_output ? NULL : &projection, diagnostic
   );
   if (status == MLN_STATUS_OK) {
-    MLN_TEST_OK(mln_map_projection_release(projection, NULL));
+    mln_map_projection_release(projection);
   } else {
     TEST_ASSERT_EQUAL_UINT64(call->preset, projection);
   }
@@ -297,7 +298,7 @@ static void a_view_projection_ignores_the_maps_constraints(void) {
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 24.0, applied.zoom);
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 70.0, applied.pitch);
 
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
+  mln_map_projection_release(projection);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -325,7 +326,7 @@ static void setters_apply_before_return(void) {
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 40.0, committed.center.longitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 6.0, committed.zoom);
 
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
+  mln_map_projection_release(projection);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -430,7 +431,7 @@ static void unwrapped_conversion_preserves_world_copies(void) {
   // At zoom 2 the viewport spans less than a world but still crosses the
   // antimeridian, so its edges unwrap onto either side of 180.
   jump_to(map, 179.0, 2.0);
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
+  mln_map_projection_release(projection);
   projection = mln_test_map_create_projection(map);
   const mln_screen_point edges[] = {points[0], points[2]};
   mln_lat_lng edges_wrapped[2] = {0};
@@ -446,7 +447,7 @@ static void unwrapped_conversion_preserves_world_copies(void) {
   TEST_ASSERT_TRUE(edges_wrapped[0].longitude > 0.0);
   TEST_ASSERT_TRUE(edges_wrapped[1].longitude < 0.0);
 
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
+  mln_map_projection_release(projection);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -464,7 +465,7 @@ static double projection_meters_per_pixel(
 static double snapshot_meters_per_pixel(mln_map map, double latitude) {
   mln_map_projection projection = mln_test_map_create_projection(map);
   double meters = projection_meters_per_pixel(projection, latitude);
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
+  mln_map_projection_release(projection);
   return meters;
 }
 
@@ -522,7 +523,7 @@ static void meters_per_pixel_follows_the_projection_camera(void) {
     mln_map_projection_meters_per_pixel_at_latitude(projection, 0.0, NULL, NULL)
   );
 
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
+  mln_map_projection_release(projection);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -579,7 +580,6 @@ typedef struct projection_thread_probe {
   mln_status pixel_status;
   mln_status coordinate_status;
   double round_trip_latitude;
-  mln_status close_status;
 } projection_thread_probe;
 
 static void projection_foreign_thread(void* argument) {
@@ -608,7 +608,7 @@ static void projection_foreign_thread(void* argument) {
   );
   probe->round_trip_latitude = coordinate.latitude;
 
-  probe->close_status = mln_map_projection_release(probe->projection, NULL);
+  mln_map_projection_release(probe->projection);
 }
 
 static void projection_handles_are_callable_from_foreign_threads(void) {
@@ -622,7 +622,6 @@ static void projection_handles_are_callable_from_foreign_threads(void) {
     .pixel_status = MLN_STATUS_INVALID_STATE,
     .coordinate_status = MLN_STATUS_INVALID_STATE,
     .round_trip_latitude = 0.0,
-    .close_status = MLN_STATUS_INVALID_STATE,
   };
   mln_test_thread* thread =
     mln_test_thread_start(projection_foreign_thread, &probe);
@@ -634,7 +633,10 @@ static void projection_handles_are_callable_from_foreign_threads(void) {
   MLN_TEST_OK(probe.pixel_status);
   MLN_TEST_OK(probe.coordinate_status);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 15.0, probe.round_trip_latitude);
-  MLN_TEST_OK(probe.close_status);
+  mln_camera_options camera = mln_camera_options_default();
+  MLN_TEST_INVALID_STATE(
+    mln_map_projection_get_camera(probe.projection, &camera, NULL)
+  );
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -657,7 +659,7 @@ static void projection_setters_reject_invalid_values(void) {
   TEST_ASSERT_EQUAL_DOUBLE(before.center.latitude, after.center.latitude);
   TEST_ASSERT_EQUAL_DOUBLE(before.center.longitude, after.center.longitude);
   TEST_ASSERT_EQUAL_DOUBLE(before.zoom, after.zoom);
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
+  mln_map_projection_release(projection);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -749,7 +751,7 @@ static void conversions_reject_invalid_inputs_without_writing_outputs(void) {
   }
   TEST_ASSERT_EQUAL_MEMORY(outputs_before, outputs, sizeof(outputs));
 
-  MLN_TEST_OK(mln_map_projection_release(projection, NULL));
+  mln_map_projection_release(projection);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }

@@ -183,6 +183,33 @@ export function attachSession(
 }
 
 /**
+ * Attaches an owned texture as attachSession() does, over graphics objects
+ * that the case destroys itself through `destroyGraphics`. A teardown destroys
+ * them if the case did not.
+ */
+export function attachSessionOverOwnGraphics(
+  map: MapHandle,
+  options: RenderSessionAttachOptions = {},
+): RenderSessionAttachment & { readonly destroyGraphics: () => void } {
+  const context = addon.create(backends[backend]);
+  let destroyed = false;
+  const destroyGraphics = () => {
+    if (!destroyed) {
+      destroyed = true;
+      addon.destroy(context.graphics);
+    }
+  };
+  teardown(destroyGraphics);
+  const attachment = attachOwnedTexture(context, map, {
+    driver: RenderDriverKind.coreWorker,
+    requestedTextureRingDepth: 1,
+    ...options,
+  });
+  teardown(() => releaseSession(attachment.session));
+  return { ...attachment, destroyGraphics };
+}
+
+/**
  * Native code that a host brings, from the test graphics addon: the function
  * pointers and the context of a native registration. Each call that native
  * code makes through them reaches this realm's event loop as an event.
@@ -227,9 +254,9 @@ export class NativeProbe implements ProbeAddresses {
 }
 
 /**
- * Abandons a session, then closes it. A session that the case detached,
- * abandoned, or closed already has nothing left to abandon, and a second close
- * does nothing.
+ * Abandons a session, then disposes it. A session that the case detached,
+ * abandoned, or disposed already has nothing left to abandon, and a second
+ * dispose does nothing.
  */
 function releaseSession(session: RenderSessionHandle): void {
   try {
@@ -237,7 +264,7 @@ function releaseSession(session: RenderSessionHandle): void {
   } catch {
     // Native code reports what the session has already given up.
   }
-  session.close();
+  session.dispose();
 }
 
 /** Demands a frame, which renders whether or not the map changed. */
