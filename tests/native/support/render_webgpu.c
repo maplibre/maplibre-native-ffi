@@ -27,10 +27,11 @@ typedef struct webgpu_state {
 // device requests are futures, and the suite runs on a worker where blocking on
 // them is legal.
 static bool await_future(WGPUInstance instance, WGPUFuture future) {
-  // A non-zero wait timeout requires the TimedWaitAny instance feature. Bound
-  // adapter creation so an unavailable adapter fails the fixture instead of
-  // hanging the runner.
-  const uint64_t timeout_ns = UINT64_C(5) * 1000U * 1000U * 1000U;
+  // A non-zero wait timeout requires the TimedWaitAny instance feature. The
+  // bound only keeps an unavailable adapter from hanging the runner, so it is
+  // generous: browser shards start their GPU processes together, and a 5 s
+  // bound expired before a shard's adapter arrived.
+  const uint64_t timeout_ns = UINT64_C(30) * 1000U * 1000U * 1000U;
   WGPUFutureWaitInfo wait = {.future = future, .completed = false};
   const WGPUWaitStatus status =
     wgpuInstanceWaitAny(instance, 1, &wait, timeout_ns);
