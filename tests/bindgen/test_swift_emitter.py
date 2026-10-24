@@ -62,19 +62,22 @@ class SwiftEmitterTests(unittest.TestCase):
         for owner in ("MapHandle", "LeaseHandle"):
             self.assertIn(
                 f"public final class {owner}: @unchecked Sendable, NativeReceiver, "
-                "CustomStringConvertible {",
-                owners,
-            )
-            self.assertIn(
-                f'public var description: String {{ "{owner}(id=0x\\(String(id, '
-                'radix: 16)), closed=\\(isClosed))" }',
+                "Identifiable, Hashable, CustomStringConvertible {",
                 owners,
             )
         self.assertEqual(owners.count("public var isClosed: Bool"), 2)
+        self.assertEqual(
+            owners.count("public var description: String { handle.description }"),
+            2,
+        )
         # Only an event source's id doc names events.
-        self.assertEqual(owners.count("which runtime events report"), 1)
-        self.assertIn("which runtime events report", owners.split("class MapHandle")[1])
-        self.assertIn("  /// The native handle value.\n  public var id: UInt64", owners)
+        self.assertEqual(owners.count("runtime events report"), 1)
+        self.assertIn("runtime events report", owners.split("class MapHandle")[1])
+        self.assertIn(
+            "  /// The native handle, which no later handle in the process reuses.\n"
+            "  /// It stays valid after the handle closes.\n  public var id: UInt64",
+            owners,
+        )
 
     def test_a_dispose_with_a_completion_is_the_close_and_the_dispose(self):
         outputs = swift.generate(parse(DISPOSE_WITH_COMPLETION))
