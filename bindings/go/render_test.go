@@ -215,12 +215,12 @@ func TestCallerDriverIsServicedFromAGoroutine(t *testing.T) {
 		t.Fatal("the attachment completed before the host serviced the session")
 	default:
 	}
-	if snapshot, err := r.session.GetSnapshot(); err != nil || snapshot.State != RenderSessionStateAttaching {
+	if snapshot, err := r.session.Snapshot(); err != nil || snapshot.State != RenderSessionStateAttaching {
 		t.Fatalf("snapshot while attaching = %+v, %v; want RenderSessionStateAttaching", snapshot, err)
 	}
 	receive(t, r.driverWork, "the driver-work wake")
 	r.attach(t)
-	if capabilities, err := r.session.GetCapabilities(); err != nil || capabilities.Driver != RenderDriverKindCallerGraphicsThread {
+	if capabilities, err := r.session.Capabilities(); err != nil || capabilities.Driver != RenderDriverKindCallerGraphicsThread {
 		t.Fatalf("capabilities = %+v, %v; want the caller driver", capabilities, err)
 	}
 	r.renderFrame(t)

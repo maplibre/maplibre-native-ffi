@@ -14,7 +14,7 @@ const (
 func attachOwnedTexture(
 	m *MapHandle, context testsupport.Context, extent LogicalExtent, options RenderSessionAttachOptions,
 ) (*RenderSessionHandle, *Future[struct{}], error) {
-	attachment, err := m.AttachVulkanOwnedTexture(VulkanOwnedTextureDescriptor{
+	return m.AttachVulkanOwnedTexture(VulkanOwnedTextureDescriptor{
 		Extent: extent,
 		Context: VulkanContextDescriptor{
 			Instance:                 context.VulkanInstance,
@@ -26,7 +26,6 @@ func attachOwnedTexture(
 			GetDeviceProcAddr:        context.VulkanGetDeviceProcAddr,
 		},
 	}, options)
-	return attachment.Session, attachment.Completion, err
 }
 
 func withFrameView(frame *AcquiredFrameHandle, use func(frameView) error) error {

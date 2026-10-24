@@ -13,14 +13,10 @@ import (
 // ABI version this binding targets, and the render backend that the test
 // task's build tag names.
 func TestLinkedLibraryMatchesTheBuild(t *testing.T) {
-	if version, err := CVersion(); err != nil || version != bindingCABIVersion {
-		t.Fatalf("CVersion() = %d, %v; want %d", version, err, bindingCABIVersion)
+	if version := CVersion(); version != bindingCABIVersion {
+		t.Fatalf("CVersion() = %d, want %d", version, bindingCABIVersion)
 	}
-	backends, err := SupportedRenderBackendMask()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !backends.Has(buildBackend) {
+	if backends := SupportedRenderBackendMask(); !backends.Has(buildBackend) {
 		t.Fatalf("SupportedRenderBackendMask() = %#x, want the build's backend %#x", uint32(backends), uint32(buildBackend))
 	}
 }

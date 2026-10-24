@@ -16,7 +16,7 @@ func TestDiscardedCommandsAreFencedAndSyncRejectionReturnsError(t *testing.T) {
 	}
 	// A later command on the same map completes after the discarded one.
 	await(t, submitted(f.m.RequestRepaint()))
-	snapshot, err := f.m.GetSnapshot()
+	snapshot, err := f.m.Snapshot()
 	if err != nil {
 		t.Fatal(err)
 	}

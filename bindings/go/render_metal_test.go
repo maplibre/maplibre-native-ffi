@@ -14,13 +14,12 @@ const (
 func attachOwnedTexture(
 	m *MapHandle, context testsupport.Context, extent LogicalExtent, options RenderSessionAttachOptions,
 ) (*RenderSessionHandle, *Future[struct{}], error) {
-	attachment, err := m.AttachMetalOwnedTexture(MetalOwnedTextureDescriptor{
+	return m.AttachMetalOwnedTexture(MetalOwnedTextureDescriptor{
 		Extent:  extent,
 		Context: MetalContextDescriptor{Device: context.MetalDevice},
 		// MTLPixelFormatBGRA8Unorm.
 		PixelFormat: 80,
 	}, options)
-	return attachment.Session, attachment.Completion, err
 }
 
 func withFrameView(frame *AcquiredFrameHandle, use func(frameView) error) error {

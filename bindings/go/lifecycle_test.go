@@ -68,7 +68,7 @@ func TestHandleIdNamesItsEventsAndOutlivesClose(t *testing.T) {
 // and native reports a closed input handle stale.
 func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 	for _, session := range []*RenderSessionHandle{nil, {}} {
-		if _, err := session.GetCapabilities(); !errors.Is(err, StatusInvalidArgument) {
+		if _, err := session.Capabilities(); !errors.Is(err, StatusInvalidArgument) {
 			t.Fatalf("receiver %#v: %v, want StatusInvalidArgument", session, err)
 		}
 	}

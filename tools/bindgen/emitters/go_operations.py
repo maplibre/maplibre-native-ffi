@@ -12,6 +12,11 @@ def element(value):
     return value.unwrapped
 
 
+def camel(value):
+    first, *rest = value.split("_")
+    return first + "".join(name(part) for part in rest)
+
+
 def method_name(plan, receiver, handle):
     method = name(plan.member)
     if handle and handle.handle and plan.name == handle.handle.release:
@@ -129,6 +134,15 @@ def operation(plan, values, *, discard=False):
     method = method_name(plan, receiver, handle)
     if plan.view:
         method = "With" + name(plan.view.stem)
+    elif (
+        receiver
+        and not plan.completion
+        and len(method) > 3
+        and method.startswith("Get")
+        and all(p.name == receiver_name for p in plan.inputs)
+    ):
+        # Go getters drop Get; queries that return a Future keep it.
+        method = method.removeprefix("Get")
     internal = {
         "arena",
         "raw",
@@ -146,8 +160,7 @@ def operation(plan, values, *, discard=False):
     }
     labels = {}
     for p in plan.function.parameters:
-        parts = p.name.split("_")
-        label = parts[0] + "".join(name(part) for part in parts[1:])
+        label = camel(p.name)
         if p.name in {o.name for o in plan.outputs}:
             label = "out" + name(output_member(p.name))
         while label in GO_KEYWORDS or label in internal or label in labels.values():
@@ -326,6 +339,13 @@ def operation(plan, values, *, discard=False):
     ):
         values.require(plan.result)
         result_type = values.type(plan.result)
+    # A global call with no inputs, no status, and a plain result can't fail.
+    infallible = bool(
+        result_type
+        and not receiver
+        and not signature
+        and plan.result.kind in {"scalar", "enum", "native_pointer"}
+    )
     call = native_call(
         plan.function, *(arguments[p.name] for p in plan.function.parameters)
     )
@@ -336,23 +356,19 @@ def operation(plan, values, *, discard=False):
             labels[text.result_length],
         )
         call = f"bindingCallerSizedText(&{storage}, func({storage} *C.char, {capacity} C.size_t, {length} *C.size_t) int32 {{ return int32({call}) }})"
-    products = ""
+    # Several outputs return as Go results, named after the C outputs and,
+    # for a completion, ready. The runtime carries them in an unnamed struct.
+    results = None
     if len(output_types) > 1:
-        returned = name(plan.name.removeprefix("mln_")) + "Result"
-        names = [name(output_member(p.name)) for p, _, _ in outputs] + (
-            ["Completion"] if plan.completion else []
+        names = [camel(output_member(p.name)) for p, _, _ in outputs] + (
+            ["ready"] if plan.completion else []
         )
-        products = (
-            f"type {returned} struct {{ "
-            + "; ".join(f"{n} {t}" for n, t in zip(names, output_types, strict=True))
-            + " }\n"
-        )
-        converted = (
-            returned
-            + "{"
-            + ", ".join(f"{n}: {c}" for n, c in zip(names, conversions, strict=True))
-            + "}"
-        )
+        taken = set(names) & {labels[p.name] for p in plan.inputs}
+        if taken:
+            raise ModelError([f"{plan.name}: results {sorted(taken)} name parameters"])
+        results = list(zip(names, output_types, strict=True))
+        returned = "struct{ " + "; ".join(f"{n} {t}" for n, t in results) + " }"
+        converted = returned + "{" + ", ".join(conversions) + "}"
     elif output_types:
         returned, converted = output_types[0], conversions[0]
     else:
@@ -399,7 +415,10 @@ def operation(plan, values, *, discard=False):
             values.fail(
                 plan.result or outputs[0][1], "direct calls cannot have outputs"
             )
-        if result_type:
+        if result_type and infallible:
+            returned = result_type
+            invocation = f"return {values.copy(plan.result, call)}"
+        elif result_type:
             returned = result_type
             converted = values.copy(plan.result, call)
             invocation = f"return bindingDirect({target}, func(arena *bindingArena, raw uint64) {returned} {{\n{closure_setup}return {converted}\n}})"
@@ -438,12 +457,20 @@ def operation(plan, values, *, discard=False):
     if discard:
         receiver_signature = f"(view {receiver_type}Discarding) "
         setup.insert(0, "receiver := view.owner")
-    results = f"({returned}, error)" if returned else "error"
+    if results:
+        invocation = (
+            invocation.replace("return ", "result, err := ", 1)
+            + "\nreturn "
+            + ", ".join(f"result.{n}" for n, _ in results)
+            + ", err"
+        )
+        returns = "(" + ", ".join(f"{n} {t}" for n, t in results) + ", err error)"
+    elif infallible:
+        returns = returned
+    else:
+        returns = f"({returned}, error)" if returned else "error"
     body = "".join(line + "\n" for line in setup) + invocation
-    return (
-        products
-        + f"func {receiver_signature}{method}({', '.join(signature)}) {results} {{\n{body}\n}}\n"
-    )
+    return f"func {receiver_signature}{method}({', '.join(signature)}) {returns} {{\n{body}\n}}\n"
 
 
 def lower(bound):

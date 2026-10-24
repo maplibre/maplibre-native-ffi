@@ -302,12 +302,12 @@ func newOpenGLOwnedTextureTarget(context *openGLContext, v viewport, m *maplibre
 		return nil, err
 	}
 	target := &openGLOwnedTextureTarget{newOpenGLFrameTarget(compositor, driver)}
-	attachment, err := m.AttachOpenglOwnedTexture(
+	session, ready, err := m.AttachOpenglOwnedTexture(
 		maplibre.OpenglOwnedTextureDescriptor{Extent: v.extent(), Context: descriptor},
 		target.attachOptions(textureRingDepth),
 	)
 	if err == nil {
-		err = target.attach(attachment.Session, attachment.Completion)
+		err = target.attach(session, ready)
 	}
 	if err != nil {
 		return nil, errors.Join(fmt.Errorf("OpenGL texture attach failed: %w", err), compositor.Close())
@@ -407,10 +407,11 @@ func newOpenGLBorrowedTextureTarget(context *openGLContext, v viewport, m *mapli
 	ring, descriptor, err := target.describe(v)
 	if err == nil {
 		target.ring = ring
-		var attachment maplibre.MapAttachOpenglBorrowedTextureResult
-		attachment, err = m.AttachOpenglBorrowedTexture(descriptor, target.attachOptions(textureRingDepth))
+		var session *maplibre.RenderSessionHandle
+		var ready *maplibre.Future[struct{}]
+		session, ready, err = m.AttachOpenglBorrowedTexture(descriptor, target.attachOptions(textureRingDepth))
 		if err == nil {
-			err = target.attach(attachment.Session, attachment.Completion)
+			err = target.attach(session, ready)
 		}
 	}
 	if err != nil {
@@ -514,12 +515,12 @@ func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapH
 	}
 	target := &openGLSurfaceTarget{callerDriver: driver, context: context}
 	target.presents = true
-	attachment, err := m.AttachOpenglSurface(
+	session, ready, err := m.AttachOpenglSurface(
 		maplibre.OpenglSurfaceDescriptor{Extent: v.extent(), Context: descriptor, Surface: context.surface()},
 		target.attachOptions(0),
 	)
 	if err == nil {
-		err = target.attach(attachment.Session, attachment.Completion)
+		err = target.attach(session, ready)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("OpenGL surface attach failed: %w", err)

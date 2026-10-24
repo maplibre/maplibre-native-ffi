@@ -246,18 +246,12 @@ func waitEvent(event *sdl.Event, deadline time.Time, hasDeadline bool) bool {
 }
 
 func validateNativeRenderBackend() error {
-	backends, err := maplibre.SupportedRenderBackendMask()
-	if err != nil {
-		return err
-	}
+	backends := maplibre.SupportedRenderBackendMask()
 	fmt.Printf("native render backends: %s\n", renderBackendSupportLabel(backends))
 	if !backends.Has(maplibre.RenderBackendFlagOpengl) {
 		return errors.New("loaded native library does not support OpenGL")
 	}
-	providers, err := maplibre.OpenglSupportedContextProviderMask()
-	if err != nil {
-		return err
-	}
+	providers := maplibre.OpenglSupportedContextProviderMask()
 	required := maplibre.OpenglContextProviderFlagEgl
 	if stdruntime.GOOS == "windows" {
 		required = maplibre.OpenglContextProviderFlagWgl
