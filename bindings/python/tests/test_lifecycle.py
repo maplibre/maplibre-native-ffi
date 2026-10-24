@@ -34,8 +34,41 @@ def test_closing_twice_is_safe_and_a_closed_handle_refuses_use() -> None:
         runtime.close()
 
     data = mln.geojson_source_data_create(b'{"type":"FeatureCollection","features":[]}')
+    _check_handle(data, closed=False)
     data.close()
     data.close()
+    with data:
+        pass
+    _check_handle(data, closed=True)
+
+
+def _check_handle(
+    handle: mln.GeojsonSourceDataHandle | mln.MapHandle | mln.RuntimeHandle,
+    *,
+    closed: bool,
+) -> None:
+    assert handle.id != 0
+    assert handle.is_closed is closed
+    name = type(handle).__name__
+    assert repr(handle) == f"{name}(id={handle.id:#x}, closed={str(closed).lower()})"
+
+
+def test_dispose_closes_a_handle_once() -> None:
+    runtime = mln.runtime_create()
+    map_handle = result(runtime.create_map())
+    for handle in (map_handle, runtime):
+        _check_handle(handle, closed=False)
+        handle.dispose()
+        handle.dispose()
+        with handle:
+            pass
+        _check_handle(handle, closed=True)
+    # An asynchronous close after dispose reaches native, which reports the
+    # handle stale.
+    with pytest.raises(
+        mln.MaplibreError, check=lambda error: error.status == mln.Status.INVALID_STATE
+    ):
+        map_handle.close()
 
 
 def test_leaving_a_block_after_an_explicit_close_does_nothing() -> None:
@@ -49,8 +82,8 @@ def test_leaving_a_root_block_disposes_it_without_waiting_for_its_children() -> 
     with mln.runtime_create() as runtime:
         # Release refuses a runtime with a live map, and dispose accepts it.
         map_handle = result(runtime.create_map())
-    assert repr(runtime) == f"RuntimeHandle(id={runtime.id}, closed=True)"
-    assert repr(map_handle) == f"MapHandle(id={map_handle.id}, closed=False)"
+    _check_handle(runtime, closed=True)
+    _check_handle(map_handle, closed=False)
     assert type(map_handle).__module__ == "maplibre_native_ffi"
     result(map_handle.close())
 

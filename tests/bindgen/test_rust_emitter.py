@@ -74,10 +74,45 @@ class RustEmitterTests(unittest.TestCase):
             "dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_session_dispose(raw, std::ptr::null(), out_diagnostic) })",
             source,
         )
-        self.assertIn("pub fn release(&self) -> Result<NativeFuture<()>>", source)
+        # The async release reaches native on a closed handle, and the sync
+        # dispose of a closed handle does nothing.
+        self.assertIn(
+            "pub fn release(&self) -> Result<NativeFuture<()>> {\n"
+            "        self.inner.close(|session| {",
+            source,
+        )
         self.assertIn("call.complete(", source)
-        self.assertIn("pub fn dispose(&self) -> Result<()>", source)
+        self.assertIn(
+            "pub fn dispose(&self) -> Result<()> {\n"
+            "        self.inner.close_once(|session| {",
+            source,
+        )
         self.assertIn("call.discard(", source)
+
+    def test_only_runtime_event_sources_document_their_id_as_a_source(self):
+        api = parse(
+            """
+typedef enum mln_runtime_event_source_type : unsigned {
+  MLN_RUNTIME_EVENT_SOURCE_MAP = 1,
+} mln_runtime_event_source_type;
+typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_release");
+typedef unsigned long long mln_query BIND("kind=handle;release=mln_query_release");
+void mln_map_release(mln_map map);
+void mln_query_release(mln_query query);
+"""
+        )
+        validate(api)
+        generated = rust.generate(api)
+        prefix = "crates/maplibre-native-ffi/src/generated/"
+        self.assertIn(
+            "    /// Returns the native handle value, which runtime events report as their source.\n"
+            "    fn id;\n",
+            generated[prefix + "map.rs"],
+        )
+        self.assertIn(
+            "    /// Returns the native handle value.\n    fn id;\n",
+            generated[prefix + "query.rs"],
+        )
 
     def test_generated_bindings_run_with_the_handwritten_runtime(self):
         defines = (

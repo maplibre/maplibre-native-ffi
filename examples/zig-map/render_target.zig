@@ -207,9 +207,9 @@ fn abandon(handle: maplibre.RenderSession) void {
 /// Releases a sampled frame with CPU-complete synchronization. The compositor
 /// waits for its GPU work before returning, so that is accurate.
 pub fn releaseFrame(frame: *?maplibre.AcquiredFrame) void {
-    const owned = frame.* orelse return;
+    var owned = frame.* orelse return;
     frame.* = null;
-    maplibre.acquiredFrameRelease(std.heap.smp_allocator, owned, null, null) catch |err| {
+    maplibre.acquiredFrameRelease(std.heap.smp_allocator, &owned, null, null) catch |err| {
         diagnostics.logError("texture release failed", err, null);
     };
 }

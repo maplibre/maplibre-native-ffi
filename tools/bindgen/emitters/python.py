@@ -50,13 +50,32 @@ def pascal(name: str) -> str:
     return "".join(part.capitalize() for part in name.split("_"))
 
 
+def event_sources(api: Api) -> set[str]:
+    """The handles that a runtime event can name as its source."""
+    return {
+        "mln_" + value.name.removeprefix("MLN_RUNTIME_EVENT_SOURCE_").lower()
+        for enum in api.enums
+        if enum.name == "mln_runtime_event_source_type"
+        for value in enum.values
+    }
+
+
+def public_dispose(handle: HandlePlan) -> bool:
+    """Whether a handle has a C dispose besides a void release: a separate
+    dispose, or a release that disposes and also takes a completion."""
+    return bool(
+        handle.dispose
+        and (handle.dispose != handle.release or handle.dispose_completion)
+    )
+
+
 def unsupported(function: Function | Record, reason: str) -> ModelError:
     return ModelError([f"{function.location}: Python: {function.name}: {reason}"])
 
 
 # Members every handle owner defines. The release operation alone becomes
 # `close`; any other operation with one of these names would shadow a member.
-OWNER_MEMBERS = {"state", "close", "id"}
+OWNER_MEMBERS = {"state", "close", "dispose", "id", "is_closed"}
 LOCAL_NAMES = {
     "self",
     "py",
@@ -1043,12 +1062,30 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
         value._native = native
         return value
 """)
+    sources = event_sources(api)
     for native, owner in OWNERS.items():
+        handle = bound.handles[native]
         # A handle without scoped cleanup, such as a frame, has no `with` block.
         mixin = (
             "NativeHandleMixin"
-            if bound.handles[native].scoped_release is None
+            if handle.scoped_release is None
             else "ScopedHandleMixin"
+        )
+        id_doc = (
+            "The native handle value, which runtime events report as their source.\n\n"
+            "        It stays readable after close, so events drained later still match\n"
+            "        the handle that produced them.\n        "
+            if native in sources
+            else "The native handle value. It stays readable after close."
+        )
+        # The dispose is the scoped release, which `__exit__` also calls.
+        dispose = (
+            f"""
+    def dispose(self) -> None:
+{docs.docstring(bound.doc(handle.dispose), "        ")}        self._native._exit()
+"""
+            if public_dispose(handle)
+            else ""
         )
         owner_classes.append(f'''class {owner}(_{owner}Operations, {mixin}):
 {docs.docstring(bound.doc(native), "    ")}    __module__ = "maplibre_native_ffi"
@@ -1063,7 +1100,12 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
         owner._native = native
         owner._parent = parent
         return owner
-''')
+
+    @property
+    def id(self) -> int:
+        """{id_doc}"""
+        return int(self._native.id)
+{dispose}''')
     files["python/maplibre_native_ffi/_generated_owners.py"] = (
         f'"""{notice}"""\nfrom ._lifecycle import NativeHandleMixin, ScopedHandleMixin\n'
         + "\n".join(

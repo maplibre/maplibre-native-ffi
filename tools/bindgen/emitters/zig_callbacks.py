@@ -84,8 +84,8 @@ def parts(values, value):
                 transfer = "ownership_transferred = true; "
                 release = camel(parameter.value.handle.release.removeprefix("mln_"))
                 owned.append(
-                    f"const {adopted} = {values.public(parameter.value)}.adopt({raw}); "
-                    f"defer if (!ownership_transferred) {{ {release}({adopted}) catch {{}}; }}; "
+                    f"var {adopted} = {values.public(parameter.value)}.adopt({raw}); "
+                    f"defer if (!ownership_transferred) {{ {release}(&{adopted}) catch {{}}; }}; "
                 )
                 converted.append(adopted)
             elif (

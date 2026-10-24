@@ -98,6 +98,19 @@ internal sealed unsafe class NativeHandleState<T>
 
     internal T Handle => handle;
 
+    internal bool IsClosed
+    {
+        get
+        {
+            lock (gate)
+                return closed;
+        }
+    }
+
+    // The one debug representation that every binding gives its handles.
+    public override string ToString() =>
+        $"{typeName}(id=0x{handle.Value:x}, closed={(IsClosed ? "true" : "false")})";
+
     // Only a batch getter copies pointers after its native lease has ended.
     internal ReadScope Read(object owner)
     {

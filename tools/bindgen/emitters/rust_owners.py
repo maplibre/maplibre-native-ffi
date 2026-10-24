@@ -30,6 +30,17 @@ def disposer(bound: BoundApi, handle: HandlePlan):
     return plan.function
 
 
+def event_sources(bound: BoundApi) -> frozenset[str]:
+    """The handles that runtime events name as their source."""
+    prefix = "MLN_RUNTIME_EVENT_SOURCE_"
+    return frozenset(
+        "mln_" + member.name.removeprefix(prefix).lower()
+        for enum in bound.source.enums
+        if enum.name == "mln_runtime_event_source_type"
+        for member in enum.values
+    )
+
+
 def owned_handles(bound: BoundApi) -> dict[str, HandlePlan]:
     """Public handles a Rust owner can hold and dispose from `Drop`."""
     candidates = {
@@ -63,12 +74,20 @@ def declaration(bound: BoundApi, handle: HandlePlan) -> str:
     if handle.release_inputs:
         release = handle.release.removeprefix(native + "_")
         must_use = f'    #[must_use = "`{owner}` must be released with `{owner}::{release}`"]\n'
+    id_doc = "    /// Returns the native handle value"
+    id_doc += (
+        ", which runtime events report as their source.\n"
+        if native in event_sources(bound)
+        else ".\n"
+    )
     return (
         "native_owner! {\n"
         f"    /// Owns one `{native}` native handle.\n"
         + (f"    ///\n{summary}" if (summary := doc(bound, native, "    ")) else "")
         + f"{must_use}"
         f"    pub struct {owner}({native}) dispose {finalize}, counted {str(counted).lower()};\n"
+        f"{id_doc}"
+        "    fn id;\n"
         "}\n"
     )
 

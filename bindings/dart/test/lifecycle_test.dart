@@ -6,16 +6,49 @@ import 'package:test/test.dart';
 
 import 'support/fixture.dart';
 
+/// A handle describes itself by its type, id, and whether it is closed.
+Matcher _describes(String typeName, int id, {required bool closed}) =>
+    equals('$typeName(id=0x${id.toRadixString(16)}, closed=$closed)');
+
 void main() {
-  test('repeated asynchronous release reaches native', () async {
+  test('a second close is a no-op and the handle reports it', () async {
     final fixture = await openRuntime();
     final map = await fixture.openMap();
     final projection = mapProjectionCreate(map.getSnapshot().view);
 
+    expect(projection.id, isNot(0));
+    expect(projection.isClosed, isFalse);
+    expect(
+      projection.toString(),
+      _describes('MapProjectionHandle', projection.id, closed: false),
+    );
     projection.close();
+    expect(projection.isClosed, isTrue);
     projection.close();
+    expect(
+      '$projection',
+      _describes('MapProjectionHandle', projection.id, closed: true),
+    );
+  });
+
+  test('a second dispose is a no-op and the handle reports it', () {
+    final runtime = runtimeCreate(runtimeOptionsDefault());
+    addTearDown(() => closeIfLive(runtime.close));
+
+    expect(runtime.isClosed, isFalse);
+    expect('$runtime', _describes('RuntimeHandle', runtime.id, closed: false));
+    runtime.dispose();
+    expect(runtime.isClosed, isTrue);
+    runtime.dispose();
+    expect('$runtime', _describes('RuntimeHandle', runtime.id, closed: true));
+  });
+
+  test('repeated asynchronous release reaches native', () async {
+    final fixture = await openRuntime();
+    final map = await fixture.openMap();
 
     await within(map.close(), 'map close');
+    expect(map.isClosed, isTrue);
     expect(
       map.close,
       throwsA(

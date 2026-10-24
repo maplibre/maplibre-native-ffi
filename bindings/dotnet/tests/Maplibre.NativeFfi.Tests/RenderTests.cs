@@ -164,7 +164,15 @@ public sealed class RenderTests
 
                 Assert.NotNull(escaped);
                 Assert.Throws<MaplibreException>(() => escaped());
+                Assert.False(frame.IsClosed);
                 frame.Release(null);
+                Assert.True(frame.IsClosed);
+                Assert.Equal(
+                    $"AcquiredFrameHandle(id=0x{frame.Id:x}, closed=true)",
+                    frame.ToString()
+                );
+                // A discard after the release does nothing.
+                frame.Discard();
                 Assert.Throws<MaplibreException>(() => frame.GetResult());
             }
         );

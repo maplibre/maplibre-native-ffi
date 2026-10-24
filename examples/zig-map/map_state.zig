@@ -21,7 +21,7 @@ pub const MapState = struct {
             diagnostics.logError("runtime create failed", err, &diagnostic);
             return types.AppError.RuntimeCreateFailed;
         };
-        errdefer if (maplibre.runtimeRelease(runtime, null)) |future| {
+        errdefer if (maplibre.runtimeRelease(&runtime, null)) |future| {
             var teardown = future;
             _ = teardown.wait(null) catch {};
             teardown.deinit();
@@ -40,7 +40,7 @@ pub const MapState = struct {
             diagnostics.logError("map create failed", err, &diagnostic);
             return types.AppError.MapCreateFailed;
         };
-        errdefer if (maplibre.mapRelease(map, null)) |future| {
+        errdefer if (maplibre.mapRelease(&map, null)) |future| {
             var teardown = future;
             teardown.deinit();
         } else |_| map.deinit();
@@ -57,12 +57,12 @@ pub const MapState = struct {
     pub fn deinit(self: *MapState) void {
         // Awaiting both release completions lets native teardown finish before
         // the app tears down state that the callbacks use.
-        if (maplibre.mapRelease(self.map, null)) |future| {
+        if (maplibre.mapRelease(&self.map, null)) |future| {
             var teardown = future;
             _ = teardown.wait(null) catch {};
             teardown.deinit();
         } else |_| self.map.deinit();
-        if (maplibre.runtimeRelease(self.runtime, null)) |future| {
+        if (maplibre.runtimeRelease(&self.runtime, null)) |future| {
             var teardown = future;
             _ = teardown.wait(null) catch {};
             teardown.deinit();

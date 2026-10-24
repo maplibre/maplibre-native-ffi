@@ -100,8 +100,14 @@ test "generated owned callback arguments are released on conversion and host err
     raw.callback.?(raw.context, "query", 43);
     try std.testing.expectEqual(@as(usize, 2), probe.calls);
     try std.testing.expectEqual(@as(u64, 42), released_query);
-    try api.queryRelease(probe.saved.?);
+    var saved = probe.saved.?;
+    try api.queryRelease(&saved);
     try std.testing.expectEqual(@as(u64, 43), released_query);
+    // The release closed the value, so a second one does not reach native.
+    try std.testing.expect(saved.isClosed());
+    released_query = 0;
+    try api.queryRelease(&saved);
+    try std.testing.expectEqual(@as(u64, 0), released_query);
 }
 
 test "generated caller-sized output arrays" {

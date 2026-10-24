@@ -9,6 +9,8 @@ native_owner! {
     /// See `mln_resource_request` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     pub struct ResourceRequestHandle(mln_resource_request) dispose |raw| { unsafe { sys::mln_resource_request_release(raw) }; Ok(()) }, counted false;
+    /// Returns the native handle value.
+    fn id;
 }
 
 impl ResourceRequestHandle {
@@ -56,7 +58,7 @@ impl ResourceRequestHandle {
     /// See `mln_resource_request_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn release(&self) -> Result<()> {
-        self.inner.close(|handle| {
+        self.inner.close_once(|handle| {
             let mut call = Call::new(handle, None);
             call.run(|handle| unsafe { sys::mln_resource_request_release(handle) });
             Ok(())

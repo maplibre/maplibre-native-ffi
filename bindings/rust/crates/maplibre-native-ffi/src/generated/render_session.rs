@@ -9,6 +9,8 @@ native_owner! {
     /// See `mln_render_session` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     pub struct RenderSessionHandle(mln_render_session) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_render_session_dispose(raw, std::ptr::null(), out_diagnostic) }), counted false;
+    /// Returns the native handle value.
+    fn id;
 }
 
 impl RenderSessionHandle {
@@ -116,7 +118,7 @@ impl RenderSessionHandle {
     /// See `mln_render_session_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn dispose(&self) -> Result<()> {
-        self.inner.close(|session| {
+        self.inner.close_once(|session| {
             let call = Call::new(session, None);
             call.discard(|session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_dispose(session, completion, out_diagnostic)

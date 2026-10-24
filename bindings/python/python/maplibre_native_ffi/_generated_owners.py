@@ -49,6 +49,11 @@ class AcquiredFrameHandle(_AcquiredFrameHandleOperations, NativeHandleMixin):
         owner._parent = parent
         return owner
 
+    @property
+    def id(self) -> int:
+        """The native handle value. It stays readable after close."""
+        return int(self._native.id)
+
 
 class GeojsonSourceDataHandle(_GeojsonSourceDataHandleOperations, ScopedHandleMixin):
     """Prepared GeoJSON data that sources retain independently of its handle.
@@ -69,6 +74,11 @@ class GeojsonSourceDataHandle(_GeojsonSourceDataHandleOperations, ScopedHandleMi
         owner._native = native
         owner._parent = parent
         return owner
+
+    @property
+    def id(self) -> int:
+        """The native handle value. It stays readable after close."""
+        return int(self._native.id)
 
 
 class MapHandle(_MapHandleOperations, ScopedHandleMixin):
@@ -91,6 +101,23 @@ class MapHandle(_MapHandleOperations, ScopedHandleMixin):
         owner._parent = parent
         return owner
 
+    @property
+    def id(self) -> int:
+        """The native handle value, which runtime events report as their source.
+
+        It stays readable after close, so events drained later still match
+        the handle that produced them.
+        """
+        return int(self._native.id)
+
+    def dispose(self) -> None:
+        """Consumes a map handle without observing its asynchronous retirement.
+
+        See `mln_map_dispose` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        self._native._exit()
+
 
 class MapProjectionHandle(_MapProjectionHandleOperations, ScopedHandleMixin):
     """A standalone projection of one map view.
@@ -111,6 +138,11 @@ class MapProjectionHandle(_MapProjectionHandleOperations, ScopedHandleMixin):
         owner._native = native
         owner._parent = parent
         return owner
+
+    @property
+    def id(self) -> int:
+        """The native handle value. It stays readable after close."""
+        return int(self._native.id)
 
 
 class RenderFrameBatchHandle(_RenderFrameBatchHandleOperations, ScopedHandleMixin):
@@ -133,6 +165,11 @@ class RenderFrameBatchHandle(_RenderFrameBatchHandleOperations, ScopedHandleMixi
         owner._parent = parent
         return owner
 
+    @property
+    def id(self) -> int:
+        """The native handle value. It stays readable after close."""
+        return int(self._native.id)
+
 
 class RenderSessionHandle(_RenderSessionHandleOperations, ScopedHandleMixin):
     """A render session, which renders one map to one render target.
@@ -154,6 +191,20 @@ class RenderSessionHandle(_RenderSessionHandleOperations, ScopedHandleMixin):
         owner._parent = parent
         return owner
 
+    @property
+    def id(self) -> int:
+        """The native handle value. It stays readable after close."""
+        return int(self._native.id)
+
+    def dispose(self) -> None:
+        """Consumes a session in any state and retires it, then runs completion,
+        if given, once the host may destroy the target's graphics objects.
+
+        See `mln_render_session_dispose` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+        """
+        self._native._exit()
+
 
 class ResourceRequestHandle(_ResourceRequestHandleOperations, ScopedHandleMixin):
     """A resource request that a resource provider handles.
@@ -174,6 +225,11 @@ class ResourceRequestHandle(_ResourceRequestHandleOperations, ScopedHandleMixin)
         owner._native = native
         owner._parent = parent
         return owner
+
+    @property
+    def id(self) -> int:
+        """The native handle value. It stays readable after close."""
+        return int(self._native.id)
 
 
 class ResourceTransformRequestHandle(
@@ -198,6 +254,11 @@ class ResourceTransformRequestHandle(
         owner._parent = parent
         return owner
 
+    @property
+    def id(self) -> int:
+        """The native handle value. It stays readable after close."""
+        return int(self._native.id)
+
 
 class RuntimeHandle(_RuntimeHandleOperations, ScopedHandleMixin):
     """A runtime: the native scheduler thread and event store for its maps.
@@ -219,6 +280,24 @@ class RuntimeHandle(_RuntimeHandleOperations, ScopedHandleMixin):
         owner._parent = parent
         return owner
 
+    @property
+    def id(self) -> int:
+        """The native handle value, which runtime events report as their source.
+
+        It stays readable after close, so events drained later still match
+        the handle that produced them.
+        """
+        return int(self._native.id)
+
+    def dispose(self) -> None:
+        """Consumes a runtime handle without observing its asynchronous
+        retirement.
+
+        See `mln_runtime_dispose` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+        """
+        self._native._exit()
+
 
 class StyleExpressionHandle(_StyleExpressionHandleOperations, ScopedHandleMixin):
     """A parsed style expression, immutable and independent of any map.
@@ -239,3 +318,8 @@ class StyleExpressionHandle(_StyleExpressionHandleOperations, ScopedHandleMixin)
         owner._native = native
         owner._parent = parent
         return owner
+
+    @property
+    def id(self) -> int:
+        """The native handle value. It stays readable after close."""
+        return int(self._native.id)

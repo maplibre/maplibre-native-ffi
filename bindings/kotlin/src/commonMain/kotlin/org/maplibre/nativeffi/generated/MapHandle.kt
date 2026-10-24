@@ -13,7 +13,7 @@ public class MapHandle
 internal constructor(
   handle: Long,
   @Suppress("unused") private val parent: RuntimeHandle,
-) : GeneratedMapOperations(), org.maplibre.nativeffi.runtime.AsyncReleasable {
+) : GeneratedMapOperations(), org.maplibre.nativeffi.runtime.AsyncReleasable, AutoCloseable {
   internal override val binding = HandleState("MapHandle", handle, GeneratedOwnerDisposal::map)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
   /**
@@ -23,9 +23,14 @@ internal constructor(
   public val id: ULong
     get() = binding.handle.toULong()
 
+  /** Whether a release, dispose, close, or discard has ended the handle. */
   public override val isClosed: Boolean
     get() = binding.isReleased
 
+  public override fun close() {
+    dispose()
+  }
+
   override fun toString(): String =
-    "MapHandle(id=0x${binding.handle.toString(16)}, closed=${binding.isReleased})"
+    "MapHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
 }

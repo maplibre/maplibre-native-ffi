@@ -98,6 +98,13 @@ impl<T: NativeHandle> HandleState<T> {
     /// until the returned guard drops. Native serializes other releases.
     pub fn reserve(self: &Arc<Self>) -> crate::Result<ReleaseReservation<T>> {
         let mut state = lock(&self.state);
+        self.reserve_locked(&mut state)
+    }
+
+    fn reserve_locked(
+        self: &Arc<Self>,
+        state: &mut Ownership,
+    ) -> crate::Result<ReleaseReservation<T>> {
         if state.readers != 0 || state.releasing {
             return Err(Self::in_use());
         }
@@ -119,6 +126,24 @@ impl<T: NativeHandle> HandleState<T> {
             reservation.commit();
         }
         result
+    }
+
+    /// Runs `close` like `close_with`, but returns `Ok` without calling it once
+    /// ownership has ended, so a synchronous release is idempotent.
+    pub fn close_once(
+        self: &Arc<Self>,
+        close: impl FnOnce(T) -> crate::Result<()>,
+    ) -> crate::Result<()> {
+        let mut reservation = {
+            let mut state = lock(&self.state);
+            if state.released {
+                return Ok(());
+            }
+            self.reserve_locked(&mut state)?
+        };
+        close(self.raw())?;
+        reservation.commit();
+        Ok(())
     }
 
     /// Transfers an unreleased handle to disposal and reports a refused disposal.

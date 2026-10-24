@@ -160,8 +160,8 @@ test "native record defaults round trip through generated conversion" {
 test "synchronous calls fill caller-sized outputs in input order" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
-    const projection = try maplibre.mapProjectionCreate(testing.allocator, (try maplibre.mapGetSnapshot(fixture.map, null)).view, null);
-    defer maplibre.mapProjectionRelease(projection) catch unreachable;
+    var projection = try maplibre.mapProjectionCreate(testing.allocator, (try maplibre.mapGetSnapshot(fixture.map, null)).view, null);
+    defer maplibre.mapProjectionRelease(&projection) catch unreachable;
     const coordinates = [_]maplibre.LatLng{ .{ .latitude = 0, .longitude = 0 }, .{ .latitude = 10, .longitude = 20 }, .{ .latitude = -12, .longitude = -30 } };
     var points = try maplibre.mapProjectionPixelsForLatLngs(testing.allocator, projection, &coordinates, null);
     defer points.deinit();
@@ -187,8 +187,8 @@ test "synchronous calls fill caller-sized outputs in input order" {
 }
 
 test "caller-sized text returns results longer than its first storage" {
-    const zoom = try maplibre.styleExpressionCreate(testing.allocator, "[\"interpolate\", [\"linear\"], [\"zoom\"], 0, 0, 10, 100]", null, null);
-    defer maplibre.styleExpressionRelease(zoom) catch unreachable;
+    var zoom = try maplibre.styleExpressionCreate(testing.allocator, "[\"interpolate\", [\"linear\"], [\"zoom\"], 0, 0, 10, 100]", null, null);
+    defer maplibre.styleExpressionRelease(&zoom) catch unreachable;
     var level = try maplibre.styleExpressionEvaluate(testing.allocator, zoom, .{ .zoom = 5, .available_images = &.{} }, null);
     defer level.deinit();
     try testing.expectEqualStrings("50.0", level.value);
@@ -198,8 +198,8 @@ test "caller-sized text returns results longer than its first storage" {
     @memset(&text, 'a');
     text[0] = '"';
     text[text.len - 1] = '"';
-    const long = try maplibre.styleExpressionCreate(testing.allocator, &text, null, null);
-    defer maplibre.styleExpressionRelease(long) catch unreachable;
+    var long = try maplibre.styleExpressionCreate(testing.allocator, &text, null, null);
+    defer maplibre.styleExpressionRelease(&long) catch unreachable;
     var result = try maplibre.styleExpressionEvaluate(testing.allocator, long, null, null);
     defer result.deinit();
     try testing.expectEqualStrings(&text, result.value);

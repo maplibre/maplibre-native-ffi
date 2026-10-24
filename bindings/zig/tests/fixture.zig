@@ -168,7 +168,8 @@ fn denyResource(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, request: maplib
         .error_reason = .not_found,
         .error_message = "the Zig test fixture serves no resources",
     }, null);
-    try maplibre.resourceRequestRelease(request);
+    var owned = request;
+    try maplibre.resourceRequestRelease(&owned);
     return .handle;
 }
 
@@ -188,8 +189,6 @@ pub const Fixture = struct {
     pending_events: std.ArrayList(maplibre.OwnedValue(maplibre.RuntimeEvent)) = .empty,
     runtime: maplibre.Runtime,
     map: maplibre.Map,
-    map_open: bool = true,
-    runtime_open: bool = true,
 
     pub fn create(options: FixtureOptions) !*Fixture {
         const self = try testing.allocator.create(Fixture);
@@ -199,7 +198,7 @@ pub const Fixture = struct {
         defer runtime_options.deinit();
         runtime_options.value.asset_path = options.asset_path;
         self.runtime = try maplibre.runtimeCreate(testing.allocator, runtime_options.value, null);
-        errdefer closeRuntimeHandle(self.runtime) catch self.runtime.deinit();
+        errdefer closeRuntimeHandle(&self.runtime) catch self.runtime.deinit();
         try resolve(try maplibre.runtimeSetEventHandler(testing.allocator, self.runtime, .{
             .callback = receiveEvents,
             .context = self,
@@ -230,11 +229,11 @@ pub const Fixture = struct {
     /// fixture. A close that fails logs an error, which fails the test, and
     /// falls back to disposal so the next test starts clean.
     pub fn destroy(self: *Fixture) void {
-        if (self.map_open) self.closeMap() catch |err| {
+        if (!self.map.isClosed()) self.closeMap() catch |err| {
             std.log.err("fixture map close failed: {s}", .{@errorName(err)});
             self.map.deinit();
         };
-        if (self.runtime_open) self.closeRuntime() catch |err| {
+        if (!self.runtime.isClosed()) self.closeRuntime() catch |err| {
             std.log.err("fixture runtime close failed: {s}", .{@errorName(err)});
             self.runtime.deinit();
         };
@@ -244,13 +243,11 @@ pub const Fixture = struct {
     }
 
     pub fn closeMap(self: *Fixture) !void {
-        try closeMapHandle(self.map);
-        self.map_open = false;
+        try closeMapHandle(&self.map);
     }
 
     fn closeRuntime(self: *Fixture) !void {
-        try closeRuntimeHandle(self.runtime);
-        self.runtime_open = false;
+        try closeRuntimeHandle(&self.runtime);
     }
 
     /// Releases the runtime once native has retired every child that the test
@@ -259,7 +256,7 @@ pub const Fixture = struct {
     pub fn releaseRuntimeWhenChildless(self: *Fixture) !void {
         try self.events.waitUntil(self, struct {
             fn ready(fixture: *Fixture) anyerror!bool {
-                var teardown = maplibre.runtimeRelease(fixture.runtime, null) catch |err| switch (err) {
+                var teardown = maplibre.runtimeRelease(&fixture.runtime, null) catch |err| switch (err) {
                     error.InvalidState => return false,
                     else => return err,
                 };
@@ -268,7 +265,6 @@ pub const Fixture = struct {
                 return true;
             }
         }.ready);
-        self.runtime_open = false;
     }
 
     /// Waits for a runtime command, which follows every submission to the
@@ -309,11 +305,11 @@ pub const Fixture = struct {
     }
 };
 
-pub fn closeRuntimeHandle(runtime: maplibre.Runtime) !void {
+pub fn closeRuntimeHandle(runtime: *maplibre.Runtime) !void {
     try resolve(try maplibre.runtimeRelease(runtime, null));
 }
 
-pub fn closeMapHandle(map: maplibre.Map) !void {
+pub fn closeMapHandle(map: *maplibre.Map) !void {
     try resolve(try maplibre.mapRelease(map, null));
 }
 
@@ -407,8 +403,6 @@ pub const OwnedTexture = struct {
     graphics: Graphics,
     session: maplibre.RenderSession,
     caller_driven: bool,
-    /// Whether the session handle is unconsumed, so close releases it.
-    open: bool = true,
     attached: bool = true,
     next_token: u64 = 1,
 
@@ -453,7 +447,7 @@ pub const OwnedTexture = struct {
     /// destroys the graphics context. A failed detach logs an error, which
     /// fails the test, and the release abandons the session instead.
     pub fn close(self: *OwnedTexture) void {
-        if (self.open) {
+        if (!self.session.isClosed()) {
             if (self.attached) self.detach() catch |err| {
                 std.log.err("render session detach failed: {s}", .{@errorName(err)});
             };
@@ -467,12 +461,11 @@ pub const OwnedTexture = struct {
     /// may destroy its graphics objects. A failure logs an error, which fails
     /// the test.
     fn release(self: *OwnedTexture) void {
-        var retired = maplibre.renderSessionRelease(self.session, null) catch |err| {
+        var retired = maplibre.renderSessionRelease(&self.session, null) catch |err| {
             std.log.err("render session release failed: {s}", .{@errorName(err)});
             return;
         };
         defer retired.deinit();
-        self.open = false;
         retired.wait(null) catch |err| {
             std.log.err("render session retirement failed: {s}", .{@errorName(err)});
         };

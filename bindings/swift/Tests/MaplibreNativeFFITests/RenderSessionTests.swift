@@ -206,7 +206,16 @@ private func attachOwnedTextureSession(
     }
     #expect(throws: MaplibreError.self) { try escaped.width }
 
+    // The refused release left the frame open; a second release after the
+    // accepted one is a no-op.
+    #expect(!first.isClosed)
     try first.release(consumerCompletion: nil)
+    #expect(first.isClosed)
+    try first.release(consumerCompletion: nil)
+    #expect(
+      first.description
+        == "AcquiredFrameHandle(id=0x\(String(first.id, radix: 16)), closed=true)"
+    )
   }
 }
 
@@ -238,6 +247,9 @@ private func attachOwnedTextureSession(
     let rendered = try await attachOwnedTextureSession(style: redStyle)
     fixture = rendered.fixture
     #expect(try await rendered.session.awaitRenderedFrame() != nil)
+    try rendered.session.dispose()
+    #expect(rendered.session.isClosed)
+    // A second dispose is a no-op.
     try rendered.session.dispose()
     try await fixture.map.close()
     rendered.thread?.stop()

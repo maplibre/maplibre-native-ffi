@@ -104,7 +104,7 @@ pub fn main(init_args: std.process.Init) !void {
 
     var signal = WakeSignal{ .io = init_args.io };
     var runtime = try maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:" }, &diagnostic);
-    defer if (maplibre.runtimeRelease(runtime, null)) |future| {
+    defer if (maplibre.runtimeRelease(&runtime, null)) |future| {
         var teardown = future;
         _ = teardown.wait(null) catch {};
         teardown.deinit();
@@ -116,7 +116,7 @@ pub fn main(init_args: std.process.Init) !void {
     var map_future = try maplibre.runtimeCreateMap(allocator, runtime, options, &diagnostic);
     defer map_future.deinit();
     var map = try map_future.wait(&diagnostic);
-    defer if (maplibre.mapRelease(map, null)) |future| {
+    defer if (maplibre.mapRelease(&map, null)) |future| {
         var teardown = future;
         _ = teardown.wait(null) catch {};
         teardown.deinit();

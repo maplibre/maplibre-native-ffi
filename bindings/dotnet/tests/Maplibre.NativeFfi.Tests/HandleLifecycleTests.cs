@@ -51,6 +51,34 @@ public sealed class HandleLifecycleTests
     }
 
     [Fact]
+    public async Task AHandleNamesItsIdAndWhetherItIsClosed()
+    {
+        await using var fixture = await NativeFixture.CreateAsync();
+        var projection = MapProjectionHandle.Create(fixture.Map.GetSnapshot().View);
+        var projectionId = $"0x{projection.Id:x}";
+        Assert.False(projection.IsClosed);
+        Assert.Equal(
+            $"MapProjectionHandle(id={projectionId}, closed=false)",
+            projection.ToString()
+        );
+        projection.Dispose();
+        Assert.True(projection.IsClosed);
+        Assert.Equal($"MapProjectionHandle(id={projectionId}, closed=true)", projection.ToString());
+        projection.Dispose();
+
+        var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        var runtimeId = $"0x{runtime.Id:x}";
+        Assert.False(runtime.IsClosed);
+        Assert.Equal($"RuntimeHandle(id={runtimeId}, closed=false)", runtime.ToString());
+        runtime.Dispose();
+        Assert.True(runtime.IsClosed);
+        Assert.Equal($"RuntimeHandle(id={runtimeId}, closed=true)", runtime.ToString());
+        // A second dispose and a scope that exits after the dispose do nothing.
+        runtime.Dispose();
+        await runtime.DisposeAsync();
+    }
+
+    [Fact]
     public async Task BorrowedCopiesAllowReadersAndRefuseConcurrentRelease()
     {
         var state = CreateCopyProtectedState();

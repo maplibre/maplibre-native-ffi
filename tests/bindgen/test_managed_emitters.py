@@ -4,7 +4,14 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from support import ROOT, parse, parse_sources, protocol_header, require_tool
+from support import (
+    ROOT,
+    parse,
+    parse_sources,
+    protocol_header,
+    real_api,
+    require_tool,
+)
 
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters import dart, dart_native, dotnet, dotnet_native, kotlin
@@ -117,6 +124,28 @@ mln_status mln_measurement_create(mln_measurement *out_measurement BIND("directi
             "NativeMethods.mln_measurement_dispose(live, null, diagnostic);",
             operations,
         )
+
+    def test_every_dotnet_owner_has_the_same_handle_members(self):
+        generated = dotnet.generate(real_api())
+        for path, event_source in (
+            ("Runtime/RuntimeHandle.Operations.g.cs", True),
+            ("Map/MapHandle.Operations.g.cs", True),
+            ("RenderSession/RenderSessionHandle.Operations.g.cs", False),
+            ("RenderSession/AcquiredFrameHandle.Operations.g.cs", False),
+            ("Projection/MapProjectionHandle.Operations.g.cs", False),
+        ):
+            operations = generated[path]
+            self.assertIn("public ulong Id => state.Handle.Value;", operations)
+            self.assertIn("public bool IsClosed => state.IsClosed;", operations)
+            self.assertIn(
+                "public override string ToString() => state.ToString();", operations
+            )
+            # Only the handles that runtime events name are their source.
+            self.assertEqual(
+                event_source,
+                "which runtime events report as their" in operations,
+                path,
+            )
 
     def test_dart_generates_callback_registrations_only_with_queue_delivery(
         self,

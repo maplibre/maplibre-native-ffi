@@ -30,6 +30,7 @@ RESERVED = {
     "marshal",
     "diagnostics",
     "started",
+    "released",
     "out",
     "text",
     "generated",
@@ -204,8 +205,10 @@ def operation(plan, values, *, discard=False):
         validate_input(function, name, value)
         target = element(value)
         values.add(target if target.kind == "handle" else value)
+        # A consuming call closes the caller's value, so it takes a pointer.
+        pointer = "*" if name == receiver_name and plan.consumes else ""
         signature.append(
-            f"{local}: {values.public(target if target.kind == 'handle' else value)}"
+            f"{local}: {pointer}{values.public(target if target.kind == 'handle' else value)}"
         )
         if name == receiver_name:
             continue
@@ -230,6 +233,8 @@ def operation(plan, values, *, discard=False):
         arguments.append(local)
     mode = access(plan)
     receiver = names[receiver_name] if receiver_name else "{}"
+    if plan.consumes:
+        receiver += ".*"
     diagnostic = "diagnostic" if function.diagnostic else "null"
     args = ".{ " + ", ".join(arguments) + " }" if arguments else ".{}"
     head = f'"{plan.name}", .{mode}, {receiver}'
@@ -307,6 +312,8 @@ def operation(plan, values, *, discard=False):
         else:
             return_type = results[0][1] if results else "void"
             body = [f"return {invoke};"]
+    if plan.consumes:
+        body = consume(function, names[receiver_name], body, return_type)
     if needs_allocator:
         signature.insert(0, "allocator: std.mem.Allocator")
     if function.diagnostic:
@@ -328,6 +335,28 @@ def operation(plan, values, *, discard=False):
         + "\n}\n"
     )
     return code
+
+
+def consume(function, receiver, body, return_type):
+    """Close the receiver once native accepts its release. A synchronous release
+    of a closed receiver does nothing; an asynchronous one reaches native,
+    which reports a stale handle."""
+    if len(body) != 1 or not body[0].startswith("return "):
+        raise failure(
+            function, "consumption with outputs requires an owner transaction"
+        )
+    release = body[0].removeprefix("return ").removesuffix(";")
+    if return_type == "void":
+        return [
+            f"if ({receiver}.closed) return;",
+            f"try {release};",
+            f"{receiver}.closed = true;",
+        ]
+    return [
+        f"const released = try {release};",
+        f"{receiver}.closed = true;",
+        "return released;",
+    ]
 
 
 def view_operation(plan, values):

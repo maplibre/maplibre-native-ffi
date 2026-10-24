@@ -73,6 +73,9 @@ void main() {
       await within(attachment.completed, 'attachment');
 
       attachment.session.dispose();
+      expect(attachment.session.isClosed, isTrue);
+      // A second dispose is a no-op.
+      attachment.session.dispose();
       // A dispose reports no retirement, so the map's release waits for it.
       await within(map.close(), 'map close');
       graphics.close();
@@ -143,7 +146,16 @@ void main() {
       // A view that escapes its scope refuses every read.
       expect(readEscapedWidth, throwsA(isA<MaplibreException>()));
 
+      // The refused release left the frame open; a second release after the
+      // accepted one is a no-op.
+      expect(frame.isClosed, isFalse);
       frame.release();
+      expect(frame.isClosed, isTrue);
+      frame.release();
+      expect(
+        frame.toString(),
+        'AcquiredFrameHandle(id=0x${frame.id.toRadixString(16)}, closed=true)',
+      );
       expect(frame.getResult, throwsA(isA<MaplibreException>()));
     },
     skip: _openglFrameSkip,

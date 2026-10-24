@@ -9,6 +9,8 @@ native_owner! {
     /// See `mln_runtime` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     pub struct RuntimeHandle(mln_runtime) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_runtime_dispose(raw, out_diagnostic) }), counted false;
+    /// Returns the native handle value, which runtime events report as their source.
+    fn id;
 }
 
 impl RuntimeHandle {
@@ -136,7 +138,7 @@ impl RuntimeHandle {
     /// See `mln_runtime_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn dispose(&self) -> Result<()> {
-        self.inner.close(|runtime| {
+        self.inner.close_once(|runtime| {
             let mut call = Call::new(runtime, None);
             call.status(|runtime, out_diagnostic| unsafe {
                 sys::mln_runtime_dispose(runtime, out_diagnostic)

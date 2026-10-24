@@ -143,6 +143,26 @@ class TypeScriptEmitterTests(unittest.TestCase):
             text,
         )
 
+    def test_only_event_sources_document_their_id_as_an_event_source(self):
+        # Every owner inherits its ID, closed state, and debug text from
+        # Owner. Only the handles that runtime events name redeclare the ID,
+        # to document it as their source.
+        text = next(
+            text
+            for name, text in typescript.generate(self.api).items()
+            if name.endswith("generated_operations.ts")
+        )
+
+        def owner(name):
+            start = text.index(f"export class {name} extends Owner {{")
+            return text[start : text.index("\n}\n", start)]
+
+        for name in ("MapHandle", "RuntimeHandle"):
+            self.assertIn("declare readonly id: bigint;", owner(name))
+            self.assertIn("runtime events report as their", owner(name))
+        for name in ("MapProjectionHandle", "RenderSessionHandle"):
+            self.assertNotIn("readonly id", owner(name))
+
     def test_only_synchronous_categories_return_without_a_promise(self):
         # An operation that the headers complete later returns a Promise or an
         # attachment, so only the categories that return synchronously can

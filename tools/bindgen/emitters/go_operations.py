@@ -7,6 +7,9 @@ from ..semantic import output_member
 from .go import GO_KEYWORDS, documented_operation, name, native_call
 from .go_values import Values, public
 
+# Members every handle owner declares, which no operation may take.
+OWNER_MEMBERS = {"Close", "Dispose", "Id", "IsClosed", "String"}
+
 
 def element(value):
     return value.unwrapped
@@ -21,7 +24,7 @@ def method_name(plan, receiver, handle):
     method = name(plan.member)
     if handle and handle.handle and plan.name == handle.handle.release:
         return "Close"
-    if receiver and method in {"Close", "Id"}:
+    if receiver and method in OWNER_MEMBERS:
         raise ModelError([f"{plan.name}: {method} is reserved for owner state"])
     return method
 
@@ -117,15 +120,22 @@ def needs_read(plan):
     )
 
 
-def operation(plan, values, *, discard=False):
-    if plan.role == "support":
+def operation(plan, values, *, discard=False, dispose=False):
+    """Lower one operation. `dispose` lowers a handle's C dispose as its
+    synchronous `Dispose`, which passes a null completion to a dispose that is
+    also the release."""
+    dropped_completion = None
+    if dispose and plan.completion:
+        dropped_completion = plan.completion.parameter
+        plan = replace(plan, completion=None)
+    if plan.role == "support" and not dispose:
         raise ModelError(
             [f"{plan.name}: support relationship is emitted with its owner or value"]
         )
     receiver_name = plan.receiver or plan.scoped_receiver
     receiver = next((p for p in plan.inputs if p.name == receiver_name), None)
     handle = element(receiver.value) if receiver else None
-    method = method_name(plan, receiver, handle)
+    method = "Dispose" if dispose else method_name(plan, receiver, handle)
     if plan.view:
         method = "With" + name(plan.view.stem)
     elif (
@@ -172,6 +182,8 @@ def operation(plan, values, *, discard=False):
     # that the runtime calls again when the text did not fit.
     text = plan.caller_sized_text
     signature, setup, body_setup, arguments = [], [], [], {}
+    if dropped_completion:
+        arguments[dropped_completion] = "nil"
     for p in plan.inputs:
         if p.name == receiver_name:
             continue

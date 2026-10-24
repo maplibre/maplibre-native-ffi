@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.lifecycle
 
+// AutoCloseable's `use`, which the suspending `use` imported below would shadow.
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
@@ -8,6 +9,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.use as useAndClose
 import kotlinx.coroutines.CompletableDeferred
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.RuntimeFixture
@@ -48,9 +50,35 @@ class HandleLifecycleTest {
   fun aHandleNamesItsIdAndWhetherItIsClosed() {
     val data = GeneratedApi.geojsonSourceDataCreate(POINT_JSON.encodeToByteArray())
     val id = "0x" + data.id.toString(16)
+    assertFalse(data.isClosed)
     assertEquals("GeojsonSourceDataHandle(id=$id, closed=false)", data.toString())
     data.close()
+    assertTrue(data.isClosed)
     assertEquals("GeojsonSourceDataHandle(id=$id, closed=true)", data.toString())
+  }
+
+  @Test
+  fun aDisposeEndsTheHandleAndRepeatedCleanupDoesNothing() = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    val id = "0x" + runtime.id.toString(16)
+    assertFalse(runtime.isClosed)
+    assertEquals("RuntimeHandle(id=$id, closed=false)", runtime.toString())
+    runtime.dispose()
+    assertTrue(runtime.isClosed)
+    assertEquals("RuntimeHandle(id=$id, closed=true)", runtime.toString())
+    // A second dispose, a close, and either `use` leave the disposed handle as it is.
+    runtime.dispose()
+    runtime.close()
+    runtime.use {}
+    runtime.useAndClose {}
+  }
+
+  @Test
+  fun closingAHandleWithADisposeDisposesIt() = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    runtime.useAndClose {}
+    assertTrue(runtime.isClosed)
+    runtime.close()
   }
 
   @Test

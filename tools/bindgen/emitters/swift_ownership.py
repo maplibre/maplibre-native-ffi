@@ -2,6 +2,9 @@
 
 from ..model import ModelError
 
+# The handles that mln_runtime_event_source_type names as an event's source.
+EVENT_SOURCES = {"mln_runtime", "mln_map"}
+
 
 def consumed(plan, owner, values):
     function = plan.function
@@ -174,14 +177,23 @@ def owner_declarations(bound):
             passed += ", protectsCopies: true"
         from .swift import doc
 
+        id_doc = (
+            "  /// The native handle, which no later handle in the process reuses\n"
+            "  /// and runtime events report as their source. It stays valid after\n"
+            "  /// the handle closes.\n"
+            if handle.native in EVENT_SOURCES
+            else "  /// The native handle, which no later handle in the process reuses.\n"
+            "  /// It stays valid after the handle closes.\n"
+        )
         chunks.append(f'''{doc(bound, handle.native)}public final class {owner}: @unchecked Sendable, NativeReceiver, Identifiable, Hashable, CustomStringConvertible {{
   let handle: NativeHandleState<{raw}>
   init(adopting raw: {handle.native}{parent}) throws {{
     handle = try NativeHandleState(typeName: "{owner}", handle: {raw}(raw: raw){passed})
   }}
-  /// The native handle, which no later handle in the process reuses. It
-  /// stays valid after the handle closes.
-  public var id: UInt64 {{ handle.value.raw }}
+{id_doc}  public var id: UInt64 {{ handle.value.raw }}
+  /// Whether the binding has accepted a close, dispose, discard, or release
+  /// of this handle.
+  public var isClosed: Bool {{ handle.isClosed }}
   public var description: String {{ handle.description }}
   public static func == (lhs: {owner}, rhs: {owner}) -> Bool {{ lhs.id == rhs.id }}
   public func hash(into hasher: inout Hasher) {{ hasher.combine(id) }}

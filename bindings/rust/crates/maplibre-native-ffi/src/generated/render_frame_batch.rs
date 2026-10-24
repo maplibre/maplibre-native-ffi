@@ -9,6 +9,8 @@ native_owner! {
     /// See `mln_render_frame_batch` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     pub struct RenderFrameBatchHandle(mln_render_frame_batch) dispose |raw| { unsafe { sys::mln_render_frame_batch_release(raw) }; Ok(()) }, counted true;
+    /// Returns the native handle value.
+    fn id;
 }
 
 impl RenderFrameBatchHandle {
@@ -31,7 +33,7 @@ impl RenderFrameBatchHandle {
     /// See `mln_render_frame_batch_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn release(&self) -> Result<()> {
-        self.inner.close(|batch| {
+        self.inner.close_once(|batch| {
             let mut call = Call::new(batch, None);
             call.run(|batch| unsafe { sys::mln_render_frame_batch_release(batch) });
             Ok(())

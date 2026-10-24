@@ -45,6 +45,10 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     }
   }
 
+  var isClosed: Bool {
+    lock.withLock { closed }
+  }
+
   func handOff() {
     lock.withLock { closed = true }
   }

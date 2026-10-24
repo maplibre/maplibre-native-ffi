@@ -29,6 +29,9 @@ from .dart_values import (
 # Flutter app's Android host code calls it before the isolate starts.
 HOST_ONLY = {"mln_android_init"}
 
+# The handles that mln_runtime_event_source_type names as an event's source.
+EVENT_SOURCES = {"mln_runtime", "mln_map"}
+
 
 def native_call(function, arguments):
     """Call a C function, passing the isolate's diagnostic when it takes one."""
@@ -637,11 +640,23 @@ def render_owner(native, handle, bodies, bound, roots):
         + f"final class {public} implements Finalizable{', _CallbackRootOwner' if roots else ''} {{\n"
         f"  {public}._({', '.join(parameters)}) : _state = NativeHandleState(handle, '{public}');\n"
         + "\n".join(fields)
-        + "\n\n  /// The native handle id, which runtime events report as their source.\n"
-        "  ///\n"
-        "  /// It stays readable after close, so events drained later still match\n"
-        "  /// this handle.\n"
-        "  int get id => _state.handleId;\n\n" + "".join(bodies) + "}\n"
+        + "\n\n"
+        + (
+            "  /// The native handle id, which runtime events report as their source.\n"
+            "  ///\n"
+            "  /// It stays readable after close, so events drained later still match\n"
+            "  /// this handle.\n"
+            if native in EVENT_SOURCES
+            else "  /// The native handle id.\n"
+        )
+        + "  int get id => _state.handleId;\n\n"
+        "  /// Whether the binding has accepted a close, dispose, discard, or release\n"
+        "  /// of this handle.\n"
+        "  bool get isClosed => _state.isClosed;\n\n"
+        "  @override\n"
+        f"  String toString() => '{public}(id=0x${{id.toRadixString(16)}}, closed=$isClosed)';\n\n"
+        + "".join(bodies)
+        + "}\n"
     )
 
 

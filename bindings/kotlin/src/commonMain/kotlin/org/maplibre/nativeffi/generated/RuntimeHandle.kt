@@ -12,7 +12,7 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 public class RuntimeHandle
 internal constructor(
   handle: Long,
-) : GeneratedRuntimeOperations(), org.maplibre.nativeffi.runtime.AsyncReleasable {
+) : GeneratedRuntimeOperations(), org.maplibre.nativeffi.runtime.AsyncReleasable, AutoCloseable {
   internal override val binding =
     HandleState("RuntimeHandle", handle, GeneratedOwnerDisposal::runtime)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
@@ -23,9 +23,14 @@ internal constructor(
   public val id: ULong
     get() = binding.handle.toULong()
 
+  /** Whether a release, dispose, close, or discard has ended the handle. */
   public override val isClosed: Boolean
     get() = binding.isReleased
 
+  public override fun close() {
+    dispose()
+  }
+
   override fun toString(): String =
-    "RuntimeHandle(id=0x${binding.handle.toString(16)}, closed=${binding.isReleased})"
+    "RuntimeHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
 }

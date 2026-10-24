@@ -33,12 +33,12 @@ pub const validateAbiVersion = status.validateAbiVersion;
 ///
 /// See `mln_acquired_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const AcquiredFrame = owner.Handle("mln_acquired_frame", null);
+pub const AcquiredFrame = owner.Handle("AcquiredFrame", "mln_acquired_frame", null);
 /// Prepared GeoJSON data that sources retain independently of its handle.
 ///
 /// See `mln_geojson_source_data` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const GeojsonSourceData = owner.Handle("mln_geojson_source_data", struct {
+pub const GeojsonSourceData = owner.Handle("GeojsonSourceData", "mln_geojson_source_data", struct {
     fn dispose(raw: u64) status.Error!void {
         c.mln_geojson_source_data_release(raw);
     }
@@ -47,7 +47,9 @@ pub const GeojsonSourceData = owner.Handle("mln_geojson_source_data", struct {
 ///
 /// See `mln_map` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const Map = owner.Handle("mln_map", struct {
+///
+/// Runtime events report its `id()` as their source.
+pub const Map = owner.Handle("Map", "mln_map", struct {
     fn dispose(raw: u64) status.Error!void {
         try status.call(c.mln_map_dispose, .{raw}, null);
     }
@@ -56,7 +58,7 @@ pub const Map = owner.Handle("mln_map", struct {
 ///
 /// See `mln_map_projection` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const MapProjection = owner.Handle("mln_map_projection", struct {
+pub const MapProjection = owner.Handle("MapProjection", "mln_map_projection", struct {
     fn dispose(raw: u64) status.Error!void {
         c.mln_map_projection_release(raw);
     }
@@ -65,7 +67,7 @@ pub const MapProjection = owner.Handle("mln_map_projection", struct {
 ///
 /// See `mln_render_frame_batch` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const RenderFrameBatch = owner.Handle("mln_render_frame_batch", struct {
+pub const RenderFrameBatch = owner.Handle("RenderFrameBatch", "mln_render_frame_batch", struct {
     fn dispose(raw: u64) status.Error!void {
         c.mln_render_frame_batch_release(raw);
     }
@@ -74,7 +76,7 @@ pub const RenderFrameBatch = owner.Handle("mln_render_frame_batch", struct {
 ///
 /// See `mln_render_session` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const RenderSession = owner.Handle("mln_render_session", struct {
+pub const RenderSession = owner.Handle("RenderSession", "mln_render_session", struct {
     fn dispose(raw: u64) status.Error!void {
         try status.call(c.mln_render_session_dispose, .{ raw, null }, null);
     }
@@ -83,7 +85,7 @@ pub const RenderSession = owner.Handle("mln_render_session", struct {
 ///
 /// See `mln_resource_request` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const ResourceRequest = owner.Handle("mln_resource_request", struct {
+pub const ResourceRequest = owner.Handle("ResourceRequest", "mln_resource_request", struct {
     fn dispose(raw: u64) status.Error!void {
         c.mln_resource_request_release(raw);
     }
@@ -92,7 +94,7 @@ pub const ResourceRequest = owner.Handle("mln_resource_request", struct {
 ///
 /// See `mln_resource_transform_request` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const ResourceTransformRequest = owner.Handle("mln_resource_transform_request", struct {
+pub const ResourceTransformRequest = owner.Handle("ResourceTransformRequest", "mln_resource_transform_request", struct {
     fn dispose(raw: u64) status.Error!void {
         c.mln_resource_transform_request_release(raw);
     }
@@ -101,7 +103,9 @@ pub const ResourceTransformRequest = owner.Handle("mln_resource_transform_reques
 ///
 /// See `mln_runtime` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const Runtime = owner.Handle("mln_runtime", struct {
+///
+/// Runtime events report its `id()` as their source.
+pub const Runtime = owner.Handle("Runtime", "mln_runtime", struct {
     fn dispose(raw: u64) status.Error!void {
         try status.call(c.mln_runtime_dispose, .{raw}, null);
     }
@@ -110,7 +114,7 @@ pub const Runtime = owner.Handle("mln_runtime", struct {
 ///
 /// See `mln_style_expression` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const StyleExpression = owner.Handle("mln_style_expression", struct {
+pub const StyleExpression = owner.Handle("StyleExpression", "mln_style_expression", struct {
     fn dispose(raw: u64) status.Error!void {
         c.mln_style_expression_release(raw);
     }
@@ -3215,9 +3219,9 @@ pub const ResourceTransform = struct {
                     return;
                 };
                 var ownership_transferred = false;
-                const owned_request = ResourceTransformRequest.adopt(callback_arg_3);
+                var owned_request = ResourceTransformRequest.adopt(callback_arg_3);
                 defer if (!ownership_transferred) {
-                    resourceTransformRequestRelease(owned_request) catch {};
+                    resourceTransformRequestRelease(&owned_request) catch {};
                 };
                 var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
                 defer arena.deinit();
@@ -4935,8 +4939,10 @@ pub const WglContextDescriptor = struct {
 ///
 /// See `mln_acquired_frame_discard` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn acquiredFrameDiscard(frame: AcquiredFrame, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_acquired_frame_discard", .handle, frame, null, diagnostic, .{});
+pub fn acquiredFrameDiscard(frame: *AcquiredFrame, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    if (frame.closed) return;
+    try call.invoke("mln_acquired_frame_discard", .handle, frame.*, null, diagnostic, .{});
+    frame.closed = true;
 }
 
 /// Copies Metal-native metadata from an acquired frame.
@@ -4991,8 +4997,10 @@ pub fn acquiredFrameGetWebgpuTexture(comptime Result: type, handle: AcquiredFram
 ///
 /// See `mln_acquired_frame_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn acquiredFrameRelease(allocator: std.mem.Allocator, frame: AcquiredFrame, consumer_completion: ?GpuSync, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_acquired_frame_release", .handle, frame, allocator, diagnostic, .{consumer_completion});
+pub fn acquiredFrameRelease(allocator: std.mem.Allocator, frame: *AcquiredFrame, consumer_completion: ?GpuSync, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    if (frame.closed) return;
+    try call.invoke("mln_acquired_frame_release", .handle, frame.*, allocator, diagnostic, .{consumer_completion});
+    frame.closed = true;
 }
 
 /// Initializes Android platform services.
@@ -5104,8 +5112,10 @@ pub fn geojsonSourceDataCreate(allocator: std.mem.Allocator, data: []const u8, o
 ///
 /// See `mln_geojson_source_data_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn geojsonSourceDataRelease(data: GeojsonSourceData) status.Error!void {
-    return call.direct("mln_geojson_source_data_release", .handle, data, void, null, .{});
+pub fn geojsonSourceDataRelease(data: *GeojsonSourceData) status.Error!void {
+    if (data.closed) return;
+    try call.direct("mln_geojson_source_data_release", .handle, data.*, void, null, .{});
+    data.closed = true;
 }
 
 /// Returns default GeoJSON source options.
@@ -5423,8 +5433,10 @@ pub fn mapCancelTransitions(map: Map, diagnostic: ?*diagnostics.Diagnostic) stat
 ///
 /// See `mln_map_dispose` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn mapDispose(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_map_dispose", .handle, map, null, diagnostic, .{});
+pub fn mapDispose(map: *Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    if (map.closed) return;
+    try call.invoke("mln_map_dispose", .handle, map.*, null, diagnostic, .{});
+    map.closed = true;
 }
 
 /// Submits an ordered debug-log command.
@@ -5706,8 +5718,10 @@ pub fn mapProjectionPixelsForLatLngs(allocator: std.mem.Allocator, projection: M
 ///
 /// See `mln_map_projection_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-pub fn mapProjectionRelease(projection: MapProjection) status.Error!void {
-    return call.direct("mln_map_projection_release", .handle, projection, void, null, .{});
+pub fn mapProjectionRelease(projection: *MapProjection) status.Error!void {
+    if (projection.closed) return;
+    try call.direct("mln_map_projection_release", .handle, projection.*, void, null, .{});
+    projection.closed = true;
 }
 
 /// Applies a camera update to a standalone projection.
@@ -5722,8 +5736,10 @@ pub fn mapProjectionSetCamera(allocator: std.mem.Allocator, projection: MapProje
 ///
 /// See `mln_map_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn mapRelease(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-    return call.submit("mln_map_release", .handle, map, call.unit, null, diagnostic, .{});
+pub fn mapRelease(map: *Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    const released = try call.submit("mln_map_release", .handle, map.*, call.unit, null, diagnostic, .{});
+    map.closed = true;
+    return released;
 }
 
 /// Removes per-feature state from this map.
@@ -6147,8 +6163,10 @@ pub fn renderFrameBatchGet(allocator: std.mem.Allocator, batch: RenderFrameBatch
 ///
 /// See `mln_render_frame_batch_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn renderFrameBatchRelease(batch: RenderFrameBatch) status.Error!void {
-    return call.direct("mln_render_frame_batch_release", .handle, batch, void, null, .{});
+pub fn renderFrameBatchRelease(batch: *RenderFrameBatch) status.Error!void {
+    if (batch.closed) return;
+    try call.direct("mln_render_frame_batch_release", .handle, batch.*, void, null, .{});
+    batch.closed = true;
 }
 
 /// Irreversibly ends session work and destroys the session's graphics objects
@@ -6211,8 +6229,10 @@ pub fn renderSessionDetach(session: RenderSession, diagnostic: ?*diagnostics.Dia
 ///
 /// See `mln_render_session_dispose` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn renderSessionRelease(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-    return call.submit("mln_render_session_dispose", .handle, session, call.unit, null, diagnostic, .{});
+pub fn renderSessionRelease(session: *RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    const released = try call.submit("mln_render_session_dispose", .handle, session.*, call.unit, null, diagnostic, .{});
+    session.closed = true;
+    return released;
 }
 
 /// Consumes a session in any state and retires it, then runs completion, if
@@ -6220,8 +6240,10 @@ pub fn renderSessionRelease(session: RenderSession, diagnostic: ?*diagnostics.Di
 ///
 /// See `mln_render_session_dispose` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn renderSessionDispose(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.discard("mln_render_session_dispose", .handle, session, null, diagnostic, .{});
+pub fn renderSessionDispose(session: *RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    if (session.closed) return;
+    try call.discard("mln_render_session_dispose", .handle, session.*, null, diagnostic, .{});
+    session.closed = true;
 }
 
 /// Drains every currently queued terminal frame result into an independently
@@ -6437,8 +6459,10 @@ pub fn resourceRequestPassThrough(handle: ResourceRequest, diagnostic: ?*diagnos
 ///
 /// See `mln_resource_request_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn resourceRequestRelease(handle: ResourceRequest) status.Error!void {
-    return call.direct("mln_resource_request_release", .handle, handle, void, null, .{});
+pub fn resourceRequestRelease(handle: *ResourceRequest) status.Error!void {
+    if (handle.closed) return;
+    try call.direct("mln_resource_request_release", .handle, handle.*, void, null, .{});
+    handle.closed = true;
 }
 
 /// Registers a callback that runs when MapLibre cancels a C API resource
@@ -6470,8 +6494,10 @@ pub fn resourceTransformRequestComplete(request: ResourceTransformRequest, url: 
 ///
 /// See `mln_resource_transform_request_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn resourceTransformRequestRelease(request: ResourceTransformRequest) status.Error!void {
-    return call.direct("mln_resource_transform_request_release", .handle, request, void, null, .{});
+pub fn resourceTransformRequestRelease(request: *ResourceTransformRequest) status.Error!void {
+    if (request.closed) return;
+    try call.direct("mln_resource_transform_request_release", .handle, request.*, void, null, .{});
+    request.closed = true;
 }
 
 /// Stops event delivery and retires the previous handler.
@@ -6542,8 +6568,10 @@ pub fn runtimeDeleteOfflineRegion(runtime: Runtime, region_id: i64, diagnostic: 
 ///
 /// See `mln_runtime_dispose` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn runtimeDispose(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_runtime_dispose", .handle, runtime, null, diagnostic, .{});
+pub fn runtimeDispose(runtime: *Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    if (runtime.closed) return;
+    try call.invoke("mln_runtime_dispose", .handle, runtime.*, null, diagnostic, .{});
+    runtime.closed = true;
 }
 
 /// Reports which runtime-scoped event types this runtime queues.
@@ -6606,8 +6634,10 @@ pub fn runtimeOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedVal
 ///
 /// See `mln_runtime_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn runtimeRelease(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-    return call.submit("mln_runtime_release", .handle, runtime, call.unit, null, diagnostic, .{});
+pub fn runtimeRelease(runtime: *Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    const released = try call.submit("mln_runtime_release", .handle, runtime.*, call.unit, null, diagnostic, .{});
+    runtime.closed = true;
+    return released;
 }
 
 /// Starts a MapLibre ambient cache maintenance operation for this runtime.
@@ -6742,8 +6772,10 @@ pub fn styleExpressionOptionsDefault() status.Error!StyleExpressionOptions {
 ///
 /// See `mln_style_expression_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-pub fn styleExpressionRelease(expression: StyleExpression) status.Error!void {
-    return call.direct("mln_style_expression_release", .handle, expression, void, null, .{});
+pub fn styleExpressionRelease(expression: *StyleExpression) status.Error!void {
+    if (expression.closed) return;
+    try call.direct("mln_style_expression_release", .handle, expression.*, void, null, .{});
+    expression.closed = true;
 }
 
 /// Returns default runtime style image options.

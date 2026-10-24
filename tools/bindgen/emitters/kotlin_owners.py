@@ -6,6 +6,8 @@ from .kotlin_operations import disposal_method, method_name, needs_read, receive
 from .kotlin_values import doc, generated_owners, name, owner_name
 
 ASYNC_RELEASABLE = "org.maplibre.nativeffi.runtime.AsyncReleasable"
+# The handles that `mln_runtime_event_source_type` names as an event's source.
+EVENT_SOURCES = frozenset({"mln_runtime", "mln_map"})
 
 
 @dataclass(frozen=True)
@@ -36,9 +38,8 @@ def state_type(native, plans):
 def releases(bound, native, plans):
     """Map the scoped release onto AutoCloseable or AsyncReleasable, when a host can call it bare.
 
-    A dispose that is also the release, with a completion that may be null,
-    maps onto both: `use` disposes, and the suspending `use` awaits the
-    release.
+    An asynchronous release of a handle with a dispose maps onto both: `use`
+    disposes, and the suspending `use` awaits the release.
     """
     handle = bound.handles[native]
     plan = next(
@@ -51,7 +52,7 @@ def releases(bound, native, plans):
     method = method_name(plan)
     if plan.completion:
         result = [Release(ASYNC_RELEASABLE, "release", method)]
-        if plan.completion.optional:
+        if handle.dispose:
             result.append(Release("AutoCloseable", "close", disposal_method(handle)))
     elif all(defaulted(p) for p in extra):
         result = [Release("AutoCloseable", "close", method)]
@@ -97,18 +98,23 @@ def owner(bound, native, plans):
     body = [
         f'  internal override val binding = {state_type(native, plans)}("{owner_class}", handle, GeneratedOwnerDisposal::{dispose})',
         '  @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)',
-        (
-            "  /**\n"
+        "  /**\n"
+        + (
             "   * The native handle value, which runtime events report as their source. It stays readable\n"
             "   * after close, so events drained later still match this handle.\n"
-            "   */\n"
-            "  public val id: ULong get() = binding.handle.toULong()"
-        ),
-    ]
-    if any(release.interface == ASYNC_RELEASABLE for release in closes):
-        body.append(
-            "  public override val isClosed: Boolean get() = binding.isReleased"
+            if native in EVENT_SOURCES
+            else "   * The native handle value. It stays readable after close.\n"
         )
+        + "   */\n"
+        "  public val id: ULong get() = binding.handle.toULong()",
+        "  /** Whether a release, dispose, close, or discard has ended the handle. */\n"
+        + (
+            "  public override val isClosed: Boolean"
+            if any(release.interface == ASYNC_RELEASABLE for release in closes)
+            else "  public val isClosed: Boolean"
+        )
+        + " get() = binding.isReleased",
+    ]
     for release in closes:
         if release.inherited:
             continue
@@ -118,7 +124,7 @@ def owner(bound, native, plans):
             else f"  public override fun release(): kotlinx.coroutines.Deferred<Unit> = {release.method}()"
         )
     body.append(
-        f'  override fun toString(): String = "{owner_class}(id=0x${{binding.handle.toString(16)}}, closed=${{binding.isReleased}})"'
+        f'  override fun toString(): String = "{owner_class}(id=0x${{binding.handle.toString(16)}}, closed=$isClosed)"'
     )
     return (
         "// Generated from handle ownership plans by tools/bindgen. Do not edit.\n"

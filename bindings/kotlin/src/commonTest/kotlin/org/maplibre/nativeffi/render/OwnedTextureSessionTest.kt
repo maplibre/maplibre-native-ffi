@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.render
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -84,6 +85,9 @@ class OwnedTextureSessionTest {
         assertFailsWithStatus(Status.BUSY) { frame.release() }
         assertFailsWithStatus(Status.BUSY) { session.abandon() }
         // Discarding another frame leaves this view readable until its block ends.
+        assertFalse(sibling.isClosed)
+        sibling.discard()
+        assertTrue(sibling.isClosed)
         sibling.discard()
         assertEquals(kind, sync.kind)
       }

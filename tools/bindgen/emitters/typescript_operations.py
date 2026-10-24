@@ -29,6 +29,8 @@ from .typescript_values import (
 )
 
 HEADER = "// Generated from the C headers by tools/bindgen. Do not edit.\n"
+# The handles that `mln_runtime_event_source_type` names as an event's source.
+EVENT_SOURCES = frozenset({"mln_runtime", "mln_map"})
 
 
 def signature(entry: Lowered) -> str:
@@ -238,6 +240,16 @@ def render_owner(bound, values, natives, native: str, handle, methods) -> str:
     text += f"  constructor({', '.join(parameters)}) {{\n"
     text += f'    super(key, handle, "{public}", {{ {", ".join(options)} }});\n'
     text += "  }\n"
+    if native in EVENT_SOURCES:
+        # Redeclares the inherited ID only to document it for this handle.
+        text += (
+            "\n  /**\n"
+            "   * The native handle value, which runtime events report as their\n"
+            "   * source. It stays readable after close, so events drained later\n"
+            "   * still match this handle.\n"
+            "   */\n"
+            "  declare readonly id: bigint;\n"
+        )
     discarding = [e for e in methods if e.discardable]
     if discarding:
         text += (

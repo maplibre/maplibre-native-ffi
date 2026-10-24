@@ -29,6 +29,9 @@ from tools.bindgen.semantic import (
 from . import dotnet_native
 from .dotnet_values import Unsupported, Values, member, raw_handle, typed_mask
 
+# The handles that `mln_runtime_event_source_type` names as an event's source.
+EVENT_SOURCES = frozenset({"mln_runtime", "mln_map"})
+
 
 def operation_contract(plan: OperationPlan) -> str | None:
     """Reject contracts that the .NET operation skeleton does not implement."""
@@ -1147,8 +1150,26 @@ def emit(api: Api | BoundApi) -> Emission:
             f"\n    private static mln_status Abandon({native_type} live, mln_diagnostic* diagnostic) {abandon}\n"
             f"\n    NativeHandleState<{native_type}> INativeOwner<{native_type}>.State => state;\n"
             f"    internal {native_type} Handle => state.Handle;\n"
-            "    // Runtime events report their source by this identity.\n"
-            "    public ulong Id => state.Handle.Value;\n"
+            + (
+                "    /// <summary>\n"
+                "    /// The native handle value, which runtime events report as their\n"
+                "    /// source. It stays readable after close, so events drained later\n"
+                "    /// still match this handle.\n"
+                "    /// </summary>\n"
+                if native in EVENT_SOURCES
+                else "    /// <summary>\n"
+                "    /// The native handle value. It stays readable after close.\n"
+                "    /// </summary>\n"
+            )
+            + "    public ulong Id => state.Handle.Value;\n"
+            "    /// <summary>\n"
+            "    /// Whether a release, dispose, close, or discard has ended the handle.\n"
+            "    /// </summary>\n"
+            "    public bool IsClosed => state.IsClosed;\n"
+            "    /// <summary>\n"
+            '    /// Names the handle\'s type, its <see cref="Id" />, and whether it is closed.\n'
+            "    /// </summary>\n"
+            "    public override string ToString() => state.ToString();\n"
             + (
                 ""
                 if handle.scoped_release is None

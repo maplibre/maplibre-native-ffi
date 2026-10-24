@@ -9,6 +9,8 @@ native_owner! {
     /// See `mln_map` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     pub struct MapHandle(mln_map) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_map_dispose(raw, out_diagnostic) }), counted false;
+    /// Returns the native handle value, which runtime events report as their source.
+    fn id;
 }
 
 impl MapHandle {
@@ -737,7 +739,7 @@ impl MapHandle {
     /// See `mln_map_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn dispose(&self) -> Result<()> {
-        self.inner.close(|map| {
+        self.inner.close_once(|map| {
             let mut call = Call::new(map, None);
             call.status(|map, out_diagnostic| unsafe { sys::mln_map_dispose(map, out_diagnostic) })
         })

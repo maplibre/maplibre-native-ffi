@@ -96,7 +96,12 @@ fn a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it() {
     assert_eq!(session_abandon, Status::Busy);
 
     // Once the view's scope ends, both close.
+    assert!(!frame.is_closed());
     frame.release(None).unwrap();
+    assert!(frame.is_closed() && sibling.is_closed());
+    // Either consuming call on a closed frame does nothing.
+    frame.release(None).unwrap();
+    frame.discard().unwrap();
     session.close();
 }
 

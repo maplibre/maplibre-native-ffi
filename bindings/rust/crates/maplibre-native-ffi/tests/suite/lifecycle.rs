@@ -11,8 +11,54 @@ use crate::support::*;
 fn releasing_a_handle_twice_reaches_native() {
     let (runtime, map) = Fixture::new().into_parts();
     wait_for(map.release());
+    assert!(map.is_closed());
     assert_eq!(map.release().unwrap_err().status(), Status::InvalidState);
     wait_for(runtime.release());
+}
+
+#[test]
+fn a_disposed_handle_is_closed_and_a_second_dispose_does_nothing() {
+    let (runtime, map) = Fixture::new().into_parts();
+    assert!(!map.is_closed());
+    assert_eq!(
+        format!("{map:?}"),
+        format!("MapHandle(id=0x{:x}, closed=false)", map.id())
+    );
+
+    map.dispose().unwrap();
+    assert!(map.is_closed());
+    map.dispose().unwrap();
+    assert_eq!(
+        format!("{map:?}"),
+        format!("MapHandle(id=0x{:x}, closed=true)", map.id())
+    );
+    // An asynchronous release still reaches native, which reports the stale
+    // handle.
+    assert_eq!(map.release().unwrap_err().status(), Status::InvalidState);
+
+    // A runtime accepts its dispose while its disposed map retires.
+    runtime.dispose().unwrap();
+    assert!(runtime.is_closed());
+    runtime.dispose().unwrap();
+}
+
+#[test]
+fn a_released_projection_is_closed_and_a_second_release_does_nothing() {
+    let fixture = Fixture::new();
+    let projection = map_projection_create(&fixture.map().get_snapshot().unwrap().view).unwrap();
+    assert!(!projection.is_closed());
+    assert_ne!(projection.id(), 0);
+
+    projection.release().unwrap();
+    assert!(projection.is_closed());
+    projection.release().unwrap();
+    assert_eq!(
+        format!("{projection:?}"),
+        format!(
+            "MapProjectionHandle(id=0x{:x}, closed=true)",
+            projection.id()
+        )
+    );
 }
 
 #[test]

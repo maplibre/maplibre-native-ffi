@@ -20,13 +20,11 @@ internal constructor(
   internal override val binding =
     HandleState("RenderSessionHandle", handle, GeneratedOwnerDisposal::renderSession)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
-  /**
-   * The native handle value, which runtime events report as their source. It stays readable after
-   * close, so events drained later still match this handle.
-   */
+  /** The native handle value. It stays readable after close. */
   public val id: ULong
     get() = binding.handle.toULong()
 
+  /** Whether a release, dispose, close, or discard has ended the handle. */
   public override val isClosed: Boolean
     get() = binding.isReleased
 
@@ -35,5 +33,5 @@ internal constructor(
   }
 
   override fun toString(): String =
-    "RenderSessionHandle(id=0x${binding.handle.toString(16)}, closed=${binding.isReleased})"
+    "RenderSessionHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
 }

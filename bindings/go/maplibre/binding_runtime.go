@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"runtime/cgo"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -424,12 +425,18 @@ func (scope *bindingScope) check() {
 	}
 }
 
-// Id returns the native handle value, which runtime events report as their
-// source. It stays readable after Close, so events drained later still match
-// this handle.
-func (owner *bindingOwner) Id() uint64 {
+// id returns the native handle value, which stays readable after a release.
+func (owner *bindingOwner) id() uint64 {
 	if owner == nil || owner.state == nil {
 		return 0
 	}
 	return owner.state.raw
+}
+
+func (owner *bindingOwner) isClosed() bool {
+	return owner == nil || owner.state == nil || owner.state.released.Load()
+}
+
+func bindingDescribe(typeName string, owner *bindingOwner) string {
+	return typeName + "(id=0x" + strconv.FormatUint(owner.id(), 16) + ", closed=" + strconv.FormatBool(owner.isClosed()) + ")"
 }

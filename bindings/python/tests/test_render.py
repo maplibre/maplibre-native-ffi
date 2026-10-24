@@ -418,7 +418,12 @@ def test_a_frame_view_holds_its_owners_until_its_scope_ends(
 
         assert target.with_texture(frame, inspect) != 0
         frame.get_result()
+        assert not frame.is_closed
         frame.close()
+        # A frame closes once, so a discard after close does nothing.
+        frame.discard()
+        assert frame.is_closed
+        assert repr(frame) == f"AcquiredFrameHandle(id={frame.id:#x}, closed=true)"
         with pytest.raises(
             mln.MaplibreError,
             check=lambda error: error.status == mln.Status.INVALID_STATE,

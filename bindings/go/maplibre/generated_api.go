@@ -6272,6 +6272,19 @@ func (handle *AcquiredFrameHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
+// Id returns the native handle value. It stays readable after the handle
+// closes.
+func (handle *AcquiredFrameHandle) Id() uint64 { return handle.owner().id() }
+
+// IsClosed reports whether the binding has accepted a release, dispose, or
+// discard of the handle. A nil handle is closed.
+func (handle *AcquiredFrameHandle) IsClosed() bool { return handle.owner().isClosed() }
+
+// String formats the handle as AcquiredFrameHandle(id=0x<hex>, closed=<true|false>).
+func (handle *AcquiredFrameHandle) String() string {
+	return bindingDescribe("AcquiredFrameHandle", handle.owner())
+}
+
 // GeojsonSourceDataHandle corresponds to mln_geojson_source_data. Prepared
 // GeoJSON data that sources retain independently of its handle.
 //
@@ -6290,6 +6303,19 @@ func (handle *GeojsonSourceDataHandle) owner() *bindingOwner {
 		return nil
 	}
 	return handle.bindingOwner
+}
+
+// Id returns the native handle value. It stays readable after the handle
+// closes.
+func (handle *GeojsonSourceDataHandle) Id() uint64 { return handle.owner().id() }
+
+// IsClosed reports whether the binding has accepted a release, dispose, or
+// discard of the handle. A nil handle is closed.
+func (handle *GeojsonSourceDataHandle) IsClosed() bool { return handle.owner().isClosed() }
+
+// String formats the handle as GeojsonSourceDataHandle(id=0x<hex>, closed=<true|false>).
+func (handle *GeojsonSourceDataHandle) String() string {
+	return bindingDescribe("GeojsonSourceDataHandle", handle.owner())
 }
 
 // MapHandle corresponds to mln_map. A map, which holds map state independent of
@@ -6312,6 +6338,18 @@ func (handle *MapHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
+// Id returns the native handle value, which runtime events report as their
+// source. It stays readable after the handle closes, so events drained later
+// still match this handle.
+func (handle *MapHandle) Id() uint64 { return handle.owner().id() }
+
+// IsClosed reports whether the binding has accepted a release, dispose, or
+// discard of the handle. A nil handle is closed.
+func (handle *MapHandle) IsClosed() bool { return handle.owner().isClosed() }
+
+// String formats the handle as MapHandle(id=0x<hex>, closed=<true|false>).
+func (handle *MapHandle) String() string { return bindingDescribe("MapHandle", handle.owner()) }
+
 // MapProjectionHandle corresponds to mln_map_projection. A standalone
 // projection of one map view.
 //
@@ -6330,6 +6368,19 @@ func (handle *MapProjectionHandle) owner() *bindingOwner {
 		return nil
 	}
 	return handle.bindingOwner
+}
+
+// Id returns the native handle value. It stays readable after the handle
+// closes.
+func (handle *MapProjectionHandle) Id() uint64 { return handle.owner().id() }
+
+// IsClosed reports whether the binding has accepted a release, dispose, or
+// discard of the handle. A nil handle is closed.
+func (handle *MapProjectionHandle) IsClosed() bool { return handle.owner().isClosed() }
+
+// String formats the handle as MapProjectionHandle(id=0x<hex>, closed=<true|false>).
+func (handle *MapProjectionHandle) String() string {
+	return bindingDescribe("MapProjectionHandle", handle.owner())
 }
 
 // RenderFrameBatchHandle corresponds to mln_render_frame_batch. An owned batch
@@ -6352,6 +6403,19 @@ func (handle *RenderFrameBatchHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
+// Id returns the native handle value. It stays readable after the handle
+// closes.
+func (handle *RenderFrameBatchHandle) Id() uint64 { return handle.owner().id() }
+
+// IsClosed reports whether the binding has accepted a release, dispose, or
+// discard of the handle. A nil handle is closed.
+func (handle *RenderFrameBatchHandle) IsClosed() bool { return handle.owner().isClosed() }
+
+// String formats the handle as RenderFrameBatchHandle(id=0x<hex>, closed=<true|false>).
+func (handle *RenderFrameBatchHandle) String() string {
+	return bindingDescribe("RenderFrameBatchHandle", handle.owner())
+}
+
 // RenderSessionHandle corresponds to mln_render_session. A render session,
 // which renders one map to one render target.
 //
@@ -6370,6 +6434,19 @@ func (handle *RenderSessionHandle) owner() *bindingOwner {
 		return nil
 	}
 	return handle.bindingOwner
+}
+
+// Id returns the native handle value. It stays readable after the handle
+// closes.
+func (handle *RenderSessionHandle) Id() uint64 { return handle.owner().id() }
+
+// IsClosed reports whether the binding has accepted a release, dispose, or
+// discard of the handle. A nil handle is closed.
+func (handle *RenderSessionHandle) IsClosed() bool { return handle.owner().isClosed() }
+
+// String formats the handle as RenderSessionHandle(id=0x<hex>, closed=<true|false>).
+func (handle *RenderSessionHandle) String() string {
+	return bindingDescribe("RenderSessionHandle", handle.owner())
 }
 
 // ResourceRequestHandle corresponds to mln_resource_request. A resource request
@@ -6392,6 +6469,19 @@ func (handle *ResourceRequestHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
+// Id returns the native handle value. It stays readable after the handle
+// closes.
+func (handle *ResourceRequestHandle) Id() uint64 { return handle.owner().id() }
+
+// IsClosed reports whether the binding has accepted a release, dispose, or
+// discard of the handle. A nil handle is closed.
+func (handle *ResourceRequestHandle) IsClosed() bool { return handle.owner().isClosed() }
+
+// String formats the handle as ResourceRequestHandle(id=0x<hex>, closed=<true|false>).
+func (handle *ResourceRequestHandle) String() string {
+	return bindingDescribe("ResourceRequestHandle", handle.owner())
+}
+
 // ResourceTransformRequestHandle corresponds to mln_resource_transform_request.
 // A resource URL transform that waits for its host's answer.
 //
@@ -6410,6 +6500,19 @@ func (handle *ResourceTransformRequestHandle) owner() *bindingOwner {
 		return nil
 	}
 	return handle.bindingOwner
+}
+
+// Id returns the native handle value. It stays readable after the handle
+// closes.
+func (handle *ResourceTransformRequestHandle) Id() uint64 { return handle.owner().id() }
+
+// IsClosed reports whether the binding has accepted a release, dispose, or
+// discard of the handle. A nil handle is closed.
+func (handle *ResourceTransformRequestHandle) IsClosed() bool { return handle.owner().isClosed() }
+
+// String formats the handle as ResourceTransformRequestHandle(id=0x<hex>, closed=<true|false>).
+func (handle *ResourceTransformRequestHandle) String() string {
+	return bindingDescribe("ResourceTransformRequestHandle", handle.owner())
 }
 
 // RuntimeHandle corresponds to mln_runtime. A runtime: the native scheduler
@@ -6432,6 +6535,18 @@ func (handle *RuntimeHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
+// Id returns the native handle value, which runtime events report as their
+// source. It stays readable after the handle closes, so events drained later
+// still match this handle.
+func (handle *RuntimeHandle) Id() uint64 { return handle.owner().id() }
+
+// IsClosed reports whether the binding has accepted a release, dispose, or
+// discard of the handle. A nil handle is closed.
+func (handle *RuntimeHandle) IsClosed() bool { return handle.owner().isClosed() }
+
+// String formats the handle as RuntimeHandle(id=0x<hex>, closed=<true|false>).
+func (handle *RuntimeHandle) String() string { return bindingDescribe("RuntimeHandle", handle.owner()) }
+
 // StyleExpressionHandle corresponds to mln_style_expression. A parsed style
 // expression, immutable and independent of any map.
 //
@@ -6450,6 +6565,19 @@ func (handle *StyleExpressionHandle) owner() *bindingOwner {
 		return nil
 	}
 	return handle.bindingOwner
+}
+
+// Id returns the native handle value. It stays readable after the handle
+// closes.
+func (handle *StyleExpressionHandle) Id() uint64 { return handle.owner().id() }
+
+// IsClosed reports whether the binding has accepted a release, dispose, or
+// discard of the handle. A nil handle is closed.
+func (handle *StyleExpressionHandle) IsClosed() bool { return handle.owner().isClosed() }
+
+// String formats the handle as StyleExpressionHandle(id=0x<hex>, closed=<true|false>).
+func (handle *StyleExpressionHandle) String() string {
+	return bindingDescribe("StyleExpressionHandle", handle.owner())
 }
 
 type MapHandleDiscarding struct{ owner *MapHandle }
@@ -8736,6 +8864,38 @@ func (receiver *StyleExpressionHandle) Close() error {
 // https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
 func SupportedRenderBackendMask() RenderBackendFlag {
 	return RenderBackendFlag(C.mln_supported_render_backend_mask())
+}
+
+// Dispose consumes a map handle without observing its asynchronous retirement.
+//
+// See mln_map_dispose in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+func (receiver *MapHandle) Dispose() error {
+	return bindingDo(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_dispose(C.mln_map(raw), diagnostic))
+	})
+}
+
+// Dispose consumes a session in any state and retires it, then runs completion,
+// if given, once the host may destroy the target's graphics objects.
+//
+// See mln_render_session_dispose in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+func (receiver *RenderSessionHandle) Dispose() error {
+	return bindingDo(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_dispose(C.mln_render_session(raw), nil, diagnostic))
+	})
+}
+
+// Dispose consumes a runtime handle without observing its asynchronous
+// retirement.
+//
+// See mln_runtime_dispose in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+func (receiver *RuntimeHandle) Dispose() error {
+	return bindingDo(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_dispose(C.mln_runtime(raw), diagnostic))
+	})
 }
 
 func (view MapHandleDiscarding) AddCustomGeometrySource(sourceId string, options CustomGeometrySourceOptions) error {

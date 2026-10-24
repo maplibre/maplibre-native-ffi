@@ -716,9 +716,12 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             raise Unsupported("consumption with outputs requires an owner transaction")
         if ending[0].startswith(f"{call_local}.status("):
             ending = [ending[0].removesuffix("?;")]
+        # A synchronous release is idempotent; an asynchronous one reaches
+        # native, which reports a stale handle through the error channel.
+        close = "close_once" if public == "()" else "close"
         body = [
             *prelude,
-            f"self.inner.close(|{target}| {{",
+            f"self.inner.{close}(|{target}| {{",
             f"    let {mutable}{call_local} = Call::new({target}, None);",
             *("    " + line for line in [*setup, *ending]),
             "})",

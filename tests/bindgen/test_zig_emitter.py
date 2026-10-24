@@ -37,16 +37,39 @@ mln_status mln_session_dispose(mln_session session, const mln_completion *comple
         self.assertIn(
             "try status.call(c.mln_session_dispose, .{ raw, null }, null);", source
         )
+        # Both take the caller's value and close it once native accepts. The
+        # sync dispose of a closed value does nothing, and the async release
+        # reaches native.
         self.assertIn(
-            'pub fn sessionRelease(@"session": Session, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {\n'
-            '    return call.submit("mln_session_dispose",',
+            'pub fn sessionRelease(@"session": *Session, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {\n'
+            '    const released = try call.submit("mln_session_dispose", .handle, @"session".*,',
             source,
         )
         self.assertIn(
-            'pub fn sessionDispose(@"session": Session, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {\n'
-            '    return call.discard("mln_session_dispose",',
+            'pub fn sessionDispose(@"session": *Session, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {\n'
+            '    if (@"session".closed) return;\n'
+            '    try call.discard("mln_session_dispose", .handle, @"session".*,',
             source,
         )
+        self.assertEqual(source.count('@"session".closed = true;'), 2)
+
+    def test_only_runtime_event_sources_document_their_id_as_a_source(self):
+        api = parse(
+            """
+typedef enum mln_runtime_event_source_type : unsigned {
+  MLN_RUNTIME_EVENT_SOURCE_MAP = 1,
+} mln_runtime_event_source_type;
+typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_release");
+typedef unsigned long long mln_query BIND("kind=handle;release=mln_query_release");
+void mln_map_release(mln_map map);
+void mln_query_release(mln_query query);
+"""
+        )
+        validate(api)
+        source = zig.generate(api)["maplibre_native_ffi.zig"]
+        note = "/// Runtime events report its `id()` as their source.\n"
+        self.assertIn(note + 'pub const Map = owner.Handle("Map", "mln_map",', source)
+        self.assertNotIn(note + "pub const Query", source)
 
     def test_generated_values_and_keyword_parameters_round_trip(self):
         zig_tool = require_tool(self, "zig", BINDING)

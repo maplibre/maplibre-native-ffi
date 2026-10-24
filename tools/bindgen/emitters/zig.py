@@ -60,6 +60,17 @@ def doc(bound: BoundApi, native: str, indent: str = "") -> str:
     return docs.line_comment(bound.doc(native), indent)
 
 
+def event_sources(bound: BoundApi) -> frozenset[str]:
+    """The handles that runtime events name as their source."""
+    prefix = "MLN_RUNTIME_EVENT_SOURCE_"
+    return frozenset(
+        "mln_" + member.name.removeprefix(prefix).lower()
+        for enum in bound.source.enums
+        if enum.name == "mln_runtime_event_source_type"
+        for member in enum.values
+    )
+
+
 def documented(bound: BoundApi, native: str, code: str, marker: str) -> str:
     """Code with a declaration's comment before the line that starts it."""
     start = code.index(marker)
@@ -180,9 +191,15 @@ pub const OwnedValue = marshal.OwnedValue;
             if handle.scoped_release is None
             else f"struct {{ fn dispose(raw: u64) status.Error!void {{ {' '.join(calls)} }} }}.dispose"
         )
+        source = (
+            "///\n/// Runtime events report its `id()` as their source.\n"
+            if handle.native in event_sources(bound)
+            else ""
+        )
         owners.append(
             doc(bound, handle.native)
-            + f'pub const {public} = owner.Handle("{handle.native}", {dispose});'
+            + source
+            + f'pub const {public} = owner.Handle("{public}", "{handle.native}", {dispose});'
         )
     from .zig_operations import operation
     from .zig_values import Values

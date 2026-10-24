@@ -230,6 +230,36 @@ mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, 
             "def close(self) -> Future[None]:",
             files["python/maplibre_native_ffi/_generated_operations.py"],
         )
+        # The synchronous dispose is the scope's exit.
+        owners = files["python/maplibre_native_ffi/_generated_owners.py"]
+        self.assertIn("def dispose(self) -> None:", owners)
+        self.assertIn("self._native._exit()", owners)
+
+    def test_dispose_is_public_only_where_c_has_one_besides_a_void_release(self):
+        owners = python.generate(real_api())[
+            "python/maplibre_native_ffi/_generated_owners.py"
+        ]
+        classes = {
+            block.split("(", 1)[0]: block
+            for block in owners.split("\nclass ")[1:]
+            if "_handle_name" in block
+        }
+        self.assertEqual(len(classes), 10)
+        self.assertEqual(
+            {name for name, block in classes.items() if "def dispose(" in block},
+            {"MapHandle", "RenderSessionHandle", "RuntimeHandle"},
+        )
+        # Every handle has an id, and only the runtime and the map are event
+        # sources.
+        self.assertTrue(all("def id(self) -> int:" in b for b in classes.values()))
+        self.assertEqual(
+            {
+                name
+                for name, block in classes.items()
+                if "report as their source" in block
+            },
+            {"MapHandle", "RuntimeHandle"},
+        )
 
     def test_tagged_union_wrapper_keeps_payload_record_and_unknown_tag(self):
         api = self.parse(groups=("tagged_union",))

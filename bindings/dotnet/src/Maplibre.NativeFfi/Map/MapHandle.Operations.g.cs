@@ -31,8 +31,22 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     NativeHandleState<MlnMap> INativeOwner<MlnMap>.State => state;
     internal MlnMap Handle => state.Handle;
 
-    // Runtime events report their source by this identity.
+    /// <summary>
+    /// The native handle value, which runtime events report as their
+    /// source. It stays readable after close, so events drained later
+    /// still match this handle.
+    /// </summary>
     public ulong Id => state.Handle.Value;
+
+    /// <summary>
+    /// Whether a release, dispose, close, or discard has ended the handle.
+    /// </summary>
+    public bool IsClosed => state.IsClosed;
+
+    /// <summary>
+    /// Names the handle's type, its <see cref="Id" />, and whether it is closed.
+    /// </summary>
+    public override string ToString() => state.ToString();
 
     public void Dispose()
     {

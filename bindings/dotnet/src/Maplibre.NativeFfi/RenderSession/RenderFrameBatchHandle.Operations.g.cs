@@ -39,8 +39,20 @@ public sealed unsafe partial class RenderFrameBatchHandle
     NativeHandleState<MlnRenderFrameBatch> INativeOwner<MlnRenderFrameBatch>.State => state;
     internal MlnRenderFrameBatch Handle => state.Handle;
 
-    // Runtime events report their source by this identity.
+    /// <summary>
+    /// The native handle value. It stays readable after close.
+    /// </summary>
     public ulong Id => state.Handle.Value;
+
+    /// <summary>
+    /// Whether a release, dispose, close, or discard has ended the handle.
+    /// </summary>
+    public bool IsClosed => state.IsClosed;
+
+    /// <summary>
+    /// Names the handle's type, its <see cref="Id" />, and whether it is closed.
+    /// </summary>
+    public override string ToString() => state.ToString();
 
     public void Dispose()
     {

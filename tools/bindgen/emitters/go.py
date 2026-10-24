@@ -64,10 +64,50 @@ def native_call(function, *arguments, diagnostic="diagnostic"):
     return f"C.{function.name}({', '.join(arguments)})"
 
 
+def event_sources(api) -> set[str]:
+    """The handles that a runtime event can name as its source."""
+    return {
+        "mln_" + value.name.removeprefix("MLN_RUNTIME_EVENT_SOURCE_").lower()
+        for enum in api.enums
+        if enum.name == "mln_runtime_event_source_type"
+        for value in enum.values
+    }
+
+
+def public_dispose(handle) -> bool:
+    """Whether a handle has a C dispose besides a void release: a separate
+    dispose, or a release that disposes and also takes a completion."""
+    return bool(
+        handle.dispose
+        and (handle.dispose != handle.release or handle.dispose_completion)
+    )
+
+
+def owner_members(owner: str, event_source: bool) -> str:
+    """The state members that every handle owner declares."""
+    id_doc = (
+        "// Id returns the native handle value, which runtime events report as their\n"
+        "// source. It stays readable after the handle closes, so events drained later\n"
+        "// still match this handle.\n"
+        if event_source
+        else "// Id returns the native handle value. It stays readable after the handle\n"
+        "// closes.\n"
+    )
+    return (
+        id_doc
+        + f"func (handle *{owner}) Id() uint64 {{ return handle.owner().id() }}\n"
+        "// IsClosed reports whether the binding has accepted a release, dispose, or\n"
+        "// discard of the handle. A nil handle is closed.\n"
+        f"func (handle *{owner}) IsClosed() bool {{ return handle.owner().isClosed() }}\n"
+        f"// String formats the handle as {owner}(id=0x<hex>, closed=<true|false>).\n"
+        f'func (handle *{owner}) String() string {{ return bindingDescribe("{owner}", handle.owner()) }}\n'
+    )
+
+
 def lower(api):
-    from .go_callbacks import sources
+    from .go_callbacks import sources as callback_sources
     from .go_operations import lower as lower_operations
-    from .go_operations import needs_read
+    from .go_operations import needs_read, operation
 
     bound = compile_api(api)
     values, operations, generated, unsupported = lower_operations(bound)
@@ -81,6 +121,7 @@ def lower(api):
     }
     owners = []
     used_support = set()
+    sources = event_sources(bound.source)
     for native, handle in sorted(bound.handles.items()):
         if handle.dispose in bound.source.runtime_exports:
             continue
@@ -111,13 +152,21 @@ def lower(api):
         owners.append(
             doc(bound, native, owner)
             + f'type {owner} struct {{ *bindingOwner }}\nfunc adopt{owner}(raw uint64, parent any) *{owner} {{ owner := &{owner}{{bindingAdopt(raw,parent,"{owner}",{str(native in guarded).lower()},func(raw uint64){{ {dispose} }})}}; return owner }}\n'
-            f"// owner returns the handle's owner state, or nil for a nil handle.\nfunc (handle *{owner}) owner() *bindingOwner {{ if handle == nil {{ return nil }}; return handle.bindingOwner }}"
+            f"// owner returns the handle's owner state, or nil for a nil handle.\nfunc (handle *{owner}) owner() *bindingOwner {{ if handle == nil {{ return nil }}; return handle.bindingOwner }}\n"
+            + owner_members(owner, native in sources)
         )
         used_support.add(disposer)
+        if public_dispose(handle):
+            plan = bound.operations_by_name[handle.dispose]
+            operations.append(
+                documented_operation(
+                    bound, plan.name, operation(plan, values, dispose=True)
+                )
+            )
     go, header, c = [], [], []
     for record in list(values.records.values()):
         if record.registration:
-            a, b, d = sources(values, record)
+            a, b, d = callback_sources(values, record)
             go.append(a)
             header.append(b)
             c.append(d)
@@ -130,8 +179,6 @@ def lower(api):
             and plan.completion
             and plan.completion.discardable
         ):
-            from .go_operations import operation
-
             operations.append(operation(plan, values, discard=True))
         if plan.role == "support" and plan.name in used_support:
             generated.append(plan.name)

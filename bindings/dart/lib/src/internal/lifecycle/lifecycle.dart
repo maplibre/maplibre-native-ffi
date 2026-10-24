@@ -57,6 +57,8 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
 
   int get handleId => _handle.raw;
 
+  bool get isClosed => _closed;
+
   H get handle => _handle;
 
   /// Releases the native handle once native accepts [destroy].

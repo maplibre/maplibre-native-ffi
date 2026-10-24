@@ -2,6 +2,7 @@ package maplibre
 
 import (
 	"errors"
+	"fmt"
 	stdruntime "runtime"
 	"testing"
 	"weak"
@@ -18,16 +19,61 @@ func TestClosingTwiceIsSafe(t *testing.T) {
 	if !errors.As(err, &closed) || closed.Status != StatusInvalidState || closed.Diagnostic == "" {
 		t.Fatalf("SetStyleJson after close = %v, want native invalid state", err)
 	}
+	if err := f.m.Dispose(); err != nil {
+		t.Fatalf("Dispose after close: %v, want a no-op", err)
+	}
+}
+
+type handleMembers interface {
+	Id() uint64
+	IsClosed() bool
+	String() string
+}
+
+// checkHandleMembers checks that handle has an id and reports closed in
+// IsClosed and in String.
+func checkHandleMembers(t *testing.T, handle handleMembers, typeName string, closed bool) {
+	t.Helper()
+	if handle.Id() == 0 {
+		t.Errorf("%s.Id() = 0, want the native handle value", typeName)
+	}
+	if got := handle.IsClosed(); got != closed {
+		t.Errorf("%s.IsClosed() = %t, want %t", typeName, got, closed)
+	}
+	want := fmt.Sprintf("%s(id=%#x, closed=%t)", typeName, handle.Id(), closed)
+	if got := handle.String(); got != want {
+		t.Errorf("%s.String() = %q, want %q", typeName, got, want)
+	}
+}
+
+// Dispose and a void release each close their handle once: a second call does
+// nothing, and the id and String outlive the handle.
+func TestDisposeAndReleaseCloseOnce(t *testing.T) {
+	f := newFixture(t)
+	checkHandleMembers(t, f.m, "MapHandle", false)
+	checkHandleMembers(t, f.runtime, "RuntimeHandle", false)
+	for range 2 {
+		if err := f.m.Dispose(); err != nil {
+			t.Fatalf("MapHandle.Dispose: %v", err)
+		}
+		if err := f.runtime.Dispose(); err != nil {
+			t.Fatalf("RuntimeHandle.Dispose: %v", err)
+		}
+	}
+	checkHandleMembers(t, f.m, "MapHandle", true)
+	checkHandleMembers(t, f.runtime, "RuntimeHandle", true)
 
 	data, err := GeojsonSourceDataCreate([]byte(`{"type":"FeatureCollection","features":[]}`), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	checkHandleMembers(t, data, "GeojsonSourceDataHandle", false)
 	for range 2 {
 		if err := data.Close(); err != nil {
 			t.Fatalf("GeojsonSourceDataHandle.Close: %v", err)
 		}
 	}
+	checkHandleMembers(t, data, "GeojsonSourceDataHandle", true)
 }
 
 // A runtime refuses to close while its map is live. The refusal leaves the

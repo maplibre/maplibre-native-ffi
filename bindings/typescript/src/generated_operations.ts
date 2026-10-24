@@ -959,6 +959,13 @@ export class MapHandle extends Owner {
     super(key, handle, "MapHandle", { parent, registrations });
   }
 
+  /**
+   * The native handle value, which runtime events report as their
+   * source. It stays readable after close, so events drained later
+   * still match this handle.
+   */
+  declare readonly id: bigint;
+
   /** The commands of this owner that discard their outcomes. */
   get discarding(): MapHandleDiscarding {
     return new MapHandleDiscarding(ADOPT, this);
@@ -4220,6 +4227,13 @@ export class RuntimeHandle extends Owner {
   constructor(key: AdoptKey, handle: bigint, registrations?: Registrations) {
     super(key, handle, "RuntimeHandle", { registrations, root: true });
   }
+
+  /**
+   * The native handle value, which runtime events report as their
+   * source. It stays readable after close, so events drained later
+   * still match this handle.
+   */
+  declare readonly id: bigint;
   /**
    * Calls `close()`, for `await using`.
    * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.

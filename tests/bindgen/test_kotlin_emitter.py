@@ -182,6 +182,42 @@ class KotlinLayoutTests(unittest.TestCase):
             owners[f"{GENERATED}/AcquiredFrameHandle.kt"],
         )
 
+    def test_every_owner_has_the_same_handle_members(self):
+        owners = kotlin.generate(real_api())
+        for handle in (
+            "Runtime",
+            "Map",
+            "RenderSession",
+            "AcquiredFrame",
+            "MapProjection",
+        ):
+            owner = owners[f"{GENERATED}/{handle}Handle.kt"]
+            self.assertIn("public val id: ULong", owner)
+            self.assertIn("val isClosed: Boolean get() = binding.isReleased", owner)
+            self.assertIn(
+                f'"{handle}Handle(id=0x${{binding.handle.toString(16)}}, closed=$isClosed)"',
+                owner,
+            )
+            # Only the handles that runtime events name are their source.
+            self.assertEqual(
+                handle in {"Runtime", "Map"},
+                "runtime events report as their source" in owner,
+                handle,
+            )
+        # A handle with a dispose closes by disposing, and its suspending
+        # `use` awaits the release.
+        for handle in ("Runtime", "Map"):
+            owner = owners[f"{GENERATED}/{handle}Handle.kt"]
+            self.assertIn(
+                "org.maplibre.nativeffi.runtime.AsyncReleasable, AutoCloseable {",
+                owner,
+            )
+            self.assertIn("public override fun close() { dispose() }", owner)
+        self.assertIn(
+            "public override fun close() { release() }",
+            owners[f"{GENERATED}/MapProjectionHandle.kt"],
+        )
+
     def test_a_dispose_with_a_completion_is_the_release_and_the_dispose(self):
         outputs = kotlin.generate(parse(DISPOSE_WITH_COMPLETION))
         operations = outputs[f"{GENERATED}/GeneratedLeaseOperations.kt"]

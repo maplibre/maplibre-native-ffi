@@ -319,6 +319,27 @@ func TestFrameViewIsScopedToItsCallback(t *testing.T) {
 	}
 }
 
+// A frame closes once: a second discard or a close after one does nothing.
+func TestFrameDiscardsOnce(t *testing.T) {
+	r := newRenderFixture(t)
+	r.attach(t)
+	r.renderFrame(t)
+	frame, err := r.session.AcquireFrame()
+	if err != nil || frame == nil {
+		t.Fatalf("AcquireFrame = %v, %v; want a rendered frame", frame, err)
+	}
+	checkHandleMembers(t, frame, "AcquiredFrameHandle", false)
+	for range 2 {
+		if err := frame.Discard(); err != nil {
+			t.Fatalf("AcquiredFrameHandle.Discard: %v", err)
+		}
+	}
+	if err := frame.Close(nil); err != nil {
+		t.Fatalf("AcquiredFrameHandle.Close after Discard: %v, want a no-op", err)
+	}
+	checkHandleMembers(t, frame, "AcquiredFrameHandle", true)
+}
+
 func TestFrameViewSurvivesYielding(t *testing.T) {
 	r := newRenderFixture(t)
 	r.attach(t)

@@ -10,6 +10,7 @@ from support import (
     FIXTURES,
     PROTOCOLS_STUB,
     ROOT,
+    parse,
     parse_sources,
     protocol_header,
     require_tool,
@@ -22,7 +23,38 @@ from tools.bindgen.schema import validate
 BINDING = ROOT / "bindings/dart"
 
 
+# An event source and a handle that is not one, each closed by a void release.
+EVENT_SOURCE_AND_LEASE = """
+typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_close");
+typedef unsigned long long mln_lease BIND("kind=handle;release=mln_lease_close");
+mln_status mln_map_open(
+  mln_map* out_map BIND("direction=out"), mln_diagnostic* out_diagnostic
+);
+mln_status mln_lease_open(
+  mln_lease* out_lease BIND("direction=out"), mln_diagnostic* out_diagnostic
+);
+void mln_map_close(mln_map map);
+void mln_lease_close(mln_lease lease);
+"""
+
+
 class DartEmitterTests(unittest.TestCase):
+    def test_every_owner_has_the_same_handle_members(self):
+        generated = dart.generate(parse(EVENT_SOURCE_AND_LEASE))
+        for owner in ("MapHandle", "LeaseHandle"):
+            self.assertIn(
+                f"String toString() => '{owner}(id=0x${{id.toRadixString(16)}}, "
+                "closed=$isClosed)';",
+                generated,
+            )
+        self.assertEqual(generated.count("bool get isClosed => _state.isClosed;"), 2)
+        # Only an event source's id doc names events.
+        self.assertEqual(generated.count("which runtime events report"), 1)
+        self.assertIn(
+            "which runtime events report", generated.split("class MapHandle")[1]
+        )
+        self.assertIn("  /// The native handle id.\n  int get id", generated)
+
     def test_generated_values_and_keyword_parameters_round_trip(self):
         dart_tool = require_tool(self, "dart", BINDING)
         clang = require_tool(self, "clang")

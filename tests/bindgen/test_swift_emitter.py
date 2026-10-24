@@ -39,7 +39,43 @@ mln_status mln_lease_dispose(
 """
 
 
+# An event source and a handle that is not one, each closed by a void release.
+EVENT_SOURCE_AND_LEASE = """
+typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_close");
+typedef unsigned long long mln_lease BIND("kind=handle;release=mln_lease_close");
+mln_status mln_map_open(
+  mln_map* out_map BIND("direction=out"), mln_diagnostic* out_diagnostic
+);
+mln_status mln_lease_open(
+  mln_lease* out_lease BIND("direction=out"), mln_diagnostic* out_diagnostic
+);
+void mln_map_close(mln_map map);
+void mln_lease_close(mln_lease lease);
+"""
+
+
 class SwiftEmitterTests(unittest.TestCase):
+    def test_every_owner_has_the_same_handle_members(self):
+        owners = swift.generate(parse(EVENT_SOURCE_AND_LEASE))[
+            "Generated/GeneratedOwners.swift"
+        ]
+        for owner in ("MapHandle", "LeaseHandle"):
+            self.assertIn(
+                f"public final class {owner}: @unchecked Sendable, NativeReceiver, "
+                "CustomStringConvertible {",
+                owners,
+            )
+            self.assertIn(
+                f'public var description: String {{ "{owner}(id=0x\\(String(id, '
+                'radix: 16)), closed=\\(isClosed))" }',
+                owners,
+            )
+        self.assertEqual(owners.count("public var isClosed: Bool"), 2)
+        # Only an event source's id doc names events.
+        self.assertEqual(owners.count("which runtime events report"), 1)
+        self.assertIn("which runtime events report", owners.split("class MapHandle")[1])
+        self.assertIn("  /// The native handle value.\n  public var id: UInt64", owners)
+
     def test_a_dispose_with_a_completion_is_the_close_and_the_dispose(self):
         outputs = swift.generate(parse(DISPOSE_WITH_COMPLETION))
         operations = outputs["Generated/Operations/GeneratedApiLeaseOperations.swift"]

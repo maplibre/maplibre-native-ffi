@@ -80,9 +80,16 @@ impl<H: NativeHandle> OwnerState<H> {
         Ok(Call::new(native, Some(read)))
     }
 
-    /// Consumes the handle through `close`.
+    /// Consumes the handle through `close`, which native may refuse for a
+    /// handle that is already closed.
     pub(crate) fn close<R>(&self, close: impl FnOnce(H) -> Result<R>) -> Result<R> {
         self.handle.close_with(close)
+    }
+
+    /// Consumes the handle through a synchronous `close`, or does nothing once
+    /// the handle is closed.
+    pub(crate) fn close_once(&self, close: impl FnOnce(H) -> Result<()>) -> Result<()> {
+        self.handle.close_once(close)
     }
 }
 
@@ -95,18 +102,28 @@ impl<H: NativeHandle> Drop for OwnerState<H> {
 }
 
 /// Declares a public handle type that owns one native handle of type
-/// `$native`, which `$dispose` disposes when the last reference drops.
+/// `$native`, which `$dispose` disposes when the last reference drops. The
+/// attributes before `fn id` document its `id`.
 macro_rules! native_owner {
-    ($(#[$meta:meta])* pub struct $name:ident($native:ident) dispose $dispose:expr, counted $counted:expr;) => {
+    (
+        $(#[$meta:meta])*
+        pub struct $name:ident($native:ident) dispose $dispose:expr, counted $counted:expr;
+        $(#[$id_meta:meta])*
+        fn id;
+    ) => {
         $(#[$meta])*
         pub struct $name {
             pub(crate) inner: std::sync::Arc<$crate::handle::OwnerState<maplibre_native_ffi_sys::$native>>,
         }
         impl std::fmt::Debug for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.debug_struct(stringify!($name))
-                    .field("closed", &self.inner.is_closed())
-                    .finish()
+                write!(
+                    f,
+                    "{}(id={:#x}, closed={})",
+                    stringify!($name),
+                    self.id(),
+                    self.is_closed(),
+                )
             }
         }
         impl $name {
@@ -129,10 +146,17 @@ macro_rules! native_owner {
                 Ok(Self { inner })
             }
 
-            /// Returns the native handle value, which event sources report for
-            /// this handle.
+            $(#[$id_meta])*
             pub fn id(&self) -> u64 {
                 self.inner.id()
+            }
+
+            /// Returns whether this handle's ownership has ended: native accepted
+            /// its release, dispose, or discard, or the binding returned it to
+            /// native. A synchronous release or dispose of a closed handle
+            /// does nothing.
+            pub fn is_closed(&self) -> bool {
+                self.inner.is_closed()
             }
         }
     };

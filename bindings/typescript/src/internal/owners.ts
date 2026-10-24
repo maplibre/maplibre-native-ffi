@@ -26,6 +26,7 @@ export function checkKey(key: AdoptKey): void {
 
 interface OwnerState extends RootHolder {
   readonly handle: bigint;
+  readonly name: string;
   // Keeps the parent owner reachable while this owner lives.
   readonly parent: Owner | undefined;
   token: object | undefined;
@@ -45,10 +46,7 @@ export interface OwnerOptions {
 
 /** The owner of one native handle. */
 export abstract class Owner {
-  /**
-   * The native handle ID, which runtime events report as their source. It
-   * stays readable after close.
-   */
+  /** The native handle value. It stays readable after close. */
   readonly id: bigint;
   // The state lives on the owner, not in a WeakMap keyed by it: ArkTS keeps
   // a WeakMap value alive while it names its key, so an owner whose callback
@@ -79,12 +77,26 @@ export abstract class Owner {
     // can fail.
     this.#state = {
       handle,
+      name,
       parent: options.parent,
       token: native.ownerTokenCreate(handle, name, !!options.session),
       released: false,
       roots: new Map(),
     };
     options.registrations?.commit(this.#state);
+  }
+
+  /**
+   * Whether a release, dispose, close, or discard has ended the handle.
+   */
+  get isClosed(): boolean {
+    return this.#state.released;
+  }
+
+  /** Names the owner's type, its handle ID, and whether it is closed. */
+  toString(): string {
+    const state = this.#state;
+    return `${state.name}(id=0x${state.handle.toString(16)}, closed=${state.released})`;
   }
 }
 

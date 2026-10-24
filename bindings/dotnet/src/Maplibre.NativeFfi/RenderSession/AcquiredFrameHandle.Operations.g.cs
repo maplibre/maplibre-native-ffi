@@ -37,8 +37,20 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     NativeHandleState<MlnAcquiredFrame> INativeOwner<MlnAcquiredFrame>.State => state;
     internal MlnAcquiredFrame Handle => state.Handle;
 
-    // Runtime events report their source by this identity.
+    /// <summary>
+    /// The native handle value. It stays readable after close.
+    /// </summary>
     public ulong Id => state.Handle.Value;
+
+    /// <summary>
+    /// Whether a release, dispose, close, or discard has ended the handle.
+    /// </summary>
+    public bool IsClosed => state.IsClosed;
+
+    /// <summary>
+    /// Names the handle's type, its <see cref="Id" />, and whether it is closed.
+    /// </summary>
+    public override string ToString() => state.ToString();
 
     /// <summary>
     /// Consumes an acquired frame without consumer GPU synchronization, so it

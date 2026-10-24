@@ -59,6 +59,35 @@ test(
   { needs: ["disposers"] },
 );
 
+test("a handle names its id and whether it is closed", async () => {
+  const fixture = await openRuntime();
+  const projection = mapProjectionCreate(
+    (await fixture.openMap()).getSnapshot().view,
+  );
+  const projectionId = `0x${projection.id.toString(16)}`;
+  assert.equal(projection.isClosed, false);
+  assert.equal(
+    projection.toString(),
+    `MapProjectionHandle(id=${projectionId}, closed=false)`,
+  );
+  projection.close();
+  assert.equal(projection.isClosed, true);
+  assert.equal(
+    projection.toString(),
+    `MapProjectionHandle(id=${projectionId}, closed=true)`,
+  );
+
+  const runtime = runtimeCreate();
+  const runtimeId = `0x${runtime.id.toString(16)}`;
+  assert.equal(runtime.isClosed, false);
+  assert.equal(String(runtime), `RuntimeHandle(id=${runtimeId}, closed=false)`);
+  runtime.dispose();
+  assert.equal(runtime.isClosed, true);
+  assert.equal(String(runtime), `RuntimeHandle(id=${runtimeId}, closed=true)`);
+  // A second dispose is a no-op.
+  runtime.dispose();
+});
+
 test("a refused close leaves the handle usable for a later close", async () => {
   const runtime = runtimeCreate();
   const map = await bounded(runtime.createMap(), "map creation");
