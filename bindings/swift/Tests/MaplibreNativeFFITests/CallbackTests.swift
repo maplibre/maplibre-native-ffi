@@ -5,6 +5,7 @@ import Testing
 
 /// Adds a custom geometry source whose callback state reports its release
 /// through `releases`.
+@discardableResult
 private func addCustomSource(
   _ map: MapHandle,
   id: String,
@@ -26,27 +27,18 @@ private func addCustomSource(
   try await withMapFixture { fixture in
     try await fixture.map.setStyleJson(json: emptyStyle)
     let accepted = LockedBox(0)
-    let added = try await addCustomSource(
-      fixture.map,
-      id: "custom",
-      releases: accepted
-    )
-    #expect(added.disposition == .committed)
+    try await addCustomSource(fixture.map, id: "custom", releases: accepted)
 
     // A second source under the same ID is rejected on the map thread.
     let rejected = LockedBox(0)
-    let duplicate = try await addCustomSource(
-      fixture.map,
-      id: "custom",
-      releases: rejected
-    )
-    #expect(duplicate.disposition == .failed)
+    await #expect(throws: MaplibreError.self) {
+      try await addCustomSource(fixture.map, id: "custom", releases: rejected)
+    }
     _ = try await fixture.map.requestRepaint()
     #expect(rejected.value == 1)
     #expect(accepted.value == 0)
 
-    let removed = try await fixture.map.removeStyleSource(sourceId: "custom")
-    #expect(removed.disposition == .committed)
+    try await fixture.map.removeStyleSource(sourceId: "custom")
     #expect(accepted.value == 1)
   }
 }
@@ -72,8 +64,7 @@ private func addCustomSource(
           }
         )
       )
-      #expect(try await fixture.map.updateCamera(update: update)
-        .disposition == .committed)
+      try await fixture.map.updateCamera(update: update)
     }
     #expect(releases.value == 0)
     _ = try await fixture.map.cancelCameraTransition(transitionId: UInt64.max)

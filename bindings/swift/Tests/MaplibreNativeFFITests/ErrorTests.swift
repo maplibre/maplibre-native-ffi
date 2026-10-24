@@ -1,7 +1,9 @@
+import Foundation
 @testable import MaplibreNativeFFI
 import Testing
 
-/// Errors preserve the generated status and the diagnostic.
+/// Errors preserve the generated status and the diagnostic, and Foundation's
+/// localized description shows both.
 @Test func aFailedCallMapsItsStatusAndCarriesItsDiagnostic() async throws {
   try await withMapFixture { fixture in
     let native = await expectMaplibreError(.invalidArgument) {
@@ -12,6 +14,8 @@ import Testing
     #expect(native?.diagnostic.isEmpty == false)
     #expect(native?.description
       .hasPrefix("INVALID_ARGUMENT: ") == true)
+    #expect(native.map { ($0 as Error).localizedDescription }
+      == native?.description)
 
     let binding = await expectMaplibreError(.invalidState) {
       try await fixture.map.close()
@@ -29,6 +33,9 @@ import Testing
   let error = try #require(NativeAbi.mismatch(actual: expectedCAbiVersion + 1))
   #expect(error.expected == expectedCAbiVersion)
   #expect(error.actual == expectedCAbiVersion + 1)
+  #expect((error as Error).localizedDescription.contains(
+    "version \(expectedCAbiVersion + 1)"
+  ))
 
   #expect(NativeAbi.mismatch(actual: expectedCAbiVersion) == nil)
   try NativeAbi.ensureCompatible()

@@ -162,15 +162,16 @@ private struct ConversionFailure: Error {}
   try await teardown?.value()
 }
 
-/// A command that native accepts and then fails reports the failure as its
-/// completion's disposition, status, and diagnostic, instead of throwing.
-@Test func aFailedCommandDispositionArrivesAsData() async throws {
+/// A command that native accepts and then fails throws its status, its
+/// diagnostic, and the generation it published.
+@Test func aFailedCommandThrowsItsStatusAndGeneration() async throws {
   try await withMapFixture { fixture in
-    try await fixture.map.setStyleJson(json: emptyStyle)
-    let removal = try await fixture.map.removeStyleSource(sourceId: "missing")
-    #expect(removal.disposition == .failed)
-    #expect(removal.rawStatus == MLN_STATUS_NOT_FOUND.rawValue)
-    #expect(!removal.diagnostic.isEmpty)
+    let committed = try await fixture.map.setStyleJson(json: emptyStyle)
+    let error = await expectMaplibreError(.notFound) {
+      try await fixture.map.removeStyleSource(sourceId: "missing")
+    }
+    #expect(error?.diagnostic.isEmpty == false)
+    #expect(error.map { $0.generation > committed.generation } == true)
   }
 }
 

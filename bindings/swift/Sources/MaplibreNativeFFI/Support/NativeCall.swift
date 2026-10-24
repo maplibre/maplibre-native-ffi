@@ -100,8 +100,8 @@ extension NativeReceiver {
     try await nativeStart(convert: { _ in () }, call)
   }
 
-  /// Starts a command and awaits its disposition, which reports a failed or
-  /// cancelled command as data rather than as an error.
+  /// Starts a command and awaits its commit. A failed or cancelled command
+  /// throws `MaplibreError`.
   @discardableResult
   func nativeCommand(
     _ call: NativeStartCall

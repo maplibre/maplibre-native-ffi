@@ -10,16 +10,13 @@ private final class NativeCompletionState<Value: Sendable>:
 {
   private let lock = NSLock()
   private let convert: (UnsafePointer<mln_completion_result>) throws -> Value
-  private let acceptErrorStatus: Bool
   private var result: Result<Value, Error>?
   private var waiter: CheckedContinuation<Value, Error>?
   private var cancelled = false
 
   init(
-    acceptErrorStatus: Bool = false,
     convert: @escaping (UnsafePointer<mln_completion_result>) throws -> Value
   ) {
-    self.acceptErrorStatus = acceptErrorStatus
     self.convert = convert
   }
 
@@ -27,14 +24,15 @@ private final class NativeCompletionState<Value: Sendable>:
     let converted: Result<Value, Error>
     do {
       let raw = native.pointee
-      guard raw.status == MLN_STATUS_OK.rawValue || acceptErrorStatus else {
+      guard raw.status == MLN_STATUS_OK.rawValue else {
         let diagnostic = try NativeString.copyUTF8(
           data: raw.diagnostic.data,
           size: raw.diagnostic.size
         )
         throw MaplibreError(
           status: Status(rawValue: raw.status),
-          diagnostic: diagnostic
+          diagnostic: diagnostic,
+          generation: raw.generation
         )
       }
       converted = try .success(convert(native))
@@ -116,13 +114,9 @@ enum NativeCompletion {
       UnsafePointer<mln_completion>,
       UnsafeMutablePointer<mln_diagnostic>
     ) throws -> mln_status,
-    acceptErrorStatus: Bool = false,
     convert: @escaping (UnsafePointer<mln_completion_result>) throws -> Value
   ) throws -> NativeFuture<Value> {
-    let state = NativeCompletionState(
-      acceptErrorStatus: acceptErrorStatus,
-      convert: convert
-    )
+    let state = NativeCompletionState(convert: convert)
     let retained = Unmanaged<AnyObject>.passRetained(state)
     var descriptor = mln_completion()
     descriptor.size = UInt32(MemoryLayout<mln_completion>.size)
@@ -164,16 +158,10 @@ enum NativeCompletion {
       UnsafeMutablePointer<mln_diagnostic>
     ) throws -> mln_status
   ) throws -> NativeFuture<CommandCompletion> {
-    try start(call, acceptErrorStatus: true) { result in
-      try CommandCompletion(
-        disposition: CommandDisposition(rawValue: result.pointee.disposition),
+    try start(call) { result in
+      CommandCompletion(
         generation: result.pointee.generation,
-        renderUpdateGeneration: result.pointee.render_update_generation,
-        rawStatus: result.pointee.status,
-        diagnostic: NativeString.copyUTF8(
-          data: result.pointee.diagnostic.data,
-          size: result.pointee.diagnostic.size
-        )
+        renderUpdateGeneration: result.pointee.render_update_generation
       )
     }
   }
