@@ -4,6 +4,7 @@
 
 import {
   AwaitableWake,
+  FrameDemandFlag,
   type LogicalExtent,
   type MapHandle,
   OpenglClientApi,
@@ -267,7 +268,10 @@ function releaseSession(session: RenderSessionHandle): void {
   session.dispose();
 }
 
-/** Demands a frame, which renders whether or not the map changed. */
+/**
+ * Demands a frame with the default flags, which render only when the map has
+ * an update newer than the session's last frame.
+ */
 export function requestFrame(session: RenderSessionHandle, token: bigint) {
   session.requestFrame({ token });
 }
@@ -294,7 +298,11 @@ function takeResult(
   return undefined;
 }
 
-/** How many frame demands a case makes before it fails for want of a frame. */
+/**
+ * How many frame demands a case makes before it fails for want of a frame. A
+ * demand waits for the map's next update, so only a target that is not ready
+ * ends one without a frame.
+ */
 const frameAttempts = 8;
 
 /**
@@ -371,11 +379,18 @@ export class TestSession {
     return result.value;
   }
 
-  /** Demands frames until one renders, and returns its result. */
+  /**
+   * Demands frames until one renders, and returns its result. A demand made
+   * when the map has nothing newer than the last frame waits for its next
+   * update, such as the one that a source publishes as it loads.
+   */
   async renderFrame(): Promise<RenderFrameResult> {
     for (let attempt = 0; attempt < frameAttempts; attempt++) {
       const token = ++this.#token;
-      requestFrame(this.session, token);
+      this.session.requestFrame({
+        token,
+        flags: FrameDemandFlag.ifNeeded | FrameDemandFlag.waitForUpdate,
+      });
       const result = await this.#until(
         () => takeResult(this.session, token),
         `frame ${token}`,
