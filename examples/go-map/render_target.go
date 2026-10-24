@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/jfreymuth/go-sdl3/sdl"
-	maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
+	"github.com/maplibre/maplibre-native-ffi/bindings/go/maplibre"
 )
 
 const glTexture2D = 0x0DE1

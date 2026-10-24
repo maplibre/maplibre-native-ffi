@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/jfreymuth/go-sdl3/sdl"
-	maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
+	"github.com/maplibre/maplibre-native-ffi/bindings/go/maplibre"
 )
 
 // loopWake is a native wake for the SDL thread. The wake marks its work and

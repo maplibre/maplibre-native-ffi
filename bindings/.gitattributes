@@ -201,9 +201,9 @@
 /dotnet/src/Maplibre.NativeFfi/Texture/WebgpuTextureFrameView.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Wake/Wake.g.cs linguist-generated=true
 /generated-coverage.json linguist-generated=true
-/go/generated_api.go linguist-generated=true
-/go/generated_callbacks.c linguist-generated=true
-/go/generated_callbacks.h linguist-generated=true
+/go/maplibre/generated_api.go linguist-generated=true
+/go/maplibre/generated_callbacks.c linguist-generated=true
+/go/maplibre/generated_callbacks.h linguist-generated=true
 /kotlin/src/androidMain/jni/mln_jni_generated.c linguist-generated=true
 /kotlin/src/androidMain/kotlin/org/maplibre/nativeffi/internal/c/C.kt linguist-generated=true
 /kotlin/src/androidMain/kotlin/org/maplibre/nativeffi/internal/c/UpcallStubs.kt linguist-generated=true

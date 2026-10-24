@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
+	"github.com/maplibre/maplibre-native-ffi/bindings/go/maplibre"
 )
 
 type runtimeMapState struct {

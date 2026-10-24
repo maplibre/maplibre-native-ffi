@@ -234,10 +234,10 @@ hooks:
 
 ### Go
 
-Add the module at the release's version.
+Add the package at the release's version.
 
 ```bash frame="terminal"
-go get github.com/maplibre/maplibre-native-ffi/bindings/go@v{{version}}
+go get github.com/maplibre/maplibre-native-ffi/bindings/go/maplibre@v{{version}}
 ```
 
 cgo finds the C library through pkg-config. Unpack the release's
@@ -252,7 +252,7 @@ For the snapshot channel, take the module from `main` and the C library from the
 [snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot).
 
 ```bash frame="terminal"
-go get github.com/maplibre/maplibre-native-ffi/bindings/go@main
+go get github.com/maplibre/maplibre-native-ffi/bindings/go/maplibre@main
 ```
 
 ### Python

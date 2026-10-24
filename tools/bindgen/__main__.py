@@ -39,7 +39,7 @@ def render(api: Api) -> tuple[dict[str, str], dict]:
     outputs = native_capture.generate(bound)
     outputs.update(native_results.generate(bound))
     for directory, emitter in (
-        ("bindings/go", go),
+        ("bindings/go/maplibre", go),
         ("bindings/dotnet/src/Maplibre.NativeFfi", dotnet),
         ("bindings/rust", rust),
         ("bindings/python", python),

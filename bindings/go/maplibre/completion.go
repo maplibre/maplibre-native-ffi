@@ -2,7 +2,7 @@ package maplibre
 
 /*
 #include "binding_callback.h"
-#include "internal/cgo_completion_shim.h"
+#include "cgo_completion_shim.h"
 */
 import "C"
 
