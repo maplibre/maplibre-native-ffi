@@ -13,6 +13,13 @@ import java.lang.invoke.MethodHandle
 import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
 
+/**
+ * The address of the symbol [name], or a `NoSuchElementException` that names it, as Java 23's
+ * `SymbolLookup.findOrThrow` does.
+ */
+internal fun SymbolLookup.symbol(name: String): MemorySegment =
+  find(name).orElseThrow { NoSuchElementException("Symbol not found: $name") }
+
 /** Builds the FFM downcalls and upcall stubs that the generated declarations name. */
 internal object Ffm {
   // Pointers cross as `JAVA_LONG`: every JVM target is 64-bit, where a pointer and a 64-bit
@@ -30,7 +37,7 @@ internal object Ffm {
 
   /** The downcall for the C function [name], returning [result] or void when it is null. */
   fun downcall(name: String, result: MemoryLayout?, vararg arguments: MemoryLayout): MethodHandle =
-    linker.downcallHandle(symbols.findOrThrow(name), descriptor(result, arguments))
+    linker.downcallHandle(symbols.symbol(name), descriptor(result, arguments))
 
   /**
    * The downcall for a C function pointer that the caller passes as a leading [MemorySegment],

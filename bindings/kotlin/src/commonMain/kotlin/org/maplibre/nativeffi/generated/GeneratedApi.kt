@@ -5,20 +5,8 @@ import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
-import org.maplibre.nativeffi.render.NativePointer
 
 public object GeneratedApi {
-  /**
-   * Initializes Android platform services.
-   *
-   * See `mln_android_init` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-   */
-  public fun androidInit(jniEnv: NativePointer, context: NativePointer): Unit =
-    nativeCall(null, null) {
-      check(C.mln_android_init(jniEnv.address, context.address, diagnostic))
-    }
-
   /**
    * Returns empty animation options initialized for this C API version.
    *
@@ -447,18 +435,6 @@ public object GeneratedApi {
       val out = sized(w(56, 80), 8)
       C.mln_opengl_surface_descriptor_default(out)
       readOpenglSurfaceDescriptor(out)
-    }
-
-  /**
-   * Returns the process-wide `mln_plugin_register_v1` entry point; never null.
-   *
-   * See `mln_plugin_get_register_function_v1` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
-   */
-  public fun pluginGetRegisterFunctionV1(): NativePointer =
-    nativeCall(null, null) {
-      val raw = C.mln_plugin_get_register_function_v1()
-      NativePointer.ofAddress(raw)
     }
 
   /**

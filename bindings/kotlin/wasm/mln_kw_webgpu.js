@@ -1,4 +1,4 @@
-// The WebGPU imports of the Kotlin/Wasm binding's BrowserGraphics, which the
+// The WebGPU imports of the Kotlin/Wasm binding's WebGraphics, which the
 // module of a WebGPU build links and exports as Module.mlnKwWebgpu.
 //
 // emdawnwebgpu keeps every WebGPU object of the module in its own table, so

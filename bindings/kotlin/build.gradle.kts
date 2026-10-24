@@ -100,7 +100,13 @@ kotlin {
 
   compilerOptions { freeCompilerArgs.add("-Xexpect-actual-classes") }
 
-  jvm { compilerOptions { jvmTarget.set(JvmTarget.fromTarget(libs.versions.java.release.get())) } }
+  jvm {
+    compilerOptions {
+      jvmTarget.set(JvmTarget.fromTarget(libs.versions.java.release.get()))
+      // Compiles against the release's class library, so no newer JDK API slips in.
+      freeCompilerArgs.add("-Xjdk-release=${libs.versions.java.release.get()}")
+    }
+  }
 
   android {
     namespace = "org.maplibre.nativeffi"

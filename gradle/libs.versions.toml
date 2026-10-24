@@ -7,7 +7,7 @@ coroutines = "1.11.0"
 android-compileSdk = "36"
 android-minSdk = "24"
 java-toolchain = "25"
-java-release = "24"
+java-release = "22"
 java-android-release = "17"
 androidx-test-runner = "1.7.0"
 

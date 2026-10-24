@@ -1,4 +1,4 @@
-// The WebGL registration of the Kotlin/Wasm binding's BrowserGraphics, which
+// The WebGL registration of the Kotlin/Wasm binding's WebGraphics, which
 // the module of a WebGL build links and exports as Module.mlnKwWebgl.
 //
 // Emscripten names a WebGL context by a handle in the GL table of the agent

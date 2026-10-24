@@ -26,7 +26,7 @@ import org.maplibre.nativeffi.internal.loader.ensureNativeLibrary
  * [registerWebglContext] needs a WebGL module. Import from the agent that runs Kotlin, which is the
  * agent that drives the sessions.
  */
-public object BrowserGraphics {
+public object WebGraphics {
   /**
    * Imports a `GPUDevice` as the `WGPUDevice` of a `WebgpuContextDescriptor`. Pass a null instance
    * and a null queue beside it: sessions use neither, and null names the device's default queue.
@@ -150,7 +150,7 @@ public object BrowserGraphics {
 }
 
 /**
- * A WebGPU object of the page, imported into the browser module by [BrowserGraphics]. Close it only
+ * A WebGPU object of the page, imported into the browser module by [WebGraphics]. Close it only
  * after every session that names [pointer] has completed its detach or been destroyed: [close]
  * releases the module's reference at once, and the JavaScript object stays usable.
  */
@@ -180,8 +180,8 @@ internal constructor(private val address: Long, private val release: (Int) -> Un
 }
 
 /**
- * A WebGL 2 context of the page, registered with the browser module by [BrowserGraphics]. Close it
- * only after every session that names [context] has completed its detach or been destroyed: [close]
+ * A WebGL 2 context of the page, registered with the browser module by [WebGraphics]. Close it only
+ * after every session that names [context] has completed its detach or been destroyed: [close]
  * removes the registration at once, and the JavaScript context stays usable.
  */
 public class RegisteredWebglContext internal constructor(private val handle: Int) : AutoCloseable {

@@ -11,6 +11,7 @@ import java.lang.foreign.ValueLayout.JAVA_INT_UNALIGNED
 import java.lang.foreign.ValueLayout.JAVA_LONG
 import java.lang.foreign.ValueLayout.JAVA_LONG_UNALIGNED
 import java.lang.foreign.ValueLayout.JAVA_SHORT_UNALIGNED
+import org.maplibre.nativeffi.internal.c.symbol
 
 /** Native memory through one FFM segment that spans the address space. */
 internal actual object NativeMemory {
@@ -18,22 +19,22 @@ internal actual object NativeMemory {
   private val linker = Linker.nativeLinker()
   private val calloc =
     linker.downcallHandle(
-      linker.defaultLookup().findOrThrow("calloc"),
+      linker.defaultLookup().symbol("calloc"),
       FunctionDescriptor.of(JAVA_LONG, JAVA_LONG, JAVA_LONG),
     )
   private val freeMemory =
     linker.downcallHandle(
-      linker.defaultLookup().findOrThrow("free"),
+      linker.defaultLookup().symbol("free"),
       FunctionDescriptor.ofVoid(JAVA_LONG),
     )
   private val malloc =
     linker.downcallHandle(
-      linker.defaultLookup().findOrThrow("malloc"),
+      linker.defaultLookup().symbol("malloc"),
       FunctionDescriptor.of(JAVA_LONG, JAVA_LONG),
     )
   private val strlen =
     linker.downcallHandle(
-      linker.defaultLookup().findOrThrow("strlen"),
+      linker.defaultLookup().symbol("strlen"),
       FunctionDescriptor.of(JAVA_LONG, JAVA_LONG),
     )
 

@@ -29,12 +29,12 @@ import org.maplibre.nativeffi.smallMapOptions
 import org.maplibre.nativeffi.withMap
 
 /**
- * Graphics objects that the page creates, imported through [BrowserGraphics], render a
- * caller-driven frame on the build's backend: a `GPUDevice` into a borrowed ring of the page's
- * `GPUTexture` and `GPUTextureView` on WebGPU, and an owned texture over a `WebGL2RenderingContext`
- * on WebGL. Each import closes after its session, and its handle then refuses use.
+ * Graphics objects that the page creates, imported through [WebGraphics], render a caller-driven
+ * frame on the build's backend: a `GPUDevice` into a borrowed ring of the page's `GPUTexture` and
+ * `GPUTextureView` on WebGPU, and an owned texture over a `WebGL2RenderingContext` on WebGL. Each
+ * import closes after its session, and its handle then refuses use.
  */
-class BrowserGraphicsTest {
+class WebGraphicsTest {
   @Test
   fun aGraphicsObjectThatThePageCreatedRendersAFrame() = runSuspendTest {
     withMap(MapMode.STATIC, options = smallMapOptions(MapMode.STATIC, WIDTH, HEIGHT)) {
@@ -52,9 +52,9 @@ class BrowserGraphicsTest {
         "the browser provided no WebGPU device; see the console for why"
       }
     val pageTexture = createRingTexture(pageDevice, WIDTH, HEIGHT)
-    val device = BrowserGraphics.importWebgpuDevice(pageDevice)
-    val texture = BrowserGraphics.importWebgpuTexture(pageTexture)
-    val view = BrowserGraphics.importWebgpuTextureView(createTextureView(pageTexture))
+    val device = WebGraphics.importWebgpuDevice(pageDevice)
+    val texture = WebGraphics.importWebgpuTexture(pageTexture)
+    val view = WebGraphics.importWebgpuTextureView(createTextureView(pageTexture))
     val pointer = device.pointer
     val descriptor =
       WebgpuBorrowedTextureDescriptor(
@@ -64,7 +64,7 @@ class BrowserGraphicsTest {
         context =
           WebgpuContextDescriptor(NativePointer.NULL_POINTER, pointer, NativePointer.NULL_POINTER),
         textures = listOf(WebgpuBorrowedTexture(texture.pointer, view.pointer)),
-        format = BrowserGraphics.webgpuTextureFormat("rgba8unorm"),
+        format = WebGraphics.webgpuTextureFormat("rgba8unorm"),
       )
     withRenderSession(
       RenderDriverKind.CALLER_GRAPHICS_THREAD,
@@ -80,7 +80,7 @@ class BrowserGraphicsTest {
       // copy is submitted while the frame is borrowed, and the queue orders it after the session's
       // rendering.
       val center = frame.withWebgpuTexture { frameTexture ->
-        val named = BrowserGraphics.webgpuObject(frameTexture.texture)
+        val named = WebGraphics.webgpuObject(frameTexture.texture)
         assertTrue(isSameObject(named, pageTexture), "the frame names another texture")
         readCenterPixel(pageDevice, named, WIDTH, HEIGHT)
       }
@@ -101,7 +101,7 @@ class BrowserGraphicsTest {
   private suspend fun MapFixture.renderWithPageContext() {
     val pageContext =
       checkNotNull(pageWebglContext(WIDTH)) { "creating the page's WebGL context failed" }
-    val context = BrowserGraphics.registerWebglContext(pageContext)
+    val context = WebGraphics.registerWebglContext(pageContext)
     val descriptor =
       OpenglOwnedTextureDescriptor(
         extent,
@@ -134,7 +134,7 @@ class BrowserGraphicsTest {
     context.close()
     assertFailsWith<IllegalStateException> { context.context }
     // The closed handle stays reserved, so a new registration never takes it.
-    BrowserGraphics.registerWebglContext(pageContext).use { assertNotEquals(handle, it.context) }
+    WebGraphics.registerWebglContext(pageContext).use { assertNotEquals(handle, it.context) }
     // Chromium caps the WebGL contexts of a page, so the test frees its own.
     loseWebglContext(pageContext)
   }

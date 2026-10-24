@@ -30,7 +30,7 @@ import org.maplibre.nativeffi.generated.WglContextDescriptor
 /**
  * The handles of a test graphics context, as addresses. Only its backend's fields are set. A WebGL
  * context is an `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, and a WebGPU device is an emdawnwebgpu handle:
- * the page creates them, and the binding imports them through `BrowserGraphics`.
+ * the page creates them, and the binding imports them through `WebGraphics`.
  */
 internal class TestGraphicsContext(
   val metalDevice: Long = 0,
@@ -94,7 +94,7 @@ internal enum class TestBackend(val graphicsBackend: UInt) {
   /**
    * WebGL 2 in the browser. tests/graphics leaves WebGL to JavaScript, so this value, past the
    * tests/graphics values, names the browser fixtures: the page creates the context, and the
-   * binding imports it through `BrowserGraphics`.
+   * binding imports it through `WebGraphics`.
    */
   WEBGL(5u),
   /** WebGPU in the browser, from the browser fixtures, as for [WEBGL]. */

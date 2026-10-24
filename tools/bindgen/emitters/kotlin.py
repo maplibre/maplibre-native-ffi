@@ -48,6 +48,10 @@ PLATFORMS = {
     "androidMain": "android",
     "wasmJsMain": "wasm",
 }
+# The C functions that the handwritten `Maplibre` objects own, on the targets
+# that can call them, so the generated API leaves them out. Their native
+# declarations stay, because those objects call them.
+HANDWRITTEN = {"mln_android_init", "mln_plugin_get_register_function_v1"}
 # The factories of the native registrations, which only the threaded targets
 # can pass (see kotlin_callbacks).
 NATIVE_REGISTRATIONS = (
@@ -139,6 +143,8 @@ def lowered(api: Api | BoundApi):
             unsupported[function.name] = f"{function.location}: {error}"
         finally:
             values.split = None
+    for handwritten in HANDWRITTEN:
+        bodies.pop(handwritten, None)
     functions = [
         plan.function
         for plan in bound.operations

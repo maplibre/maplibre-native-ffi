@@ -58,7 +58,7 @@ list(APPEND MLN_FFI_LINK_FLAGS
 set(MLN_KW_EXPORTS "${CMAKE_CURRENT_SOURCE_DIR}/mln_kw_exports.txt")
 set(MLN_KW_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/mln_kw_library.js")
 
-# BrowserGraphics reaches the graphics library of the build's backend as a
+# WebGraphics reaches the graphics library of the build's backend as a
 # property of the module, which imports a page's objects into the module's
 # tables.
 set(MLN_FFI_ARTIFACT_FILE
@@ -135,7 +135,7 @@ mln_kw_module(maplibre_native_kotlin maplibre-native-kotlin)
 # The module that the Kotlin/Wasm suite loads, with the fixtures in
 # test_support.c and their canvases and pool probe in test_support.js. The page
 # creates its own WebGL contexts and WebGPU devices, which the suite imports
-# through BrowserGraphics.
+# through WebGraphics.
 mln_kw_module(
   maplibre_native_kotlin_test maplibre-native-kotlin-test SOURCES test_support.c
   JS_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/test_support.js")

@@ -29,18 +29,18 @@ public class AndroidContextReference private constructor(internal val address: L
   }
 }
 
-/** Android-only platform integration entry points for Kotlin/Native. */
-public object MaplibreAndroid {
-  /**
-   * Initializes Android platform services using JNI handles from the host.
-   *
-   * Required once during Android host setup, before creating a runtime. APK assets use the provided
-   * Context's AssetManager. A zero address in either argument fails with `Status.INVALID_ARGUMENT`.
-   */
-  public fun initialize(jniEnvironment: AndroidJniEnvironment, context: AndroidContextReference) {
-    ensureNativeLibrary()
-    NativeDiagnostics.check { diagnostic ->
-      C.mln_android_init(jniEnvironment.address, context.address, diagnostic)
-    }
+/**
+ * Initializes Android platform services using JNI handles from the host.
+ *
+ * Required once during Android host setup, before creating a runtime. APK assets use the provided
+ * Context's AssetManager. A zero address in either argument fails with `Status.INVALID_ARGUMENT`.
+ */
+public fun Maplibre.initialize(
+  jniEnvironment: AndroidJniEnvironment,
+  context: AndroidContextReference,
+) {
+  ensureNativeLibrary()
+  NativeDiagnostics.check { diagnostic ->
+    C.mln_android_init(jniEnvironment.address, context.address, diagnostic)
   }
 }
