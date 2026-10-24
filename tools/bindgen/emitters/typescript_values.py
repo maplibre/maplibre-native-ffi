@@ -330,7 +330,8 @@ class Values:
             return
         if value.kind == "enum":
             self.enum_scalar(value)
-            self.used[value.native] = value
+            if value.native not in self.bound.control_enums:
+                self.used[value.native] = value
             return
         if value.kind == "handle":
             if value.native not in self.bound.public_handles:

@@ -30,30 +30,6 @@ public struct StyleExpressionInfo: Equatable, Hashable, Sendable {
   }
 }
 
-/// Fields present in `mln_style_expression_inputs`.
-///
-/// See `mln_style_expression_input_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-public struct StyleExpressionInputField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let zoom: StyleExpressionInputField = .init(rawValue: 1)
-  public static let colorRampParameter: StyleExpressionInputField =
-    .init(rawValue: 2)
-  public static let elevation: StyleExpressionInputField = .init(rawValue: 4)
-  public static let feature: StyleExpressionInputField = .init(rawValue: 8)
-  public static let featureState: StyleExpressionInputField =
-    .init(rawValue: 16)
-  public static let globalState: StyleExpressionInputField = .init(rawValue: 32)
-  public static let canonicalTileId: StyleExpressionInputField =
-    .init(rawValue: 64)
-}
-
 /// What one evaluation reads.
 ///
 /// See `mln_style_expression_inputs` in the
@@ -176,23 +152,6 @@ public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
       .count(availableImages.count)
     return raw
   }
-}
-
-/// Fields present in `mln_style_expression_options`.
-///
-/// See `mln_style_expression_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-public struct StyleExpressionOptionField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  /// expected_type is set.
-  public static let expectedType: StyleExpressionOptionField =
-    .init(rawValue: 1)
 }
 
 /// Options for parsing a style expression.

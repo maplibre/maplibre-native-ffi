@@ -301,35 +301,6 @@ public struct OpenglContextOwnership: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// OpenGL platform context provider used by a context descriptor.
-///
-/// See `mln_opengl_context_platform` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-public struct OpenglContextPlatform: RawRepresentable, CustomStringConvertible,
-  NativeOpenValue, Equatable, Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  /// No OpenGL context provider is selected.
-  public static let unspecified: OpenglContextPlatform = .init(rawValue: 0)
-  public static let wgl: OpenglContextPlatform = .init(rawValue: 1)
-  public static let egl: OpenglContextPlatform = .init(rawValue: 2)
-  /// Emscripten WebGL context handle.
-  public static let webgl: OpenglContextPlatform = .init(rawValue: 3)
-  public var description: String {
-    switch rawValue {
-    case 0: return "UNSPECIFIED"
-    case 1: return "WGL"
-    case 2: return "EGL"
-    case 3: return "WEBGL"
-    default: return "OpenglContextPlatform(\(rawValue))"
-    }
-  }
-}
-
 /// OpenGL context providers supported by this build.
 ///
 /// See `mln_opengl_context_provider_flag` in the

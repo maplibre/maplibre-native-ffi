@@ -420,12 +420,44 @@ class BoundApi:
         """The documentation of a declaration, or `record.field` member."""
         return self.docs.get(native)
 
+    @functools.cached_property
+    def control_enums(self) -> frozenset[str]:
+        """Enums that only presence masks and union tags use.
+
+        A binding writes and reads those fields itself, so no host code names
+        the enum, and a binding keeps its values private.
+        """
+        control, used = set(), set()
+
+        def visit(value: ValuePlan | None, uses: set[str]) -> None:
+            if value is None:
+                return
+            if value.kind == "enum":
+                uses.add(value.native)
+            visit(value.element, uses)
+
+        for value in self.values.values():
+            for member in value.fields:
+                visit(
+                    member.value,
+                    control if member.role in {"presence_mask", "tag"} else used,
+                )
+        for operation in (*self.operations, *self.runtime_operations):
+            for parameter in (*operation.inputs, *operation.outputs):
+                visit(parameter.value, used)
+            visit(operation.result, used)
+        for callback in self.callbacks.values():
+            for parameter in callback.parameters:
+                visit(parameter.value, used)
+            visit(callback.result, used)
+        return frozenset(control - used)
+
     @property
     def public_values(self) -> dict[str, ValuePlan]:
         return {
             name: value
             for name, value in self.values.items()
-            if name not in self.source.runtime_types
+            if name not in self.source.runtime_types and name not in self.control_enums
         }
 
     @property

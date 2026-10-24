@@ -21,22 +21,6 @@ export type AmbientCacheOperation =
   | (number & {});
 
 /**
- * Field mask values for `mln_animation_options`.
- *
- * See `mln_animation_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export const AnimationOptionField = {
-  duration: 1,
-  velocity: 2,
-  minZoom: 4,
-  easing: 8,
-  transitionId: 16,
-} as const;
-/** A bitwise OR of AnimationOptionField flags. */
-export type AnimationOptionField = number;
-
-/**
  * Optional animation controls for camera transitions.
  *
  * See `mln_animation_options` in the
@@ -70,35 +54,6 @@ export interface AnimationOptions {
    */
   endHandler?: CameraTransitionHandler;
 }
-
-/**
- * Field mask values for `mln_bound_options`.
- *
- * See `mln_bound_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export const BoundOptionField = {
-  /**
-   * Selects `mln_bound_options.bounds` as a geographic constraint that the
-   * camera center stays inside. Mutually exclusive with
-   * `MLN_BOUND_OPTION_UNBOUNDED`.
-   */
-  bounds: 1,
-  minZoom: 2,
-  maxZoom: 4,
-  minPitch: 8,
-  maxPitch: 16,
-  /**
-   * Selects the unbounded geographic constraint, which leaves every camera
-   * center unconstrained and lets the map pan freely across the antimeridian.
-   * This differs from world bounds of -90/-180 to 90/180, which clamp longitude
-   * to that range. Mutually exclusive with `MLN_BOUND_OPTION_BOUNDS`, and
-   * leaves `mln_bound_options.bounds` unread.
-   */
-  unbounded: 32,
-} as const;
-/** A bitwise OR of BoundOptionField flags. */
-export type BoundOptionField = number;
 
 /**
  * Optional map camera constraint fields.
@@ -179,36 +134,6 @@ export interface CameraDelta {
 }
 
 /**
- * Field mask values for `mln_camera_delta`.
- *
- * See `mln_camera_delta_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export const CameraDeltaField = {
-  offset: 1,
-  scale: 2,
-  bearing: 4,
-  pitch: 8,
-  anchor: 16,
-} as const;
-/** A bitwise OR of CameraDeltaField flags. */
-export type CameraDeltaField = number;
-
-/**
- * Field mask values for `mln_camera_fit_options`.
- *
- * See `mln_camera_fit_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export const CameraFitOptionField = {
-  padding: 1,
-  bearing: 2,
-  pitch: 4,
-} as const;
-/** A bitwise OR of CameraFitOptionField flags. */
-export type CameraFitOptionField = number;
-
-/**
  * Optional fitting controls for camera-for-viewport queries.
  *
  * See `mln_camera_fit_options` in the
@@ -219,26 +144,6 @@ export interface CameraFitOptions {
   bearing?: number;
   pitch?: number;
 }
-
-/**
- * Field mask values for `mln_camera_options`.
- *
- * See `mln_camera_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export const CameraOptionField = {
-  center: 1,
-  zoom: 2,
-  bearing: 4,
-  pitch: 8,
-  centerAltitude: 16,
-  padding: 32,
-  anchor: 64,
-  roll: 128,
-  fov: 256,
-} as const;
-/** A bitwise OR of CameraOptionField flags. */
-export type CameraOptionField = number;
 
 /**
  * Camera fields used by snapshots and camera updates.
@@ -406,24 +311,6 @@ export type ConstrainMode =
   | (number & {});
 
 /**
- * Field mask values for `mln_custom_geometry_source_options`.
- *
- * See `mln_custom_geometry_source_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-export const CustomGeometrySourceOptionField = {
-  minZoom: 1,
-  maxZoom: 2,
-  tolerance: 4,
-  tileSize: 8,
-  buffer: 16,
-  clip: 32,
-  wrap: 64,
-} as const;
-/** A bitwise OR of CustomGeometrySourceOptionField flags. */
-export type CustomGeometrySourceOptionField = number;
-
-/**
  * Options for custom geometry sources.
  *
  * See `mln_custom_geometry_source_options` in the
@@ -446,19 +333,6 @@ export interface CustomGeometrySourceOptions {
   clip?: boolean;
   wrap?: boolean;
 }
-
-/**
- * Field mask values for `mln_custom_mvt_vector_source_options`.
- *
- * See `mln_custom_mvt_vector_source_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-export const CustomMvtVectorSourceOptionField = {
-  minZoom: 1,
-  maxZoom: 2,
-} as const;
-/** A bitwise OR of CustomMvtVectorSourceOptionField flags. */
-export type CustomMvtVectorSourceOptionField = number;
 
 /**
  * Options for custom MVT vector sources.
@@ -572,20 +446,6 @@ export interface FeatureStateSelector {
 }
 
 /**
- * Optional fields for `mln_feature_state_selector`.
- *
- * See `mln_feature_state_selector_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export const FeatureStateSelectorField = {
-  sourceLayerId: 1,
-  featureId: 2,
-  stateKey: 4,
-} as const;
-/** A bitwise OR of FeatureStateSelectorField flags. */
-export type FeatureStateSelectorField = number;
-
-/**
  * One nonblocking request for a frame.
  *
  * See `mln_frame_demand` in the
@@ -640,19 +500,6 @@ export const FrameDemandFlag = {
 export type FrameDemandFlag = number;
 
 /**
- * Field mask values for `mln_free_camera_options`.
- *
- * See `mln_free_camera_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export const FreeCameraOptionField = {
-  position: 1,
-  orientation: 2,
-} as const;
-/** A bitwise OR of FreeCameraOptionField flags. */
-export type FreeCameraOptionField = number;
-
-/**
  * Free camera position and orientation in MapLibre Native camera space.
  *
  * See `mln_free_camera_options` in the
@@ -662,28 +509,6 @@ export interface FreeCameraOptions {
   position?: Vec3;
   orientation?: Quaternion;
 }
-
-/**
- * Field mask values for `mln_geojson_source_options`.
- *
- * See `mln_geojson_source_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-export const GeojsonSourceOptionField = {
-  minZoom: 1,
-  maxZoom: 2,
-  tolerance: 4,
-  clusterMaxZoom: 8,
-  clusterProperties: 16,
-  buffer: 32,
-  clusterRadius: 64,
-  clusterMinPoints: 128,
-  lineMetrics: 256,
-  cluster: 512,
-  synchronousTiling: 1024,
-} as const;
-/** A bitwise OR of GeojsonSourceOptionField flags. */
-export type GeojsonSourceOptionField = number;
 
 /**
  * Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
@@ -1126,23 +951,6 @@ export interface MapSnapshot {
 }
 
 /**
- * Field mask values for `mln_map_tile_options`.
- *
- * See `mln_map_tile_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export const MapTileOptionField = {
-  prefetchZoomDelta: 1,
-  lodMinRadius: 2,
-  lodScale: 4,
-  lodPitchThreshold: 8,
-  lodZoomShift: 16,
-  lodMode: 32,
-} as const;
-/** A bitwise OR of MapTileOptionField flags. */
-export type MapTileOptionField = number;
-
-/**
  * Tile prefetch and LOD tuning controls.
  *
  * See `mln_map_tile_options` in the
@@ -1192,21 +1000,6 @@ export interface MapView {
    */
   viewport?: MapViewportOptions;
 }
-
-/**
- * Field mask values for `mln_map_viewport_options`.
- *
- * See `mln_map_viewport_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export const MapViewportOptionField = {
-  northOrientation: 1,
-  constrainMode: 2,
-  viewportMode: 4,
-  frustumOffset: 8,
-} as const;
-/** A bitwise OR of MapViewportOptionField flags. */
-export type MapViewportOptionField = number;
 
 /**
  * Live map viewport and render-transform controls.
@@ -1458,15 +1251,6 @@ export type OfflineRegionDefinitionData =
       readonly bytes: Uint8Array;
     };
 
-export const OfflineRegionDefinitionType = {
-  tilePyramid: 1,
-  geometry: 2,
-} as const;
-/** One of the OfflineRegionDefinitionType values, or a value this binding does not know. */
-export type OfflineRegionDefinitionType =
-  | (typeof OfflineRegionDefinitionType)[keyof typeof OfflineRegionDefinitionType]
-  | (number & {});
-
 export const OfflineRegionDownloadState = {
   inactive: 0,
   active: 1,
@@ -1664,29 +1448,6 @@ export type OpenglContextOwnership =
   | (number & {});
 
 /**
- * OpenGL platform context provider used by a context descriptor.
- *
- * See `mln_opengl_context_platform` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-export const OpenglContextPlatform = {
-  /**
-   * No OpenGL context provider is selected.
-   */
-  unspecified: 0,
-  wgl: 1,
-  egl: 2,
-  /**
-   * Emscripten WebGL context handle.
-   */
-  webgl: 3,
-} as const;
-/** One of the OpenglContextPlatform values, or a value this binding does not know. */
-export type OpenglContextPlatform =
-  | (typeof OpenglContextPlatform)[keyof typeof OpenglContextPlatform]
-  | (number & {});
-
-/**
  * OpenGL context providers supported by this build.
  *
  * See `mln_opengl_context_provider_flag` in the
@@ -1858,20 +1619,6 @@ export interface ProjectionMode {
    */
   ySkew?: number;
 }
-
-/**
- * Field mask values for MapLibre axonometric rendering options.
- *
- * See `mln_projection_mode_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export const ProjectionModeField = {
-  axonometric: 1,
-  xSkew: 2,
-  ySkew: 4,
-} as const;
-/** A bitwise OR of ProjectionModeField flags. */
-export type ProjectionModeField = number;
 
 /**
  * Quaternion stored as x, y, z, w components.
@@ -2274,33 +2021,6 @@ export interface RenderedFeature {
 }
 
 /**
- * Optional fields for `mln_rendered_feature`.
- *
- * See `mln_rendered_feature_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-export const RenderedFeatureField = {
-  sourceId: 1,
-  sourceLayerId: 2,
-  state: 4,
-} as const;
-/** A bitwise OR of RenderedFeatureField flags. */
-export type RenderedFeatureField = number;
-
-/**
- * Optional fields for `mln_rendered_feature_query_options`.
- *
- * See `mln_rendered_feature_query_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-export const RenderedFeatureQueryOptionField = {
-  layerIds: 1,
-  filter: 2,
-} as const;
-/** A bitwise OR of RenderedFeatureQueryOptionField flags. */
-export type RenderedFeatureQueryOptionField = number;
-
-/**
  * Options for rendered feature queries.
  *
  * See `mln_rendered_feature_query_options` in the
@@ -2342,22 +2062,6 @@ export type RenderedQueryGeometryData =
       readonly tag: number;
       readonly bytes: Uint8Array;
     };
-
-/**
- * Rendered feature query geometry variants.
- *
- * See `mln_rendered_query_geometry_type` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-export const RenderedQueryGeometryType = {
-  point: 1,
-  box: 2,
-  lineString: 3,
-} as const;
-/** One of the RenderedQueryGeometryType values, or a value this binding does not know. */
-export type RenderedQueryGeometryType =
-  | (typeof RenderedQueryGeometryType)[keyof typeof RenderedQueryGeometryType]
-  | (number & {});
 
 /**
  * Rendering statistics reported in `MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME`.
@@ -2511,29 +2215,6 @@ export interface ResourceRange {
  */
 export type ResourceRequestCancelHandler = () => void;
 
-/**
- * Field mask values for `mln_resource_request_info`.
- *
- * See `mln_resource_request_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-export const ResourceRequestField = {
-  /**
-   * The request asks only for the bytes in range.
-   */
-  range: 1,
-  /**
-   * The cached copy being revalidated carries a modification time.
-   */
-  priorModified: 2,
-  /**
-   * The cached copy being revalidated carries an expiration time.
-   */
-  priorExpires: 4,
-} as const;
-/** A bitwise OR of ResourceRequestField flags. */
-export type ResourceRequestField = number;
-
 export interface ResourceRequestInfo {
   /**
    * URL entering the network layer, before tile server normalization.
@@ -2576,29 +2257,6 @@ export interface ResourceResponse {
   etag?: string;
   retryAfterUnixMs?: bigint;
 }
-
-/**
- * Field mask values for `mln_resource_response`.
- *
- * See `mln_resource_response_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-export const ResourceResponseField = {
-  /**
-   * The response carries a modification time.
-   */
-  modified: 1,
-  /**
-   * The response carries an expiration time.
-   */
-  expires: 2,
-  /**
-   * An ERROR response carries the earliest time to retry the request.
-   */
-  retryAfter: 4,
-} as const;
-/** A bitwise OR of ResourceResponseField flags. */
-export type ResourceResponseField = number;
 
 /**
  * How a resource provider answered a request.
@@ -2827,26 +2485,6 @@ export type RuntimeEventPayload =
     };
 
 /**
- * Payload kinds used by `mln_runtime_event.payload_type`.
- *
- * See `mln_runtime_event_payload_type` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-export const RuntimeEventPayloadType = {
-  none: 0,
-  renderFrame: 1,
-  renderMap: 2,
-  tileAction: 4,
-  offlineRegionStatus: 5,
-  offlineRegionResponseError: 6,
-  offlineRegionTileCountLimit: 7,
-} as const;
-/** One of the RuntimeEventPayloadType values, or a value this binding does not know. */
-export type RuntimeEventPayloadType =
-  | (typeof RuntimeEventPayloadType)[keyof typeof RuntimeEventPayloadType]
-  | (number & {});
-
-/**
  * Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`.
  *
  * See `mln_runtime_event_render_frame` in the
@@ -3008,31 +2646,6 @@ export interface SourceFeature {
 }
 
 /**
- * Optional fields for `mln_source_feature`.
- *
- * See `mln_source_feature_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-export const SourceFeatureField = {
-  sourceLayerId: 1,
-} as const;
-/** A bitwise OR of SourceFeatureField flags. */
-export type SourceFeatureField = number;
-
-/**
- * Optional fields for `mln_source_feature_query_options`.
- *
- * See `mln_source_feature_query_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-export const SourceFeatureQueryOptionField = {
-  sourceLayerIds: 1,
-  filter: 2,
-} as const;
-/** A bitwise OR of SourceFeatureQueryOptionField flags. */
-export type SourceFeatureQueryOptionField = number;
-
-/**
  * Options for source feature queries.
  *
  * See `mln_source_feature_query_options` in the
@@ -3119,24 +2732,6 @@ export interface StyleExpressionInfo {
 }
 
 /**
- * Fields present in `mln_style_expression_inputs`.
- *
- * See `mln_style_expression_input_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
- */
-export const StyleExpressionInputField = {
-  zoom: 1,
-  colorRampParameter: 2,
-  elevation: 4,
-  feature: 8,
-  featureState: 16,
-  globalState: 32,
-  canonicalTileId: 64,
-} as const;
-/** A bitwise OR of StyleExpressionInputField flags. */
-export type StyleExpressionInputField = number;
-
-/**
  * What one evaluation reads.
  *
  * See `mln_style_expression_inputs` in the
@@ -3179,21 +2774,6 @@ export interface StyleExpressionInputs {
    */
   availableImages?: readonly string[];
 }
-
-/**
- * Fields present in `mln_style_expression_options`.
- *
- * See `mln_style_expression_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
- */
-export const StyleExpressionOptionField = {
-  /**
-   * expected_type is set.
-   */
-  expectedType: 1,
-} as const;
-/** A bitwise OR of StyleExpressionOptionField flags. */
-export type StyleExpressionOptionField = number;
 
 /**
  * Options for parsing a style expression.
@@ -3313,47 +2893,6 @@ export interface StyleImageInfo {
    */
   readonly sdf: boolean;
 }
-
-/**
- * Field mask values for `mln_style_image_info`.
- *
- * See `mln_style_image_info_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-export const StyleImageInfoField = {
-  /**
-   * The image declares a content box.
-   */
-  content: 1,
-  /**
-   * The image declares a horizontal text-fit mode.
-   */
-  textFitWidth: 2,
-  /**
-   * The image declares a vertical text-fit mode.
-   */
-  textFitHeight: 4,
-} as const;
-/** A bitwise OR of StyleImageInfoField flags. */
-export type StyleImageInfoField = number;
-
-/**
- * Field mask values for `mln_style_image_options`.
- *
- * See `mln_style_image_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-export const StyleImageOptionField = {
-  pixelRatio: 1,
-  sdf: 2,
-  stretchX: 4,
-  stretchY: 8,
-  content: 16,
-  textFitWidth: 32,
-  textFitHeight: 64,
-} as const;
-/** A bitwise OR of StyleImageOptionField flags. */
-export type StyleImageOptionField = number;
 
 /**
  * Options for runtime style images.
@@ -3527,45 +3066,6 @@ export interface StyleSourceInfo {
 }
 
 /**
- * Fields available in `mln_style_source_info`.
- *
- * See `mln_style_source_info_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-export const StyleSourceInfoField = {
-  /**
-   * The source retains a URL.
-   */
-  url: 1,
-  /**
-   * The tile source was defined with an inline TileJSON description.
-   */
-  tilejson: 2,
-  /**
-   * The inline TileJSON description contains geographic bounds.
-   */
-  bounds: 4,
-  /**
-   * The source exposes a tile size.
-   */
-  tileSize: 8,
-  /**
-   * The source exposes a vector tile encoding.
-   */
-  vectorEncoding: 16,
-  /**
-   * The source exposes a DEM raster encoding.
-   */
-  rasterEncoding: 32,
-  /**
-   * The source carries an attribution string, which may be empty.
-   */
-  attribution: 64,
-} as const;
-/** A bitwise OR of StyleSourceInfoField flags. */
-export type StyleSourceInfoField = number;
-
-/**
  * Inline TileJSON metadata of a tile source.
  *
  * See `mln_style_source_tile_info` in the
@@ -3627,20 +3127,6 @@ export const StyleTileScheme = {
 export type StyleTileScheme =
   | (typeof StyleTileScheme)[keyof typeof StyleTileScheme]
   | (number & {});
-
-/**
- * Field mask values for `mln_style_transition_options`.
- *
- * See `mln_style_transition_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-export const StyleTransitionOptionField = {
-  duration: 1,
-  delay: 2,
-  enablePlacementTransitions: 4,
-} as const;
-/** A bitwise OR of StyleTransitionOptionField flags. */
-export type StyleTransitionOptionField = number;
 
 /**
  * Global style transition options.

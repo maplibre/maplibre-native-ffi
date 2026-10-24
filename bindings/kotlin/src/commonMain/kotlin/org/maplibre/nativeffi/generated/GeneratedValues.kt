@@ -24,67 +24,6 @@ public data class AmbientCacheOperation(public val rawValue: UInt) {
 }
 
 /**
- * Field mask values for `mln_animation_options`.
- *
- * See `mln_animation_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class AnimationOptionField(public val rawValue: UInt) {
-  public infix fun or(other: AnimationOptionField): AnimationOptionField =
-    AnimationOptionField(rawValue or other.rawValue)
-
-  public infix fun and(other: AnimationOptionField): AnimationOptionField =
-    AnimationOptionField(rawValue and other.rawValue)
-
-  public operator fun contains(other: AnimationOptionField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val DURATION: AnimationOptionField = AnimationOptionField(1u)
-    public val VELOCITY: AnimationOptionField = AnimationOptionField(2u)
-    public val MIN_ZOOM: AnimationOptionField = AnimationOptionField(4u)
-    public val EASING: AnimationOptionField = AnimationOptionField(8u)
-    public val TRANSITION_ID: AnimationOptionField = AnimationOptionField(16u)
-  }
-}
-
-/**
- * Field mask values for `mln_bound_options`.
- *
- * See `mln_bound_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class BoundOptionField(public val rawValue: UInt) {
-  public infix fun or(other: BoundOptionField): BoundOptionField =
-    BoundOptionField(rawValue or other.rawValue)
-
-  public infix fun and(other: BoundOptionField): BoundOptionField =
-    BoundOptionField(rawValue and other.rawValue)
-
-  public operator fun contains(other: BoundOptionField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    /**
-     * Selects `mln_bound_options.bounds` as a geographic constraint that the camera center stays
-     * inside. Mutually exclusive with `MLN_BOUND_OPTION_UNBOUNDED`.
-     */
-    public val BOUNDS: BoundOptionField = BoundOptionField(1u)
-    public val MIN_ZOOM: BoundOptionField = BoundOptionField(2u)
-    public val MAX_ZOOM: BoundOptionField = BoundOptionField(4u)
-    public val MIN_PITCH: BoundOptionField = BoundOptionField(8u)
-    public val MAX_PITCH: BoundOptionField = BoundOptionField(16u)
-    /**
-     * Selects the unbounded geographic constraint, which leaves every camera center unconstrained
-     * and lets the map pan freely across the antimeridian. This differs from world bounds of
-     * -90/-180 to 90/180, which clamp longitude to that range. Mutually exclusive with
-     * `MLN_BOUND_OPTION_BOUNDS`, and leaves `mln_bound_options.bounds` unread.
-     */
-    public val UNBOUNDED: BoundOptionField = BoundOptionField(32u)
-  }
-}
-
-/**
  * Camera change kinds reported by camera will-change and did-change events.
  *
  * See `mln_camera_change_mode` in the
@@ -103,83 +42,6 @@ public data class CameraChangeMode(public val rawValue: UInt) {
     public val IMMEDIATE: CameraChangeMode = CameraChangeMode(0u)
     /** The camera moved as part of an animated transition. */
     public val ANIMATED: CameraChangeMode = CameraChangeMode(1u)
-  }
-}
-
-/**
- * Field mask values for `mln_camera_delta`.
- *
- * See `mln_camera_delta_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class CameraDeltaField(public val rawValue: UInt) {
-  public infix fun or(other: CameraDeltaField): CameraDeltaField =
-    CameraDeltaField(rawValue or other.rawValue)
-
-  public infix fun and(other: CameraDeltaField): CameraDeltaField =
-    CameraDeltaField(rawValue and other.rawValue)
-
-  public operator fun contains(other: CameraDeltaField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val OFFSET: CameraDeltaField = CameraDeltaField(1u)
-    public val SCALE: CameraDeltaField = CameraDeltaField(2u)
-    public val BEARING: CameraDeltaField = CameraDeltaField(4u)
-    public val PITCH: CameraDeltaField = CameraDeltaField(8u)
-    public val ANCHOR: CameraDeltaField = CameraDeltaField(16u)
-  }
-}
-
-/**
- * Field mask values for `mln_camera_fit_options`.
- *
- * See `mln_camera_fit_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class CameraFitOptionField(public val rawValue: UInt) {
-  public infix fun or(other: CameraFitOptionField): CameraFitOptionField =
-    CameraFitOptionField(rawValue or other.rawValue)
-
-  public infix fun and(other: CameraFitOptionField): CameraFitOptionField =
-    CameraFitOptionField(rawValue and other.rawValue)
-
-  public operator fun contains(other: CameraFitOptionField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val PADDING: CameraFitOptionField = CameraFitOptionField(1u)
-    public val BEARING: CameraFitOptionField = CameraFitOptionField(2u)
-    public val PITCH: CameraFitOptionField = CameraFitOptionField(4u)
-  }
-}
-
-/**
- * Field mask values for `mln_camera_options`.
- *
- * See `mln_camera_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class CameraOptionField(public val rawValue: UInt) {
-  public infix fun or(other: CameraOptionField): CameraOptionField =
-    CameraOptionField(rawValue or other.rawValue)
-
-  public infix fun and(other: CameraOptionField): CameraOptionField =
-    CameraOptionField(rawValue and other.rawValue)
-
-  public operator fun contains(other: CameraOptionField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val CENTER: CameraOptionField = CameraOptionField(1u)
-    public val ZOOM: CameraOptionField = CameraOptionField(2u)
-    public val BEARING: CameraOptionField = CameraOptionField(4u)
-    public val PITCH: CameraOptionField = CameraOptionField(8u)
-    public val CENTER_ALTITUDE: CameraOptionField = CameraOptionField(16u)
-    public val PADDING: CameraOptionField = CameraOptionField(32u)
-    public val ANCHOR: CameraOptionField = CameraOptionField(64u)
-    public val ROLL: CameraOptionField = CameraOptionField(128u)
-    public val FOV: CameraOptionField = CameraOptionField(256u)
   }
 }
 
@@ -283,78 +145,6 @@ public data class ConstrainMode(public val rawValue: UInt) {
 }
 
 /**
- * Field mask values for `mln_custom_geometry_source_options`.
- *
- * See `mln_custom_geometry_source_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class CustomGeometrySourceOptionField(public val rawValue: UInt) {
-  public infix fun or(other: CustomGeometrySourceOptionField): CustomGeometrySourceOptionField =
-    CustomGeometrySourceOptionField(rawValue or other.rawValue)
-
-  public infix fun and(other: CustomGeometrySourceOptionField): CustomGeometrySourceOptionField =
-    CustomGeometrySourceOptionField(rawValue and other.rawValue)
-
-  public operator fun contains(other: CustomGeometrySourceOptionField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val MIN_ZOOM: CustomGeometrySourceOptionField = CustomGeometrySourceOptionField(1u)
-    public val MAX_ZOOM: CustomGeometrySourceOptionField = CustomGeometrySourceOptionField(2u)
-    public val TOLERANCE: CustomGeometrySourceOptionField = CustomGeometrySourceOptionField(4u)
-    public val TILE_SIZE: CustomGeometrySourceOptionField = CustomGeometrySourceOptionField(8u)
-    public val BUFFER: CustomGeometrySourceOptionField = CustomGeometrySourceOptionField(16u)
-    public val CLIP: CustomGeometrySourceOptionField = CustomGeometrySourceOptionField(32u)
-    public val WRAP: CustomGeometrySourceOptionField = CustomGeometrySourceOptionField(64u)
-  }
-}
-
-/**
- * Field mask values for `mln_custom_mvt_vector_source_options`.
- *
- * See `mln_custom_mvt_vector_source_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class CustomMvtVectorSourceOptionField(public val rawValue: UInt) {
-  public infix fun or(other: CustomMvtVectorSourceOptionField): CustomMvtVectorSourceOptionField =
-    CustomMvtVectorSourceOptionField(rawValue or other.rawValue)
-
-  public infix fun and(other: CustomMvtVectorSourceOptionField): CustomMvtVectorSourceOptionField =
-    CustomMvtVectorSourceOptionField(rawValue and other.rawValue)
-
-  public operator fun contains(other: CustomMvtVectorSourceOptionField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val MIN_ZOOM: CustomMvtVectorSourceOptionField = CustomMvtVectorSourceOptionField(1u)
-    public val MAX_ZOOM: CustomMvtVectorSourceOptionField = CustomMvtVectorSourceOptionField(2u)
-  }
-}
-
-/**
- * Optional fields for `mln_feature_state_selector`.
- *
- * See `mln_feature_state_selector_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class FeatureStateSelectorField(public val rawValue: UInt) {
-  public infix fun or(other: FeatureStateSelectorField): FeatureStateSelectorField =
-    FeatureStateSelectorField(rawValue or other.rawValue)
-
-  public infix fun and(other: FeatureStateSelectorField): FeatureStateSelectorField =
-    FeatureStateSelectorField(rawValue and other.rawValue)
-
-  public operator fun contains(other: FeatureStateSelectorField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val SOURCE_LAYER_ID: FeatureStateSelectorField = FeatureStateSelectorField(1u)
-    public val FEATURE_ID: FeatureStateSelectorField = FeatureStateSelectorField(2u)
-    public val STATE_KEY: FeatureStateSelectorField = FeatureStateSelectorField(4u)
-  }
-}
-
-/**
  * Frame-demand policy bits.
  *
  * See `mln_frame_demand_flag` in the
@@ -392,59 +182,6 @@ public data class FrameDemandFlag(public val rawValue: UInt) {
      * frame, submit them in a command group, or arm demands once per display frame.
      */
     public val WAIT_FOR_UPDATE: FrameDemandFlag = FrameDemandFlag(4u)
-  }
-}
-
-/**
- * Field mask values for `mln_free_camera_options`.
- *
- * See `mln_free_camera_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class FreeCameraOptionField(public val rawValue: UInt) {
-  public infix fun or(other: FreeCameraOptionField): FreeCameraOptionField =
-    FreeCameraOptionField(rawValue or other.rawValue)
-
-  public infix fun and(other: FreeCameraOptionField): FreeCameraOptionField =
-    FreeCameraOptionField(rawValue and other.rawValue)
-
-  public operator fun contains(other: FreeCameraOptionField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val POSITION: FreeCameraOptionField = FreeCameraOptionField(1u)
-    public val ORIENTATION: FreeCameraOptionField = FreeCameraOptionField(2u)
-  }
-}
-
-/**
- * Field mask values for `mln_geojson_source_options`.
- *
- * See `mln_geojson_source_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class GeojsonSourceOptionField(public val rawValue: UInt) {
-  public infix fun or(other: GeojsonSourceOptionField): GeojsonSourceOptionField =
-    GeojsonSourceOptionField(rawValue or other.rawValue)
-
-  public infix fun and(other: GeojsonSourceOptionField): GeojsonSourceOptionField =
-    GeojsonSourceOptionField(rawValue and other.rawValue)
-
-  public operator fun contains(other: GeojsonSourceOptionField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val MIN_ZOOM: GeojsonSourceOptionField = GeojsonSourceOptionField(1u)
-    public val MAX_ZOOM: GeojsonSourceOptionField = GeojsonSourceOptionField(2u)
-    public val TOLERANCE: GeojsonSourceOptionField = GeojsonSourceOptionField(4u)
-    public val CLUSTER_MAX_ZOOM: GeojsonSourceOptionField = GeojsonSourceOptionField(8u)
-    public val CLUSTER_PROPERTIES: GeojsonSourceOptionField = GeojsonSourceOptionField(16u)
-    public val BUFFER: GeojsonSourceOptionField = GeojsonSourceOptionField(32u)
-    public val CLUSTER_RADIUS: GeojsonSourceOptionField = GeojsonSourceOptionField(64u)
-    public val CLUSTER_MIN_POINTS: GeojsonSourceOptionField = GeojsonSourceOptionField(128u)
-    public val LINE_METRICS: GeojsonSourceOptionField = GeojsonSourceOptionField(256u)
-    public val CLUSTER: GeojsonSourceOptionField = GeojsonSourceOptionField(512u)
-    public val SYNCHRONOUS_TILING: GeojsonSourceOptionField = GeojsonSourceOptionField(1024u)
   }
 }
 
@@ -659,56 +396,6 @@ public data class MapMode(public val rawValue: UInt) {
   }
 }
 
-/**
- * Field mask values for `mln_map_tile_options`.
- *
- * See `mln_map_tile_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class MapTileOptionField(public val rawValue: UInt) {
-  public infix fun or(other: MapTileOptionField): MapTileOptionField =
-    MapTileOptionField(rawValue or other.rawValue)
-
-  public infix fun and(other: MapTileOptionField): MapTileOptionField =
-    MapTileOptionField(rawValue and other.rawValue)
-
-  public operator fun contains(other: MapTileOptionField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val PREFETCH_ZOOM_DELTA: MapTileOptionField = MapTileOptionField(1u)
-    public val LOD_MIN_RADIUS: MapTileOptionField = MapTileOptionField(2u)
-    public val LOD_SCALE: MapTileOptionField = MapTileOptionField(4u)
-    public val LOD_PITCH_THRESHOLD: MapTileOptionField = MapTileOptionField(8u)
-    public val LOD_ZOOM_SHIFT: MapTileOptionField = MapTileOptionField(16u)
-    public val LOD_MODE: MapTileOptionField = MapTileOptionField(32u)
-  }
-}
-
-/**
- * Field mask values for `mln_map_viewport_options`.
- *
- * See `mln_map_viewport_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class MapViewportOptionField(public val rawValue: UInt) {
-  public infix fun or(other: MapViewportOptionField): MapViewportOptionField =
-    MapViewportOptionField(rawValue or other.rawValue)
-
-  public infix fun and(other: MapViewportOptionField): MapViewportOptionField =
-    MapViewportOptionField(rawValue and other.rawValue)
-
-  public operator fun contains(other: MapViewportOptionField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val NORTH_ORIENTATION: MapViewportOptionField = MapViewportOptionField(1u)
-    public val CONSTRAIN_MODE: MapViewportOptionField = MapViewportOptionField(2u)
-    public val VIEWPORT_MODE: MapViewportOptionField = MapViewportOptionField(4u)
-    public val FRUSTUM_OFFSET: MapViewportOptionField = MapViewportOptionField(8u)
-  }
-}
-
 public data class NetworkStatus(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
@@ -744,20 +431,6 @@ public data class NorthOrientation(public val rawValue: UInt) {
     public val RIGHT: NorthOrientation = NorthOrientation(1u)
     public val DOWN: NorthOrientation = NorthOrientation(2u)
     public val LEFT: NorthOrientation = NorthOrientation(3u)
-  }
-}
-
-public data class OfflineRegionDefinitionType(public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      1u -> "TILE_PYRAMID"
-      2u -> "GEOMETRY"
-      else -> "OfflineRegionDefinitionType($rawValue)"
-    }
-
-  public companion object {
-    public val TILE_PYRAMID: OfflineRegionDefinitionType = OfflineRegionDefinitionType(1u)
-    public val GEOMETRY: OfflineRegionDefinitionType = OfflineRegionDefinitionType(2u)
   }
 }
 
@@ -823,32 +496,6 @@ public data class OpenglContextOwnership(public val rawValue: UInt) {
 }
 
 /**
- * OpenGL platform context provider used by a context descriptor.
- *
- * See `mln_opengl_context_platform` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class OpenglContextPlatform(public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "UNSPECIFIED"
-      1u -> "WGL"
-      2u -> "EGL"
-      3u -> "WEBGL"
-      else -> "OpenglContextPlatform($rawValue)"
-    }
-
-  public companion object {
-    /** No OpenGL context provider is selected. */
-    public val UNSPECIFIED: OpenglContextPlatform = OpenglContextPlatform(0u)
-    public val WGL: OpenglContextPlatform = OpenglContextPlatform(1u)
-    public val EGL: OpenglContextPlatform = OpenglContextPlatform(2u)
-    /** Emscripten WebGL context handle. */
-    public val WEBGL: OpenglContextPlatform = OpenglContextPlatform(3u)
-  }
-}
-
-/**
  * OpenGL context providers supported by this build.
  *
  * See `mln_opengl_context_provider_flag` in the
@@ -869,29 +516,6 @@ public data class OpenglContextProviderFlag(public val rawValue: UInt) {
     public val EGL: OpenglContextProviderFlag = OpenglContextProviderFlag(2u)
     /** Browser WebGL context imported into an Emscripten module. */
     public val WEBGL: OpenglContextProviderFlag = OpenglContextProviderFlag(4u)
-  }
-}
-
-/**
- * Field mask values for MapLibre axonometric rendering options.
- *
- * See `mln_projection_mode_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class ProjectionModeField(public val rawValue: UInt) {
-  public infix fun or(other: ProjectionModeField): ProjectionModeField =
-    ProjectionModeField(rawValue or other.rawValue)
-
-  public infix fun and(other: ProjectionModeField): ProjectionModeField =
-    ProjectionModeField(rawValue and other.rawValue)
-
-  public operator fun contains(other: ProjectionModeField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val AXONOMETRIC: ProjectionModeField = ProjectionModeField(1u)
-    public val X_SKEW: ProjectionModeField = ProjectionModeField(2u)
-    public val Y_SKEW: ProjectionModeField = ProjectionModeField(4u)
   }
 }
 
@@ -1082,73 +706,6 @@ public data class RenderSessionState(public val rawValue: UInt) {
   }
 }
 
-/**
- * Optional fields for `mln_rendered_feature`.
- *
- * See `mln_rendered_feature_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-public data class RenderedFeatureField(public val rawValue: UInt) {
-  public infix fun or(other: RenderedFeatureField): RenderedFeatureField =
-    RenderedFeatureField(rawValue or other.rawValue)
-
-  public infix fun and(other: RenderedFeatureField): RenderedFeatureField =
-    RenderedFeatureField(rawValue and other.rawValue)
-
-  public operator fun contains(other: RenderedFeatureField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val SOURCE_ID: RenderedFeatureField = RenderedFeatureField(1u)
-    public val SOURCE_LAYER_ID: RenderedFeatureField = RenderedFeatureField(2u)
-    public val STATE: RenderedFeatureField = RenderedFeatureField(4u)
-  }
-}
-
-/**
- * Optional fields for `mln_rendered_feature_query_options`.
- *
- * See `mln_rendered_feature_query_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-public data class RenderedFeatureQueryOptionField(public val rawValue: UInt) {
-  public infix fun or(other: RenderedFeatureQueryOptionField): RenderedFeatureQueryOptionField =
-    RenderedFeatureQueryOptionField(rawValue or other.rawValue)
-
-  public infix fun and(other: RenderedFeatureQueryOptionField): RenderedFeatureQueryOptionField =
-    RenderedFeatureQueryOptionField(rawValue and other.rawValue)
-
-  public operator fun contains(other: RenderedFeatureQueryOptionField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val LAYER_IDS: RenderedFeatureQueryOptionField = RenderedFeatureQueryOptionField(1u)
-    public val FILTER: RenderedFeatureQueryOptionField = RenderedFeatureQueryOptionField(2u)
-  }
-}
-
-/**
- * Rendered feature query geometry variants.
- *
- * See `mln_rendered_query_geometry_type` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-public data class RenderedQueryGeometryType(public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      1u -> "POINT"
-      2u -> "BOX"
-      3u -> "LINE_STRING"
-      else -> "RenderedQueryGeometryType($rawValue)"
-    }
-
-  public companion object {
-    public val POINT: RenderedQueryGeometryType = RenderedQueryGeometryType(1u)
-    public val BOX: RenderedQueryGeometryType = RenderedQueryGeometryType(2u)
-    public val LINE_STRING: RenderedQueryGeometryType = RenderedQueryGeometryType(3u)
-  }
-}
-
 public data class ResourceErrorReason(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
@@ -1273,58 +830,6 @@ public data class ResourceProviderDecision(public val rawValue: UInt) {
 }
 
 /**
- * Field mask values for `mln_resource_request_info`.
- *
- * See `mln_resource_request_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class ResourceRequestField(public val rawValue: UInt) {
-  public infix fun or(other: ResourceRequestField): ResourceRequestField =
-    ResourceRequestField(rawValue or other.rawValue)
-
-  public infix fun and(other: ResourceRequestField): ResourceRequestField =
-    ResourceRequestField(rawValue and other.rawValue)
-
-  public operator fun contains(other: ResourceRequestField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    /** The request asks only for the bytes in range. */
-    public val RANGE: ResourceRequestField = ResourceRequestField(1u)
-    /** The cached copy being revalidated carries a modification time. */
-    public val PRIOR_MODIFIED: ResourceRequestField = ResourceRequestField(2u)
-    /** The cached copy being revalidated carries an expiration time. */
-    public val PRIOR_EXPIRES: ResourceRequestField = ResourceRequestField(4u)
-  }
-}
-
-/**
- * Field mask values for `mln_resource_response`.
- *
- * See `mln_resource_response_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class ResourceResponseField(public val rawValue: UInt) {
-  public infix fun or(other: ResourceResponseField): ResourceResponseField =
-    ResourceResponseField(rawValue or other.rawValue)
-
-  public infix fun and(other: ResourceResponseField): ResourceResponseField =
-    ResourceResponseField(rawValue and other.rawValue)
-
-  public operator fun contains(other: ResourceResponseField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    /** The response carries a modification time. */
-    public val MODIFIED: ResourceResponseField = ResourceResponseField(1u)
-    /** The response carries an expiration time. */
-    public val EXPIRES: ResourceResponseField = ResourceResponseField(2u)
-    /** An ERROR response carries the earliest time to retry the request. */
-    public val RETRY_AFTER: ResourceResponseField = ResourceResponseField(4u)
-  }
-}
-
-/**
  * How a resource provider answered a request.
  *
  * See `mln_resource_response_status` in the
@@ -1425,37 +930,6 @@ public data class RuntimeEventMask(public val rawValue: ULong) {
 }
 
 /**
- * Payload kinds used by `mln_runtime_event.payload_type`.
- *
- * See `mln_runtime_event_payload_type` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class RuntimeEventPayloadType(public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "NONE"
-      1u -> "RENDER_FRAME"
-      2u -> "RENDER_MAP"
-      4u -> "TILE_ACTION"
-      5u -> "OFFLINE_REGION_STATUS"
-      6u -> "OFFLINE_REGION_RESPONSE_ERROR"
-      7u -> "OFFLINE_REGION_TILE_COUNT_LIMIT"
-      else -> "RuntimeEventPayloadType($rawValue)"
-    }
-
-  public companion object {
-    public val NONE: RuntimeEventPayloadType = RuntimeEventPayloadType(0u)
-    public val RENDER_FRAME: RuntimeEventPayloadType = RuntimeEventPayloadType(1u)
-    public val RENDER_MAP: RuntimeEventPayloadType = RuntimeEventPayloadType(2u)
-    public val TILE_ACTION: RuntimeEventPayloadType = RuntimeEventPayloadType(4u)
-    public val OFFLINE_REGION_STATUS: RuntimeEventPayloadType = RuntimeEventPayloadType(5u)
-    public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventPayloadType = RuntimeEventPayloadType(6u)
-    public val OFFLINE_REGION_TILE_COUNT_LIMIT: RuntimeEventPayloadType =
-      RuntimeEventPayloadType(7u)
-  }
-}
-
-/**
  * Source kinds used by `mln_runtime_event.source_type`.
  *
  * See `mln_runtime_event_source_type` in the
@@ -1530,49 +1004,6 @@ public data class RuntimeEventType(public val rawValue: UInt) {
 }
 
 /**
- * Optional fields for `mln_source_feature`.
- *
- * See `mln_source_feature_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-public data class SourceFeatureField(public val rawValue: UInt) {
-  public infix fun or(other: SourceFeatureField): SourceFeatureField =
-    SourceFeatureField(rawValue or other.rawValue)
-
-  public infix fun and(other: SourceFeatureField): SourceFeatureField =
-    SourceFeatureField(rawValue and other.rawValue)
-
-  public operator fun contains(other: SourceFeatureField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val SOURCE_LAYER_ID: SourceFeatureField = SourceFeatureField(1u)
-  }
-}
-
-/**
- * Optional fields for `mln_source_feature_query_options`.
- *
- * See `mln_source_feature_query_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-public data class SourceFeatureQueryOptionField(public val rawValue: UInt) {
-  public infix fun or(other: SourceFeatureQueryOptionField): SourceFeatureQueryOptionField =
-    SourceFeatureQueryOptionField(rawValue or other.rawValue)
-
-  public infix fun and(other: SourceFeatureQueryOptionField): SourceFeatureQueryOptionField =
-    SourceFeatureQueryOptionField(rawValue and other.rawValue)
-
-  public operator fun contains(other: SourceFeatureQueryOptionField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val SOURCE_LAYER_IDS: SourceFeatureQueryOptionField = SourceFeatureQueryOptionField(1u)
-    public val FILTER: SourceFeatureQueryOptionField = SourceFeatureQueryOptionField(2u)
-  }
-}
-
-/**
  * Status values returned by status-returning functions.
  *
  * See `mln_status` in the
@@ -1621,55 +1052,6 @@ public data class Status(public val rawValue: Int) {
 }
 
 /**
- * Fields present in `mln_style_expression_inputs`.
- *
- * See `mln_style_expression_input_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
- */
-public data class StyleExpressionInputField(public val rawValue: UInt) {
-  public infix fun or(other: StyleExpressionInputField): StyleExpressionInputField =
-    StyleExpressionInputField(rawValue or other.rawValue)
-
-  public infix fun and(other: StyleExpressionInputField): StyleExpressionInputField =
-    StyleExpressionInputField(rawValue and other.rawValue)
-
-  public operator fun contains(other: StyleExpressionInputField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val ZOOM: StyleExpressionInputField = StyleExpressionInputField(1u)
-    public val COLOR_RAMP_PARAMETER: StyleExpressionInputField = StyleExpressionInputField(2u)
-    public val ELEVATION: StyleExpressionInputField = StyleExpressionInputField(4u)
-    public val FEATURE: StyleExpressionInputField = StyleExpressionInputField(8u)
-    public val FEATURE_STATE: StyleExpressionInputField = StyleExpressionInputField(16u)
-    public val GLOBAL_STATE: StyleExpressionInputField = StyleExpressionInputField(32u)
-    public val CANONICAL_TILE_ID: StyleExpressionInputField = StyleExpressionInputField(64u)
-  }
-}
-
-/**
- * Fields present in `mln_style_expression_options`.
- *
- * See `mln_style_expression_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
- */
-public data class StyleExpressionOptionField(public val rawValue: UInt) {
-  public infix fun or(other: StyleExpressionOptionField): StyleExpressionOptionField =
-    StyleExpressionOptionField(rawValue or other.rawValue)
-
-  public infix fun and(other: StyleExpressionOptionField): StyleExpressionOptionField =
-    StyleExpressionOptionField(rawValue and other.rawValue)
-
-  public operator fun contains(other: StyleExpressionOptionField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    /** expected_type is set. */
-    public val EXPECTED_TYPE: StyleExpressionOptionField = StyleExpressionOptionField(1u)
-  }
-}
-
-/**
  * Style expression types that a parsed expression may be required to have.
  *
  * See `mln_style_expression_type_kind` in the
@@ -1708,59 +1090,6 @@ public data class StyleExpressionTypeKind(public val rawValue: UInt) {
       StyleExpressionTypeKind(9u)
     /** An array whose items have item_kind, which is not itself an array. */
     public val ARRAY: StyleExpressionTypeKind = StyleExpressionTypeKind(10u)
-  }
-}
-
-/**
- * Field mask values for `mln_style_image_info`.
- *
- * See `mln_style_image_info_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleImageInfoField(public val rawValue: UInt) {
-  public infix fun or(other: StyleImageInfoField): StyleImageInfoField =
-    StyleImageInfoField(rawValue or other.rawValue)
-
-  public infix fun and(other: StyleImageInfoField): StyleImageInfoField =
-    StyleImageInfoField(rawValue and other.rawValue)
-
-  public operator fun contains(other: StyleImageInfoField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    /** The image declares a content box. */
-    public val CONTENT: StyleImageInfoField = StyleImageInfoField(1u)
-    /** The image declares a horizontal text-fit mode. */
-    public val TEXT_FIT_WIDTH: StyleImageInfoField = StyleImageInfoField(2u)
-    /** The image declares a vertical text-fit mode. */
-    public val TEXT_FIT_HEIGHT: StyleImageInfoField = StyleImageInfoField(4u)
-  }
-}
-
-/**
- * Field mask values for `mln_style_image_options`.
- *
- * See `mln_style_image_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleImageOptionField(public val rawValue: UInt) {
-  public infix fun or(other: StyleImageOptionField): StyleImageOptionField =
-    StyleImageOptionField(rawValue or other.rawValue)
-
-  public infix fun and(other: StyleImageOptionField): StyleImageOptionField =
-    StyleImageOptionField(rawValue and other.rawValue)
-
-  public operator fun contains(other: StyleImageOptionField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val PIXEL_RATIO: StyleImageOptionField = StyleImageOptionField(1u)
-    public val SDF: StyleImageOptionField = StyleImageOptionField(2u)
-    public val STRETCH_X: StyleImageOptionField = StyleImageOptionField(4u)
-    public val STRETCH_Y: StyleImageOptionField = StyleImageOptionField(8u)
-    public val CONTENT: StyleImageOptionField = StyleImageOptionField(16u)
-    public val TEXT_FIT_WIDTH: StyleImageOptionField = StyleImageOptionField(32u)
-    public val TEXT_FIT_HEIGHT: StyleImageOptionField = StyleImageOptionField(64u)
   }
 }
 
@@ -1827,40 +1156,6 @@ public data class StyleRasterDemEncoding(public val rawValue: UInt) {
 }
 
 /**
- * Fields available in `mln_style_source_info`.
- *
- * See `mln_style_source_info_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleSourceInfoField(public val rawValue: UInt) {
-  public infix fun or(other: StyleSourceInfoField): StyleSourceInfoField =
-    StyleSourceInfoField(rawValue or other.rawValue)
-
-  public infix fun and(other: StyleSourceInfoField): StyleSourceInfoField =
-    StyleSourceInfoField(rawValue and other.rawValue)
-
-  public operator fun contains(other: StyleSourceInfoField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    /** The source retains a URL. */
-    public val URL: StyleSourceInfoField = StyleSourceInfoField(1u)
-    /** The tile source was defined with an inline TileJSON description. */
-    public val TILEJSON: StyleSourceInfoField = StyleSourceInfoField(2u)
-    /** The inline TileJSON description contains geographic bounds. */
-    public val BOUNDS: StyleSourceInfoField = StyleSourceInfoField(4u)
-    /** The source exposes a tile size. */
-    public val TILE_SIZE: StyleSourceInfoField = StyleSourceInfoField(8u)
-    /** The source exposes a vector tile encoding. */
-    public val VECTOR_ENCODING: StyleSourceInfoField = StyleSourceInfoField(16u)
-    /** The source exposes a DEM raster encoding. */
-    public val RASTER_ENCODING: StyleSourceInfoField = StyleSourceInfoField(32u)
-    /** The source carries an attribution string, which may be empty. */
-    public val ATTRIBUTION: StyleSourceInfoField = StyleSourceInfoField(64u)
-  }
-}
-
-/**
  * Style source type values returned by source metadata queries.
  *
  * See `mln_style_source_type` in the
@@ -1913,30 +1208,6 @@ public data class StyleTileScheme(public val rawValue: UInt) {
   public companion object {
     public val XYZ: StyleTileScheme = StyleTileScheme(0u)
     public val TMS: StyleTileScheme = StyleTileScheme(1u)
-  }
-}
-
-/**
- * Field mask values for `mln_style_transition_options`.
- *
- * See `mln_style_transition_option_field` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleTransitionOptionField(public val rawValue: UInt) {
-  public infix fun or(other: StyleTransitionOptionField): StyleTransitionOptionField =
-    StyleTransitionOptionField(rawValue or other.rawValue)
-
-  public infix fun and(other: StyleTransitionOptionField): StyleTransitionOptionField =
-    StyleTransitionOptionField(rawValue and other.rawValue)
-
-  public operator fun contains(other: StyleTransitionOptionField): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  public companion object {
-    public val DURATION: StyleTransitionOptionField = StyleTransitionOptionField(1u)
-    public val DELAY: StyleTransitionOptionField = StyleTransitionOptionField(2u)
-    public val ENABLE_PLACEMENT_TRANSITIONS: StyleTransitionOptionField =
-      StyleTransitionOptionField(4u)
   }
 }
 

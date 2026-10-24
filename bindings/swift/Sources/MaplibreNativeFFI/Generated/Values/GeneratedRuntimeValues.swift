@@ -268,26 +268,6 @@ public struct NetworkStatus: RawRepresentable, CustomStringConvertible,
   }
 }
 
-public struct OfflineRegionDefinitionType: RawRepresentable,
-  CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let tilePyramid: OfflineRegionDefinitionType =
-    .init(rawValue: 1)
-  public static let geometry: OfflineRegionDefinitionType = .init(rawValue: 2)
-  public var description: String {
-    switch rawValue {
-    case 1: return "TILE_PYRAMID"
-    case 2: return "GEOMETRY"
-    default: return "OfflineRegionDefinitionType(\(rawValue))"
-    }
-  }
-}
-
 public struct OfflineRegionDownloadState: RawRepresentable,
   CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable
 {
@@ -707,26 +687,6 @@ private func invokeResourceRequestCancelHandlerCallback(
   box.value.callback?()
 }
 
-/// Field mask values for `mln_resource_request_info`.
-///
-/// See `mln_resource_request_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct ResourceRequestField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  /// The request asks only for the bytes in range.
-  public static let range: ResourceRequestField = .init(rawValue: 1)
-  /// The cached copy being revalidated carries a modification time.
-  public static let priorModified: ResourceRequestField = .init(rawValue: 2)
-  /// The cached copy being revalidated carries an expiration time.
-  public static let priorExpires: ResourceRequestField = .init(rawValue: 4)
-}
-
 public struct ResourceRequestInfo: Equatable, Hashable, Sendable {
   /// URL entering the network layer, before tile server normalization.
   public var requestedUrl: String?
@@ -897,26 +857,6 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
     }
     return raw
   }
-}
-
-/// Field mask values for `mln_resource_response`.
-///
-/// See `mln_resource_response_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct ResourceResponseField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  /// The response carries a modification time.
-  public static let modified: ResourceResponseField = .init(rawValue: 1)
-  /// The response carries an expiration time.
-  public static let expires: ResourceResponseField = .init(rawValue: 2)
-  /// An ERROR response carries the earliest time to retry the request.
-  public static let retryAfter: ResourceResponseField = .init(rawValue: 4)
 }
 
 /// How a resource provider answered a request.
@@ -1378,43 +1318,6 @@ public enum RuntimeEventPayload: Equatable, Hashable, Sendable {
   case unknown(UInt32, Data)
   public static var `default`: Self {
     .none
-  }
-}
-
-/// Payload kinds used by `mln_runtime_event.payload_type`.
-///
-/// See `mln_runtime_event_payload_type` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct RuntimeEventPayloadType: RawRepresentable,
-  CustomStringConvertible,
-  NativeOpenValue, Equatable, Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let none: RuntimeEventPayloadType = .init(rawValue: 0)
-  public static let renderFrame: RuntimeEventPayloadType = .init(rawValue: 1)
-  public static let renderMap: RuntimeEventPayloadType = .init(rawValue: 2)
-  public static let tileAction: RuntimeEventPayloadType = .init(rawValue: 4)
-  public static let offlineRegionStatus: RuntimeEventPayloadType =
-    .init(rawValue: 5)
-  public static let offlineRegionResponseError: RuntimeEventPayloadType =
-    .init(rawValue: 6)
-  public static let offlineRegionTileCountLimit: RuntimeEventPayloadType =
-    .init(rawValue: 7)
-  public var description: String {
-    switch rawValue {
-    case 0: return "NONE"
-    case 1: return "RENDER_FRAME"
-    case 2: return "RENDER_MAP"
-    case 4: return "TILE_ACTION"
-    case 5: return "OFFLINE_REGION_STATUS"
-    case 6: return "OFFLINE_REGION_RESPONSE_ERROR"
-    case 7: return "OFFLINE_REGION_TILE_COUNT_LIMIT"
-    default: return "RuntimeEventPayloadType(\(rawValue))"
-    }
   }
 }
 

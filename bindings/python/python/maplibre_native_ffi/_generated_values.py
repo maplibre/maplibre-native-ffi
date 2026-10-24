@@ -184,35 +184,6 @@ class AmbientCacheOperation(UnknownIntEnum):
     CLEAR = 4
 
 
-class AnimationOptionField(IntFlag):
-    """Field mask values for `mln_animation_options`.
-
-    See `mln_animation_option_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    """
-
-    DURATION = 1
-    VELOCITY = 2
-    MIN_ZOOM = 4
-    EASING = 8
-    TRANSITION_ID = 16
-
-
-class BoundOptionField(IntFlag):
-    """Field mask values for `mln_bound_options`.
-
-    See `mln_bound_option_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    """
-
-    BOUNDS = 1
-    MIN_ZOOM = 2
-    MAX_ZOOM = 4
-    MIN_PITCH = 8
-    MAX_PITCH = 16
-    UNBOUNDED = 32
-
-
 class CameraChangeMode(UnknownIntEnum):
     """Camera change kinds reported by camera will-change and did-change events.
 
@@ -222,50 +193,6 @@ class CameraChangeMode(UnknownIntEnum):
 
     IMMEDIATE = 0
     ANIMATED = 1
-
-
-class CameraDeltaField(IntFlag):
-    """Field mask values for `mln_camera_delta`.
-
-    See `mln_camera_delta_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    """
-
-    OFFSET = 1
-    SCALE = 2
-    BEARING = 4
-    PITCH = 8
-    ANCHOR = 16
-
-
-class CameraFitOptionField(IntFlag):
-    """Field mask values for `mln_camera_fit_options`.
-
-    See `mln_camera_fit_option_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    """
-
-    PADDING = 1
-    BEARING = 2
-    PITCH = 4
-
-
-class CameraOptionField(IntFlag):
-    """Field mask values for `mln_camera_options`.
-
-    See `mln_camera_option_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    """
-
-    CENTER = 1
-    ZOOM = 2
-    BEARING = 4
-    PITCH = 8
-    CENTER_ALTITUDE = 16
-    PADDING = 32
-    ANCHOR = 64
-    ROLL = 128
-    FOV = 256
 
 
 class CameraTransitionOutcome(UnknownIntEnum):
@@ -318,45 +245,6 @@ class ConstrainMode(UnknownIntEnum):
     SCREEN = 3
 
 
-class CustomGeometrySourceOptionField(IntFlag):
-    """Field mask values for `mln_custom_geometry_source_options`.
-
-    See `mln_custom_geometry_source_option_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-
-    MIN_ZOOM = 1
-    MAX_ZOOM = 2
-    TOLERANCE = 4
-    TILE_SIZE = 8
-    BUFFER = 16
-    CLIP = 32
-    WRAP = 64
-
-
-class CustomMvtVectorSourceOptionField(IntFlag):
-    """Field mask values for `mln_custom_mvt_vector_source_options`.
-
-    See `mln_custom_mvt_vector_source_option_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-
-    MIN_ZOOM = 1
-    MAX_ZOOM = 2
-
-
-class FeatureStateSelectorField(IntFlag):
-    """Optional fields for `mln_feature_state_selector`.
-
-    See `mln_feature_state_selector_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    """
-
-    SOURCE_LAYER_ID = 1
-    FEATURE_ID = 2
-    STATE_KEY = 4
-
-
 class FrameDemandFlag(IntFlag):
     """Frame-demand policy bits.
 
@@ -367,37 +255,6 @@ class FrameDemandFlag(IntFlag):
     IF_NEEDED = 1
     PRESENT = 2
     WAIT_FOR_UPDATE = 4
-
-
-class FreeCameraOptionField(IntFlag):
-    """Field mask values for `mln_free_camera_options`.
-
-    See `mln_free_camera_option_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    """
-
-    POSITION = 1
-    ORIENTATION = 2
-
-
-class GeojsonSourceOptionField(IntFlag):
-    """Field mask values for `mln_geojson_source_options`.
-
-    See `mln_geojson_source_option_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-
-    MIN_ZOOM = 1
-    MAX_ZOOM = 2
-    TOLERANCE = 4
-    CLUSTER_MAX_ZOOM = 8
-    CLUSTER_PROPERTIES = 16
-    BUFFER = 32
-    CLUSTER_RADIUS = 64
-    CLUSTER_MIN_POINTS = 128
-    LINE_METRICS = 256
-    CLUSTER = 512
-    SYNCHRONOUS_TILING = 1024
 
 
 class GesturePhase(UnknownIntEnum):
@@ -505,34 +362,6 @@ class MapMode(UnknownIntEnum):
     TILE = 2
 
 
-class MapTileOptionField(IntFlag):
-    """Field mask values for `mln_map_tile_options`.
-
-    See `mln_map_tile_option_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    """
-
-    PREFETCH_ZOOM_DELTA = 1
-    LOD_MIN_RADIUS = 2
-    LOD_SCALE = 4
-    LOD_PITCH_THRESHOLD = 8
-    LOD_ZOOM_SHIFT = 16
-    LOD_MODE = 32
-
-
-class MapViewportOptionField(IntFlag):
-    """Field mask values for `mln_map_viewport_options`.
-
-    See `mln_map_viewport_option_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    """
-
-    NORTH_ORIENTATION = 1
-    CONSTRAIN_MODE = 2
-    VIEWPORT_MODE = 4
-    FRUSTUM_OFFSET = 8
-
-
 class NetworkStatus(UnknownIntEnum):
     ONLINE = 1
     OFFLINE = 2
@@ -549,11 +378,6 @@ class NorthOrientation(UnknownIntEnum):
     RIGHT = 1
     DOWN = 2
     LEFT = 3
-
-
-class OfflineRegionDefinitionType(UnknownIntEnum):
-    TILE_PYRAMID = 1
-    GEOMETRY = 2
 
 
 class OfflineRegionDownloadState(UnknownIntEnum):
@@ -585,19 +409,6 @@ class OpenglContextOwnership(UnknownIntEnum):
     DEDICATED = 1
 
 
-class OpenglContextPlatform(UnknownIntEnum):
-    """OpenGL platform context provider used by a context descriptor.
-
-    See `mln_opengl_context_platform` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-    """
-
-    UNSPECIFIED = 0
-    WGL = 1
-    EGL = 2
-    WEBGL = 3
-
-
 class OpenglContextProviderFlag(IntFlag):
     """OpenGL context providers supported by this build.
 
@@ -608,18 +419,6 @@ class OpenglContextProviderFlag(IntFlag):
     WGL = 1
     EGL = 2
     WEBGL = 4
-
-
-class ProjectionModeField(IntFlag):
-    """Field mask values for MapLibre axonometric rendering options.
-
-    See `mln_projection_mode_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    """
-
-    AXONOMETRIC = 1
-    X_SKEW = 2
-    Y_SKEW = 4
 
 
 class RenderAbandonDisposition(UnknownIntEnum):
@@ -709,41 +508,6 @@ class RenderSessionState(UnknownIntEnum):
     ABANDONED = 6
 
 
-class RenderedFeatureField(IntFlag):
-    """Optional fields for `mln_rendered_feature`.
-
-    See `mln_rendered_feature_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-    """
-
-    SOURCE_ID = 1
-    SOURCE_LAYER_ID = 2
-    STATE = 4
-
-
-class RenderedFeatureQueryOptionField(IntFlag):
-    """Optional fields for `mln_rendered_feature_query_options`.
-
-    See `mln_rendered_feature_query_option_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-    """
-
-    LAYER_IDS = 1
-    FILTER = 2
-
-
-class RenderedQueryGeometryType(UnknownIntEnum):
-    """Rendered feature query geometry variants.
-
-    See `mln_rendered_query_geometry_type` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-    """
-
-    POINT = 1
-    BOX = 2
-    LINE_STRING = 3
-
-
 class ResourceErrorReason(UnknownIntEnum):
     NONE = 0
     NOT_FOUND = 1
@@ -798,30 +562,6 @@ class ResourcePriority(UnknownIntEnum):
 class ResourceProviderDecision(UnknownIntEnum):
     PASS_THROUGH = 0
     HANDLE = 1
-
-
-class ResourceRequestField(IntFlag):
-    """Field mask values for `mln_resource_request_info`.
-
-    See `mln_resource_request_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    """
-
-    RANGE = 1
-    PRIOR_MODIFIED = 2
-    PRIOR_EXPIRES = 4
-
-
-class ResourceResponseField(IntFlag):
-    """Field mask values for `mln_resource_response`.
-
-    See `mln_resource_response_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    """
-
-    MODIFIED = 1
-    EXPIRES = 2
-    RETRY_AFTER = 4
 
 
 class ResourceResponseStatus(UnknownIntEnum):
@@ -879,22 +619,6 @@ class RuntimeEventMask(IntFlag):
     ALL = 12576254
 
 
-class RuntimeEventPayloadType(UnknownIntEnum):
-    """Payload kinds used by `mln_runtime_event.payload_type`.
-
-    See `mln_runtime_event_payload_type` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    """
-
-    NONE = 0
-    RENDER_FRAME = 1
-    RENDER_MAP = 2
-    TILE_ACTION = 4
-    OFFLINE_REGION_STATUS = 5
-    OFFLINE_REGION_RESPONSE_ERROR = 6
-    OFFLINE_REGION_TILE_COUNT_LIMIT = 7
-
-
 class RuntimeEventSourceType(UnknownIntEnum):
     """Source kinds used by `mln_runtime_event.source_type`.
 
@@ -934,27 +658,6 @@ class RuntimeEventType(UnknownIntEnum):
     MAP_SOURCE_CHANGED = 23
 
 
-class SourceFeatureField(IntFlag):
-    """Optional fields for `mln_source_feature`.
-
-    See `mln_source_feature_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-    """
-
-    SOURCE_LAYER_ID = 1
-
-
-class SourceFeatureQueryOptionField(IntFlag):
-    """Optional fields for `mln_source_feature_query_options`.
-
-    See `mln_source_feature_query_option_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-    """
-
-    SOURCE_LAYER_IDS = 1
-    FILTER = 2
-
-
 class Status(UnknownIntEnum):
     """Status values returned by status-returning functions.
 
@@ -975,32 +678,6 @@ class Status(UnknownIntEnum):
     NOT_FOUND = -10
 
 
-class StyleExpressionInputField(IntFlag):
-    """Fields present in `mln_style_expression_inputs`.
-
-    See `mln_style_expression_input_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-    """
-
-    ZOOM = 1
-    COLOR_RAMP_PARAMETER = 2
-    ELEVATION = 4
-    FEATURE = 8
-    FEATURE_STATE = 16
-    GLOBAL_STATE = 32
-    CANONICAL_TILE_ID = 64
-
-
-class StyleExpressionOptionField(IntFlag):
-    """Fields present in `mln_style_expression_options`.
-
-    See `mln_style_expression_option_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-    """
-
-    EXPECTED_TYPE = 1
-
-
 class StyleExpressionTypeKind(UnknownIntEnum):
     """Style expression types that a parsed expression may be required to have.
 
@@ -1019,34 +696,6 @@ class StyleExpressionTypeKind(UnknownIntEnum):
     PADDING = 8
     VARIABLE_ANCHOR_OFFSET_COLLECTION = 9
     ARRAY = 10
-
-
-class StyleImageInfoField(IntFlag):
-    """Field mask values for `mln_style_image_info`.
-
-    See `mln_style_image_info_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-
-    CONTENT = 1
-    TEXT_FIT_WIDTH = 2
-    TEXT_FIT_HEIGHT = 4
-
-
-class StyleImageOptionField(IntFlag):
-    """Field mask values for `mln_style_image_options`.
-
-    See `mln_style_image_option_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-
-    PIXEL_RATIO = 1
-    SDF = 2
-    STRETCH_X = 4
-    STRETCH_Y = 8
-    CONTENT = 16
-    TEXT_FIT_WIDTH = 32
-    TEXT_FIT_HEIGHT = 64
 
 
 class StyleImageTextFit(UnknownIntEnum):
@@ -1083,22 +732,6 @@ class StyleRasterDemEncoding(UnknownIntEnum):
     TERRARIUM = 1
 
 
-class StyleSourceInfoField(IntFlag):
-    """Fields available in `mln_style_source_info`.
-
-    See `mln_style_source_info_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-
-    URL = 1
-    TILEJSON = 2
-    BOUNDS = 4
-    TILE_SIZE = 8
-    VECTOR_ENCODING = 16
-    RASTER_ENCODING = 32
-    ATTRIBUTION = 64
-
-
 class StyleSourceType(UnknownIntEnum):
     """Style source type values returned by source metadata queries.
 
@@ -1127,18 +760,6 @@ class StyleTileScheme(UnknownIntEnum):
 
     XYZ = 0
     TMS = 1
-
-
-class StyleTransitionOptionField(IntFlag):
-    """Field mask values for `mln_style_transition_options`.
-
-    See `mln_style_transition_option_field` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-
-    DURATION = 1
-    DELAY = 2
-    ENABLE_PLACEMENT_TRANSITIONS = 4
 
 
 class StyleVectorTileEncoding(UnknownIntEnum):

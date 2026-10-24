@@ -41,32 +41,6 @@ public struct CanonicalTileId: Equatable, Hashable, Sendable {
   }
 }
 
-/// Field mask values for `mln_custom_geometry_source_options`.
-///
-/// See `mln_custom_geometry_source_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct CustomGeometrySourceOptionField: OptionSet, NativeOpenValue,
-  Equatable, Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let minZoom: CustomGeometrySourceOptionField =
-    .init(rawValue: 1)
-  public static let maxZoom: CustomGeometrySourceOptionField =
-    .init(rawValue: 2)
-  public static let tolerance: CustomGeometrySourceOptionField =
-    .init(rawValue: 4)
-  public static let tileSize: CustomGeometrySourceOptionField =
-    .init(rawValue: 8)
-  public static let buffer: CustomGeometrySourceOptionField =
-    .init(rawValue: 16)
-  public static let clip: CustomGeometrySourceOptionField = .init(rawValue: 32)
-  public static let wrap: CustomGeometrySourceOptionField = .init(rawValue: 64)
-}
-
 /// Options for custom geometry sources.
 ///
 /// See `mln_custom_geometry_source_options` in the
@@ -195,24 +169,6 @@ private func invokeCustomGeometrySourceOptionsCancelTile(
   box.value.cancelTile?(CanonicalTileId(raw: tile_id))
 }
 
-/// Field mask values for `mln_custom_mvt_vector_source_options`.
-///
-/// See `mln_custom_mvt_vector_source_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct CustomMvtVectorSourceOptionField: OptionSet, NativeOpenValue,
-  Equatable, Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let minZoom: CustomMvtVectorSourceOptionField =
-    .init(rawValue: 1)
-  public static let maxZoom: CustomMvtVectorSourceOptionField =
-    .init(rawValue: 2)
-}
-
 /// Options for custom MVT vector sources.
 ///
 /// See `mln_custom_mvt_vector_source_options` in the
@@ -294,36 +250,6 @@ private func invokeCustomMvtVectorSourceOptionsCancelTile(
   let box = Unmanaged<GeneratedCallbackBox<CustomMvtVectorSourceOptions>>
     .fromOpaque(user_data).takeUnretainedValue()
   box.value.cancelTile?(CanonicalTileId(raw: tile_id))
-}
-
-/// Field mask values for `mln_geojson_source_options`.
-///
-/// See `mln_geojson_source_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct GeojsonSourceOptionField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let minZoom: GeojsonSourceOptionField = .init(rawValue: 1)
-  public static let maxZoom: GeojsonSourceOptionField = .init(rawValue: 2)
-  public static let tolerance: GeojsonSourceOptionField = .init(rawValue: 4)
-  public static let clusterMaxZoom: GeojsonSourceOptionField =
-    .init(rawValue: 8)
-  public static let clusterProperties: GeojsonSourceOptionField =
-    .init(rawValue: 16)
-  public static let buffer: GeojsonSourceOptionField = .init(rawValue: 32)
-  public static let clusterRadius: GeojsonSourceOptionField =
-    .init(rawValue: 64)
-  public static let clusterMinPoints: GeojsonSourceOptionField =
-    .init(rawValue: 128)
-  public static let lineMetrics: GeojsonSourceOptionField = .init(rawValue: 256)
-  public static let cluster: GeojsonSourceOptionField = .init(rawValue: 512)
-  public static let synchronousTiling: GeojsonSourceOptionField =
-    .init(rawValue: 1024)
 }
 
 /// Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
@@ -685,47 +611,6 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
   }
 }
 
-/// Field mask values for `mln_style_image_info`.
-///
-/// See `mln_style_image_info_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleImageInfoField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  /// The image declares a content box.
-  public static let content: StyleImageInfoField = .init(rawValue: 1)
-  /// The image declares a horizontal text-fit mode.
-  public static let textFitWidth: StyleImageInfoField = .init(rawValue: 2)
-  /// The image declares a vertical text-fit mode.
-  public static let textFitHeight: StyleImageInfoField = .init(rawValue: 4)
-}
-
-/// Field mask values for `mln_style_image_options`.
-///
-/// See `mln_style_image_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleImageOptionField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let pixelRatio: StyleImageOptionField = .init(rawValue: 1)
-  public static let sdf: StyleImageOptionField = .init(rawValue: 2)
-  public static let stretchX: StyleImageOptionField = .init(rawValue: 4)
-  public static let stretchY: StyleImageOptionField = .init(rawValue: 8)
-  public static let content: StyleImageOptionField = .init(rawValue: 16)
-  public static let textFitWidth: StyleImageOptionField = .init(rawValue: 32)
-  public static let textFitHeight: StyleImageOptionField = .init(rawValue: 64)
-}
-
 /// Options for runtime style images.
 ///
 /// See `mln_style_image_options` in the
@@ -1048,34 +933,6 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
   }
 }
 
-/// Fields available in `mln_style_source_info`.
-///
-/// See `mln_style_source_info_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleSourceInfoField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  /// The source retains a URL.
-  public static let url: StyleSourceInfoField = .init(rawValue: 1)
-  /// The tile source was defined with an inline TileJSON description.
-  public static let tilejson: StyleSourceInfoField = .init(rawValue: 2)
-  /// The inline TileJSON description contains geographic bounds.
-  public static let bounds: StyleSourceInfoField = .init(rawValue: 4)
-  /// The source exposes a tile size.
-  public static let tileSize: StyleSourceInfoField = .init(rawValue: 8)
-  /// The source exposes a vector tile encoding.
-  public static let vectorEncoding: StyleSourceInfoField = .init(rawValue: 16)
-  /// The source exposes a DEM raster encoding.
-  public static let rasterEncoding: StyleSourceInfoField = .init(rawValue: 32)
-  /// The source carries an attribution string, which may be empty.
-  public static let attribution: StyleSourceInfoField = .init(rawValue: 64)
-}
-
 /// Inline TileJSON metadata of a tile source.
 ///
 /// See `mln_style_source_tile_info` in the
@@ -1179,24 +1036,6 @@ public struct StyleTileScheme: RawRepresentable, CustomStringConvertible,
     default: return "StyleTileScheme(\(rawValue))"
     }
   }
-}
-
-/// Field mask values for `mln_style_transition_options`.
-///
-/// See `mln_style_transition_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleTransitionOptionField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let duration: StyleTransitionOptionField = .init(rawValue: 1)
-  public static let delay: StyleTransitionOptionField = .init(rawValue: 2)
-  public static let enablePlacementTransitions: StyleTransitionOptionField =
-    .init(rawValue: 4)
 }
 
 /// Global style transition options.

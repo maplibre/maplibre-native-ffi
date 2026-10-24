@@ -3,25 +3,6 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// Field mask values for `mln_animation_options`.
-///
-/// See `mln_animation_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct AnimationOptionField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let duration: AnimationOptionField = .init(rawValue: 1)
-  public static let velocity: AnimationOptionField = .init(rawValue: 2)
-  public static let minZoom: AnimationOptionField = .init(rawValue: 4)
-  public static let easing: AnimationOptionField = .init(rawValue: 8)
-  public static let transitionId: AnimationOptionField = .init(rawValue: 16)
-}
-
 /// Optional animation controls for camera transitions.
 ///
 /// See `mln_animation_options` in the
@@ -104,34 +85,6 @@ public struct AnimationOptions: Sendable {
     raw.end_handler = try endHandler.nativeValue(arena: arena)
     return raw
   }
-}
-
-/// Field mask values for `mln_bound_options`.
-///
-/// See `mln_bound_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct BoundOptionField: OptionSet, NativeOpenValue, Equatable, Hashable,
-  Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  /// Selects `mln_bound_options.bounds` as a geographic constraint that the
-  /// camera center stays inside. Mutually exclusive with
-  /// `MLN_BOUND_OPTION_UNBOUNDED`.
-  public static let bounds: BoundOptionField = .init(rawValue: 1)
-  public static let minZoom: BoundOptionField = .init(rawValue: 2)
-  public static let maxZoom: BoundOptionField = .init(rawValue: 4)
-  public static let minPitch: BoundOptionField = .init(rawValue: 8)
-  public static let maxPitch: BoundOptionField = .init(rawValue: 16)
-  /// Selects the unbounded geographic constraint, which leaves every camera
-  /// center unconstrained and lets the map pan freely across the antimeridian.
-  /// This differs from world bounds of -90/-180 to 90/180, which clamp
-  /// longitude to that range. Mutually exclusive with
-  /// `MLN_BOUND_OPTION_BOUNDS`, and leaves `mln_bound_options.bounds` unread.
-  public static let unbounded: BoundOptionField = .init(rawValue: 32)
 }
 
 /// Optional map camera constraint fields.
@@ -294,42 +247,6 @@ public struct CameraDelta: Sendable {
   }
 }
 
-/// Field mask values for `mln_camera_delta`.
-///
-/// See `mln_camera_delta_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct CameraDeltaField: OptionSet, NativeOpenValue, Equatable, Hashable,
-  Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let offset: CameraDeltaField = .init(rawValue: 1)
-  public static let scale: CameraDeltaField = .init(rawValue: 2)
-  public static let bearing: CameraDeltaField = .init(rawValue: 4)
-  public static let pitch: CameraDeltaField = .init(rawValue: 8)
-  public static let anchor: CameraDeltaField = .init(rawValue: 16)
-}
-
-/// Field mask values for `mln_camera_fit_options`.
-///
-/// See `mln_camera_fit_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct CameraFitOptionField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let padding: CameraFitOptionField = .init(rawValue: 1)
-  public static let bearing: CameraFitOptionField = .init(rawValue: 2)
-  public static let pitch: CameraFitOptionField = .init(rawValue: 4)
-}
-
 /// Optional fitting controls for camera-for-viewport queries.
 ///
 /// See `mln_camera_fit_options` in the
@@ -376,30 +293,6 @@ public struct CameraFitOptions: Equatable, Hashable, Sendable {
     }
     return raw
   }
-}
-
-/// Field mask values for `mln_camera_options`.
-///
-/// See `mln_camera_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct CameraOptionField: OptionSet, NativeOpenValue, Equatable,
-  Hashable,
-  Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let center: CameraOptionField = .init(rawValue: 1)
-  public static let zoom: CameraOptionField = .init(rawValue: 2)
-  public static let bearing: CameraOptionField = .init(rawValue: 4)
-  public static let pitch: CameraOptionField = .init(rawValue: 8)
-  public static let centerAltitude: CameraOptionField = .init(rawValue: 16)
-  public static let padding: CameraOptionField = .init(rawValue: 32)
-  public static let anchor: CameraOptionField = .init(rawValue: 64)
-  public static let roll: CameraOptionField = .init(rawValue: 128)
-  public static let fov: CameraOptionField = .init(rawValue: 256)
 }
 
 /// Camera fields used by snapshots and camera updates.
@@ -851,40 +744,6 @@ public struct FeatureStateSelector: Equatable, Hashable, Sendable {
   }
 }
 
-/// Optional fields for `mln_feature_state_selector`.
-///
-/// See `mln_feature_state_selector_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct FeatureStateSelectorField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let sourceLayerId: FeatureStateSelectorField =
-    .init(rawValue: 1)
-  public static let featureId: FeatureStateSelectorField = .init(rawValue: 2)
-  public static let stateKey: FeatureStateSelectorField = .init(rawValue: 4)
-}
-
-/// Field mask values for `mln_free_camera_options`.
-///
-/// See `mln_free_camera_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct FreeCameraOptionField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let position: FreeCameraOptionField = .init(rawValue: 1)
-  public static let orientation: FreeCameraOptionField = .init(rawValue: 2)
-}
-
 /// Free camera position and orientation in MapLibre Native camera space.
 ///
 /// See `mln_free_camera_options` in the
@@ -1242,26 +1101,6 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   }
 }
 
-/// Field mask values for `mln_map_tile_options`.
-///
-/// See `mln_map_tile_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct MapTileOptionField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let prefetchZoomDelta: MapTileOptionField = .init(rawValue: 1)
-  public static let lodMinRadius: MapTileOptionField = .init(rawValue: 2)
-  public static let lodScale: MapTileOptionField = .init(rawValue: 4)
-  public static let lodPitchThreshold: MapTileOptionField = .init(rawValue: 8)
-  public static let lodZoomShift: MapTileOptionField = .init(rawValue: 16)
-  public static let lodMode: MapTileOptionField = .init(rawValue: 32)
-}
-
 /// Tile prefetch and LOD tuning controls.
 ///
 /// See `mln_map_tile_options` in the
@@ -1391,25 +1230,6 @@ public struct MapView: Equatable, Hashable, Sendable {
     raw.viewport = viewport.nativeValue()
     return raw
   }
-}
-
-/// Field mask values for `mln_map_viewport_options`.
-///
-/// See `mln_map_viewport_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct MapViewportOptionField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let northOrientation: MapViewportOptionField =
-    .init(rawValue: 1)
-  public static let constrainMode: MapViewportOptionField = .init(rawValue: 2)
-  public static let viewportMode: MapViewportOptionField = .init(rawValue: 4)
-  public static let frustumOffset: MapViewportOptionField = .init(rawValue: 8)
 }
 
 /// Live map viewport and render-transform controls.
@@ -1838,23 +1658,6 @@ public struct ProjectionMode: Equatable, Hashable, Sendable {
     }
     return raw
   }
-}
-
-/// Field mask values for MapLibre axonometric rendering options.
-///
-/// See `mln_projection_mode_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct ProjectionModeField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let axonometric: ProjectionModeField = .init(rawValue: 1)
-  public static let xSkew: ProjectionModeField = .init(rawValue: 2)
-  public static let ySkew: ProjectionModeField = .init(rawValue: 4)
 }
 
 /// Quaternion stored as x, y, z, w components.

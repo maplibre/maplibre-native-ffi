@@ -39,48 +39,6 @@ func (value AmbientCacheOperation) String() string {
 	return fmt.Sprintf("AmbientCacheOperation(%d)", value)
 }
 
-// AnimationOptionField corresponds to mln_animation_option_field. Field mask
-// values for mln_animation_options.
-//
-// See mln_animation_option_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type AnimationOptionField uint32
-
-const (
-	AnimationOptionFieldDuration     AnimationOptionField = AnimationOptionField(C.MLN_ANIMATION_OPTION_DURATION)
-	AnimationOptionFieldVelocity     AnimationOptionField = AnimationOptionField(C.MLN_ANIMATION_OPTION_VELOCITY)
-	AnimationOptionFieldMinZoom      AnimationOptionField = AnimationOptionField(C.MLN_ANIMATION_OPTION_MIN_ZOOM)
-	AnimationOptionFieldEasing       AnimationOptionField = AnimationOptionField(C.MLN_ANIMATION_OPTION_EASING)
-	AnimationOptionFieldTransitionId AnimationOptionField = AnimationOptionField(C.MLN_ANIMATION_OPTION_TRANSITION_ID)
-)
-
-func (value AnimationOptionField) Has(flags AnimationOptionField) bool { return value&flags == flags }
-
-// BoundOptionField corresponds to mln_bound_option_field. Field mask values for
-// mln_bound_options.
-//
-// See mln_bound_option_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type BoundOptionField uint32
-
-const (
-	// Selects mln_bound_options.bounds as a geographic constraint that the camera
-	// center stays inside. Mutually exclusive with MLN_BOUND_OPTION_UNBOUNDED.
-	BoundOptionFieldBounds   BoundOptionField = BoundOptionField(C.MLN_BOUND_OPTION_BOUNDS)
-	BoundOptionFieldMinZoom  BoundOptionField = BoundOptionField(C.MLN_BOUND_OPTION_MIN_ZOOM)
-	BoundOptionFieldMaxZoom  BoundOptionField = BoundOptionField(C.MLN_BOUND_OPTION_MAX_ZOOM)
-	BoundOptionFieldMinPitch BoundOptionField = BoundOptionField(C.MLN_BOUND_OPTION_MIN_PITCH)
-	BoundOptionFieldMaxPitch BoundOptionField = BoundOptionField(C.MLN_BOUND_OPTION_MAX_PITCH)
-	// Selects the unbounded geographic constraint, which leaves every camera center
-	// unconstrained and lets the map pan freely across the antimeridian. This
-	// differs from world bounds of -90/-180 to 90/180, which clamp longitude to
-	// that range. Mutually exclusive with MLN_BOUND_OPTION_BOUNDS, and leaves
-	// mln_bound_options.bounds unread.
-	BoundOptionFieldUnbounded BoundOptionField = BoundOptionField(C.MLN_BOUND_OPTION_UNBOUNDED)
-)
-
-func (value BoundOptionField) Has(flags BoundOptionField) bool { return value&flags == flags }
-
 // CameraChangeMode corresponds to mln_camera_change_mode. Camera change kinds
 // reported by camera will-change and did-change events.
 //
@@ -104,59 +62,6 @@ func (value CameraChangeMode) String() string {
 	}
 	return fmt.Sprintf("CameraChangeMode(%d)", value)
 }
-
-// CameraDeltaField corresponds to mln_camera_delta_field. Field mask values for
-// mln_camera_delta.
-//
-// See mln_camera_delta_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type CameraDeltaField uint32
-
-const (
-	CameraDeltaFieldOffset  CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_OFFSET)
-	CameraDeltaFieldScale   CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_SCALE)
-	CameraDeltaFieldBearing CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_BEARING)
-	CameraDeltaFieldPitch   CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_PITCH)
-	CameraDeltaFieldAnchor  CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_ANCHOR)
-)
-
-func (value CameraDeltaField) Has(flags CameraDeltaField) bool { return value&flags == flags }
-
-// CameraFitOptionField corresponds to mln_camera_fit_option_field. Field mask
-// values for mln_camera_fit_options.
-//
-// See mln_camera_fit_option_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type CameraFitOptionField uint32
-
-const (
-	CameraFitOptionFieldPadding CameraFitOptionField = CameraFitOptionField(C.MLN_CAMERA_FIT_OPTION_PADDING)
-	CameraFitOptionFieldBearing CameraFitOptionField = CameraFitOptionField(C.MLN_CAMERA_FIT_OPTION_BEARING)
-	CameraFitOptionFieldPitch   CameraFitOptionField = CameraFitOptionField(C.MLN_CAMERA_FIT_OPTION_PITCH)
-)
-
-func (value CameraFitOptionField) Has(flags CameraFitOptionField) bool { return value&flags == flags }
-
-// CameraOptionField corresponds to mln_camera_option_field. Field mask values
-// for mln_camera_options.
-//
-// See mln_camera_option_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type CameraOptionField uint32
-
-const (
-	CameraOptionFieldCenter         CameraOptionField = CameraOptionField(C.MLN_CAMERA_OPTION_CENTER)
-	CameraOptionFieldZoom           CameraOptionField = CameraOptionField(C.MLN_CAMERA_OPTION_ZOOM)
-	CameraOptionFieldBearing        CameraOptionField = CameraOptionField(C.MLN_CAMERA_OPTION_BEARING)
-	CameraOptionFieldPitch          CameraOptionField = CameraOptionField(C.MLN_CAMERA_OPTION_PITCH)
-	CameraOptionFieldCenterAltitude CameraOptionField = CameraOptionField(C.MLN_CAMERA_OPTION_CENTER_ALTITUDE)
-	CameraOptionFieldPadding        CameraOptionField = CameraOptionField(C.MLN_CAMERA_OPTION_PADDING)
-	CameraOptionFieldAnchor         CameraOptionField = CameraOptionField(C.MLN_CAMERA_OPTION_ANCHOR)
-	CameraOptionFieldRoll           CameraOptionField = CameraOptionField(C.MLN_CAMERA_OPTION_ROLL)
-	CameraOptionFieldFov            CameraOptionField = CameraOptionField(C.MLN_CAMERA_OPTION_FOV)
-)
-
-func (value CameraOptionField) Has(flags CameraOptionField) bool { return value&flags == flags }
 
 // CameraTransitionOutcome corresponds to mln_camera_transition_outcome. How the
 // transitions of one camera command ended.
@@ -270,62 +175,6 @@ func (value ConstrainMode) String() string {
 	return fmt.Sprintf("ConstrainMode(%d)", value)
 }
 
-// CustomGeometrySourceOptionField corresponds to
-// mln_custom_geometry_source_option_field. Field mask values for
-// mln_custom_geometry_source_options.
-//
-// See mln_custom_geometry_source_option_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type CustomGeometrySourceOptionField uint32
-
-const (
-	CustomGeometrySourceOptionFieldMinZoom   CustomGeometrySourceOptionField = CustomGeometrySourceOptionField(C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM)
-	CustomGeometrySourceOptionFieldMaxZoom   CustomGeometrySourceOptionField = CustomGeometrySourceOptionField(C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM)
-	CustomGeometrySourceOptionFieldTolerance CustomGeometrySourceOptionField = CustomGeometrySourceOptionField(C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE)
-	CustomGeometrySourceOptionFieldTileSize  CustomGeometrySourceOptionField = CustomGeometrySourceOptionField(C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE)
-	CustomGeometrySourceOptionFieldBuffer    CustomGeometrySourceOptionField = CustomGeometrySourceOptionField(C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER)
-	CustomGeometrySourceOptionFieldClip      CustomGeometrySourceOptionField = CustomGeometrySourceOptionField(C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP)
-	CustomGeometrySourceOptionFieldWrap      CustomGeometrySourceOptionField = CustomGeometrySourceOptionField(C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP)
-)
-
-func (value CustomGeometrySourceOptionField) Has(flags CustomGeometrySourceOptionField) bool {
-	return value&flags == flags
-}
-
-// CustomMvtVectorSourceOptionField corresponds to
-// mln_custom_mvt_vector_source_option_field. Field mask values for
-// mln_custom_mvt_vector_source_options.
-//
-// See mln_custom_mvt_vector_source_option_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type CustomMvtVectorSourceOptionField uint32
-
-const (
-	CustomMvtVectorSourceOptionFieldMinZoom CustomMvtVectorSourceOptionField = CustomMvtVectorSourceOptionField(C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM)
-	CustomMvtVectorSourceOptionFieldMaxZoom CustomMvtVectorSourceOptionField = CustomMvtVectorSourceOptionField(C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM)
-)
-
-func (value CustomMvtVectorSourceOptionField) Has(flags CustomMvtVectorSourceOptionField) bool {
-	return value&flags == flags
-}
-
-// FeatureStateSelectorField corresponds to mln_feature_state_selector_field.
-// Optional fields for mln_feature_state_selector.
-//
-// See mln_feature_state_selector_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type FeatureStateSelectorField uint32
-
-const (
-	FeatureStateSelectorFieldSourceLayerId FeatureStateSelectorField = FeatureStateSelectorField(C.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID)
-	FeatureStateSelectorFieldFeatureId     FeatureStateSelectorField = FeatureStateSelectorField(C.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID)
-	FeatureStateSelectorFieldStateKey      FeatureStateSelectorField = FeatureStateSelectorField(C.MLN_FEATURE_STATE_SELECTOR_STATE_KEY)
-)
-
-func (value FeatureStateSelectorField) Has(flags FeatureStateSelectorField) bool {
-	return value&flags == flags
-}
-
 // FrameDemandFlag corresponds to mln_frame_demand_flag. Frame-demand policy
 // bits.
 //
@@ -356,45 +205,6 @@ const (
 )
 
 func (value FrameDemandFlag) Has(flags FrameDemandFlag) bool { return value&flags == flags }
-
-// FreeCameraOptionField corresponds to mln_free_camera_option_field. Field mask
-// values for mln_free_camera_options.
-//
-// See mln_free_camera_option_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type FreeCameraOptionField uint32
-
-const (
-	FreeCameraOptionFieldPosition    FreeCameraOptionField = FreeCameraOptionField(C.MLN_FREE_CAMERA_OPTION_POSITION)
-	FreeCameraOptionFieldOrientation FreeCameraOptionField = FreeCameraOptionField(C.MLN_FREE_CAMERA_OPTION_ORIENTATION)
-)
-
-func (value FreeCameraOptionField) Has(flags FreeCameraOptionField) bool { return value&flags == flags }
-
-// GeojsonSourceOptionField corresponds to mln_geojson_source_option_field.
-// Field mask values for mln_geojson_source_options.
-//
-// See mln_geojson_source_option_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type GeojsonSourceOptionField uint32
-
-const (
-	GeojsonSourceOptionFieldMinZoom           GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM)
-	GeojsonSourceOptionFieldMaxZoom           GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM)
-	GeojsonSourceOptionFieldTolerance         GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE)
-	GeojsonSourceOptionFieldClusterMaxZoom    GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM)
-	GeojsonSourceOptionFieldClusterProperties GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES)
-	GeojsonSourceOptionFieldBuffer            GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_BUFFER)
-	GeojsonSourceOptionFieldClusterRadius     GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS)
-	GeojsonSourceOptionFieldClusterMinPoints  GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS)
-	GeojsonSourceOptionFieldLineMetrics       GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS)
-	GeojsonSourceOptionFieldCluster           GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER)
-	GeojsonSourceOptionFieldSynchronousTiling GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING)
-)
-
-func (value GeojsonSourceOptionField) Has(flags GeojsonSourceOptionField) bool {
-	return value&flags == flags
-}
 
 // GesturePhase corresponds to mln_gesture_phase. Gesture boundary carried
 // atomically with a camera update or delta.
@@ -617,42 +427,6 @@ func (value MapMode) String() string {
 	return fmt.Sprintf("MapMode(%d)", value)
 }
 
-// MapTileOptionField corresponds to mln_map_tile_option_field. Field mask
-// values for mln_map_tile_options.
-//
-// See mln_map_tile_option_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type MapTileOptionField uint32
-
-const (
-	MapTileOptionFieldPrefetchZoomDelta MapTileOptionField = MapTileOptionField(C.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA)
-	MapTileOptionFieldLodMinRadius      MapTileOptionField = MapTileOptionField(C.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS)
-	MapTileOptionFieldLodScale          MapTileOptionField = MapTileOptionField(C.MLN_MAP_TILE_OPTION_LOD_SCALE)
-	MapTileOptionFieldLodPitchThreshold MapTileOptionField = MapTileOptionField(C.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD)
-	MapTileOptionFieldLodZoomShift      MapTileOptionField = MapTileOptionField(C.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT)
-	MapTileOptionFieldLodMode           MapTileOptionField = MapTileOptionField(C.MLN_MAP_TILE_OPTION_LOD_MODE)
-)
-
-func (value MapTileOptionField) Has(flags MapTileOptionField) bool { return value&flags == flags }
-
-// MapViewportOptionField corresponds to mln_map_viewport_option_field. Field
-// mask values for mln_map_viewport_options.
-//
-// See mln_map_viewport_option_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type MapViewportOptionField uint32
-
-const (
-	MapViewportOptionFieldNorthOrientation MapViewportOptionField = MapViewportOptionField(C.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION)
-	MapViewportOptionFieldConstrainMode    MapViewportOptionField = MapViewportOptionField(C.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE)
-	MapViewportOptionFieldViewportMode     MapViewportOptionField = MapViewportOptionField(C.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE)
-	MapViewportOptionFieldFrustumOffset    MapViewportOptionField = MapViewportOptionField(C.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET)
-)
-
-func (value MapViewportOptionField) Has(flags MapViewportOptionField) bool {
-	return value&flags == flags
-}
-
 type NetworkStatus uint32
 
 const (
@@ -696,23 +470,6 @@ func (value NorthOrientation) String() string {
 		return "NorthOrientationLeft"
 	}
 	return fmt.Sprintf("NorthOrientation(%d)", value)
-}
-
-type OfflineRegionDefinitionType uint32
-
-const (
-	OfflineRegionDefinitionTypeTilePyramid OfflineRegionDefinitionType = OfflineRegionDefinitionType(C.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID)
-	OfflineRegionDefinitionTypeGeometry    OfflineRegionDefinitionType = OfflineRegionDefinitionType(C.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY)
-)
-
-func (value OfflineRegionDefinitionType) String() string {
-	switch value {
-	case 1:
-		return "OfflineRegionDefinitionTypeTilePyramid"
-	case 2:
-		return "OfflineRegionDefinitionTypeGeometry"
-	}
-	return fmt.Sprintf("OfflineRegionDefinitionType(%d)", value)
 }
 
 type OfflineRegionDownloadState uint32
@@ -785,36 +542,6 @@ func (value OpenglContextOwnership) String() string {
 	return fmt.Sprintf("OpenglContextOwnership(%d)", value)
 }
 
-// OpenglContextPlatform corresponds to mln_opengl_context_platform. OpenGL
-// platform context provider used by a context descriptor.
-//
-// See mln_opengl_context_platform in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-type OpenglContextPlatform uint32
-
-const (
-	// No OpenGL context provider is selected.
-	OpenglContextPlatformUnspecified OpenglContextPlatform = OpenglContextPlatform(C.MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED)
-	OpenglContextPlatformWgl         OpenglContextPlatform = OpenglContextPlatform(C.MLN_OPENGL_CONTEXT_PLATFORM_WGL)
-	OpenglContextPlatformEgl         OpenglContextPlatform = OpenglContextPlatform(C.MLN_OPENGL_CONTEXT_PLATFORM_EGL)
-	// Emscripten WebGL context handle.
-	OpenglContextPlatformWebgl OpenglContextPlatform = OpenglContextPlatform(C.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL)
-)
-
-func (value OpenglContextPlatform) String() string {
-	switch value {
-	case 0:
-		return "OpenglContextPlatformUnspecified"
-	case 1:
-		return "OpenglContextPlatformWgl"
-	case 2:
-		return "OpenglContextPlatformEgl"
-	case 3:
-		return "OpenglContextPlatformWebgl"
-	}
-	return fmt.Sprintf("OpenglContextPlatform(%d)", value)
-}
-
 // OpenglContextProviderFlag corresponds to mln_opengl_context_provider_flag.
 // OpenGL context providers supported by this build.
 //
@@ -832,21 +559,6 @@ const (
 func (value OpenglContextProviderFlag) Has(flags OpenglContextProviderFlag) bool {
 	return value&flags == flags
 }
-
-// ProjectionModeField corresponds to mln_projection_mode_field. Field mask
-// values for MapLibre axonometric rendering options.
-//
-// See mln_projection_mode_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type ProjectionModeField uint32
-
-const (
-	ProjectionModeFieldAxonometric ProjectionModeField = ProjectionModeField(C.MLN_PROJECTION_MODE_AXONOMETRIC)
-	ProjectionModeFieldXSkew       ProjectionModeField = ProjectionModeField(C.MLN_PROJECTION_MODE_X_SKEW)
-	ProjectionModeFieldYSkew       ProjectionModeField = ProjectionModeField(C.MLN_PROJECTION_MODE_Y_SKEW)
-)
-
-func (value ProjectionModeField) Has(flags ProjectionModeField) bool { return value&flags == flags }
 
 // RenderAbandonDisposition corresponds to mln_render_abandon_disposition. What
 // abandon did with a session's graphics resources.
@@ -1030,63 +742,6 @@ func (value RenderSessionState) String() string {
 	return fmt.Sprintf("RenderSessionState(%d)", value)
 }
 
-// RenderedFeatureField corresponds to mln_rendered_feature_field. Optional
-// fields for mln_rendered_feature.
-//
-// See mln_rendered_feature_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-type RenderedFeatureField uint32
-
-const (
-	RenderedFeatureFieldSourceId      RenderedFeatureField = RenderedFeatureField(C.MLN_RENDERED_FEATURE_SOURCE_ID)
-	RenderedFeatureFieldSourceLayerId RenderedFeatureField = RenderedFeatureField(C.MLN_RENDERED_FEATURE_SOURCE_LAYER_ID)
-	RenderedFeatureFieldState         RenderedFeatureField = RenderedFeatureField(C.MLN_RENDERED_FEATURE_STATE)
-)
-
-func (value RenderedFeatureField) Has(flags RenderedFeatureField) bool { return value&flags == flags }
-
-// RenderedFeatureQueryOptionField corresponds to
-// mln_rendered_feature_query_option_field. Optional fields for
-// mln_rendered_feature_query_options.
-//
-// See mln_rendered_feature_query_option_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-type RenderedFeatureQueryOptionField uint32
-
-const (
-	RenderedFeatureQueryOptionFieldLayerIds RenderedFeatureQueryOptionField = RenderedFeatureQueryOptionField(C.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS)
-	RenderedFeatureQueryOptionFieldFilter   RenderedFeatureQueryOptionField = RenderedFeatureQueryOptionField(C.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER)
-)
-
-func (value RenderedFeatureQueryOptionField) Has(flags RenderedFeatureQueryOptionField) bool {
-	return value&flags == flags
-}
-
-// RenderedQueryGeometryType corresponds to mln_rendered_query_geometry_type.
-// Rendered feature query geometry variants.
-//
-// See mln_rendered_query_geometry_type in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-type RenderedQueryGeometryType uint32
-
-const (
-	RenderedQueryGeometryTypePoint      RenderedQueryGeometryType = RenderedQueryGeometryType(C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT)
-	RenderedQueryGeometryTypeBox        RenderedQueryGeometryType = RenderedQueryGeometryType(C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX)
-	RenderedQueryGeometryTypeLineString RenderedQueryGeometryType = RenderedQueryGeometryType(C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING)
-)
-
-func (value RenderedQueryGeometryType) String() string {
-	switch value {
-	case 1:
-		return "RenderedQueryGeometryTypePoint"
-	case 2:
-		return "RenderedQueryGeometryTypeBox"
-	case 3:
-		return "RenderedQueryGeometryTypeLineString"
-	}
-	return fmt.Sprintf("RenderedQueryGeometryType(%d)", value)
-}
-
 type ResourceErrorReason uint32
 
 const (
@@ -1228,42 +883,6 @@ func (value ResourceProviderDecision) String() string {
 	return fmt.Sprintf("ResourceProviderDecision(%d)", value)
 }
 
-// ResourceRequestField corresponds to mln_resource_request_field. Field mask
-// values for mln_resource_request_info.
-//
-// See mln_resource_request_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type ResourceRequestField uint32
-
-const (
-	// The request asks only for the bytes in range.
-	ResourceRequestFieldRange ResourceRequestField = ResourceRequestField(C.MLN_RESOURCE_REQUEST_RANGE)
-	// The cached copy being revalidated carries a modification time.
-	ResourceRequestFieldPriorModified ResourceRequestField = ResourceRequestField(C.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED)
-	// The cached copy being revalidated carries an expiration time.
-	ResourceRequestFieldPriorExpires ResourceRequestField = ResourceRequestField(C.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES)
-)
-
-func (value ResourceRequestField) Has(flags ResourceRequestField) bool { return value&flags == flags }
-
-// ResourceResponseField corresponds to mln_resource_response_field. Field mask
-// values for mln_resource_response.
-//
-// See mln_resource_response_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type ResourceResponseField uint32
-
-const (
-	// The response carries a modification time.
-	ResourceResponseFieldModified ResourceResponseField = ResourceResponseField(C.MLN_RESOURCE_RESPONSE_MODIFIED)
-	// The response carries an expiration time.
-	ResourceResponseFieldExpires ResourceResponseField = ResourceResponseField(C.MLN_RESOURCE_RESPONSE_EXPIRES)
-	// An ERROR response carries the earliest time to retry the request.
-	ResourceResponseFieldRetryAfter ResourceResponseField = ResourceResponseField(C.MLN_RESOURCE_RESPONSE_RETRY_AFTER)
-)
-
-func (value ResourceResponseField) Has(flags ResourceResponseField) bool { return value&flags == flags }
-
 // ResourceResponseStatus corresponds to mln_resource_response_status. How a
 // resource provider answered a request.
 //
@@ -1365,43 +984,6 @@ const (
 
 func (value RuntimeEventMask) Has(flags RuntimeEventMask) bool { return value&flags == flags }
 
-// RuntimeEventPayloadType corresponds to mln_runtime_event_payload_type.
-// Payload kinds used by mln_runtime_event.payload_type.
-//
-// See mln_runtime_event_payload_type in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type RuntimeEventPayloadType uint32
-
-const (
-	RuntimeEventPayloadTypeNone                        RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_NONE)
-	RuntimeEventPayloadTypeRenderFrame                 RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME)
-	RuntimeEventPayloadTypeRenderMap                   RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP)
-	RuntimeEventPayloadTypeTileAction                  RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION)
-	RuntimeEventPayloadTypeOfflineRegionStatus         RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS)
-	RuntimeEventPayloadTypeOfflineRegionResponseError  RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR)
-	RuntimeEventPayloadTypeOfflineRegionTileCountLimit RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT)
-)
-
-func (value RuntimeEventPayloadType) String() string {
-	switch value {
-	case 0:
-		return "RuntimeEventPayloadTypeNone"
-	case 1:
-		return "RuntimeEventPayloadTypeRenderFrame"
-	case 2:
-		return "RuntimeEventPayloadTypeRenderMap"
-	case 4:
-		return "RuntimeEventPayloadTypeTileAction"
-	case 5:
-		return "RuntimeEventPayloadTypeOfflineRegionStatus"
-	case 6:
-		return "RuntimeEventPayloadTypeOfflineRegionResponseError"
-	case 7:
-		return "RuntimeEventPayloadTypeOfflineRegionTileCountLimit"
-	}
-	return fmt.Sprintf("RuntimeEventPayloadType(%d)", value)
-}
-
 // RuntimeEventSourceType corresponds to mln_runtime_event_source_type. Source
 // kinds used by mln_runtime_event.source_type.
 //
@@ -1497,36 +1079,6 @@ func (value RuntimeEventType) String() string {
 	return fmt.Sprintf("RuntimeEventType(%d)", value)
 }
 
-// SourceFeatureField corresponds to mln_source_feature_field. Optional fields
-// for mln_source_feature.
-//
-// See mln_source_feature_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-type SourceFeatureField uint32
-
-const (
-	SourceFeatureFieldSourceLayerId SourceFeatureField = SourceFeatureField(C.MLN_SOURCE_FEATURE_SOURCE_LAYER_ID)
-)
-
-func (value SourceFeatureField) Has(flags SourceFeatureField) bool { return value&flags == flags }
-
-// SourceFeatureQueryOptionField corresponds to
-// mln_source_feature_query_option_field. Optional fields for
-// mln_source_feature_query_options.
-//
-// See mln_source_feature_query_option_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-type SourceFeatureQueryOptionField uint32
-
-const (
-	SourceFeatureQueryOptionFieldSourceLayerIds SourceFeatureQueryOptionField = SourceFeatureQueryOptionField(C.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS)
-	SourceFeatureQueryOptionFieldFilter         SourceFeatureQueryOptionField = SourceFeatureQueryOptionField(C.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER)
-)
-
-func (value SourceFeatureQueryOptionField) Has(flags SourceFeatureQueryOptionField) bool {
-	return value&flags == flags
-}
-
 // Status corresponds to mln_status. Status values returned by status-returning
 // functions.
 //
@@ -1588,43 +1140,6 @@ func (value Status) String() string {
 
 func (value Status) Error() string { return value.String() }
 
-// StyleExpressionInputField corresponds to mln_style_expression_input_field.
-// Fields present in mln_style_expression_inputs.
-//
-// See mln_style_expression_input_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
-type StyleExpressionInputField uint32
-
-const (
-	StyleExpressionInputFieldZoom               StyleExpressionInputField = StyleExpressionInputField(C.MLN_STYLE_EXPRESSION_INPUT_ZOOM)
-	StyleExpressionInputFieldColorRampParameter StyleExpressionInputField = StyleExpressionInputField(C.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER)
-	StyleExpressionInputFieldElevation          StyleExpressionInputField = StyleExpressionInputField(C.MLN_STYLE_EXPRESSION_INPUT_ELEVATION)
-	StyleExpressionInputFieldFeature            StyleExpressionInputField = StyleExpressionInputField(C.MLN_STYLE_EXPRESSION_INPUT_FEATURE)
-	StyleExpressionInputFieldFeatureState       StyleExpressionInputField = StyleExpressionInputField(C.MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE)
-	StyleExpressionInputFieldGlobalState        StyleExpressionInputField = StyleExpressionInputField(C.MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE)
-	StyleExpressionInputFieldCanonicalTileId    StyleExpressionInputField = StyleExpressionInputField(C.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID)
-)
-
-func (value StyleExpressionInputField) Has(flags StyleExpressionInputField) bool {
-	return value&flags == flags
-}
-
-// StyleExpressionOptionField corresponds to mln_style_expression_option_field.
-// Fields present in mln_style_expression_options.
-//
-// See mln_style_expression_option_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
-type StyleExpressionOptionField uint32
-
-const (
-	// expected_type is set.
-	StyleExpressionOptionFieldExpectedType StyleExpressionOptionField = StyleExpressionOptionField(C.MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE)
-)
-
-func (value StyleExpressionOptionField) Has(flags StyleExpressionOptionField) bool {
-	return value&flags == flags
-}
-
 // StyleExpressionTypeKind corresponds to mln_style_expression_type_kind. Style
 // expression types that a parsed expression may be required to have.
 //
@@ -1676,43 +1191,6 @@ func (value StyleExpressionTypeKind) String() string {
 	}
 	return fmt.Sprintf("StyleExpressionTypeKind(%d)", value)
 }
-
-// StyleImageInfoField corresponds to mln_style_image_info_field. Field mask
-// values for mln_style_image_info.
-//
-// See mln_style_image_info_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleImageInfoField uint32
-
-const (
-	// The image declares a content box.
-	StyleImageInfoFieldContent StyleImageInfoField = StyleImageInfoField(C.MLN_STYLE_IMAGE_INFO_CONTENT)
-	// The image declares a horizontal text-fit mode.
-	StyleImageInfoFieldTextFitWidth StyleImageInfoField = StyleImageInfoField(C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH)
-	// The image declares a vertical text-fit mode.
-	StyleImageInfoFieldTextFitHeight StyleImageInfoField = StyleImageInfoField(C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT)
-)
-
-func (value StyleImageInfoField) Has(flags StyleImageInfoField) bool { return value&flags == flags }
-
-// StyleImageOptionField corresponds to mln_style_image_option_field. Field mask
-// values for mln_style_image_options.
-//
-// See mln_style_image_option_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleImageOptionField uint32
-
-const (
-	StyleImageOptionFieldPixelRatio    StyleImageOptionField = StyleImageOptionField(C.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO)
-	StyleImageOptionFieldSdf           StyleImageOptionField = StyleImageOptionField(C.MLN_STYLE_IMAGE_OPTION_SDF)
-	StyleImageOptionFieldStretchX      StyleImageOptionField = StyleImageOptionField(C.MLN_STYLE_IMAGE_OPTION_STRETCH_X)
-	StyleImageOptionFieldStretchY      StyleImageOptionField = StyleImageOptionField(C.MLN_STYLE_IMAGE_OPTION_STRETCH_Y)
-	StyleImageOptionFieldContent       StyleImageOptionField = StyleImageOptionField(C.MLN_STYLE_IMAGE_OPTION_CONTENT)
-	StyleImageOptionFieldTextFitWidth  StyleImageOptionField = StyleImageOptionField(C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH)
-	StyleImageOptionFieldTextFitHeight StyleImageOptionField = StyleImageOptionField(C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT)
-)
-
-func (value StyleImageOptionField) Has(flags StyleImageOptionField) bool { return value&flags == flags }
 
 // StyleImageTextFit corresponds to mln_style_image_text_fit. How a stretchable
 // image fits text along one axis.
@@ -1783,32 +1261,6 @@ func (value StyleRasterDemEncoding) String() string {
 	return fmt.Sprintf("StyleRasterDemEncoding(%d)", value)
 }
 
-// StyleSourceInfoField corresponds to mln_style_source_info_field. Fields
-// available in mln_style_source_info.
-//
-// See mln_style_source_info_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleSourceInfoField uint32
-
-const (
-	// The source retains a URL.
-	StyleSourceInfoFieldUrl StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_URL)
-	// The tile source was defined with an inline TileJSON description.
-	StyleSourceInfoFieldTilejson StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_TILEJSON)
-	// The inline TileJSON description contains geographic bounds.
-	StyleSourceInfoFieldBounds StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_BOUNDS)
-	// The source exposes a tile size.
-	StyleSourceInfoFieldTileSize StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_TILE_SIZE)
-	// The source exposes a vector tile encoding.
-	StyleSourceInfoFieldVectorEncoding StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING)
-	// The source exposes a DEM raster encoding.
-	StyleSourceInfoFieldRasterEncoding StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING)
-	// The source carries an attribution string, which may be empty.
-	StyleSourceInfoFieldAttribution StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_ATTRIBUTION)
-)
-
-func (value StyleSourceInfoField) Has(flags StyleSourceInfoField) bool { return value&flags == flags }
-
 // StyleSourceType corresponds to mln_style_source_type. Style source type
 // values returned by source metadata queries.
 //
@@ -1875,23 +1327,6 @@ func (value StyleTileScheme) String() string {
 		return "StyleTileSchemeTms"
 	}
 	return fmt.Sprintf("StyleTileScheme(%d)", value)
-}
-
-// StyleTransitionOptionField corresponds to mln_style_transition_option_field.
-// Field mask values for mln_style_transition_options.
-//
-// See mln_style_transition_option_field in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleTransitionOptionField uint32
-
-const (
-	StyleTransitionOptionFieldDuration                   StyleTransitionOptionField = StyleTransitionOptionField(C.MLN_STYLE_TRANSITION_OPTION_DURATION)
-	StyleTransitionOptionFieldDelay                      StyleTransitionOptionField = StyleTransitionOptionField(C.MLN_STYLE_TRANSITION_OPTION_DELAY)
-	StyleTransitionOptionFieldEnablePlacementTransitions StyleTransitionOptionField = StyleTransitionOptionField(C.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS)
-)
-
-func (value StyleTransitionOptionField) Has(flags StyleTransitionOptionField) bool {
-	return value&flags == flags
 }
 
 // StyleVectorTileEncoding corresponds to mln_style_vector_tile_encoding. Vector

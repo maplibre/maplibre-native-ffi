@@ -28,7 +28,7 @@ func TestEventDecoderReadsAStridedBatchWithUnknownValues(t *testing.T) {
 			}),
 		newRuntimeEventForTest(RuntimeEventType(0x7fff_0001), RuntimeEventSourceType(0x7fff_0002), 0x7fff_0004).
 			withGeneration(0x1_0000_0003).
-			withRawPayload(RuntimeEventPayloadType(0x7fff_0003), window),
+			withRawPayload(0x7fff_0003, window),
 	})
 	if len(decoded) != 3 {
 		t.Fatalf("decoded %d events, want 3", len(decoded))

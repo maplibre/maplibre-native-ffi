@@ -61,40 +61,6 @@ public struct RenderedFeature: Equatable, Hashable, Sendable {
   }
 }
 
-/// Optional fields for `mln_rendered_feature`.
-///
-/// See `mln_rendered_feature_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-public struct RenderedFeatureField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let sourceId: RenderedFeatureField = .init(rawValue: 1)
-  public static let sourceLayerId: RenderedFeatureField = .init(rawValue: 2)
-  public static let state: RenderedFeatureField = .init(rawValue: 4)
-}
-
-/// Optional fields for `mln_rendered_feature_query_options`.
-///
-/// See `mln_rendered_feature_query_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-public struct RenderedFeatureQueryOptionField: OptionSet, NativeOpenValue,
-  Equatable, Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let layerIds: RenderedFeatureQueryOptionField =
-    .init(rawValue: 1)
-  public static let filter: RenderedFeatureQueryOptionField = .init(rawValue: 2)
-}
-
 /// Options for rendered feature queries.
 ///
 /// See `mln_rendered_feature_query_options` in the
@@ -244,31 +210,6 @@ public enum RenderedQueryGeometryData: Equatable, Hashable, Sendable {
   }
 }
 
-/// Rendered feature query geometry variants.
-///
-/// See `mln_rendered_query_geometry_type` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-public struct RenderedQueryGeometryType: RawRepresentable,
-  CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let point: RenderedQueryGeometryType = .init(rawValue: 1)
-  public static let box: RenderedQueryGeometryType = .init(rawValue: 2)
-  public static let lineString: RenderedQueryGeometryType = .init(rawValue: 3)
-  public var description: String {
-    switch rawValue {
-    case 1: return "POINT"
-    case 2: return "BOX"
-    case 3: return "LINE_STRING"
-    default: return "RenderedQueryGeometryType(\(rawValue))"
-    }
-  }
-}
-
 /// Screen-space box in logical map pixels.
 ///
 /// See `mln_screen_box` in the
@@ -364,38 +305,6 @@ public struct SourceFeature: Equatable, Hashable, Sendable {
         size: raw.source_layer_id.size
       ) : nil
   }
-}
-
-/// Optional fields for `mln_source_feature`.
-///
-/// See `mln_source_feature_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-public struct SourceFeatureField: OptionSet, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let sourceLayerId: SourceFeatureField = .init(rawValue: 1)
-}
-
-/// Optional fields for `mln_source_feature_query_options`.
-///
-/// See `mln_source_feature_query_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-public struct SourceFeatureQueryOptionField: OptionSet, NativeOpenValue,
-  Equatable, Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let sourceLayerIds: SourceFeatureQueryOptionField =
-    .init(rawValue: 1)
-  public static let filter: SourceFeatureQueryOptionField = .init(rawValue: 2)
 }
 
 /// Options for source feature queries.

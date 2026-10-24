@@ -177,6 +177,29 @@ mln_status read_value(value *out BIND("direction=out"), mln_diagnostic *out_diag
                 )
             )
 
+    def test_enums_that_only_masks_and_tags_use_stay_private(self):
+        source = """
+typedef enum BIND("kind=bitmask") fields : unsigned { CENTER = 1 } fields;
+typedef enum tag : unsigned { NUMBER = 1 } tag;
+typedef enum shared : unsigned { SHARED_A = 1 } shared;
+typedef struct options {
+  unsigned fields BIND("enum=fields");
+  double latitude BIND("mask=fields;bit=CENTER");
+  unsigned kind BIND("enum=tag");
+  union { double number BIND("variant=NUMBER"); } payload BIND("tag=kind");
+  unsigned shared_tag BIND("enum=shared");
+  union { double other BIND("variant=SHARED_A"); } other BIND("tag=shared_tag");
+  unsigned mode BIND("enum=shared");
+} options;
+mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
+"""
+        api = bind(self.parse(source), require_complete=True)
+        self.assertEqual(api.control_enums, {"fields", "tag"})
+        self.assertNotIn("fields", api.public_values)
+        self.assertNotIn("tag", api.public_values)
+        # A value field that also uses the enum keeps it public.
+        self.assertIn("shared", api.public_values)
+
     def test_a_presence_bit_guards_one_member_of_a_record(self):
         source = """
 typedef enum BIND("kind=bitmask") fields : unsigned { CENTER = 1, ZOOM = 2 } fields;

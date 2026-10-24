@@ -10,20 +10,6 @@ pub enum AmbientCacheOperation: u32 {
 } Unknown
 }
 
-native_flags! {
-/// Field mask values for `mln_animation_options`.
-///
-/// See `mln_animation_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub struct AnimationOptionField: u32 {
-    const DURATION = 1;
-    const VELOCITY = 2;
-    const MIN_ZOOM = 4;
-    const EASING = 8;
-    const TRANSITION_ID = 16;
-}
-}
-
 /// Optional animation controls for camera transitions.
 ///
 /// See `mln_animation_options` in the
@@ -97,29 +83,6 @@ impl FromNative<sys::mln_animation_options> for AnimationOptions {
             end_handler: Default::default(),
         })
     }
-}
-
-native_flags! {
-/// Field mask values for `mln_bound_options`.
-///
-/// See `mln_bound_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub struct BoundOptionField: u32 {
-    /// Selects `mln_bound_options.bounds` as a geographic constraint that the
-    /// camera center stays inside. Mutually exclusive with
-    /// `MLN_BOUND_OPTION_UNBOUNDED`.
-    const BOUNDS = 1;
-    const MIN_ZOOM = 2;
-    const MAX_ZOOM = 4;
-    const MIN_PITCH = 8;
-    const MAX_PITCH = 16;
-    /// Selects the unbounded geographic constraint, which leaves every camera
-    /// center unconstrained and lets the map pan freely across the
-    /// antimeridian. This differs from world bounds of -90/-180 to 90/180,
-    /// which clamp longitude to that range. Mutually exclusive with
-    /// `MLN_BOUND_OPTION_BOUNDS`, and leaves `mln_bound_options.bounds` unread.
-    const UNBOUNDED = 32;
-}
 }
 
 /// Optional map camera constraint fields.
@@ -280,32 +243,6 @@ impl FromNative<sys::mln_camera_delta> for CameraDelta {
     }
 }
 
-native_flags! {
-/// Field mask values for `mln_camera_delta`.
-///
-/// See `mln_camera_delta_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub struct CameraDeltaField: u32 {
-    const OFFSET = 1;
-    const SCALE = 2;
-    const BEARING = 4;
-    const PITCH = 8;
-    const ANCHOR = 16;
-}
-}
-
-native_flags! {
-/// Field mask values for `mln_camera_fit_options`.
-///
-/// See `mln_camera_fit_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub struct CameraFitOptionField: u32 {
-    const PADDING = 1;
-    const BEARING = 2;
-    const PITCH = 4;
-}
-}
-
 /// Optional fitting controls for camera-for-viewport queries.
 ///
 /// See `mln_camera_fit_options` in the
@@ -351,24 +288,6 @@ impl FromNative<sys::mln_camera_fit_options> for CameraFitOptions {
             pitch: (raw.fields & sys::MLN_CAMERA_FIT_OPTION_PITCH != 0).then_some(raw.pitch),
         })
     }
-}
-
-native_flags! {
-/// Field mask values for `mln_camera_options`.
-///
-/// See `mln_camera_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub struct CameraOptionField: u32 {
-    const CENTER = 1;
-    const ZOOM = 2;
-    const BEARING = 4;
-    const PITCH = 8;
-    const CENTER_ALTITUDE = 16;
-    const PADDING = 32;
-    const ANCHOR = 64;
-    const ROLL = 128;
-    const FOV = 256;
-}
 }
 
 /// Camera fields used by snapshots and camera updates.
@@ -702,22 +621,6 @@ pub enum ConstrainMode: u32 {
 } Unknown
 }
 
-native_flags! {
-/// Field mask values for `mln_custom_geometry_source_options`.
-///
-/// See `mln_custom_geometry_source_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub struct CustomGeometrySourceOptionField: u32 {
-    const MIN_ZOOM = 1;
-    const MAX_ZOOM = 2;
-    const TOLERANCE = 4;
-    const TILE_SIZE = 8;
-    const BUFFER = 16;
-    const CLIP = 32;
-    const WRAP = 64;
-}
-}
-
 /// Options for custom geometry sources.
 ///
 /// See `mln_custom_geometry_source_options` in the
@@ -865,17 +768,6 @@ impl FromNative<sys::mln_custom_geometry_source_options> for CustomGeometrySourc
                 .then_some(raw.wrap),
         })
     }
-}
-
-native_flags! {
-/// Field mask values for `mln_custom_mvt_vector_source_options`.
-///
-/// See `mln_custom_mvt_vector_source_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub struct CustomMvtVectorSourceOptionField: u32 {
-    const MIN_ZOOM = 1;
-    const MAX_ZOOM = 2;
-}
 }
 
 /// Options for custom MVT vector sources.
@@ -1160,18 +1052,6 @@ impl ToNative<sys::mln_feature_state_selector> for FeatureStateSelector {
     }
 }
 
-native_flags! {
-/// Optional fields for `mln_feature_state_selector`.
-///
-/// See `mln_feature_state_selector_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub struct FeatureStateSelectorField: u32 {
-    const SOURCE_LAYER_ID = 1;
-    const FEATURE_ID = 2;
-    const STATE_KEY = 4;
-}
-}
-
 /// One nonblocking request for a frame.
 ///
 /// See `mln_frame_demand` in the
@@ -1240,17 +1120,6 @@ pub struct FrameDemandFlag: u32 {
 }
 }
 
-native_flags! {
-/// Field mask values for `mln_free_camera_options`.
-///
-/// See `mln_free_camera_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub struct FreeCameraOptionField: u32 {
-    const POSITION = 1;
-    const ORIENTATION = 2;
-}
-}
-
 /// Free camera position and orientation in MapLibre Native camera space.
 ///
 /// See `mln_free_camera_options` in the
@@ -1301,26 +1170,6 @@ impl FromNative<sys::mln_free_camera_options> for FreeCameraOptions {
             }?,
         })
     }
-}
-
-native_flags! {
-/// Field mask values for `mln_geojson_source_options`.
-///
-/// See `mln_geojson_source_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub struct GeojsonSourceOptionField: u32 {
-    const MIN_ZOOM = 1;
-    const MAX_ZOOM = 2;
-    const TOLERANCE = 4;
-    const CLUSTER_MAX_ZOOM = 8;
-    const CLUSTER_PROPERTIES = 16;
-    const BUFFER = 32;
-    const CLUSTER_RADIUS = 64;
-    const CLUSTER_MIN_POINTS = 128;
-    const LINE_METRICS = 256;
-    const CLUSTER = 512;
-    const SYNCHRONOUS_TILING = 1024;
-}
 }
 
 /// Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
@@ -2194,21 +2043,6 @@ impl FromNative<sys::mln_map_snapshot> for MapSnapshot {
     }
 }
 
-native_flags! {
-/// Field mask values for `mln_map_tile_options`.
-///
-/// See `mln_map_tile_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub struct MapTileOptionField: u32 {
-    const PREFETCH_ZOOM_DELTA = 1;
-    const LOD_MIN_RADIUS = 2;
-    const LOD_SCALE = 4;
-    const LOD_PITCH_THRESHOLD = 8;
-    const LOD_ZOOM_SHIFT = 16;
-    const LOD_MODE = 32;
-}
-}
-
 /// Tile prefetch and LOD tuning controls.
 ///
 /// See `mln_map_tile_options` in the
@@ -2336,19 +2170,6 @@ impl FromNative<sys::mln_map_view> for MapView {
             viewport: unsafe { from_native(raw.viewport) }?,
         })
     }
-}
-
-native_flags! {
-/// Field mask values for `mln_map_viewport_options`.
-///
-/// See `mln_map_viewport_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub struct MapViewportOptionField: u32 {
-    const NORTH_ORIENTATION = 1;
-    const CONSTRAIN_MODE = 2;
-    const VIEWPORT_MODE = 4;
-    const FRUSTUM_OFFSET = 8;
-}
 }
 
 /// Live map viewport and render-transform controls.
@@ -2856,13 +2677,6 @@ impl Default for OfflineRegionDefinitionData {
 }
 
 native_enum! {
-pub enum OfflineRegionDefinitionType: u32 {
-    TilePyramid = 1,
-    Geometry = 2,
-} Unknown
-}
-
-native_enum! {
 pub enum OfflineRegionDownloadState: u32 {
     Inactive = 0,
     Active = 1,
@@ -3190,21 +3004,6 @@ pub enum OpenglContextOwnership: u32 {
 } Unknown
 }
 
-native_enum! {
-/// OpenGL platform context provider used by a context descriptor.
-///
-/// See `mln_opengl_context_platform` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-pub enum OpenglContextPlatform: u32 {
-    /// No OpenGL context provider is selected.
-    Unspecified = 0,
-    Wgl = 1,
-    Egl = 2,
-    /// Emscripten WebGL context handle.
-    Webgl = 3,
-} Unknown
-}
-
 native_flags! {
 /// OpenGL context providers supported by this build.
 ///
@@ -3503,18 +3302,6 @@ impl FromNative<sys::mln_projection_mode> for ProjectionMode {
             y_skew: (raw.fields & sys::MLN_PROJECTION_MODE_Y_SKEW != 0).then_some(raw.y_skew),
         })
     }
-}
-
-native_flags! {
-/// Field mask values for MapLibre axonometric rendering options.
-///
-/// See `mln_projection_mode_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub struct ProjectionModeField: u32 {
-    const AXONOMETRIC = 1;
-    const X_SKEW = 2;
-    const Y_SKEW = 4;
-}
 }
 
 /// Quaternion stored as x, y, z, w components.
@@ -4051,29 +3838,6 @@ impl FromNative<sys::mln_rendered_feature> for RenderedFeature {
     }
 }
 
-native_flags! {
-/// Optional fields for `mln_rendered_feature`.
-///
-/// See `mln_rendered_feature_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub struct RenderedFeatureField: u32 {
-    const SOURCE_ID = 1;
-    const SOURCE_LAYER_ID = 2;
-    const STATE = 4;
-}
-}
-
-native_flags! {
-/// Optional fields for `mln_rendered_feature_query_options`.
-///
-/// See `mln_rendered_feature_query_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub struct RenderedFeatureQueryOptionField: u32 {
-    const LAYER_IDS = 1;
-    const FILTER = 2;
-}
-}
-
 /// Options for rendered feature queries.
 ///
 /// See `mln_rendered_feature_query_options` in the
@@ -4195,18 +3959,6 @@ impl Default for RenderedQueryGeometryData {
     fn default() -> Self {
         Self::Unknown(0)
     }
-}
-
-native_enum! {
-/// Rendered feature query geometry variants.
-///
-/// See `mln_rendered_query_geometry_type` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub enum RenderedQueryGeometryType: u32 {
-    Point = 1,
-    Box = 2,
-    LineString = 3,
-} Unknown
 }
 
 /// Rendering statistics reported in `MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME`.
@@ -4495,21 +4247,6 @@ impl ToNative<sys::mln_resource_request_cancel_handler> for ResourceRequestCance
     }
 }
 
-native_flags! {
-/// Field mask values for `mln_resource_request_info`.
-///
-/// See `mln_resource_request_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub struct ResourceRequestField: u32 {
-    /// The request asks only for the bytes in range.
-    const RANGE = 1;
-    /// The cached copy being revalidated carries a modification time.
-    const PRIOR_MODIFIED = 2;
-    /// The cached copy being revalidated carries an expiration time.
-    const PRIOR_EXPIRES = 4;
-}
-}
-
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ResourceRequestInfo {
     /// URL entering the network layer, before tile server normalization.
@@ -4594,21 +4331,6 @@ impl ToNative<sys::mln_resource_response> for ResourceResponse {
         }
         Ok(raw)
     }
-}
-
-native_flags! {
-/// Field mask values for `mln_resource_response`.
-///
-/// See `mln_resource_response_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub struct ResourceResponseField: u32 {
-    /// The response carries a modification time.
-    const MODIFIED = 1;
-    /// The response carries an expiration time.
-    const EXPIRES = 2;
-    /// An ERROR response carries the earliest time to retry the request.
-    const RETRY_AFTER = 4;
-}
 }
 
 native_enum! {
@@ -5008,22 +4730,6 @@ impl Default for RuntimeEventPayload {
     }
 }
 
-native_enum! {
-/// Payload kinds used by `mln_runtime_event.payload_type`.
-///
-/// See `mln_runtime_event_payload_type` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub enum RuntimeEventPayloadType: u32 {
-    None = 0,
-    RenderFrame = 1,
-    RenderMap = 2,
-    TileAction = 4,
-    OfflineRegionStatus = 5,
-    OfflineRegionResponseError = 6,
-    OfflineRegionTileCountLimit = 7,
-} Unknown
-}
-
 /// Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`.
 ///
 /// See `mln_runtime_event_render_frame` in the
@@ -5278,27 +4984,6 @@ impl FromNative<sys::mln_source_feature> for SourceFeature {
     }
 }
 
-native_flags! {
-/// Optional fields for `mln_source_feature`.
-///
-/// See `mln_source_feature_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub struct SourceFeatureField: u32 {
-    const SOURCE_LAYER_ID = 1;
-}
-}
-
-native_flags! {
-/// Optional fields for `mln_source_feature_query_options`.
-///
-/// See `mln_source_feature_query_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub struct SourceFeatureQueryOptionField: u32 {
-    const SOURCE_LAYER_IDS = 1;
-    const FILTER = 2;
-}
-}
-
 /// Options for source feature queries.
 ///
 /// See `mln_source_feature_query_options` in the
@@ -5399,22 +5084,6 @@ impl FromNative<sys::mln_style_expression_info> for StyleExpressionInfo {
             is_zoom_constant: raw.is_zoom_constant,
         })
     }
-}
-
-native_flags! {
-/// Fields present in `mln_style_expression_inputs`.
-///
-/// See `mln_style_expression_input_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-pub struct StyleExpressionInputField: u32 {
-    const ZOOM = 1;
-    const COLOR_RAMP_PARAMETER = 2;
-    const ELEVATION = 4;
-    const FEATURE = 8;
-    const FEATURE_STATE = 16;
-    const GLOBAL_STATE = 32;
-    const CANONICAL_TILE_ID = 64;
-}
 }
 
 /// What one evaluation reads.
@@ -5530,17 +5199,6 @@ impl FromNative<sys::mln_style_expression_inputs> for StyleExpressionInputs {
             }?,
         })
     }
-}
-
-native_flags! {
-/// Fields present in `mln_style_expression_options`.
-///
-/// See `mln_style_expression_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-pub struct StyleExpressionOptionField: u32 {
-    /// expected_type is set.
-    const EXPECTED_TYPE = 1;
-}
 }
 
 /// Options for parsing a style expression.
@@ -5711,37 +5369,6 @@ impl FromNative<sys::mln_style_image_info> for StyleImageInfo {
             sdf: raw.sdf,
         })
     }
-}
-
-native_flags! {
-/// Field mask values for `mln_style_image_info`.
-///
-/// See `mln_style_image_info_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub struct StyleImageInfoField: u32 {
-    /// The image declares a content box.
-    const CONTENT = 1;
-    /// The image declares a horizontal text-fit mode.
-    const TEXT_FIT_WIDTH = 2;
-    /// The image declares a vertical text-fit mode.
-    const TEXT_FIT_HEIGHT = 4;
-}
-}
-
-native_flags! {
-/// Field mask values for `mln_style_image_options`.
-///
-/// See `mln_style_image_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub struct StyleImageOptionField: u32 {
-    const PIXEL_RATIO = 1;
-    const SDF = 2;
-    const STRETCH_X = 4;
-    const STRETCH_Y = 8;
-    const CONTENT = 16;
-    const TEXT_FIT_WIDTH = 32;
-    const TEXT_FIT_HEIGHT = 64;
-}
 }
 
 /// Options for runtime style images.
@@ -5990,29 +5617,6 @@ impl FromNative<sys::mln_style_source_info> for StyleSourceInfo {
     }
 }
 
-native_flags! {
-/// Fields available in `mln_style_source_info`.
-///
-/// See `mln_style_source_info_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub struct StyleSourceInfoField: u32 {
-    /// The source retains a URL.
-    const URL = 1;
-    /// The tile source was defined with an inline TileJSON description.
-    const TILEJSON = 2;
-    /// The inline TileJSON description contains geographic bounds.
-    const BOUNDS = 4;
-    /// The source exposes a tile size.
-    const TILE_SIZE = 8;
-    /// The source exposes a vector tile encoding.
-    const VECTOR_ENCODING = 16;
-    /// The source exposes a DEM raster encoding.
-    const RASTER_ENCODING = 32;
-    /// The source carries an attribution string, which may be empty.
-    const ATTRIBUTION = 64;
-}
-}
-
 /// Inline TileJSON metadata of a tile source.
 ///
 /// See `mln_style_source_tile_info` in the
@@ -6067,18 +5671,6 @@ pub enum StyleTileScheme: u32 {
     Xyz = 0,
     Tms = 1,
 } Unknown
-}
-
-native_flags! {
-/// Field mask values for `mln_style_transition_options`.
-///
-/// See `mln_style_transition_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub struct StyleTransitionOptionField: u32 {
-    const DURATION = 1;
-    const DELAY = 2;
-    const ENABLE_PLACEMENT_TRANSITIONS = 4;
-}
 }
 
 /// Global style transition options.

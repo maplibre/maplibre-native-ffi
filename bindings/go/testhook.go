@@ -89,7 +89,7 @@ func (event runtimeEventForTest) withTileAction(payload RuntimeEventTileAction) 
 
 // withRawPayload fills the payload window with bytes under a payload type this
 // binding version does not define.
-func (event runtimeEventForTest) withRawPayload(payloadType RuntimeEventPayloadType, bytes []byte) runtimeEventForTest {
+func (event runtimeEventForTest) withRawPayload(payloadType uint32, bytes []byte) runtimeEventForTest {
 	event.raw.payload_type = C.uint32_t(payloadType)
 	window := event.raw.payload[:]
 	clear(window)

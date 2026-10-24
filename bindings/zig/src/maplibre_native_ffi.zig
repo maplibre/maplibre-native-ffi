@@ -129,23 +129,6 @@ pub const AmbientCacheOperation = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// Field mask values for `mln_animation_options`.
-///
-/// See `mln_animation_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const AnimationOptionField = struct {
-    duration: bool = false,
-    velocity: bool = false,
-    min_zoom: bool = false,
-    easing: bool = false,
-    transition_id: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-};
-
 /// Optional animation controls for camera transitions.
 ///
 /// See `mln_animation_options` in the
@@ -190,32 +173,6 @@ pub const AnimationOptions = struct {
             .end_handler = .{},
         };
     }
-};
-
-/// Field mask values for `mln_bound_options`.
-///
-/// See `mln_bound_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const BoundOptionField = struct {
-    /// Selects `mln_bound_options.bounds` as a geographic constraint that the
-    /// camera center stays inside. Mutually exclusive with
-    /// `MLN_BOUND_OPTION_UNBOUNDED`.
-    bounds: bool = false,
-    min_zoom: bool = false,
-    max_zoom: bool = false,
-    min_pitch: bool = false,
-    max_pitch: bool = false,
-    /// Selects the unbounded geographic constraint, which leaves every camera
-    /// center unconstrained and lets the map pan freely across the
-    /// antimeridian. This differs from world bounds of -90/-180 to 90/180,
-    /// which clamp longitude to that range. Mutually exclusive with
-    /// `MLN_BOUND_OPTION_BOUNDS`, and leaves `mln_bound_options.bounds` unread.
-    unbounded: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
 };
 
 /// Optional map camera constraint fields.
@@ -317,38 +274,6 @@ pub const CameraDelta = struct {
     }
 };
 
-/// Field mask values for `mln_camera_delta`.
-///
-/// See `mln_camera_delta_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const CameraDeltaField = struct {
-    offset: bool = false,
-    scale: bool = false,
-    bearing: bool = false,
-    pitch: bool = false,
-    anchor: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-};
-
-/// Field mask values for `mln_camera_fit_options`.
-///
-/// See `mln_camera_fit_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const CameraFitOptionField = struct {
-    padding: bool = false,
-    bearing: bool = false,
-    pitch: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-};
-
 /// Optional fitting controls for camera-for-viewport queries.
 ///
 /// See `mln_camera_fit_options` in the
@@ -372,27 +297,6 @@ pub const CameraFitOptions = struct {
             .pitch = if (raw.fields & c.MLN_CAMERA_FIT_OPTION_PITCH != 0) raw.pitch else null,
         };
     }
-};
-
-/// Field mask values for `mln_camera_options`.
-///
-/// See `mln_camera_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const CameraOptionField = struct {
-    center: bool = false,
-    zoom: bool = false,
-    bearing: bool = false,
-    pitch: bool = false,
-    center_altitude: bool = false,
-    padding: bool = false,
-    anchor: bool = false,
-    roll: bool = false,
-    fov: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64, 128, 256 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
 };
 
 /// Camera fields used by snapshots and camera updates.
@@ -624,25 +528,6 @@ pub const ConstrainMode = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// Field mask values for `mln_custom_geometry_source_options`.
-///
-/// See `mln_custom_geometry_source_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub const CustomGeometrySourceOptionField = struct {
-    min_zoom: bool = false,
-    max_zoom: bool = false,
-    tolerance: bool = false,
-    tile_size: bool = false,
-    buffer: bool = false,
-    clip: bool = false,
-    wrap: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-};
-
 /// Options for custom geometry sources.
 ///
 /// See `mln_custom_geometry_source_options` in the
@@ -724,20 +609,6 @@ pub const CustomGeometrySourceOptions = struct {
             .wrap = if (raw.fields & c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP != 0) raw.wrap else null,
         };
     }
-};
-
-/// Field mask values for `mln_custom_mvt_vector_source_options`.
-///
-/// See `mln_custom_mvt_vector_source_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub const CustomMvtVectorSourceOptionField = struct {
-    min_zoom: bool = false,
-    max_zoom: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
 };
 
 /// Options for custom MVT vector sources.
@@ -949,21 +820,6 @@ pub const FeatureStateSelector = struct {
     }
 };
 
-/// Optional fields for `mln_feature_state_selector`.
-///
-/// See `mln_feature_state_selector_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const FeatureStateSelectorField = struct {
-    source_layer_id: bool = false,
-    feature_id: bool = false,
-    state_key: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-};
-
 /// One nonblocking request for a frame.
 ///
 /// See `mln_frame_demand` in the
@@ -1019,20 +875,6 @@ pub const FrameDemandFlag = struct {
     pub const toNative = methods.toNative;
 };
 
-/// Field mask values for `mln_free_camera_options`.
-///
-/// See `mln_free_camera_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const FreeCameraOptionField = struct {
-    position: bool = false,
-    orientation: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-};
-
 /// Free camera position and orientation in MapLibre Native camera space.
 ///
 /// See `mln_free_camera_options` in the
@@ -1053,29 +895,6 @@ pub const FreeCameraOptions = struct {
             .orientation = if (raw.fields & c.MLN_FREE_CAMERA_OPTION_ORIENTATION != 0) Quaternion.fromNative(raw.orientation) else null,
         };
     }
-};
-
-/// Field mask values for `mln_geojson_source_options`.
-///
-/// See `mln_geojson_source_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub const GeojsonSourceOptionField = struct {
-    min_zoom: bool = false,
-    max_zoom: bool = false,
-    tolerance: bool = false,
-    cluster_max_zoom: bool = false,
-    cluster_properties: bool = false,
-    buffer: bool = false,
-    cluster_radius: bool = false,
-    cluster_min_points: bool = false,
-    line_metrics: bool = false,
-    cluster: bool = false,
-    synchronous_tiling: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
 };
 
 /// Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
@@ -1666,24 +1485,6 @@ pub const MapSnapshot = struct {
     }
 };
 
-/// Field mask values for `mln_map_tile_options`.
-///
-/// See `mln_map_tile_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const MapTileOptionField = struct {
-    prefetch_zoom_delta: bool = false,
-    lod_min_radius: bool = false,
-    lod_scale: bool = false,
-    lod_pitch_threshold: bool = false,
-    lod_zoom_shift: bool = false,
-    lod_mode: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-};
-
 /// Tile prefetch and LOD tuning controls.
 ///
 /// See `mln_map_tile_options` in the
@@ -1755,22 +1556,6 @@ pub const MapView = struct {
             .viewport = MapViewportOptions.fromNative(raw.viewport),
         };
     }
-};
-
-/// Field mask values for `mln_map_viewport_options`.
-///
-/// See `mln_map_viewport_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const MapViewportOptionField = struct {
-    north_orientation: bool = false,
-    constrain_mode: bool = false,
-    viewport_mode: bool = false,
-    frustum_offset: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
 };
 
 /// Live map viewport and render-transform controls.
@@ -2092,14 +1877,6 @@ pub const OfflineRegionDefinitionData = union(enum) {
     unknown: u32,
 };
 
-pub const OfflineRegionDefinitionType = enum(u32) {
-    geometry = 2,
-    tile_pyramid = 1,
-    _,
-    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
-    pub const toNative = marshal.EnumMethods(@This()).toNative;
-};
-
 pub const OfflineRegionDownloadState = enum(u32) {
     active = 1,
     inactive = 0,
@@ -2356,22 +2133,6 @@ pub const OpenglContextOwnership = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// OpenGL platform context provider used by a context descriptor.
-///
-/// See `mln_opengl_context_platform` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-pub const OpenglContextPlatform = enum(u32) {
-    /// Emscripten WebGL context handle.
-    webgl = 3,
-    egl = 2,
-    wgl = 1,
-    /// No OpenGL context provider is selected.
-    unspecified = 0,
-    _,
-    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
-    pub const toNative = marshal.EnumMethods(@This()).toNative;
-};
-
 /// OpenGL context providers supported by this build.
 ///
 /// See `mln_opengl_context_provider_flag` in the
@@ -2579,21 +2340,6 @@ pub const ProjectionMode = struct {
             .y_skew = if (raw.fields & c.MLN_PROJECTION_MODE_Y_SKEW != 0) raw.y_skew else null,
         };
     }
-};
-
-/// Field mask values for MapLibre axonometric rendering options.
-///
-/// See `mln_projection_mode_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const ProjectionModeField = struct {
-    axonometric: bool = false,
-    x_skew: bool = false,
-    y_skew: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
 };
 
 /// Quaternion stored as x, y, z, w components.
@@ -3012,35 +2758,6 @@ pub const RenderedFeature = struct {
     }
 };
 
-/// Optional fields for `mln_rendered_feature`.
-///
-/// See `mln_rendered_feature_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub const RenderedFeatureField = struct {
-    source_id: bool = false,
-    source_layer_id: bool = false,
-    state: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-};
-
-/// Optional fields for `mln_rendered_feature_query_options`.
-///
-/// See `mln_rendered_feature_query_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub const RenderedFeatureQueryOptionField = struct {
-    layer_ids: bool = false,
-    filter: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-};
-
 /// Options for rendered feature queries.
 ///
 /// See `mln_rendered_feature_query_options` in the
@@ -3131,19 +2848,6 @@ pub const RenderedQueryGeometryData = union(enum) {
     box: ScreenBox,
     line_string: ScreenLineString,
     unknown: u32,
-};
-
-/// Rendered feature query geometry variants.
-///
-/// See `mln_rendered_query_geometry_type` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub const RenderedQueryGeometryType = enum(u32) {
-    line_string = 3,
-    box = 2,
-    point = 1,
-    _,
-    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
-    pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
 /// Rendering statistics reported in `MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME`.
@@ -3351,24 +3055,6 @@ pub const ResourceRequestCancelHandler = struct {
     }
 };
 
-/// Field mask values for `mln_resource_request_info`.
-///
-/// See `mln_resource_request_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub const ResourceRequestField = struct {
-    /// The request asks only for the bytes in range.
-    range: bool = false,
-    /// The cached copy being revalidated carries a modification time.
-    prior_modified: bool = false,
-    /// The cached copy being revalidated carries an expiration time.
-    prior_expires: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-};
-
 pub const ResourceRequestInfo = struct {
     /// URL entering the network layer, before tile server normalization.
     requested_url: ?[]const u8 = null,
@@ -3451,24 +3137,6 @@ pub const ResourceResponse = struct {
             .retry_after_unix_ms = if (raw.fields & c.MLN_RESOURCE_RESPONSE_RETRY_AFTER != 0) raw.retry_after_unix_ms else null,
         };
     }
-};
-
-/// Field mask values for `mln_resource_response`.
-///
-/// See `mln_resource_response_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub const ResourceResponseField = struct {
-    /// The response carries a modification time.
-    modified: bool = false,
-    /// The response carries an expiration time.
-    expires: bool = false,
-    /// An ERROR response carries the earliest time to retry the request.
-    retry_after: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
 };
 
 /// How a resource provider answered a request.
@@ -3755,23 +3423,6 @@ pub const RuntimeEventPayload = union(enum) {
     unknown: u32,
 };
 
-/// Payload kinds used by `mln_runtime_event.payload_type`.
-///
-/// See `mln_runtime_event_payload_type` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub const RuntimeEventPayloadType = enum(u32) {
-    offline_region_tile_count_limit = 7,
-    offline_region_response_error = 6,
-    offline_region_status = 5,
-    tile_action = 4,
-    render_map = 2,
-    render_frame = 1,
-    none = 0,
-    _,
-    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
-    pub const toNative = marshal.EnumMethods(@This()).toNative;
-};
-
 /// Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`.
 ///
 /// See `mln_runtime_event_render_frame` in the
@@ -3982,33 +3633,6 @@ pub const SourceFeature = struct {
     }
 };
 
-/// Optional fields for `mln_source_feature`.
-///
-/// See `mln_source_feature_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub const SourceFeatureField = struct {
-    source_layer_id: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{1};
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-};
-
-/// Optional fields for `mln_source_feature_query_options`.
-///
-/// See `mln_source_feature_query_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub const SourceFeatureQueryOptionField = struct {
-    source_layer_ids: bool = false,
-    filter: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-};
-
 /// Options for source feature queries.
 ///
 /// See `mln_source_feature_query_options` in the
@@ -4100,25 +3724,6 @@ pub const StyleExpressionInfo = struct {
     }
 };
 
-/// Fields present in `mln_style_expression_inputs`.
-///
-/// See `mln_style_expression_input_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-pub const StyleExpressionInputField = struct {
-    zoom: bool = false,
-    color_ramp_parameter: bool = false,
-    elevation: bool = false,
-    feature: bool = false,
-    feature_state: bool = false,
-    global_state: bool = false,
-    canonical_tile_id: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-};
-
 /// What one evaluation reads.
 ///
 /// See `mln_style_expression_inputs` in the
@@ -4189,20 +3794,6 @@ pub const StyleExpressionInputs = struct {
             },
         };
     }
-};
-
-/// Fields present in `mln_style_expression_options`.
-///
-/// See `mln_style_expression_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-pub const StyleExpressionOptionField = struct {
-    /// expected_type is set.
-    expected_type: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{1};
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
 };
 
 /// Options for parsing a style expression.
@@ -4327,43 +3918,6 @@ pub const StyleImageInfo = struct {
             .sdf = raw.sdf,
         };
     }
-};
-
-/// Field mask values for `mln_style_image_info`.
-///
-/// See `mln_style_image_info_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub const StyleImageInfoField = struct {
-    /// The image declares a content box.
-    content: bool = false,
-    /// The image declares a horizontal text-fit mode.
-    text_fit_width: bool = false,
-    /// The image declares a vertical text-fit mode.
-    text_fit_height: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-};
-
-/// Field mask values for `mln_style_image_options`.
-///
-/// See `mln_style_image_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub const StyleImageOptionField = struct {
-    pixel_ratio: bool = false,
-    sdf: bool = false,
-    stretch_x: bool = false,
-    stretch_y: bool = false,
-    content: bool = false,
-    text_fit_width: bool = false,
-    text_fit_height: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
 };
 
 /// Options for runtime style images.
@@ -4551,32 +4105,6 @@ pub const StyleSourceInfo = struct {
     }
 };
 
-/// Fields available in `mln_style_source_info`.
-///
-/// See `mln_style_source_info_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub const StyleSourceInfoField = struct {
-    /// The source retains a URL.
-    url: bool = false,
-    /// The tile source was defined with an inline TileJSON description.
-    tilejson: bool = false,
-    /// The inline TileJSON description contains geographic bounds.
-    bounds: bool = false,
-    /// The source exposes a tile size.
-    tile_size: bool = false,
-    /// The source exposes a vector tile encoding.
-    vector_encoding: bool = false,
-    /// The source exposes a DEM raster encoding.
-    raster_encoding: bool = false,
-    /// The source carries an attribution string, which may be empty.
-    attribution: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-};
-
 /// Inline TileJSON metadata of a tile source.
 ///
 /// See `mln_style_source_tile_info` in the
@@ -4635,21 +4163,6 @@ pub const StyleTileScheme = enum(u32) {
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
-};
-
-/// Field mask values for `mln_style_transition_options`.
-///
-/// See `mln_style_transition_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub const StyleTransitionOptionField = struct {
-    duration: bool = false,
-    delay: bool = false,
-    enable_placement_transitions: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
 };
 
 /// Global style transition options.

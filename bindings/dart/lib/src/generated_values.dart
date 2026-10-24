@@ -17,48 +17,6 @@ final class AmbientCacheOperation extends _Enum {
   };
 }
 
-/// Field mask values for `mln_animation_options`.
-///
-/// See `mln_animation_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class AnimationOptionField extends _Flags<AnimationOptionField> {
-  const AnimationOptionField.fromRawValue(super.rawValue);
-  static const duration = AnimationOptionField.fromRawValue(1);
-  static const velocity = AnimationOptionField.fromRawValue(2);
-  static const minZoom = AnimationOptionField.fromRawValue(4);
-  static const easing = AnimationOptionField.fromRawValue(8);
-  static const transitionId = AnimationOptionField.fromRawValue(16);
-  @override
-  AnimationOptionField _of(int rawValue) =>
-      AnimationOptionField.fromRawValue(rawValue);
-}
-
-/// Field mask values for `mln_bound_options`.
-///
-/// See `mln_bound_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class BoundOptionField extends _Flags<BoundOptionField> {
-  const BoundOptionField.fromRawValue(super.rawValue);
-
-  /// Selects `mln_bound_options.bounds` as a geographic constraint that the
-  /// camera center stays inside. Mutually exclusive with
-  /// `MLN_BOUND_OPTION_UNBOUNDED`.
-  static const bounds = BoundOptionField.fromRawValue(1);
-  static const minZoom = BoundOptionField.fromRawValue(2);
-  static const maxZoom = BoundOptionField.fromRawValue(4);
-  static const minPitch = BoundOptionField.fromRawValue(8);
-  static const maxPitch = BoundOptionField.fromRawValue(16);
-
-  /// Selects the unbounded geographic constraint, which leaves every camera
-  /// center unconstrained and lets the map pan freely across the antimeridian.
-  /// This differs from world bounds of -90/-180 to 90/180, which clamp
-  /// longitude to that range. Mutually exclusive with
-  /// `MLN_BOUND_OPTION_BOUNDS`, and leaves `mln_bound_options.bounds` unread.
-  static const unbounded = BoundOptionField.fromRawValue(32);
-  @override
-  BoundOptionField _of(int rawValue) => BoundOptionField.fromRawValue(rawValue);
-}
-
 /// Camera change kinds reported by camera will-change and did-change events.
 ///
 /// See `mln_camera_change_mode` in the
@@ -77,55 +35,6 @@ final class CameraChangeMode extends _Enum {
     1 => 'CameraChangeMode.animated',
     _ => 'CameraChangeMode($rawValue)',
   };
-}
-
-/// Field mask values for `mln_camera_delta`.
-///
-/// See `mln_camera_delta_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class CameraDeltaField extends _Flags<CameraDeltaField> {
-  const CameraDeltaField.fromRawValue(super.rawValue);
-  static const offset = CameraDeltaField.fromRawValue(1);
-  static const scale = CameraDeltaField.fromRawValue(2);
-  static const bearing = CameraDeltaField.fromRawValue(4);
-  static const pitch = CameraDeltaField.fromRawValue(8);
-  static const anchor = CameraDeltaField.fromRawValue(16);
-  @override
-  CameraDeltaField _of(int rawValue) => CameraDeltaField.fromRawValue(rawValue);
-}
-
-/// Field mask values for `mln_camera_fit_options`.
-///
-/// See `mln_camera_fit_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class CameraFitOptionField extends _Flags<CameraFitOptionField> {
-  const CameraFitOptionField.fromRawValue(super.rawValue);
-  static const padding = CameraFitOptionField.fromRawValue(1);
-  static const bearing = CameraFitOptionField.fromRawValue(2);
-  static const pitch = CameraFitOptionField.fromRawValue(4);
-  @override
-  CameraFitOptionField _of(int rawValue) =>
-      CameraFitOptionField.fromRawValue(rawValue);
-}
-
-/// Field mask values for `mln_camera_options`.
-///
-/// See `mln_camera_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class CameraOptionField extends _Flags<CameraOptionField> {
-  const CameraOptionField.fromRawValue(super.rawValue);
-  static const center = CameraOptionField.fromRawValue(1);
-  static const zoom = CameraOptionField.fromRawValue(2);
-  static const bearing = CameraOptionField.fromRawValue(4);
-  static const pitch = CameraOptionField.fromRawValue(8);
-  static const centerAltitude = CameraOptionField.fromRawValue(16);
-  static const padding = CameraOptionField.fromRawValue(32);
-  static const anchor = CameraOptionField.fromRawValue(64);
-  static const roll = CameraOptionField.fromRawValue(128);
-  static const fov = CameraOptionField.fromRawValue(256);
-  @override
-  CameraOptionField _of(int rawValue) =>
-      CameraOptionField.fromRawValue(rawValue);
 }
 
 /// How the transitions of one camera command ended.
@@ -213,54 +122,6 @@ final class ConstrainMode extends _Enum {
   };
 }
 
-/// Field mask values for `mln_custom_geometry_source_options`.
-///
-/// See `mln_custom_geometry_source_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class CustomGeometrySourceOptionField
-    extends _Flags<CustomGeometrySourceOptionField> {
-  const CustomGeometrySourceOptionField.fromRawValue(super.rawValue);
-  static const minZoom = CustomGeometrySourceOptionField.fromRawValue(1);
-  static const maxZoom = CustomGeometrySourceOptionField.fromRawValue(2);
-  static const tolerance = CustomGeometrySourceOptionField.fromRawValue(4);
-  static const tileSize = CustomGeometrySourceOptionField.fromRawValue(8);
-  static const buffer = CustomGeometrySourceOptionField.fromRawValue(16);
-  static const clip = CustomGeometrySourceOptionField.fromRawValue(32);
-  static const wrap = CustomGeometrySourceOptionField.fromRawValue(64);
-  @override
-  CustomGeometrySourceOptionField _of(int rawValue) =>
-      CustomGeometrySourceOptionField.fromRawValue(rawValue);
-}
-
-/// Field mask values for `mln_custom_mvt_vector_source_options`.
-///
-/// See `mln_custom_mvt_vector_source_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class CustomMvtVectorSourceOptionField
-    extends _Flags<CustomMvtVectorSourceOptionField> {
-  const CustomMvtVectorSourceOptionField.fromRawValue(super.rawValue);
-  static const minZoom = CustomMvtVectorSourceOptionField.fromRawValue(1);
-  static const maxZoom = CustomMvtVectorSourceOptionField.fromRawValue(2);
-  @override
-  CustomMvtVectorSourceOptionField _of(int rawValue) =>
-      CustomMvtVectorSourceOptionField.fromRawValue(rawValue);
-}
-
-/// Optional fields for `mln_feature_state_selector`.
-///
-/// See `mln_feature_state_selector_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class FeatureStateSelectorField
-    extends _Flags<FeatureStateSelectorField> {
-  const FeatureStateSelectorField.fromRawValue(super.rawValue);
-  static const sourceLayerId = FeatureStateSelectorField.fromRawValue(1);
-  static const featureId = FeatureStateSelectorField.fromRawValue(2);
-  static const stateKey = FeatureStateSelectorField.fromRawValue(4);
-  @override
-  FeatureStateSelectorField _of(int rawValue) =>
-      FeatureStateSelectorField.fromRawValue(rawValue);
-}
-
 /// Frame-demand policy bits.
 ///
 /// See `mln_frame_demand_flag` in the
@@ -291,41 +152,6 @@ final class FrameDemandFlag extends _Flags<FrameDemandFlag> {
   static const waitForUpdate = FrameDemandFlag.fromRawValue(4);
   @override
   FrameDemandFlag _of(int rawValue) => FrameDemandFlag.fromRawValue(rawValue);
-}
-
-/// Field mask values for `mln_free_camera_options`.
-///
-/// See `mln_free_camera_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class FreeCameraOptionField extends _Flags<FreeCameraOptionField> {
-  const FreeCameraOptionField.fromRawValue(super.rawValue);
-  static const position = FreeCameraOptionField.fromRawValue(1);
-  static const orientation = FreeCameraOptionField.fromRawValue(2);
-  @override
-  FreeCameraOptionField _of(int rawValue) =>
-      FreeCameraOptionField.fromRawValue(rawValue);
-}
-
-/// Field mask values for `mln_geojson_source_options`.
-///
-/// See `mln_geojson_source_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class GeojsonSourceOptionField extends _Flags<GeojsonSourceOptionField> {
-  const GeojsonSourceOptionField.fromRawValue(super.rawValue);
-  static const minZoom = GeojsonSourceOptionField.fromRawValue(1);
-  static const maxZoom = GeojsonSourceOptionField.fromRawValue(2);
-  static const tolerance = GeojsonSourceOptionField.fromRawValue(4);
-  static const clusterMaxZoom = GeojsonSourceOptionField.fromRawValue(8);
-  static const clusterProperties = GeojsonSourceOptionField.fromRawValue(16);
-  static const buffer = GeojsonSourceOptionField.fromRawValue(32);
-  static const clusterRadius = GeojsonSourceOptionField.fromRawValue(64);
-  static const clusterMinPoints = GeojsonSourceOptionField.fromRawValue(128);
-  static const lineMetrics = GeojsonSourceOptionField.fromRawValue(256);
-  static const cluster = GeojsonSourceOptionField.fromRawValue(512);
-  static const synchronousTiling = GeojsonSourceOptionField.fromRawValue(1024);
-  @override
-  GeojsonSourceOptionField _of(int rawValue) =>
-      GeojsonSourceOptionField.fromRawValue(rawValue);
 }
 
 /// Gesture boundary carried atomically with a camera update or delta.
@@ -505,38 +331,6 @@ final class MapMode extends _Enum {
   };
 }
 
-/// Field mask values for `mln_map_tile_options`.
-///
-/// See `mln_map_tile_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class MapTileOptionField extends _Flags<MapTileOptionField> {
-  const MapTileOptionField.fromRawValue(super.rawValue);
-  static const prefetchZoomDelta = MapTileOptionField.fromRawValue(1);
-  static const lodMinRadius = MapTileOptionField.fromRawValue(2);
-  static const lodScale = MapTileOptionField.fromRawValue(4);
-  static const lodPitchThreshold = MapTileOptionField.fromRawValue(8);
-  static const lodZoomShift = MapTileOptionField.fromRawValue(16);
-  static const lodMode = MapTileOptionField.fromRawValue(32);
-  @override
-  MapTileOptionField _of(int rawValue) =>
-      MapTileOptionField.fromRawValue(rawValue);
-}
-
-/// Field mask values for `mln_map_viewport_options`.
-///
-/// See `mln_map_viewport_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class MapViewportOptionField extends _Flags<MapViewportOptionField> {
-  const MapViewportOptionField.fromRawValue(super.rawValue);
-  static const northOrientation = MapViewportOptionField.fromRawValue(1);
-  static const constrainMode = MapViewportOptionField.fromRawValue(2);
-  static const viewportMode = MapViewportOptionField.fromRawValue(4);
-  static const frustumOffset = MapViewportOptionField.fromRawValue(8);
-  @override
-  MapViewportOptionField _of(int rawValue) =>
-      MapViewportOptionField.fromRawValue(rawValue);
-}
-
 final class NetworkStatus extends _Enum {
   const NetworkStatus.fromRawValue(super.rawValue);
   static const online = NetworkStatus.fromRawValue(1);
@@ -566,18 +360,6 @@ final class NorthOrientation extends _Enum {
     2 => 'NorthOrientation.down',
     3 => 'NorthOrientation.left',
     _ => 'NorthOrientation($rawValue)',
-  };
-}
-
-final class OfflineRegionDefinitionType extends _Enum {
-  const OfflineRegionDefinitionType.fromRawValue(super.rawValue);
-  static const tilePyramid = OfflineRegionDefinitionType.fromRawValue(1);
-  static const geometry = OfflineRegionDefinitionType.fromRawValue(2);
-  @override
-  String toString() => switch (rawValue) {
-    1 => 'OfflineRegionDefinitionType.tilePyramid',
-    2 => 'OfflineRegionDefinitionType.geometry',
-    _ => 'OfflineRegionDefinitionType($rawValue)',
   };
 }
 
@@ -638,30 +420,6 @@ final class OpenglContextOwnership extends _Enum {
   };
 }
 
-/// OpenGL platform context provider used by a context descriptor.
-///
-/// See `mln_opengl_context_platform` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class OpenglContextPlatform extends _Enum {
-  const OpenglContextPlatform.fromRawValue(super.rawValue);
-
-  /// No OpenGL context provider is selected.
-  static const unspecified = OpenglContextPlatform.fromRawValue(0);
-  static const wgl = OpenglContextPlatform.fromRawValue(1);
-  static const egl = OpenglContextPlatform.fromRawValue(2);
-
-  /// Emscripten WebGL context handle.
-  static const webgl = OpenglContextPlatform.fromRawValue(3);
-  @override
-  String toString() => switch (rawValue) {
-    0 => 'OpenglContextPlatform.unspecified',
-    1 => 'OpenglContextPlatform.wgl',
-    2 => 'OpenglContextPlatform.egl',
-    3 => 'OpenglContextPlatform.webgl',
-    _ => 'OpenglContextPlatform($rawValue)',
-  };
-}
-
 /// OpenGL context providers supported by this build.
 ///
 /// See `mln_opengl_context_provider_flag` in the
@@ -677,20 +435,6 @@ final class OpenglContextProviderFlag
   @override
   OpenglContextProviderFlag _of(int rawValue) =>
       OpenglContextProviderFlag.fromRawValue(rawValue);
-}
-
-/// Field mask values for MapLibre axonometric rendering options.
-///
-/// See `mln_projection_mode_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class ProjectionModeField extends _Flags<ProjectionModeField> {
-  const ProjectionModeField.fromRawValue(super.rawValue);
-  static const axonometric = ProjectionModeField.fromRawValue(1);
-  static const xSkew = ProjectionModeField.fromRawValue(2);
-  static const ySkew = ProjectionModeField.fromRawValue(4);
-  @override
-  ProjectionModeField _of(int rawValue) =>
-      ProjectionModeField.fromRawValue(rawValue);
 }
 
 /// What abandon did with a session's graphics resources.
@@ -845,52 +589,6 @@ final class RenderSessionState extends _Enum {
   };
 }
 
-/// Optional fields for `mln_rendered_feature`.
-///
-/// See `mln_rendered_feature_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-final class RenderedFeatureField extends _Flags<RenderedFeatureField> {
-  const RenderedFeatureField.fromRawValue(super.rawValue);
-  static const sourceId = RenderedFeatureField.fromRawValue(1);
-  static const sourceLayerId = RenderedFeatureField.fromRawValue(2);
-  static const state = RenderedFeatureField.fromRawValue(4);
-  @override
-  RenderedFeatureField _of(int rawValue) =>
-      RenderedFeatureField.fromRawValue(rawValue);
-}
-
-/// Optional fields for `mln_rendered_feature_query_options`.
-///
-/// See `mln_rendered_feature_query_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-final class RenderedFeatureQueryOptionField
-    extends _Flags<RenderedFeatureQueryOptionField> {
-  const RenderedFeatureQueryOptionField.fromRawValue(super.rawValue);
-  static const layerIds = RenderedFeatureQueryOptionField.fromRawValue(1);
-  static const filter = RenderedFeatureQueryOptionField.fromRawValue(2);
-  @override
-  RenderedFeatureQueryOptionField _of(int rawValue) =>
-      RenderedFeatureQueryOptionField.fromRawValue(rawValue);
-}
-
-/// Rendered feature query geometry variants.
-///
-/// See `mln_rendered_query_geometry_type` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-final class RenderedQueryGeometryType extends _Enum {
-  const RenderedQueryGeometryType.fromRawValue(super.rawValue);
-  static const point = RenderedQueryGeometryType.fromRawValue(1);
-  static const box = RenderedQueryGeometryType.fromRawValue(2);
-  static const lineString = RenderedQueryGeometryType.fromRawValue(3);
-  @override
-  String toString() => switch (rawValue) {
-    1 => 'RenderedQueryGeometryType.point',
-    2 => 'RenderedQueryGeometryType.box',
-    3 => 'RenderedQueryGeometryType.lineString',
-    _ => 'RenderedQueryGeometryType($rawValue)',
-  };
-}
-
 final class ResourceErrorReason extends _Enum {
   const ResourceErrorReason.fromRawValue(super.rawValue);
   static const none = ResourceErrorReason.fromRawValue(0);
@@ -994,46 +692,6 @@ final class ResourceProviderDecision extends _Enum {
   };
 }
 
-/// Field mask values for `mln_resource_request_info`.
-///
-/// See `mln_resource_request_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class ResourceRequestField extends _Flags<ResourceRequestField> {
-  const ResourceRequestField.fromRawValue(super.rawValue);
-
-  /// The request asks only for the bytes in range.
-  static const range = ResourceRequestField.fromRawValue(1);
-
-  /// The cached copy being revalidated carries a modification time.
-  static const priorModified = ResourceRequestField.fromRawValue(2);
-
-  /// The cached copy being revalidated carries an expiration time.
-  static const priorExpires = ResourceRequestField.fromRawValue(4);
-  @override
-  ResourceRequestField _of(int rawValue) =>
-      ResourceRequestField.fromRawValue(rawValue);
-}
-
-/// Field mask values for `mln_resource_response`.
-///
-/// See `mln_resource_response_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class ResourceResponseField extends _Flags<ResourceResponseField> {
-  const ResourceResponseField.fromRawValue(super.rawValue);
-
-  /// The response carries a modification time.
-  static const modified = ResourceResponseField.fromRawValue(1);
-
-  /// The response carries an expiration time.
-  static const expires = ResourceResponseField.fromRawValue(2);
-
-  /// An ERROR response carries the earliest time to retry the request.
-  static const retryAfter = ResourceResponseField.fromRawValue(4);
-  @override
-  ResourceResponseField _of(int rawValue) =>
-      ResourceResponseField.fromRawValue(rawValue);
-}
-
 /// How a resource provider answered a request.
 ///
 /// See `mln_resource_response_status` in the
@@ -1124,34 +782,6 @@ final class RuntimeEventMask extends _Flags<RuntimeEventMask> {
   RuntimeEventMask _of(int rawValue) => RuntimeEventMask.fromRawValue(rawValue);
 }
 
-/// Payload kinds used by `mln_runtime_event.payload_type`.
-///
-/// See `mln_runtime_event_payload_type` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class RuntimeEventPayloadType extends _Enum {
-  const RuntimeEventPayloadType.fromRawValue(super.rawValue);
-  static const none = RuntimeEventPayloadType.fromRawValue(0);
-  static const renderFrame = RuntimeEventPayloadType.fromRawValue(1);
-  static const renderMap = RuntimeEventPayloadType.fromRawValue(2);
-  static const tileAction = RuntimeEventPayloadType.fromRawValue(4);
-  static const offlineRegionStatus = RuntimeEventPayloadType.fromRawValue(5);
-  static const offlineRegionResponseError =
-      RuntimeEventPayloadType.fromRawValue(6);
-  static const offlineRegionTileCountLimit =
-      RuntimeEventPayloadType.fromRawValue(7);
-  @override
-  String toString() => switch (rawValue) {
-    0 => 'RuntimeEventPayloadType.none',
-    1 => 'RuntimeEventPayloadType.renderFrame',
-    2 => 'RuntimeEventPayloadType.renderMap',
-    4 => 'RuntimeEventPayloadType.tileAction',
-    5 => 'RuntimeEventPayloadType.offlineRegionStatus',
-    6 => 'RuntimeEventPayloadType.offlineRegionResponseError',
-    7 => 'RuntimeEventPayloadType.offlineRegionTileCountLimit',
-    _ => 'RuntimeEventPayloadType($rawValue)',
-  };
-}
-
 /// Source kinds used by `mln_runtime_event.source_type`.
 ///
 /// See `mln_runtime_event_source_type` in the
@@ -1219,32 +849,6 @@ final class RuntimeEventType extends _Enum {
   };
 }
 
-/// Optional fields for `mln_source_feature`.
-///
-/// See `mln_source_feature_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-final class SourceFeatureField extends _Flags<SourceFeatureField> {
-  const SourceFeatureField.fromRawValue(super.rawValue);
-  static const sourceLayerId = SourceFeatureField.fromRawValue(1);
-  @override
-  SourceFeatureField _of(int rawValue) =>
-      SourceFeatureField.fromRawValue(rawValue);
-}
-
-/// Optional fields for `mln_source_feature_query_options`.
-///
-/// See `mln_source_feature_query_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-final class SourceFeatureQueryOptionField
-    extends _Flags<SourceFeatureQueryOptionField> {
-  const SourceFeatureQueryOptionField.fromRawValue(super.rawValue);
-  static const sourceLayerIds = SourceFeatureQueryOptionField.fromRawValue(1);
-  static const filter = SourceFeatureQueryOptionField.fromRawValue(2);
-  @override
-  SourceFeatureQueryOptionField _of(int rawValue) =>
-      SourceFeatureQueryOptionField.fromRawValue(rawValue);
-}
-
 /// Status values returned by status-returning functions.
 ///
 /// See `mln_status` in the
@@ -1299,40 +903,6 @@ final class Status extends _Enum {
   };
 }
 
-/// Fields present in `mln_style_expression_inputs`.
-///
-/// See `mln_style_expression_input_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-final class StyleExpressionInputField
-    extends _Flags<StyleExpressionInputField> {
-  const StyleExpressionInputField.fromRawValue(super.rawValue);
-  static const zoom = StyleExpressionInputField.fromRawValue(1);
-  static const colorRampParameter = StyleExpressionInputField.fromRawValue(2);
-  static const elevation = StyleExpressionInputField.fromRawValue(4);
-  static const feature = StyleExpressionInputField.fromRawValue(8);
-  static const featureState = StyleExpressionInputField.fromRawValue(16);
-  static const globalState = StyleExpressionInputField.fromRawValue(32);
-  static const canonicalTileId = StyleExpressionInputField.fromRawValue(64);
-  @override
-  StyleExpressionInputField _of(int rawValue) =>
-      StyleExpressionInputField.fromRawValue(rawValue);
-}
-
-/// Fields present in `mln_style_expression_options`.
-///
-/// See `mln_style_expression_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-final class StyleExpressionOptionField
-    extends _Flags<StyleExpressionOptionField> {
-  const StyleExpressionOptionField.fromRawValue(super.rawValue);
-
-  /// expected_type is set.
-  static const expectedType = StyleExpressionOptionField.fromRawValue(1);
-  @override
-  StyleExpressionOptionField _of(int rawValue) =>
-      StyleExpressionOptionField.fromRawValue(rawValue);
-}
-
 /// Style expression types that a parsed expression may be required to have.
 ///
 /// See `mln_style_expression_type_kind` in the
@@ -1372,44 +942,6 @@ final class StyleExpressionTypeKind extends _Enum {
     10 => 'StyleExpressionTypeKind.array',
     _ => 'StyleExpressionTypeKind($rawValue)',
   };
-}
-
-/// Field mask values for `mln_style_image_info`.
-///
-/// See `mln_style_image_info_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class StyleImageInfoField extends _Flags<StyleImageInfoField> {
-  const StyleImageInfoField.fromRawValue(super.rawValue);
-
-  /// The image declares a content box.
-  static const content = StyleImageInfoField.fromRawValue(1);
-
-  /// The image declares a horizontal text-fit mode.
-  static const textFitWidth = StyleImageInfoField.fromRawValue(2);
-
-  /// The image declares a vertical text-fit mode.
-  static const textFitHeight = StyleImageInfoField.fromRawValue(4);
-  @override
-  StyleImageInfoField _of(int rawValue) =>
-      StyleImageInfoField.fromRawValue(rawValue);
-}
-
-/// Field mask values for `mln_style_image_options`.
-///
-/// See `mln_style_image_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class StyleImageOptionField extends _Flags<StyleImageOptionField> {
-  const StyleImageOptionField.fromRawValue(super.rawValue);
-  static const pixelRatio = StyleImageOptionField.fromRawValue(1);
-  static const sdf = StyleImageOptionField.fromRawValue(2);
-  static const stretchX = StyleImageOptionField.fromRawValue(4);
-  static const stretchY = StyleImageOptionField.fromRawValue(8);
-  static const content = StyleImageOptionField.fromRawValue(16);
-  static const textFitWidth = StyleImageOptionField.fromRawValue(32);
-  static const textFitHeight = StyleImageOptionField.fromRawValue(64);
-  @override
-  StyleImageOptionField _of(int rawValue) =>
-      StyleImageOptionField.fromRawValue(rawValue);
 }
 
 /// How a stretchable image fits text along one axis.
@@ -1462,38 +994,6 @@ final class StyleRasterDemEncoding extends _Enum {
   };
 }
 
-/// Fields available in `mln_style_source_info`.
-///
-/// See `mln_style_source_info_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class StyleSourceInfoField extends _Flags<StyleSourceInfoField> {
-  const StyleSourceInfoField.fromRawValue(super.rawValue);
-
-  /// The source retains a URL.
-  static const url = StyleSourceInfoField.fromRawValue(1);
-
-  /// The tile source was defined with an inline TileJSON description.
-  static const tilejson = StyleSourceInfoField.fromRawValue(2);
-
-  /// The inline TileJSON description contains geographic bounds.
-  static const bounds = StyleSourceInfoField.fromRawValue(4);
-
-  /// The source exposes a tile size.
-  static const tileSize = StyleSourceInfoField.fromRawValue(8);
-
-  /// The source exposes a vector tile encoding.
-  static const vectorEncoding = StyleSourceInfoField.fromRawValue(16);
-
-  /// The source exposes a DEM raster encoding.
-  static const rasterEncoding = StyleSourceInfoField.fromRawValue(32);
-
-  /// The source carries an attribution string, which may be empty.
-  static const attribution = StyleSourceInfoField.fromRawValue(64);
-  @override
-  StyleSourceInfoField _of(int rawValue) =>
-      StyleSourceInfoField.fromRawValue(rawValue);
-}
-
 /// Style source type values returned by source metadata queries.
 ///
 /// See `mln_style_source_type` in the
@@ -1540,22 +1040,6 @@ final class StyleTileScheme extends _Enum {
     1 => 'StyleTileScheme.tms',
     _ => 'StyleTileScheme($rawValue)',
   };
-}
-
-/// Field mask values for `mln_style_transition_options`.
-///
-/// See `mln_style_transition_option_field` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class StyleTransitionOptionField
-    extends _Flags<StyleTransitionOptionField> {
-  const StyleTransitionOptionField.fromRawValue(super.rawValue);
-  static const duration = StyleTransitionOptionField.fromRawValue(1);
-  static const delay = StyleTransitionOptionField.fromRawValue(2);
-  static const enablePlacementTransitions =
-      StyleTransitionOptionField.fromRawValue(4);
-  @override
-  StyleTransitionOptionField _of(int rawValue) =>
-      StyleTransitionOptionField.fromRawValue(rawValue);
 }
 
 /// Vector tile encoding values.
