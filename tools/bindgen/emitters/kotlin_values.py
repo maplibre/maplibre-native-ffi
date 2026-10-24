@@ -354,6 +354,7 @@ class Values:
                 if self.views
                 else []
             ),
+            "import kotlin.jvm.JvmInline",
             "import org.maplibre.nativeffi.internal.callback.NativeRegistration",
             "import org.maplibre.nativeffi.internal.values.flagLabel",
             "import org.maplibre.nativeffi.render.NativePointer",
@@ -380,7 +381,7 @@ class Values:
                     )
                 result.extend(
                     [
-                        f"{enum_doc(self.bound, value)}public data class {public}(public val rawValue: {scalar}) {{",
+                        f"{enum_doc(self.bound, value)}@JvmInline\npublic value class {public}(public val rawValue: {scalar}) {{",
                         *(
                             [
                                 f"  public infix fun or(other: {public}): {public} = {public}(rawValue or other.rawValue)",
