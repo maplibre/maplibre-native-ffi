@@ -29,6 +29,10 @@ sdk_root="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}"
 log_dir=${TMPDIR:-/tmp}
 log_file="${log_dir%/}/android-emulator-$avd_name.log"
 serial_script="$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh"
+# The emulator looks for AVDs under $HOME, but avdmanager's JVM finds its home
+# its own way, and on a CI runner the two disagree. Naming the default AVD home
+# makes both use it.
+export ANDROID_AVD_HOME="${ANDROID_AVD_HOME:-$HOME/.android/avd}"
 
 # adb arrives with platform-tools, which the package check below installs, so
 # an SDK that has never had it yet reaches that step rather than failing here.
