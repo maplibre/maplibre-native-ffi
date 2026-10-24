@@ -3949,11 +3949,16 @@ final class AcquiredFrameHandle implements Finalizable {
   final NativeHandleState<_NativeAcquiredFrame> _state;
   _NativeAcquiredFrame get _handle => _state.handle;
 
-  /// The native handle id, which runtime events report as their source.
-  ///
-  /// It stays readable after close, so events drained later still match
-  /// this handle.
+  /// The native handle id.
   int get id => _state.handleId;
+
+  /// Whether the binding has accepted a close, dispose, discard, or release
+  /// of this handle.
+  bool get isClosed => _state.isClosed;
+
+  @override
+  String toString() =>
+      'AcquiredFrameHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
 
   /// Consumes an acquired frame without consumer GPU synchronization, so it
   /// quarantines the frame's slot of the texture ring.
@@ -4141,11 +4146,16 @@ final class GeojsonSourceDataHandle implements Finalizable {
   final NativeHandleState<_NativeGeojsonSourceData> _state;
   _NativeGeojsonSourceData get _handle => _state.handle;
 
-  /// The native handle id, which runtime events report as their source.
-  ///
-  /// It stays readable after close, so events drained later still match
-  /// this handle.
+  /// The native handle id.
   int get id => _state.handleId;
+
+  /// Whether the binding has accepted a close, dispose, discard, or release
+  /// of this handle.
+  bool get isClosed => _state.isClosed;
+
+  @override
+  String toString() =>
+      'GeojsonSourceDataHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
 
   /// Releases prepared GeoJSON source data.
   ///
@@ -4739,6 +4749,14 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// It stays readable after close, so events drained later still match
   /// this handle.
   int get id => _state.handleId;
+
+  /// Whether the binding has accepted a close, dispose, discard, or release
+  /// of this handle.
+  bool get isClosed => _state.isClosed;
+
+  @override
+  String toString() =>
+      'MapHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
 
   /// Adds a custom geometry source.
   ///
@@ -6363,11 +6381,16 @@ final class MapProjectionHandle implements Finalizable {
   final NativeHandleState<_NativeMapProjection> _state;
   _NativeMapProjection get _handle => _state.handle;
 
-  /// The native handle id, which runtime events report as their source.
-  ///
-  /// It stays readable after close, so events drained later still match
-  /// this handle.
+  /// The native handle id.
   int get id => _state.handleId;
+
+  /// Whether the binding has accepted a close, dispose, discard, or release
+  /// of this handle.
+  bool get isClosed => _state.isClosed;
+
+  @override
+  String toString() =>
+      'MapProjectionHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
 
   /// Copies the projection camera into out_camera.
   ///
@@ -6594,11 +6617,16 @@ final class RenderFrameBatchHandle implements Finalizable {
   final NativeHandleState<_NativeRenderFrameBatch> _state;
   _NativeRenderFrameBatch get _handle => _state.handle;
 
-  /// The native handle id, which runtime events report as their source.
-  ///
-  /// It stays readable after close, so events drained later still match
-  /// this handle.
+  /// The native handle id.
   int get id => _state.handleId;
+
+  /// Whether the binding has accepted a close, dispose, discard, or release
+  /// of this handle.
+  bool get isClosed => _state.isClosed;
+
+  @override
+  String toString() =>
+      'RenderFrameBatchHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
 
   /// Borrows the result view stored by an owned frame-result batch.
   ///
@@ -6655,11 +6683,16 @@ final class RenderSessionHandle implements Finalizable {
   RenderSessionHandleDiscarding get discarding =>
       RenderSessionHandleDiscarding._(this);
 
-  /// The native handle id, which runtime events report as their source.
-  ///
-  /// It stays readable after close, so events drained later still match
-  /// this handle.
+  /// The native handle id.
   int get id => _state.handleId;
+
+  /// Whether the binding has accepted a close, dispose, discard, or release
+  /// of this handle.
+  bool get isClosed => _state.isClosed;
+
+  @override
+  String toString() =>
+      'RenderSessionHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
 
   /// Irreversibly ends session work and destroys the session's graphics objects
   /// where that is safe.
@@ -7129,11 +7162,16 @@ final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
   final NativeHandleState<_NativeResourceRequest> _state;
   _NativeResourceRequest get _handle => _state.handle;
 
-  /// The native handle id, which runtime events report as their source.
-  ///
-  /// It stays readable after close, so events drained later still match
-  /// this handle.
+  /// The native handle id.
   int get id => _state.handleId;
+
+  /// Whether the binding has accepted a close, dispose, discard, or release
+  /// of this handle.
+  bool get isClosed => _state.isClosed;
+
+  @override
+  String toString() =>
+      'ResourceRequestHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
 
   /// Completes a C API resource provider request.
   ///
@@ -7227,11 +7265,16 @@ final class ResourceTransformRequestHandle implements Finalizable {
   final NativeHandleState<_NativeResourceTransformRequest> _state;
   _NativeResourceTransformRequest get _handle => _state.handle;
 
-  /// The native handle id, which runtime events report as their source.
-  ///
-  /// It stays readable after close, so events drained later still match
-  /// this handle.
+  /// The native handle id.
   int get id => _state.handleId;
+
+  /// Whether the binding has accepted a close, dispose, discard, or release
+  /// of this handle.
+  bool get isClosed => _state.isClosed;
+
+  @override
+  String toString() =>
+      'ResourceTransformRequestHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
 
   /// Answers a resource transform request with a replacement URL.
   ///
@@ -7280,6 +7323,14 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   /// It stays readable after close, so events drained later still match
   /// this handle.
   int get id => _state.handleId;
+
+  /// Whether the binding has accepted a close, dispose, discard, or release
+  /// of this handle.
+  bool get isClosed => _state.isClosed;
+
+  @override
+  String toString() =>
+      'RuntimeHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
 
   /// Stops event delivery and retires the previous handler.
   ///
@@ -7661,11 +7712,16 @@ final class StyleExpressionHandle implements Finalizable {
   final NativeHandleState<_NativeStyleExpression> _state;
   _NativeStyleExpression get _handle => _state.handle;
 
-  /// The native handle id, which runtime events report as their source.
-  ///
-  /// It stays readable after close, so events drained later still match
-  /// this handle.
+  /// The native handle id.
   int get id => _state.handleId;
+
+  /// Whether the binding has accepted a close, dispose, discard, or release
+  /// of this handle.
+  bool get isClosed => _state.isClosed;
+
+  @override
+  String toString() =>
+      'StyleExpressionHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
 
   /// Evaluates a parsed expression and writes its result as UTF-8 JSON.
   ///
