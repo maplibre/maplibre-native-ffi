@@ -128,8 +128,11 @@ ci:
     linux-arm64:
       covers: >-
         Linux ARM64 glibc with OpenGL (EGL) and Vulkan, running Linux x64's
-        suites on ARM runners. Catches architecture and ARM toolchain problems.
-        Platform-independent code that Linux x64 tests doesn't need it.
+        suites on ARM runners about twice as slow as x64. Catches only what
+        differs by CPU architecture on Linux: architecture conditionals in code
+        or build logic, a tool or dependency fetched per architecture, and the
+        ARM runner setup. Linux platform, renderer, and binding changes that
+        Linux x64 already builds and tests don't need it.
       paths:
         - third_party/maplibre-native
     linux-musl:
@@ -178,15 +181,28 @@ ci:
         - examples/swift-map/.mise/*
         - examples/swift-map/Sources/SwiftMapIOS/*
         - third_party/maplibre-native
-    windows:
+    windows-x64:
       covers: >-
-        Windows x64 and ARM64 with OpenGL (WGL) and Vulkan, built with MSVC.
-        Runs the C tests and the desktop binding suites. Catches MSVC, Windows
-        API, path, shell, and toolchain installation problems.
-        Platform-independent code that Linux x64 tests doesn't need it.
+        Windows x64 with OpenGL (WGL) and Vulkan, built with MSVC. Runs the C
+        tests and the desktop binding suites. Catches MSVC, Windows API, path,
+        shell, and toolchain installation problems. Platform-independent code
+        that Linux x64 tests doesn't need it.
       paths:
         - src/platform/windows/*
         - src/render/opengl/wgl_*
+        - cmake/platform/windows.cmake
+        - mise.windows.toml
+        - .github/actions/setup-windows-*
+        - third_party/maplibre-native
+    windows-arm64:
+      covers: >-
+        Windows ARM64 with OpenGL (WGL) and Vulkan, running Windows x64's suites
+        on ARM runners. Catches only what differs by CPU architecture on
+        Windows: architecture conditionals in code or build logic, a tool or
+        dependency fetched per architecture, and the ARM runner setup. Windows
+        platform, renderer, and binding changes that Windows x64 already builds
+        and tests don't need it.
+      paths:
         - cmake/platform/windows.cmake
         - mise.windows.toml
         - .github/actions/setup-windows-*

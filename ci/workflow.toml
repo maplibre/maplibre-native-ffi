@@ -146,7 +146,8 @@ linux-arm64 = { targets = ["linux-gnu-arm64-*"] }
 linux-musl = { targets = ["linux-musl-*"] }
 macos = { targets = ["macos-*"] }
 apple-mobile = { targets = ["ios-*", "tvos-*"], jobs = ["apple-xcframework"] }
-windows = { targets = ["windows-*"] }
+windows-x64 = { targets = ["windows-x64-*"] }
+windows-arm64 = { targets = ["windows-arm64-*"] }
 android = { targets = ["android-*"], jobs = ["android-multi"] }
 ohos = { targets = ["ohos-*"] }
 web = { targets = ["emscripten-*"] }

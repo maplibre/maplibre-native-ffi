@@ -478,9 +478,15 @@ def ci_workflow(source: dict, presets: dict) -> dict:
             "pull_request": {"types": ["opened", "synchronize", "reopened"]},
         },
         "permissions": {"contents": "read"},
+        # A newer push to main cancels the run it supersedes. A re-run, such as
+        # the one a release starts for its cancelled commit, gets a group of
+        # its own so that neither run cancels the other.
         "concurrency": {
-            "group": "${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}",
-            "cancel-in-progress": "${{ github.event.action == 'synchronize' }}",
+            "group": "${{ github.workflow }}-${{ github.event.pull_request.number"
+            " || (github.event_name == 'push' && github.run_attempt == '1' && github.ref)"
+            " || format('{0}-{1}', github.run_id, github.run_attempt) }}",
+            "cancel-in-progress": "${{ github.event.action == 'synchronize'"
+            " || github.event_name == 'push' }}",
         },
         "jobs": {
             "plan": plan_job(),

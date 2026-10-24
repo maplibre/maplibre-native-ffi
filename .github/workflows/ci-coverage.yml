@@ -13,8 +13,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: ${{ github.event.action == 'synchronize' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || (github.event_name == 'push' && github.run_attempt == '1' && github.ref) || format('{0}-{1}', github.run_id, github.run_attempt) }}
+  cancel-in-progress: ${{ github.event.action == 'synchronize' || github.event_name == 'push' }}
 jobs:
   plan:
     runs-on: blacksmith-2vcpu-ubuntu-2404
@@ -2507,7 +2507,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'windows') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'windows-x64') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-windows-x64-vulkan:
     name: target / windows-x64-vulkan
     runs-on: blacksmith-4vcpu-windows-2025
@@ -2594,7 +2594,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'windows') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'windows-x64') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-windows-arm64-wgl:
     name: target / windows-arm64-wgl
     runs-on: windows-11-arm
@@ -2669,7 +2669,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'windows') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'windows-arm64') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   target-windows-arm64-vulkan:
     name: target / windows-arm64-vulkan
     runs-on: windows-11-arm
@@ -2743,7 +2743,7 @@ jobs:
         run: exit 1
     needs:
       - plan
-    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'windows') || contains(fromJSON(needs.plan.outputs.units), 'maven')
+    if: fromJSON(needs.plan.outputs.all) || contains(fromJSON(needs.plan.outputs.units), 'windows-arm64') || contains(fromJSON(needs.plan.outputs.units), 'maven')
   android-multi:
     name: Android multi-ABI packaging
     runs-on: blacksmith-4vcpu-ubuntu-2404

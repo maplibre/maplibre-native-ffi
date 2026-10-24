@@ -34,13 +34,35 @@ fi
 
 run="$(jq '.[0]' <<<"$runs")"
 run_id="$(jq -r '.databaseId' <<<"$run")"
-echo "waiting for CI run $run_id to succeed" >&2
-gh run watch \
-  --repo "$GITHUB_REPOSITORY" \
-  --compact \
-  --exit-status \
-  --interval 30 \
-  "$run_id" >&2
+
+# A newer push to main cancels this commit's run, so re-run the jobs it
+# cancelled. Jobs that already passed keep their artifacts.
+for rerun in {0..3}; do
+  echo "waiting for CI run $run_id to succeed" >&2
+  if gh run watch \
+    --repo "$GITHUB_REPOSITORY" \
+    --compact \
+    --exit-status \
+    --interval 30 \
+    "$run_id" >&2; then
+    break
+  fi
+  conclusion="$(gh run view --repo "$GITHUB_REPOSITORY" "$run_id" \
+    --json conclusion --jq '.conclusion')"
+  if [[ "$conclusion" != cancelled ]] || ((rerun == 3)); then
+    echo "CI run $run_id concluded $conclusion" >&2
+    exit 1
+  fi
+  echo "CI run $run_id was cancelled; re-running its cancelled jobs" >&2
+  gh run rerun --repo "$GITHUB_REPOSITORY" --failed "$run_id" >&2
+  # The re-run queues asynchronously; watching before then ends at once.
+  for _ in {1..12}; do
+    status="$(gh run view --repo "$GITHUB_REPOSITORY" "$run_id" \
+      --json status --jq '.status')"
+    [[ "$status" != completed ]] && break
+    sleep 5
+  done
+done
 
 jq -cn \
   --arg run_id "$run_id" \

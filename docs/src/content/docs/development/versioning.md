@@ -1,6 +1,6 @@
 ---
 title: Releases and snapshots
-description: Version format, the release tag, and snapshot publication.
+description: Version format, release tags, registry setup, and snapshots.
 sidebar:
   order: 5
 ---
@@ -22,10 +22,8 @@ or a binding increments it.
 
 ## Release tags
 
-A release has one tag, `vAPI_EPOCH.YYYYMM.REVISION`, on a commit on `main` that
-has passed CI. Every artifact of the release builds from that commit. The
-release workflow rejects a tag out of order or from another month. It then tags
-the same commit `bindings/go/<tag>`, the tag Go resolves the module from.
+A release has one tag, `vAPI_EPOCH.YYYYMM.REVISION`, on a commit on `main`.
+`mise run ci:release-version --next` prints the next one.
 
 pub.dev, crates.io, and npm enable automated publishing only for a package that
 exists, so publish the first version of each package by hand, from a clean
@@ -34,7 +32,7 @@ checkout of a published release tag or from the release run.
 - Dart: run `mise run //bindings/dart:prepare-release <tag>`, then
   `dart pub publish` from `bindings/dart`. On the package's admin page, enable
   publishing from GitHub Actions for `maplibre/maplibre-native-ffi`, with the
-  tag pattern v{{version}}, as pub.dev writes it, and the `pub.dev` environment.
+  tag pattern v{{version}} and the `pub.dev` environment.
 - Rust: run `mise run //bindings/rust:prepare-release <tag>`, then
   `cargo publish --allow-dirty -p <crate>` for `maplibre-native-ffi-sys`,
   `maplibre-native-ffi-core`, and `maplibre-native-ffi`, in that order. In each
@@ -58,11 +56,10 @@ publish by hand. Add a trusted publishing policy for
 `nuget.org` environment, and set the repository variable `NUGET_USER` to the
 NuGet.org account that owns the policy.
 
-PyPI lets a pending trusted publisher create a project, so the release workflow
-publishes every Python version, the first included. PyPI holds one pending
-publisher per workflow and environment, so each distribution needs a trusted
-publisher for `maplibre/maplibre-native-ffi`, with the workflow `release.yml`
-and an environment of its own:
+PyPI lets a pending trusted publisher create a project, so Python needs no first
+publish by hand. Add a trusted publisher for each distribution, for
+`maplibre/maplibre-native-ffi`, with the workflow `release.yml` and its own
+environment:
 
 | Distribution                         | Environment           |
 | ------------------------------------ | --------------------- |
@@ -73,14 +70,6 @@ and an environment of its own:
 
 ## Snapshots
 
-The Publish snapshots workflow runs daily and publishes every snapshot channel
-from the head of `main`, using the artifacts of its CI run once that run
-succeeds. A scheduled run skips when `main` has not moved since the last run
-that published everything. Dispatch the workflow manually to publish now, or
-with `docs_only` to republish only the docs site.
-
-pub.dev, crates.io, npm, PyPI, and NuGet.org keep every version that they
-publish, so they get no snapshot channel. The floating channels replace their
-contents on each publish: Maven Central snapshots for Kotlin, and the
-`unstable-native-snapshot` GitHub release for the C library, the Zig package,
-the .NET packages, and the Python wheels.
+The Publish snapshots workflow publishes every snapshot channel from `main`
+daily. Dispatch it to publish now, or with `docs_only` to republish only the
+docs site.
