@@ -332,6 +332,9 @@ public struct RenderSessionState: RawRepresentable, CustomStringConvertible,
   public static let attached: RenderSessionState = .init(rawValue: 2)
   public static let detaching: RenderSessionState = .init(rawValue: 3)
   public static let detached: RenderSessionState = .init(rawValue: 4)
+  /// A frame or driver task failed and the session can no longer render. The
+  /// map reports the failure as `MLN_RUNTIME_EVENT_MAP_RENDER_ERROR`. A failed
+  /// attach reports it through its completion instead.
   public static let targetLost: RenderSessionState = .init(rawValue: 5)
   public static let abandoned: RenderSessionState = .init(rawValue: 6)
   public var description: String {

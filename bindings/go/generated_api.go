@@ -1001,10 +1001,13 @@ func (value RenderSessionCapabilityFlag) Has(flags RenderSessionCapabilityFlag) 
 type RenderSessionState uint32
 
 const (
-	RenderSessionStateAttaching  RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_ATTACHING)
-	RenderSessionStateAttached   RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_ATTACHED)
-	RenderSessionStateDetaching  RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_DETACHING)
-	RenderSessionStateDetached   RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_DETACHED)
+	RenderSessionStateAttaching RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_ATTACHING)
+	RenderSessionStateAttached  RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_ATTACHED)
+	RenderSessionStateDetaching RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_DETACHING)
+	RenderSessionStateDetached  RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_DETACHED)
+	// A frame or driver task failed and the session can no longer render. The map
+	// reports the failure as MLN_RUNTIME_EVENT_MAP_RENDER_ERROR. A failed attach
+	// reports it through its completion instead.
 	RenderSessionStateTargetLost RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_TARGET_LOST)
 	RenderSessionStateAbandoned  RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_ABANDONED)
 )

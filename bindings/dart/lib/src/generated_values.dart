@@ -827,6 +827,10 @@ final class RenderSessionState extends _Enum {
   static const attached = RenderSessionState.fromRawValue(2);
   static const detaching = RenderSessionState.fromRawValue(3);
   static const detached = RenderSessionState.fromRawValue(4);
+
+  /// A frame or driver task failed and the session can no longer render. The
+  /// map reports the failure as `MLN_RUNTIME_EVENT_MAP_RENDER_ERROR`. A failed
+  /// attach reports it through its completion instead.
   static const targetLost = RenderSessionState.fromRawValue(5);
   static const abandoned = RenderSessionState.fromRawValue(6);
   @override

@@ -14,6 +14,12 @@ public enum RenderSessionState : uint
     Attached = 2,
     Detaching = 3,
     Detached = 4,
+
+    /// <summary>
+    /// A frame or driver task failed and the session can no longer render. The
+    /// map reports the failure as <c>MLN_RUNTIME_EVENT_MAP_RENDER_ERROR</c>. A
+    /// failed attach reports it through its completion instead.
+    /// </summary>
     TargetLost = 5,
     Abandoned = 6,
 }

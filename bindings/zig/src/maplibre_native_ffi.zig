@@ -2977,6 +2977,9 @@ pub const RenderSessionSnapshot = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub const RenderSessionState = enum(u32) {
     abandoned = 6,
+    /// A frame or driver task failed and the session can no longer render. The
+    /// map reports the failure as `MLN_RUNTIME_EVENT_MAP_RENDER_ERROR`. A
+    /// failed attach reports it through its completion instead.
     target_lost = 5,
     detached = 4,
     detaching = 3,

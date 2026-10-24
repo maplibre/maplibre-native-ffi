@@ -1072,6 +1072,11 @@ public data class RenderSessionState(public val rawValue: UInt) {
     public val ATTACHED: RenderSessionState = RenderSessionState(2u)
     public val DETACHING: RenderSessionState = RenderSessionState(3u)
     public val DETACHED: RenderSessionState = RenderSessionState(4u)
+    /**
+     * A frame or driver task failed and the session can no longer render. The map reports the
+     * failure as `MLN_RUNTIME_EVENT_MAP_RENDER_ERROR`. A failed attach reports it through its
+     * completion instead.
+     */
     public val TARGET_LOST: RenderSessionState = RenderSessionState(5u)
     public val ABANDONED: RenderSessionState = RenderSessionState(6u)
   }

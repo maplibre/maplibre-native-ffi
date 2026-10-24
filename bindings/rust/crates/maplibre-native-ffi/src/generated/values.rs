@@ -4005,6 +4005,9 @@ pub enum RenderSessionState: u32 {
     Attached = 2,
     Detaching = 3,
     Detached = 4,
+    /// A frame or driver task failed and the session can no longer render. The
+    /// map reports the failure as `MLN_RUNTIME_EVENT_MAP_RENDER_ERROR`. A
+    /// failed attach reports it through its completion instead.
     TargetLost = 5,
     Abandoned = 6,
 } Unknown

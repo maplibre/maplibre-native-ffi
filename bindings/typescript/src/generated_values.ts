@@ -2246,6 +2246,11 @@ export const RenderSessionState = {
   attached: 2,
   detaching: 3,
   detached: 4,
+  /**
+   * A frame or driver task failed and the session can no longer render. The map
+   * reports the failure as `MLN_RUNTIME_EVENT_MAP_RENDER_ERROR`. A failed
+   * attach reports it through its completion instead.
+   */
   targetLost: 5,
   abandoned: 6,
 } as const;
