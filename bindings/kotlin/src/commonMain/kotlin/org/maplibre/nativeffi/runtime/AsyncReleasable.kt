@@ -24,17 +24,24 @@ public interface AsyncReleasable {
  * release failure propagates.
  */
 public suspend inline fun <T : AsyncReleasable, R> T.use(block: suspend (T) -> R): R {
-  val result =
-    try {
-      block(this)
-    } catch (failure: Throwable) {
-      try {
-        if (!isClosed) withContext(NonCancellable) { release().await() }
-      } catch (releaseFailure: Throwable) {
-        failure.addSuppressed(releaseFailure)
+  var failure: Throwable? = null
+  try {
+    return block(this)
+  } catch (thrown: Throwable) {
+    failure = thrown
+    throw thrown
+  } finally {
+    // A finally block also releases when [block] returns from the caller.
+    if (!isClosed) {
+      if (failure == null) {
+        withContext(NonCancellable) { release().await() }
+      } else {
+        try {
+          withContext(NonCancellable) { release().await() }
+        } catch (releaseFailure: Throwable) {
+          failure.addSuppressed(releaseFailure)
+        }
       }
-      throw failure
     }
-  if (!isClosed) withContext(NonCancellable) { release().await() }
-  return result
+  }
 }

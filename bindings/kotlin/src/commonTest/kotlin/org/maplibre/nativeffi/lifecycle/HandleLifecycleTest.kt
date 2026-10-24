@@ -102,6 +102,13 @@ class HandleLifecycleTest {
   }
 
   @Test
+  fun useReleasesTheOwnerWhenItsBlockReturnsFromTheCaller() = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    returnFromUse(runtime)
+    assertTrue(runtime.isClosed)
+  }
+
+  @Test
   fun aHandleIdNamesItsEventsAndOutlivesRelease() = runSuspendTest {
     RuntimeFixture.use {
       val map = runtime.createMap(smallMapOptions()).awaitWithin("the map")
@@ -175,6 +182,12 @@ class HandleLifecycleTest {
   }
 
   /** A weak reference to an object that nothing else references. */
+  private suspend fun returnFromUse(runtime: RuntimeHandle) {
+    runtime.use {
+      return
+    }
+  }
+
   private fun unreferencedObject(): TestWeakReference = TestWeakReference(Any())
 
   /** Creates a map whose runtime nothing but the map references, and a weak reference to it. */
