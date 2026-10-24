@@ -86,7 +86,11 @@ internal actual fun interceptCallbackFailures(sink: (CallbackException) -> Unit)
 
 // Native keeps each routed request and queues it, and the page runs the callback as it drains.
 internal actual fun RuntimeHandle.setTestProvider(provider: TestProvider): Deferred<Unit> =
-  setResourceProvider(QueuedResourceProvider(provider.callback, provider.routes))
+  setResourceProvider(
+    QueuedResourceProvider(provider.routes) { request, handle ->
+      provider.callback(request, handle)
+    },
+  )
 
 // Native consumes each record and queues it, and the page runs the callback as it drains.
 internal actual fun setTestLogCallback(callback: (LogEvent) -> Unit) {

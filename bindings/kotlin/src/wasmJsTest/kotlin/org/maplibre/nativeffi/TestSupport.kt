@@ -55,7 +55,7 @@ internal object TestSupport {
 internal class TestWake(callback: () -> Unit) : AutoCloseable {
   private val call = NativeCall(0L)
   val owner = CallbackOwner()
-  val address: Long = call.writeWake(Wake(callback)).also { call.accept(owner) }
+  val address: Long = call.writeWake(Wake { callback() }).also { call.accept(owner) }
 
   override fun close() = call.close()
 }

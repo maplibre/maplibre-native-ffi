@@ -16,6 +16,7 @@ import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
 import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.generated.Wake
+import org.maplibre.nativeffi.generated.WakeCallback
 import org.maplibre.nativeffi.generated.native
 import org.maplibre.nativeffi.internal.c.UpcallStubs
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
@@ -41,7 +42,7 @@ private const val HEIGHT = 16
 class NativeRegistrationTest {
   @Test
   fun aNativeWakeReachesNativeWhichReleasesItOnce() = runSuspendTest {
-    var fixtureWake: () -> Unit = {}
+    var fixtureWake = WakeCallback {}
     HostFunctions(onCall = { fixtureWake() }).use { host ->
       withSmallMap {
         withRenderSession(

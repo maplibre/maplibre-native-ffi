@@ -255,11 +255,14 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
             if function.name not in split[lowering]:
                 continue
             plan = bound.operations_by_name[function.name]
-            receiver = (
-                f"Generated{value_name(receiver_value(plan).native)}Operations"
-                if plan.receiver
-                else "GeneratedApi"
-            )
+            if plan.receiver:
+                receiver = (
+                    f"Generated{value_name(receiver_value(plan).native)}Operations"
+                )
+            elif plan.scoped_receiver:
+                receiver = kotlin_callbacks.scoped_response(plan)
+            else:
+                receiver = "GeneratedApi"
             extensions.append(
                 operation_doc(bound, plan)
                 + extension(split[lowering][function.name], receiver)

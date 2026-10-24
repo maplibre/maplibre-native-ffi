@@ -15,8 +15,8 @@ import org.maplibre.nativeffi.generated.LogHandler
 import org.maplibre.nativeffi.generated.ResourceProvider
 import org.maplibre.nativeffi.generated.ResourceProviderDecision
 import org.maplibre.nativeffi.generated.Status
-import org.maplibre.nativeffi.generated.httpHeaderTransformResponseSetHeader
 import org.maplibre.nativeffi.generated.logSetCallback
+import org.maplibre.nativeffi.generated.setHeader
 import org.maplibre.nativeffi.generated.setHttpHeaderTransform
 import org.maplibre.nativeffi.generated.setResourceProvider
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
@@ -71,12 +71,12 @@ class ThreadedCallbackTest {
           runOnBackgroundThread {
             fromAnotherThread =
               runCatching {
-                GeneratedApi.httpHeaderTransformResponseSetHeader(response, "X-Test", "1")
+                response.setHeader("X-Test", "1")
               }
                 .exceptionOrNull()
           }
           val inside = runCatching {
-            GeneratedApi.httpHeaderTransformResponseSetHeader(response, "X-Test", "1")
+            response.setHeader("X-Test", "1")
           }
             .exceptionOrNull()
           outcome.complete(inside to fromAnotherThread)
@@ -96,7 +96,7 @@ class ThreadedCallbackTest {
         "the response from another thread: $fromAnotherThread",
       )
       assertFailsWithStatus(Status.INVALID_STATE) {
-        GeneratedApi.httpHeaderTransformResponseSetHeader(escaped!!, "X-Test", "1")
+        escaped!!.setHeader("X-Test", "1")
       }
       runtime.clearHttpHeaderTransform().awaitWithin("the header transform clear")
     }

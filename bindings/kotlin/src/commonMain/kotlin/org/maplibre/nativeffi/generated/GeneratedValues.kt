@@ -4310,10 +4310,17 @@ public data class CameraTransitionHandler(
 /**
  * Receives the end of one camera command's transitions.
  *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
+ * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
  * See `mln_camera_transition_end_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-public typealias CameraTransitionEndCallback = (end: CameraTransitionEnd) -> Unit
+public fun interface CameraTransitionEndCallback {
+  public operator fun invoke(end: CameraTransitionEnd)
+}
 
 /**
  * Options for custom geometry sources.
@@ -4322,10 +4329,6 @@ public typealias CameraTransitionEndCallback = (end: CameraTransitionEnd) -> Uni
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class CustomGeometrySourceOptions(
-  /** Tile fetch callback. Required in callback mode; null in queue mode. */
-  public val fetchTile: CustomSourceFetchTileCallback? = null,
-  /** Optional best-effort tile cancel callback. Null in queue mode. */
-  public val cancelTile: CustomSourceCancelTileCallback? = null,
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
   public val tolerance: Double? = null,
@@ -4333,23 +4336,41 @@ public data class CustomGeometrySourceOptions(
   public val buffer: UInt? = null,
   public val clip: Boolean? = null,
   public val wrap: Boolean? = null,
+  /** Tile fetch callback. Required in callback mode; null in queue mode. */
+  public val fetchTile: CustomSourceFetchTileCallback? = null,
+  /** Optional best-effort tile cancel callback. Null in queue mode. */
+  public val cancelTile: CustomSourceCancelTileCallback? = null,
 )
 
 /**
  * Requests one tile of a custom geometry or custom MVT vector source.
  *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
+ * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
  * See `mln_custom_source_fetch_tile_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-public typealias CustomSourceFetchTileCallback = (tileId: CanonicalTileId) -> Unit
+public fun interface CustomSourceFetchTileCallback {
+  public operator fun invoke(tileId: CanonicalTileId)
+}
 
 /**
  * Cancels a request for one tile of a custom geometry or custom MVT vector source, best effort.
  *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
+ * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
  * See `mln_custom_source_cancel_tile_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-public typealias CustomSourceCancelTileCallback = (tileId: CanonicalTileId) -> Unit
+public fun interface CustomSourceCancelTileCallback {
+  public operator fun invoke(tileId: CanonicalTileId)
+}
 
 /**
  * Options for custom MVT vector sources.
@@ -4358,12 +4379,12 @@ public typealias CustomSourceCancelTileCallback = (tileId: CanonicalTileId) -> U
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class CustomMvtVectorSourceOptions(
+  public val minZoom: Double? = null,
+  public val maxZoom: Double? = null,
   /** Tile fetch callback. Required in callback mode; null in queue mode. */
   public val fetchTile: CustomSourceFetchTileCallback? = null,
   /** Optional best-effort tile cancel callback. Null in queue mode. */
   public val cancelTile: CustomSourceCancelTileCallback? = null,
-  public val minZoom: Double? = null,
-  public val maxZoom: Double? = null,
 )
 
 /**
@@ -4391,10 +4412,17 @@ internal constructor(
 /**
  * Schedules service by the receiver that owns a queue or driver.
  *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
+ * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
  * See `mln_wake_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
  */
-public typealias WakeCallback = () -> Unit
+public fun interface WakeCallback {
+  public operator fun invoke()
+}
 
 /**
  * Host lock on the graphics queue that a session shares with its host, copied by a successful
@@ -4426,10 +4454,18 @@ internal constructor(
  * Takes or returns the host's lock on the queue that a session shares with it. Native code relies
  * on the lock being held or released when the call returns.
  *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads and relies
+ * on its work being done when it returns. Kotlin/Wasm cannot run Kotlin on a native thread, so it
+ * refuses a registration that sets one.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
  * See `mln_queue_lock_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-public typealias QueueLockCallback = () -> Unit
+public fun interface QueueLockCallback {
+  public operator fun invoke()
+}
 
 /**
  * Cancel callback or queue state for one handled resource request.
@@ -4445,10 +4481,17 @@ public data class ResourceRequestCancelHandler(
 /**
  * Reports that MapLibre cancelled a C API resource provider request.
  *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
+ * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
  * See `mln_resource_request_cancel_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-public typealias ResourceRequestCancelCallback = () -> Unit
+public fun interface ResourceRequestCancelCallback {
+  public operator fun invoke()
+}
 
 /**
  * Runtime and map event delivery. Set either callback or queue.
@@ -4463,10 +4506,17 @@ public data class RuntimeEventHandler(
 /**
  * Receives selected events after their snapshots have been published.
  *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
+ * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
  * See `mln_runtime_event_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-public typealias RuntimeEventCallback = (events: EventBatchView) -> Unit
+public fun interface RuntimeEventCallback {
+  public operator fun invoke(events: EventBatchView)
+}
 
 /**
  * Resource transform state.
@@ -4482,8 +4532,18 @@ public data class ResourceTransform(
 /**
  * Asks the host for the URL of one network resource request.
  *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
+ * Kotlin/Wasm, the page calls it when it drains the binding's delivery queue.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
  * See `mln_resource_transform_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-public typealias ResourceTransformCallback =
-  (kind: ResourceKind, url: String, request: ResourceTransformRequestHandle) -> Unit
+public fun interface ResourceTransformCallback {
+  public operator fun invoke(
+    kind: ResourceKind,
+    url: String,
+    request: ResourceTransformRequestHandle,
+  )
+}

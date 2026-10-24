@@ -44,7 +44,6 @@ from dataclasses import dataclass, replace
 from .. import async_hosts, docs
 from ..model import CType
 from ..protocol import COMPLETION
-from ..semantic import public_stem
 from .kotlin_values import Unsupported, doc, identifier, name, owner_class
 
 # The split lowerings: the threaded targets' forms, and Kotlin/Wasm's.
@@ -218,9 +217,68 @@ def split_note(value, values):
     )
 
 
+def registration_forms(value, values):
+    """The `async_hosts` forms of the registrations that take callback [value]."""
+    return {
+        form(registration, values)
+        for used in (values.used, *values.split_used.values())
+        for registration in used.values()
+        if registration.registration
+        and any(
+            field.value.native == value.native
+            for field in async_hosts.callback_fields(registration)
+        )
+    }
+
+
+def thread_note(value, values):
+    """Which thread runs a callback on each target that takes it."""
+    if values.split == ASYNC:
+        return "The page calls it when it drains the binding's delivery queue."
+    forms = registration_forms(value, values)
+    if values.split == THREADED or forms <= {"rules"}:
+        return (
+            "Native code calls it on one of its own threads and waits for it to return."
+        )
+    if "native" in forms:
+        return (
+            "On the JVM, Android, and Kotlin/Native, native code calls it on one of "
+            "its own threads and relies on its work being done when it returns. "
+            "Kotlin/Wasm cannot run Kotlin on a native thread, so it refuses a "
+            "registration that sets one."
+        )
+    return (
+        "On the JVM, Android, and Kotlin/Native, native code calls it on one of its "
+        "own threads. On Kotlin/Wasm, the page calls it when it drains the "
+        "binding's delivery queue."
+    )
+
+
+def throw_note(value, values):
+    """What native receives, and where the throwable goes, when a callback throws."""
+    callback = values.bound.callbacks[value.native]
+    report = "the binding reports it as a `CallbackException`"
+    if callback.failure == "contain" or queued(value, values):
+        return f"If it throws, {report}."
+    return f"If it throws, native receives `{callback.failure}`, and {report}."
+
+
 def declaration_doc(value, values):
     """The KDoc of a declaration, which says how a split form differs by target."""
     found = values.bound.doc(value.native)
+    if value.kind == "callback":
+        notes = (
+            *(found.notes if found else ()),
+            thread_note(value, values),
+            throw_note(value, values),
+        )
+        summary = found.summary if found else ""
+        if split(value, values):
+            note = split_note(value, values)
+            summary = f"{summary} {note}" if summary else note
+        return docs.block_comment(
+            docs.Doc(value.native, summary, found.url if found else "", notes)
+        )
     if accepts_native(value, values) and found:
         factory = native_factory(value, values)
         note = (
@@ -254,7 +312,12 @@ def declaration(value, values):
             or queued(value, values)
             else values.public(callback.result)
         )
-        return f"{declaration_doc(value, values)}public typealias {public} = ({parameters}) -> {returns}"
+        return (
+            f"{declaration_doc(value, values)}public fun interface {public} {{\n"
+            f"  public operator fun invoke({parameters})"
+            + ("" if returns == "Unit" else f": {returns}")
+            + "\n}"
+        )
     if value.response:
         return (
             f"{doc(values.bound, value.native)}public class {public} internal constructor("
@@ -263,7 +326,12 @@ def declaration(value, values):
         )
     parameters = []
     defaults = []
-    for member, typ, field in values.members(value):
+    # Function-typed members come last, so a caller can pass the last as a
+    # trailing lambda.
+    members = sorted(
+        values.members(value), key=lambda member: member[2].value.kind == "callback"
+    )
+    for member, typ, field in members:
         default = "null" if typ.endswith("?") else values.field_default(field)
         defaults.append(f"{member}: {typ}" + (f" = {default}" if default else ""))
         parameters.append(
@@ -279,7 +347,7 @@ def declaration(value, values):
         )
     # The internal member holds a native registration, which only the threaded
     # factory creates, so the public constructor leaves it null.
-    members = ", ".join(member for member, _typ, _field in values.members(value))
+    members = ", ".join(member for member, _typ, _field in members)
     parameters.append(f"  internal val {NATIVE_MEMBER}: NativeRegistration?")
     return (
         f"{declaration_doc(value, values)}@ConsistentCopyVisibility\n"
@@ -1011,19 +1079,20 @@ def operation(plan, values, native):
             raise Unsupported("a callback response exists only inside a threaded form")
         lengths = {p.value.length for p in plan.inputs if p.value.kind == "buffer"}
         inputs = [
-            p for p in plan.inputs if p.name != plan.receiver and p.name not in lengths
+            p
+            for p in plan.inputs
+            if p.name not in {plan.receiver, plan.scoped_receiver}
+            and p.name not in lengths
         ]
         params = [(parameter_name(p.name), values.public(p.value)) for p in inputs]
-        # A response operation takes its response as an argument, so it keeps
-        # the whole name that a free function has.
-        method = identifier(plan.member if plan.receiver else public_stem(plan.name))
+        # The split source set declares a response operation as an extension of
+        # its response (see `scoped_response`).
         arguments = call_arguments(plan, values)
-        scoped = parameter_name(plan.scoped_receiver)
         index = [p.name for p in plan.inputs].index(plan.scoped_receiver)
         arguments[index] = "handle"
         return (
-            f"  public fun {method}({declaration(params)}): Unit = "
-            f"nativeRespond({scoped}.bindingScope, {scoped}.bindingAddress) "
+            f"  public fun {identifier(plan.member)}({declaration(params)}): Unit = "
+            "nativeRespond(bindingScope, bindingAddress) "
             f"{{ {encodings(plan)}{native.checked(plan.function, arguments)} }}\n"
         )
     if not plan.registrations or plan.owned_outputs:
@@ -1035,6 +1104,12 @@ def operation(plan, values, native):
             "callback registration needs its native admission transaction"
         )
     return None
+
+
+def scoped_response(plan):
+    """The response type that a response operation extends."""
+    response = next(p.value for p in plan.inputs if p.name == plan.scoped_receiver)
+    return name(response.unwrapped.native)
 
 
 def immediate_registration(plan, values, native):

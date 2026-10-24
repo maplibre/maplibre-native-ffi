@@ -26,11 +26,16 @@ public data class QueuedLogHandler(
  * Receives a MapLibre Native log record. The page receives the call after native has answered it,
  * so the callback returns nothing, and native answers `1` as it does for a queue.
  *
+ * The page calls it when it drains the binding's delivery queue.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
  * See `mln_log_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
-public typealias QueuedLogCallback =
-  (severity: LogSeverity, event: LogEvent, code: Long, message: String) -> Unit
+public fun interface QueuedLogCallback {
+  public operator fun invoke(severity: LogSeverity, event: LogEvent, code: Long, message: String)
+}
 
 /**
  * HTTP header transform state: a callback, or native header rules. This is the Kotlin/Wasm form,
@@ -54,10 +59,10 @@ public data class HttpHeaderTransformRules(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class QueuedResourceProvider(
-  /** Decides each request that the routes leave to the provider. */
-  public val callback: QueuedResourceProviderCallback,
   /** The requests that reach the provider; empty to claim every request. */
   public val routes: List<ResourceRoute> = emptyList(),
+  /** Decides each request that the routes leave to the provider. */
+  public val callback: QueuedResourceProviderCallback,
 )
 
 /**
@@ -65,11 +70,16 @@ public data class QueuedResourceProvider(
  * so the callback returns nothing, and native answers `MLN_RESOURCE_PROVIDER_DECISION_HANDLE` as it
  * does for a queue.
  *
+ * The page calls it when it drains the binding's delivery queue.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
  * See `mln_resource_provider_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-public typealias QueuedResourceProviderCallback =
-  (request: ResourceRequestInfo, handle: ResourceRequestHandle) -> Unit
+public fun interface QueuedResourceProviderCallback {
+  public operator fun invoke(request: ResourceRequestInfo, handle: ResourceRequestHandle)
+}
 
 internal fun NativeCall.putQueuedLogHandler(target: Long, value: QueuedLogHandler) {
   writeU32(target, w(24, 40).toUInt())

@@ -9,12 +9,6 @@ import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
-public class HttpHeaderTransformResponse
-internal constructor(
-  internal val bindingAddress: Long,
-  internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope,
-)
-
 /**
  * Process-global log callback or queue state. Kotlin/Wasm takes `QueuedLogHandler` in its place.
  *
@@ -29,11 +23,21 @@ public data class LogHandler(
 /**
  * Receives a MapLibre Native log record. Kotlin/Wasm takes `QueuedLogCallback` in its place.
  *
+ * Native code calls it on one of its own threads and waits for it to return.
+ *
+ * If it throws, native receives `0`, and the binding reports it as a `CallbackException`.
+ *
  * See `mln_log_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
-public typealias LogCallback =
-  (severity: LogSeverity, event: LogEvent, code: Long, message: String) -> UInt
+public fun interface LogCallback {
+  public operator fun invoke(
+    severity: LogSeverity,
+    event: LogEvent,
+    code: Long,
+    message: String,
+  ): UInt
+}
 
 /**
  * HTTP header transform state: a callback, or native header rules. Kotlin/Wasm takes
@@ -43,20 +47,36 @@ public typealias LogCallback =
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class HttpHeaderTransform(
-  /** The callback, or null to apply rules. */
-  public val callback: HttpHeaderTransformCallback? = null,
   /** Header rules for a transform without a callback; empty with one. */
   public val rules: List<HttpHeaderRule> = emptyList(),
+  /** The callback, or null to apply rules. */
+  public val callback: HttpHeaderTransformCallback? = null,
 )
 
 /**
  * Adds end-to-end headers to one outgoing HTTP request attempt.
  *
+ * Native code calls it on one of its own threads and waits for it to return.
+ *
+ * If it throws, native receives `MLN_STATUS_NATIVE_ERROR`, and the binding reports it as a
+ * `CallbackException`.
+ *
  * See `mln_http_header_transform_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-public typealias HttpHeaderTransformCallback =
-  (kind: ResourceKind, url: String, outResponse: HttpHeaderTransformResponse) -> Unit
+public fun interface HttpHeaderTransformCallback {
+  public operator fun invoke(
+    kind: ResourceKind,
+    url: String,
+    outResponse: HttpHeaderTransformResponse,
+  )
+}
+
+public class HttpHeaderTransformResponse
+internal constructor(
+  internal val bindingAddress: Long,
+  internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope,
+)
 
 /**
  * Resource provider state. Kotlin/Wasm takes `QueuedResourceProvider` in its place.
@@ -65,21 +85,29 @@ public typealias HttpHeaderTransformCallback =
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class ResourceProvider(
-  /** Decides each request that the routes leave to the provider. */
-  public val callback: ResourceProviderCallback,
   /** The requests that reach the provider; empty to claim every request. */
   public val routes: List<ResourceRoute> = emptyList(),
+  /** Decides each request that the routes leave to the provider. */
+  public val callback: ResourceProviderCallback,
 )
 
 /**
  * Intercepts a network resource request. Kotlin/Wasm takes `QueuedResourceProviderCallback` in its
  * place.
  *
+ * Native code calls it on one of its own threads and waits for it to return.
+ *
+ * If it throws, native receives `4294967295`, and the binding reports it as a `CallbackException`.
+ *
  * See `mln_resource_provider_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-public typealias ResourceProviderCallback =
-  (request: ResourceRequestInfo, handle: ResourceRequestHandle) -> ResourceProviderDecision
+public fun interface ResourceProviderCallback {
+  public operator fun invoke(
+    request: ResourceRequestInfo,
+    handle: ResourceRequestHandle,
+  ): ResourceProviderDecision
+}
 
 internal fun NativeCall.putLogHandler(target: Long, value: LogHandler) {
   writeU32(target, w(24, 40).toUInt())
@@ -128,12 +156,8 @@ internal fun NativeCall.writeResourceProvider(value: ResourceProvider): Long =
  * See `mln_http_header_transform_response_set_header` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-public fun GeneratedApi.httpHeaderTransformResponseSetHeader(
-  response: HttpHeaderTransformResponse,
-  name: String,
-  value: String,
-): Unit =
-  nativeRespond(response.bindingScope, response.bindingAddress) {
+public fun HttpHeaderTransformResponse.setHeader(name: String, value: String): Unit =
+  nativeRespond(bindingScope, bindingAddress) {
     check(
       C.mln_http_header_transform_response_set_header(handle, view(name), view(value), diagnostic),
     )
