@@ -539,9 +539,10 @@ class Values:
             return {"double": "0", "int": "0", "bool": "false"}.get(self.public(value))
         if value.kind == "enum":
             return (
-                f"const {public_name(value.native)}.fromRawValue(0)"
+                f"{public_name(value.native)}.{self.empty_member(value)}"
                 if value.enum_kind == "bitmask"
-                or any(number == 0 for _, number in value.enum_values)
+                else f"const {public_name(value.native)}.fromRawValue(0)"
+                if any(number == 0 for _, number in value.enum_values)
                 else None
             )
         if value.kind == "record":
@@ -555,6 +556,23 @@ class Values:
                     return None
             return f"const {public_name(value.native)}()"
         return None
+
+    def enum_members(self, value):
+        """Each C enum constant's Dart name and number, in declaration order."""
+        prefix = enum_member_prefix(
+            (name for name, _ in value.enum_values), value.native
+        )
+        return [
+            (name, identifier(name.removeprefix(prefix).lower()), number)
+            for name, number in value.enum_values
+        ]
+
+    def empty_member(self, value):
+        """The name of a bitmask's empty value: C's zero constant, or `none`."""
+        return next(
+            (member for _, member, number in self.enum_members(value) if number == 0),
+            "none",
+        )
 
     def delivered_owner(self, callback, parameter):
         """Whether a delivered argument is a handle that the host takes from
@@ -1013,28 +1031,35 @@ class Values:
             documented.append((len(declarations), value.native))
             if value.kind == "enum":
                 public = public_name(value.native)
-                prefix = enum_member_prefix(
-                    (name for name, _ in value.enum_values), value.native
-                )
+                enum_members = self.enum_members(value)
                 members = "\n".join(
-                    f"{doc(self.bound, name, '  ')}  static const {identifier(name.removeprefix(prefix).lower())} = {public}.fromRawValue({number});"
-                    for name, number in value.enum_values
+                    f"{doc(self.bound, name, '  ')}  static const {member} = {public}.fromRawValue({number});"
+                    for name, member, number in enum_members
                 )
                 bitmask = value.enum_kind == "bitmask"
                 base = f"_Flags<{public}>" if bitmask else "_Enum"
-                operators = (
-                    f"  @override {public} _of(int rawValue) => {public}.fromRawValue(rawValue);\n"
-                    if bitmask
-                    else ""
-                )
-                if not bitmask:
+                declares_empty = any(number == 0 for _, _, number in enum_members)
+                if bitmask:
+                    if not declares_empty:
+                        members += f"\n\n  /// No flags.\n  static const none = {public}.fromRawValue(0);"
+                    names = {} if declares_empty else {0: "none"}
+                    for _, member, number in enum_members:
+                        names.setdefault(number, member)
+                    entries = ", ".join(
+                        f"{number}: '{member}'" for number, member in names.items()
+                    )
+                    operators = (
+                        f"  @override {public} _of(int rawValue) => {public}.fromRawValue(rawValue);\n"
+                        f"  @override String toString() => _describe('{public}', const {{{entries}}});\n"
+                    )
+                else:
                     cases = "\n".join(
-                        f"{number} => '{public}.{identifier(name.removeprefix(prefix).lower())}',"
-                        for number, name in {
-                            number: name for name, number in value.enum_values
+                        f"{number} => '{public}.{member}',"
+                        for number, member in {
+                            number: member for _, member, number in enum_members
                         }.items()
                     )
-                    operators += f"  @override String toString() => switch (rawValue) {{ {cases} _ => '{public}($rawValue)', }};\n"
+                    operators = f"  @override String toString() => switch (rawValue) {{ {cases} _ => '{public}($rawValue)', }};\n"
                 declarations.append(
                     f"final class {public} extends {base} {{\n  const {public}.fromRawValue(super.rawValue);\n{members}\n{operators}}}\n"
                 )
@@ -1137,11 +1162,23 @@ class Values:
             args += [f"this.{name} = false" for name, _ in flags]
             signature = ", ".join(args)
             signature = "{" + signature + "}"
-            compared = ", ".join(
-                [name for name, _, _ in members] + [name for name, _ in flags]
-            )
+            names = [name for name, _, _ in members] + [name for name, _ in flags]
+            compared = ", ".join(names)
+            described = ", ".join(f"'{name}'" for name in names)
+            copy = ""
+            if value.native in self.bound.inputs:
+                parameters = ", ".join(
+                    f"{typ.removesuffix('?')}? {name}" for name, typ, _ in members
+                ) + "".join(f", bool? {name}" for name, _ in flags)
+                copy = (
+                    f"\n  /// A copy of this value with the given members replaced.\n"
+                    f"  {public} copyWith({{{parameters}}}) => {public}("
+                    + ", ".join(f"{name}: {name} ?? this.{name}" for name in names)
+                    + ");\n"
+                )
             declarations.append(
-                f"final class {public} extends _Value {{\n  {'const ' if not initializers and not value.default else ''}{public}({signature}){' : ' + ', '.join(initializers) if initializers else ''};\n{fields}\n  @override List<Object?> get _members => [{compared}];\n}}\n"
+                f"final class {public} extends _Value {{\n  {'const ' if not initializers and not value.default else ''}{public}({signature}){' : ' + ', '.join(initializers) if initializers else ''};\n{fields}\n{copy}\n  @override List<Object?> get _members => [{compared}];\n"
+                f"  @override String toString() => _describe('{public}', const [{described}]);\n}}\n"
             )
             write = [
                 f"Pointer<raw.{value.native}> _write{public}({public} value, Allocator arena"

@@ -38,7 +38,7 @@ void main() {
     // from one dump could then reach the callback installed for the next.
     // Synchronous records reach the delivery queue before the dump's own
     // completion does, so awaiting a dump fences its records.
-    logSetAsyncSeverityMask(const LogSeverityMask.fromRawValue(0));
+    logSetAsyncSeverityMask(LogSeverityMask.none);
     addTearDown(() async {
       final installed = logRegistrationProbeForTesting();
       logClearCallback();

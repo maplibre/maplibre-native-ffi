@@ -1,7 +1,7 @@
 /// The public value types of the C API.
 ///
 /// `generated_values.dart` declares each value, enum, and callback type; this
-/// library supplies the equality they share.
+/// library supplies the equality and descriptions they share.
 library;
 
 import 'dart:typed_data';
@@ -27,6 +27,20 @@ abstract base class _Value {
 
   @override
   int get hashCode => _valueHash(_members);
+
+  /// Describes this value as `type(name=member, ...)`, pairing [names] with
+  /// [_members]. Byte members print only their length.
+  String _describe(String type, List<String> names) {
+    final members = _members;
+    final described = [
+      for (var index = 0; index < names.length; index++)
+        '${names[index]}=${switch (members[index]) {
+          final Uint8List bytes => 'Uint8List(${bytes.length} bytes)',
+          final member => member,
+        }}',
+    ];
+    return '$type(${described.join(', ')})';
+  }
 }
 
 /// A C enum value, which equals another of its type with the same raw value.
@@ -56,6 +70,23 @@ abstract base class _Flags<T extends _Flags<T>> extends _Enum {
 
   /// Whether every bit of [other] is set in this value.
   bool contains(T other) => (rawValue & other.rawValue) == other.rawValue;
+
+  /// Describes this value as the named members whose bits it sets, joined by
+  /// `|`, then any unnamed bits in hex.
+  String _describe(String type, Map<int, String> names) {
+    final exact = names[rawValue];
+    if (exact != null) return '$type.$exact';
+    final described = <String>[];
+    var rest = rawValue;
+    for (final MapEntry(key: bits, value: name) in names.entries) {
+      if (bits != 0 && rest & bits == bits) {
+        described.add('$type.$name');
+        rest &= ~bits;
+      }
+    }
+    if (rest != 0) described.add('0x${rest.toUnsigned(64).toRadixString(16)}');
+    return described.join(' | ');
+  }
 }
 
 bool _valueEquals(Object? left, Object? right) {

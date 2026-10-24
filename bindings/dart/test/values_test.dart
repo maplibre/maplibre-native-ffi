@@ -228,4 +228,30 @@ void main() {
     expect(() => options.clusterProperties![0] = 9, throwsUnsupportedError);
     expect(() => definition.geometry[0] = 9, throwsUnsupportedError);
   });
+
+  test('copyWith replaces only the members it is given', () {
+    final camera = CameraOptions(zoom: 2, bearing: 30);
+    expect(camera.copyWith(zoom: 4), CameraOptions(zoom: 4, bearing: 30));
+    expect(camera.copyWith(), camera);
+  });
+
+  test('values and flag sets describe their members', () {
+    expect(
+      const LatLng(latitude: 1, longitude: 2).toString(),
+      'LatLng(latitude=1.0, longitude=2.0)',
+    );
+    expect(
+      GeojsonSourceOptions(clusterProperties: Uint8List(3)).toString(),
+      contains('clusterProperties=Uint8List(3 bytes)'),
+    );
+    expect(FrameDemandFlag.none.toString(), 'FrameDemandFlag.none');
+    expect(
+      (FrameDemandFlag.present |
+              FrameDemandFlag.waitForUpdate |
+              const FrameDemandFlag.fromRawValue(0x100))
+          .toString(),
+      'FrameDemandFlag.present | FrameDemandFlag.waitForUpdate | 0x100',
+    );
+    expect(RuntimeEventMask.all.toString(), 'RuntimeEventMask.all');
+  });
 }

@@ -92,9 +92,7 @@ Future<void> releaseSession(RenderSessionHandle session) =>
 
 /// Demands a forced frame, which renders whether or not the map changed.
 void _requestFrame(RenderSessionHandle session, int token) {
-  session.requestFrame(
-    FrameDemand(flags: const FrameDemandFlag.fromRawValue(0), token: token),
-  );
+  session.requestFrame(FrameDemand(flags: FrameDemandFlag.none, token: token));
 }
 
 /// Drains the session's frame results and returns the one for [token], or

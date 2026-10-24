@@ -150,8 +150,18 @@ final class FrameDemandFlag extends _Flags<FrameDemandFlag> {
   /// appears in a later frame. To show several commands in one frame, submit
   /// them in a command group, or arm demands once per display frame.
   static const waitForUpdate = FrameDemandFlag.fromRawValue(4);
+
+  /// No flags.
+  static const none = FrameDemandFlag.fromRawValue(0);
   @override
   FrameDemandFlag _of(int rawValue) => FrameDemandFlag.fromRawValue(rawValue);
+  @override
+  String toString() => _describe('FrameDemandFlag', const {
+    0: 'none',
+    1: 'ifNeeded',
+    2: 'present',
+    4: 'waitForUpdate',
+  });
 }
 
 /// Gesture boundary carried atomically with a camera update or delta.
@@ -286,8 +296,20 @@ final class LogSeverityMask extends _Flags<LogSeverityMask> {
   static const error = LogSeverityMask.fromRawValue(8);
   static const defaultValue = LogSeverityMask.fromRawValue(6);
   static const all = LogSeverityMask.fromRawValue(14);
+
+  /// No flags.
+  static const none = LogSeverityMask.fromRawValue(0);
   @override
   LogSeverityMask _of(int rawValue) => LogSeverityMask.fromRawValue(rawValue);
+  @override
+  String toString() => _describe('LogSeverityMask', const {
+    0: 'none',
+    2: 'info',
+    4: 'warning',
+    8: 'error',
+    6: 'defaultValue',
+    14: 'all',
+  });
 }
 
 /// Debug overlay mask values for `mln_map_set_debug_options()`.
@@ -303,8 +325,22 @@ final class MapDebugOption extends _Flags<MapDebugOption> {
   static const overdraw = MapDebugOption.fromRawValue(32);
   static const stencilClip = MapDebugOption.fromRawValue(64);
   static const depthBuffer = MapDebugOption.fromRawValue(128);
+
+  /// No flags.
+  static const none = MapDebugOption.fromRawValue(0);
   @override
   MapDebugOption _of(int rawValue) => MapDebugOption.fromRawValue(rawValue);
+  @override
+  String toString() => _describe('MapDebugOption', const {
+    0: 'none',
+    2: 'tileBorders',
+    4: 'parseStatus',
+    8: 'timestamps',
+    16: 'collision',
+    32: 'overdraw',
+    64: 'stencilClip',
+    128: 'depthBuffer',
+  });
 }
 
 /// Map rendering modes used when creating a map.
@@ -432,9 +468,19 @@ final class OpenglContextProviderFlag
 
   /// Browser WebGL context imported into an Emscripten module.
   static const webgl = OpenglContextProviderFlag.fromRawValue(4);
+
+  /// No flags.
+  static const none = OpenglContextProviderFlag.fromRawValue(0);
   @override
   OpenglContextProviderFlag _of(int rawValue) =>
       OpenglContextProviderFlag.fromRawValue(rawValue);
+  @override
+  String toString() => _describe('OpenglContextProviderFlag', const {
+    0: 'none',
+    1: 'wgl',
+    2: 'egl',
+    4: 'webgl',
+  });
 }
 
 /// What abandon did with a session's graphics resources.
@@ -467,9 +513,20 @@ final class RenderBackendFlag extends _Flags<RenderBackendFlag> {
   static const vulkan = RenderBackendFlag.fromRawValue(2);
   static const opengl = RenderBackendFlag.fromRawValue(4);
   static const webgpu = RenderBackendFlag.fromRawValue(8);
+
+  /// No flags.
+  static const none = RenderBackendFlag.fromRawValue(0);
   @override
   RenderBackendFlag _of(int rawValue) =>
       RenderBackendFlag.fromRawValue(rawValue);
+  @override
+  String toString() => _describe('RenderBackendFlag', const {
+    0: 'none',
+    1: 'metal',
+    2: 'vulkan',
+    4: 'opengl',
+    8: 'webgpu',
+  });
 }
 
 /// Execution placement for one render session.
@@ -556,9 +613,20 @@ final class RenderSessionCapabilityFlag
   static const readback = RenderSessionCapabilityFlag.fromRawValue(2);
   static const consumerSync = RenderSessionCapabilityFlag.fromRawValue(4);
   static const presentation = RenderSessionCapabilityFlag.fromRawValue(8);
+
+  /// No flags.
+  static const none = RenderSessionCapabilityFlag.fromRawValue(0);
   @override
   RenderSessionCapabilityFlag _of(int rawValue) =>
       RenderSessionCapabilityFlag.fromRawValue(rawValue);
+  @override
+  String toString() => _describe('RenderSessionCapabilityFlag', const {
+    0: 'none',
+    1: 'frameAcquisition',
+    2: 'readback',
+    4: 'consumerSync',
+    8: 'presentation',
+  });
 }
 
 /// Render-session lifecycle visible in snapshots.
@@ -650,8 +718,24 @@ final class ResourceKindMask extends _Flags<ResourceKindMask> {
   static const spriteJson = ResourceKindMask.fromRawValue(64);
   static const image = ResourceKindMask.fromRawValue(128);
   static const all = ResourceKindMask.fromRawValue(255);
+
+  /// No flags.
+  static const none = ResourceKindMask.fromRawValue(0);
   @override
   ResourceKindMask _of(int rawValue) => ResourceKindMask.fromRawValue(rawValue);
+  @override
+  String toString() => _describe('ResourceKindMask', const {
+    0: 'none',
+    1: 'unknown',
+    2: 'style',
+    4: 'source',
+    8: 'tile',
+    16: 'glyphs',
+    32: 'spriteImage',
+    64: 'spriteJson',
+    128: 'image',
+    255: 'all',
+  });
 }
 
 final class ResourceLoadingMethod extends _Enum {
@@ -780,6 +864,32 @@ final class RuntimeEventMask extends _Flags<RuntimeEventMask> {
   static const all = RuntimeEventMask.fromRawValue(12576254);
   @override
   RuntimeEventMask _of(int rawValue) => RuntimeEventMask.fromRawValue(rawValue);
+  @override
+  String toString() => _describe('RuntimeEventMask', const {
+    0: 'none',
+    2: 'mapCameraWillChange',
+    4: 'mapCameraIsChanging',
+    8: 'mapCameraDidChange',
+    16: 'mapStyleLoaded',
+    32: 'mapLoadingStarted',
+    64: 'mapLoadingFinished',
+    128: 'mapLoadingFailed',
+    256: 'mapIdle',
+    1024: 'mapRenderError',
+    8192: 'mapRenderFrameStarted',
+    16384: 'mapRenderFrameFinished',
+    32768: 'mapRenderMapStarted',
+    65536: 'mapRenderMapFinished',
+    131072: 'mapStyleImageMissing',
+    262144: 'mapTileAction',
+    524288: 'offlineRegionStatusChanged',
+    1048576: 'offlineRegionResponseError',
+    2097152: 'offlineRegionTileCountLimitExceeded',
+    8388608: 'mapSourceChanged',
+    8906238: 'allMapEvents',
+    3670016: 'allRuntimeEvents',
+    12576254: 'all',
+  });
 }
 
 /// Source kinds used by `mln_runtime_event.source_type`.
@@ -1116,6 +1226,9 @@ final class UrlMatchFlags extends _Flags<UrlMatchFlags> {
   static const glob = UrlMatchFlags.fromRawValue(1);
   @override
   UrlMatchFlags _of(int rawValue) => UrlMatchFlags.fromRawValue(rawValue);
+  @override
+  String toString() =>
+      _describe('UrlMatchFlags', const {0: 'exact', 1: 'glob'});
 }
 
 /// Viewport orientation modes used by `mln_map_viewport_options`.
@@ -1212,6 +1325,18 @@ final class MetalTextureFrame extends _Value {
     device,
     pixelFormat,
   ];
+  @override
+  String toString() => _describe('MetalTextureFrame', const [
+    'generation',
+    'width',
+    'height',
+    'scaleFactor',
+    'frameId',
+    'slot',
+    'texture',
+    'device',
+    'pixelFormat',
+  ]);
 }
 
 /// OpenGL frame acquired from a texture ring.
@@ -1282,6 +1407,20 @@ final class OpenglTextureFrame extends _Value {
     format,
     type,
   ];
+  @override
+  String toString() => _describe('OpenglTextureFrame', const [
+    'generation',
+    'width',
+    'height',
+    'scaleFactor',
+    'frameId',
+    'slot',
+    'texture',
+    'target',
+    'internalFormat',
+    'format',
+    'type',
+  ]);
 }
 
 /// Backend synchronization copied by frame access and release calls.
@@ -1299,8 +1438,14 @@ final class GpuSync extends _Value {
   /// Bit pattern of the GLsync pointer.
   final int object;
 
+  /// A copy of this value with the given members replaced.
+  GpuSync copyWith({GpuSyncKind? kind, int? object}) =>
+      GpuSync(kind: kind ?? this.kind, object: object ?? this.object);
+
   @override
   List<Object?> get _members => [kind, object];
+  @override
+  String toString() => _describe('GpuSync', const ['kind', 'object']);
 }
 
 /// Geographic coordinate in degrees used by map and projection APIs.
@@ -1316,8 +1461,16 @@ final class LatLng extends _Value {
   /// Longitude in degrees. Input longitude must be finite.
   final double longitude;
 
+  /// A copy of this value with the given members replaced.
+  LatLng copyWith({double? latitude, double? longitude}) => LatLng(
+    latitude: latitude ?? this.latitude,
+    longitude: longitude ?? this.longitude,
+  );
+
   @override
   List<Object?> get _members => [latitude, longitude];
+  @override
+  String toString() => _describe('LatLng', const ['latitude', 'longitude']);
 }
 
 /// Screen-space inset in logical map pixels.
@@ -1336,8 +1489,24 @@ final class EdgeInsets extends _Value {
   final double bottom;
   final double right;
 
+  /// A copy of this value with the given members replaced.
+  EdgeInsets copyWith({
+    double? top,
+    double? left,
+    double? bottom,
+    double? right,
+  }) => EdgeInsets(
+    top: top ?? this.top,
+    left: left ?? this.left,
+    bottom: bottom ?? this.bottom,
+    right: right ?? this.right,
+  );
+
   @override
   List<Object?> get _members => [top, left, bottom, right];
+  @override
+  String toString() =>
+      _describe('EdgeInsets', const ['top', 'left', 'bottom', 'right']);
 }
 
 /// Screen-space point in logical map pixels, from the top-left of the viewport
@@ -1350,8 +1519,14 @@ final class ScreenPoint extends _Value {
   final double x;
   final double y;
 
+  /// A copy of this value with the given members replaced.
+  ScreenPoint copyWith({double? x, double? y}) =>
+      ScreenPoint(x: x ?? this.x, y: y ?? this.y);
+
   @override
   List<Object?> get _members => [x, y];
+  @override
+  String toString() => _describe('ScreenPoint', const ['x', 'y']);
 }
 
 /// Camera fields used by snapshots and camera updates.
@@ -1382,6 +1557,29 @@ final class CameraOptions extends _Value {
   final double? roll;
   final double? fieldOfView;
 
+  /// A copy of this value with the given members replaced.
+  CameraOptions copyWith({
+    LatLng? center,
+    double? centerAltitude,
+    EdgeInsets? padding,
+    ScreenPoint? anchor,
+    double? zoom,
+    double? bearing,
+    double? pitch,
+    double? roll,
+    double? fieldOfView,
+  }) => CameraOptions(
+    center: center ?? this.center,
+    centerAltitude: centerAltitude ?? this.centerAltitude,
+    padding: padding ?? this.padding,
+    anchor: anchor ?? this.anchor,
+    zoom: zoom ?? this.zoom,
+    bearing: bearing ?? this.bearing,
+    pitch: pitch ?? this.pitch,
+    roll: roll ?? this.roll,
+    fieldOfView: fieldOfView ?? this.fieldOfView,
+  );
+
   @override
   List<Object?> get _members => [
     center,
@@ -1394,6 +1592,18 @@ final class CameraOptions extends _Value {
     roll,
     fieldOfView,
   ];
+  @override
+  String toString() => _describe('CameraOptions', const [
+    'center',
+    'centerAltitude',
+    'padding',
+    'anchor',
+    'zoom',
+    'bearing',
+    'pitch',
+    'roll',
+    'fieldOfView',
+  ]);
 }
 
 /// Logical extent in UI pixels and the device-pixel scale.
@@ -1415,8 +1625,19 @@ final class LogicalExtent extends _Value {
   /// Device pixels per UI pixel. Defaults to 1.0.
   final double scaleFactor;
 
+  /// A copy of this value with the given members replaced.
+  LogicalExtent copyWith({int? width, int? height, double? scaleFactor}) =>
+      LogicalExtent(
+        width: width ?? this.width,
+        height: height ?? this.height,
+        scaleFactor: scaleFactor ?? this.scaleFactor,
+      );
+
   @override
   List<Object?> get _members => [width, height, scaleFactor];
+  @override
+  String toString() =>
+      _describe('LogicalExtent', const ['width', 'height', 'scaleFactor']);
 }
 
 /// MapLibre axonometric rendering options used for snapshots and commands.
@@ -1435,8 +1656,19 @@ final class ProjectionMode extends _Value {
   /// Y-skew factor of the axonometric transform.
   final double? ySkew;
 
+  /// A copy of this value with the given members replaced.
+  ProjectionMode copyWith({bool? axonometric, double? xSkew, double? ySkew}) =>
+      ProjectionMode(
+        axonometric: axonometric ?? this.axonometric,
+        xSkew: xSkew ?? this.xSkew,
+        ySkew: ySkew ?? this.ySkew,
+      );
+
   @override
   List<Object?> get _members => [axonometric, xSkew, ySkew];
+  @override
+  String toString() =>
+      _describe('ProjectionMode', const ['axonometric', 'xSkew', 'ySkew']);
 }
 
 /// Live map viewport and render-transform controls.
@@ -1461,6 +1693,19 @@ final class MapViewportOptions extends _Value {
   final ViewportMode? viewportMode;
   final EdgeInsets? frustumOffset;
 
+  /// A copy of this value with the given members replaced.
+  MapViewportOptions copyWith({
+    NorthOrientation? northOrientation,
+    ConstrainMode? constrainMode,
+    ViewportMode? viewportMode,
+    EdgeInsets? frustumOffset,
+  }) => MapViewportOptions(
+    northOrientation: northOrientation ?? this.northOrientation,
+    constrainMode: constrainMode ?? this.constrainMode,
+    viewportMode: viewportMode ?? this.viewportMode,
+    frustumOffset: frustumOffset ?? this.frustumOffset,
+  );
+
   @override
   List<Object?> get _members => [
     northOrientation,
@@ -1468,6 +1713,13 @@ final class MapViewportOptions extends _Value {
     viewportMode,
     frustumOffset,
   ];
+  @override
+  String toString() => _describe('MapViewportOptions', const [
+    'northOrientation',
+    'constrainMode',
+    'viewportMode',
+    'frustumOffset',
+  ]);
 }
 
 /// Everything that a projection depends on: the transform that a published
@@ -1499,8 +1751,28 @@ final class MapView extends _Value {
   /// every field set.
   final MapViewportOptions viewport;
 
+  /// A copy of this value with the given members replaced.
+  MapView copyWith({
+    CameraOptions? camera,
+    LogicalExtent? extent,
+    ProjectionMode? projectionMode,
+    MapViewportOptions? viewport,
+  }) => MapView(
+    camera: camera ?? this.camera,
+    extent: extent ?? this.extent,
+    projectionMode: projectionMode ?? this.projectionMode,
+    viewport: viewport ?? this.viewport,
+  );
+
   @override
   List<Object?> get _members => [camera, extent, projectionMode, viewport];
+  @override
+  String toString() => _describe('MapView', const [
+    'camera',
+    'extent',
+    'projectionMode',
+    'viewport',
+  ]);
 }
 
 /// Terminal result of one frame demand, held by an owned frame-result batch and
@@ -1563,6 +1835,16 @@ final class RenderFrameResult extends _Value {
     needsRepaint,
     view,
   ];
+  @override
+  String toString() => _describe('RenderFrameResult', const [
+    'disposition',
+    'token',
+    'mapUpdateGeneration',
+    'generation',
+    'frameGeneration',
+    'needsRepaint',
+    'view',
+  ]);
 }
 
 /// Vulkan frame acquired from a texture ring.
@@ -1634,6 +1916,20 @@ final class VulkanTextureFrame extends _Value {
     format,
     layout,
   ];
+  @override
+  String toString() => _describe('VulkanTextureFrame', const [
+    'generation',
+    'width',
+    'height',
+    'scaleFactor',
+    'frameId',
+    'slot',
+    'image',
+    'imageView',
+    'device',
+    'format',
+    'layout',
+  ]);
 }
 
 /// WebGPU frame acquired from a texture ring.
@@ -1698,6 +1994,19 @@ final class WebgpuTextureFrame extends _Value {
     device,
     format,
   ];
+  @override
+  String toString() => _describe('WebgpuTextureFrame', const [
+    'generation',
+    'width',
+    'height',
+    'scaleFactor',
+    'frameId',
+    'slot',
+    'texture',
+    'textureView',
+    'device',
+    'format',
+  ]);
 }
 
 /// Cubic easing curve for animated camera transitions.
@@ -1711,8 +2020,19 @@ final class UnitBezier extends _Value {
   final double x2;
   final double y2;
 
+  /// A copy of this value with the given members replaced.
+  UnitBezier copyWith({double? x1, double? y1, double? x2, double? y2}) =>
+      UnitBezier(
+        x1: x1 ?? this.x1,
+        y1: y1 ?? this.y1,
+        x2: x2 ?? this.x2,
+        y2: y2 ?? this.y2,
+      );
+
   @override
   List<Object?> get _members => [x1, y1, x2, y2];
+  @override
+  String toString() => _describe('UnitBezier', const ['x1', 'y1', 'x2', 'y2']);
 }
 
 /// The end of one camera command's transitions, borrowed for the callback.
@@ -1736,6 +2056,9 @@ final class CameraTransitionEnd extends _Value {
 
   @override
   List<Object?> get _members => [outcome, generation];
+  @override
+  String toString() =>
+      _describe('CameraTransitionEnd', const ['outcome', 'generation']);
 }
 
 /// Receives the end of one camera command's transitions.
@@ -1789,6 +2112,23 @@ final class AnimationOptions extends _Value {
   /// Reports the end of the command's transitions. Disabled by default.
   final CameraTransitionHandler endHandler;
 
+  /// A copy of this value with the given members replaced.
+  AnimationOptions copyWith({
+    double? durationMs,
+    double? velocity,
+    double? minZoom,
+    UnitBezier? easing,
+    int? transitionId,
+    CameraTransitionHandler? endHandler,
+  }) => AnimationOptions(
+    durationMs: durationMs ?? this.durationMs,
+    velocity: velocity ?? this.velocity,
+    minZoom: minZoom ?? this.minZoom,
+    easing: easing ?? this.easing,
+    transitionId: transitionId ?? this.transitionId,
+    endHandler: endHandler ?? this.endHandler,
+  );
+
   @override
   List<Object?> get _members => [
     durationMs,
@@ -1798,6 +2138,15 @@ final class AnimationOptions extends _Value {
     transitionId,
     endHandler,
   ];
+  @override
+  String toString() => _describe('AnimationOptions', const [
+    'durationMs',
+    'velocity',
+    'minZoom',
+    'easing',
+    'transitionId',
+    'endHandler',
+  ]);
 }
 
 /// Geographic bounds in degrees.
@@ -1812,8 +2161,17 @@ final class LatLngBounds extends _Value {
   final LatLng southwest;
   final LatLng northeast;
 
+  /// A copy of this value with the given members replaced.
+  LatLngBounds copyWith({LatLng? southwest, LatLng? northeast}) => LatLngBounds(
+    southwest: southwest ?? this.southwest,
+    northeast: northeast ?? this.northeast,
+  );
+
   @override
   List<Object?> get _members => [southwest, northeast];
+  @override
+  String toString() =>
+      _describe('LatLngBounds', const ['southwest', 'northeast']);
 }
 
 /// Optional map camera constraint fields.
@@ -1843,6 +2201,24 @@ final class BoundOptions extends _Value {
   /// longitude to that range. Mutually exclusive with
   /// `MLN_BOUND_OPTION_BOUNDS`, and leaves `mln_bound_options.bounds` unread.
   final bool unbounded;
+
+  /// A copy of this value with the given members replaced.
+  BoundOptions copyWith({
+    LatLngBounds? bounds,
+    double? minZoom,
+    double? maxZoom,
+    double? minPitch,
+    double? maxPitch,
+    bool? unbounded,
+  }) => BoundOptions(
+    bounds: bounds ?? this.bounds,
+    minZoom: minZoom ?? this.minZoom,
+    maxZoom: maxZoom ?? this.maxZoom,
+    minPitch: minPitch ?? this.minPitch,
+    maxPitch: maxPitch ?? this.maxPitch,
+    unbounded: unbounded ?? this.unbounded,
+  );
+
   @override
   List<Object?> get _members => [
     bounds,
@@ -1852,6 +2228,15 @@ final class BoundOptions extends _Value {
     maxPitch,
     unbounded,
   ];
+  @override
+  String toString() => _describe('BoundOptions', const [
+    'bounds',
+    'minZoom',
+    'maxZoom',
+    'minPitch',
+    'maxPitch',
+    'unbounded',
+  ]);
 }
 
 /// One atomic relative camera update.
@@ -1888,6 +2273,25 @@ final class CameraDelta extends _Value {
   final AnimationOptions animation;
   final GesturePhase gesturePhase;
 
+  /// A copy of this value with the given members replaced.
+  CameraDelta copyWith({
+    ScreenPoint? offset,
+    double? scale,
+    double? bearing,
+    double? pitch,
+    ScreenPoint? anchor,
+    AnimationOptions? animation,
+    GesturePhase? gesturePhase,
+  }) => CameraDelta(
+    offset: offset ?? this.offset,
+    scale: scale ?? this.scale,
+    bearing: bearing ?? this.bearing,
+    pitch: pitch ?? this.pitch,
+    anchor: anchor ?? this.anchor,
+    animation: animation ?? this.animation,
+    gesturePhase: gesturePhase ?? this.gesturePhase,
+  );
+
   @override
   List<Object?> get _members => [
     offset,
@@ -1898,6 +2302,16 @@ final class CameraDelta extends _Value {
     animation,
     gesturePhase,
   ];
+  @override
+  String toString() => _describe('CameraDelta', const [
+    'offset',
+    'scale',
+    'bearing',
+    'pitch',
+    'anchor',
+    'animation',
+    'gesturePhase',
+  ]);
 }
 
 /// Optional fitting controls for camera-for-viewport queries.
@@ -1910,8 +2324,22 @@ final class CameraFitOptions extends _Value {
   final double? bearing;
   final double? pitch;
 
+  /// A copy of this value with the given members replaced.
+  CameraFitOptions copyWith({
+    EdgeInsets? padding,
+    double? bearing,
+    double? pitch,
+  }) => CameraFitOptions(
+    padding: padding ?? this.padding,
+    bearing: bearing ?? this.bearing,
+    pitch: pitch ?? this.pitch,
+  );
+
   @override
   List<Object?> get _members => [padding, bearing, pitch];
+  @override
+  String toString() =>
+      _describe('CameraFitOptions', const ['padding', 'bearing', 'pitch']);
 }
 
 /// One atomic absolute camera update.
@@ -1933,8 +2361,28 @@ final class CameraUpdate extends _Value {
   final AnimationOptions animation;
   final GesturePhase gesturePhase;
 
+  /// A copy of this value with the given members replaced.
+  CameraUpdate copyWith({
+    CameraUpdateMode? mode,
+    CameraOptions? camera,
+    AnimationOptions? animation,
+    GesturePhase? gesturePhase,
+  }) => CameraUpdate(
+    mode: mode ?? this.mode,
+    camera: camera ?? this.camera,
+    animation: animation ?? this.animation,
+    gesturePhase: gesturePhase ?? this.gesturePhase,
+  );
+
   @override
   List<Object?> get _members => [mode, camera, animation, gesturePhase];
+  @override
+  String toString() => _describe('CameraUpdate', const [
+    'mode',
+    'camera',
+    'animation',
+    'gesturePhase',
+  ]);
 }
 
 /// Canonical tile identity used by custom geometry and custom MVT vector source
@@ -1948,8 +2396,14 @@ final class CanonicalTileId extends _Value {
   final int x;
   final int y;
 
+  /// A copy of this value with the given members replaced.
+  CanonicalTileId copyWith({int? z, int? x, int? y}) =>
+      CanonicalTileId(z: z ?? this.z, x: x ?? this.x, y: y ?? this.y);
+
   @override
   List<Object?> get _members => [z, x, y];
+  @override
+  String toString() => _describe('CanonicalTileId', const ['z', 'x', 'y']);
 }
 
 /// Requests one tile of a custom geometry or custom MVT vector source.
@@ -2033,8 +2487,14 @@ final class FrameDemand extends _Value {
   /// Host identity returned with the terminal frame result.
   final int token;
 
+  /// A copy of this value with the given members replaced.
+  FrameDemand copyWith({FrameDemandFlag? flags, int? token}) =>
+      FrameDemand(flags: flags ?? this.flags, token: token ?? this.token);
+
   @override
   List<Object?> get _members => [flags, token];
+  @override
+  String toString() => _describe('FrameDemand', const ['flags', 'token']);
 }
 
 /// Three-component vector used by free camera options.
@@ -2047,8 +2507,14 @@ final class Vec3 extends _Value {
   final double y;
   final double z;
 
+  /// A copy of this value with the given members replaced.
+  Vec3 copyWith({double? x, double? y, double? z}) =>
+      Vec3(x: x ?? this.x, y: y ?? this.y, z: z ?? this.z);
+
   @override
   List<Object?> get _members => [x, y, z];
+  @override
+  String toString() => _describe('Vec3', const ['x', 'y', 'z']);
 }
 
 /// Quaternion stored as x, y, z, w components.
@@ -2062,8 +2528,19 @@ final class Quaternion extends _Value {
   final double z;
   final double w;
 
+  /// A copy of this value with the given members replaced.
+  Quaternion copyWith({double? x, double? y, double? z, double? w}) =>
+      Quaternion(
+        x: x ?? this.x,
+        y: y ?? this.y,
+        z: z ?? this.z,
+        w: w ?? this.w,
+      );
+
   @override
   List<Object?> get _members => [x, y, z, w];
+  @override
+  String toString() => _describe('Quaternion', const ['x', 'y', 'z', 'w']);
 }
 
 /// Free camera position and orientation in MapLibre Native camera space.
@@ -2075,8 +2552,18 @@ final class FreeCameraOptions extends _Value {
   final Vec3? position;
   final Quaternion? orientation;
 
+  /// A copy of this value with the given members replaced.
+  FreeCameraOptions copyWith({Vec3? position, Quaternion? orientation}) =>
+      FreeCameraOptions(
+        position: position ?? this.position,
+        orientation: orientation ?? this.orientation,
+      );
+
   @override
   List<Object?> get _members => [position, orientation];
+  @override
+  String toString() =>
+      _describe('FreeCameraOptions', const ['position', 'orientation']);
 }
 
 /// Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
@@ -2137,6 +2624,33 @@ final class GeojsonSourceOptions extends _Value {
   /// Defaults to false.
   final bool? synchronousTiling;
 
+  /// A copy of this value with the given members replaced.
+  GeojsonSourceOptions copyWith({
+    double? minZoom,
+    double? maxZoom,
+    double? tolerance,
+    double? clusterMaxZoom,
+    Uint8List? clusterProperties,
+    int? buffer,
+    int? clusterRadius,
+    int? clusterMinPoints,
+    bool? lineMetrics,
+    bool? cluster,
+    bool? synchronousTiling,
+  }) => GeojsonSourceOptions(
+    minZoom: minZoom ?? this.minZoom,
+    maxZoom: maxZoom ?? this.maxZoom,
+    tolerance: tolerance ?? this.tolerance,
+    clusterMaxZoom: clusterMaxZoom ?? this.clusterMaxZoom,
+    clusterProperties: clusterProperties ?? this.clusterProperties,
+    buffer: buffer ?? this.buffer,
+    clusterRadius: clusterRadius ?? this.clusterRadius,
+    clusterMinPoints: clusterMinPoints ?? this.clusterMinPoints,
+    lineMetrics: lineMetrics ?? this.lineMetrics,
+    cluster: cluster ?? this.cluster,
+    synchronousTiling: synchronousTiling ?? this.synchronousTiling,
+  );
+
   @override
   List<Object?> get _members => [
     minZoom,
@@ -2151,6 +2665,20 @@ final class GeojsonSourceOptions extends _Value {
     cluster,
     synchronousTiling,
   ];
+  @override
+  String toString() => _describe('GeojsonSourceOptions', const [
+    'minZoom',
+    'maxZoom',
+    'tolerance',
+    'clusterMaxZoom',
+    'clusterProperties',
+    'buffer',
+    'clusterRadius',
+    'clusterMinPoints',
+    'lineMetrics',
+    'cluster',
+    'synchronousTiling',
+  ]);
 }
 
 /// One HTTP header that a header rule supplies.
@@ -2162,8 +2690,14 @@ final class HttpHeader extends _Value {
   final String name;
   final String value;
 
+  /// A copy of this value with the given members replaced.
+  HttpHeader copyWith({String? name, String? value}) =>
+      HttpHeader(name: name ?? this.name, value: value ?? this.value);
+
   @override
   List<Object?> get _members => [name, value];
+  @override
+  String toString() => _describe('HttpHeader', const ['name', 'value']);
 }
 
 /// One rule of a native HTTP header transform.
@@ -2194,8 +2728,24 @@ final class HttpHeaderRule extends _Value {
   /// `mln_http_header_transform_response_set_header()` does.
   final List<HttpHeader> headers;
 
+  /// A copy of this value with the given members replaced.
+  HttpHeaderRule copyWith({
+    ResourceKindMask? kinds,
+    UrlMatchFlags? flags,
+    String? url,
+    List<HttpHeader>? headers,
+  }) => HttpHeaderRule(
+    kinds: kinds ?? this.kinds,
+    flags: flags ?? this.flags,
+    url: url ?? this.url,
+    headers: headers ?? this.headers,
+  );
+
   @override
   List<Object?> get _members => [kinds, flags, url, headers];
+  @override
+  String toString() =>
+      _describe('HttpHeaderRule', const ['kinds', 'flags', 'url', 'headers']);
 }
 
 /// Lower-level Spherical Mercator projected-meter coordinate.
@@ -2211,8 +2761,18 @@ final class ProjectedMeters extends _Value {
   /// Distance measured eastward from the prime meridian, in meters.
   final double easting;
 
+  /// A copy of this value with the given members replaced.
+  ProjectedMeters copyWith({double? northing, double? easting}) =>
+      ProjectedMeters(
+        northing: northing ?? this.northing,
+        easting: easting ?? this.easting,
+      );
+
   @override
   List<Object?> get _members => [northing, easting];
+  @override
+  String toString() =>
+      _describe('ProjectedMeters', const ['northing', 'easting']);
 }
 
 /// Receives a MapLibre Native log record.
@@ -2257,8 +2817,28 @@ final class PremultipliedRgba8Image extends _Value {
   /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
   final Uint8List pixels;
 
+  /// A copy of this value with the given members replaced.
+  PremultipliedRgba8Image copyWith({
+    int? width,
+    int? height,
+    int? stride,
+    Uint8List? pixels,
+  }) => PremultipliedRgba8Image(
+    width: width ?? this.width,
+    height: height ?? this.height,
+    stride: stride ?? this.stride,
+    pixels: pixels ?? this.pixels,
+  );
+
   @override
   List<Object?> get _members => [width, height, stride, pixels];
+  @override
+  String toString() => _describe('PremultipliedRgba8Image', const [
+    'width',
+    'height',
+    'stride',
+    'pixels',
+  ]);
 }
 
 /// One caller-owned Metal texture of a borrowed texture ring.
@@ -2271,8 +2851,14 @@ final class MetalBorrowedTexture extends _Value {
   /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
   final NativePointer texture;
 
+  /// A copy of this value with the given members replaced.
+  MetalBorrowedTexture copyWith({NativePointer? texture}) =>
+      MetalBorrowedTexture(texture: texture ?? this.texture);
+
   @override
   List<Object?> get _members => [texture];
+  @override
+  String toString() => _describe('MetalBorrowedTexture', const ['texture']);
 }
 
 /// Metal attachment options for a borrowed texture target.
@@ -2312,6 +2898,19 @@ final class MetalBorrowedTextureDescriptor extends _Value {
   /// The ring's textures, one per slot, in slot order. Required.
   final List<MetalBorrowedTexture> textures;
 
+  /// A copy of this value with the given members replaced.
+  MetalBorrowedTextureDescriptor copyWith({
+    LogicalExtent? extent,
+    int? physicalWidth,
+    int? physicalHeight,
+    List<MetalBorrowedTexture>? textures,
+  }) => MetalBorrowedTextureDescriptor(
+    extent: extent ?? this.extent,
+    physicalWidth: physicalWidth ?? this.physicalWidth,
+    physicalHeight: physicalHeight ?? this.physicalHeight,
+    textures: textures ?? this.textures,
+  );
+
   @override
   List<Object?> get _members => [
     extent,
@@ -2319,6 +2918,13 @@ final class MetalBorrowedTextureDescriptor extends _Value {
     physicalHeight,
     textures,
   ];
+  @override
+  String toString() => _describe('MetalBorrowedTextureDescriptor', const [
+    'extent',
+    'physicalWidth',
+    'physicalHeight',
+    'textures',
+  ]);
 }
 
 /// Schedules service by the receiver that owns a queue or driver.
@@ -2439,6 +3045,24 @@ final class RenderSessionAttachOptions extends _Value {
   /// `MLN_STATUS_UNSUPPORTED`.
   final QueueLock? queueLock;
 
+  /// A copy of this value with the given members replaced.
+  RenderSessionAttachOptions copyWith({
+    RenderDriverKind? driver,
+    int? requestedTextureRingDepth,
+    GpuSyncKind? producerSyncKind,
+    Wake? frameWake,
+    Wake? driverWorkWake,
+    QueueLock? queueLock,
+  }) => RenderSessionAttachOptions(
+    driver: driver ?? this.driver,
+    requestedTextureRingDepth:
+        requestedTextureRingDepth ?? this.requestedTextureRingDepth,
+    producerSyncKind: producerSyncKind ?? this.producerSyncKind,
+    frameWake: frameWake ?? this.frameWake,
+    driverWorkWake: driverWorkWake ?? this.driverWorkWake,
+    queueLock: queueLock ?? this.queueLock,
+  );
+
   @override
   List<Object?> get _members => [
     driver,
@@ -2448,6 +3072,15 @@ final class RenderSessionAttachOptions extends _Value {
     driverWorkWake,
     queueLock,
   ];
+  @override
+  String toString() => _describe('RenderSessionAttachOptions', const [
+    'driver',
+    'requestedTextureRingDepth',
+    'producerSyncKind',
+    'frameWake',
+    'driverWorkWake',
+    'queueLock',
+  ]);
 }
 
 /// Metal backend context fields shared by Metal render targets.
@@ -2460,8 +3093,14 @@ final class MetalContextDescriptor extends _Value {
   /// `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it.
   final NativePointer device;
 
+  /// A copy of this value with the given members replaced.
+  MetalContextDescriptor copyWith({NativePointer? device}) =>
+      MetalContextDescriptor(device: device ?? this.device);
+
   @override
   List<Object?> get _members => [device];
+  @override
+  String toString() => _describe('MetalContextDescriptor', const ['device']);
 }
 
 /// Metal attachment options for an owned texture target.
@@ -2490,8 +3129,25 @@ final class MetalOwnedTextureDescriptor extends _Value {
   /// MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
   final int pixelFormat;
 
+  /// A copy of this value with the given members replaced.
+  MetalOwnedTextureDescriptor copyWith({
+    LogicalExtent? extent,
+    MetalContextDescriptor? context,
+    int? pixelFormat,
+  }) => MetalOwnedTextureDescriptor(
+    extent: extent ?? this.extent,
+    context: context ?? this.context,
+    pixelFormat: pixelFormat ?? this.pixelFormat,
+  );
+
   @override
   List<Object?> get _members => [extent, context, pixelFormat];
+  @override
+  String toString() => _describe('MetalOwnedTextureDescriptor', const [
+    'extent',
+    'context',
+    'pixelFormat',
+  ]);
 }
 
 /// Metal attachment options for a native surface.
@@ -2517,8 +3173,22 @@ final class MetalSurfaceDescriptor extends _Value {
   /// `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required.
   final NativePointer layer;
 
+  /// A copy of this value with the given members replaced.
+  MetalSurfaceDescriptor copyWith({
+    LogicalExtent? extent,
+    MetalContextDescriptor? context,
+    NativePointer? layer,
+  }) => MetalSurfaceDescriptor(
+    extent: extent ?? this.extent,
+    context: context ?? this.context,
+    layer: layer ?? this.layer,
+  );
+
   @override
   List<Object?> get _members => [extent, context, layer];
+  @override
+  String toString() =>
+      _describe('MetalSurfaceDescriptor', const ['extent', 'context', 'layer']);
 }
 
 /// WGL context fields shared by OpenGL render targets on Windows.
@@ -2544,8 +3214,25 @@ final class WglContextDescriptor extends _Value {
   /// Optional wglGetProcAddress-compatible function for the host loader.
   final NativePointer getProcAddress;
 
+  /// A copy of this value with the given members replaced.
+  WglContextDescriptor copyWith({
+    NativePointer? deviceContext,
+    NativePointer? shareContext,
+    NativePointer? getProcAddress,
+  }) => WglContextDescriptor(
+    deviceContext: deviceContext ?? this.deviceContext,
+    shareContext: shareContext ?? this.shareContext,
+    getProcAddress: getProcAddress ?? this.getProcAddress,
+  );
+
   @override
   List<Object?> get _members => [deviceContext, shareContext, getProcAddress];
+  @override
+  String toString() => _describe('WglContextDescriptor', const [
+    'deviceContext',
+    'shareContext',
+    'getProcAddress',
+  ]);
 }
 
 /// EGL context fields shared by OpenGL render targets.
@@ -2586,6 +3273,21 @@ final class EglContextDescriptor extends _Value {
   /// Optional eglGetProcAddress-compatible function for the host loader.
   final NativePointer getProcAddress;
 
+  /// A copy of this value with the given members replaced.
+  EglContextDescriptor copyWith({
+    NativePointer? display,
+    NativePointer? config,
+    NativePointer? shareContext,
+    OpenglClientApi? clientApi,
+    NativePointer? getProcAddress,
+  }) => EglContextDescriptor(
+    display: display ?? this.display,
+    config: config ?? this.config,
+    shareContext: shareContext ?? this.shareContext,
+    clientApi: clientApi ?? this.clientApi,
+    getProcAddress: getProcAddress ?? this.getProcAddress,
+  );
+
   @override
   List<Object?> get _members => [
     display,
@@ -2594,6 +3296,14 @@ final class EglContextDescriptor extends _Value {
     clientApi,
     getProcAddress,
   ];
+  @override
+  String toString() => _describe('EglContextDescriptor', const [
+    'display',
+    'config',
+    'shareContext',
+    'clientApi',
+    'getProcAddress',
+  ]);
 }
 
 /// WebGL context fields shared by OpenGL render targets in the browser.
@@ -2617,8 +3327,25 @@ final class WebglContextDescriptor extends _Value {
   /// canvas must still be transferable when attachment starts.
   final String canvasSelector;
 
+  /// A copy of this value with the given members replaced.
+  WebglContextDescriptor copyWith({
+    WebglContextKind? kind,
+    int? context,
+    String? canvasSelector,
+  }) => WebglContextDescriptor(
+    kind: kind ?? this.kind,
+    context: context ?? this.context,
+    canvasSelector: canvasSelector ?? this.canvasSelector,
+  );
+
   @override
   List<Object?> get _members => [kind, context, canvasSelector];
+  @override
+  String toString() => _describe('WebglContextDescriptor', const [
+    'kind',
+    'context',
+    'canvasSelector',
+  ]);
 }
 
 /// OpenGL backend context fields shared by OpenGL render targets.
@@ -2677,8 +3404,14 @@ final class OpenglBorrowedTexture extends _Value {
   /// Borrowed OpenGL texture object name. Required.
   final int texture;
 
+  /// A copy of this value with the given members replaced.
+  OpenglBorrowedTexture copyWith({int? texture}) =>
+      OpenglBorrowedTexture(texture: texture ?? this.texture);
+
   @override
   List<Object?> get _members => [texture];
+  @override
+  String toString() => _describe('OpenglBorrowedTexture', const ['texture']);
 }
 
 /// OpenGL attachment options for a borrowed texture target.
@@ -2729,6 +3462,23 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
   /// OpenGL texture target of every texture. Must be GL_TEXTURE_2D.
   final int target;
 
+  /// A copy of this value with the given members replaced.
+  OpenglBorrowedTextureDescriptor copyWith({
+    LogicalExtent? extent,
+    int? physicalWidth,
+    int? physicalHeight,
+    OpenglContextDescriptor? context,
+    List<OpenglBorrowedTexture>? textures,
+    int? target,
+  }) => OpenglBorrowedTextureDescriptor(
+    extent: extent ?? this.extent,
+    physicalWidth: physicalWidth ?? this.physicalWidth,
+    physicalHeight: physicalHeight ?? this.physicalHeight,
+    context: context ?? this.context,
+    textures: textures ?? this.textures,
+    target: target ?? this.target,
+  );
+
   @override
   List<Object?> get _members => [
     extent,
@@ -2738,6 +3488,15 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
     textures,
     target,
   ];
+  @override
+  String toString() => _describe('OpenglBorrowedTextureDescriptor', const [
+    'extent',
+    'physicalWidth',
+    'physicalHeight',
+    'context',
+    'textures',
+    'target',
+  ]);
 }
 
 /// OpenGL attachment options for an owned texture target.
@@ -2761,8 +3520,20 @@ final class OpenglOwnedTextureDescriptor extends _Value {
   /// readback.
   final OpenglContextDescriptor context;
 
+  /// A copy of this value with the given members replaced.
+  OpenglOwnedTextureDescriptor copyWith({
+    LogicalExtent? extent,
+    OpenglContextDescriptor? context,
+  }) => OpenglOwnedTextureDescriptor(
+    extent: extent ?? this.extent,
+    context: context ?? this.context,
+  );
+
   @override
   List<Object?> get _members => [extent, context];
+  @override
+  String toString() =>
+      _describe('OpenglOwnedTextureDescriptor', const ['extent', 'context']);
 }
 
 /// OpenGL attachment options for a native surface.
@@ -2790,8 +3561,25 @@ final class OpenglSurfaceDescriptor extends _Value {
   /// binding.
   final NativePointer surface;
 
+  /// A copy of this value with the given members replaced.
+  OpenglSurfaceDescriptor copyWith({
+    LogicalExtent? extent,
+    OpenglContextDescriptor? context,
+    NativePointer? surface,
+  }) => OpenglSurfaceDescriptor(
+    extent: extent ?? this.extent,
+    context: context ?? this.context,
+    surface: surface ?? this.surface,
+  );
+
   @override
   List<Object?> get _members => [extent, context, surface];
+  @override
+  String toString() => _describe('OpenglSurfaceDescriptor', const [
+    'extent',
+    'context',
+    'surface',
+  ]);
 }
 
 /// Vulkan backend context fields shared by Vulkan render targets.
@@ -2832,6 +3620,26 @@ final class VulkanContextDescriptor extends _Value {
   /// PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device.
   final NativePointer getDeviceProcAddr;
 
+  /// A copy of this value with the given members replaced.
+  VulkanContextDescriptor copyWith({
+    NativePointer? instance,
+    NativePointer? physicalDevice,
+    NativePointer? device,
+    NativePointer? graphicsQueue,
+    int? graphicsQueueFamilyIndex,
+    NativePointer? getInstanceProcAddr,
+    NativePointer? getDeviceProcAddr,
+  }) => VulkanContextDescriptor(
+    instance: instance ?? this.instance,
+    physicalDevice: physicalDevice ?? this.physicalDevice,
+    device: device ?? this.device,
+    graphicsQueue: graphicsQueue ?? this.graphicsQueue,
+    graphicsQueueFamilyIndex:
+        graphicsQueueFamilyIndex ?? this.graphicsQueueFamilyIndex,
+    getInstanceProcAddr: getInstanceProcAddr ?? this.getInstanceProcAddr,
+    getDeviceProcAddr: getDeviceProcAddr ?? this.getDeviceProcAddr,
+  );
+
   @override
   List<Object?> get _members => [
     instance,
@@ -2842,6 +3650,16 @@ final class VulkanContextDescriptor extends _Value {
     getInstanceProcAddr,
     getDeviceProcAddr,
   ];
+  @override
+  String toString() => _describe('VulkanContextDescriptor', const [
+    'instance',
+    'physicalDevice',
+    'device',
+    'graphicsQueue',
+    'graphicsQueueFamilyIndex',
+    'getInstanceProcAddr',
+    'getDeviceProcAddr',
+  ]);
 }
 
 /// One caller-owned Vulkan image of a borrowed texture ring.
@@ -2858,8 +3676,18 @@ final class VulkanBorrowedTexture extends _Value {
   /// that matches image and the descriptor's format.
   final int imageView;
 
+  /// A copy of this value with the given members replaced.
+  VulkanBorrowedTexture copyWith({int? image, int? imageView}) =>
+      VulkanBorrowedTexture(
+        image: image ?? this.image,
+        imageView: imageView ?? this.imageView,
+      );
+
   @override
   List<Object?> get _members => [image, imageView];
+  @override
+  String toString() =>
+      _describe('VulkanBorrowedTexture', const ['image', 'imageView']);
 }
 
 /// Vulkan attachment options for a borrowed texture target.
@@ -2922,6 +3750,27 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
   /// to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
   final int finalLayout;
 
+  /// A copy of this value with the given members replaced.
+  VulkanBorrowedTextureDescriptor copyWith({
+    LogicalExtent? extent,
+    int? physicalWidth,
+    int? physicalHeight,
+    VulkanContextDescriptor? context,
+    List<VulkanBorrowedTexture>? textures,
+    int? format,
+    int? initialLayout,
+    int? finalLayout,
+  }) => VulkanBorrowedTextureDescriptor(
+    extent: extent ?? this.extent,
+    physicalWidth: physicalWidth ?? this.physicalWidth,
+    physicalHeight: physicalHeight ?? this.physicalHeight,
+    context: context ?? this.context,
+    textures: textures ?? this.textures,
+    format: format ?? this.format,
+    initialLayout: initialLayout ?? this.initialLayout,
+    finalLayout: finalLayout ?? this.finalLayout,
+  );
+
   @override
   List<Object?> get _members => [
     extent,
@@ -2933,6 +3782,17 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
     initialLayout,
     finalLayout,
   ];
+  @override
+  String toString() => _describe('VulkanBorrowedTextureDescriptor', const [
+    'extent',
+    'physicalWidth',
+    'physicalHeight',
+    'context',
+    'textures',
+    'format',
+    'initialLayout',
+    'finalLayout',
+  ]);
 }
 
 /// Vulkan attachment options for an owned texture target.
@@ -2953,8 +3813,20 @@ final class VulkanOwnedTextureDescriptor extends _Value {
   /// Borrowed Vulkan context. All handles are required.
   final VulkanContextDescriptor context;
 
+  /// A copy of this value with the given members replaced.
+  VulkanOwnedTextureDescriptor copyWith({
+    LogicalExtent? extent,
+    VulkanContextDescriptor? context,
+  }) => VulkanOwnedTextureDescriptor(
+    extent: extent ?? this.extent,
+    context: context ?? this.context,
+  );
+
   @override
   List<Object?> get _members => [extent, context];
+  @override
+  String toString() =>
+      _describe('VulkanOwnedTextureDescriptor', const ['extent', 'context']);
 }
 
 /// Vulkan attachment options for a native surface.
@@ -2982,8 +3854,25 @@ final class VulkanSurfaceDescriptor extends _Value {
   /// Borrowed VkSurfaceKHR bit pattern. Required.
   final int surface;
 
+  /// A copy of this value with the given members replaced.
+  VulkanSurfaceDescriptor copyWith({
+    LogicalExtent? extent,
+    VulkanContextDescriptor? context,
+    int? surface,
+  }) => VulkanSurfaceDescriptor(
+    extent: extent ?? this.extent,
+    context: context ?? this.context,
+    surface: surface ?? this.surface,
+  );
+
   @override
   List<Object?> get _members => [extent, context, surface];
+  @override
+  String toString() => _describe('VulkanSurfaceDescriptor', const [
+    'extent',
+    'context',
+    'surface',
+  ]);
 }
 
 /// WebGPU backend context fields shared by WebGPU render targets.
@@ -3007,8 +3896,25 @@ final class WebgpuContextDescriptor extends _Value {
   /// non-null queue must belong to device.
   final NativePointer queue;
 
+  /// A copy of this value with the given members replaced.
+  WebgpuContextDescriptor copyWith({
+    NativePointer? instance,
+    NativePointer? device,
+    NativePointer? queue,
+  }) => WebgpuContextDescriptor(
+    instance: instance ?? this.instance,
+    device: device ?? this.device,
+    queue: queue ?? this.queue,
+  );
+
   @override
   List<Object?> get _members => [instance, device, queue];
+  @override
+  String toString() => _describe('WebgpuContextDescriptor', const [
+    'instance',
+    'device',
+    'queue',
+  ]);
 }
 
 /// One caller-owned WebGPU texture of a borrowed texture ring.
@@ -3028,8 +3934,20 @@ final class WebgpuBorrowedTexture extends _Value {
   /// color view compatible with texture and the descriptor's format.
   final NativePointer textureView;
 
+  /// A copy of this value with the given members replaced.
+  WebgpuBorrowedTexture copyWith({
+    NativePointer? texture,
+    NativePointer? textureView,
+  }) => WebgpuBorrowedTexture(
+    texture: texture ?? this.texture,
+    textureView: textureView ?? this.textureView,
+  );
+
   @override
   List<Object?> get _members => [texture, textureView];
+  @override
+  String toString() =>
+      _describe('WebgpuBorrowedTexture', const ['texture', 'textureView']);
 }
 
 /// WebGPU attachment options for a borrowed texture target.
@@ -3079,6 +3997,23 @@ final class WebgpuBorrowedTextureDescriptor extends _Value {
   /// invalid.
   final int format;
 
+  /// A copy of this value with the given members replaced.
+  WebgpuBorrowedTextureDescriptor copyWith({
+    LogicalExtent? extent,
+    int? physicalWidth,
+    int? physicalHeight,
+    WebgpuContextDescriptor? context,
+    List<WebgpuBorrowedTexture>? textures,
+    int? format,
+  }) => WebgpuBorrowedTextureDescriptor(
+    extent: extent ?? this.extent,
+    physicalWidth: physicalWidth ?? this.physicalWidth,
+    physicalHeight: physicalHeight ?? this.physicalHeight,
+    context: context ?? this.context,
+    textures: textures ?? this.textures,
+    format: format ?? this.format,
+  );
+
   @override
   List<Object?> get _members => [
     extent,
@@ -3088,6 +4023,15 @@ final class WebgpuBorrowedTextureDescriptor extends _Value {
     textures,
     format,
   ];
+  @override
+  String toString() => _describe('WebgpuBorrowedTextureDescriptor', const [
+    'extent',
+    'physicalWidth',
+    'physicalHeight',
+    'context',
+    'textures',
+    'format',
+  ]);
 }
 
 /// WebGPU attachment options for an owned texture target.
@@ -3108,8 +4052,20 @@ final class WebgpuOwnedTextureDescriptor extends _Value {
   /// Borrowed WebGPU context. device is required.
   final WebgpuContextDescriptor context;
 
+  /// A copy of this value with the given members replaced.
+  WebgpuOwnedTextureDescriptor copyWith({
+    LogicalExtent? extent,
+    WebgpuContextDescriptor? context,
+  }) => WebgpuOwnedTextureDescriptor(
+    extent: extent ?? this.extent,
+    context: context ?? this.context,
+  );
+
   @override
   List<Object?> get _members => [extent, context];
+  @override
+  String toString() =>
+      _describe('WebgpuOwnedTextureDescriptor', const ['extent', 'context']);
 }
 
 /// WebGPU attachment options for a native surface.
@@ -3143,8 +4099,28 @@ final class WebgpuSurfaceDescriptor extends _Value {
   /// takes it from navigator.gpu.getPreferredCanvasFormat().
   final int format;
 
+  /// A copy of this value with the given members replaced.
+  WebgpuSurfaceDescriptor copyWith({
+    LogicalExtent? extent,
+    WebgpuContextDescriptor? context,
+    NativePointer? surface,
+    int? format,
+  }) => WebgpuSurfaceDescriptor(
+    extent: extent ?? this.extent,
+    context: context ?? this.context,
+    surface: surface ?? this.surface,
+    format: format ?? this.format,
+  );
+
   @override
   List<Object?> get _members => [extent, context, surface, format];
+  @override
+  String toString() => _describe('WebgpuSurfaceDescriptor', const [
+    'extent',
+    'context',
+    'surface',
+    'format',
+  ]);
 }
 
 /// Camera result borrowed for an ordered camera-query completion.
@@ -3158,6 +4134,9 @@ final class CameraQueryResult extends _Value {
 
   @override
   List<Object?> get _members => [generation, camera];
+  @override
+  String toString() =>
+      _describe('CameraQueryResult', const ['generation', 'camera']);
 }
 
 /// Feature-state source, feature, and key selector.
@@ -3186,8 +4165,28 @@ final class FeatureStateSelector extends _Value {
   /// Optional state key. Used only by remove and requires feature_id.
   final String? stateKey;
 
+  /// A copy of this value with the given members replaced.
+  FeatureStateSelector copyWith({
+    String? sourceId,
+    String? sourceLayerId,
+    String? featureId,
+    String? stateKey,
+  }) => FeatureStateSelector(
+    sourceId: sourceId ?? this.sourceId,
+    sourceLayerId: sourceLayerId ?? this.sourceLayerId,
+    featureId: featureId ?? this.featureId,
+    stateKey: stateKey ?? this.stateKey,
+  );
+
   @override
   List<Object?> get _members => [sourceId, sourceLayerId, featureId, stateKey];
+  @override
+  String toString() => _describe('FeatureStateSelector', const [
+    'sourceId',
+    'sourceLayerId',
+    'featureId',
+    'stateKey',
+  ]);
 }
 
 /// Tile prefetch and LOD tuning controls.
@@ -3214,6 +4213,23 @@ final class MapTileOptions extends _Value {
   /// One of `mln_tile_lod_mode`.
   final TileLodMode? lodMode;
 
+  /// A copy of this value with the given members replaced.
+  MapTileOptions copyWith({
+    int? prefetchZoomDelta,
+    double? lodMinRadius,
+    double? lodScale,
+    double? lodPitchThreshold,
+    double? lodZoomShift,
+    TileLodMode? lodMode,
+  }) => MapTileOptions(
+    prefetchZoomDelta: prefetchZoomDelta ?? this.prefetchZoomDelta,
+    lodMinRadius: lodMinRadius ?? this.lodMinRadius,
+    lodScale: lodScale ?? this.lodScale,
+    lodPitchThreshold: lodPitchThreshold ?? this.lodPitchThreshold,
+    lodZoomShift: lodZoomShift ?? this.lodZoomShift,
+    lodMode: lodMode ?? this.lodMode,
+  );
+
   @override
   List<Object?> get _members => [
     prefetchZoomDelta,
@@ -3223,6 +4239,15 @@ final class MapTileOptions extends _Value {
     lodZoomShift,
     lodMode,
   ];
+  @override
+  String toString() => _describe('MapTileOptions', const [
+    'prefetchZoomDelta',
+    'lodMinRadius',
+    'lodScale',
+    'lodPitchThreshold',
+    'lodZoomShift',
+    'lodMode',
+  ]);
 }
 
 /// Immutable map state copied from the latest published generation.
@@ -3231,13 +4256,13 @@ final class MapTileOptions extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class MapSnapshot extends _Value {
   const MapSnapshot({
-    this.debugOptions = const MapDebugOption.fromRawValue(0),
+    this.debugOptions = MapDebugOption.none,
     this.generation = 0,
     this.fullyLoaded = false,
     this.renderingStatsViewEnabled = false,
     this.gestureInProgress = false,
     this.transitionInProgress = false,
-    this.eventMask = const RuntimeEventMask.fromRawValue(0),
+    this.eventMask = RuntimeEventMask.none,
     this.latestRenderUpdateGeneration = 0,
     required this.tile,
     required this.bounds,
@@ -3287,6 +4312,21 @@ final class MapSnapshot extends _Value {
     freeCamera,
     view,
   ];
+  @override
+  String toString() => _describe('MapSnapshot', const [
+    'debugOptions',
+    'generation',
+    'fullyLoaded',
+    'renderingStatsViewEnabled',
+    'gestureInProgress',
+    'transitionInProgress',
+    'eventMask',
+    'latestRenderUpdateGeneration',
+    'tile',
+    'bounds',
+    'freeCamera',
+    'view',
+  ]);
 }
 
 /// One stretchable interval along an image axis, in image pixels.
@@ -3298,8 +4338,14 @@ final class ImageStretch extends _Value {
   final double from;
   final double to;
 
+  /// A copy of this value with the given members replaced.
+  ImageStretch copyWith({double? from, double? to}) =>
+      ImageStretch(from: from ?? this.from, to: to ?? this.to);
+
   @override
   List<Object?> get _members => [from, to];
+  @override
+  String toString() => _describe('ImageStretch', const ['from', 'to']);
 }
 
 /// Content-box insets in image pixels, measured from the image's top-left.
@@ -3318,8 +4364,24 @@ final class ImageContent extends _Value {
   final double right;
   final double bottom;
 
+  /// A copy of this value with the given members replaced.
+  ImageContent copyWith({
+    double? left,
+    double? top,
+    double? right,
+    double? bottom,
+  }) => ImageContent(
+    left: left ?? this.left,
+    top: top ?? this.top,
+    right: right ?? this.right,
+    bottom: bottom ?? this.bottom,
+  );
+
   @override
   List<Object?> get _members => [left, top, right, bottom];
+  @override
+  String toString() =>
+      _describe('ImageContent', const ['left', 'top', 'right', 'bottom']);
 }
 
 /// One complete runtime style image, borrowed for a completion callback.
@@ -3388,6 +4450,19 @@ final class StyleImageInfo extends _Value {
     pixelRatio,
     sdf,
   ];
+  @override
+  String toString() => _describe('StyleImageInfo', const [
+    'width',
+    'height',
+    'pixels',
+    'stretchX',
+    'stretchY',
+    'content',
+    'textFitWidth',
+    'textFitHeight',
+    'pixelRatio',
+    'sdf',
+  ]);
 }
 
 /// One style layer, borrowed for a completion callback.
@@ -3436,6 +4511,16 @@ final class StyleLayerInfo extends _Value {
     maxZoom,
     visibility,
   ];
+  @override
+  String toString() => _describe('StyleLayerInfo', const [
+    'id',
+    'type',
+    'sourceId',
+    'sourceLayer',
+    'minZoom',
+    'maxZoom',
+    'visibility',
+  ]);
 }
 
 /// Inline TileJSON metadata of a tile source.
@@ -3464,6 +4549,13 @@ final class StyleSourceTileInfo extends _Value {
 
   @override
   List<Object?> get _members => [tileUrls, minZoom, maxZoom, scheme];
+  @override
+  String toString() => _describe('StyleSourceTileInfo', const [
+    'tileUrls',
+    'minZoom',
+    'maxZoom',
+    'scheme',
+  ]);
 }
 
 /// Complete metadata of one style source, borrowed for a completion callback.
@@ -3527,6 +4619,19 @@ final class StyleSourceInfo extends _Value {
     vectorEncoding,
     rasterEncoding,
   ];
+  @override
+  String toString() => _describe('StyleSourceInfo', const [
+    'id',
+    'type',
+    'isVolatile',
+    'attribution',
+    'url',
+    'tilejson',
+    'bounds',
+    'tileSize',
+    'vectorEncoding',
+    'rasterEncoding',
+  ]);
 }
 
 /// Global style transition options.
@@ -3551,12 +4656,30 @@ final class StyleTransitionOptions extends _Value {
   /// Whether symbol placement changes cross-fade.
   final bool? enablePlacementTransitions;
 
+  /// A copy of this value with the given members replaced.
+  StyleTransitionOptions copyWith({
+    double? durationMs,
+    double? delayMs,
+    bool? enablePlacementTransitions,
+  }) => StyleTransitionOptions(
+    durationMs: durationMs ?? this.durationMs,
+    delayMs: delayMs ?? this.delayMs,
+    enablePlacementTransitions:
+        enablePlacementTransitions ?? this.enablePlacementTransitions,
+  );
+
   @override
   List<Object?> get _members => [
     durationMs,
     delayMs,
     enablePlacementTransitions,
   ];
+  @override
+  String toString() => _describe('StyleTransitionOptions', const [
+    'durationMs',
+    'delayMs',
+    'enablePlacementTransitions',
+  ]);
 }
 
 /// Options used when creating a map.
@@ -3589,6 +4712,19 @@ final class MapOptions extends _Value {
   /// `mln_runtime_event_mask` values.
   final RuntimeEventMask eventMask;
 
+  /// A copy of this value with the given members replaced.
+  MapOptions copyWith({
+    LogicalExtent? initialExtent,
+    MapMode? mapMode,
+    bool? fastPforEnabled,
+    RuntimeEventMask? eventMask,
+  }) => MapOptions(
+    initialExtent: initialExtent ?? this.initialExtent,
+    mapMode: mapMode ?? this.mapMode,
+    fastPforEnabled: fastPforEnabled ?? this.fastPforEnabled,
+    eventMask: eventMask ?? this.eventMask,
+  );
+
   @override
   List<Object?> get _members => [
     initialExtent,
@@ -3596,6 +4732,13 @@ final class MapOptions extends _Value {
     fastPforEnabled,
     eventMask,
   ];
+  @override
+  String toString() => _describe('MapOptions', const [
+    'initialExtent',
+    'mapMode',
+    'fastPforEnabled',
+    'eventMask',
+  ]);
 }
 
 /// Options for runtime style images.
@@ -3637,6 +4780,25 @@ final class StyleImageOptions extends _Value {
   /// Whether the image is a signed distance field icon. Defaults to false.
   final bool? sdf;
 
+  /// A copy of this value with the given members replaced.
+  StyleImageOptions copyWith({
+    List<ImageStretch>? stretchX,
+    List<ImageStretch>? stretchY,
+    ImageContent? content,
+    StyleImageTextFit? textFitWidth,
+    StyleImageTextFit? textFitHeight,
+    double? pixelRatio,
+    bool? sdf,
+  }) => StyleImageOptions(
+    stretchX: stretchX ?? this.stretchX,
+    stretchY: stretchY ?? this.stretchY,
+    content: content ?? this.content,
+    textFitWidth: textFitWidth ?? this.textFitWidth,
+    textFitHeight: textFitHeight ?? this.textFitHeight,
+    pixelRatio: pixelRatio ?? this.pixelRatio,
+    sdf: sdf ?? this.sdf,
+  );
+
   @override
   List<Object?> get _members => [
     stretchX,
@@ -3647,6 +4809,16 @@ final class StyleImageOptions extends _Value {
     pixelRatio,
     sdf,
   ];
+  @override
+  String toString() => _describe('StyleImageOptions', const [
+    'stretchX',
+    'stretchY',
+    'content',
+    'textFitWidth',
+    'textFitHeight',
+    'pixelRatio',
+    'sdf',
+  ]);
 }
 
 /// A borrowed view of one owned frame-result batch.
@@ -3662,6 +4834,8 @@ final class RenderFrameBatchView extends _Value {
 
   @override
   List<Object?> get _members => [results];
+  @override
+  String toString() => _describe('RenderFrameBatchView', const ['results']);
 }
 
 final class RenderAbandonResult extends _Value {
@@ -3678,6 +4852,11 @@ final class RenderAbandonResult extends _Value {
 
   @override
   List<Object?> get _members => [disposition, quarantinedResourceCount];
+  @override
+  String toString() => _describe('RenderAbandonResult', const [
+    'disposition',
+    'quarantinedResourceCount',
+  ]);
 }
 
 /// Driver and target capabilities fixed for one attached render session.
@@ -3688,7 +4867,7 @@ final class RenderSessionCapabilities extends _Value {
   const RenderSessionCapabilities({
     required this.driver,
     this.textureRingDepth = 0,
-    this.flags = const RenderSessionCapabilityFlag.fromRawValue(0),
+    this.flags = RenderSessionCapabilityFlag.none,
   });
 
   /// One `mln_render_driver_kind` value.
@@ -3703,6 +4882,12 @@ final class RenderSessionCapabilities extends _Value {
 
   @override
   List<Object?> get _members => [driver, textureRingDepth, flags];
+  @override
+  String toString() => _describe('RenderSessionCapabilities', const [
+    'driver',
+    'textureRingDepth',
+    'flags',
+  ]);
 }
 
 /// Any-thread render-session snapshot.
@@ -3759,6 +4944,17 @@ final class RenderSessionSnapshot extends _Value {
     acquiredFrameCount,
     pendingChanges,
   ];
+  @override
+  String toString() => _describe('RenderSessionSnapshot', const [
+    'state',
+    'extent',
+    'generation',
+    'mapUpdateGeneration',
+    'renderedUpdateGeneration',
+    'frameGeneration',
+    'acquiredFrameCount',
+    'pendingChanges',
+  ]);
 }
 
 /// Screen-space box in logical map pixels.
@@ -3773,8 +4969,14 @@ final class ScreenBox extends _Value {
   final ScreenPoint min;
   final ScreenPoint max;
 
+  /// A copy of this value with the given members replaced.
+  ScreenBox copyWith({ScreenPoint? min, ScreenPoint? max}) =>
+      ScreenBox(min: min ?? this.min, max: max ?? this.max);
+
   @override
   List<Object?> get _members => [min, max];
+  @override
+  String toString() => _describe('ScreenBox', const ['min', 'max']);
 }
 
 /// Screen-space line string in logical map pixels.
@@ -3788,8 +4990,14 @@ final class ScreenLineString extends _Value {
   /// Points. Null only when point_count is 0.
   final List<ScreenPoint> points;
 
+  /// A copy of this value with the given members replaced.
+  ScreenLineString copyWith({List<ScreenPoint>? points}) =>
+      ScreenLineString(points: points ?? this.points);
+
   @override
   List<Object?> get _members => [points];
+  @override
+  String toString() => _describe('ScreenLineString', const ['points']);
 }
 
 /// Rendered feature query geometry descriptor.
@@ -3853,8 +5061,20 @@ final class RenderedFeatureQueryOptions extends _Value {
   /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
   final Uint8List? filter;
 
+  /// A copy of this value with the given members replaced.
+  RenderedFeatureQueryOptions copyWith({
+    List<String>? layerIds,
+    Uint8List? filter,
+  }) => RenderedFeatureQueryOptions(
+    layerIds: layerIds ?? this.layerIds,
+    filter: filter ?? this.filter,
+  );
+
   @override
   List<Object?> get _members => [layerIds, filter];
+  @override
+  String toString() =>
+      _describe('RenderedFeatureQueryOptions', const ['layerIds', 'filter']);
 }
 
 /// One rendered-feature query hit borrowed for a completion callback.
@@ -3888,6 +5108,14 @@ final class RenderedFeature extends _Value {
     sourceLayerId,
     state,
   ];
+  @override
+  String toString() => _describe('RenderedFeature', const [
+    'feature',
+    'layerId',
+    'sourceId',
+    'sourceLayerId',
+    'state',
+  ]);
 }
 
 /// Options for source feature queries.
@@ -3909,8 +5137,22 @@ final class SourceFeatureQueryOptions extends _Value {
   /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
   final Uint8List? filter;
 
+  /// A copy of this value with the given members replaced.
+  SourceFeatureQueryOptions copyWith({
+    List<String>? sourceLayerIds,
+    Uint8List? filter,
+  }) => SourceFeatureQueryOptions(
+    sourceLayerIds: sourceLayerIds ?? this.sourceLayerIds,
+    filter: filter ?? this.filter,
+  );
+
   @override
   List<Object?> get _members => [sourceLayerIds, filter];
+  @override
+  String toString() => _describe('SourceFeatureQueryOptions', const [
+    'sourceLayerIds',
+    'filter',
+  ]);
 }
 
 /// One source-feature query hit borrowed for a completion callback.
@@ -3927,6 +5169,9 @@ final class SourceFeature extends _Value {
 
   @override
   List<Object?> get _members => [feature, sourceLayerId];
+  @override
+  String toString() =>
+      _describe('SourceFeature', const ['feature', 'sourceLayerId']);
 }
 
 /// CPU image readback metadata for a texture target frame.
@@ -3955,6 +5200,13 @@ final class TextureImageInfo extends _Value {
 
   @override
   List<Object?> get _members => [width, height, stride, byteLength];
+  @override
+  String toString() => _describe('TextureImageInfo', const [
+    'width',
+    'height',
+    'stride',
+    'byteLength',
+  ]);
 }
 
 /// Texture readback borrowed for a completion callback.
@@ -3971,6 +5223,9 @@ final class TextureReadbackResult extends _Value {
 
   @override
   List<Object?> get _members => [data, info];
+  @override
+  String toString() =>
+      _describe('TextureReadbackResult', const ['data', 'info']);
 }
 
 /// A resource provider's answer to one request.
@@ -4001,6 +5256,29 @@ final class ResourceResponse extends _Value {
   final String? etag;
   final int? retryAfterUnixMs;
 
+  /// A copy of this value with the given members replaced.
+  ResourceResponse copyWith({
+    ResourceResponseStatus? status,
+    ResourceErrorReason? errorReason,
+    Uint8List? bytes,
+    String? errorMessage,
+    bool? mustRevalidate,
+    int? modifiedUnixMs,
+    int? expiresUnixMs,
+    String? etag,
+    int? retryAfterUnixMs,
+  }) => ResourceResponse(
+    status: status ?? this.status,
+    errorReason: errorReason ?? this.errorReason,
+    bytes: bytes ?? this.bytes,
+    errorMessage: errorMessage ?? this.errorMessage,
+    mustRevalidate: mustRevalidate ?? this.mustRevalidate,
+    modifiedUnixMs: modifiedUnixMs ?? this.modifiedUnixMs,
+    expiresUnixMs: expiresUnixMs ?? this.expiresUnixMs,
+    etag: etag ?? this.etag,
+    retryAfterUnixMs: retryAfterUnixMs ?? this.retryAfterUnixMs,
+  );
+
   @override
   List<Object?> get _members => [
     status,
@@ -4013,6 +5291,18 @@ final class ResourceResponse extends _Value {
     etag,
     retryAfterUnixMs,
   ];
+  @override
+  String toString() => _describe('ResourceResponse', const [
+    'status',
+    'errorReason',
+    'bytes',
+    'errorMessage',
+    'mustRevalidate',
+    'modifiedUnixMs',
+    'expiresUnixMs',
+    'etag',
+    'retryAfterUnixMs',
+  ]);
 }
 
 /// Reports that MapLibre cancelled a C API resource provider request.
@@ -4051,8 +5341,22 @@ final class ResourceRoute extends _Value {
   /// The URL or glob pattern to compare.
   final String url;
 
+  /// A copy of this value with the given members replaced.
+  ResourceRoute copyWith({
+    ResourceKindMask? kinds,
+    UrlMatchFlags? flags,
+    String? url,
+  }) => ResourceRoute(
+    kinds: kinds ?? this.kinds,
+    flags: flags ?? this.flags,
+    url: url ?? this.url,
+  );
+
   @override
   List<Object?> get _members => [kinds, flags, url];
+  @override
+  String toString() =>
+      _describe('ResourceRoute', const ['kinds', 'flags', 'url']);
 }
 
 /// Options used when creating a runtime.
@@ -4069,8 +5373,18 @@ final class RuntimeOptions extends _Value {
   /// Cache database path. Copied during runtime creation.
   final String? cachePath;
 
+  /// A copy of this value with the given members replaced.
+  RuntimeOptions copyWith({String? assetPath, String? cachePath}) =>
+      RuntimeOptions(
+        assetPath: assetPath ?? this.assetPath,
+        cachePath: cachePath ?? this.cachePath,
+      );
+
   @override
   List<Object?> get _members => [assetPath, cachePath];
+  @override
+  String toString() =>
+      _describe('RuntimeOptions', const ['assetPath', 'cachePath']);
 }
 
 /// Tile-pyramid offline region definition.
@@ -4098,6 +5412,23 @@ final class OfflineTilePyramidRegionDefinition extends _Value {
   final double pixelRatio;
   final bool includeIdeographs;
 
+  /// A copy of this value with the given members replaced.
+  OfflineTilePyramidRegionDefinition copyWith({
+    String? styleUrl,
+    LatLngBounds? bounds,
+    double? minZoom,
+    double? maxZoom,
+    double? pixelRatio,
+    bool? includeIdeographs,
+  }) => OfflineTilePyramidRegionDefinition(
+    styleUrl: styleUrl ?? this.styleUrl,
+    bounds: bounds ?? this.bounds,
+    minZoom: minZoom ?? this.minZoom,
+    maxZoom: maxZoom ?? this.maxZoom,
+    pixelRatio: pixelRatio ?? this.pixelRatio,
+    includeIdeographs: includeIdeographs ?? this.includeIdeographs,
+  );
+
   @override
   List<Object?> get _members => [
     styleUrl,
@@ -4107,6 +5438,15 @@ final class OfflineTilePyramidRegionDefinition extends _Value {
     pixelRatio,
     includeIdeographs,
   ];
+  @override
+  String toString() => _describe('OfflineTilePyramidRegionDefinition', const [
+    'styleUrl',
+    'bounds',
+    'minZoom',
+    'maxZoom',
+    'pixelRatio',
+    'includeIdeographs',
+  ]);
 }
 
 /// Geometry offline region definition.
@@ -4138,6 +5478,23 @@ final class OfflineGeometryRegionDefinition extends _Value {
   final double pixelRatio;
   final bool includeIdeographs;
 
+  /// A copy of this value with the given members replaced.
+  OfflineGeometryRegionDefinition copyWith({
+    String? styleUrl,
+    Uint8List? geometry,
+    double? minZoom,
+    double? maxZoom,
+    double? pixelRatio,
+    bool? includeIdeographs,
+  }) => OfflineGeometryRegionDefinition(
+    styleUrl: styleUrl ?? this.styleUrl,
+    geometry: geometry ?? this.geometry,
+    minZoom: minZoom ?? this.minZoom,
+    maxZoom: maxZoom ?? this.maxZoom,
+    pixelRatio: pixelRatio ?? this.pixelRatio,
+    includeIdeographs: includeIdeographs ?? this.includeIdeographs,
+  );
+
   @override
   List<Object?> get _members => [
     styleUrl,
@@ -4147,6 +5504,15 @@ final class OfflineGeometryRegionDefinition extends _Value {
     pixelRatio,
     includeIdeographs,
   ];
+  @override
+  String toString() => _describe('OfflineGeometryRegionDefinition', const [
+    'styleUrl',
+    'geometry',
+    'minZoom',
+    'maxZoom',
+    'pixelRatio',
+    'includeIdeographs',
+  ]);
 }
 
 /// Tagged offline region definition.
@@ -4203,6 +5569,9 @@ final class OfflineRegionInfo extends _Value {
 
   @override
   List<Object?> get _members => [id, definition, metadata];
+  @override
+  String toString() =>
+      _describe('OfflineRegionInfo', const ['id', 'definition', 'metadata']);
 }
 
 /// Offline region status snapshot.
@@ -4245,6 +5614,18 @@ final class OfflineRegionStatus extends _Value {
     requiredResourceCountIsPrecise,
     complete,
   ];
+  @override
+  String toString() => _describe('OfflineRegionStatus', const [
+    'downloadState',
+    'completedResourceCount',
+    'completedResourceSize',
+    'completedTileCount',
+    'requiredTileCount',
+    'completedTileSize',
+    'requiredResourceCount',
+    'requiredResourceCountIsPrecise',
+    'complete',
+  ]);
 }
 
 /// Rendering statistics reported in `MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME`.
@@ -4283,6 +5664,14 @@ final class RenderingStats extends _Value {
     drawCallCount,
     totalDrawCallCount,
   ];
+  @override
+  String toString() => _describe('RenderingStats', const [
+    'encodingTime',
+    'renderingTime',
+    'frameCount',
+    'drawCallCount',
+    'totalDrawCallCount',
+  ]);
 }
 
 /// Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`.
@@ -4309,6 +5698,13 @@ final class RuntimeEventRenderFrame extends _Value {
 
   @override
   List<Object?> get _members => [mode, needsRepaint, placementChanged, stats];
+  @override
+  String toString() => _describe('RuntimeEventRenderFrame', const [
+    'mode',
+    'needsRepaint',
+    'placementChanged',
+    'stats',
+  ]);
 }
 
 /// Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED`.
@@ -4323,6 +5719,8 @@ final class RuntimeEventRenderMap extends _Value {
 
   @override
   List<Object?> get _members => [mode];
+  @override
+  String toString() => _describe('RuntimeEventRenderMap', const ['mode']);
 }
 
 /// Overscaled tile identity reported in tile observer events.
@@ -4351,6 +5749,14 @@ final class TileId extends _Value {
     canonicalX,
     canonicalY,
   ];
+  @override
+  String toString() => _describe('TileId', const [
+    'overscaledZ',
+    'wrap',
+    'canonicalZ',
+    'canonicalX',
+    'canonicalY',
+  ]);
 }
 
 /// Payload for `MLN_RUNTIME_EVENT_MAP_TILE_ACTION`.
@@ -4369,6 +5775,9 @@ final class RuntimeEventTileAction extends _Value {
 
   @override
   List<Object?> get _members => [operation, tileId];
+  @override
+  String toString() =>
+      _describe('RuntimeEventTileAction', const ['operation', 'tileId']);
 }
 
 /// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED`.
@@ -4385,6 +5794,11 @@ final class RuntimeEventOfflineRegionStatus extends _Value {
 
   @override
   List<Object?> get _members => [regionId, status];
+  @override
+  String toString() => _describe('RuntimeEventOfflineRegionStatus', const [
+    'regionId',
+    'status',
+  ]);
 }
 
 /// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
@@ -4403,6 +5817,11 @@ final class RuntimeEventOfflineRegionResponseError extends _Value {
 
   @override
   List<Object?> get _members => [regionId, reason];
+  @override
+  String toString() => _describe(
+    'RuntimeEventOfflineRegionResponseError',
+    const ['regionId', 'reason'],
+  );
 }
 
 /// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`.
@@ -4419,6 +5838,11 @@ final class RuntimeEventOfflineRegionTileCountLimit extends _Value {
 
   @override
   List<Object?> get _members => [regionId, limit];
+  @override
+  String toString() => _describe(
+    'RuntimeEventOfflineRegionTileCountLimit',
+    const ['regionId', 'limit'],
+  );
 }
 
 /// One delivered runtime event.
@@ -4519,6 +5943,8 @@ final class EventBatchView extends _Value {
 
   @override
   List<Object?> get _members => [events];
+  @override
+  String toString() => _describe('EventBatchView', const ['events']);
 }
 
 /// Receives selected events after their snapshots have been published.
@@ -4563,6 +5989,8 @@ final class ResourceRange extends _Value {
 
   @override
   List<Object?> get _members => [start, end];
+  @override
+  String toString() => _describe('ResourceRange', const ['start', 'end']);
 }
 
 final class ResourceRequestInfo extends _Value {
@@ -4615,6 +6043,21 @@ final class ResourceRequestInfo extends _Value {
     priorEtag,
     priorData,
   ];
+  @override
+  String toString() => _describe('ResourceRequestInfo', const [
+    'requestedUrl',
+    'resolvedUrl',
+    'kind',
+    'loadingMethod',
+    'priority',
+    'usage',
+    'storagePolicy',
+    'range',
+    'priorModifiedUnixMs',
+    'priorExpiresUnixMs',
+    'priorEtag',
+    'priorData',
+  ]);
 }
 
 /// Intercepts a network resource request.
@@ -4679,8 +6122,22 @@ final class StyleExpressionType extends _Value {
   /// For an array, its fixed length, or zero for any length.
   final int itemCount;
 
+  /// A copy of this value with the given members replaced.
+  StyleExpressionType copyWith({
+    StyleExpressionTypeKind? kind,
+    StyleExpressionTypeKind? itemKind,
+    int? itemCount,
+  }) => StyleExpressionType(
+    kind: kind ?? this.kind,
+    itemKind: itemKind ?? this.itemKind,
+    itemCount: itemCount ?? this.itemCount,
+  );
+
   @override
   List<Object?> get _members => [kind, itemKind, itemCount];
+  @override
+  String toString() =>
+      _describe('StyleExpressionType', const ['kind', 'itemKind', 'itemCount']);
 }
 
 /// Options for parsing a style expression.
@@ -4695,8 +6152,15 @@ final class StyleExpressionOptions extends _Value {
   /// asserts it. Without it, the expression keeps the type it infers.
   final StyleExpressionType? expectedType;
 
+  /// A copy of this value with the given members replaced.
+  StyleExpressionOptions copyWith({StyleExpressionType? expectedType}) =>
+      StyleExpressionOptions(expectedType: expectedType ?? this.expectedType);
+
   @override
   List<Object?> get _members => [expectedType];
+  @override
+  String toString() =>
+      _describe('StyleExpressionOptions', const ['expectedType']);
 }
 
 /// What one evaluation reads.
@@ -4753,6 +6217,27 @@ final class StyleExpressionInputs extends _Value {
   /// expression reports any other ID as unavailable.
   final List<String> availableImages;
 
+  /// A copy of this value with the given members replaced.
+  StyleExpressionInputs copyWith({
+    double? zoom,
+    double? colorRampParameter,
+    double? elevation,
+    Uint8List? feature,
+    Uint8List? featureState,
+    Uint8List? globalState,
+    CanonicalTileId? canonicalTileId,
+    List<String>? availableImages,
+  }) => StyleExpressionInputs(
+    zoom: zoom ?? this.zoom,
+    colorRampParameter: colorRampParameter ?? this.colorRampParameter,
+    elevation: elevation ?? this.elevation,
+    feature: feature ?? this.feature,
+    featureState: featureState ?? this.featureState,
+    globalState: globalState ?? this.globalState,
+    canonicalTileId: canonicalTileId ?? this.canonicalTileId,
+    availableImages: availableImages ?? this.availableImages,
+  );
+
   @override
   List<Object?> get _members => [
     zoom,
@@ -4764,6 +6249,17 @@ final class StyleExpressionInputs extends _Value {
     canonicalTileId,
     availableImages,
   ];
+  @override
+  String toString() => _describe('StyleExpressionInputs', const [
+    'zoom',
+    'colorRampParameter',
+    'elevation',
+    'feature',
+    'featureState',
+    'globalState',
+    'canonicalTileId',
+    'availableImages',
+  ]);
 }
 
 /// What a parsed expression depends on.
@@ -4784,4 +6280,9 @@ final class StyleExpressionInfo extends _Value {
 
   @override
   List<Object?> get _members => [isFeatureConstant, isZoomConstant];
+  @override
+  String toString() => _describe('StyleExpressionInfo', const [
+    'isFeatureConstant',
+    'isZoomConstant',
+  ]);
 }
