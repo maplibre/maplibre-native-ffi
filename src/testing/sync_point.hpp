@@ -20,6 +20,9 @@ enum class SyncPoint : std::uint8_t {
   // The runtime worker is about to build a map's native map, inside the map's
   // creation transaction, where a failure fails the creation. No lock is held.
   MapConstruction,
+  // A map creation has written its handle and submitted the map's
+  // construction, and is about to return. No lock is held.
+  MapCreationSubmitted,
   // A runtime release or dispose found submission leases or children
   // outstanding, such as a released map's cleanup, and deferred the runtime's
   // retirement until they drain. It fires only when retirement is deferred,

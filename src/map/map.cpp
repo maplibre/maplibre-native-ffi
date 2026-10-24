@@ -3479,15 +3479,19 @@ auto create_map_start(
   const auto handle = handle_table<MapObject>().insert(owned_map);
   owned_map->self = handle;
   owned_map->event_state->map = handle;
+  // The completion may run before this call returns, so the caller's handle
+  // is written before the work that runs it is submitted.
+  *out_map = handle;
   const auto submit_status = submit_runtime_operation(
     runtime_state, state, std::move(work), completion_state
   );
   if (submit_status != MLN_STATUS_OK) {
+    *out_map = MLN_HANDLE_NULL;
     static_cast<void>(handle_table<MapObject>().remove(handle));
     return submit_status;
   }
   retain_guard.dismiss();
-  *out_map = handle;
+  mln::testing::hit(mln::testing::SyncPoint::MapCreationSubmitted);
   return MLN_STATUS_OK;
 }
 

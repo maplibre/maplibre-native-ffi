@@ -1,10 +1,13 @@
-// A map whose creation failed. Nothing public makes MapLibre's map constructor
-// throw, so the case fails the first allocation the runtime worker makes after
-// the MapConstruction point.
+// Map creation orderings no public fence reaches: a readiness completion that
+// runs before the creating call returns, and a creation that fails. Nothing
+// public makes MapLibre's map constructor throw, so the failure case fails the
+// first allocation the runtime worker makes after the MapConstruction point.
 
+#include <atomic>
 #include <optional>
 
 #include "internal/support/allocation_faults.hpp"
+#include "internal/support/sync_points.hpp"
 #include "maplibre_native_c.h"
 #include "support/test_support.h"
 #include "testing/sync_point.hpp"
@@ -12,7 +15,56 @@
 namespace {
 
 using mln::native_tests::AllocationFaults;
+using mln::native_tests::SyncPointScope;
 using mln::testing::SyncPoint;
+
+struct InlineReadiness {
+  mln_runtime runtime = MLN_HANDLE_NULL;
+  mln_map map = MLN_HANDLE_NULL;
+  mln_status status = MLN_STATUS_NATIVE_ERROR;
+  std::atomic<mln_map> seen{MLN_HANDLE_NULL};
+  std::atomic_bool ready = false;
+};
+
+void create_map_on_thread(void* context) {
+  auto& probe = *static_cast<InlineReadiness*>(context);
+  const auto completion = mln_completion{
+    .size = sizeof(mln_completion),
+    .callback =
+      [](void* user_data, const mln_completion_result* result) {
+        auto& probe = *static_cast<InlineReadiness*>(user_data);
+        // The creating thread is still inside mln_runtime_create_map().
+        if (result->status == MLN_STATUS_OK) probe.seen = probe.map;
+        probe.ready = true;
+        mln_test_pulse();
+      },
+    .user_data = &probe,
+  };
+  probe.status = mln_runtime_create_map(
+    probe.runtime, nullptr, &probe.map, &completion, nullptr
+  );
+}
+
+// The completion may run before the creating call returns, and the map it
+// reports ready is already in out_map when it does.
+void a_completion_before_return_reads_the_map() {
+  const auto runtime = mln_test_create_runtime();
+  auto sync_points = SyncPointScope{};
+  sync_points.hold(SyncPoint::MapCreationSubmitted);
+  auto probe = InlineReadiness{.runtime = runtime};
+  auto* creator = mln_test_thread_start(create_map_on_thread, &probe);
+  TEST_ASSERT_TRUE(
+    sync_points.wait_for_hits(SyncPoint::MapCreationSubmitted, 1)
+  );
+  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.ready));
+  sync_points.release(SyncPoint::MapCreationSubmitted);
+  mln_test_thread_join(creator);
+  MLN_TEST_OK(probe.status);
+  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, probe.map);
+  TEST_ASSERT_EQUAL_UINT64(probe.map, probe.seen.load());
+  mln_test_destroy_map(probe.map);
+  mln_test_destroy_runtime(runtime);
+}
 
 void fail_construction(SyncPoint point, void* /*context*/) noexcept {
   if (point != SyncPoint::MapConstruction) return;
@@ -74,4 +126,7 @@ void work_queued_on_a_failed_map_reports_invalid_state() {
 
 }  // namespace
 
-MLN_TEST_GROUP { RUN_TEST(work_queued_on_a_failed_map_reports_invalid_state); }
+MLN_TEST_GROUP {
+  RUN_TEST(a_completion_before_return_reads_the_map);
+  RUN_TEST(work_queued_on_a_failed_map_reports_invalid_state);
+}

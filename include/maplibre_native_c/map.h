@@ -1104,11 +1104,12 @@ MLN_API mln_map_options mln_map_options_default(void) MLN_NOEXCEPT;
  * Starts creation of a map on the runtime.
  *
  * Input is copied before this function returns. An accepted creation writes
- * the map to out_map before return, in a creating state, and the caller owns
- * it from then on. Commands, operations, and queries submitted to the map run
- * after creation finishes; if creation failed, each completes with
- * MLN_STATUS_INVALID_STATE. Until the completion reports MLN_STATUS_OK,
- * mln_map_get_snapshot() and every render target attach return
+ * the map to out_map, in a creating state, before the completion can run, so
+ * the completion may read it there; the caller owns the map from then on.
+ * A rejected creation leaves out_map null. Commands, operations, and queries
+ * submitted to the map run after creation finishes; if creation failed, each
+ * completes with MLN_STATUS_INVALID_STATE. Until the completion reports
+ * MLN_STATUS_OK, mln_map_get_snapshot() and every render target attach return
  * MLN_STATUS_INVALID_STATE. Release or dispose the map whether or not creation
  * succeeds. A map released while it is still creating finishes creation and
  * reports it through the completion before the map retires.
