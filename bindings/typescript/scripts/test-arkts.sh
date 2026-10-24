@@ -21,8 +21,6 @@ case "$preset" in
     exit 2
     ;;
 esac
-connect_key=${MLN_FFI_OHOS_EMULATOR_CONNECT_KEY:-127.0.0.1:55555}
-hdc=(hdc -t "$connect_key")
 build="$binding/native/build/$preset"
 work="$build/hap-suite"
 bundle=org.maplibre.nativeffi.suite
@@ -50,9 +48,12 @@ cp "$build/libmaplibre_native_ffi.so" \
   "$native_install/lib/libmln_test_graphics.so" "$work/libs/$abi/"
 "$binding/scripts/build-hap.sh" "$work" "$bundle" "$abi"
 
-if ! "${hdc[@]}" shell echo ready 2>/dev/null | tr -d '\r' | grep -qx ready; then
+key_script="$binding/../../scripts/ohos-emulator-connect-key.sh"
+if ! connect_key=$("$key_script"); then
   mise run //:ohos-emulator:boot
+  connect_key=$("$key_script")
 fi
+hdc=(hdc -t "$connect_key")
 
 # The origin listens on a free port here, and the device reaches it on the
 # same port.

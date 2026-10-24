@@ -50,6 +50,11 @@ is running, whoever started it, and creates the AVD if it is missing. Since
 another session may be using it, no task stops it; run
 `mise run //:android-emulator:stop <abi> --api <level>` when none is.
 
+Every checkout also shares the one OpenHarmony emulator that runs the Oniro
+image mise installed. A task reuses it, whoever started it, and a new one
+forwards hdc from the first free port from 55555 on. Run
+`mise run //:ohos-emulator:stop` when no session is using it.
+
 ## Debug on a CI runner
 
 [Blacksmith Testbox](https://github.com/useblacksmith/begin-testbox) runs

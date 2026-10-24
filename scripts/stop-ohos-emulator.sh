@@ -1,28 +1,21 @@
 #!/usr/bin/env bash
-# Stops the OpenHarmony emulator that boot-ohos-emulator.sh started.
+# Stops the shared OpenHarmony emulator, whoever started it. Every session on
+# the machine may be using that emulator, so no task stops it on its own; this
+# is for a person who knows that none is.
 set -euo pipefail
 
-pid_file="$MISE_MONOREPO_ROOT/build/ohos-emulator/qemu.pid"
-connect_key=${MLN_FFI_OHOS_EMULATOR_CONNECT_KEY:-127.0.0.1:55555}
-if [[ ! -f "$pid_file" ]]; then
-  echo "No mise-managed OpenHarmony emulator is running."
+if ! process=$("$MISE_MONOREPO_ROOT/scripts/ohos-emulator-process.sh"); then
+  echo "OpenHarmony emulator is not running."
   exit 0
 fi
+read -r pid connect_key <<<"$process"
 # Disconnect hdc before QEMU closes the forwarded socket. This keeps the
 # listener port reusable when another suite starts the emulator immediately.
 hdc tconn "$connect_key" -remove >/dev/null 2>&1 || true
 
-pid=$(<"$pid_file")
-if [[ "$pid" =~ ^[0-9]+$ ]] &&
-  kill -0 "$pid" 2>/dev/null &&
-  ps -p "$pid" -o args= | grep -q qemu-system-x86_64; then
-  kill "$pid"
-  for ((attempt = 0; attempt < 30; attempt++)); do
-    kill -0 "$pid" 2>/dev/null || break
-    sleep 1
-  done
-  if kill -0 "$pid" 2>/dev/null; then
-    kill -KILL "$pid"
-  fi
-fi
-rm -f "$pid_file"
+kill "$pid" 2>/dev/null || exit 0
+for ((attempt = 0; attempt < 30; attempt++)); do
+  kill -0 "$pid" 2>/dev/null || exit 0
+  sleep 1
+done
+kill -KILL "$pid" 2>/dev/null || true

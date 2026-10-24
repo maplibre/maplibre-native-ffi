@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Runs native test executables in the OpenHarmony emulator, booting it when
-# needed. Every executable runs and reports its own exit status; the first
-# failure stops the batch.
+# Runs native test executables on the shared OpenHarmony emulator, which
+# boot-ohos-emulator.sh boots when it is not running yet. Every executable runs
+# and reports its own exit status; the first failure stops the batch.
 set -euo pipefail
 
 if [[ $# -lt 4 ]]; then
@@ -34,8 +34,9 @@ if (($# == 0)); then
 fi
 test_executables=("$@")
 
-connect_key=${MLN_FFI_OHOS_EMULATOR_CONNECT_KEY:-127.0.0.1:55555}
-remote_dir=/data/local/tmp/maplibre-native-ffi
+# Other sessions may be running tests on the same shared emulator, so each run
+# has a directory of its own and removes it when it ends.
+remote_dir=/data/local/tmp/maplibre-native-ffi-$$
 fixture_dir=${MLN_FFI_TEST_FIXTURE_DIR:-}
 
 for local_file in "$native_library" "$cxx_library" ${extra_libraries[@]+"${extra_libraries[@]}"} "${test_executables[@]}"; do
@@ -53,12 +54,19 @@ if [[ -n "$fixture_dir" && ! -d "$fixture_dir" ]]; then
   exit 2
 fi
 
-if ! hdc tconn "$connect_key" >/dev/null 2>&1 ||
-  ! hdc -t "$connect_key" shell echo ready 2>/dev/null | tr -d '\r' | grep -qx ready; then
+key_script="$MISE_MONOREPO_ROOT/scripts/ohos-emulator-connect-key.sh"
+if ! connect_key=$("$key_script"); then
   mise run //:ohos-emulator:boot
+  connect_key=$("$key_script")
 fi
 
-hdc -t "$connect_key" shell "rm -rf '$remote_dir' && mkdir -p '$remote_dir/tmp'"
+remove_remote_dir() {
+  perl -e 'alarm shift; exec @ARGV' 30 \
+    hdc -t "$connect_key" shell "rm -rf '$remote_dir'" >/dev/null 2>&1 || true
+}
+trap remove_remote_dir EXIT
+
+hdc -t "$connect_key" shell "mkdir -p '$remote_dir/tmp'"
 hdc -t "$connect_key" file send "$native_library" "$remote_dir/libmaplibre-native-c.so"
 hdc -t "$connect_key" file send "$cxx_library" "$remote_dir/libc++_shared.so"
 for library in ${extra_libraries[@]+"${extra_libraries[@]}"}; do

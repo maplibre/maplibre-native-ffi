@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
+# Runs QEMU on the Oniro image in the foreground, with hdc reachable at the
+# connect key. QEMU takes a write lock on each image, so a second emulator on
+# the same images exits rather than writing them too, whatever its connect key.
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-  echo "usage: $0 <image-directory>" >&2
+if [[ $# -ne 2 ]]; then
+  echo "usage: $0 <image-directory> <connect-key>" >&2
   exit 2
 fi
 
-image_dir=$1
-connect_key=${MLN_FFI_OHOS_EMULATOR_CONNECT_KEY:-127.0.0.1:55555}
+image_dir=$(cd -P "$1" && pwd)
+connect_key=$2
 host_address=${connect_key%:*}
 host_port=${connect_key##*:}
 if [[ -z "$host_address" || ! "$host_port" =~ ^[0-9]+$ ]]; then
@@ -49,7 +52,8 @@ case "$(uname -s)" in
     ;;
 esac
 
-cd "$image_dir"
+# The images are named by absolute path, which is how ohos-emulator-process.sh
+# tells this emulator from any other.
 exec "$qemu_bin" \
   -machine q35 \
   -smp 6 \
@@ -61,15 +65,15 @@ exec "$qemu_bin" \
   -display vnc=127.0.0.1:0 \
   -serial telnet:127.0.0.1:4444,server,nowait \
   -rtc base=utc,clock=host \
-  -initrd ramdisk.img \
-  -kernel bzImage \
-  -drive if=none,file=updater.img,format=raw,id=updater,index=0 \
+  -initrd "$image_dir/ramdisk.img" \
+  -kernel "$image_dir/bzImage" \
+  -drive if=none,file="$image_dir/updater.img",format=raw,file.locking=on,id=updater,index=0 \
   -device virtio-blk-pci,drive=updater \
-  -drive if=none,file=system.img,format=raw,id=system,index=1 \
+  -drive if=none,file="$image_dir/system.img",format=raw,file.locking=on,id=system,index=1 \
   -device virtio-blk-pci,drive=system \
-  -drive if=none,file=vendor.img,format=raw,id=vendor,index=2 \
+  -drive if=none,file="$image_dir/vendor.img",format=raw,file.locking=on,id=vendor,index=2 \
   -device virtio-blk-pci,drive=vendor \
-  -drive if=none,file=userdata.img,format=raw,id=userdata,index=3 \
+  -drive if=none,file="$image_dir/userdata.img",format=raw,file.locking=on,id=userdata,index=3 \
   -device virtio-blk-pci,drive=userdata \
   -append "ip=dhcp loglevel=4 console=ttyS0,115200 init=init root=/dev/ram0 rw ohos.boot.hardware=x86_general ohos.required_mount.system=/dev/block/vdb@/usr@ext4@ro,barrier=1@wait,required ohos.required_mount.vendor=/dev/block/vdc@/vendor@ext4@ro,barrier=1@wait,required ohos.required_mount.misc=/dev/block/vda@/misc@none@none=@wait,required" \
   "${acceleration[@]}" \

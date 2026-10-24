@@ -509,11 +509,11 @@ flag "--api <api>" default="{{vars.android_system_image_api}}"
 run = '"$MISE_MONOREPO_ROOT/scripts/stop-android-emulator.sh" "$usage_api" "$usage_abi"'
 
 [tasks."ohos-emulator:boot"]
-description = "Boot the OpenHarmony emulator and wait until it is ready."
-run = '"$MISE_MONOREPO_ROOT/scripts/boot-ohos-emulator.sh" "{{vars.ohos_sdk_version}}"'
+description = "Boot the shared OpenHarmony emulator, or reuse it, and wait until it is ready."
+run = '"$MISE_MONOREPO_ROOT/scripts/boot-ohos-emulator.sh"'
 
 [tasks."ohos-emulator:stop"]
-description = "Stop the OpenHarmony emulator started by mise."
+description = "Stop the shared OpenHarmony emulator, which any session on the machine may be using."
 run = '"$MISE_MONOREPO_ROOT/scripts/stop-ohos-emulator.sh"'
 
 [tasks.check]
