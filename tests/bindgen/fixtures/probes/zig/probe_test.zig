@@ -101,12 +101,12 @@ test "generated owned callback arguments are released on conversion and host err
     try std.testing.expectEqual(@as(usize, 2), probe.calls);
     try std.testing.expectEqual(@as(u64, 42), released_query);
     var saved = probe.saved.?;
-    api.queryRelease(&saved);
+    saved.release();
     try std.testing.expectEqual(@as(u64, 43), released_query);
     // The release closed the value, so a second one does not reach native.
     try std.testing.expect(saved.isClosed());
     released_query = 0;
-    api.queryRelease(&saved);
+    saved.release();
     try std.testing.expectEqual(@as(u64, 0), released_query);
 }
 

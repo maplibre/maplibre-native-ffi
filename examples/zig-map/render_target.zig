@@ -76,7 +76,7 @@ pub const Session = struct {
     pub fn deinit(self: *Session) void {
         var handle = self.handle orelse return;
         var detached = false;
-        if (maplibre.renderSessionDetach(handle, null)) |future| {
+        if (handle.detach(null)) |future| {
             var completion = future;
             defer completion.deinit();
             detached = if (self.waitLifecycle(&completion)) |_| true else |_| false;
@@ -89,7 +89,7 @@ pub const Session = struct {
     /// Services every queued caller-driver item on the graphics thread.
     pub fn service(self: *Session) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        _ = maplibre.renderSessionServiceDriverWork(self.handle.?, &diagnostic) catch |err| {
+        _ = (self.handle.?).serviceDriverWork(&diagnostic) catch |err| {
             diagnostics.logError("render driver service failed", err, &diagnostic);
             return types.AppError.BackendDrawFailed;
         };
@@ -100,7 +100,7 @@ pub const Session = struct {
     pub fn requestFrame(self: *Session, force: bool) !void {
         self.next_token += 1;
         var diagnostic: maplibre.Diagnostic = .{};
-        maplibre.renderSessionRequestFrame(self.handle.?, .{
+        (self.handle.?).requestFrame(.{
             .flags = .{ .if_needed = !force, .wait_for_update = !force, .present = self.presents },
             .token = self.next_token,
         }, &diagnostic) catch |err| {
@@ -112,9 +112,9 @@ pub const Session = struct {
     /// Drains every queued frame result.
     pub fn drainResults(self: *Session) !FrameResults {
         var results: FrameResults = .{};
-        var batch = try maplibre.renderSessionDrainFrameResults(self.handle.?, null) orelse return results;
+        var batch = try (self.handle.?).drainFrameResults(null) orelse return results;
         defer batch.deinit();
-        var view = try maplibre.renderFrameBatchGet(std.heap.smp_allocator, batch, null);
+        var view = try batch.get(std.heap.smp_allocator, null);
         defer view.deinit();
         for (view.value.results) |result| {
             switch (result.disposition) {
@@ -132,7 +132,7 @@ pub const Session = struct {
     /// map.
     pub fn resize(self: *Session, viewport: types.Viewport) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        var completion = maplibre.renderSessionResize(self.handle.?, extent(viewport), &diagnostic) catch |err| {
+        var completion = (self.handle.?).resize(extent(viewport), &diagnostic) catch |err| {
             diagnostics.logError("render session resize failed", err, &diagnostic);
             return types.AppError.ResizeFailed;
         };
@@ -146,7 +146,7 @@ pub const Session = struct {
         var acquired = false;
         while (true) {
             var diagnostic: maplibre.Diagnostic = .{};
-            const frame = maplibre.renderSessionAcquireFrame(self.handle.?, &diagnostic) catch |err| {
+            const frame = (self.handle.?).acquireFrame(&diagnostic) catch |err| {
                 diagnostics.logError("texture acquire failed", err, &diagnostic);
                 return types.AppError.BackendDrawFailed;
             } orelse return acquired;
@@ -165,7 +165,7 @@ pub const Session = struct {
             while (true) {
                 // A wake that arrives after the clear ends the next wait at once.
                 events.clearDriverWait();
-                _ = maplibre.renderSessionServiceDriverWork(self.handle.?, &diagnostic) catch |err| {
+                _ = (self.handle.?).serviceDriverWork(&diagnostic) catch |err| {
                     diagnostics.logError("render driver service failed", err, &diagnostic);
                     return err;
                 };
@@ -193,7 +193,7 @@ pub fn graphicsKept() bool {
 /// lifecycle submission with target loss.
 fn abandon(handle: maplibre.RenderSession) void {
     var diagnostic: maplibre.Diagnostic = .{};
-    const result = maplibre.renderSessionAbandon(handle, &diagnostic) catch |err| {
+    const result = handle.abandon(&diagnostic) catch |err| {
         // A session that already released its target reports invalid state.
         if (err != error.InvalidState) diagnostics.logError("render session abandon failed", err, &diagnostic);
         return;
@@ -209,7 +209,7 @@ fn abandon(handle: maplibre.RenderSession) void {
 pub fn releaseFrame(frame: *?maplibre.AcquiredFrame) void {
     var owned = frame.* orelse return;
     frame.* = null;
-    maplibre.acquiredFrameRelease(&owned, null, null) catch |err| {
+    owned.release(null, null) catch |err| {
         diagnostics.logError("texture release failed", err, null);
     };
 }

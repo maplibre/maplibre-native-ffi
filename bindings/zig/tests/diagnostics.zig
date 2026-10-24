@@ -15,8 +15,8 @@ test "a failed command returns its error and fills the wait's diagnostic" {
 
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
-    const committed = try support.resolve(try maplibre.mapSetStyleJson(fixture.map, support.style_json, null));
-    var future = try maplibre.mapRemoveStyleSource(fixture.map, "missing", null);
+    const committed = try support.resolve(try fixture.map.setStyleJson(support.style_json, null));
+    var future = try fixture.map.removeStyleSource("missing", null);
     defer future.deinit();
     try testing.expectError(error.NotFound, future.wait(&diagnostic));
     try testing.expectEqual(.not_found, diagnostic.status);

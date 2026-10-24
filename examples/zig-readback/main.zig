@@ -77,7 +77,7 @@ fn waitForSessionFuture(
         const deadline = std.Io.Clock.Timestamp.now(signal.io, .awake).addDuration(native_work_timeout);
         while (true) {
             signal.reset();
-            _ = try maplibre.renderSessionServiceDriverWork(session, null);
+            _ = try session.serviceDriverWork(null);
             if (try future.poll()) break;
             try signal.wait(deadline);
         }
@@ -102,7 +102,7 @@ pub fn main(init_args: std.process.Init) !void {
 
     var signal = WakeSignal{ .io = init_args.io };
     var runtime = try maplibre.runtimeCreate(.{ .cache_path = ":memory:" }, &diagnostic);
-    defer if (maplibre.runtimeRelease(&runtime, null)) |future| {
+    defer if (runtime.release(null)) |future| {
         var teardown = future;
         _ = teardown.wait(null) catch {};
         teardown.deinit();
@@ -111,22 +111,22 @@ pub fn main(init_args: std.process.Init) !void {
     var options = maplibre.mapOptionsDefault();
     options.map_mode = .static;
     options.event_mask = .{};
-    var map_future = try maplibre.runtimeCreateMap(runtime, options, &diagnostic);
+    var map_future = try runtime.createMap(options, &diagnostic);
     defer map_future.deinit();
     var map = try map_future.wait(&diagnostic);
-    defer if (maplibre.mapRelease(&map, null)) |future| {
+    defer if (map.release(null)) |future| {
         var teardown = future;
         _ = teardown.wait(null) catch {};
         teardown.deinit();
     } else |_| map.deinit();
 
-    var resize = try maplibre.mapResize(map, .{ .width = width, .height = height, .scale_factor = 1.0 }, &diagnostic);
+    var resize = try map.resize(.{ .width = width, .height = height, .scale_factor = 1.0 }, &diagnostic);
     resize.deinit();
     try setInitialCamera(allocator, &map);
     var style = if (isSmokeRun(init_args))
-        try maplibre.mapSetStyleJson(map, smoke_style_json, &diagnostic)
+        try map.setStyleJson(smoke_style_json, &diagnostic)
     else
-        try maplibre.mapSetStyleUrl(map, style_url, &diagnostic);
+        try map.setStyleUrl(style_url, &diagnostic);
     style.deinit();
 
     var context = try OwnedTextureContext.init();
@@ -158,7 +158,7 @@ fn renderWithDriver(
     });
     var attachment_needs_cleanup = true;
     errdefer if (attachment_needs_cleanup) {
-        _ = maplibre.renderSessionAbandon(attachment.session, null) catch {};
+        _ = attachment.session.abandon(null) catch {};
         attachment.session.deinit();
     };
     defer attachment.ready.deinit();
@@ -166,25 +166,25 @@ fn renderWithDriver(
 
     var session = attachment.session;
     defer {
-        var detach = maplibre.renderSessionDetach(session, null) catch null;
+        var detach = session.detach(null) catch null;
         if (detach) |*completion| {
             defer completion.deinit();
             waitForSessionFuture(session, completion, signal, null) catch {
-                _ = maplibre.renderSessionAbandon(session, null) catch {};
+                _ = session.abandon(null) catch {};
             };
         } else {
-            _ = maplibre.renderSessionAbandon(session, null) catch {};
+            _ = session.abandon(null) catch {};
         }
         session.deinit();
     }
     attachment_needs_cleanup = false;
 
-    var still_image = try maplibre.mapRequestStillImage(map.*, null);
+    var still_image = try map.requestStillImage(null);
     defer still_image.deinit();
     try still_image.notify(signal.wake());
     try renderStillImage(allocator, session, &still_image, signal);
 
-    var readback = try maplibre.renderSessionReadTexture(allocator, session, null);
+    var readback = try session.readTexture(allocator, null);
     defer readback.deinit();
     var image = try waitForSessionFuture(session, &readback, signal, null);
     defer image.deinit();
@@ -203,16 +203,16 @@ fn renderStillImage(
 ) !void {
     const deadline = std.Io.Clock.Timestamp.now(signal.io, .awake).addDuration(native_work_timeout);
     var next_token: u64 = 1;
-    try maplibre.renderSessionRequestFrame(session, .{ .token = next_token, .flags = .{ .if_needed = true, .wait_for_update = true } }, null);
+    try session.requestFrame(.{ .token = next_token, .flags = .{ .if_needed = true, .wait_for_update = true } }, null);
     while (true) {
         signal.reset();
-        if (uses_caller_driver) _ = try maplibre.renderSessionServiceDriverWork(session, null);
+        if (uses_caller_driver) _ = try session.serviceDriverWork(null);
         if (try still_image.poll()) return still_image.wait(null);
         var demand = false;
-        var results = try maplibre.renderSessionDrainFrameResults(session, null);
+        var results = try session.drainFrameResults(null);
         if (results) |*batch| {
             defer batch.deinit();
-            var view = try maplibre.renderFrameBatchGet(allocator, batch.*, null);
+            var view = try batch.get(allocator, null);
             defer view.deinit();
             for (view.value.results) |result| {
                 switch (result.disposition) {
@@ -224,7 +224,7 @@ fn renderStillImage(
         }
         if (demand) {
             next_token += 1;
-            try maplibre.renderSessionRequestFrame(session, .{ .token = next_token, .flags = .{ .if_needed = true, .wait_for_update = true } }, null);
+            try session.requestFrame(.{ .token = next_token, .flags = .{ .if_needed = true, .wait_for_update = true } }, null);
         }
         try signal.wait(deadline);
     }
@@ -289,19 +289,19 @@ fn attachOwnedTexture(
     wakes.frame_wake = signal.wake();
     wakes.driver_work_wake = if (uses_caller_driver) signal.wake() else .{};
     return if (build_options.supports_vulkan)
-        try maplibre.mapAttachVulkanOwnedTexture(map.*, .{
+        try map.attachVulkanOwnedTexture(.{
             .extent = extent,
             .context = context.descriptor(),
         }, withDriver(wakes, .core_worker), null)
     else if (build_options.supports_metal)
-        try maplibre.mapAttachMetalOwnedTexture(map.*, .{
+        try map.attachMetalOwnedTexture(.{
             .extent = extent,
             .context = context.descriptor(),
             // MTLPixelFormatBGRA8Unorm, the format Apple's drawables use.
             .pixel_format = 80,
         }, withDriver(wakes, .core_worker), null)
     else if (build_options.supports_opengl)
-        try maplibre.mapAttachOpenglOwnedTexture(map.*, .{
+        try map.attachOpenglOwnedTexture(.{
             .extent = extent,
             .context = context.descriptor(),
         }, withDriver(wakes, if (supports_egl) .core_worker else .caller_graphics_thread), null)
@@ -589,7 +589,7 @@ fn setInitialCamera(allocator: std.mem.Allocator, map: *maplibre.Map) !void {
         .bearing = 12.0,
         .pitch = 30.0,
     };
-    var completion = try maplibre.mapUpdateCamera(map.*, update.value, null);
+    var completion = try map.updateCamera(update.value, null);
     completion.deinit();
 }
 

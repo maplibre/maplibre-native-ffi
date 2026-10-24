@@ -19,10 +19,10 @@ fn createFixture() !*support.Fixture {
 /// Renders one frame, reads the texture back, and checks that the middle
 /// pixel holds the style's background color.
 fn renderAndReadBack(owned: *support.OwnedTexture) !void {
-    const capabilities = try maplibre.renderSessionGetCapabilities(owned.session, null);
+    const capabilities = try owned.session.getCapabilities(null);
     try testing.expect(capabilities.flags.readback);
     _ = try owned.renderUntilRendered();
-    var image = try owned.resolve(try maplibre.renderSessionReadTexture(testing.allocator, owned.session, null));
+    var image = try owned.resolve(try owned.session.readTexture(testing.allocator, null));
     defer image.deinit();
     try testing.expectEqual(extent.width, image.value.info.width);
     try testing.expectEqual(extent.height, image.value.info.height);
@@ -53,7 +53,7 @@ const ThreadRender = struct {
     fn render(self: *ThreadRender) !void {
         const owned = try support.OwnedTexture.attach(self.map, extent, .caller_graphics_thread);
         defer owned.close();
-        self.driver = (try maplibre.renderSessionGetCapabilities(owned.session, null)).driver;
+        self.driver = (try owned.session.getCapabilities(null)).driver;
         try renderAndReadBack(owned);
         try owned.detach();
     }
@@ -79,8 +79,8 @@ test "a drain before any demand returns no batch" {
     defer fixture.destroy();
     const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
     defer owned.close();
-    try testing.expect(try maplibre.renderSessionDrainFrameResults(owned.session, null) == null);
-    try testing.expect(try maplibre.renderSessionAcquireFrame(owned.session, null) == null);
+    try testing.expect(try owned.session.drainFrameResults(null) == null);
+    try testing.expect(try owned.session.acquireFrame(null) == null);
 }
 
 // A scoped view leases its frame for the callback. Inside the scope, releasing
@@ -93,10 +93,10 @@ test "a scoped frame view holds its frame until the scope returns" {
     const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
     defer owned.close();
     _ = try owned.renderUntilRendered();
-    var frame = (try maplibre.renderSessionAcquireFrame(owned.session, null)).?;
-    try support.expectCommitted(try maplibre.mapRequestRepaint(fixture.map, null));
+    var frame = (try owned.session.acquireFrame(null)).?;
+    try support.expectCommitted(try fixture.map.requestRepaint(null));
     _ = try owned.renderUntilRendered();
-    var sibling = (try maplibre.renderSessionAcquireFrame(owned.session, null)).?;
+    var sibling = (try owned.session.acquireFrame(null)).?;
 
     const width = try support.getOwnedTexture(frame, {}, struct {
         fn use(_: void, view: support.OwnedTextureFrame) u32 {
@@ -112,23 +112,23 @@ test "a scoped frame view holds its frame until the scope returns" {
         fn inspect(self: @This(), _: maplibre.GpuSync) anyerror!void {
             // The native scope keeps the frame and its session busy.
             var diagnostic: maplibre.Diagnostic = .{};
-            try testing.expectError(error.Busy, maplibre.acquiredFrameRelease(self.frame, maplibre.gpuSyncDefault(), &diagnostic));
+            try testing.expectError(error.Busy, self.frame.release(maplibre.gpuSyncDefault(), &diagnostic));
             try testing.expectEqual(.busy, diagnostic.status);
-            try testing.expectError(error.Busy, maplibre.renderSessionAbandon(self.session, null));
-            try maplibre.acquiredFrameDiscard(self.sibling, null);
-            try maplibre.acquiredFrameGetProducerSync(self.frame.*, {}, struct {
+            try testing.expectError(error.Busy, self.session.abandon(null));
+            try self.sibling.discard(null);
+            try self.frame.getProducerSync({}, struct {
                 fn use(_: void, _: maplibre.GpuSync) anyerror!void {}
             }.use, null);
             return error.HostConsumerFailed;
         }
     };
-    try testing.expectError(error.HostConsumerFailed, maplibre.acquiredFrameGetProducerSync(frame, Probe{ .frame = &frame, .sibling = &sibling, .session = owned.session }, Probe.inspect, null));
+    try testing.expectError(error.HostConsumerFailed, frame.getProducerSync(Probe{ .frame = &frame, .sibling = &sibling, .session = owned.session }, Probe.inspect, null));
     try testing.expect(sibling.isClosed() and !frame.isClosed());
-    try maplibre.acquiredFrameRelease(&frame, null, null);
+    try frame.release(null, null);
     try testing.expect(frame.isClosed());
     // Either consuming call on a closed frame does nothing.
-    try maplibre.acquiredFrameRelease(&frame, null, null);
-    try maplibre.acquiredFrameDiscard(&frame, null);
+    try frame.release(null, null);
+    try frame.discard(null);
 }
 
 // A frame anchors its session and a session its map. Disposing the map first
@@ -139,13 +139,13 @@ test "disposing a parent graph retires its acquired frame and session" {
     const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
     defer owned.close();
     _ = try owned.renderUntilRendered();
-    var frame = (try maplibre.renderSessionAcquireFrame(owned.session, null)).?;
+    var frame = (try owned.session.acquireFrame(null)).?;
 
     fixture.map.deinit();
-    try maplibre.acquiredFrameDiscard(&frame, null);
+    try frame.discard(null);
     owned.session.deinit();
-    try testing.expectError(error.InvalidState, maplibre.acquiredFrameGetResult(frame, null));
-    try testing.expectError(error.InvalidState, maplibre.renderSessionGetSnapshot(owned.session, null));
+    try testing.expectError(error.InvalidState, frame.getResult(null));
+    try testing.expectError(error.InvalidState, owned.session.getSnapshot(null));
     // The graphics context outlives the session, so the test waits for the
     // runtime to retire everything before the deferred teardown destroys it.
     try fixture.releaseRuntimeWhenChildless();
@@ -159,7 +159,7 @@ test "a released session lets the host destroy its graphics context" {
     const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
     errdefer owned.close();
     _ = try owned.renderUntilRendered();
-    const retired = try maplibre.renderSessionRelease(&owned.session, null);
+    const retired = try owned.session.release(null);
     try support.resolve(retired);
     owned.close();
 }

@@ -31,16 +31,16 @@ test "a callback registration is rooted until native releases it" {
     var retained = support.Counter{};
     var refused = support.Counter{};
     var duplicate = support.Counter{};
-    try support.expectCommitted(try maplibre.mapAddCustomGeometrySource(fixture.map, "removed", customSource(&removed, null), null));
-    try support.expectCommitted(try maplibre.mapAddCustomGeometrySource(fixture.map, "retained", customSource(&retained, null), null));
-    try testing.expectError(error.InvalidArgument, maplibre.mapAddCustomGeometrySource(fixture.map, "refused", customSource(&refused, 33.0), null));
+    try support.expectCommitted(try fixture.map.addCustomGeometrySource("removed", customSource(&removed, null), null));
+    try support.expectCommitted(try fixture.map.addCustomGeometrySource("retained", customSource(&retained, null), null));
+    try testing.expectError(error.InvalidArgument, fixture.map.addCustomGeometrySource("refused", customSource(&refused, 33.0), null));
 
     // A registration that native accepted and then failed to commit is native's
     // to release.
-    try testing.expectError(error.InvalidArgument, support.resolve(try maplibre.mapAddCustomGeometrySource(fixture.map, "removed", customSource(&duplicate, null), null)));
+    try testing.expectError(error.InvalidArgument, support.resolve(try fixture.map.addCustomGeometrySource("removed", customSource(&duplicate, null), null)));
     try duplicate.waitFor(1);
 
-    try support.expectCommitted(try maplibre.mapRemoveStyleSource(fixture.map, "removed", null));
+    try support.expectCommitted(try fixture.map.removeStyleSource("removed", null));
     try removed.waitFor(1);
     try fixture.fence();
     try testing.expectEqual(@as(usize, 0), retained.get());
@@ -82,7 +82,7 @@ test "replacing the process-global log callback releases the previous one" {
 
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
-    try testing.expectError(error.NativeError, support.resolve(try maplibre.mapSetStyleJson(fixture.map, "{", null)));
+    try testing.expectError(error.NativeError, support.resolve(try fixture.map.setStyleJson("{", null)));
     try replacement.saw_parse_error.wait();
 
     try maplibre.logClearCallback(null);
@@ -94,9 +94,9 @@ const failing_style_url = "custom://failing-provider.json";
 
 fn completeThenFail(_: ?*anyopaque, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
     if (std.mem.eql(u8, request.requested_url orelse "", failing_style_url)) {
-        try maplibre.resourceRequestComplete(handle, .{ .bytes = support.style_json }, null);
+        try handle.complete(.{ .bytes = support.style_json }, null);
         var owned = handle;
-        maplibre.resourceRequestRelease(&owned);
+        owned.release();
     }
     return error.NativeError;
 }
@@ -109,11 +109,11 @@ test "an error returned by a resource provider is contained and reported" {
     defer fixture.destroy();
     try fixture.setProvider(.{ .callback = completeThenFail });
 
-    try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, failing_style_url, null));
+    try support.expectCommitted(try fixture.map.setStyleUrl(failing_style_url, null));
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     loaded.deinit();
 
-    try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, "custom://unanswered.json", null));
+    try support.expectCommitted(try fixture.map.setStyleUrl("custom://unanswered.json", null));
     var failed = try fixture.waitForEvent(.map_loading_failed);
     defer failed.deinit();
 }
@@ -127,9 +127,9 @@ const DeferringProvider = struct {
 
     fn provide(self: *DeferringProvider, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
         if (!std.mem.eql(u8, request.requested_url orelse "", self.url)) {
-            try maplibre.resourceRequestComplete(handle, .{ .status = .@"error", .error_reason = .not_found }, null);
+            try handle.complete(.{ .status = .@"error", .error_reason = .not_found }, null);
             var owned = handle;
-            maplibre.resourceRequestRelease(&owned);
+            owned.release();
             return .handle;
         }
         const index = self.taken.get();
@@ -144,14 +144,14 @@ const DeferringProvider = struct {
 
     fn take(self: *DeferringProvider, fixture: *support.Fixture) !maplibre.ResourceRequest {
         const index = self.taken.get();
-        try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, self.url, null));
+        try support.expectCommitted(try fixture.map.setStyleUrl(self.url, null));
         try self.taken.waitFor(index + 1);
         return self.handles[index];
     }
 };
 
 fn completeOnThread(handle: maplibre.ResourceRequest, result: *?anyerror) void {
-    maplibre.resourceRequestComplete(handle, .{ .bytes = support.style_json }, null) catch |err| {
+    handle.complete(.{ .bytes = support.style_json }, null) catch |err| {
         result.* = err;
         return;
     };
@@ -167,18 +167,18 @@ test "a decision handle answers its request later from another thread" {
     var provider = DeferringProvider{ .url = "custom://later.json" };
     try provider.install(fixture);
     var handle = try provider.take(fixture);
-    defer maplibre.resourceRequestRelease(&handle);
-    try testing.expect(!try maplibre.resourceRequestIsCancelled(handle, null));
+    defer handle.release();
+    try testing.expect(!try handle.isCancelled(null));
 
     var diagnostic: maplibre.Diagnostic = .{};
-    try testing.expectError(error.InvalidArgument, maplibre.resourceRequestComplete(handle, .{ .etag = "bad\x00tag" }, &diagnostic));
+    try testing.expectError(error.InvalidArgument, handle.complete(.{ .etag = "bad\x00tag" }, &diagnostic));
     try testing.expect(diagnostic.status != null);
 
     var thread_result: ?anyerror = error.NotRun;
     const thread = try std.Thread.spawn(.{}, completeOnThread, .{ handle, &thread_result });
     thread.join();
     try testing.expectEqual(@as(?anyerror, null), thread_result);
-    try testing.expectError(error.InvalidState, maplibre.resourceRequestComplete(handle, .{ .bytes = support.style_json }, null));
+    try testing.expectError(error.InvalidState, handle.complete(.{ .bytes = support.style_json }, null));
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     loaded.deinit();
 }
@@ -193,13 +193,13 @@ test "released request handle copies stay closed after later requests" {
 
     var stale = try provider.take(fixture);
     const stale_copy = stale;
-    maplibre.resourceRequestRelease(&stale);
-    try testing.expectError(error.InvalidState, maplibre.resourceRequestIsCancelled(stale_copy, null));
+    stale.release();
+    try testing.expectError(error.InvalidState, stale_copy.isCancelled(null));
 
     var live = try provider.take(fixture);
-    defer maplibre.resourceRequestRelease(&live);
-    try testing.expectError(error.InvalidState, maplibre.resourceRequestComplete(stale_copy, .{ .bytes = support.style_json }, null));
-    try maplibre.resourceRequestComplete(live, .{ .bytes = support.style_json }, null);
+    defer live.release();
+    try testing.expectError(error.InvalidState, stale_copy.complete(.{ .bytes = support.style_json }, null));
+    try live.complete(.{ .bytes = support.style_json }, null);
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     loaded.deinit();
 }
@@ -233,13 +233,13 @@ test "a registration that reports cancellation is never rooted" {
     // report it, so the wait checks the request again after each wake.
     try fixture.events.waitUntil(handle, struct {
         fn ready(request: maplibre.ResourceRequest) anyerror!bool {
-            return maplibre.resourceRequestIsCancelled(request, null);
+            return request.isCancelled(null);
         }
     }.ready);
 
     var probe = CancelProbe{};
-    try testing.expect(try maplibre.resourceRequestSetCancelCallback(handle, .init(&probe, CancelProbe.cancelled, CancelProbe.released), null));
-    maplibre.resourceRequestRelease(&handle);
+    try testing.expect(try handle.setCancelCallback(.init(&probe, CancelProbe.cancelled, CancelProbe.released), null));
+    handle.release();
     try fixture.releaseRuntimeWhenChildless();
     try testing.expectEqual(@as(usize, 0), probe.cancels.get());
     try testing.expectEqual(@as(usize, 0), probe.releases.get());
@@ -255,14 +255,14 @@ const HeaderProbe = struct {
     other_thread: ?anyerror = null,
 
     fn setHeaderOnThread(response: maplibre.HttpHeaderTransformResponse, result: *?anyerror) void {
-        result.* = if (maplibre.httpHeaderTransformResponseSetHeader(response, "X-Test", "other", null)) null else |err| err;
+        result.* = if (response.setHeader("X-Test", "other", null)) null else |err| err;
     }
 
     fn transform(self: *HeaderProbe, kind: maplibre.ResourceKind, _: []const u8, response: maplibre.HttpHeaderTransformResponse) maplibre.Error!void {
         if (kind != .style or self.calls.load(.acquire) != 0) return;
         const thread = std.Thread.spawn(.{}, setHeaderOnThread, .{ response, &self.other_thread }) catch return error.OutOfMemory;
         thread.join();
-        try maplibre.httpHeaderTransformResponseSetHeader(response, "X-Test", "inside", null);
+        try response.setHeader("X-Test", "inside", null);
         self.saved = response;
         _ = self.calls.fetchAdd(1, .release);
     }
@@ -277,18 +277,18 @@ test "a scoped response rejects use after its callback and from another thread" 
     defer fixture.destroy();
     try fixture.setProvider(.{ .callback = passThrough });
     var probe = HeaderProbe{};
-    try support.resolve(try maplibre.runtimeSetHttpHeaderTransform(testing.allocator, fixture.runtime, .init(&probe, HeaderProbe.transform, null), null));
+    try support.resolve(try fixture.runtime.setHttpHeaderTransform(testing.allocator, .init(&probe, HeaderProbe.transform, null), null));
 
-    try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, "http://127.0.0.1:1/style.json", null));
+    try support.expectCommitted(try fixture.map.setStyleUrl("http://127.0.0.1:1/style.json", null));
     var failed = try fixture.waitForEvent(.map_loading_failed);
     failed.deinit();
     try testing.expectEqual(@as(usize, 1), probe.calls.load(.acquire));
 
     try testing.expectEqual(@as(?anyerror, error.InvalidState), probe.other_thread);
     var diagnostic: maplibre.Diagnostic = .{};
-    try testing.expectError(error.InvalidState, maplibre.httpHeaderTransformResponseSetHeader(probe.saved.?, "X-Test", "late", &diagnostic));
+    try testing.expectError(error.InvalidState, (probe.saved.?).setHeader("X-Test", "late", &diagnostic));
     try testing.expectEqual(null, diagnostic.status);
-    try support.resolve(try maplibre.runtimeClearHttpHeaderTransform(fixture.runtime, null));
+    try support.resolve(try fixture.runtime.clearHttpHeaderTransform(null));
 }
 
 const TransformProbe = struct {
@@ -298,19 +298,19 @@ const TransformProbe = struct {
     fn transform(self: *TransformProbe, kind: maplibre.ResourceKind, _: []const u8, request: maplibre.ResourceTransformRequest) maplibre.Error!void {
         if (kind != .style or self.saved != null) {
             var owned = request;
-            return maplibre.resourceTransformRequestRelease(&owned);
+            return owned.release();
         }
         self.saved = request;
         self.taken.add();
     }
 
     fn answer(request: maplibre.ResourceTransformRequest, result: *?anyerror) void {
-        maplibre.resourceTransformRequestComplete(request, "unsupported://rewritten.json", null) catch |err| {
+        request.complete("unsupported://rewritten.json", null) catch |err| {
             result.* = err;
             return;
         };
         var owned = request;
-        maplibre.resourceTransformRequestRelease(&owned);
+        owned.release();
     }
 };
 
@@ -323,9 +323,9 @@ test "a transform request is answered from another thread after its callback" {
     defer fixture.destroy();
     try fixture.setProvider(.{ .callback = passThrough });
     var probe = TransformProbe{};
-    try support.resolve(try maplibre.runtimeSetResourceTransform(fixture.runtime, .init(&probe, TransformProbe.transform, null), null));
+    try support.resolve(try fixture.runtime.setResourceTransform(.init(&probe, TransformProbe.transform, null), null));
 
-    try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, "unsupported://original.json", null));
+    try support.expectCommitted(try fixture.map.setStyleUrl("unsupported://original.json", null));
     try probe.taken.waitFor(1);
     var answered: ?anyerror = null;
     const thread = try std.Thread.spawn(.{}, TransformProbe.answer, .{ probe.saved.?, &answered });
@@ -333,7 +333,7 @@ test "a transform request is answered from another thread after its callback" {
     try testing.expectEqual(@as(?anyerror, null), answered);
     var failed = try fixture.waitForEvent(.map_loading_failed);
     failed.deinit();
-    try support.resolve(try maplibre.runtimeClearResourceTransform(fixture.runtime, null));
+    try support.resolve(try fixture.runtime.clearResourceTransform(null));
 }
 
 const routed_style_url = "custom://routed/style.json";
@@ -357,12 +357,12 @@ const RoutedProvider = struct {
         const is_style = request.kind == .style and std.mem.eql(u8, url, routed_style_url);
         const is_source = request.kind == .source and std.mem.eql(u8, url, routed_source_url);
         if (is_style) {
-            try maplibre.resourceRequestComplete(handle, .{ .bytes = routed_style_json }, null);
+            try handle.complete(.{ .bytes = routed_style_json }, null);
         } else {
-            try maplibre.resourceRequestComplete(handle, .{ .status = .@"error", .error_reason = .not_found }, null);
+            try handle.complete(.{ .status = .@"error", .error_reason = .not_found }, null);
         }
         var owned = handle;
-        maplibre.resourceRequestRelease(&owned);
+        owned.release();
         if (is_style) {
             self.styles.add();
         } else if (is_source) {
@@ -399,17 +399,17 @@ test "a provider receives only the requests its routes match" {
     });
     var routed = maplibre.ResourceProvider.init(&provider, RoutedProvider.provide, null);
     routed.routes = routes;
-    const registered = try maplibre.runtimeSetResourceProvider(testing.allocator, fixture.runtime, routed, null);
+    const registered = try fixture.runtime.setResourceProvider(testing.allocator, routed, null);
     _ = scratch.reset(.free_all);
     try support.resolve(registered);
 
-    try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, "custom://outside.json", null));
+    try support.expectCommitted(try fixture.map.setStyleUrl("custom://outside.json", null));
     var failed = try fixture.waitForEvent(.map_loading_failed);
     defer failed.deinit();
     try testing.expect(std.mem.indexOf(u8, failed.value.message, "custom://outside.json") != null);
     try testing.expectEqual(@as(usize, 0), provider.calls());
 
-    try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, routed_style_url, null));
+    try support.expectCommitted(try fixture.map.setStyleUrl(routed_style_url, null));
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     loaded.deinit();
     try provider.sources.waitFor(1);
@@ -431,9 +431,9 @@ test "a camera end handler inside a command is released after it runs" {
     update.value.mode = .ease;
     update.value.camera = .{ .zoom = 4.0 };
     update.value.animation = .{ .duration_ms = 60_000, .transition_id = 3, .end_handler = ended.handler() };
-    try support.expectCommitted(try maplibre.mapUpdateCamera(fixture.map, update.value, null));
+    try support.expectCommitted(try fixture.map.updateCamera(update.value, null));
     try testing.expectEqual(@as(usize, 0), ended.releases.get());
-    try support.expectCommitted(try maplibre.mapCancelCameraTransition(fixture.map, 3, null));
+    try support.expectCommitted(try fixture.map.cancelCameraTransition(3, null));
     try testing.expectEqual(@as(u32, 1), ended.ends.load(.acquire));
     try testing.expectEqual(maplibre.CameraTransitionOutcome.cancelled, ended.outcome);
     try ended.releases.waitFor(1);
@@ -443,7 +443,7 @@ test "a camera end handler inside a command is released after it runs" {
     defer delta.deinit();
     delta.value.scale = -1;
     delta.value.animation.end_handler = rejected.handler();
-    try testing.expectError(error.InvalidArgument, maplibre.mapApplyCameraDelta(fixture.map, delta.value, null));
+    try testing.expectError(error.InvalidArgument, fixture.map.applyCameraDelta(delta.value, null));
     try fixture.fence();
     try testing.expectEqual(@as(usize, 0), rejected.releases.get());
     try testing.expectEqual(@as(u32, 0), rejected.ends.load(.acquire));

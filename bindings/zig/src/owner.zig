@@ -10,16 +10,12 @@ const log = std.log.scoped(.maplibre_native_ffi);
 /// The closed state belongs to this value, not to the native handle: the
 /// consuming calls take a pointer and close the value they are given. A copy
 /// made before then stays open, and native reports its later calls as stale.
-pub fn Handle(comptime public_name: []const u8, comptime name: []const u8, comptime dispose: ?*const fn (u64) status.Error!void) type {
+///
+/// `Self` is the generated handle type, with a `raw: u64` field, a `closed:
+/// bool` field, and a `native_name`; it declares these members as its own.
+pub fn Handle(comptime Self: type, comptime public_name: []const u8, comptime dispose: ?*const fn (u64) status.Error!void) type {
     return struct {
-        const Self = @This();
-        pub const native_name = name;
-        raw: u64,
-        closed: bool = false,
-
-        pub fn discarding(self: Self) @import("maplibre_native_ffi.zig").Discarding(Self) {
-            return .{ .receiver = self };
-        }
+        const name = Self.native_name;
 
         pub fn adopt(raw: u64) Self {
             return .{ .raw = raw };

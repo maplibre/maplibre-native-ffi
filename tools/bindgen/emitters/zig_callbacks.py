@@ -87,7 +87,7 @@ def parts(values, value):
                 adopted = "owned_" + parameter.name
                 transfer = "ownership_transferred = true; "
                 native_release = parameter.value.handle.release
-                release = f"{camel(native_release.removeprefix('mln_'))}(&{adopted})"
+                release = f"{adopted}.{camel(values.bound.operations_by_name[native_release].member)}()"
                 if (
                     values.bound.operations_by_name[
                         native_release

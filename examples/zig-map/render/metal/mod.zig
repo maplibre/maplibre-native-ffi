@@ -232,7 +232,7 @@ const MetalOwnedTextureBackend = struct {
 
     fn attach(self: *MetalOwnedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = maplibre.mapAttachMetalOwnedTexture(map.*, .{
+        const attachment = map.attachMetalOwnedTexture(.{
             .extent = render_target.extent(viewport),
             .context = .{ .device = (self.compositor.view.device.value.?) },
             .pixel_format = MTLPixelFormatBGRA8Unorm,
@@ -264,13 +264,13 @@ fn presentAcquired(session: *render_target.Session, compositor: *MetalTextureCom
         fn producer(context: @This(), sync: maplibre.GpuSync) anyerror!bool {
             var with_sync = context;
             with_sync.sync = sync;
-            return maplibre.acquiredFrameGetMetalTexture(context.frame, with_sync, draw, null);
+            return context.frame.getMetalTexture(with_sync, draw, null);
         }
         fn draw(context: @This(), info: maplibre.MetalTextureFrame) anyerror!bool {
             return context.compositor.drawMetalTexture(info.texture orelse return types.AppError.BackendDrawFailed, context.sync);
         }
     };
-    return maplibre.acquiredFrameGetProducerSync(frame, Context{ .compositor = compositor, .frame = frame }, Context.producer, null);
+    return frame.getProducerSync(Context{ .compositor = compositor, .frame = frame }, Context.producer, null);
 }
 
 /// The textures of a borrowed ring, one per slot.
@@ -328,7 +328,7 @@ const MetalBorrowedTextureBackend = struct {
     fn attach(self: *MetalBorrowedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
         const entries = self.ring.entries();
-        const attachment = maplibre.mapAttachMetalBorrowedTexture(std.heap.smp_allocator, map.*, .{
+        const attachment = map.attachMetalBorrowedTexture(std.heap.smp_allocator, .{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
@@ -355,7 +355,7 @@ const MetalBorrowedTextureBackend = struct {
         errdefer replacement.deinit();
         var diagnostic: maplibre.Diagnostic = .{};
         const entries = replacement.entries();
-        var completion = maplibre.renderSessionSetMetalBorrowedTextureTarget(std.heap.smp_allocator, self.session.handle.?, .{
+        var completion = (self.session.handle.?).setMetalBorrowedTextureTarget(std.heap.smp_allocator, .{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
@@ -388,7 +388,7 @@ const MetalSurfaceBackend = struct {
 
     fn attach(self: *MetalSurfaceBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = maplibre.mapAttachMetalSurface(map.*, .{
+        const attachment = map.attachMetalSurface(.{
             .extent = render_target.extent(viewport),
             .context = .{ .device = (self.view.device.value.?) },
             .layer = (self.view.layer.value.?),

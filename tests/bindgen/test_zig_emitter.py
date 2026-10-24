@@ -41,17 +41,17 @@ mln_status mln_session_dispose(mln_session session, const mln_completion *comple
         # sync dispose of a closed value does nothing, and the async release
         # reaches native.
         self.assertIn(
-            'pub fn sessionRelease(@"session": *Session, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {\n'
-            '    const released = try call.submit("mln_session_dispose", .handle, @"session".*,',
+            "pub fn release(self: *Session, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {\n"
+            '    const released = try call.submit("mln_session_dispose", .handle, self.*,',
             source,
         )
         self.assertIn(
-            'pub fn sessionDispose(@"session": *Session, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {\n'
-            '    if (@"session".closed) return;\n'
-            '    try call.discard("mln_session_dispose", .handle, @"session".*,',
+            "pub fn dispose(self: *Session, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {\n"
+            "    if (self.closed) return;\n"
+            '    try call.discard("mln_session_dispose", .handle, self.*,',
             source,
         )
-        self.assertEqual(source.count('@"session".closed = true;'), 2)
+        self.assertEqual(source.count("self.closed = true;"), 2)
 
     def test_only_runtime_event_sources_document_their_id_as_a_source(self):
         api = parse(
@@ -68,7 +68,7 @@ void mln_query_release(mln_query query);
         validate(api)
         source = zig.generate(api)["maplibre_native_ffi.zig"]
         note = "/// Runtime events report its `id()` as their source.\n"
-        self.assertIn(note + 'pub const Map = owner.Handle("Map", "mln_map",', source)
+        self.assertIn(note + "pub const Map = struct {", source)
         self.assertNotIn(note + "pub const Query", source)
 
     def test_generated_values_and_keyword_parameters_round_trip(self):

@@ -8,8 +8,8 @@ test "discarded commands are fenced and synchronous rejection returns an error" 
     defer fixture.destroy();
     try fixture.map.discarding().setDebugOptions(.{ .tile_borders = true }, null);
     // A later command on the same map completes after the discarded one.
-    _ = try support.resolve(try maplibre.mapRequestRepaint(fixture.map, null));
-    const snapshot = try maplibre.mapGetSnapshot(fixture.map, null);
+    _ = try support.resolve(try fixture.map.requestRepaint(null));
+    const snapshot = try fixture.map.getSnapshot(null);
     try testing.expect(snapshot.debug_options.tile_borders);
     try testing.expectError(error.InvalidArgument, fixture.map.discarding().resize(.{ .width = 0, .height = 8, .scale_factor = 1 }, null));
 }
@@ -21,9 +21,9 @@ const ProviderProbe = struct {
     fn provide(self: *@This(), request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
         _ = self.calls.fetchAdd(1, .seq_cst);
         if (request.kind != .style) return .pass_through;
-        var cleared = try maplibre.runtimeClearResourceTransform(self.runtime, null);
+        var cleared = try self.runtime.clearResourceTransform(null);
         cleared.deinit();
-        try maplibre.resourceRequestComplete(handle, .{ .bytes = support.style_json }, null);
+        try handle.complete(.{ .bytes = support.style_json }, null);
         var owned = handle;
         owned.deinit();
         return .pass_through;
@@ -38,10 +38,10 @@ test "a provider can deinit its request inside its callback" {
     defer fixture.destroy();
     var probe = ProviderProbe{ .runtime = fixture.runtime };
     try fixture.setProvider(.init(&probe, ProviderProbe.provide, ProviderProbe.release));
-    _ = try support.resolve(try maplibre.mapSetStyleUrl(fixture.map, "binding-test://style", null));
+    _ = try support.resolve(try fixture.map.setStyleUrl("binding-test://style", null));
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     loaded.deinit();
-    try support.resolve(try maplibre.runtimeClearResourceProvider(fixture.runtime, null));
+    try support.resolve(try fixture.runtime.clearResourceProvider(null));
     try testing.expectEqual(@as(usize, 1), probe.calls.load(.seq_cst));
     try testing.expectEqual(@as(usize, 1), probe.releases.load(.seq_cst));
 }

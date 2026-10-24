@@ -65,6 +65,8 @@ class Values:
         self.bound = bound
         self.used = {}
         self.results = {}
+        # The methods of each response type, by native name.
+        self.methods = {}
 
     def native_type(self, value):
         return (
@@ -205,7 +207,8 @@ class Values:
         from .zig_dynamic_values import declaration, dynamic
 
         if value.response:
-            return f"pub const {self.public(value)} = struct {{ native: *c.{value.native} }};\n"
+            methods = "\n".join(self.methods.get(value.native, []))
+            return f"pub const {self.public(value)} = struct {{ native: *c.{value.native},\n{methods}\n}};\n"
         if value.kind == "union":
             fields = "\n".join(
                 doc(self.bound, f"{value.native}.{field.name}", "    ")

@@ -299,7 +299,7 @@ const VulkanOwnedTextureBackend = struct {
 
     fn attach(self: *VulkanOwnedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = maplibre.mapAttachVulkanOwnedTexture(map.*, .{
+        const attachment = map.attachVulkanOwnedTexture(.{
             .extent = render_target.extent(viewport),
             .context = vulkanContextDescriptor(&self.compositor.context),
         }, options, &diagnostic) catch |err| {
@@ -321,13 +321,13 @@ fn presentAcquired(session: *render_target.Session, compositor: *VulkanTextureCo
         frame: maplibre.AcquiredFrame,
         fn producer(context: @This(), sync: maplibre.GpuSync) anyerror!bool {
             if (sync.kind != .cpu_complete) return types.AppError.BackendDrawFailed;
-            return maplibre.acquiredFrameGetVulkanTexture(context.frame, context, draw, null);
+            return context.frame.getVulkanTexture(context, draw, null);
         }
         fn draw(context: @This(), info: maplibre.VulkanTextureFrame) anyerror!bool {
             return context.compositor.presentImageView(vulkanHandleFromBits(c.VkImageView, info.image_view));
         }
     };
-    return maplibre.acquiredFrameGetProducerSync(frame, FrameContext{ .compositor = compositor, .frame = frame }, FrameContext.producer, null);
+    return frame.getProducerSync(FrameContext{ .compositor = compositor, .frame = frame }, FrameContext.producer, null);
 }
 
 const BorrowedImage = struct {
@@ -485,7 +485,7 @@ const VulkanBorrowedTextureBackend = struct {
     fn attach(self: *VulkanBorrowedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
         const entries = self.ring.entries();
-        const attachment = maplibre.mapAttachVulkanBorrowedTexture(std.heap.smp_allocator, map.*, self.descriptor(&entries, viewport), options, &diagnostic) catch |err| {
+        const attachment = map.attachVulkanBorrowedTexture(std.heap.smp_allocator, self.descriptor(&entries, viewport), options, &diagnostic) catch |err| {
             diagnostics.logError("Vulkan borrowed texture attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
         };
@@ -507,7 +507,7 @@ const VulkanBorrowedTextureBackend = struct {
         errdefer replacement.deinit(self.compositor.context.device);
         var diagnostic: maplibre.Diagnostic = .{};
         const entries = replacement.entries();
-        var completion = maplibre.renderSessionSetVulkanBorrowedTextureTarget(std.heap.smp_allocator, self.session.handle.?, self.descriptor(&entries, viewport), &diagnostic) catch |err| {
+        var completion = (self.session.handle.?).setVulkanBorrowedTextureTarget(std.heap.smp_allocator, self.descriptor(&entries, viewport), &diagnostic) catch |err| {
             diagnostics.logError("Vulkan borrowed texture set target failed", err, &diagnostic);
             return types.AppError.ResizeFailed;
         };
@@ -555,7 +555,7 @@ const VulkanSurfaceBackend = struct {
 
     fn attach(self: *VulkanSurfaceBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = maplibre.mapAttachVulkanSurface(map.*, .{
+        const attachment = map.attachVulkanSurface(.{
             .extent = render_target.extent(viewport),
             .context = vulkanContextDescriptor(&self.context),
             .surface = vulkanHandleToBinding(self.context.surface),

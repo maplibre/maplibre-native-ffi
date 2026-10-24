@@ -21,7 +21,7 @@ pub const MapState = struct {
             diagnostics.logError("runtime create failed", err, &diagnostic);
             return types.AppError.RuntimeCreateFailed;
         };
-        errdefer if (maplibre.runtimeRelease(&runtime, null)) |future| {
+        errdefer if (runtime.release(null)) |future| {
             var teardown = future;
             _ = teardown.wait(null) catch {};
             teardown.deinit();
@@ -31,7 +31,7 @@ pub const MapState = struct {
         map_options.initial_extent = render_target.extent(viewport);
         map_options.map_mode = .continuous;
         map_options.event_mask = .{};
-        var map_future = maplibre.runtimeCreateMap(runtime, map_options, &diagnostic) catch |err| {
+        var map_future = runtime.createMap(map_options, &diagnostic) catch |err| {
             diagnostics.logError("map create failed", err, &diagnostic);
             return types.AppError.MapCreateFailed;
         };
@@ -40,7 +40,7 @@ pub const MapState = struct {
             diagnostics.logError("map create failed", err, &diagnostic);
             return types.AppError.MapCreateFailed;
         };
-        errdefer if (maplibre.mapRelease(&map, null)) |future| {
+        errdefer if (map.release(null)) |future| {
             var teardown = future;
             teardown.deinit();
         } else |_| map.deinit();
@@ -57,12 +57,12 @@ pub const MapState = struct {
     pub fn deinit(self: *MapState) void {
         // Awaiting both release completions lets native teardown finish before
         // the app tears down state that the callbacks use.
-        if (maplibre.mapRelease(&self.map, null)) |future| {
+        if (self.map.release(null)) |future| {
             var teardown = future;
             _ = teardown.wait(null) catch {};
             teardown.deinit();
         } else |_| self.map.deinit();
-        if (maplibre.runtimeRelease(&self.runtime, null)) |future| {
+        if (self.runtime.release(null)) |future| {
             var teardown = future;
             _ = teardown.wait(null) catch {};
             teardown.deinit();
@@ -80,7 +80,7 @@ pub const MapState = struct {
         var delta = try maplibre.cameraDeltaDefault(self.allocator);
         defer delta.deinit();
         delta.value.offset = .{ .x = dx, .y = dy };
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.map, delta.value, &self.diagnostic));
+        try self.cameraMutation(self.map.applyCameraDelta(delta.value, &self.diagnostic));
     }
 
     pub fn moveByAnimated(self: *MapState, dx: f64, dy: f64, duration_ms: f64) !void {
@@ -88,7 +88,7 @@ pub const MapState = struct {
         defer delta.deinit();
         delta.value.offset = .{ .x = dx, .y = dy };
         delta.value.animation.duration_ms = duration_ms;
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.map, delta.value, &self.diagnostic));
+        try self.cameraMutation(self.map.applyCameraDelta(delta.value, &self.diagnostic));
     }
 
     pub fn scaleBy(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint) !void {
@@ -96,7 +96,7 @@ pub const MapState = struct {
         defer delta.deinit();
         delta.value.scale = scale;
         delta.value.anchor = anchor;
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.map, delta.value, &self.diagnostic));
+        try self.cameraMutation(self.map.applyCameraDelta(delta.value, &self.diagnostic));
     }
 
     pub fn scaleByAnimated(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint, duration_ms: f64) !void {
@@ -105,7 +105,7 @@ pub const MapState = struct {
         delta.value.scale = scale;
         delta.value.anchor = anchor;
         delta.value.animation.duration_ms = duration_ms;
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.map, delta.value, &self.diagnostic));
+        try self.cameraMutation(self.map.applyCameraDelta(delta.value, &self.diagnostic));
     }
 
     pub fn adjustOrientation(self: *MapState, bearing: f64, pitch: f64) !void {
@@ -113,7 +113,7 @@ pub const MapState = struct {
         defer delta.deinit();
         delta.value.bearing = bearing;
         delta.value.pitch = pitch;
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.map, delta.value, &self.diagnostic));
+        try self.cameraMutation(self.map.applyCameraDelta(delta.value, &self.diagnostic));
     }
 
     pub fn adjustBearingAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
@@ -121,7 +121,7 @@ pub const MapState = struct {
         defer update.deinit();
         update.value.bearing = delta;
         update.value.animation.duration_ms = duration_ms;
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.map, update.value, &self.diagnostic));
+        try self.cameraMutation(self.map.applyCameraDelta(update.value, &self.diagnostic));
     }
 
     pub fn adjustPitchAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
@@ -129,7 +129,7 @@ pub const MapState = struct {
         defer update.deinit();
         update.value.pitch = delta;
         update.value.animation.duration_ms = duration_ms;
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.map, update.value, &self.diagnostic));
+        try self.cameraMutation(self.map.applyCameraDelta(update.value, &self.diagnostic));
     }
 
     pub fn resetOrientation(self: *MapState, duration_ms: f64) !void {
@@ -142,13 +142,13 @@ pub const MapState = struct {
     }
 
     fn updateCamera(self: *MapState, update: maplibre.CameraUpdate) !void {
-        try self.cameraMutation(maplibre.mapUpdateCamera(self.map, update, &self.diagnostic));
+        try self.cameraMutation(self.map.updateCamera(update, &self.diagnostic));
     }
 
     /// Ends any running camera transition, so a starting gesture takes over
     /// from it rather than fighting it.
     pub fn cancelTransitions(self: *MapState) !void {
-        try self.cameraMutation(maplibre.mapCancelTransitions(self.map, &self.diagnostic));
+        try self.cameraMutation(self.map.cancelTransitions(&self.diagnostic));
     }
 
     fn cameraMutation(self: *MapState, result: anytype) !void {
@@ -172,9 +172,9 @@ fn loadStyle(
     smoke: bool,
 ) !void {
     const submitted = if (smoke)
-        maplibre.mapSetStyleJson(map.*, smoke_style_json, diagnostic)
+        map.setStyleJson(smoke_style_json, diagnostic)
     else
-        maplibre.mapSetStyleUrl(map.*, "https://tiles.openfreemap.org/styles/bright", diagnostic);
+        map.setStyleUrl("https://tiles.openfreemap.org/styles/bright", diagnostic);
     var completion = submitted catch |err| {
         diagnostics.logError("style load failed", err, diagnostic);
         return types.AppError.StyleLoadFailed;
@@ -195,7 +195,7 @@ fn setCamera(
         .bearing = 12.0,
         .pitch = 30.0,
     };
-    var completion = maplibre.mapUpdateCamera(map.*, update.value, diagnostic) catch |err| {
+    var completion = map.updateCamera(update.value, diagnostic) catch |err| {
         diagnostics.logError("camera jump failed", err, diagnostic);
         return types.AppError.CameraJumpFailed;
     };

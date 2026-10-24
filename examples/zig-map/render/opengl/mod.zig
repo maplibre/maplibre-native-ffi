@@ -515,7 +515,7 @@ const OpenGLOwnedTextureBackend = struct {
 
     fn attach(self: *OpenGLOwnedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = maplibre.mapAttachOpenglOwnedTexture(map.*, .{
+        const attachment = map.attachOpenglOwnedTexture(.{
             .extent = render_target.extent(viewport),
             .context = self.compositor.context.descriptor(),
         }, options, &diagnostic) catch |err| {
@@ -544,13 +544,13 @@ fn presentAcquired(session: *render_target.Session, compositor: *OpenGLTextureCo
         frame: maplibre.AcquiredFrame,
         fn producer(context: @This(), sync: maplibre.GpuSync) anyerror!bool {
             if (sync.kind != .cpu_complete) return types.AppError.BackendDrawFailed;
-            return maplibre.acquiredFrameGetOpenglTexture(context.frame, context, draw, null);
+            return context.frame.getOpenglTexture(context, draw, null);
         }
         fn draw(context: @This(), info: maplibre.OpenglTextureFrame) anyerror!bool {
             return context.compositor.drawTexture(info.texture);
         }
     };
-    return maplibre.acquiredFrameGetProducerSync(frame, Context{ .compositor = compositor, .frame = frame }, Context.producer, null);
+    return frame.getProducerSync(Context{ .compositor = compositor, .frame = frame }, Context.producer, null);
 }
 
 const BorrowedTexture = struct {
@@ -645,7 +645,7 @@ const OpenGLBorrowedTextureBackend = struct {
     fn attach(self: *OpenGLBorrowedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
         const entries = self.ring.entries();
-        const attachment = maplibre.mapAttachOpenglBorrowedTexture(std.heap.smp_allocator, map.*, .{
+        const attachment = map.attachOpenglBorrowedTexture(std.heap.smp_allocator, .{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
@@ -674,7 +674,7 @@ const OpenGLBorrowedTextureBackend = struct {
         errdefer replacement.deinit(&self.compositor.context, self.compositor.procs);
         var diagnostic: maplibre.Diagnostic = .{};
         const entries = replacement.entries();
-        var completion = maplibre.renderSessionSetOpenglBorrowedTextureTarget(std.heap.smp_allocator, self.session.handle.?, .{
+        var completion = (self.session.handle.?).setOpenglBorrowedTextureTarget(std.heap.smp_allocator, .{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
@@ -712,7 +712,7 @@ const OpenGLSurfaceBackend = struct {
 
     fn attach(self: *OpenGLSurfaceBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = maplibre.mapAttachOpenglSurface(map.*, .{
+        const attachment = map.attachOpenglSurface(.{
             .extent = render_target.extent(viewport),
             .context = self.context.descriptor(),
             .surface = self.context.surface(),
@@ -735,7 +735,7 @@ const OpenGLSurfaceBackend = struct {
         };
         if (!replaced) return self.session.resize(viewport);
         var diagnostic: maplibre.Diagnostic = .{};
-        var completion = maplibre.renderSessionSetOpenglSurfaceTarget(self.session.handle.?, .{
+        var completion = (self.session.handle.?).setOpenglSurfaceTarget(.{
             .extent = render_target.extent(viewport),
             .context = self.context.descriptor(),
             .surface = self.context.surface(),

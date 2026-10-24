@@ -14,26 +14,26 @@ test "copied handles report native invalid state after release" {
     defer fixture.destroy();
     var map_copy = fixture.map;
     var runtime_copy = fixture.runtime;
-    var projection = try maplibre.mapProjectionCreate((try maplibre.mapGetSnapshot(fixture.map, null)).view, null);
+    var projection = try maplibre.mapProjectionCreate((try fixture.map.getSnapshot(null)).view, null);
     var projection_copy = projection;
 
-    maplibre.mapProjectionRelease(&projection);
+    projection.release();
     try testing.expect(!projection_copy.isClosed());
-    try testing.expectError(error.InvalidState, maplibre.mapProjectionGetCamera(projection_copy, null));
+    try testing.expectError(error.InvalidState, projection_copy.getCamera(null));
     // A void release reports nothing for a stale handle.
-    maplibre.mapProjectionRelease(&projection_copy);
+    projection_copy.release();
 
     try fixture.closeMap();
     try testing.expectError(error.InvalidState, support.closeMapHandle(&map_copy));
     try testing.expect(!map_copy.isClosed());
     var diagnostic: maplibre.Diagnostic = .{};
-    try testing.expectError(error.InvalidState, maplibre.mapGetSnapshot(map_copy, &diagnostic));
+    try testing.expectError(error.InvalidState, map_copy.getSnapshot(&diagnostic));
     try testing.expectEqual(.invalid_state, diagnostic.status);
     try testing.expect(diagnostic.message().len != 0);
 
     try support.closeRuntimeHandle(&fixture.runtime);
     try testing.expectError(error.InvalidState, support.closeRuntimeHandle(&runtime_copy));
-    try testing.expectError(error.InvalidState, maplibre.runtimeGetEventMask(runtime_copy, null));
+    try testing.expectError(error.InvalidState, runtime_copy.getEventMask(null));
 }
 
 // A handle's id is the source that its events carry, and a close leaves it in
@@ -41,7 +41,7 @@ test "copied handles report native invalid state after release" {
 test "a handle's raw value names its events and outlives close" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
-    try support.expectCommitted(try maplibre.mapSetStyleJson(fixture.map, support.style_json, null));
+    try support.expectCommitted(try fixture.map.setStyleJson(support.style_json, null));
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     defer loaded.deinit();
     try testing.expectEqual(fixture.map.id(), loaded.value.source);
@@ -58,17 +58,17 @@ test "a disposed handle is closed and a second dispose does nothing" {
     try testing.expect(!fixture.map.isClosed());
     try expectFormat("Map(id=0x{x}, closed=false)", fixture.map);
 
-    try maplibre.mapDispose(&fixture.map, null);
+    try fixture.map.dispose(null);
     try testing.expect(fixture.map.isClosed());
-    try maplibre.mapDispose(&fixture.map, null);
+    try fixture.map.dispose(null);
     fixture.map.deinit();
     try expectFormat("Map(id=0x{x}, closed=true)", fixture.map);
-    try testing.expectError(error.InvalidState, maplibre.mapRelease(&fixture.map, null));
+    try testing.expectError(error.InvalidState, fixture.map.release(null));
 
     // A runtime accepts its dispose while its disposed map retires.
-    try maplibre.runtimeDispose(&fixture.runtime, null);
+    try fixture.runtime.dispose(null);
     try testing.expect(fixture.runtime.isClosed());
-    try maplibre.runtimeDispose(&fixture.runtime, null);
+    try fixture.runtime.dispose(null);
     fixture.runtime.deinit();
 }
 
@@ -76,21 +76,21 @@ test "a disposed handle is closed and a second dispose does nothing" {
 test "a released projection is closed and a second release or deinit does nothing" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
-    var projection = try maplibre.mapProjectionCreate((try maplibre.mapGetSnapshot(fixture.map, null)).view, null);
+    var projection = try maplibre.mapProjectionCreate((try fixture.map.getSnapshot(null)).view, null);
     try testing.expect(!projection.isClosed());
     try testing.expect(projection.id() != 0);
 
-    maplibre.mapProjectionRelease(&projection);
+    projection.release();
     try testing.expect(projection.isClosed());
-    maplibre.mapProjectionRelease(&projection);
+    projection.release();
     projection.deinit();
     try expectFormat("MapProjection(id=0x{x}, closed=true)", projection);
 
-    var scoped = try maplibre.mapProjectionCreate((try maplibre.mapGetSnapshot(fixture.map, null)).view, null);
+    var scoped = try maplibre.mapProjectionCreate((try fixture.map.getSnapshot(null)).view, null);
     scoped.deinit();
     try testing.expect(scoped.isClosed());
     scoped.deinit();
-    maplibre.mapProjectionRelease(&scoped);
+    scoped.release();
 }
 
 /// Checks a handle's `{f}` text against `template`, which formats its id.
@@ -109,7 +109,7 @@ test "a refused close leaves the handle usable and a later close succeeds" {
     defer fixture.destroy();
 
     var diagnostic: maplibre.Diagnostic = .{};
-    try testing.expectError(error.InvalidState, maplibre.runtimeRelease(&fixture.runtime, &diagnostic));
+    try testing.expectError(error.InvalidState, fixture.runtime.release(&diagnostic));
     try testing.expect(!fixture.runtime.isClosed());
     try testing.expectEqual(.invalid_state, diagnostic.status);
     try fixture.fence();
@@ -130,12 +130,12 @@ test "a child map keeps its disposed runtime's callbacks alive" {
     var options = try maplibre.runtimeOptionsDefault(testing.allocator);
     defer options.deinit();
     var runtime = try maplibre.runtimeCreate(options.value, null);
-    try support.resolve(try maplibre.runtimeSetEventHandler(runtime, .init(&handler_releases, ignoreEvents, countRelease), null));
-    var map = try support.resolve(try maplibre.runtimeCreateMap(runtime, maplibre.mapOptionsDefault(), null));
+    try support.resolve(try runtime.setEventHandler(.init(&handler_releases, ignoreEvents, countRelease), null));
+    var map = try support.resolve(try runtime.createMap(maplibre.mapOptionsDefault(), null));
 
     runtime.deinit();
-    try testing.expectError(error.InvalidState, maplibre.runtimeGetEventMask(runtime, null));
-    _ = try maplibre.mapGetSnapshot(map, null);
+    try testing.expectError(error.InvalidState, runtime.getEventMask(null));
+    _ = try map.getSnapshot(null);
     // No fence can follow the disposal: native refuses the map's commands
     // once its runtime is disposed. The count stays zero without one because
     // native releases the handler only when it retires the runtime, which this
@@ -153,10 +153,10 @@ test "discarding a creation future retires the map it creates" {
     defer fixture.destroy();
     try fixture.closeMap();
 
-    var completed = try maplibre.runtimeCreateMap(fixture.runtime, maplibre.mapOptionsDefault(), null);
+    var completed = try fixture.runtime.createMap(maplibre.mapOptionsDefault(), null);
     while (!try completed.poll()) try fixture.fence();
     completed.deinit();
-    var pending = try maplibre.runtimeCreateMap(fixture.runtime, maplibre.mapOptionsDefault(), null);
+    var pending = try fixture.runtime.createMap(maplibre.mapOptionsDefault(), null);
     pending.deinit();
     try fixture.fence();
 

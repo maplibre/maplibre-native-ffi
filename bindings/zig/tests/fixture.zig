@@ -159,13 +159,13 @@ pub fn expectCommitted(future_value: maplibre.Future(maplibre.CommandCompletion)
 /// Answers every request with a not-found error, so no test reaches the
 /// network by accident.
 fn denyResource(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, request: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
-    try maplibre.resourceRequestComplete(request, .{
+    try request.complete(.{
         .status = .@"error",
         .error_reason = .not_found,
         .error_message = "the Zig test fixture serves no resources",
     }, null);
     var owned = request;
-    maplibre.resourceRequestRelease(&owned);
+    owned.release();
     return .handle;
 }
 
@@ -195,12 +195,12 @@ pub const Fixture = struct {
         runtime_options.value.asset_path = options.asset_path;
         self.runtime = try maplibre.runtimeCreate(runtime_options.value, null);
         errdefer closeRuntimeHandle(&self.runtime) catch self.runtime.deinit();
-        try resolve(try maplibre.runtimeSetEventHandler(self.runtime, .init(self, receiveEvents, null), null));
+        try resolve(try self.runtime.setEventHandler(.init(self, receiveEvents, null), null));
         try self.setProvider(denying_provider);
         var map_options = maplibre.mapOptionsDefault();
         map_options.initial_extent = options.extent;
         map_options.map_mode = options.map_mode;
-        self.map = try resolve(try maplibre.runtimeCreateMap(self.runtime, map_options, null));
+        self.map = try resolve(try self.runtime.createMap(map_options, null));
         return self;
     }
 
@@ -248,7 +248,7 @@ pub const Fixture = struct {
     pub fn releaseRuntimeWhenChildless(self: *Fixture) !void {
         try self.events.waitUntil(self, struct {
             fn ready(fixture: *Fixture) anyerror!bool {
-                var teardown = maplibre.runtimeRelease(&fixture.runtime, null) catch |err| switch (err) {
+                var teardown = fixture.runtime.release(null) catch |err| switch (err) {
                     error.InvalidState => return false,
                     else => return err,
                 };
@@ -262,15 +262,15 @@ pub const Fixture = struct {
     /// Waits for a runtime command, which follows every submission to the
     /// runtime's worker accepted so far.
     pub fn fence(self: *Fixture) !void {
-        try resolve(try maplibre.runtimeClearResourceTransform(self.runtime, null));
+        try resolve(try self.runtime.clearResourceTransform(null));
     }
 
     pub fn setProvider(self: *Fixture, provider: maplibre.ResourceProvider) !void {
-        try resolve(try maplibre.runtimeSetResourceProvider(testing.allocator, self.runtime, provider, null));
+        try resolve(try self.runtime.setResourceProvider(testing.allocator, provider, null));
     }
 
     pub fn loadStyle(self: *Fixture) !void {
-        try expectCommitted(try maplibre.mapSetStyleJson(self.map, style_json, null));
+        try expectCommitted(try self.map.setStyleJson(style_json, null));
         var loaded = try self.waitForEvent(.map_style_loaded);
         loaded.deinit();
     }
@@ -298,11 +298,11 @@ pub const Fixture = struct {
 };
 
 pub fn closeRuntimeHandle(runtime: *maplibre.Runtime) !void {
-    try resolve(try maplibre.runtimeRelease(runtime, null));
+    try resolve(try runtime.release(null));
 }
 
 pub fn closeMapHandle(map: *maplibre.Map) !void {
-    try resolve(try maplibre.mapRelease(map, null));
+    try resolve(try map.release(null));
 }
 
 // Rendering. Every native backend but WebGL and WebGPU takes its context from
@@ -386,11 +386,11 @@ pub fn getOwnedTexture(frame: maplibre.AcquiredFrame, context: anytype, comptime
 }
 
 const getBackendTexture = if (build_options.supports_metal)
-    maplibre.acquiredFrameGetMetalTexture
+    maplibre.AcquiredFrame.getMetalTexture
 else if (build_options.supports_vulkan)
-    maplibre.acquiredFrameGetVulkanTexture
+    maplibre.AcquiredFrame.getVulkanTexture
 else
-    maplibre.acquiredFrameGetOpenglTexture;
+    maplibre.AcquiredFrame.getOpenglTexture;
 
 /// An owned-texture render session on a fixture's map, with the wakes that
 /// its waits block on. OpenGL sessions share the fixture context, which is
@@ -419,20 +419,20 @@ pub const OwnedTexture = struct {
         options.frame_wake = self.wakes.wake();
         options.driver_work_wake = self.wakes.wake();
         const attachment = if (build_options.supports_metal)
-            try maplibre.mapAttachMetalOwnedTexture(map, .{
+            try map.attachMetalOwnedTexture(.{
                 .extent = extent,
                 .context = .{ .device = self.graphics.context.metal_device },
                 // MTLPixelFormatBGRA8Unorm.
                 .pixel_format = 80,
             }, options, null)
         else if (build_options.supports_vulkan)
-            try maplibre.mapAttachVulkanOwnedTexture(map, .{ .extent = extent, .context = self.graphics.vulkanContext() }, options, null)
+            try map.attachVulkanOwnedTexture(.{ .extent = extent, .context = self.graphics.vulkanContext() }, options, null)
         else attachment: {
             var descriptor = try maplibre.openglOwnedTextureDescriptorDefault(testing.allocator);
             defer descriptor.deinit();
             descriptor.value.extent = extent;
             descriptor.value.context = self.graphics.openglContext();
-            break :attachment try maplibre.mapAttachOpenglOwnedTexture(map, descriptor.value, options, null);
+            break :attachment try map.attachOpenglOwnedTexture(descriptor.value, options, null);
         };
         self.session = attachment.session;
         errdefer self.release();
@@ -458,7 +458,7 @@ pub const OwnedTexture = struct {
     /// may destroy its graphics objects. A failure logs an error, which fails
     /// the test.
     fn release(self: *OwnedTexture) void {
-        var retired = maplibre.renderSessionRelease(&self.session, null) catch |err| {
+        var retired = self.session.release(null) catch |err| {
             std.log.err("render session release failed: {s}", .{@errorName(err)});
             return;
         };
@@ -469,7 +469,7 @@ pub const OwnedTexture = struct {
     }
 
     pub fn detach(self: *OwnedTexture) !void {
-        try self.resolve(try maplibre.renderSessionDetach(self.session, null));
+        try self.resolve(try self.session.detach(null));
         self.attached = false;
     }
 
@@ -489,7 +489,7 @@ pub const OwnedTexture = struct {
     }
 
     fn service(self: *OwnedTexture) !void {
-        if (self.caller_driven) _ = try maplibre.renderSessionServiceDriverWork(self.session, null);
+        if (self.caller_driven) _ = try self.session.serviceDriverWork(null);
     }
 
     /// Requests one forced frame, which renders whether or not the map
@@ -497,15 +497,15 @@ pub const OwnedTexture = struct {
     pub fn renderFrame(self: *OwnedTexture) !maplibre.RenderFrameResult {
         const token = self.next_token;
         self.next_token += 1;
-        try maplibre.renderSessionRequestFrame(self.session, .{ .flags = .{}, .token = token }, null);
+        try self.session.requestFrame(.{ .flags = .{}, .token = token }, null);
         const Context = struct { owner: *OwnedTexture, token: u64, result: ?maplibre.RenderFrameResult = null };
         var context = Context{ .owner = self, .token = token };
         try self.wakes.waitUntil(&context, struct {
             fn ready(ctx: *Context) anyerror!bool {
                 try ctx.owner.service();
-                var batch = try maplibre.renderSessionDrainFrameResults(ctx.owner.session, null) orelse return false;
+                var batch = try ctx.owner.session.drainFrameResults(null) orelse return false;
                 defer batch.deinit();
-                var view = try maplibre.renderFrameBatchGet(testing.allocator, batch, null);
+                var view = try batch.get(testing.allocator, null);
                 defer view.deinit();
                 for (view.value.results) |result| {
                     if (result.token == ctx.token) ctx.result = result;

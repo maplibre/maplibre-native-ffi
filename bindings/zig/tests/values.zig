@@ -30,11 +30,11 @@ test "host strings use views and native-lent strings decode" {
     defer fixture.destroy();
     try fixture.loadStyle();
     const source_id = "nul\x00source";
-    try support.expectCommitted(try maplibre.mapAddStyleSourceJson(fixture.map, source_id, "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}", null));
-    var info = (try support.resolve(try maplibre.mapGetStyleSource(testing.allocator, fixture.map, source_id, null))).?;
+    try support.expectCommitted(try fixture.map.addStyleSourceJson(source_id, "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}", null));
+    var info = (try support.resolve(try fixture.map.getStyleSource(testing.allocator, source_id, null))).?;
     defer info.deinit();
     try testing.expectEqual(maplibre.StyleSourceType.geojson, info.value.type);
-    try testing.expect(try support.resolve(try maplibre.mapGetStyleSource(testing.allocator, fixture.map, "nul", null)) == null);
+    try testing.expect(try support.resolve(try fixture.map.getStyleSource(testing.allocator, "nul", null)) == null);
 }
 
 // A null optional field sets no presence bit, so the command leaves that value
@@ -47,18 +47,18 @@ test "optional fields and masks round-trip through presence bits" {
     defer update.deinit();
     update.value.mode = .jump;
     update.value.camera = .{ .zoom = 3.0, .pitch = 30.0 };
-    try support.expectCommitted(try maplibre.mapUpdateCamera(fixture.map, update.value, null));
+    try support.expectCommitted(try fixture.map.updateCamera(update.value, null));
     update.value.camera = .{ .zoom = 5.0 };
-    try support.expectCommitted(try maplibre.mapUpdateCamera(fixture.map, update.value, null));
-    const snapshot = try maplibre.mapGetSnapshot(fixture.map, null);
+    try support.expectCommitted(try fixture.map.updateCamera(update.value, null));
+    const snapshot = try fixture.map.getSnapshot(null);
     try testing.expectEqual(@as(?f64, 5.0), snapshot.view.camera.zoom);
     try testing.expectApproxEqAbs(@as(f64, 30.0), snapshot.view.camera.pitch.?, 1e-9);
 
     var mask = maplibre.RuntimeEventMask.all;
     mask.map_tile_action = false;
     mask.offline_region_status_changed = false;
-    try maplibre.runtimeSetEventMask(fixture.runtime, mask, null);
-    try testing.expectEqual(mask, try maplibre.runtimeGetEventMask(fixture.runtime, null));
+    try fixture.runtime.setEventMask(mask, null);
+    try testing.expectEqual(mask, try fixture.runtime.getEventMask(null));
 }
 
 // Native steps through a batch by the stride it reports, which may exceed the
@@ -120,10 +120,10 @@ test "open enums keep unknown values and 64-bit carriers round-trip" {
     update.value.mode = .ease;
     update.value.camera = .{ .zoom = 4.0 };
     update.value.animation = .{ .duration_ms = 60_000, .transition_id = transition_id, .end_handler = ended.handler() };
-    try support.expectCommitted(try maplibre.mapUpdateCamera(fixture.map, update.value, null));
-    try support.expectCommitted(try maplibre.mapCancelCameraTransition(fixture.map, transition_id & 0x7fff_ffff_ffff_ffff, null));
+    try support.expectCommitted(try fixture.map.updateCamera(update.value, null));
+    try support.expectCommitted(try fixture.map.cancelCameraTransition(transition_id & 0x7fff_ffff_ffff_ffff, null));
     try testing.expectEqual(@as(u32, 0), ended.ends.load(.acquire));
-    try support.expectCommitted(try maplibre.mapCancelCameraTransition(fixture.map, transition_id, null));
+    try support.expectCommitted(try fixture.map.cancelCameraTransition(transition_id, null));
     try ended.releases.waitFor(1);
     try testing.expectEqual(@as(u32, 1), ended.ends.load(.acquire));
     try testing.expectEqual(maplibre.CameraTransitionOutcome.cancelled, ended.outcome);
@@ -137,7 +137,7 @@ test "an array input is copied at submission" {
     try fixture.loadStyle();
 
     var pixels: [2 * 2 * 4]u8 = @splat(0x80);
-    const submitted = try maplibre.mapSetStyleImage(testing.allocator, fixture.map, "copied", .{
+    const submitted = try fixture.map.setStyleImage(testing.allocator, "copied", .{
         .width = 2,
         .height = 2,
         .stride = 2 * 4,
@@ -146,7 +146,7 @@ test "an array input is copied at submission" {
     @memset(&pixels, 0);
     try support.expectCommitted(submitted);
 
-    var copy = (try support.resolve(try maplibre.mapGetStyleImage(testing.allocator, fixture.map, "copied", null))).?;
+    var copy = (try support.resolve(try fixture.map.getStyleImage(testing.allocator, "copied", null))).?;
     defer copy.deinit();
     try testing.expectEqual(@as(usize, pixels.len), copy.value.pixels.len);
     for (copy.value.pixels) |byte| try testing.expectEqual(@as(u8, 0x80), byte);
@@ -160,36 +160,36 @@ test "native record defaults round trip through generated conversion" {
 test "synchronous calls fill caller-sized outputs in input order" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
-    var projection = try maplibre.mapProjectionCreate((try maplibre.mapGetSnapshot(fixture.map, null)).view, null);
-    defer maplibre.mapProjectionRelease(&projection);
+    var projection = try maplibre.mapProjectionCreate((try fixture.map.getSnapshot(null)).view, null);
+    defer projection.release();
     const coordinates = [_]maplibre.LatLng{ .{ .latitude = 0, .longitude = 0 }, .{ .latitude = 10, .longitude = 20 }, .{ .latitude = -12, .longitude = -30 } };
-    var points = try maplibre.mapProjectionPixelsForLatLngs(testing.allocator, projection, &coordinates, null);
+    var points = try projection.pixelsForLatLngs(testing.allocator, &coordinates, null);
     defer points.deinit();
     try testing.expectEqual(coordinates.len, points.value.len);
-    var wrapped = try maplibre.mapProjectionLatLngsForPixels(testing.allocator, projection, points.value, null);
+    var wrapped = try projection.latLngsForPixels(testing.allocator, points.value, null);
     defer wrapped.deinit();
-    var unwrapped = try maplibre.mapProjectionLatLngsForPixelsUnwrapped(testing.allocator, projection, points.value, null);
+    var unwrapped = try projection.latLngsForPixelsUnwrapped(testing.allocator, points.value, null);
     defer unwrapped.deinit();
     for (coordinates, points.value, wrapped.value, unwrapped.value) |coordinate, point, single_wrapped, single_unwrapped| {
-        try testing.expectEqualDeep(try maplibre.mapProjectionPixelForLatLng(projection, coordinate, null), point);
-        try testing.expectEqualDeep(try maplibre.mapProjectionLatLngForPixel(projection, point, null), single_wrapped);
-        try testing.expectEqualDeep(try maplibre.mapProjectionLatLngForPixelUnwrapped(projection, point, null), single_unwrapped);
+        try testing.expectEqualDeep(try projection.pixelForLatLng(coordinate, null), point);
+        try testing.expectEqualDeep(try projection.latLngForPixel(point, null), single_wrapped);
+        try testing.expectEqualDeep(try projection.latLngForPixelUnwrapped(point, null), single_unwrapped);
     }
-    var empty_points = try maplibre.mapProjectionPixelsForLatLngs(testing.allocator, projection, &.{}, null);
+    var empty_points = try projection.pixelsForLatLngs(testing.allocator, &.{}, null);
     defer empty_points.deinit();
     try testing.expectEqual(@as(usize, 0), empty_points.value.len);
-    var empty_wrapped = try maplibre.mapProjectionLatLngsForPixels(testing.allocator, projection, &.{}, null);
+    var empty_wrapped = try projection.latLngsForPixels(testing.allocator, &.{}, null);
     defer empty_wrapped.deinit();
     try testing.expectEqual(@as(usize, 0), empty_wrapped.value.len);
-    var empty_unwrapped = try maplibre.mapProjectionLatLngsForPixelsUnwrapped(testing.allocator, projection, &.{}, null);
+    var empty_unwrapped = try projection.latLngsForPixelsUnwrapped(testing.allocator, &.{}, null);
     defer empty_unwrapped.deinit();
     try testing.expectEqual(@as(usize, 0), empty_unwrapped.value.len);
 }
 
 test "caller-sized text returns results longer than its first storage" {
     var zoom = try maplibre.styleExpressionCreate("[\"interpolate\", [\"linear\"], [\"zoom\"], 0, 0, 10, 100]", null, null);
-    defer maplibre.styleExpressionRelease(&zoom);
-    var level = try maplibre.styleExpressionEvaluate(testing.allocator, zoom, .{ .zoom = 5, .available_images = &.{} }, null);
+    defer zoom.release();
+    var level = try zoom.evaluate(testing.allocator, .{ .zoom = 5, .available_images = &.{} }, null);
     defer level.deinit();
     try testing.expectEqualStrings("50.0", level.value);
 
@@ -199,8 +199,8 @@ test "caller-sized text returns results longer than its first storage" {
     text[0] = '"';
     text[text.len - 1] = '"';
     var long = try maplibre.styleExpressionCreate(&text, null, null);
-    defer maplibre.styleExpressionRelease(&long);
-    var result = try maplibre.styleExpressionEvaluate(testing.allocator, long, null, null);
+    defer long.release();
+    var result = try long.evaluate(testing.allocator, null, null);
     defer result.deinit();
     try testing.expectEqualStrings(&text, result.value);
 }

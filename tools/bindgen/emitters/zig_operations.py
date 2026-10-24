@@ -110,7 +110,18 @@ def function_name(plan, values, *, discard=False):
     return camel(plan.name.removeprefix("mln_"))
 
 
-def operation(plan, values, *, discard=False):
+def method_name(plan, *, discard=False):
+    """A method's name: its member name, or `dispose` for the call that passes
+    no completion to a dispose that is also its handle's release."""
+    if discard and plan.completion and plan.completion.optional:
+        return "dispose"
+    return camel(plan.member)
+
+
+def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
+    """A function, or with `method` a method of its receiver's type, which
+    takes the receiver as `self`. `taken` names the declarations of that
+    type, which no parameter may shadow."""
     function = plan.function
     if plan.consumes == "always" and function.return_type.kind != "void":
         raise failure(
@@ -118,7 +129,7 @@ def operation(plan, values, *, discard=False):
             "status-returning unconditional consumption requires a commit-on-error adapter",
         )
     if plan.view:
-        return view_operation(plan, values)
+        return view_operation(plan, values, method)
     inputs = {p.name: p.value for p in plan.inputs}
     outputs = {p.name: p.value for p in plan.outputs}
     owned_outputs = {p.parameter: p for p in plan.owned_outputs}
@@ -126,9 +137,11 @@ def operation(plan, values, *, discard=False):
     names = {}
     for parameter in function.parameters:
         public = parameter.name
-        while public in RESERVED or public in names.values():
+        while public in RESERVED or public in taken or public in names.values():
             public += "_input"
         names[parameter.name] = identifier(public)
+    if method:
+        names[receiver_name] = "self"
     length_sources = {
         v.length: n
         for n, v in inputs.items()
@@ -344,7 +357,16 @@ def operation(plan, values, *, discard=False):
         signature.insert(0, "allocator: std.mem.Allocator")
     if function.diagnostic:
         signature.append(DIAGNOSTIC_PARAMETER)
-    method = function_name(plan, values, discard=discard)
+    if method:
+        receiver_parameter = next(
+            i for i, p in enumerate(signature) if p.startswith("self:")
+        )
+        signature.insert(0, signature.pop(receiver_parameter))
+    name = (
+        method_name(plan, discard=discard)
+        if method
+        else function_name(plan, values, discard=discard)
+    )
     if discard and not completion.optional:
         receiver_parameter = next(
             i
@@ -356,7 +378,7 @@ def operation(plan, values, *, discard=False):
         signature.insert(0, f"self: {receiver_type}Discarding")
         body.insert(0, f"const {receiver} = self.receiver;")
     code = (
-        f"pub fn {method}({', '.join(signature)}) {'' if infallible else 'status.Error!'}{return_type} {{\n    "
+        f"pub fn {name}({', '.join(signature)}) {'' if infallible else 'status.Error!'}{return_type} {{\n    "
         + "\n    ".join(body)
         + "\n}\n"
     )
@@ -391,7 +413,7 @@ def consume(function, receiver, body, return_type, infallible=False):
     ]
 
 
-def view_operation(plan, values):
+def view_operation(plan, values, method=False):
     view = plan.view
     value = view.output.value.element
     values.add(value)
@@ -401,7 +423,9 @@ def view_operation(plan, values):
     typ = values.public(value)
     # `use` is a `*const fn (@TypeOf(context), View) E!Result`, and the view
     # returns its result with the binding's errors and its own.
-    return f'''pub fn {camel(plan.name.removeprefix("mln_"))}(handle: {handle_type}, context: anytype, comptime use: anytype, {DIAGNOSTIC_PARAMETER}) call.ViewResult(@TypeOf(use)) {{
-    return call.scopedView("{plan.name}", "{view.begin}", "{view.end}", {typ}, handle, context, use, diagnostic);
+    name = method_name(plan) if method else camel(plan.name.removeprefix("mln_"))
+    handle = "self" if method else "handle"
+    return f'''pub fn {name}({handle}: {handle_type}, context: anytype, comptime use: anytype, {DIAGNOSTIC_PARAMETER}) call.ViewResult(@TypeOf(use)) {{
+    return call.scopedView("{plan.name}", "{view.begin}", "{view.end}", {typ}, {handle}, context, use, diagnostic);
 }}
 '''
