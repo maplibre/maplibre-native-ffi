@@ -359,6 +359,16 @@ class Values:
                 chunks.append(
                     f"func (value {typename}) Has(flags {typename}) bool {{ return value & flags == flags }}"
                 )
+                # String names each single-bit flag; wider members are unions
+                # of those bits.
+                flags = ", ".join(
+                    f'{{{number}, "{typename}{name(key.removeprefix(prefix).lower())}"}}'
+                    for key, number in value.enum_values
+                    if number > 0 and number & (number - 1) == 0
+                )
+                chunks.append(
+                    f"func (value {typename}) String() string {{ return bindingFlagString(uint64(value), []bindingFlag{{{flags}}}) }}"
+                )
         for native, value in sorted(self.unions.items()):
             typename = self.union_name(value)
             chunks.append(

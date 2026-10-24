@@ -206,6 +206,10 @@ const (
 
 func (value FrameDemandFlag) Has(flags FrameDemandFlag) bool { return value&flags == flags }
 
+func (value FrameDemandFlag) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "FrameDemandFlagIfNeeded"}, {2, "FrameDemandFlagPresent"}, {4, "FrameDemandFlagWaitForUpdate"}})
+}
+
 // GesturePhase corresponds to mln_gesture_phase. Gesture boundary carried
 // atomically with a camera update or delta.
 //
@@ -380,6 +384,10 @@ const (
 
 func (value LogSeverityMask) Has(flags LogSeverityMask) bool { return value&flags == flags }
 
+func (value LogSeverityMask) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{2, "LogSeverityMaskInfo"}, {4, "LogSeverityMaskWarning"}, {8, "LogSeverityMaskError"}})
+}
+
 // MapDebugOption corresponds to mln_map_debug_option. Debug overlay mask values
 // for mln_map_set_debug_options().
 //
@@ -398,6 +406,10 @@ const (
 )
 
 func (value MapDebugOption) Has(flags MapDebugOption) bool { return value&flags == flags }
+
+func (value MapDebugOption) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{2, "MapDebugOptionTileBorders"}, {4, "MapDebugOptionParseStatus"}, {8, "MapDebugOptionTimestamps"}, {16, "MapDebugOptionCollision"}, {32, "MapDebugOptionOverdraw"}, {64, "MapDebugOptionStencilClip"}, {128, "MapDebugOptionDepthBuffer"}})
+}
 
 // MapMode corresponds to mln_map_mode. Map rendering modes used when creating a
 // map.
@@ -560,6 +572,10 @@ func (value OpenglContextProviderFlag) Has(flags OpenglContextProviderFlag) bool
 	return value&flags == flags
 }
 
+func (value OpenglContextProviderFlag) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "OpenglContextProviderFlagWgl"}, {2, "OpenglContextProviderFlagEgl"}, {4, "OpenglContextProviderFlagWebgl"}})
+}
+
 // RenderAbandonDisposition corresponds to mln_render_abandon_disposition. What
 // abandon did with a session's graphics resources.
 //
@@ -599,6 +615,10 @@ const (
 )
 
 func (value RenderBackendFlag) Has(flags RenderBackendFlag) bool { return value&flags == flags }
+
+func (value RenderBackendFlag) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "RenderBackendFlagMetal"}, {2, "RenderBackendFlagVulkan"}, {4, "RenderBackendFlagOpengl"}, {8, "RenderBackendFlagWebgpu"}})
+}
 
 // RenderDriverKind corresponds to mln_render_driver_kind. Execution placement
 // for one render session.
@@ -703,6 +723,10 @@ const (
 
 func (value RenderSessionCapabilityFlag) Has(flags RenderSessionCapabilityFlag) bool {
 	return value&flags == flags
+}
+
+func (value RenderSessionCapabilityFlag) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "RenderSessionCapabilityFlagFrameAcquisition"}, {2, "RenderSessionCapabilityFlagReadback"}, {4, "RenderSessionCapabilityFlagConsumerSync"}, {8, "RenderSessionCapabilityFlagPresentation"}})
 }
 
 // RenderSessionState corresponds to mln_render_session_state. Render-session
@@ -828,6 +852,10 @@ const (
 )
 
 func (value ResourceKindMask) Has(flags ResourceKindMask) bool { return value&flags == flags }
+
+func (value ResourceKindMask) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "ResourceKindMaskUnknown"}, {2, "ResourceKindMaskStyle"}, {4, "ResourceKindMaskSource"}, {8, "ResourceKindMaskTile"}, {16, "ResourceKindMaskGlyphs"}, {32, "ResourceKindMaskSpriteImage"}, {64, "ResourceKindMaskSpriteJson"}, {128, "ResourceKindMaskImage"}})
+}
 
 type ResourceLoadingMethod uint32
 
@@ -983,6 +1011,10 @@ const (
 )
 
 func (value RuntimeEventMask) Has(flags RuntimeEventMask) bool { return value&flags == flags }
+
+func (value RuntimeEventMask) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{2, "RuntimeEventMaskMapCameraWillChange"}, {4, "RuntimeEventMaskMapCameraIsChanging"}, {8, "RuntimeEventMaskMapCameraDidChange"}, {16, "RuntimeEventMaskMapStyleLoaded"}, {32, "RuntimeEventMaskMapLoadingStarted"}, {64, "RuntimeEventMaskMapLoadingFinished"}, {128, "RuntimeEventMaskMapLoadingFailed"}, {256, "RuntimeEventMaskMapIdle"}, {1024, "RuntimeEventMaskMapRenderError"}, {8192, "RuntimeEventMaskMapRenderFrameStarted"}, {16384, "RuntimeEventMaskMapRenderFrameFinished"}, {32768, "RuntimeEventMaskMapRenderMapStarted"}, {65536, "RuntimeEventMaskMapRenderMapFinished"}, {131072, "RuntimeEventMaskMapStyleImageMissing"}, {262144, "RuntimeEventMaskMapTileAction"}, {524288, "RuntimeEventMaskOfflineRegionStatusChanged"}, {1048576, "RuntimeEventMaskOfflineRegionResponseError"}, {2097152, "RuntimeEventMaskOfflineRegionTileCountLimitExceeded"}, {8388608, "RuntimeEventMaskMapSourceChanged"}})
+}
 
 // RuntimeEventSourceType corresponds to mln_runtime_event_source_type. Source
 // kinds used by mln_runtime_event.source_type.
@@ -1456,6 +1488,10 @@ const (
 )
 
 func (value UrlMatchFlags) Has(flags UrlMatchFlags) bool { return value&flags == flags }
+
+func (value UrlMatchFlags) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "UrlMatchFlagsGlob"}})
+}
 
 // ViewportMode corresponds to mln_viewport_mode. Viewport orientation modes
 // used by mln_map_viewport_options.

@@ -1,6 +1,10 @@
 package maplibre
 
-import "unsafe"
+import (
+	"fmt"
+	"strings"
+	"unsafe"
+)
 
 // Conversions that generated code applies to values and parameters without
 // touching C declarations, so a generator probe can compile them with its own
@@ -49,4 +53,28 @@ func bindingPresent[T any](present bool, value func() T) *T {
 	}
 	copied := value()
 	return &copied
+}
+
+type bindingFlag struct {
+	bit  uint64
+	name string
+}
+
+// bindingFlagString joins the names of the flags set in value with "|", and
+// appends any bits without a name in hex.
+func bindingFlagString(value uint64, flags []bindingFlag) string {
+	if value == 0 {
+		return "0"
+	}
+	var names []string
+	for _, flag := range flags {
+		if value&flag.bit != 0 {
+			names = append(names, flag.name)
+			value &^= flag.bit
+		}
+	}
+	if value != 0 {
+		names = append(names, fmt.Sprintf("%#x", value))
+	}
+	return strings.Join(names, "|")
 }

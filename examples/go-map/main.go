@@ -247,7 +247,7 @@ func waitEvent(event *sdl.Event, deadline time.Time, hasDeadline bool) bool {
 
 func validateNativeRenderBackend() error {
 	backends := maplibre.SupportedRenderBackendMask()
-	fmt.Printf("native render backends: %s\n", renderBackendSupportLabel(backends))
+	fmt.Printf("native render backends: %v\n", backends)
 	if !backends.Has(maplibre.RenderBackendFlagOpengl) {
 		return errors.New("loaded native library does not support OpenGL")
 	}
@@ -257,37 +257,9 @@ func validateNativeRenderBackend() error {
 		required = maplibre.OpenglContextProviderFlagWgl
 	}
 	if !providers.Has(required) {
-		return fmt.Errorf("loaded native library does not support required OpenGL context provider: %s", openGLProviderLabel(required))
+		return fmt.Errorf("loaded native library does not support required OpenGL context provider: %v", required)
 	}
 	return nil
-}
-
-func renderBackendSupportLabel(mask maplibre.RenderBackendFlag) string {
-	var labels []string
-	if mask.Has(maplibre.RenderBackendFlagMetal) {
-		labels = append(labels, "metal")
-	}
-	if mask.Has(maplibre.RenderBackendFlagOpengl) {
-		labels = append(labels, "opengl")
-	}
-	if mask.Has(maplibre.RenderBackendFlagVulkan) {
-		labels = append(labels, "vulkan")
-	}
-	if len(labels) == 0 {
-		return "none"
-	}
-	return strings.Join(labels, ",")
-}
-
-func openGLProviderLabel(provider maplibre.OpenglContextProviderFlag) string {
-	switch provider {
-	case maplibre.OpenglContextProviderFlagWgl:
-		return "wgl"
-	case maplibre.OpenglContextProviderFlagEgl:
-		return "egl"
-	default:
-		return "unknown"
-	}
 }
 
 func logSeverity(severity maplibre.LogSeverity) string {

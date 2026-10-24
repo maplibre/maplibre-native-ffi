@@ -174,3 +174,17 @@ func TestCallerSizedTextReturnsResultsLongerThanItsFirstStorage(t *testing.T) {
 		t.Fatalf("long result has %d bytes, want %d", len(got), len(text))
 	}
 }
+
+// A flag set prints the names of its flags and any unnamed bits in hex.
+func TestFlagsPrintTheirNames(t *testing.T) {
+	cases := map[RenderBackendFlag]string{
+		0:                      "0",
+		RenderBackendFlagMetal: "RenderBackendFlagMetal",
+		RenderBackendFlagOpengl | RenderBackendFlagMetal | 0x100: "RenderBackendFlagMetal|RenderBackendFlagOpengl|0x100",
+	}
+	for flags, want := range cases {
+		if got := flags.String(); got != want {
+			t.Errorf("String() = %q, want %q", got, want)
+		}
+	}
+}
