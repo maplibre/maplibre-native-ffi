@@ -98,8 +98,8 @@ test "a scoped frame view holds its frame until the scope returns" {
     _ = try owned.renderUntilRendered();
     var sibling = (try maplibre.renderSessionAcquireFrame(owned.session, null)).?;
 
-    const width = try support.getOwnedTexture(u32, frame, {}, struct {
-        fn use(_: void, view: support.OwnedTextureFrame) anyerror!u32 {
+    const width = try support.getOwnedTexture(frame, {}, struct {
+        fn use(_: void, view: support.OwnedTextureFrame) u32 {
             return view.width;
         }
     }.use);
@@ -112,17 +112,17 @@ test "a scoped frame view holds its frame until the scope returns" {
         fn inspect(self: @This(), _: maplibre.GpuSync) anyerror!void {
             // The native scope keeps the frame and its session busy.
             var diagnostic: maplibre.Diagnostic = .{};
-            try testing.expectError(error.Busy, maplibre.acquiredFrameRelease(testing.allocator, self.frame, try maplibre.gpuSyncDefault(), &diagnostic));
+            try testing.expectError(error.Busy, maplibre.acquiredFrameRelease(testing.allocator, self.frame, maplibre.gpuSyncDefault(), &diagnostic));
             try testing.expectEqual(.busy, diagnostic.status);
             try testing.expectError(error.Busy, maplibre.renderSessionAbandon(self.session, null));
             try maplibre.acquiredFrameDiscard(self.sibling, null);
-            try maplibre.acquiredFrameGetProducerSync(void, self.frame.*, {}, struct {
+            try maplibre.acquiredFrameGetProducerSync(self.frame.*, {}, struct {
                 fn use(_: void, _: maplibre.GpuSync) anyerror!void {}
             }.use, null);
             return error.HostConsumerFailed;
         }
     };
-    try testing.expectError(error.HostConsumerFailed, maplibre.acquiredFrameGetProducerSync(void, frame, Probe{ .frame = &frame, .sibling = &sibling, .session = owned.session }, Probe.inspect, null));
+    try testing.expectError(error.HostConsumerFailed, maplibre.acquiredFrameGetProducerSync(frame, Probe{ .frame = &frame, .sibling = &sibling, .session = owned.session }, Probe.inspect, null));
     try testing.expect(sibling.isClosed() and !frame.isClosed());
     try maplibre.acquiredFrameRelease(testing.allocator, &frame, null, null);
     try testing.expect(frame.isClosed());

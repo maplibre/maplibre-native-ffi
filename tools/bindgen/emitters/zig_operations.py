@@ -151,6 +151,7 @@ def operation(plan, values, *, discard=False):
         else {}
     )
     signature, arguments, results = [], [], []
+    infallible = False
     needs_allocator = False
     completion = plan.completion
     for parameter in function.parameters:
@@ -286,6 +287,23 @@ def operation(plan, values, *, discard=False):
         allocator = "allocator" if needs_allocator else "null"
         return_type = result_type
         body = [f"return call.direct({head}, {result_type}, {allocator}, {args});"]
+        # A call that passes only handle ids and copies no storage can't fail,
+        # so it calls native directly and returns no error.
+        if (
+            not needs_allocator
+            and mode != "scoped"
+            and all(
+                inputs.get(p.name) and inputs[p.name].kind == "handle"
+                for p in function.parameters
+            )
+        ):
+            native_call = f"c.{function.name}({', '.join(names[p.name] + '.raw' for p in function.parameters)})"
+            body = [
+                f"{native_call};"
+                if result_type == "void"
+                else f"return {values.capture(plan.result, native_call)};"
+            ]
+            infallible = True
     else:
         if not function.diagnostic:
             raise failure(function, "status result requires a diagnostic parameter")
@@ -323,7 +341,7 @@ def operation(plan, values, *, discard=False):
             return_type = results[0][1] if results else "void"
             body = [f"return {invoke};"]
     if plan.consumes:
-        body = consume(function, names[receiver_name], body, return_type)
+        body = consume(function, names[receiver_name], body, return_type, infallible)
     if needs_allocator:
         signature.insert(0, "allocator: std.mem.Allocator")
     if function.diagnostic:
@@ -340,17 +358,19 @@ def operation(plan, values, *, discard=False):
         signature.insert(0, f"self: {receiver_type}Discarding")
         body.insert(0, f"const {receiver} = self.receiver;")
     code = (
-        f"pub fn {method}({', '.join(signature)}) status.Error!{return_type} {{\n    "
+        f"pub fn {method}({', '.join(signature)}) {'' if infallible else 'status.Error!'}{return_type} {{\n    "
         + "\n    ".join(body)
         + "\n}\n"
     )
     return code
 
 
-def consume(function, receiver, body, return_type):
+def consume(function, receiver, body, return_type, infallible=False):
     """Close the receiver once native accepts its release. A synchronous release
     of a closed receiver does nothing; an asynchronous one reaches native,
     which reports a stale handle."""
+    if infallible and return_type == "void":
+        return [f"if ({receiver}.closed) return;", body[0], f"{receiver}.closed = true;"]
     if len(body) != 1 or not body[0].startswith("return "):
         raise failure(
             function, "consumption with outputs requires an owner transaction"
@@ -377,7 +397,9 @@ def view_operation(plan, values):
         next(p.value for p in plan.inputs if p.name == plan.receiver)
     )
     typ = values.public(value)
-    return f'''pub fn {camel(plan.name.removeprefix("mln_"))}(comptime Result: type, handle: {handle_type}, context: anytype, comptime use: *const fn (@TypeOf(context), {typ}) anyerror!Result, {DIAGNOSTIC_PARAMETER}) anyerror!Result {{
-    return call.scopedView("{plan.name}", "{view.begin}", "{view.end}", {typ}, Result, handle, context, use, diagnostic);
+    # `use` is a `*const fn (@TypeOf(context), View) E!Result`, and the view
+    # returns its result with the binding's errors and its own.
+    return f'''pub fn {camel(plan.name.removeprefix("mln_"))}(handle: {handle_type}, context: anytype, comptime use: anytype, {DIAGNOSTIC_PARAMETER}) call.ViewResult(@TypeOf(use)) {{
+    return call.scopedView("{plan.name}", "{view.begin}", "{view.end}", {typ}, handle, context, use, diagnostic);
 }}
 '''

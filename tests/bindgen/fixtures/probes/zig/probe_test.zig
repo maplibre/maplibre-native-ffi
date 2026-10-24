@@ -38,7 +38,7 @@ test "generated calls report native failures through the diagnostic" {
 }
 
 test "generated record defaults equal the native default" {
-    try api.probeSettingsCheck(try api.probeSettingsDefault(), null);
+    try api.probeSettingsCheck(api.probeSettingsDefault(), null);
 }
 
 test "generated default copies keep values and leave registrations unset" {
@@ -101,12 +101,12 @@ test "generated owned callback arguments are released on conversion and host err
     try std.testing.expectEqual(@as(usize, 2), probe.calls);
     try std.testing.expectEqual(@as(u64, 42), released_query);
     var saved = probe.saved.?;
-    try api.queryRelease(&saved);
+    api.queryRelease(&saved);
     try std.testing.expectEqual(@as(u64, 43), released_query);
     // The release closed the value, so a second one does not reach native.
     try std.testing.expect(saved.isClosed());
     released_query = 0;
-    try api.queryRelease(&saved);
+    api.queryRelease(&saved);
     try std.testing.expectEqual(@as(u64, 0), released_query);
 }
 

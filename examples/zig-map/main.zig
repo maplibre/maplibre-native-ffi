@@ -187,7 +187,7 @@ const App = struct {
 };
 
 fn validateNativeRenderBackend() !void {
-    const support = try maplibre.supportedRenderBackendMask();
+    const support = maplibre.supportedRenderBackendMask();
     var support_label_buffer: [32]u8 = undefined;
     std.debug.print("native render backends: {s}\n", .{
         renderBackendSupportLabel(&support_label_buffer, support),

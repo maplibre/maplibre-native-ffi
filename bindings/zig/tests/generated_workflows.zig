@@ -40,7 +40,7 @@ test "a provider can deinit its request inside its callback" {
     defer fixture.destroy();
     var probe = ProviderProbe{ .runtime = fixture.runtime };
     try fixture.setProvider(.{ .context = &probe, .callback = ProviderProbe.provide, .release_context = ProviderProbe.release });
-    try (try support.resolve(try maplibre.mapSetStyleUrl(fixture.map, "binding-test://style", null))).statusError();
+    _ = try support.resolve(try maplibre.mapSetStyleUrl(fixture.map, "binding-test://style", null));
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     loaded.deinit();
     try support.resolve(try maplibre.runtimeClearResourceProvider(fixture.runtime, null));

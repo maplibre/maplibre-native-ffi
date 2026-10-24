@@ -3219,7 +3219,7 @@ pub const ResourceTransform = struct {
                 var ownership_transferred = false;
                 var owned_request = ResourceTransformRequest.adopt(callback_arg_3);
                 defer if (!ownership_transferred) {
-                    resourceTransformRequestRelease(&owned_request) catch {};
+                    resourceTransformRequestRelease(&owned_request);
                 };
                 var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
                 defer arena.deinit();
@@ -4959,24 +4959,24 @@ pub fn acquiredFrameDiscard(frame: *AcquiredFrame, diagnostic: ?*diagnostics.Dia
 ///
 /// See `mln_acquired_frame_get_metal_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn acquiredFrameGetMetalTexture(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), MetalTextureFrame) anyerror!Result, diagnostic: ?*diagnostics.Diagnostic) anyerror!Result {
-    return call.scopedView("mln_acquired_frame_get_metal_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", MetalTextureFrame, Result, handle, context, use, diagnostic);
+pub fn acquiredFrameGetMetalTexture(handle: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
+    return call.scopedView("mln_acquired_frame_get_metal_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", MetalTextureFrame, handle, context, use, diagnostic);
 }
 
 /// Copies OpenGL-native metadata from an acquired frame.
 ///
 /// See `mln_acquired_frame_get_opengl_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn acquiredFrameGetOpenglTexture(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), OpenglTextureFrame) anyerror!Result, diagnostic: ?*diagnostics.Diagnostic) anyerror!Result {
-    return call.scopedView("mln_acquired_frame_get_opengl_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", OpenglTextureFrame, Result, handle, context, use, diagnostic);
+pub fn acquiredFrameGetOpenglTexture(handle: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
+    return call.scopedView("mln_acquired_frame_get_opengl_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", OpenglTextureFrame, handle, context, use, diagnostic);
 }
 
 /// Copies the producer synchronization for an acquired texture frame.
 ///
 /// See `mln_acquired_frame_get_producer_sync` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn acquiredFrameGetProducerSync(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), GpuSync) anyerror!Result, diagnostic: ?*diagnostics.Diagnostic) anyerror!Result {
-    return call.scopedView("mln_acquired_frame_get_producer_sync", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", GpuSync, Result, handle, context, use, diagnostic);
+pub fn acquiredFrameGetProducerSync(handle: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
+    return call.scopedView("mln_acquired_frame_get_producer_sync", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", GpuSync, handle, context, use, diagnostic);
 }
 
 /// Copies common metadata for an acquired frame.
@@ -4991,16 +4991,16 @@ pub fn acquiredFrameGetResult(frame: AcquiredFrame, diagnostic: ?*diagnostics.Di
 ///
 /// See `mln_acquired_frame_get_vulkan_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn acquiredFrameGetVulkanTexture(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), VulkanTextureFrame) anyerror!Result, diagnostic: ?*diagnostics.Diagnostic) anyerror!Result {
-    return call.scopedView("mln_acquired_frame_get_vulkan_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", VulkanTextureFrame, Result, handle, context, use, diagnostic);
+pub fn acquiredFrameGetVulkanTexture(handle: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
+    return call.scopedView("mln_acquired_frame_get_vulkan_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", VulkanTextureFrame, handle, context, use, diagnostic);
 }
 
 /// Copies WebGPU-native metadata from an acquired frame.
 ///
 /// See `mln_acquired_frame_get_webgpu_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn acquiredFrameGetWebgpuTexture(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), WebgpuTextureFrame) anyerror!Result, diagnostic: ?*diagnostics.Diagnostic) anyerror!Result {
-    return call.scopedView("mln_acquired_frame_get_webgpu_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", WebgpuTextureFrame, Result, handle, context, use, diagnostic);
+pub fn acquiredFrameGetWebgpuTexture(handle: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
+    return call.scopedView("mln_acquired_frame_get_webgpu_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", WebgpuTextureFrame, handle, context, use, diagnostic);
 }
 
 /// Releases an acquired frame after the host's GPU work that reads it.
@@ -5033,8 +5033,8 @@ pub fn animationOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedV
 ///
 /// See `mln_bound_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn boundOptionsDefault() status.Error!BoundOptions {
-    return call.direct("mln_bound_options_default", .none, {}, BoundOptions, null, .{});
+pub fn boundOptionsDefault() BoundOptions {
+    return BoundOptions.fromNative(c.mln_bound_options_default());
 }
 
 /// Reports the C ABI contract version. The value is 0 while the ABI is
@@ -5042,8 +5042,8 @@ pub fn boundOptionsDefault() status.Error!BoundOptions {
 ///
 /// See `mln_c_version` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub fn cVersion() status.Error!u32 {
-    return call.direct("mln_c_version", .none, {}, u32, null, .{});
+pub fn cVersion() u32 {
+    return c.mln_c_version();
 }
 
 /// Returns an empty relative camera update initialized for this API version.
@@ -5058,16 +5058,16 @@ pub fn cameraDeltaDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(
 ///
 /// See `mln_camera_fit_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn cameraFitOptionsDefault() status.Error!CameraFitOptions {
-    return call.direct("mln_camera_fit_options_default", .none, {}, CameraFitOptions, null, .{});
+pub fn cameraFitOptionsDefault() CameraFitOptions {
+    return CameraFitOptions.fromNative(c.mln_camera_fit_options_default());
 }
 
 /// Returns empty camera options initialized for this C API version.
 ///
 /// See `mln_camera_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn cameraOptionsDefault() status.Error!CameraOptions {
-    return call.direct("mln_camera_options_default", .none, {}, CameraOptions, null, .{});
+pub fn cameraOptionsDefault() CameraOptions {
+    return CameraOptions.fromNative(c.mln_camera_options_default());
 }
 
 /// Returns an empty atomic camera update initialized for this API version.
@@ -5098,16 +5098,16 @@ pub fn customMvtVectorSourceOptionsDefault(allocator: std.mem.Allocator) status.
 ///
 /// See `mln_frame_demand_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn frameDemandDefault() status.Error!FrameDemand {
-    return call.direct("mln_frame_demand_default", .none, {}, FrameDemand, null, .{});
+pub fn frameDemandDefault() FrameDemand {
+    return FrameDemand.fromNative(c.mln_frame_demand_default());
 }
 
 /// Returns empty free camera options initialized for this C API version.
 ///
 /// See `mln_free_camera_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn freeCameraOptionsDefault() status.Error!FreeCameraOptions {
-    return call.direct("mln_free_camera_options_default", .none, {}, FreeCameraOptions, null, .{});
+pub fn freeCameraOptionsDefault() FreeCameraOptions {
+    return FreeCameraOptions.fromNative(c.mln_free_camera_options_default());
 }
 
 /// Prepares GeoJSON source data for installation on a map.
@@ -5122,9 +5122,9 @@ pub fn geojsonSourceDataCreate(allocator: std.mem.Allocator, data: []const u8, o
 ///
 /// See `mln_geojson_source_data_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn geojsonSourceDataRelease(data: *GeojsonSourceData) status.Error!void {
+pub fn geojsonSourceDataRelease(data: *GeojsonSourceData) void {
     if (data.closed) return;
-    try call.direct("mln_geojson_source_data_release", .handle, data.*, void, null, .{});
+    c.mln_geojson_source_data_release(data.raw);
     data.closed = true;
 }
 
@@ -5140,8 +5140,8 @@ pub fn geojsonSourceOptionsDefault(allocator: std.mem.Allocator) status.Error!Ow
 ///
 /// See `mln_gpu_sync_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-pub fn gpuSyncDefault() status.Error!GpuSync {
-    return call.direct("mln_gpu_sync_default", .none, {}, GpuSync, null, .{});
+pub fn gpuSyncDefault() GpuSync {
+    return GpuSync.fromNative(c.mln_gpu_sync_default());
 }
 
 /// Returns an exact-match header rule for every resource kind, with no headers.
@@ -5196,8 +5196,8 @@ pub fn logSetCallback(allocator: std.mem.Allocator, handler: LogHandler, diagnos
 ///
 /// See `mln_logical_extent_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn logicalExtentDefault() status.Error!LogicalExtent {
-    return call.direct("mln_logical_extent_default", .none, {}, LogicalExtent, null, .{});
+pub fn logicalExtentDefault() LogicalExtent {
+    return LogicalExtent.fromNative(c.mln_logical_extent_default());
 }
 
 /// Computes the physical device-pixel size of a logical extent.
@@ -5646,8 +5646,8 @@ pub fn mapMoveStyleLayer(map: Map, layer_id: []const u8, before_layer_id: ?[]con
 ///
 /// See `mln_map_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn mapOptionsDefault() status.Error!MapOptions {
-    return call.direct("mln_map_options_default", .none, {}, MapOptions, null, .{});
+pub fn mapOptionsDefault() MapOptions {
+    return MapOptions.fromNative(c.mln_map_options_default());
 }
 
 /// Creates a standalone projection of a view, such as the view of a rendered
@@ -5728,9 +5728,9 @@ pub fn mapProjectionPixelsForLatLngs(allocator: std.mem.Allocator, projection: M
 ///
 /// See `mln_map_projection_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-pub fn mapProjectionRelease(projection: *MapProjection) status.Error!void {
+pub fn mapProjectionRelease(projection: *MapProjection) void {
     if (projection.closed) return;
-    try call.direct("mln_map_projection_release", .handle, projection.*, void, null, .{});
+    c.mln_map_projection_release(projection.raw);
     projection.closed = true;
 }
 
@@ -6036,8 +6036,8 @@ pub fn mapSetViewportOptions(allocator: std.mem.Allocator, map: Map, options: Ma
 ///
 /// See `mln_map_tile_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn mapTileOptionsDefault() status.Error!MapTileOptions {
-    return call.direct("mln_map_tile_options_default", .none, {}, MapTileOptions, null, .{});
+pub fn mapTileOptionsDefault() MapTileOptions {
+    return MapTileOptions.fromNative(c.mln_map_tile_options_default());
 }
 
 /// Submits one atomic camera update.
@@ -6052,8 +6052,8 @@ pub fn mapUpdateCamera(allocator: std.mem.Allocator, map: Map, update: CameraUpd
 ///
 /// See `mln_map_viewport_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn mapViewportOptionsDefault() status.Error!MapViewportOptions {
-    return call.direct("mln_map_viewport_options_default", .none, {}, MapViewportOptions, null, .{});
+pub fn mapViewportOptionsDefault() MapViewportOptions {
+    return MapViewportOptions.fromNative(c.mln_map_viewport_options_default());
 }
 
 /// Returns Metal borrowed-texture descriptor defaults for this C API version.
@@ -6068,16 +6068,16 @@ pub fn metalBorrowedTextureDescriptorDefault(allocator: std.mem.Allocator) statu
 ///
 /// See `mln_metal_owned_texture_descriptor_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn metalOwnedTextureDescriptorDefault() status.Error!MetalOwnedTextureDescriptor {
-    return call.direct("mln_metal_owned_texture_descriptor_default", .none, {}, MetalOwnedTextureDescriptor, null, .{});
+pub fn metalOwnedTextureDescriptorDefault() MetalOwnedTextureDescriptor {
+    return MetalOwnedTextureDescriptor.fromNative(c.mln_metal_owned_texture_descriptor_default());
 }
 
 /// Returns Metal surface descriptor defaults for this C API version.
 ///
 /// See `mln_metal_surface_descriptor_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn metalSurfaceDescriptorDefault() status.Error!MetalSurfaceDescriptor {
-    return call.direct("mln_metal_surface_descriptor_default", .none, {}, MetalSurfaceDescriptor, null, .{});
+pub fn metalSurfaceDescriptorDefault() MetalSurfaceDescriptor {
+    return MetalSurfaceDescriptor.fromNative(c.mln_metal_surface_descriptor_default());
 }
 
 /// Reads MapLibre Native's process-global network status.
@@ -6116,8 +6116,8 @@ pub fn openglOwnedTextureDescriptorDefault(allocator: std.mem.Allocator) status.
 ///
 /// See `mln_opengl_supported_context_provider_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-pub fn openglSupportedContextProviderMask() status.Error!OpenglContextProviderFlag {
-    return call.direct("mln_opengl_supported_context_provider_mask", .none, {}, OpenglContextProviderFlag, null, .{});
+pub fn openglSupportedContextProviderMask() OpenglContextProviderFlag {
+    return OpenglContextProviderFlag.fromNative(c.mln_opengl_supported_context_provider_mask());
 }
 
 /// Returns OpenGL surface descriptor defaults for this C API version.
@@ -6132,8 +6132,8 @@ pub fn openglSurfaceDescriptorDefault(allocator: std.mem.Allocator) status.Error
 ///
 /// See `mln_plugin_get_register_function_v1` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
-pub fn pluginGetRegisterFunctionV1() status.Error!c.mln_plugin_register_function_v1 {
-    return call.direct("mln_plugin_get_register_function_v1", .none, {}, c.mln_plugin_register_function_v1, null, .{});
+pub fn pluginGetRegisterFunctionV1() c.mln_plugin_register_function_v1 {
+    return c.mln_plugin_get_register_function_v1();
 }
 
 /// Returns a default premultiplied RGBA8 image descriptor.
@@ -6157,8 +6157,8 @@ pub fn projectedMetersForLatLng(coordinate: LatLng, diagnostic: ?*diagnostics.Di
 ///
 /// See `mln_projection_mode_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn projectionModeDefault() status.Error!ProjectionMode {
-    return call.direct("mln_projection_mode_default", .none, {}, ProjectionMode, null, .{});
+pub fn projectionModeDefault() ProjectionMode {
+    return ProjectionMode.fromNative(c.mln_projection_mode_default());
 }
 
 /// Borrows the result view stored by an owned frame-result batch.
@@ -6173,9 +6173,9 @@ pub fn renderFrameBatchGet(allocator: std.mem.Allocator, batch: RenderFrameBatch
 ///
 /// See `mln_render_frame_batch_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn renderFrameBatchRelease(batch: *RenderFrameBatch) status.Error!void {
+pub fn renderFrameBatchRelease(batch: *RenderFrameBatch) void {
     if (batch.closed) return;
-    try call.direct("mln_render_frame_batch_release", .handle, batch.*, void, null, .{});
+    c.mln_render_frame_batch_release(batch.raw);
     batch.closed = true;
 }
 
@@ -6469,9 +6469,9 @@ pub fn resourceRequestPassThrough(handle: ResourceRequest, diagnostic: ?*diagnos
 ///
 /// See `mln_resource_request_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn resourceRequestRelease(handle: *ResourceRequest) status.Error!void {
+pub fn resourceRequestRelease(handle: *ResourceRequest) void {
     if (handle.closed) return;
-    try call.direct("mln_resource_request_release", .handle, handle.*, void, null, .{});
+    c.mln_resource_request_release(handle.raw);
     handle.closed = true;
 }
 
@@ -6504,9 +6504,9 @@ pub fn resourceTransformRequestComplete(request: ResourceTransformRequest, url: 
 ///
 /// See `mln_resource_transform_request_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn resourceTransformRequestRelease(request: *ResourceTransformRequest) status.Error!void {
+pub fn resourceTransformRequestRelease(request: *ResourceTransformRequest) void {
     if (request.closed) return;
-    try call.direct("mln_resource_transform_request_release", .handle, request.*, void, null, .{});
+    c.mln_resource_transform_request_release(request.raw);
     request.closed = true;
 }
 
@@ -6774,17 +6774,17 @@ pub fn styleExpressionInputsDefault(allocator: std.mem.Allocator) status.Error!O
 ///
 /// See `mln_style_expression_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-pub fn styleExpressionOptionsDefault() status.Error!StyleExpressionOptions {
-    return call.direct("mln_style_expression_options_default", .none, {}, StyleExpressionOptions, null, .{});
+pub fn styleExpressionOptionsDefault() StyleExpressionOptions {
+    return StyleExpressionOptions.fromNative(c.mln_style_expression_options_default());
 }
 
 /// Releases a style expression.
 ///
 /// See `mln_style_expression_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-pub fn styleExpressionRelease(expression: *StyleExpression) status.Error!void {
+pub fn styleExpressionRelease(expression: *StyleExpression) void {
     if (expression.closed) return;
-    try call.direct("mln_style_expression_release", .handle, expression.*, void, null, .{});
+    c.mln_style_expression_release(expression.raw);
     expression.closed = true;
 }
 
@@ -6800,16 +6800,16 @@ pub fn styleImageOptionsDefault(allocator: std.mem.Allocator) status.Error!Owned
 ///
 /// See `mln_style_transition_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn styleTransitionOptionsDefault() status.Error!StyleTransitionOptions {
-    return call.direct("mln_style_transition_options_default", .none, {}, StyleTransitionOptions, null, .{});
+pub fn styleTransitionOptionsDefault() StyleTransitionOptions {
+    return StyleTransitionOptions.fromNative(c.mln_style_transition_options_default());
 }
 
 /// Reports the render backends available in this native library build.
 ///
 /// See `mln_supported_render_backend_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub fn supportedRenderBackendMask() status.Error!RenderBackendFlag {
-    return call.direct("mln_supported_render_backend_mask", .none, {}, RenderBackendFlag, null, .{});
+pub fn supportedRenderBackendMask() RenderBackendFlag {
+    return RenderBackendFlag.fromNative(c.mln_supported_render_backend_mask());
 }
 
 /// Returns Vulkan borrowed-texture descriptor defaults for this C API version.
@@ -6824,16 +6824,16 @@ pub fn vulkanBorrowedTextureDescriptorDefault(allocator: std.mem.Allocator) stat
 ///
 /// See `mln_vulkan_owned_texture_descriptor_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn vulkanOwnedTextureDescriptorDefault() status.Error!VulkanOwnedTextureDescriptor {
-    return call.direct("mln_vulkan_owned_texture_descriptor_default", .none, {}, VulkanOwnedTextureDescriptor, null, .{});
+pub fn vulkanOwnedTextureDescriptorDefault() VulkanOwnedTextureDescriptor {
+    return VulkanOwnedTextureDescriptor.fromNative(c.mln_vulkan_owned_texture_descriptor_default());
 }
 
 /// Returns Vulkan surface descriptor defaults for this C API version.
 ///
 /// See `mln_vulkan_surface_descriptor_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn vulkanSurfaceDescriptorDefault() status.Error!VulkanSurfaceDescriptor {
-    return call.direct("mln_vulkan_surface_descriptor_default", .none, {}, VulkanSurfaceDescriptor, null, .{});
+pub fn vulkanSurfaceDescriptorDefault() VulkanSurfaceDescriptor {
+    return VulkanSurfaceDescriptor.fromNative(c.mln_vulkan_surface_descriptor_default());
 }
 
 /// Returns WebGPU borrowed-texture descriptor defaults for this C API version.
@@ -6848,16 +6848,16 @@ pub fn webgpuBorrowedTextureDescriptorDefault(allocator: std.mem.Allocator) stat
 ///
 /// See `mln_webgpu_owned_texture_descriptor_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn webgpuOwnedTextureDescriptorDefault() status.Error!WebgpuOwnedTextureDescriptor {
-    return call.direct("mln_webgpu_owned_texture_descriptor_default", .none, {}, WebgpuOwnedTextureDescriptor, null, .{});
+pub fn webgpuOwnedTextureDescriptorDefault() WebgpuOwnedTextureDescriptor {
+    return WebgpuOwnedTextureDescriptor.fromNative(c.mln_webgpu_owned_texture_descriptor_default());
 }
 
 /// Returns WebGPU surface descriptor defaults for this C API version.
 ///
 /// See `mln_webgpu_surface_descriptor_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn webgpuSurfaceDescriptorDefault() status.Error!WebgpuSurfaceDescriptor {
-    return call.direct("mln_webgpu_surface_descriptor_default", .none, {}, WebgpuSurfaceDescriptor, null, .{});
+pub fn webgpuSurfaceDescriptorDefault() WebgpuSurfaceDescriptor {
+    return WebgpuSurfaceDescriptor.fromNative(c.mln_webgpu_surface_descriptor_default());
 }
 
 pub const MapDiscarding = struct {

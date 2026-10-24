@@ -109,7 +109,7 @@ pub fn main(init_args: std.process.Init) !void {
         teardown.deinit();
     } else |_| runtime.deinit();
 
-    var options = try maplibre.mapOptionsDefault();
+    var options = maplibre.mapOptionsDefault();
     options.map_mode = .static;
     options.event_mask = .{};
     var map_future = try maplibre.runtimeCreateMap(allocator, runtime, options, &diagnostic);
@@ -232,7 +232,7 @@ fn renderStillImage(
 }
 
 fn logAndValidateRenderBackend() !void {
-    const support = try maplibre.supportedRenderBackendMask();
+    const support = maplibre.supportedRenderBackendMask();
     var support_label_buffer: [32]u8 = undefined;
     std.debug.print("native render backends: {s}\n", .{renderBackendSupportLabel(&support_label_buffer, support)});
     if (build_options.supports_metal and !support.metal) return error.NativeRenderBackendMismatch;

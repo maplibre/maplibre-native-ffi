@@ -153,7 +153,7 @@ test "an array input is copied at submission" {
 }
 
 test "native record defaults round trip through generated conversion" {
-    const options = try maplibre.mapOptionsDefault();
+    const options = maplibre.mapOptionsDefault();
     try testing.expectEqual(options, maplibre.MapOptions.fromNative(options.toNative()));
 }
 
@@ -161,7 +161,7 @@ test "synchronous calls fill caller-sized outputs in input order" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
     var projection = try maplibre.mapProjectionCreate(testing.allocator, (try maplibre.mapGetSnapshot(fixture.map, null)).view, null);
-    defer maplibre.mapProjectionRelease(&projection) catch unreachable;
+    defer maplibre.mapProjectionRelease(&projection);
     const coordinates = [_]maplibre.LatLng{ .{ .latitude = 0, .longitude = 0 }, .{ .latitude = 10, .longitude = 20 }, .{ .latitude = -12, .longitude = -30 } };
     var points = try maplibre.mapProjectionPixelsForLatLngs(testing.allocator, projection, &coordinates, null);
     defer points.deinit();
@@ -188,7 +188,7 @@ test "synchronous calls fill caller-sized outputs in input order" {
 
 test "caller-sized text returns results longer than its first storage" {
     var zoom = try maplibre.styleExpressionCreate(testing.allocator, "[\"interpolate\", [\"linear\"], [\"zoom\"], 0, 0, 10, 100]", null, null);
-    defer maplibre.styleExpressionRelease(&zoom) catch unreachable;
+    defer maplibre.styleExpressionRelease(&zoom);
     var level = try maplibre.styleExpressionEvaluate(testing.allocator, zoom, .{ .zoom = 5, .available_images = &.{} }, null);
     defer level.deinit();
     try testing.expectEqualStrings("50.0", level.value);
@@ -199,7 +199,7 @@ test "caller-sized text returns results longer than its first storage" {
     text[0] = '"';
     text[text.len - 1] = '"';
     var long = try maplibre.styleExpressionCreate(testing.allocator, &text, null, null);
-    defer maplibre.styleExpressionRelease(&long) catch unreachable;
+    defer maplibre.styleExpressionRelease(&long);
     var result = try maplibre.styleExpressionEvaluate(testing.allocator, long, null, null);
     defer result.deinit();
     try testing.expectEqualStrings(&text, result.value);

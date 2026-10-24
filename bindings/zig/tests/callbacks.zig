@@ -36,8 +36,7 @@ test "a callback registration is rooted until native releases it" {
 
     // A registration that native accepted and then failed to commit is native's
     // to release.
-    const failed = try support.resolve(try maplibre.mapAddCustomGeometrySource(testing.allocator, fixture.map, "removed", customSource(&duplicate, null), null));
-    try testing.expectEqual(maplibre.CommandDisposition.failed, failed.disposition);
+    try testing.expectError(error.InvalidArgument, support.resolve(try maplibre.mapAddCustomGeometrySource(testing.allocator, fixture.map, "removed", customSource(&duplicate, null), null)));
     try duplicate.waitFor(1);
 
     try support.expectCommitted(try maplibre.mapRemoveStyleSource(fixture.map, "removed", null));
@@ -84,8 +83,7 @@ test "replacing the process-global log callback releases the previous one" {
 
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
-    const unparseable = try support.resolve(try maplibre.mapSetStyleJson(fixture.map, "{", null));
-    try testing.expectEqual(maplibre.CommandDisposition.failed, unparseable.disposition);
+    try testing.expectError(error.NativeError, support.resolve(try maplibre.mapSetStyleJson(fixture.map, "{", null)));
     try replacement.saw_parse_error.wait();
 
     try maplibre.logClearCallback(null);
@@ -99,7 +97,7 @@ fn completeThenFail(_: ?*anyopaque, request: maplibre.ResourceRequestInfo, handl
     if (std.mem.eql(u8, request.requested_url orelse "", failing_style_url)) {
         try maplibre.resourceRequestComplete(testing.allocator, handle, .{ .bytes = support.style_json }, null);
         var owned = handle;
-        try maplibre.resourceRequestRelease(&owned);
+        maplibre.resourceRequestRelease(&owned);
     }
     return error.NativeError;
 }
@@ -133,7 +131,7 @@ const DeferringProvider = struct {
         if (!std.mem.eql(u8, request.requested_url orelse "", self.url)) {
             try maplibre.resourceRequestComplete(std.heap.smp_allocator, handle, .{ .status = .@"error", .error_reason = .not_found }, null);
             var owned = handle;
-            try maplibre.resourceRequestRelease(&owned);
+            maplibre.resourceRequestRelease(&owned);
             return .handle;
         }
         const index = self.taken.get();
@@ -171,7 +169,7 @@ test "a decision handle answers its request later from another thread" {
     var provider = DeferringProvider{ .url = "custom://later.json" };
     try provider.install(fixture);
     var handle = try provider.take(fixture);
-    defer maplibre.resourceRequestRelease(&handle) catch {};
+    defer maplibre.resourceRequestRelease(&handle);
     try testing.expect(!try maplibre.resourceRequestIsCancelled(handle, null));
 
     var diagnostic: maplibre.Diagnostic = .{};
@@ -197,11 +195,11 @@ test "released request handle copies stay closed after later requests" {
 
     var stale = try provider.take(fixture);
     const stale_copy = stale;
-    try maplibre.resourceRequestRelease(&stale);
+    maplibre.resourceRequestRelease(&stale);
     try testing.expectError(error.InvalidState, maplibre.resourceRequestIsCancelled(stale_copy, null));
 
     var live = try provider.take(fixture);
-    defer maplibre.resourceRequestRelease(&live) catch {};
+    defer maplibre.resourceRequestRelease(&live);
     try testing.expectError(error.InvalidState, maplibre.resourceRequestComplete(testing.allocator, stale_copy, .{ .bytes = support.style_json }, null));
     try maplibre.resourceRequestComplete(testing.allocator, live, .{ .bytes = support.style_json }, null);
     var loaded = try fixture.waitForEvent(.map_style_loaded);
@@ -249,7 +247,7 @@ test "a registration that reports cancellation is never rooted" {
         .context = &probe,
         .release_context = CancelProbe.released,
     }, null));
-    try maplibre.resourceRequestRelease(&handle);
+    maplibre.resourceRequestRelease(&handle);
     try fixture.releaseRuntimeWhenChildless();
     try testing.expectEqual(@as(usize, 0), probe.cancels.get());
     try testing.expectEqual(@as(usize, 0), probe.releases.get());
@@ -322,9 +320,7 @@ const TransformProbe = struct {
             return;
         };
         var owned = request;
-        maplibre.resourceTransformRequestRelease(&owned) catch |err| {
-            result.* = err;
-        };
+        maplibre.resourceTransformRequestRelease(&owned);
     }
 };
 
@@ -377,7 +373,7 @@ const RoutedProvider = struct {
             try maplibre.resourceRequestComplete(std.heap.smp_allocator, handle, .{ .status = .@"error", .error_reason = .not_found }, null);
         }
         var owned = handle;
-        try maplibre.resourceRequestRelease(&owned);
+        maplibre.resourceRequestRelease(&owned);
         if (is_style) {
             self.styles.add();
         } else if (is_source) {

@@ -82,10 +82,18 @@ def parts(values, value):
                 # Keep the handle until the host accepts ownership.
                 adopted = "owned_" + parameter.name
                 transfer = "ownership_transferred = true; "
-                release = camel(parameter.value.handle.release.removeprefix("mln_"))
+                native_release = parameter.value.handle.release
+                release = f"{camel(native_release.removeprefix('mln_'))}(&{adopted})"
+                if (
+                    values.bound.operations_by_name[
+                        native_release
+                    ].function.return_type.kind
+                    != "void"
+                ):
+                    release += " catch {}"
                 owned.append(
                     f"var {adopted} = {values.public(parameter.value)}.adopt({raw}); "
-                    f"defer if (!ownership_transferred) {{ {release}(&{adopted}) catch {{}}; }}; "
+                    f"defer if (!ownership_transferred) {{ {release}; }}; "
                 )
                 converted.append(adopted)
             elif (

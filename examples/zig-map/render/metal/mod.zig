@@ -264,13 +264,13 @@ fn presentAcquired(session: *render_target.Session, compositor: *MetalTextureCom
         fn producer(context: @This(), sync: maplibre.GpuSync) anyerror!bool {
             var with_sync = context;
             with_sync.sync = sync;
-            return maplibre.acquiredFrameGetMetalTexture(bool, context.frame, with_sync, draw, null);
+            return maplibre.acquiredFrameGetMetalTexture(context.frame, with_sync, draw, null);
         }
         fn draw(context: @This(), info: maplibre.MetalTextureFrame) anyerror!bool {
             return context.compositor.drawMetalTexture(info.texture orelse return types.AppError.BackendDrawFailed, context.sync);
         }
     };
-    return maplibre.acquiredFrameGetProducerSync(bool, frame, Context{ .compositor = compositor, .frame = frame }, Context.producer, null);
+    return maplibre.acquiredFrameGetProducerSync(frame, Context{ .compositor = compositor, .frame = frame }, Context.producer, null);
 }
 
 /// The textures of a borrowed ring, one per slot.

@@ -21,6 +21,7 @@ pub const Error = BindingError || std.mem.Allocator.Error;
 pub fn begin(diagnostic: ?*diagnostics.Diagnostic) void {
     const target = diagnostic orelse return;
     target.status = null;
+    target.generation = 0;
     target.native.message[0] = 0;
     target.recorded = false;
 }

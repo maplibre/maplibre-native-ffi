@@ -544,13 +544,13 @@ fn presentAcquired(session: *render_target.Session, compositor: *OpenGLTextureCo
         frame: maplibre.AcquiredFrame,
         fn producer(context: @This(), sync: maplibre.GpuSync) anyerror!bool {
             if (sync.kind != .cpu_complete) return types.AppError.BackendDrawFailed;
-            return maplibre.acquiredFrameGetOpenglTexture(bool, context.frame, context, draw, null);
+            return maplibre.acquiredFrameGetOpenglTexture(context.frame, context, draw, null);
         }
         fn draw(context: @This(), info: maplibre.OpenglTextureFrame) anyerror!bool {
             return context.compositor.drawTexture(info.texture);
         }
     };
-    return maplibre.acquiredFrameGetProducerSync(bool, frame, Context{ .compositor = compositor, .frame = frame }, Context.producer, null);
+    return maplibre.acquiredFrameGetProducerSync(frame, Context{ .compositor = compositor, .frame = frame }, Context.producer, null);
 }
 
 const BorrowedTexture = struct {

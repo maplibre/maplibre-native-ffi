@@ -27,7 +27,7 @@ pub const MapState = struct {
             teardown.deinit();
         } else |_| runtime.deinit();
 
-        var map_options = try maplibre.mapOptionsDefault();
+        var map_options = maplibre.mapOptionsDefault();
         map_options.initial_extent = render_target.extent(viewport);
         map_options.map_mode = .continuous;
         map_options.event_mask = .{};

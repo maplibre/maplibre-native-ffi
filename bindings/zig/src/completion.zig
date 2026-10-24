@@ -6,7 +6,6 @@ const diagnostics = @import("diagnostics.zig");
 const status = @import("status.zig");
 const sync = @import("sync.zig");
 
-pub const CommandDisposition = @import("maplibre_native_ffi.zig").CommandDisposition;
 const Wake = @import("maplibre_native_ffi.zig").Wake;
 
 // Who holds the wake slot of a future: nobody yet, a registered wake that the
@@ -21,16 +20,11 @@ fn fireWake(wake: Wake) void {
     if (wake.release_context) |release| release(wake.context);
 }
 
+/// The generations a committed command published.
 pub const CommandCompletion = struct {
-    disposition: CommandDisposition,
     generation: u64,
+    /// The first map render update that includes the command.
     render_update_generation: u64,
-    raw_status: i32,
-
-    /// Returns the native error carried by a failed or cancelled command.
-    pub fn statusError(self: CommandCompletion) status.NativeStatusError!void {
-        return status.errorFromRawStatus(self.raw_status);
-    }
 };
 
 /// Releases a terminal value the future copied but never handed out.
@@ -48,7 +42,9 @@ fn disposeOwned(comptime Value: type, owned: *Value) void {
 
 /// One pending native completion and its copied result. A future has unique
 /// ownership: move it rather than copy it, since deinit on two copies releases
-/// the native completion twice.
+/// the native completion twice. A future that is dropped without `deinit`
+/// leaks its state and any value it holds; call a command through its
+/// handle's `discarding()` view to submit it without a future.
 pub fn Future(comptime T: type) type {
     return struct {
         const Self = @This();
@@ -61,6 +57,7 @@ pub fn Future(comptime T: type) type {
             completed: std.atomic.Value(u32) = .init(0),
             consumed: std.atomic.Value(bool) = .init(false),
             raw_status: i32 = c.MLN_STATUS_OK,
+            generation: u64 = 0,
             diagnostic: []u8 = &.{},
             value: ?T = null,
             conversion_error: ?status.Error = null,
@@ -98,11 +95,12 @@ pub fn Future(comptime T: type) type {
 
         /// Blocks until the completion arrives and hands out its terminal value.
         ///
-        /// A failed completion writes its status and message into
-        /// `diagnostic`, including a failed command, whose completion `wait`
-        /// still returns. A value the caller never takes is released by
-        /// `deinit`, including an owned handle returned by a creation
-        /// operation.
+        /// A failed completion returns its status's error and writes its
+        /// status and message into `diagnostic`. A command that failed or was
+        /// cancelled fails this way too, and the diagnostic carries the
+        /// generation it published. A value the caller never takes is
+        /// released by `deinit`, including an owned handle returned by a
+        /// creation operation.
         pub fn wait(self: *Self, diagnostic: ?*diagnostics.Diagnostic) status.Error!T {
             status.begin(diagnostic);
             return status.propagate(diagnostic, self.waitInner(diagnostic));
@@ -119,9 +117,14 @@ pub fn Future(comptime T: type) type {
                 disposeOwned(T, owned);
                 state.value = null;
             };
-            if (state.raw_status != c.MLN_STATUS_OK) status.record(diagnostic, state.raw_status, state.diagnostic);
+            if (state.raw_status != c.MLN_STATUS_OK) {
+                status.record(diagnostic, state.raw_status, state.diagnostic);
+                if (T == CommandCompletion) if (diagnostic) |target| {
+                    target.generation = state.generation;
+                };
+            }
             if (state.conversion_error) |conversion_error| return @as(status.Error!T, conversion_error);
-            if (T != CommandCompletion) try status.errorFromRawStatus(state.raw_status);
+            try status.errorFromRawStatus(state.raw_status);
             return state.value orelse unreachable;
         }
 
@@ -158,7 +161,8 @@ pub fn Future(comptime T: type) type {
             const state: *State = @ptrCast(@alignCast(user_data orelse return));
             const result: *const c.mln_completion_result = @ptrCast(raw orelse return);
             state.raw_status = result.status;
-            if (result.status == c.MLN_STATUS_OK or T == CommandCompletion) {
+            state.generation = result.generation;
+            if (result.status == c.MLN_STATUS_OK) {
                 state.value = state.copy(result, state.copy_context) catch |err| {
                     state.conversion_error = err;
                     state.finish();
@@ -298,10 +302,8 @@ pub fn unit(result: *const c.mln_completion_result) status.Error!void {
 pub fn command(result: *const c.mln_completion_result) status.Error!CommandCompletion {
     if (result.value != null or result.value_count != 0) return error.NativeError;
     return .{
-        .disposition = CommandDisposition.fromNative(result.disposition),
         .generation = result.generation,
         .render_update_generation = result.render_update_generation,
-        .raw_status = result.status,
     };
 }
 

@@ -321,13 +321,13 @@ fn presentAcquired(session: *render_target.Session, compositor: *VulkanTextureCo
         frame: maplibre.AcquiredFrame,
         fn producer(context: @This(), sync: maplibre.GpuSync) anyerror!bool {
             if (sync.kind != .cpu_complete) return types.AppError.BackendDrawFailed;
-            return maplibre.acquiredFrameGetVulkanTexture(bool, context.frame, context, draw, null);
+            return maplibre.acquiredFrameGetVulkanTexture(context.frame, context, draw, null);
         }
         fn draw(context: @This(), info: maplibre.VulkanTextureFrame) anyerror!bool {
             return context.compositor.presentImageView(vulkanHandleFromBits(c.VkImageView, info.image_view));
         }
     };
-    return maplibre.acquiredFrameGetProducerSync(bool, frame, FrameContext{ .compositor = compositor, .frame = frame }, FrameContext.producer, null);
+    return maplibre.acquiredFrameGetProducerSync(frame, FrameContext{ .compositor = compositor, .frame = frame }, FrameContext.producer, null);
 }
 
 const BorrowedImage = struct {

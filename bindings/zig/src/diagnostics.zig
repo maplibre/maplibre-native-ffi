@@ -19,6 +19,9 @@ pub const Diagnostic = struct {
     /// The native status of the failure, or null for a failure that the
     /// binding detected.
     status: ?Status = null,
+    /// The generation that a failed or cancelled command published, or 0 for
+    /// any other failure.
+    generation: u64 = 0,
     /// The message storage that native calls and the binding write. Read it
     /// through `message`.
     native: c.mln_diagnostic = .{ .size = @sizeOf(c.mln_diagnostic), .message = @splat(0) },

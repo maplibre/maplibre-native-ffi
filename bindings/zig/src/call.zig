@@ -549,19 +549,32 @@ fn discardInner(
     op.roots.accept();
 }
 
+/// The result of a scoped view whose callback is `Use`: the callback's result,
+/// with the callback's errors and the binding's.
+pub fn ViewResult(comptime Use: type) type {
+    const Function = switch (@typeInfo(Use)) {
+        .pointer => |pointer| pointer.child,
+        else => Use,
+    };
+    const Returned = @typeInfo(Function).@"fn".return_type.?;
+    return switch (@typeInfo(Returned)) {
+        .error_union => |returned| (Error || returned.error_set)!returned.payload,
+        else => Error!Returned,
+    };
+}
+
 pub fn scopedView(
     comptime name: []const u8,
     comptime begin: []const u8,
     comptime end: []const u8,
     comptime Value: type,
-    comptime Result: type,
     receiver: anytype,
     context: anytype,
-    comptime use: *const fn (@TypeOf(context), Value) anyerror!Result,
+    comptime use: anytype,
     diagnostic: ?*Diagnostic,
-) anyerror!Result {
+) ViewResult(@TypeOf(use)) {
     status.begin(diagnostic);
-    return status.propagate(diagnostic, scopedViewInner(name, begin, end, Value, Result, receiver, context, use, diagnostic));
+    return status.propagate(diagnostic, scopedViewInner(name, begin, end, Value, receiver, context, use, diagnostic));
 }
 
 fn scopedViewInner(
@@ -569,12 +582,11 @@ fn scopedViewInner(
     comptime begin: []const u8,
     comptime end: []const u8,
     comptime Value: type,
-    comptime Result: type,
     receiver: anytype,
     context: anytype,
-    comptime use: *const fn (@TypeOf(context), Value) anyerror!Result,
+    comptime use: anytype,
     diagnostic: ?*Diagnostic,
-) anyerror!Result {
+) ViewResult(@TypeOf(use)) {
     var token: ?*anyopaque = null;
     try status.call(@field(c, begin), .{ receiver.raw, &token }, diagnostic);
     defer @field(c, end)(token);
