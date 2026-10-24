@@ -44,14 +44,16 @@ pub fn Handle(comptime public_name: []const u8, comptime name: []const u8, compt
 
         /// Disposes on this thread and logs a refusal, unless the value is
         /// already closed. Native callback restrictions apply to disposals
-        /// that return a status.
+        /// that return a status; a refused disposal leaves the value open, so
+        /// a later deinit retries it.
         pub fn deinit(self: *Self) void {
             const cleanup = dispose orelse @compileError(name ++ " has no scoped cleanup; release or discard it");
             if (self.closed) return;
-            self.closed = true;
             cleanup(self.raw) catch |err| {
                 log.warn("native owner disposal failed: {s}", .{@errorName(err)});
+                return;
             };
+            self.closed = true;
         }
     };
 }
