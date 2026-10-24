@@ -8,6 +8,7 @@ import org.maplibre.nativeffi.TestWeakReference
 import org.maplibre.nativeffi.awaitCollected
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.denyingProvider
+import org.maplibre.nativeffi.expectingLeaks
 import org.maplibre.nativeffi.generated.ResourceRequestCancelHandler
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
@@ -17,15 +18,17 @@ class CallbackLifetimeTest {
   @Test
   fun aCallbackCapturingItsReceiverDoesNotKeepItReachable() = runSuspendTest {
     val claimed = CompletableDeferred<TestWeakReference>()
-    withMap(provider = selfCapturingProvider(claimed)) {
-      map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
-      // Only the request's own cancel callback references the request, and native holds that
-      // callback while the map keeps the request live.
-      val request = claimed.awaitWithin("the provider to claim the request")
-      assertTrue(
-        awaitCollected(request),
-        "a cancel callback kept the request it captures reachable",
-      )
+    expectingLeaks {
+      withMap(provider = selfCapturingProvider(claimed)) {
+        map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
+        // Only the request's own cancel callback references the request, and native holds that
+        // callback while the map keeps the request live.
+        val request = claimed.awaitWithin("the provider to claim the request")
+        assertTrue(
+          awaitCollected(request),
+          "a cancel callback kept the request it captures reachable",
+        )
+      }
     }
   }
 

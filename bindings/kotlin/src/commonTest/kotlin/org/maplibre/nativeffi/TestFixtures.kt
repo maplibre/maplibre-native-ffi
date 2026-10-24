@@ -249,3 +249,17 @@ internal suspend fun <T> runThenRelease(owners: List<AsyncReleasable>, block: su
   @Suppress("UNCHECKED_CAST")
   return result as T
 }
+
+/**
+ * Runs [block], which abandons handles on purpose, and takes the leak reports that reach the
+ * platform's handler meanwhile. The Kotlin/Wasm test page fails the running test on any error the
+ * page reports.
+ */
+internal suspend fun <T> expectingLeaks(block: suspend () -> T): T {
+  val restore = interceptUncaught { it.message?.startsWith("Leaked ") == true }
+  try {
+    return block()
+  } finally {
+    restore?.invoke()
+  }
+}

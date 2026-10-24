@@ -11,6 +11,7 @@ import org.maplibre.nativeffi.RuntimeFixture
 import org.maplibre.nativeffi.WAIT_TIMEOUT
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.denyingProvider
+import org.maplibre.nativeffi.expectingLeaks
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.ResourceRequestCancelHandler
 import org.maplibre.nativeffi.generated.ResourceRequestHandle
@@ -23,7 +24,7 @@ import org.maplibre.nativeffi.smallMapOptions
 class AbandonedHandleTest {
   @Test
   fun anAbandonedMapIsDisposedAndDropsItsPendingRequest() = runSuspendTest {
-    abandonAMapAndAwaitItsDisposal()
+    expectingLeaks { abandonAMapAndAwaitItsDisposal() }
   }
 }
 
