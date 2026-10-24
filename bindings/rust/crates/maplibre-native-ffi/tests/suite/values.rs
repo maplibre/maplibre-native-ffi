@@ -162,6 +162,17 @@ fn a_record_built_from_its_default_equals_the_native_default() {
     assert_eq!(MapOptions::default(), map_options_default());
 }
 
+// An enum without a zero member has no default rather than an unknown 0, and
+// a record that holds one has none either.
+static_assertions::assert_not_impl_any!(AmbientCacheOperation: Default);
+static_assertions::assert_not_impl_any!(RuntimeEvent: Default);
+
+#[test]
+fn an_enum_defaults_to_its_zero_member() {
+    assert_eq!(OpenglClientApi::default(), OpenglClientApi::Unspecified);
+    assert_eq!(OpenglClientApi::default().as_raw(), 0);
+}
+
 #[test]
 fn synchronous_calls_fill_caller_sized_outputs_in_input_order() {
     let fixture = Fixture::new();

@@ -83,11 +83,11 @@ impl RenderTarget {
                 })
             }
             Mode::NativeSurface => {
-                let descriptor = maplibre_native_ffi::MetalSurfaceDescriptor::new(
-                    extent(viewport),
-                    metal.context_descriptor(),
-                    metal.layer_pointer(),
-                );
+                let descriptor = maplibre_native_ffi::MetalSurfaceDescriptor {
+                    extent: extent(viewport),
+                    context: metal.context_descriptor(),
+                    layer: metal.layer_pointer(),
+                };
                 Ok(Self::Surface {
                     session: Session::new(
                         unsafe { map.attach_metal_surface(&descriptor, &options) }?,
@@ -239,7 +239,9 @@ fn borrowed_descriptor(
         physical_height: viewport.physical_height,
         textures: ring
             .iter()
-            .map(|texture| maplibre_native_ffi::MetalBorrowedTexture::new(texture.pointer()))
+            .map(|texture| maplibre_native_ffi::MetalBorrowedTexture {
+                texture: texture.pointer(),
+            })
             .collect(),
     }
 }

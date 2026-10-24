@@ -170,9 +170,12 @@ class Values:
         raw = self.scalar(value) or "u32"
         prefix = enum_member_prefix((key for key, _ in value.enum_values), value.native)
         if value.enum_kind == "bitmask":
+            # bitflags treats a zero flag as contained in every value, so the
+            # empty set stands for it.
             members = "\n".join(
                 f"{doc(self.bound, key, '    ')}    const {key.removeprefix(prefix)} = {number};"
                 for key, number in value.enum_values
+                if number != 0
             )
             return f"native_flags! {{\n{doc(self.bound, value.native)}pub struct {public}: {raw} {{\n{members}\n}}\n}}\n"
         variants = [
@@ -193,7 +196,14 @@ class Values:
             f"{doc(self.bound, key, '    ')}    {name} = {number},"
             for name, number, key in variants
         )
-        return f"native_enum! {{\n{doc(self.bound, value.native)}pub enum {public}: {raw} {{\n{members}\n}} {unknown}\n}}\n"
+        # Only a declared zero member is a default; an unknown 0 is not.
+        zero = next((name for name, number, _ in variants if number == 0), None)
+        default = (
+            f"impl Default for {public} {{ fn default() -> Self {{ Self::{zero} }} }}\n"
+            if zero
+            else ""
+        )
+        return f"native_enum! {{\n{doc(self.bound, value.native)}pub enum {public}: {raw} {{\n{members}\n}} {unknown}\n}}\n{default}"
 
     def render(self) -> str:
         return "\n".join(

@@ -132,6 +132,42 @@ def decode(values, value, source, context="raw"):
     return TRAIT_COPY.format(source)
 
 
+def defaultable(value):
+    """Whether the value's Rust type implements `Default`. An enum does only
+    when 0 is one of its members."""
+    if value.kind == "enum":
+        return value.enum_kind == "bitmask" or any(
+            number == 0 for _, number in value.enum_values
+        )
+    if value.kind == "handle":
+        return False
+    if value.kind == "reference":
+        return defaultable(value.element)
+    if value.kind != "record" or value.default:
+        return True
+    return all(
+        defaultable(field.value)
+        for field in value.fields
+        if field.public and not (field.presence and field.presence.mask)
+    )
+
+
+def numeric(value):
+    """Whether a record holds only numbers, directly or in such records."""
+    return (
+        value.kind == "record"
+        and all(
+            field.value.kind == "scalar"
+            and not field.value.ctype.pointee
+            or field.value.kind == "record"
+            and numeric(field.value)
+            for field in value.fields
+            if field.public
+        )
+        and not any(field.presence and field.presence.mask for field in value.fields)
+    )
+
+
 def comparable(value):
     return (
         not value.registration
@@ -231,9 +267,10 @@ def declaration(values, value):
             constructors.append(
                 f"pub fn {method}(value: {values.public(member.value)}) -> Self {{ Self {{ {identifier(field.name)}: {union_name}::{pascal(member.name)}(value) }} }}"
             )
-    elif copyable and not any(
-        field.presence and field.presence.mask for field in value.fields
-    ):
+    elif numeric(value) and "in" in values.directions.get(value.native, {"in", "out"}):
+        # Only a small value made of numbers, such as a coordinate, takes its
+        # fields in order. Any other record is built from its default, so a
+        # field C adds doesn't break callers.
         constructors.append(
             f"pub const fn new({', '.join(args)}) -> Self {{ Self {{ {', '.join(names)} }} }}"
         )
@@ -247,7 +284,7 @@ def declaration(values, value):
         derives += ["Copy", "PartialEq"]
     elif comparable(value):
         derives.append("PartialEq")
-    if not value.default:
+    if not value.default and defaultable(value):
         derives.append("Default")
     default = (
         f"impl Default for {name} {{ fn default() -> Self {{ convert::native_default(unsafe {{ sys::{value.default}() }}) }} }}\n"

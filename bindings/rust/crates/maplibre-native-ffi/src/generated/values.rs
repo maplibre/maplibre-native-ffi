@@ -169,6 +169,11 @@ pub enum CameraChangeMode: u32 {
     Animated = 1,
 } Unknown
 }
+impl Default for CameraChangeMode {
+    fn default() -> Self {
+        Self::Immediate
+    }
+}
 
 /// One atomic relative camera update.
 ///
@@ -389,11 +394,6 @@ pub struct CameraQueryResult {
     pub generation: u64,
     pub camera: CameraOptions,
 }
-impl CameraQueryResult {
-    pub const fn new(generation: u64, camera: CameraOptions) -> Self {
-        Self { generation, camera }
-    }
-}
 impl FromNative<sys::mln_camera_query_result> for CameraQueryResult {
     unsafe fn from_native(raw: sys::mln_camera_query_result) -> Result<Self> {
         Ok(Self {
@@ -416,14 +416,6 @@ pub struct CameraTransitionEnd {
     /// this generation and are queued before the callback runs. Zero for
     /// `MLN_CAMERA_TRANSITION_OUTCOME_CLOSED`.
     pub generation: u64,
-}
-impl CameraTransitionEnd {
-    pub const fn new(outcome: CameraTransitionOutcome, generation: u64) -> Self {
-        Self {
-            outcome,
-            generation,
-        }
-    }
 }
 impl FromNative<sys::mln_camera_transition_end> for CameraTransitionEnd {
     unsafe fn from_native(raw: sys::mln_camera_transition_end) -> Result<Self> {
@@ -509,6 +501,11 @@ pub enum CameraTransitionOutcome: u32 {
     Closed = 2,
 } Unknown
 }
+impl Default for CameraTransitionOutcome {
+    fn default() -> Self {
+        Self::Completed
+    }
+}
 
 /// One atomic absolute camera update.
 ///
@@ -559,6 +556,11 @@ pub enum CameraUpdateMode: u32 {
     Fly = 2,
 } Unknown
 }
+impl Default for CameraUpdateMode {
+    fn default() -> Self {
+        Self::Jump
+    }
+}
 
 /// Canonical tile identity used by custom geometry and custom MVT vector source
 /// callbacks.
@@ -607,6 +609,11 @@ pub enum CommandDisposition: u32 {
     Cancelled = 3,
 } Unknown
 }
+impl Default for CommandDisposition {
+    fn default() -> Self {
+        Self::Committed
+    }
+}
 
 native_enum! {
 /// Map constraint modes used by `mln_map_viewport_options`.
@@ -619,6 +626,11 @@ pub enum ConstrainMode: u32 {
     WidthAndHeight = 2,
     Screen = 3,
 } Unknown
+}
+impl Default for ConstrainMode {
+    fn default() -> Self {
+        Self::None
+    }
 }
 
 /// Options for custom geometry sources.
@@ -956,23 +968,6 @@ pub struct EglContextDescriptor {
     /// Optional eglGetProcAddress-compatible function for the host loader.
     pub get_proc_address: *mut std::ffi::c_void,
 }
-impl EglContextDescriptor {
-    pub const fn new(
-        display: *mut std::ffi::c_void,
-        config: *mut std::ffi::c_void,
-        share_context: *mut std::ffi::c_void,
-        client_api: OpenglClientApi,
-        get_proc_address: *mut std::ffi::c_void,
-    ) -> Self {
-        Self {
-            display,
-            config,
-            share_context,
-            client_api,
-            get_proc_address,
-        }
-    }
-}
 impl ToNative<sys::mln_egl_context_descriptor> for EglContextDescriptor {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_egl_context_descriptor> {
         let mut raw: sys::mln_egl_context_descriptor = unsafe { std::mem::zeroed() };
@@ -1067,11 +1062,6 @@ pub struct FrameDemand {
 impl Default for FrameDemand {
     fn default() -> Self {
         convert::native_default(unsafe { sys::mln_frame_demand_default() })
-    }
-}
-impl FrameDemand {
-    pub const fn new(flags: FrameDemandFlag, token: u64) -> Self {
-        Self { flags, token }
     }
 }
 impl ToNative<sys::mln_frame_demand> for FrameDemand {
@@ -1318,6 +1308,11 @@ pub enum GesturePhase: u32 {
     Cancel = 4,
 } Unknown
 }
+impl Default for GesturePhase {
+    fn default() -> Self {
+        Self::None
+    }
+}
 
 /// Backend synchronization copied by frame access and release calls.
 ///
@@ -1333,11 +1328,6 @@ pub struct GpuSync {
 impl Default for GpuSync {
     fn default() -> Self {
         convert::native_default(unsafe { sys::mln_gpu_sync_default() })
-    }
-}
-impl GpuSync {
-    pub const fn new(kind: GpuSyncKind, object: u64) -> Self {
-        Self { kind, object }
     }
 }
 impl ToNative<sys::mln_gpu_sync> for GpuSync {
@@ -1372,6 +1362,11 @@ pub enum GpuSyncKind: u32 {
     /// caller-graphics-thread driver. object is nonzero.
     OpenglFence = 3,
 } Unknown
+}
+impl Default for GpuSyncKind {
+    fn default() -> Self {
+        Self::CpuComplete
+    }
 }
 
 /// One HTTP header that a header rule supplies.
@@ -1731,6 +1726,11 @@ pub enum LogEvent: u32 {
     Timing = 16,
 } Unknown
 }
+impl Default for LogEvent {
+    fn default() -> Self {
+        Self::General
+    }
+}
 
 /// Process-global log callback or queue state.
 ///
@@ -1902,6 +1902,11 @@ pub enum MapMode: u32 {
     Tile = 2,
 } Unknown
 }
+impl Default for MapMode {
+    fn default() -> Self {
+        Self::Continuous
+    }
+}
 
 /// Options used when creating a map.
 ///
@@ -1925,21 +1930,6 @@ pub struct MapOptions {
 impl Default for MapOptions {
     fn default() -> Self {
         convert::native_default(unsafe { sys::mln_map_options_default() })
-    }
-}
-impl MapOptions {
-    pub const fn new(
-        initial_extent: LogicalExtent,
-        map_mode: MapMode,
-        fast_pfor_enabled: bool,
-        event_mask: RuntimeEventMask,
-    ) -> Self {
-        Self {
-            initial_extent,
-            map_mode,
-            fast_pfor_enabled,
-            event_mask,
-        }
     }
 }
 impl ToNative<sys::mln_map_options> for MapOptions {
@@ -1992,37 +1982,6 @@ pub struct MapSnapshot {
     /// The map's camera, extent, projection mode, and viewport options.
     /// `mln_map_projection_create()` converts coordinates for this view.
     pub view: MapView,
-}
-impl MapSnapshot {
-    pub const fn new(
-        debug_options: MapDebugOption,
-        generation: u64,
-        fully_loaded: bool,
-        rendering_stats_view_enabled: bool,
-        gesture_in_progress: bool,
-        transition_in_progress: bool,
-        event_mask: RuntimeEventMask,
-        latest_render_update_generation: u64,
-        tile: MapTileOptions,
-        bounds: BoundOptions,
-        free_camera: FreeCameraOptions,
-        view: MapView,
-    ) -> Self {
-        Self {
-            debug_options,
-            generation,
-            fully_loaded,
-            rendering_stats_view_enabled,
-            gesture_in_progress,
-            transition_in_progress,
-            event_mask,
-            latest_render_update_generation,
-            tile,
-            bounds,
-            free_camera,
-            view,
-        }
-    }
 }
 impl FromNative<sys::mln_map_snapshot> for MapSnapshot {
     unsafe fn from_native(raw: sys::mln_map_snapshot) -> Result<Self> {
@@ -2137,21 +2096,6 @@ pub struct MapView {
     /// with every field set.
     pub viewport: MapViewportOptions,
 }
-impl MapView {
-    pub const fn new(
-        camera: CameraOptions,
-        extent: LogicalExtent,
-        projection_mode: ProjectionMode,
-        viewport: MapViewportOptions,
-    ) -> Self {
-        Self {
-            camera,
-            extent,
-            projection_mode,
-            viewport,
-        }
-    }
-}
 impl ToNative<sys::mln_map_view> for MapView {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_map_view> {
         let mut raw: sys::mln_map_view = unsafe { std::mem::zeroed() };
@@ -2256,11 +2200,6 @@ pub struct MetalBorrowedTexture {
     /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
     pub texture: *mut std::ffi::c_void,
 }
-impl MetalBorrowedTexture {
-    pub const fn new(texture: *mut std::ffi::c_void) -> Self {
-        Self { texture }
-    }
-}
 impl ToNative<sys::mln_metal_borrowed_texture> for MetalBorrowedTexture {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_metal_borrowed_texture> {
         let mut raw: sys::mln_metal_borrowed_texture = unsafe { std::mem::zeroed() };
@@ -2336,11 +2275,6 @@ pub struct MetalContextDescriptor {
     /// `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it.
     pub device: *mut std::ffi::c_void,
 }
-impl MetalContextDescriptor {
-    pub const fn new(device: *mut std::ffi::c_void) -> Self {
-        Self { device }
-    }
-}
 impl ToNative<sys::mln_metal_context_descriptor> for MetalContextDescriptor {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_metal_context_descriptor> {
         let mut raw: sys::mln_metal_context_descriptor = unsafe { std::mem::zeroed() };
@@ -2373,19 +2307,6 @@ pub struct MetalOwnedTextureDescriptor {
 impl Default for MetalOwnedTextureDescriptor {
     fn default() -> Self {
         convert::native_default(unsafe { sys::mln_metal_owned_texture_descriptor_default() })
-    }
-}
-impl MetalOwnedTextureDescriptor {
-    pub const fn new(
-        extent: LogicalExtent,
-        context: MetalContextDescriptor,
-        pixel_format: u64,
-    ) -> Self {
-        Self {
-            extent,
-            context,
-            pixel_format,
-        }
     }
 }
 impl ToNative<sys::mln_metal_owned_texture_descriptor> for MetalOwnedTextureDescriptor {
@@ -2426,19 +2347,6 @@ pub struct MetalSurfaceDescriptor {
 impl Default for MetalSurfaceDescriptor {
     fn default() -> Self {
         convert::native_default(unsafe { sys::mln_metal_surface_descriptor_default() })
-    }
-}
-impl MetalSurfaceDescriptor {
-    pub const fn new(
-        extent: LogicalExtent,
-        context: MetalContextDescriptor,
-        layer: *mut std::ffi::c_void,
-    ) -> Self {
-        Self {
-            extent,
-            context,
-            layer,
-        }
     }
 }
 impl ToNative<sys::mln_metal_surface_descriptor> for MetalSurfaceDescriptor {
@@ -2488,31 +2396,6 @@ pub struct MetalTextureFrame {
     /// Backend-native pixel format value. Metal uses MTLPixelFormat.
     pub pixel_format: u64,
 }
-impl MetalTextureFrame {
-    pub const fn new(
-        generation: u64,
-        width: u32,
-        height: u32,
-        scale_factor: f64,
-        frame_id: u64,
-        slot: u32,
-        texture: *mut std::ffi::c_void,
-        device: *mut std::ffi::c_void,
-        pixel_format: u64,
-    ) -> Self {
-        Self {
-            generation,
-            width,
-            height,
-            scale_factor,
-            frame_id,
-            slot,
-            texture,
-            device,
-            pixel_format,
-        }
-    }
-}
 impl FromNative<sys::mln_metal_texture_frame> for MetalTextureFrame {
     unsafe fn from_native(raw: sys::mln_metal_texture_frame) -> Result<Self> {
         Ok(Self {
@@ -2547,6 +2430,11 @@ pub enum NorthOrientation: u32 {
     Down = 2,
     Left = 3,
 } Unknown
+}
+impl Default for NorthOrientation {
+    fn default() -> Self {
+        Self::Up
+    }
 }
 
 /// Geometry offline region definition.
@@ -2678,6 +2566,11 @@ pub enum OfflineRegionDownloadState: u32 {
     Active = 1,
 } Unknown
 }
+impl Default for OfflineRegionDownloadState {
+    fn default() -> Self {
+        Self::Inactive
+    }
+}
 
 /// Region data delivered by an offline completion.
 ///
@@ -2716,31 +2609,6 @@ pub struct OfflineRegionStatus {
     pub required_resource_count: u64,
     pub required_resource_count_is_precise: bool,
     pub complete: bool,
-}
-impl OfflineRegionStatus {
-    pub const fn new(
-        download_state: OfflineRegionDownloadState,
-        completed_resource_count: u64,
-        completed_resource_size: u64,
-        completed_tile_count: u64,
-        required_tile_count: u64,
-        completed_tile_size: u64,
-        required_resource_count: u64,
-        required_resource_count_is_precise: bool,
-        complete: bool,
-    ) -> Self {
-        Self {
-            download_state,
-            completed_resource_count,
-            completed_resource_size,
-            completed_tile_count,
-            required_tile_count,
-            completed_tile_size,
-            required_resource_count,
-            required_resource_count_is_precise,
-            complete,
-        }
-    }
 }
 impl FromNative<sys::mln_offline_region_status> for OfflineRegionStatus {
     unsafe fn from_native(raw: sys::mln_offline_region_status) -> Result<Self> {
@@ -2910,6 +2778,11 @@ pub enum OpenglClientApi: u32 {
     Gles = 2,
 } Unknown
 }
+impl Default for OpenglClientApi {
+    fn default() -> Self {
+        Self::Unspecified
+    }
+}
 
 /// OpenGL backend context fields shared by OpenGL render targets.
 ///
@@ -2998,6 +2871,11 @@ pub enum OpenglContextOwnership: u32 {
     /// The session keeps its own OpenGL context current on its thread.
     Dedicated = 1,
 } Unknown
+}
+impl Default for OpenglContextOwnership {
+    fn default() -> Self {
+        Self::Shared
+    }
 }
 
 native_flags! {
@@ -3128,35 +3006,6 @@ pub struct OpenglTextureFrame {
     /// OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed
     /// texture.
     pub r#type: u32,
-}
-impl OpenglTextureFrame {
-    pub const fn new(
-        generation: u64,
-        width: u32,
-        height: u32,
-        scale_factor: f64,
-        frame_id: u64,
-        slot: u32,
-        texture: u32,
-        target: u32,
-        internal_format: u32,
-        format: u32,
-        r#type: u32,
-    ) -> Self {
-        Self {
-            generation,
-            width,
-            height,
-            scale_factor,
-            frame_id,
-            slot,
-            texture,
-            target,
-            internal_format,
-            format,
-            r#type,
-        }
-    }
 }
 impl FromNative<sys::mln_opengl_texture_frame> for OpenglTextureFrame {
     unsafe fn from_native(raw: sys::mln_opengl_texture_frame) -> Result<Self> {
@@ -3418,6 +3267,11 @@ pub enum RenderAbandonDisposition: u32 {
     Quarantined = 1,
 } Unknown
 }
+impl Default for RenderAbandonDisposition {
+    fn default() -> Self {
+        Self::Clean
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RenderAbandonResult {
@@ -3425,17 +3279,6 @@ pub struct RenderAbandonResult {
     pub disposition: RenderAbandonDisposition,
     /// Backend resource groups intentionally retained until process exit.
     pub quarantined_resource_count: u32,
-}
-impl RenderAbandonResult {
-    pub const fn new(
-        disposition: RenderAbandonDisposition,
-        quarantined_resource_count: u32,
-    ) -> Self {
-        Self {
-            disposition,
-            quarantined_resource_count,
-        }
-    }
 }
 impl FromNative<sys::mln_render_abandon_result> for RenderAbandonResult {
     unsafe fn from_native(raw: sys::mln_render_abandon_result) -> Result<Self> {
@@ -3531,27 +3374,6 @@ pub struct RenderFrameResult {
     /// `MLN_RENDER_RESULT_RENDERED`.
     pub view: MapView,
 }
-impl RenderFrameResult {
-    pub const fn new(
-        disposition: RenderResult,
-        token: u64,
-        map_update_generation: u64,
-        generation: u64,
-        frame_generation: u64,
-        needs_repaint: bool,
-        view: MapView,
-    ) -> Self {
-        Self {
-            disposition,
-            token,
-            map_update_generation,
-            generation,
-            frame_generation,
-            needs_repaint,
-            view,
-        }
-    }
-}
 impl FromNative<sys::mln_render_frame_result> for RenderFrameResult {
     unsafe fn from_native(raw: sys::mln_render_frame_result) -> Result<Self> {
         Ok(Self {
@@ -3576,6 +3398,11 @@ pub enum RenderMode: u32 {
     Full = 1,
 } Unknown
 }
+impl Default for RenderMode {
+    fn default() -> Self {
+        Self::Partial
+    }
+}
 
 native_enum! {
 /// Terminal disposition of one accepted frame demand.
@@ -3599,6 +3426,11 @@ pub enum RenderResult: u32 {
     /// A newer IF_NEEDED demand with the same flags replaced this demand.
     Superseded = 4,
 } Unknown
+}
+impl Default for RenderResult {
+    fn default() -> Self {
+        Self::Rendered
+    }
 }
 
 /// Common attachment policy copied before an attach call returns.
@@ -3668,7 +3500,7 @@ impl FromNative<sys::mln_render_session_attach_options> for RenderSessionAttachO
 ///
 /// See `mln_render_session_capabilities` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RenderSessionCapabilities {
     /// One `mln_render_driver_kind` value.
     pub driver: RenderDriverKind,
@@ -3677,19 +3509,6 @@ pub struct RenderSessionCapabilities {
     pub texture_ring_depth: u32,
     /// A bitwise OR of `mln_render_session_capability_flag` values.
     pub flags: RenderSessionCapabilityFlag,
-}
-impl RenderSessionCapabilities {
-    pub const fn new(
-        driver: RenderDriverKind,
-        texture_ring_depth: u32,
-        flags: RenderSessionCapabilityFlag,
-    ) -> Self {
-        Self {
-            driver,
-            texture_ring_depth,
-            flags,
-        }
-    }
 }
 impl FromNative<sys::mln_render_session_capabilities> for RenderSessionCapabilities {
     unsafe fn from_native(raw: sys::mln_render_session_capabilities) -> Result<Self> {
@@ -3718,7 +3537,7 @@ pub struct RenderSessionCapabilityFlag: u32 {
 ///
 /// See `mln_render_session_snapshot` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RenderSessionSnapshot {
     /// One `mln_render_session_state` value.
     pub state: RenderSessionState,
@@ -3739,29 +3558,6 @@ pub struct RenderSessionSnapshot {
     /// True when a map update or an accepted resize arrived after the latest
     /// rendered frame.
     pub pending_changes: bool,
-}
-impl RenderSessionSnapshot {
-    pub const fn new(
-        state: RenderSessionState,
-        extent: LogicalExtent,
-        generation: u64,
-        map_update_generation: u64,
-        rendered_update_generation: u64,
-        frame_generation: u64,
-        acquired_frame_count: u32,
-        pending_changes: bool,
-    ) -> Self {
-        Self {
-            state,
-            extent,
-            generation,
-            map_update_generation,
-            rendered_update_generation,
-            frame_generation,
-            acquired_frame_count,
-            pending_changes,
-        }
-    }
 }
 impl FromNative<sys::mln_render_session_snapshot> for RenderSessionSnapshot {
     unsafe fn from_native(raw: sys::mln_render_session_snapshot) -> Result<Self> {
@@ -3974,23 +3770,6 @@ pub struct RenderingStats {
     /// Total draw calls executed by the native renderer.
     pub total_draw_call_count: i64,
 }
-impl RenderingStats {
-    pub const fn new(
-        encoding_time: f64,
-        rendering_time: f64,
-        frame_count: i64,
-        draw_call_count: i64,
-        total_draw_call_count: i64,
-    ) -> Self {
-        Self {
-            encoding_time,
-            rendering_time,
-            frame_count,
-            draw_call_count,
-            total_draw_call_count,
-        }
-    }
-}
 impl FromNative<sys::mln_rendering_stats> for RenderingStats {
     unsafe fn from_native(raw: sys::mln_rendering_stats) -> Result<Self> {
         Ok(Self {
@@ -4013,6 +3792,11 @@ pub enum ResourceErrorReason: u32 {
     Other = 5,
 } Unknown
 }
+impl Default for ResourceErrorReason {
+    fn default() -> Self {
+        Self::None
+    }
+}
 
 native_enum! {
 pub enum ResourceKind: u32 {
@@ -4025,6 +3809,11 @@ pub enum ResourceKind: u32 {
     SpriteJson = 6,
     Image = 7,
 } Unrecognized
+}
+impl Default for ResourceKind {
+    fn default() -> Self {
+        Self::Unknown
+    }
 }
 
 native_flags! {
@@ -4054,12 +3843,22 @@ pub enum ResourceLoadingMethod: u32 {
     NetworkOnly = 2,
 } Unknown
 }
+impl Default for ResourceLoadingMethod {
+    fn default() -> Self {
+        Self::All
+    }
+}
 
 native_enum! {
 pub enum ResourcePriority: u32 {
     Regular = 0,
     Low = 1,
 } Unknown
+}
+impl Default for ResourcePriority {
+    fn default() -> Self {
+        Self::Regular
+    }
 }
 
 /// Resource provider state.
@@ -4155,6 +3954,11 @@ pub enum ResourceProviderDecision: u32 {
     Handle = 1,
 } Unknown
 }
+impl Default for ResourceProviderDecision {
+    fn default() -> Self {
+        Self::PassThrough
+    }
+}
 
 /// Inclusive byte range of a resource request.
 ///
@@ -4166,11 +3970,6 @@ pub struct ResourceRange {
     pub start: u64,
     /// Last byte offset of the requested range, inclusive.
     pub end: u64,
-}
-impl ResourceRange {
-    pub const fn new(start: u64, end: u64) -> Self {
-        Self { start, end }
-    }
 }
 impl FromNative<sys::mln_resource_range> for ResourceRange {
     unsafe fn from_native(raw: sys::mln_resource_range) -> Result<Self> {
@@ -4341,6 +4140,11 @@ pub enum ResourceResponseStatus: u32 {
     NotModified = 3,
 } Unknown
 }
+impl Default for ResourceResponseStatus {
+    fn default() -> Self {
+        Self::Ok
+    }
+}
 
 /// One request pattern that a resource provider claims.
 ///
@@ -4384,6 +4188,11 @@ pub enum ResourceStoragePolicy: u32 {
     Permanent = 0,
     Volatile = 1,
 } Unknown
+}
+impl Default for ResourceStoragePolicy {
+    fn default() -> Self {
+        Self::Permanent
+    }
 }
 
 /// Resource transform state.
@@ -4461,12 +4270,17 @@ pub enum ResourceUsage: u32 {
     Offline = 1,
 } Unknown
 }
+impl Default for ResourceUsage {
+    fn default() -> Self {
+        Self::Online
+    }
+}
 
 /// One delivered runtime event.
 ///
 /// See `mln_runtime_event` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RuntimeEvent {
     /// One of `mln_runtime_event_type`.
     pub r#type: RuntimeEventType,
@@ -4594,8 +4408,6 @@ native_flags! {
 /// See `mln_runtime_event_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub struct RuntimeEventMask: u64 {
-    /// Selects no event type.
-    const NONE = 0;
     const MAP_CAMERA_WILL_CHANGE = 2;
     const MAP_CAMERA_IS_CHANGING = 4;
     const MAP_CAMERA_DID_CHANGE = 8;
@@ -4634,11 +4446,6 @@ pub struct RuntimeEventOfflineRegionResponseError {
     /// One of `mln_resource_error_reason`.
     pub reason: ResourceErrorReason,
 }
-impl RuntimeEventOfflineRegionResponseError {
-    pub const fn new(region_id: i64, reason: ResourceErrorReason) -> Self {
-        Self { region_id, reason }
-    }
-}
 impl FromNative<sys::mln_runtime_event_offline_region_response_error>
     for RuntimeEventOfflineRegionResponseError
 {
@@ -4661,11 +4468,6 @@ pub struct RuntimeEventOfflineRegionStatus {
     pub region_id: i64,
     pub status: OfflineRegionStatus,
 }
-impl RuntimeEventOfflineRegionStatus {
-    pub const fn new(region_id: i64, status: OfflineRegionStatus) -> Self {
-        Self { region_id, status }
-    }
-}
 impl FromNative<sys::mln_runtime_event_offline_region_status> for RuntimeEventOfflineRegionStatus {
     unsafe fn from_native(raw: sys::mln_runtime_event_offline_region_status) -> Result<Self> {
         Ok(Self {
@@ -4683,11 +4485,6 @@ impl FromNative<sys::mln_runtime_event_offline_region_status> for RuntimeEventOf
 pub struct RuntimeEventOfflineRegionTileCountLimit {
     pub region_id: i64,
     pub limit: u64,
-}
-impl RuntimeEventOfflineRegionTileCountLimit {
-    pub const fn new(region_id: i64, limit: u64) -> Self {
-        Self { region_id, limit }
-    }
 }
 impl FromNative<sys::mln_runtime_event_offline_region_tile_count_limit>
     for RuntimeEventOfflineRegionTileCountLimit
@@ -4737,21 +4534,6 @@ pub struct RuntimeEventRenderFrame {
     pub placement_changed: bool,
     pub stats: RenderingStats,
 }
-impl RuntimeEventRenderFrame {
-    pub const fn new(
-        mode: RenderMode,
-        needs_repaint: bool,
-        placement_changed: bool,
-        stats: RenderingStats,
-    ) -> Self {
-        Self {
-            mode,
-            needs_repaint,
-            placement_changed,
-            stats,
-        }
-    }
-}
 impl FromNative<sys::mln_runtime_event_render_frame> for RuntimeEventRenderFrame {
     unsafe fn from_native(raw: sys::mln_runtime_event_render_frame) -> Result<Self> {
         Ok(Self {
@@ -4772,11 +4554,6 @@ pub struct RuntimeEventRenderMap {
     /// One of `mln_render_mode`.
     pub mode: RenderMode,
 }
-impl RuntimeEventRenderMap {
-    pub const fn new(mode: RenderMode) -> Self {
-        Self { mode }
-    }
-}
 impl FromNative<sys::mln_runtime_event_render_map> for RuntimeEventRenderMap {
     unsafe fn from_native(raw: sys::mln_runtime_event_render_map) -> Result<Self> {
         Ok(Self {
@@ -4795,6 +4572,11 @@ pub enum RuntimeEventSourceType: u32 {
     Map = 1,
 } Unknown
 }
+impl Default for RuntimeEventSourceType {
+    fn default() -> Self {
+        Self::Runtime
+    }
+}
 
 /// Payload for `MLN_RUNTIME_EVENT_MAP_TILE_ACTION`.
 ///
@@ -4805,11 +4587,6 @@ pub struct RuntimeEventTileAction {
     /// One of `mln_tile_operation`.
     pub operation: TileOperation,
     pub tile_id: TileId,
-}
-impl RuntimeEventTileAction {
-    pub const fn new(operation: TileOperation, tile_id: TileId) -> Self {
-        Self { operation, tile_id }
-    }
 }
 impl FromNative<sys::mln_runtime_event_tile_action> for RuntimeEventTileAction {
     unsafe fn from_native(raw: sys::mln_runtime_event_tile_action) -> Result<Self> {
@@ -5062,14 +4839,6 @@ pub struct StyleExpressionInfo {
     /// Whether the result is the same at every zoom.
     pub is_zoom_constant: bool,
 }
-impl StyleExpressionInfo {
-    pub const fn new(is_feature_constant: bool, is_zoom_constant: bool) -> Self {
-        Self {
-            is_feature_constant,
-            is_zoom_constant,
-        }
-    }
-}
 impl FromNative<sys::mln_style_expression_info> for StyleExpressionInfo {
     unsafe fn from_native(raw: sys::mln_style_expression_info) -> Result<Self> {
         Ok(Self {
@@ -5250,19 +5019,6 @@ pub struct StyleExpressionType {
     /// For an array, its fixed length, or zero for any length.
     pub item_count: u32,
 }
-impl StyleExpressionType {
-    pub const fn new(
-        kind: StyleExpressionTypeKind,
-        item_kind: StyleExpressionTypeKind,
-        item_count: u32,
-    ) -> Self {
-        Self {
-            kind,
-            item_kind,
-            item_count,
-        }
-    }
-}
 impl ToNative<sys::mln_style_expression_type> for StyleExpressionType {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_style_expression_type> {
         let mut raw: sys::mln_style_expression_type = unsafe { std::mem::zeroed() };
@@ -5303,6 +5059,11 @@ pub enum StyleExpressionTypeKind: u32 {
     /// An array whose items have item_kind, which is not itself an array.
     Array = 10,
 } Unknown
+}
+impl Default for StyleExpressionTypeKind {
+    fn default() -> Self {
+        Self::Value
+    }
 }
 
 /// One complete runtime style image, borrowed for a completion callback.
@@ -5473,6 +5234,11 @@ pub enum StyleImageTextFit: u32 {
     Proportional = 2,
 } Unknown
 }
+impl Default for StyleImageTextFit {
+    fn default() -> Self {
+        Self::StretchOrShrink
+    }
+}
 
 /// One style layer, borrowed for a completion callback.
 ///
@@ -5519,6 +5285,11 @@ pub enum StyleLayerVisibility: u32 {
     None = 1,
 } Unknown
 }
+impl Default for StyleLayerVisibility {
+    fn default() -> Self {
+        Self::Visible
+    }
+}
 
 native_enum! {
 /// DEM raster encoding values.
@@ -5529,6 +5300,11 @@ pub enum StyleRasterDemEncoding: u32 {
     Mapbox = 0,
     Terrarium = 1,
 } Unknown
+}
+impl Default for StyleRasterDemEncoding {
+    fn default() -> Self {
+        Self::Mapbox
+    }
 }
 
 /// Complete metadata of one style source, borrowed for a completion callback.
@@ -5642,6 +5418,11 @@ pub enum StyleSourceType: u32 {
     CustomMvtVector = 9,
 } Unrecognized
 }
+impl Default for StyleSourceType {
+    fn default() -> Self {
+        Self::Unknown
+    }
+}
 
 native_enum! {
 /// Tile URL coordinate scheme values.
@@ -5652,6 +5433,11 @@ pub enum StyleTileScheme: u32 {
     Xyz = 0,
     Tms = 1,
 } Unknown
+}
+impl Default for StyleTileScheme {
+    fn default() -> Self {
+        Self::Xyz
+    }
 }
 
 /// Global style transition options.
@@ -5720,6 +5506,11 @@ pub enum StyleVectorTileEncoding: u32 {
     Mlt = 1,
 } Unknown
 }
+impl Default for StyleVectorTileEncoding {
+    fn default() -> Self {
+        Self::Mvt
+    }
+}
 
 /// CPU image readback metadata for a texture target frame.
 ///
@@ -5735,16 +5526,6 @@ pub struct TextureImageInfo {
     pub stride: u32,
     /// Required output buffer byte length.
     pub byte_length: usize,
-}
-impl TextureImageInfo {
-    pub const fn new(width: u32, height: u32, stride: u32, byte_length: usize) -> Self {
-        Self {
-            width,
-            height,
-            stride,
-            byte_length,
-        }
-    }
 }
 impl FromNative<sys::mln_texture_image_info> for TextureImageInfo {
     unsafe fn from_native(raw: sys::mln_texture_image_info) -> Result<Self> {
@@ -5788,23 +5569,6 @@ pub struct TileId {
     pub canonical_x: u32,
     pub canonical_y: u32,
 }
-impl TileId {
-    pub const fn new(
-        overscaled_z: u32,
-        wrap: i32,
-        canonical_z: u32,
-        canonical_x: u32,
-        canonical_y: u32,
-    ) -> Self {
-        Self {
-            overscaled_z,
-            wrap,
-            canonical_z,
-            canonical_x,
-            canonical_y,
-        }
-    }
-}
 impl FromNative<sys::mln_tile_id> for TileId {
     unsafe fn from_native(raw: sys::mln_tile_id) -> Result<Self> {
         Ok(Self {
@@ -5827,6 +5591,11 @@ pub enum TileLodMode: u32 {
     Distance = 1,
 } Unknown
 }
+impl Default for TileLodMode {
+    fn default() -> Self {
+        Self::Default
+    }
+}
 
 native_enum! {
 /// Tile operations reported by tile observer events.
@@ -5844,6 +5613,11 @@ pub enum TileOperation: u32 {
     Cancelled = 7,
     Null = 8,
 } Unknown
+}
+impl Default for TileOperation {
+    fn default() -> Self {
+        Self::RequestedFromCache
+    }
 }
 
 /// Cubic easing curve for animated camera transitions.
@@ -5889,7 +5663,6 @@ native_flags! {
 /// See `mln_url_match_flags` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub struct UrlMatchFlags: u32 {
-    const EXACT = 0;
     /// Reads url as a glob pattern.
     const GLOB = 1;
 }
@@ -5938,6 +5711,11 @@ pub enum ViewportMode: u32 {
     Default = 0,
     FlippedY = 1,
 } Unknown
+}
+impl Default for ViewportMode {
+    fn default() -> Self {
+        Self::Default
+    }
 }
 
 /// One caller-owned Vulkan image of a borrowed texture ring.
@@ -6066,27 +5844,6 @@ pub struct VulkanContextDescriptor {
     /// PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device.
     pub get_device_proc_addr: *mut std::ffi::c_void,
 }
-impl VulkanContextDescriptor {
-    pub const fn new(
-        instance: *mut std::ffi::c_void,
-        physical_device: *mut std::ffi::c_void,
-        device: *mut std::ffi::c_void,
-        graphics_queue: *mut std::ffi::c_void,
-        graphics_queue_family_index: u32,
-        get_instance_proc_addr: *mut std::ffi::c_void,
-        get_device_proc_addr: *mut std::ffi::c_void,
-    ) -> Self {
-        Self {
-            instance,
-            physical_device,
-            device,
-            graphics_queue,
-            graphics_queue_family_index,
-            get_instance_proc_addr,
-            get_device_proc_addr,
-        }
-    }
-}
 impl ToNative<sys::mln_vulkan_context_descriptor> for VulkanContextDescriptor {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_vulkan_context_descriptor> {
         let mut raw: sys::mln_vulkan_context_descriptor = unsafe { std::mem::zeroed() };
@@ -6131,11 +5888,6 @@ impl Default for VulkanOwnedTextureDescriptor {
         convert::native_default(unsafe { sys::mln_vulkan_owned_texture_descriptor_default() })
     }
 }
-impl VulkanOwnedTextureDescriptor {
-    pub const fn new(extent: LogicalExtent, context: VulkanContextDescriptor) -> Self {
-        Self { extent, context }
-    }
-}
 impl ToNative<sys::mln_vulkan_owned_texture_descriptor> for VulkanOwnedTextureDescriptor {
     fn to_native(
         &self,
@@ -6177,19 +5929,6 @@ pub struct VulkanSurfaceDescriptor {
 impl Default for VulkanSurfaceDescriptor {
     fn default() -> Self {
         convert::native_default(unsafe { sys::mln_vulkan_surface_descriptor_default() })
-    }
-}
-impl VulkanSurfaceDescriptor {
-    pub const fn new(
-        extent: LogicalExtent,
-        context: VulkanContextDescriptor,
-        surface: u64,
-    ) -> Self {
-        Self {
-            extent,
-            context,
-            surface,
-        }
     }
 }
 impl ToNative<sys::mln_vulkan_surface_descriptor> for VulkanSurfaceDescriptor {
@@ -6244,35 +5983,6 @@ pub struct VulkanTextureFrame {
     /// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for a session-owned ring, and
     /// the descriptor's final_layout for a borrowed one.
     pub layout: u32,
-}
-impl VulkanTextureFrame {
-    pub const fn new(
-        generation: u64,
-        width: u32,
-        height: u32,
-        scale_factor: f64,
-        frame_id: u64,
-        slot: u32,
-        image: u64,
-        image_view: u64,
-        device: *mut std::ffi::c_void,
-        format: u32,
-        layout: u32,
-    ) -> Self {
-        Self {
-            generation,
-            width,
-            height,
-            scale_factor,
-            frame_id,
-            slot,
-            image,
-            image_view,
-            device,
-            format,
-            layout,
-        }
-    }
 }
 impl FromNative<sys::mln_vulkan_texture_frame> for VulkanTextureFrame {
     unsafe fn from_native(raw: sys::mln_vulkan_texture_frame) -> Result<Self> {
@@ -6393,6 +6103,11 @@ pub enum WebglContextKind: u32 {
     TransferredCanvas = 1,
 } Unknown
 }
+impl Default for WebglContextKind {
+    fn default() -> Self {
+        Self::Existing
+    }
+}
 
 /// One caller-owned WebGPU texture of a borrowed texture ring.
 ///
@@ -6405,14 +6120,6 @@ pub struct WebgpuBorrowedTexture {
     /// Borrowed WGPUTextureView for texture. Required. The view must be a 2D
     /// color view compatible with texture and the descriptor's format.
     pub texture_view: *mut std::ffi::c_void,
-}
-impl WebgpuBorrowedTexture {
-    pub const fn new(texture: *mut std::ffi::c_void, texture_view: *mut std::ffi::c_void) -> Self {
-        Self {
-            texture,
-            texture_view,
-        }
-    }
 }
 impl ToNative<sys::mln_webgpu_borrowed_texture> for WebgpuBorrowedTexture {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_webgpu_borrowed_texture> {
@@ -6504,19 +6211,6 @@ pub struct WebgpuContextDescriptor {
     /// non-null queue must belong to device.
     pub queue: *mut std::ffi::c_void,
 }
-impl WebgpuContextDescriptor {
-    pub const fn new(
-        instance: *mut std::ffi::c_void,
-        device: *mut std::ffi::c_void,
-        queue: *mut std::ffi::c_void,
-    ) -> Self {
-        Self {
-            instance,
-            device,
-            queue,
-        }
-    }
-}
 impl ToNative<sys::mln_webgpu_context_descriptor> for WebgpuContextDescriptor {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_webgpu_context_descriptor> {
         let mut raw: sys::mln_webgpu_context_descriptor = unsafe { std::mem::zeroed() };
@@ -6551,11 +6245,6 @@ pub struct WebgpuOwnedTextureDescriptor {
 impl Default for WebgpuOwnedTextureDescriptor {
     fn default() -> Self {
         convert::native_default(unsafe { sys::mln_webgpu_owned_texture_descriptor_default() })
-    }
-}
-impl WebgpuOwnedTextureDescriptor {
-    pub const fn new(extent: LogicalExtent, context: WebgpuContextDescriptor) -> Self {
-        Self { extent, context }
     }
 }
 impl ToNative<sys::mln_webgpu_owned_texture_descriptor> for WebgpuOwnedTextureDescriptor {
@@ -6602,21 +6291,6 @@ pub struct WebgpuSurfaceDescriptor {
 impl Default for WebgpuSurfaceDescriptor {
     fn default() -> Self {
         convert::native_default(unsafe { sys::mln_webgpu_surface_descriptor_default() })
-    }
-}
-impl WebgpuSurfaceDescriptor {
-    pub const fn new(
-        extent: LogicalExtent,
-        context: WebgpuContextDescriptor,
-        surface: *mut std::ffi::c_void,
-        format: u32,
-    ) -> Self {
-        Self {
-            extent,
-            context,
-            surface,
-            format,
-        }
     }
 }
 impl ToNative<sys::mln_webgpu_surface_descriptor> for WebgpuSurfaceDescriptor {
@@ -6670,33 +6344,6 @@ pub struct WebgpuTextureFrame {
     /// Backend-native WGPUTextureFormat value.
     pub format: u32,
 }
-impl WebgpuTextureFrame {
-    pub const fn new(
-        generation: u64,
-        width: u32,
-        height: u32,
-        scale_factor: f64,
-        frame_id: u64,
-        slot: u32,
-        texture: *mut std::ffi::c_void,
-        texture_view: *mut std::ffi::c_void,
-        device: *mut std::ffi::c_void,
-        format: u32,
-    ) -> Self {
-        Self {
-            generation,
-            width,
-            height,
-            scale_factor,
-            frame_id,
-            slot,
-            texture,
-            texture_view,
-            device,
-            format,
-        }
-    }
-}
 impl FromNative<sys::mln_webgpu_texture_frame> for WebgpuTextureFrame {
     unsafe fn from_native(raw: sys::mln_webgpu_texture_frame) -> Result<Self> {
         Ok(Self {
@@ -6730,19 +6377,6 @@ pub struct WglContextDescriptor {
     pub share_context: *mut std::ffi::c_void,
     /// Optional wglGetProcAddress-compatible function for the host loader.
     pub get_proc_address: *mut std::ffi::c_void,
-}
-impl WglContextDescriptor {
-    pub const fn new(
-        device_context: *mut std::ffi::c_void,
-        share_context: *mut std::ffi::c_void,
-        get_proc_address: *mut std::ffi::c_void,
-    ) -> Self {
-        Self {
-            device_context,
-            share_context,
-            get_proc_address,
-        }
-    }
 }
 impl ToNative<sys::mln_wgl_context_descriptor> for WglContextDescriptor {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_wgl_context_descriptor> {

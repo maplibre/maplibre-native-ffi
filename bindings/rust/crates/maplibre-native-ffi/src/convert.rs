@@ -495,11 +495,6 @@ macro_rules! native_enum {
             $($(#[$variant_meta])* $variant,)*
             $unknown($raw),
         }
-        impl Default for $name {
-            fn default() -> Self {
-                Self::from_raw(0)
-            }
-        }
         impl $name {
             pub fn from_raw(raw: $raw) -> Self {
                 #[allow(unreachable_patterns)]

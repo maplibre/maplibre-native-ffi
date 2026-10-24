@@ -43,7 +43,7 @@ pub fn run() {
 
     // Parameters named after keywords and runtime locals keep their order.
     let entry = keyword_combine(5.0, 2.0, 7.0, 11.0).unwrap();
-    assert_eq!(entry, KeywordEntry::new(3.0, 7.0, 11.0));
+    assert_eq!((entry.r#type, entry.defer, entry.raw), (3.0, 7.0, 11.0));
 
     // A copy of a native default keeps its values and leaves a registration
     // unset.
