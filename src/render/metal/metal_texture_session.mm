@@ -1,11 +1,14 @@
 #include <cstddef>
 #include <memory>
 #include <span>
+#include <string>
 #include <utility>
 #include <vector>
 
+#include <mln/util/logging.hpp>
 #include <mln/util/size.hpp>
 
+#include <Metal/MTLCommandBuffer.hpp>
 #include <Metal/MTLDevice.hpp>
 #include <Metal/MTLPixelFormat.hpp>
 #include <Metal/MTLTexture.hpp>
@@ -87,6 +90,26 @@ auto validate_borrowed_texture(
   return MLN_STATUS_OK;
 }
 
+// A failed frame keeps its map update pending. A device that was removed, or
+// that revoked this process's access, fails every later frame too, so the
+// session loses its target; any other failure leaves the next demand to retry.
+auto report_command_buffer_failure(
+  const mln::core::MetalTextureBackend::CommandBufferFailure& failure
+) -> mln_status {
+  const auto message = "Metal command buffer failed with error " +
+                       std::to_string(failure.code) + ": " +
+                       failure.description;
+  mln::Log::Error(mln::Event::Render, message);
+  mln::core::set_thread_error(message.c_str());
+  switch (failure.code) {
+    case MTL::CommandBufferErrorDeviceRemoved:
+    case MTL::CommandBufferErrorAccessRevoked:
+      return MLN_STATUS_TARGET_LOST;
+    default:
+      return MLN_STATUS_NOT_READY;
+  }
+}
+
 class MetalTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
@@ -141,6 +164,9 @@ class MetalTextureSessionBackend final
 
   auto after_render(mln_render_session_object&, bool& out_rendered)
     -> mln_status override {
+    if (auto failure = backend_.take_command_buffer_failure()) {
+      return report_command_buffer_failure(*failure);
+    }
     // The Metal backend creates its texture on the first real draw; a renderer
     // pass can complete without one before content is ready.
     out_rendered = backend_.metal_texture() != nullptr;

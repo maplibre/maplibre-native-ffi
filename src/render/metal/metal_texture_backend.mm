@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <memory>
 #include <new>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -9,6 +10,8 @@
 #include <mln/mtl/renderable_resource.hpp>
 #include <mln/mtl/texture2d.hpp>
 
+#include <Foundation/NSError.hpp>
+#include <Foundation/NSString.hpp>
 #include <Metal/MTLBlitPass.hpp>
 #include <Metal/MTLCommandBuffer.hpp>
 #include <Metal/MTLCommandQueue.hpp>
@@ -142,6 +145,7 @@ class MetalTextureBackend::MetalTextureRenderableResource final
     assert(commandBuffer);
     commandBuffer->commit();
     commandBuffer->waitUntilCompleted();
+    backend.record_command_buffer_result(*commandBuffer.get());
     commandBuffer.reset();
     renderPassDescriptor.reset();
   }
@@ -271,6 +275,28 @@ void MetalTextureBackend::deactivate() {}
 auto MetalTextureBackend::metal_texture() -> MTL::Texture* {
   getDefaultRenderable();
   return getResource<MetalTextureRenderableResource>().metal_texture();
+}
+
+void MetalTextureBackend::record_command_buffer_result(
+  const MTL::CommandBuffer& buffer
+) {
+  if (buffer.status() != MTL::CommandBufferStatusError) {
+    command_buffer_failure_.reset();
+    return;
+  }
+  auto failure = CommandBufferFailure{};
+  if (const auto* error = buffer.error(); error != nullptr) {
+    failure.code = error->code();
+    if (const auto* description = error->localizedDescription()) {
+      failure.description = description->utf8String();
+    }
+  }
+  command_buffer_failure_ = std::move(failure);
+}
+
+auto MetalTextureBackend::take_command_buffer_failure()
+  -> std::optional<CommandBufferFailure> {
+  return std::exchange(command_buffer_failure_, std::nullopt);
 }
 
 auto MetalTextureBackend::select_slot(std::size_t slot) -> bool {

@@ -1,10 +1,13 @@
 #pragma once
 
+#include <optional>
+#include <string>
 #include <vector>
 
 #include <mln/gfx/headless_backend.hpp>
 #include <mln/mtl/headless_backend.hpp>
 
+#include <Metal/MTLCommandBuffer.hpp>
 #include <Metal/MTLDevice.hpp>
 #include <Metal/MTLTexture.hpp>
 
@@ -18,6 +21,12 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   class MetalTextureRenderableResource;
 
  public:
+  struct CommandBufferFailure {
+    // An MTLCommandBufferError, or 0 when Metal reported no error object.
+    NS::Integer code = 0;
+    std::string description;
+  };
+
   MetalTextureBackend(
     MTL::Device* host_device, mln::Size size, std::size_t ring_depth,
     MTL::PixelFormat pixel_format
@@ -49,8 +58,13 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   void set_borrowed_textures(
     std::vector<MTL::Texture*> textures, mln::Size new_size
   );
+  // The failure of the last command buffer a render submitted, if it failed,
+  // which the next call no longer returns.
+  auto take_command_buffer_failure() -> std::optional<CommandBufferFailure>;
 
  private:
+  void record_command_buffer_result(const MTL::CommandBuffer& buffer);
+
   // The caller's texture for each slot, or empty for a session-owned ring.
   std::vector<MTL::Texture*> borrowed_textures_;
   // Recorded when this session took borrowed_textures_, which it does not
@@ -59,6 +73,7 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   // The format of a session-owned ring's textures.
   MTL::PixelFormat owned_pixel_format_ = MTL::PixelFormatInvalid;
   RenderableSlotRing ring_;
+  std::optional<CommandBufferFailure> command_buffer_failure_;
 };
 
 }  // namespace mln::core
