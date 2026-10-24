@@ -49,7 +49,7 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
     MetalSurfaceRenderableResource(MetalSurfaceRenderableResource&&) = delete;
     auto operator=(MetalSurfaceRenderableResource&&)
       -> MetalSurfaceRenderableResource& = delete;
-    ~MetalSurfaceRenderableResource() override = default;
+    ~MetalSurfaceRenderableResource() override { finish_committed(); }
 
     void setSize(mln::Size size_) {
       size = size_;
@@ -62,8 +62,9 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
     // Every replacement layer uses the same device and pixel format, preserving
     // the cached render pipeline states.
     void set_layer(CA::MetalLayer* layer_, mln::Size size_) {
+      finish_committed();
       // Release what is still bound to the outgoing layer: a drawable must not
-      // outlive its layer.
+      // outlive its layer. This frame's buffer was never committed.
       commandBuffer.reset();
       renderPassDescriptor.reset();
       drawable.reset();
@@ -181,16 +182,11 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
     }
 
     void swap() override {
-      if (mln::core::discard_renderable_present) {
-        commandBuffer->commit();
-        commandBuffer.reset();
-        drawable.reset();
-        renderPassDescriptor.reset();
-        return;
+      if (!mln::core::discard_renderable_present) {
+        commandBuffer->presentDrawable(drawable.get());
       }
-      commandBuffer->presentDrawable(drawable.get());
       commandBuffer->commit();
-      commandBuffer.reset();
+      lastCommitted = std::move(commandBuffer);
       drawable.reset();
       renderPassDescriptor.reset();
     }
@@ -216,10 +212,24 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
     }
 
    private:
+    // Command buffers retain the drawables they target, so letting go of a
+    // layer early is valid Metal. It is not valid to the host, which may
+    // destroy a layer once the session lets go of it, nor to the paravirtual
+    // GPU of a macOS VM, which faults every process's GPU work when one lets
+    // go of a layer with work in flight on its drawable (#1035). Buffers on
+    // one queue complete in order, so waiting for the last one is enough.
+    void finish_committed() {
+      if (lastCommitted) {
+        lastCommitted->waitUntilCompleted();
+        lastCommitted.reset();
+      }
+    }
+
     MetalSurfaceBackend& backend;
     NS::SharedPtr<CA::MetalLayer> layer;
     mln::Size size{0, 0};
     mln::mtl::MTLCommandBufferPtr commandBuffer;
+    mln::mtl::MTLCommandBufferPtr lastCommitted;
     mln::mtl::MTLRenderPassDescriptorPtr renderPassDescriptor;
     mln::mtl::CAMetalDrawablePtr drawable;
     mln::gfx::Texture2DPtr depthTexture;
@@ -292,8 +302,8 @@ class MetalSurfaceSessionBackend final
     return backend_;
   }
 
-  // Command buffers retain the objects they use, so their GPU work keeps
-  // those objects alive and destruction needs no wait.
+  // Metal objects have no thread affinity, and destroying the surface waits
+  // for its last committed buffer on whichever thread does it.
   [[nodiscard]] auto allows_off_thread_teardown() const noexcept
     -> bool override {
     return true;
