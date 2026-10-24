@@ -12,7 +12,7 @@ import org.maplibre.nativeffi.render.NativePointer
  * The first call that carries the registration consumes it. Native code calls `releaseUserData`
  * once it accepts the call. When native code does not accept the call, the binding calls
  * `releaseUserData` before the call returns or throws. A later call that carries the registration
- * throws an invalid-state `MaplibreException` before it calls native code.
+ * throws an `IllegalStateException` before it calls native code.
  *
  * Only the JVM, Android, and Kotlin/Native declare this function, because a Kotlin/Wasm page has no
  * native functions of its own.
@@ -39,7 +39,7 @@ public fun Wake.Companion.native(
  * The first call that carries the registration consumes it. Native code calls `releaseUserData`
  * once it accepts the call. When native code does not accept the call, the binding calls
  * `releaseUserData` before the call returns or throws. A later call that carries the registration
- * throws an invalid-state `MaplibreException` before it calls native code.
+ * throws an `IllegalStateException` before it calls native code.
  *
  * Only the JVM, Android, and Kotlin/Native declare this function, because a Kotlin/Wasm page has no
  * native functions of its own.

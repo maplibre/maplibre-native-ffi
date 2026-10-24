@@ -12,11 +12,3 @@ internal inline fun checkStatus(status: Int, diagnostic: () -> String) {
     throw MaplibreException(Status(status), diagnostic())
   }
 }
-
-/** The error for a state the binding refuses before it reaches native. */
-internal fun invalidState(diagnostic: String): MaplibreException =
-  MaplibreException(Status.INVALID_STATE, diagnostic)
-
-/** The error for an input the binding cannot hand to native. */
-internal fun invalidArgument(diagnostic: String): MaplibreException =
-  MaplibreException(Status.INVALID_ARGUMENT, diagnostic)

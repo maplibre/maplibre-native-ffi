@@ -2,11 +2,11 @@ package org.maplibre.nativeffi.callback
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlinx.coroutines.CompletableDeferred
-import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.deny
-import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.HttpHeaderTransform
 import org.maplibre.nativeffi.generated.HttpHeaderTransformResponse
@@ -14,7 +14,6 @@ import org.maplibre.nativeffi.generated.LogEvent
 import org.maplibre.nativeffi.generated.LogHandler
 import org.maplibre.nativeffi.generated.ResourceProvider
 import org.maplibre.nativeffi.generated.ResourceProviderDecision
-import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.generated.logSetCallback
 import org.maplibre.nativeffi.generated.setHeader
 import org.maplibre.nativeffi.generated.setHttpHeaderTransform
@@ -90,12 +89,8 @@ class ThreadedCallbackTest {
       map.setStyleUrl(HTTP_STYLE_URL).awaitWithin("the style command")
       val (inside, fromAnotherThread) = outcome.awaitWithin("the header transform callback")
       assertEquals(null, inside, "setting a header inside the callback is allowed")
-      assertEquals(
-        Status.INVALID_STATE,
-        (fromAnotherThread as? MaplibreException)?.status,
-        "the response from another thread: $fromAnotherThread",
-      )
-      assertFailsWithStatus(Status.INVALID_STATE) {
+      assertIs<IllegalStateException>(fromAnotherThread, "the response from another thread")
+      assertFailsWith<IllegalStateException> {
         escaped!!.setHeader("X-Test", "1")
       }
       runtime.clearHttpHeaderTransform().awaitWithin("the header transform clear")

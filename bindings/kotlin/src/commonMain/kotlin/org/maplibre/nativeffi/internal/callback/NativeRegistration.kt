@@ -2,7 +2,6 @@ package org.maplibre.nativeffi.internal.callback
 
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
-import org.maplibre.nativeffi.internal.status.invalidState
 
 /**
  * A callback registration of the host's native functions: one function pointer for each callback
@@ -22,8 +21,8 @@ internal class NativeRegistration(
 
   /** Marks the registration taken by a call, or throws when an earlier call took it. */
   fun consume() {
-    if (!consumed.compareAndSet(expectedValue = false, newValue = true)) {
-      throw invalidState("a native registration belongs to the first call that carries it")
+    check(consumed.compareAndSet(expectedValue = false, newValue = true)) {
+      "a native registration belongs to the first call that carries it"
     }
   }
 

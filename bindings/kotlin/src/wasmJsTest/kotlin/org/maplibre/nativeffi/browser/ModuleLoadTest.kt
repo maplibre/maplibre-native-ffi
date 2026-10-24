@@ -2,13 +2,12 @@ package org.maplibre.nativeffi.browser
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.TEST_MODULE_URL
 import org.maplibre.nativeffi.TEST_POOL_SIZE
-import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.generated.GeneratedApi
-import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.internal.loader.ModuleLoader
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.workersAtLoad
@@ -20,9 +19,9 @@ class ModuleLoadTest {
     // The suite's page loads the module once, before the first test that needs it, so the test
     // removes it for the call.
     val failure = ModuleLoader.withoutModuleForTesting {
-      assertFailsWithStatus(Status.INVALID_STATE) { GeneratedApi.runtimeOptionsDefault() }
+      assertFailsWith<IllegalStateException> { GeneratedApi.runtimeOptionsDefault() }
     }
-    assertTrue("Maplibre.loadModule" in failure.diagnostic, failure.diagnostic)
+    assertTrue("Maplibre.loadModule" in failure.message.orEmpty(), failure.message)
     GeneratedApi.runtimeOptionsDefault()
   }
 

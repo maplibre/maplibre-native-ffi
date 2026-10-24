@@ -4,8 +4,6 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import org.maplibre.nativeffi.assertFailsWithStatus
-import org.maplibre.nativeffi.generated.Status
 
 class MemoryTest {
   @Test
@@ -64,9 +62,9 @@ class MemoryTest {
   @Test
   fun nullTerminatedStringsRejectEmbeddedNul() {
     NativeArena().use { arena ->
-      val error = assertFailsWithStatus(Status.INVALID_ARGUMENT) { arena.cString("a\u0000b") }
+      val error = assertFailsWith<IllegalArgumentException> { arena.cString("a\u0000b") }
 
-      assertEquals("text contains an embedded NUL", error.diagnostic)
+      assertEquals("text contains an embedded NUL", error.message)
     }
   }
 

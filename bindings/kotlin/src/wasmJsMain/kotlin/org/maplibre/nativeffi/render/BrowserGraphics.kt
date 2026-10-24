@@ -8,8 +8,6 @@ import org.maplibre.nativeffi.internal.c.unsignedWord
 import org.maplibre.nativeffi.internal.c.word
 import org.maplibre.nativeffi.internal.lifecycle.ViewScope
 import org.maplibre.nativeffi.internal.loader.ensureNativeLibrary
-import org.maplibre.nativeffi.internal.status.invalidArgument
-import org.maplibre.nativeffi.internal.status.invalidState
 
 /**
  * Browser-only graphics interop entry points.
@@ -33,8 +31,7 @@ public object BrowserGraphics {
    * Imports a `GPUDevice` as the `WGPUDevice` of a `WebgpuContextDescriptor`. Pass a null instance
    * and a null queue beside it: sessions use neither, and null names the device's default queue.
    *
-   * Throws a `MaplibreException` with `Status.INVALID_ARGUMENT` when [device] is not a `GPUDevice`
-   * of this realm.
+   * Throws an `IllegalArgumentException` when [device] is not a `GPUDevice` of this realm.
    */
   public fun importWebgpuDevice(device: JsAny): ImportedWebgpuObject =
     importWebgpu(
@@ -48,8 +45,8 @@ public object BrowserGraphics {
    * Imports a `GPUCanvasContext`, the `getContext("webgpu")` of a canvas element or an
    * `OffscreenCanvas`, as the `WGPUSurface` of a `WebgpuSurfaceDescriptor`.
    *
-   * Throws a `MaplibreException` with `Status.INVALID_ARGUMENT` when [canvasContext] is not a
-   * `GPUCanvasContext` of this realm.
+   * Throws an `IllegalArgumentException` when [canvasContext] is not a `GPUCanvasContext` of this
+   * realm.
    */
   public fun importWebgpuSurface(canvasContext: JsAny): ImportedWebgpuObject =
     importWebgpu(
@@ -62,8 +59,7 @@ public object BrowserGraphics {
   /**
    * Imports a `GPUTexture` as a `WGPUTexture`, such as a texture of a borrowed texture ring.
    *
-   * Throws a `MaplibreException` with `Status.INVALID_ARGUMENT` when [texture] is not a
-   * `GPUTexture` of this realm.
+   * Throws an `IllegalArgumentException` when [texture] is not a `GPUTexture` of this realm.
    */
   public fun importWebgpuTexture(texture: JsAny): ImportedWebgpuObject =
     importWebgpu(
@@ -76,8 +72,7 @@ public object BrowserGraphics {
   /**
    * Imports a `GPUTextureView` as a `WGPUTextureView`, such as a view of a borrowed texture ring.
    *
-   * Throws a `MaplibreException` with `Status.INVALID_ARGUMENT` when [view] is not a
-   * `GPUTextureView` of this realm.
+   * Throws an `IllegalArgumentException` when [view] is not a `GPUTextureView` of this realm.
    */
   public fun importWebgpuTextureView(view: JsAny): ImportedWebgpuObject =
     importWebgpu(
@@ -91,13 +86,12 @@ public object BrowserGraphics {
    * Returns the `WGPUTextureFormat` value of a `GPUTextureFormat` name, such as the
    * `navigator.gpu.getPreferredCanvasFormat()` that a surface descriptor's format takes.
    *
-   * Throws a `MaplibreException` with `Status.INVALID_ARGUMENT` when the module knows no format of
-   * that name.
+   * Throws an `IllegalArgumentException` when the module knows no format of that name.
    */
   public fun webgpuTextureFormat(format: String): UInt {
     requireWebgpu()
     val value = mlnKwWebgpuTextureFormat(format)
-    if (!(value >= 0)) throw invalidArgument("unknown WebGPU texture format: $format")
+    require(value >= 0) { "unknown WebGPU texture format: $format" }
     return value.toUInt()
   }
 
@@ -106,14 +100,14 @@ public object BrowserGraphics {
    * an acquired frame's `WebgpuTextureFrame.texture`. The object is valid for as long as the handle
    * is, so a frame's texture is valid until the frame's release.
    *
-   * Throws a `MaplibreException` with `Status.INVALID_ARGUMENT` when [pointer] is null or names no
-   * object of the module.
+   * Throws an `IllegalArgumentException` when [pointer] is null or names no object of the module.
    */
   public fun webgpuObject(pointer: NativePointer): JsAny {
     requireWebgpu()
-    if (!(!pointer.isNull)) throw invalidArgument("pointer is null")
-    return mlnKwWebgpuObject(word(pointer.address))
-      ?: throw invalidArgument("pointer names no WebGPU object of this module")
+    require(!pointer.isNull) { "pointer is null" }
+    return requireNotNull(mlnKwWebgpuObject(word(pointer.address))) {
+      "pointer names no WebGPU object of this module"
+    }
   }
 
   /**
@@ -122,8 +116,8 @@ public object BrowserGraphics {
    * the C reference's rules for an existing context apply: MapLibre draws with a depth and a
    * stencil buffer.
    *
-   * Throws a `MaplibreException` with `Status.INVALID_ARGUMENT` when [context] is not a
-   * `WebGL2RenderingContext` of this realm.
+   * Throws an `IllegalArgumentException` when [context] is not a `WebGL2RenderingContext` of this
+   * realm.
    */
   public fun registerWebglContext(context: JsAny): RegisteredWebglContext {
     ensureNativeLibrary()
@@ -131,8 +125,7 @@ public object BrowserGraphics {
       throw MaplibreException(Status.UNSUPPORTED, "this browser module carries no WebGL backend")
     }
     val handle = mlnKwWebglRegisterContext(context)
-    if (!(handle != 0))
-      throw invalidArgument("context is not a WebGL2RenderingContext of this realm")
+    require(handle != 0) { "context is not a WebGL2RenderingContext of this realm" }
     return RegisteredWebglContext(handle)
   }
 
@@ -144,7 +137,7 @@ public object BrowserGraphics {
   ): ImportedWebgpuObject {
     requireWebgpu()
     val handle = import()
-    if (!(handle != 0)) throw invalidArgument("$name is not a $type of this realm")
+    require(handle != 0) { "$name is not a $type of this realm" }
     return ImportedWebgpuObject(unsignedWord(handle), release)
   }
 
@@ -168,12 +161,12 @@ internal constructor(private val address: Long, private val release: (Int) -> Un
   private var closed = false
 
   /**
-   * The module's handle to the object, for a render target descriptor. Throws a `MaplibreException`
-   * with `Status.INVALID_STATE` after [close], and a pointer read before then stops working too.
+   * The module's handle to the object, for a render target descriptor. Throws an
+   * `IllegalStateException` after [close], and a pointer read before then stops working too.
    */
   public val pointer: NativePointer
     get() {
-      if (closed) throw invalidState("ImportedWebgpuObject is closed")
+      check(!closed) { "ImportedWebgpuObject is closed" }
       return NativePointer.scoped(address, scope)
     }
 
@@ -196,11 +189,11 @@ public class RegisteredWebglContext internal constructor(private val handle: Int
 
   /**
    * The context's `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for a `WebglContextDescriptor` of kind
-   * `EXISTING`. Throws a `MaplibreException` with `Status.INVALID_STATE` after [close].
+   * `EXISTING`. Throws an `IllegalStateException` after [close].
    */
   public val context: Int
     get() {
-      if (closed) throw invalidState("RegisteredWebglContext is closed")
+      check(!closed) { "RegisteredWebglContext is closed" }
       return handle
     }
 

@@ -11,7 +11,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.await
 import org.maplibre.nativeffi.MapFixture
-import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.OpenglContextDescriptor
@@ -20,7 +19,6 @@ import org.maplibre.nativeffi.generated.OpenglContextOwnership
 import org.maplibre.nativeffi.generated.OpenglOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderResult
-import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.generated.WebglContextDescriptor
 import org.maplibre.nativeffi.generated.WebglContextKind
 import org.maplibre.nativeffi.generated.WebgpuBorrowedTexture
@@ -95,7 +93,7 @@ class BrowserGraphicsTest {
     view.close()
     texture.close()
     device.close()
-    assertFailsWithStatus(Status.INVALID_STATE) { device.pointer }
+    assertFailsWith<IllegalStateException> { device.pointer }
     assertFailsWith<IllegalStateException> { pointer.address }
     destroyWebgpuDevice(pageDevice)
   }
@@ -134,7 +132,7 @@ class BrowserGraphicsTest {
 
     val handle = context.context
     context.close()
-    assertFailsWithStatus(Status.INVALID_STATE) { context.context }
+    assertFailsWith<IllegalStateException> { context.context }
     // The closed handle stays reserved, so a new registration never takes it.
     BrowserGraphics.registerWebglContext(pageContext).use { assertNotEquals(handle, it.context) }
     // Chromium caps the WebGL contexts of a page, so the test frees its own.

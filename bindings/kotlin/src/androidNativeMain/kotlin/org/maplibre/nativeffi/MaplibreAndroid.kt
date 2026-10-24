@@ -8,12 +8,11 @@ import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 public class AndroidJniEnvironment private constructor(internal val address: Long) {
   public companion object {
     /**
-     * Wraps a non-null `JNIEnv*` address that is valid for the current thread.
+     * Wraps a `JNIEnv*` address that is valid for the current thread.
      *
      * The value borrows the environment and grants no general memory access.
      */
-    public fun ofAddress(address: Long): AndroidJniEnvironment =
-      AndroidJniEnvironment(requireAddress(address, "JNIEnv"))
+    public fun ofAddress(address: Long): AndroidJniEnvironment = AndroidJniEnvironment(address)
   }
 }
 
@@ -21,13 +20,12 @@ public class AndroidJniEnvironment private constructor(internal val address: Lon
 public class AndroidContextReference private constructor(internal val address: Long) {
   public companion object {
     /**
-     * Wraps a non-null JNI object-reference address for an Android Context.
+     * Wraps a JNI object-reference address for an Android Context.
      *
      * The reference must remain valid for the initialization call. This value grants no general
      * memory access.
      */
-    public fun ofAddress(address: Long): AndroidContextReference =
-      AndroidContextReference(requireAddress(address, "Android Context"))
+    public fun ofAddress(address: Long): AndroidContextReference = AndroidContextReference(address)
   }
 }
 
@@ -37,7 +35,7 @@ public object MaplibreAndroid {
    * Initializes Android platform services using JNI handles from the host.
    *
    * Required once during Android host setup, before creating a runtime. APK assets use the provided
-   * Context's AssetManager.
+   * Context's AssetManager. A zero address in either argument fails with `Status.INVALID_ARGUMENT`.
    */
   public fun initialize(jniEnvironment: AndroidJniEnvironment, context: AndroidContextReference) {
     ensureNativeLibrary()
@@ -45,9 +43,4 @@ public object MaplibreAndroid {
       C.mln_android_init(jniEnvironment.address, context.address, diagnostic)
     }
   }
-}
-
-private fun requireAddress(address: Long, name: String): Long {
-  require(address != 0L) { "$name address must not be zero" }
-  return address
 }

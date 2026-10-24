@@ -3,7 +3,6 @@ package org.maplibre.nativeffi
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.loader.ModuleLoader
 import org.maplibre.nativeffi.internal.loader.ensureNativeLibrary
-import org.maplibre.nativeffi.internal.status.invalidArgument
 import org.maplibre.nativeffi.render.NativePointer
 
 /** Process-global entry points for the MapLibre Native FFI binding. */
@@ -23,10 +22,10 @@ public actual object Maplibre {
 
   /**
    * Loads the browser module from [url], the `maplibre-native-kotlin.mjs` that the binding's module
-   * build installs beside its `.wasm`, and checks its C ABI version. Every other call throws a
-   * `MaplibreException` with `Status.INVALID_STATE` until this returns. A later call returns once
-   * the first load finishes, and ignores its own arguments. Cancelling a caller ends only that
-   * caller's wait, and the load goes on for the others.
+   * build installs beside its `.wasm`, and checks its C ABI version. Every other call throws an
+   * `IllegalStateException` until this returns. A later call returns once the first load finishes,
+   * and ignores its own arguments. Cancelling a caller ends only that caller's wait, and the load
+   * goes on for the others.
    *
    * The module starts [pthreadPoolSize] Workers for its threads before it loads, or by default
    * enough for one runtime with one map and one render session. A thread that finds the pool empty
@@ -35,8 +34,8 @@ public actual object Maplibre {
    * The page must be cross-origin isolated, because the module's threads share its memory.
    */
   public suspend fun loadModule(url: String, pthreadPoolSize: Int? = null) {
-    if (pthreadPoolSize != null && pthreadPoolSize <= 0) {
-      throw invalidArgument("pthreadPoolSize must be positive, got $pthreadPoolSize")
+    require(pthreadPoolSize == null || pthreadPoolSize > 0) {
+      "pthreadPoolSize must be positive, got $pthreadPoolSize"
     }
     ModuleLoader.load(url, pthreadPoolSize)
   }

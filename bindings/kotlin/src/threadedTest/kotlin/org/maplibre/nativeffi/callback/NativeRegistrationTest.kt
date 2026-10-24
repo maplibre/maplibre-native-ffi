@@ -4,6 +4,7 @@ import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withContext
@@ -79,7 +80,7 @@ class NativeRegistrationTest {
           }
           assertEquals(1, host.releases.load())
           // Native would accept this attach, so only the binding refuses it.
-          assertFailsWithStatus(Status.INVALID_STATE) {
+          assertFailsWith<IllegalStateException> {
             TestGraphics.attachOwnedTexture(map, WIDTH, HEIGHT, options)
           }
         }
@@ -121,7 +122,7 @@ class NativeRegistrationTest {
         }
         assertEquals(1, host.releases.load())
         withContext(TestGraphics.thread) {
-          assertFailsWithStatus(Status.INVALID_STATE) {
+          assertFailsWith<IllegalStateException> {
             TestGraphics.attachOwnedTexture(
               map,
               WIDTH,

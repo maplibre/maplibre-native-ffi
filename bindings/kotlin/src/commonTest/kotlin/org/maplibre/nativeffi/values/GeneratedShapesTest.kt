@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.values
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlinx.coroutines.CompletableDeferred
@@ -82,10 +83,10 @@ class GeneratedShapesTest {
   }
 
   @Test
-  fun submittingAnUnknownUnionVariantUsesTheBindingError() {
+  fun submittingAnUnknownUnionVariantIsAnIllegalArgument() {
     NativeArena().use { arena ->
       val geometry = RenderedQueryGeometry(RenderedQueryGeometryData.Unknown(900u, byteArrayOf()))
-      assertFailsWithStatus(Status.INVALID_ARGUMENT) { arena.writeRenderedQueryGeometry(geometry) }
+      assertFailsWith<IllegalArgumentException> { arena.writeRenderedQueryGeometry(geometry) }
     }
   }
 

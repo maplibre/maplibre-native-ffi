@@ -1,7 +1,5 @@
 package org.maplibre.nativeffi.internal.memory
 
-import org.maplibre.nativeffi.internal.status.invalidArgument
-
 /** Pointers allocated here expire when the C call returns. */
 internal open class NativeArena : AutoCloseable {
   private var firstBlock = 0L
@@ -79,7 +77,7 @@ internal open class NativeArena : AutoCloseable {
 
   /** Copies [value] as NUL-terminated UTF-8, refusing an embedded NUL that C would truncate at. */
   fun cString(value: String): Long {
-    if ('\u0000' in value) throw invalidArgument("text contains an embedded NUL")
+    require('\u0000' !in value) { "text contains an embedded NUL" }
     val size = value.length.toLong() * 3 + 1
     return (if (size > BLOCK_SIZE / 4) block(size, false) else allocate(size, 1)).also {
       val length = NativeMemory.putUtf8(it, value)

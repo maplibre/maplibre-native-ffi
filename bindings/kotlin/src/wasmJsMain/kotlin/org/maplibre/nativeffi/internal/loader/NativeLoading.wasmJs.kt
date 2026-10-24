@@ -11,7 +11,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.await
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.delivery.HostDelivery
-import org.maplibre.nativeffi.internal.status.invalidState
 
 /**
  * One load that every caller shares. The load runs in a scope of its own, so a cancelled caller
@@ -86,9 +85,7 @@ internal object ModuleLoader {
 }
 
 internal actual fun ensureNativeLibrary() {
-  if (!ModuleLoader.loaded) {
-    throw invalidState("the browser module is not loaded; call Maplibre.loadModule first")
-  }
+  check(ModuleLoader.loaded) { "the browser module is not loaded; call Maplibre.loadModule first" }
 }
 
 // The module is an Emscripten ES module factory that the bundler must leave to the browser. Its

@@ -1,7 +1,5 @@
 package org.maplibre.nativeffi.internal.callback
 
-import org.maplibre.nativeffi.internal.status.invalidState
-
 internal expect object CallbackContext {
   var current: CallbackScope?
 }
@@ -16,8 +14,7 @@ internal class CallbackScope(val parent: CallbackScope?) : AutoCloseable {
   fun ensureActive() {
     var current = CallbackContext.current
     while (current != null && current !== this) current = current.parent
-    if (!active || current == null)
-      throw invalidState("callback value is outside its invoking thread or scope")
+    check(active && current != null) { "callback value is outside its invoking thread or scope" }
   }
 
   override fun close() {

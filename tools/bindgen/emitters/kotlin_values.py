@@ -764,7 +764,7 @@ class Values:
                 + " }"
             )
         lines.append(
-            f'    is {public}.Unknown -> throw invalidArgument("unknown native union variants cannot be submitted")'
+            f'    is {public}.Unknown -> throw IllegalArgumentException("unknown native union variants cannot be submitted")'
         )
         lines.append("  }")
         return lines
@@ -982,7 +982,6 @@ class Values:
             "import org.maplibre.nativeffi.internal.c.UpcallStubs\n"
             "import org.maplibre.nativeffi.internal.call.NativeCall\n"
             "import org.maplibre.nativeffi.internal.delivery.HostDelivery\n"
-            "import org.maplibre.nativeffi.internal.status.invalidArgument\n"
             "import org.maplibre.nativeffi.render.NativePointer\n"
             + (
                 "import org.maplibre.nativeffi.internal.lifecycle.ViewScope\n"

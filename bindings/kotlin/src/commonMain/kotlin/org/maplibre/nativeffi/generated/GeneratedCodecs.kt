@@ -6,7 +6,6 @@ import org.maplibre.nativeffi.internal.call.NativeCall
 import org.maplibre.nativeffi.internal.delivery.HostDelivery
 import org.maplibre.nativeffi.internal.lifecycle.ViewScope
 import org.maplibre.nativeffi.internal.memory.*
-import org.maplibre.nativeffi.internal.status.invalidArgument
 import org.maplibre.nativeffi.render.NativePointer
 
 internal fun NativeArena.putGpuSync(target: Long, value: GpuSync) {
@@ -783,7 +782,7 @@ internal fun NativeArena.putRenderedQueryGeometry(target: Long, value: RenderedQ
       putScreenLineString(target + 8, variant.value)
     }
     is RenderedQueryGeometryData.Unknown ->
-      throw invalidArgument("unknown native union variants cannot be submitted")
+      throw IllegalArgumentException("unknown native union variants cannot be submitted")
   }
 }
 
@@ -921,7 +920,7 @@ internal fun NativeArena.putOfflineRegionDefinition(target: Long, value: Offline
       putOfflineGeometryRegionDefinition(target + 8, variant.value)
     }
     is OfflineRegionDefinitionData.Unknown ->
-      throw invalidArgument("unknown native union variants cannot be submitted")
+      throw IllegalArgumentException("unknown native union variants cannot be submitted")
   }
 }
 
@@ -1833,7 +1832,7 @@ internal fun NativeArena.putOpenglContextDescriptor(target: Long, value: OpenglC
       putWebglContextDescriptor(target + 8, variant.value)
     }
     is OpenglContextDescriptorData.Unknown ->
-      throw invalidArgument("unknown native union variants cannot be submitted")
+      throw IllegalArgumentException("unknown native union variants cannot be submitted")
   }
 }
 
