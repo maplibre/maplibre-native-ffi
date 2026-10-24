@@ -176,7 +176,7 @@ test "a decision handle answers its request later from another thread" {
 
     var diagnostic: maplibre.Diagnostic = .{};
     try testing.expectError(error.InvalidArgument, maplibre.resourceRequestComplete(testing.allocator, handle, .{ .etag = "bad\x00tag" }, &diagnostic));
-    try testing.expect(diagnostic.raw_status != null);
+    try testing.expect(diagnostic.status != null);
 
     var thread_result: ?anyerror = error.NotRun;
     const thread = try std.Thread.spawn(.{}, completeOnThread, .{ handle, &thread_result });
@@ -298,7 +298,7 @@ test "a scoped response rejects use after its callback and from another thread" 
     try testing.expectEqual(@as(?anyerror, error.InvalidState), probe.other_thread);
     var diagnostic: maplibre.Diagnostic = .{};
     try testing.expectError(error.InvalidState, maplibre.httpHeaderTransformResponseSetHeader(probe.saved.?, "X-Test", "late", &diagnostic));
-    try testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
+    try testing.expectEqual(null, diagnostic.status);
     try support.resolve(try maplibre.runtimeClearHttpHeaderTransform(fixture.runtime, null));
 }
 

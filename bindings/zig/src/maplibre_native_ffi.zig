@@ -20,8 +20,6 @@ const status = @import("status.zig");
 
 pub const OwnedValue = marshal.OwnedValue;
 
-/// This whole API under one name, for callers that walk its declarations.
-pub const generated = @This();
 pub const Future = completion.Future;
 pub const CommandCompletion = completion.CommandCompletion;
 pub const Error = status.Error;
@@ -120,10 +118,10 @@ pub const StyleExpression = owner.Handle("StyleExpression", "mln_style_expressio
     }
 }.dispose);
 pub const AmbientCacheOperation = enum(u32) {
-    clear = 4,
-    invalidate = 3,
-    pack_database = 2,
     reset_database = 1,
+    pack_database = 2,
+    invalidate = 3,
+    clear = 4,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -220,10 +218,10 @@ pub const BoundOptions = struct {
 /// See `mln_camera_change_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const CameraChangeMode = enum(u32) {
-    /// The camera moved as part of an animated transition.
-    animated = 1,
     /// The camera reached its new value without an animated transition.
     immediate = 0,
+    /// The camera moved as part of an animated transition.
+    animated = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -348,7 +346,7 @@ pub const CameraOptions = struct {
 /// See `mln_camera_query_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const CameraQueryResult = struct {
-    generation: u64 = std.mem.zeroes(u64),
+    generation: u64 = 0,
     camera: CameraOptions,
     pub fn fromNative(raw: c.mln_camera_query_result) CameraQueryResult {
         return .{
@@ -364,12 +362,12 @@ pub const CameraQueryResult = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const CameraTransitionEnd = struct {
     /// One of `mln_camera_transition_outcome`.
-    outcome: CameraTransitionOutcome = std.mem.zeroes(CameraTransitionOutcome),
+    outcome: CameraTransitionOutcome = .completed,
     /// Generation of the published snapshot that shows the camera where the
     /// transitions left it. The map events of the change that ended them carry
     /// this generation and are queued before the callback runs. Zero for
     /// `MLN_CAMERA_TRANSITION_OUTCOME_CLOSED`.
-    generation: u64 = std.mem.zeroes(u64),
+    generation: u64 = 0,
     pub fn fromNative(raw: c.mln_camera_transition_end) CameraTransitionEnd {
         return .{
             .outcome = CameraTransitionOutcome.fromNative(raw.outcome),
@@ -419,15 +417,15 @@ pub const CameraTransitionHandler = struct {
 /// See `mln_camera_transition_outcome` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const CameraTransitionOutcome = enum(u32) {
-    /// The map closed before the transitions ended.
-    closed = 2,
+    /// Every property of the command reached its target, or a later camera
+    /// write replaced it.
+    completed = 0,
     /// `mln_map_cancel_transitions()`, `mln_map_cancel_camera_transition()`, or
     /// `MLN_GESTURE_PHASE_CANCEL` ended the transitions, or the command failed
     /// before it started them.
     cancelled = 1,
-    /// Every property of the command reached its target, or a later camera
-    /// write replaced it.
-    completed = 0,
+    /// The map closed before the transitions ended.
+    closed = 2,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -467,9 +465,9 @@ pub const CameraUpdate = struct {
 /// See `mln_camera_update_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const CameraUpdateMode = enum(u32) {
-    fly = 2,
-    ease = 1,
     jump = 0,
+    ease = 1,
+    fly = 2,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -481,9 +479,9 @@ pub const CameraUpdateMode = enum(u32) {
 /// See `mln_canonical_tile_id` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const CanonicalTileId = struct {
-    z: u32 = std.mem.zeroes(u32),
-    x: u32 = std.mem.zeroes(u32),
-    y: u32 = std.mem.zeroes(u32),
+    z: u32 = 0,
+    x: u32 = 0,
+    y: u32 = 0,
     pub fn toNative(self: CanonicalTileId) c.mln_canonical_tile_id {
         var raw = std.mem.zeroes(c.mln_canonical_tile_id);
         raw.z = self.z;
@@ -505,10 +503,10 @@ pub const CanonicalTileId = struct {
 /// See `mln_command_disposition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/completion_8h.html).
 pub const CommandDisposition = enum(u32) {
-    cancelled = 3,
-    failed = 2,
-    superseded = 1,
     committed = 0,
+    superseded = 1,
+    failed = 2,
+    cancelled = 3,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -519,10 +517,10 @@ pub const CommandDisposition = enum(u32) {
 /// See `mln_constrain_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const ConstrainMode = enum(u32) {
-    screen = 3,
-    width_and_height = 2,
-    height_only = 1,
     none = 0,
+    height_only = 1,
+    width_and_height = 2,
+    screen = 3,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -684,10 +682,10 @@ pub const CustomMvtVectorSourceOptions = struct {
 /// See `mln_edge_insets` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const EdgeInsets = struct {
-    top: f64 = std.mem.zeroes(f64),
-    left: f64 = std.mem.zeroes(f64),
-    bottom: f64 = std.mem.zeroes(f64),
-    right: f64 = std.mem.zeroes(f64),
+    top: f64 = 0,
+    left: f64 = 0,
+    bottom: f64 = 0,
+    right: f64 = 0,
     pub fn toNative(self: EdgeInsets) c.mln_edge_insets {
         var raw = std.mem.zeroes(c.mln_edge_insets);
         raw.top = self.top;
@@ -716,21 +714,21 @@ pub const EglContextDescriptor = struct {
     /// whole process, so a shared display must stay initialized until every
     /// session using it has detached or been destroyed. The host must not call
     /// eglTerminate per session.
-    display: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    display: ?*anyopaque = null,
     /// Borrowed EGLConfig used to create the session context. Required. OpenGL
     /// texture targets require EGL_SURFACE_TYPE to include EGL_PBUFFER_BIT.
-    config: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    config: ?*anyopaque = null,
     /// Borrowed EGLContext whose share group the session context joins.
     /// Required under shared ownership, where the session also takes its client
     /// API from this context. A dedicated session joins no share group, so it
     /// must be null there and names client_api instead.
-    share_context: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    share_context: ?*anyopaque = null,
     /// Client API the session creates its context for. Required under dedicated
     /// ownership. A shared session queries share_context for it, so this is
     /// ignored there.
-    client_api: OpenglClientApi = std.mem.zeroes(OpenglClientApi),
+    client_api: OpenglClientApi = .unspecified,
     /// Optional eglGetProcAddress-compatible function for the host loader.
-    get_proc_address: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    get_proc_address: ?*anyopaque = null,
     pub fn toNative(self: EglContextDescriptor) c.mln_egl_context_descriptor {
         var raw = std.mem.zeroes(c.mln_egl_context_descriptor);
         raw.display = self.display;
@@ -973,18 +971,18 @@ pub const GeojsonSourceOptions = struct {
 /// See `mln_gesture_phase` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const GesturePhase = enum(u32) {
-    /// Cancels transitions running after the camera write, then clears the
-    /// gesture flag.
-    cancel = 4,
-    /// Clears the gesture flag after the camera write.
-    end = 3,
-    /// Keeps the gesture marked as in progress before the camera write.
-    update = 2,
+    /// The update carries no gesture boundary and leaves the flag as it is.
+    none = 0,
     /// Marks a gesture as in progress before the camera write. It does not
     /// cancel running transitions; use `mln_map_cancel_transitions()` for that.
     begin = 1,
-    /// The update carries no gesture boundary and leaves the flag as it is.
-    none = 0,
+    /// Keeps the gesture marked as in progress before the camera write.
+    update = 2,
+    /// Clears the gesture flag after the camera write.
+    end = 3,
+    /// Cancels transitions running after the camera write, then clears the
+    /// gesture flag.
+    cancel = 4,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -1018,13 +1016,13 @@ pub const GpuSync = struct {
 /// See `mln_gpu_sync_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const GpuSyncKind = enum(u32) {
-    /// GLsync in the shared EGL or WGL context's share group, used only by a
-    /// caller-graphics-thread driver. object is nonzero.
-    opengl_fence = 3,
     /// The host needs no synchronization object. The work completed, or on
     /// WebGPU was submitted to the device's queue, before the frame became
     /// acquirable or before the release call.
     cpu_complete = 0,
+    /// GLsync in the shared EGL or WGL context's share group, used only by a
+    /// caller-graphics-thread driver. object is nonzero.
+    opengl_fence = 3,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -1156,10 +1154,10 @@ pub const HttpHeaderTransformResponse = struct { native: *c.mln_http_header_tran
 /// See `mln_image_content` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const ImageContent = struct {
-    left: f32 = std.mem.zeroes(f32),
-    top: f32 = std.mem.zeroes(f32),
-    right: f32 = std.mem.zeroes(f32),
-    bottom: f32 = std.mem.zeroes(f32),
+    left: f32 = 0,
+    top: f32 = 0,
+    right: f32 = 0,
+    bottom: f32 = 0,
     pub fn toNative(self: ImageContent) c.mln_image_content {
         var raw = std.mem.zeroes(c.mln_image_content);
         raw.left = self.left;
@@ -1183,8 +1181,8 @@ pub const ImageContent = struct {
 /// See `mln_image_stretch` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const ImageStretch = struct {
-    from: f32 = std.mem.zeroes(f32),
-    to: f32 = std.mem.zeroes(f32),
+    from: f32 = 0,
+    to: f32 = 0,
     pub fn toNative(self: ImageStretch) c.mln_image_stretch {
         var raw = std.mem.zeroes(c.mln_image_stretch);
         raw.from = self.from;
@@ -1205,9 +1203,9 @@ pub const ImageStretch = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const LatLng = struct {
     /// Latitude in degrees, finite and within \[-90, 90\] on input.
-    latitude: f64 = std.mem.zeroes(f64),
+    latitude: f64 = 0,
     /// Longitude in degrees. Input longitude must be finite.
-    longitude: f64 = std.mem.zeroes(f64),
+    longitude: f64 = 0,
     pub fn toNative(self: LatLng) c.mln_lat_lng {
         var raw = std.mem.zeroes(c.mln_lat_lng);
         raw.latitude = self.latitude;
@@ -1248,23 +1246,23 @@ pub const LatLngBounds = struct {
 /// See `mln_log_event` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 pub const LogEvent = enum(u32) {
-    timing = 16,
-    glyph = 15,
-    crash = 14,
-    android = 13,
-    jni = 12,
-    graphics_backend = 11,
-    image = 10,
-    sprite = 9,
-    http_request = 8,
-    database = 7,
-    style = 6,
-    render = 5,
-    parse_tile = 4,
-    parse_style = 3,
-    shader = 2,
-    setup = 1,
     general = 0,
+    setup = 1,
+    shader = 2,
+    parse_style = 3,
+    parse_tile = 4,
+    render = 5,
+    style = 6,
+    database = 7,
+    http_request = 8,
+    sprite = 9,
+    image = 10,
+    graphics_backend = 11,
+    jni = 12,
+    android = 13,
+    crash = 14,
+    glyph = 15,
+    timing = 16,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -1318,9 +1316,9 @@ pub const LogHandler = struct {
 /// See `mln_log_severity` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 pub const LogSeverity = enum(u32) {
-    @"error" = 3,
-    warning = 2,
     info = 1,
+    warning = 2,
+    @"error" = 3,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -1339,8 +1337,8 @@ pub const LogSeverityMask = struct {
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
-    pub const default = fromNative(6);
-    pub const all = fromNative(14);
+    pub const default: LogSeverityMask = .{ .info = true, .warning = true };
+    pub const all: LogSeverityMask = .{ .info = true, .warning = true, .@"error" = true };
 };
 
 /// Logical extent in UI pixels and the device-pixel scale.
@@ -1394,12 +1392,12 @@ pub const MapDebugOption = struct {
 /// See `mln_map_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const MapMode = enum(u32) {
-    /// Produces one-off still images for a single tile.
-    tile = 2,
-    /// Produces one-off still images of an arbitrary viewport.
-    static = 1,
     /// Continuously updates as data arrives and map state changes.
     continuous = 0,
+    /// Produces one-off still images of an arbitrary viewport.
+    static = 1,
+    /// Produces one-off still images for a single tile.
+    tile = 2,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -1446,21 +1444,21 @@ pub const MapOptions = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const MapSnapshot = struct {
     /// Debug overlay mask of `mln_map_debug_option` values.
-    debug_options: MapDebugOption = std.mem.zeroes(MapDebugOption),
-    generation: u64 = std.mem.zeroes(u64),
+    debug_options: MapDebugOption = .{},
+    generation: u64 = 0,
     /// True once every requested style and tile resource finished loading.
-    fully_loaded: bool = std.mem.zeroes(bool),
-    rendering_stats_view_enabled: bool = std.mem.zeroes(bool),
+    fully_loaded: bool = false,
+    rendering_stats_view_enabled: bool = false,
     /// True while the map is inside a gesture.
-    gesture_in_progress: bool = std.mem.zeroes(bool),
+    gesture_in_progress: bool = false,
     /// True while a camera command with a duration is still animating.
-    transition_in_progress: bool = std.mem.zeroes(bool),
-    event_mask: RuntimeEventMask = std.mem.zeroes(RuntimeEventMask),
+    transition_in_progress: bool = false,
+    event_mask: RuntimeEventMask = .{},
     /// Generation of the latest render update the map published. A rendered
     /// frame at or past it draws map state that includes every command this
     /// snapshot observes, though animations and resource loads finish in later
     /// frames.
-    latest_render_update_generation: u64 = std.mem.zeroes(u64),
+    latest_render_update_generation: u64 = 0,
     tile: MapTileOptions,
     bounds: BoundOptions,
     free_camera: FreeCameraOptions,
@@ -1595,7 +1593,7 @@ pub const MapViewportOptions = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const MetalBorrowedTexture = struct {
     /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
-    texture: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    texture: ?*anyopaque = null,
     pub fn toNative(self: MetalBorrowedTexture) c.mln_metal_borrowed_texture {
         var raw = std.mem.zeroes(c.mln_metal_borrowed_texture);
         raw.texture = self.texture;
@@ -1661,7 +1659,7 @@ pub const MetalBorrowedTextureDescriptor = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const MetalContextDescriptor = struct {
     /// `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it.
-    device: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    device: ?*anyopaque = null,
     pub fn toNative(self: MetalContextDescriptor) c.mln_metal_context_descriptor {
         var raw = std.mem.zeroes(c.mln_metal_context_descriptor);
         raw.device = self.device;
@@ -1738,24 +1736,24 @@ pub const MetalSurfaceDescriptor = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const MetalTextureFrame = struct {
     /// Session generation that produced this frame.
-    generation: u64 = std.mem.zeroes(u64),
+    generation: u64 = 0,
     /// Physical Metal texture width in device pixels.
-    width: u32 = std.mem.zeroes(u32),
+    width: u32 = 0,
     /// Physical Metal texture height in device pixels.
-    height: u32 = std.mem.zeroes(u32),
+    height: u32 = 0,
     /// UI-to-device pixel scale used for this frame.
-    scale_factor: f64 = std.mem.zeroes(f64),
+    scale_factor: f64 = 0,
     /// Opaque identity of this frame.
-    frame_id: u64 = std.mem.zeroes(u64),
+    frame_id: u64 = 0,
     /// Ring slot that holds this frame. For a borrowed target, the index of its
     /// texture in the descriptor's textures array.
-    slot: u32 = std.mem.zeroes(u32),
+    slot: u32 = 0,
     /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release.
-    texture: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    texture: ?*anyopaque = null,
     /// Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release.
-    device: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    device: ?*anyopaque = null,
     /// Backend-native pixel format value. Metal uses MTLPixelFormat.
-    pixel_format: u64 = std.mem.zeroes(u64),
+    pixel_format: u64 = 0,
     pub fn fromNative(raw: c.mln_metal_texture_frame) MetalTextureFrame {
         return .{
             .generation = raw.generation,
@@ -1772,8 +1770,8 @@ pub const MetalTextureFrame = struct {
 };
 
 pub const NetworkStatus = enum(u32) {
-    offline = 2,
     online = 1,
+    offline = 2,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -1784,10 +1782,10 @@ pub const NetworkStatus = enum(u32) {
 /// See `mln_north_orientation` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const NorthOrientation = enum(u32) {
-    left = 3,
-    down = 2,
-    right = 1,
     up = 0,
+    right = 1,
+    down = 2,
+    left = 3,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -1802,12 +1800,12 @@ pub const OfflineGeometryRegionDefinition = struct {
     style_url: []const u8 = &.{},
     /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
     geometry: []const u8 = &.{},
-    min_zoom: f64 = std.mem.zeroes(f64),
+    min_zoom: f64 = 0,
     /// Maximum zoom. Positive infinity lets each tile source use its own
     /// maximum zoom.
-    max_zoom: f64 = std.mem.zeroes(f64),
-    pixel_ratio: f32 = std.mem.zeroes(f32),
-    include_ideographs: bool = std.mem.zeroes(bool),
+    max_zoom: f64 = 0,
+    pixel_ratio: f32 = 0,
+    include_ideographs: bool = false,
     pub fn toNative(self: OfflineGeometryRegionDefinition, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_offline_geometry_region_definition {
         _ = allocator;
         _ = roots;
@@ -1878,8 +1876,8 @@ pub const OfflineRegionDefinitionData = union(enum) {
 };
 
 pub const OfflineRegionDownloadState = enum(u32) {
-    active = 1,
     inactive = 0,
+    active = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -1890,7 +1888,7 @@ pub const OfflineRegionDownloadState = enum(u32) {
 /// See `mln_offline_region_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const OfflineRegionInfo = struct {
-    id: i64 = std.mem.zeroes(i64),
+    id: i64 = 0,
     definition: OfflineRegionDefinition = .{},
     /// Metadata bytes.
     metadata: []const u8 = &.{},
@@ -1910,15 +1908,15 @@ pub const OfflineRegionInfo = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const OfflineRegionStatus = struct {
     /// One of `mln_offline_region_download_state`.
-    download_state: OfflineRegionDownloadState = std.mem.zeroes(OfflineRegionDownloadState),
-    completed_resource_count: u64 = std.mem.zeroes(u64),
-    completed_resource_size: u64 = std.mem.zeroes(u64),
-    completed_tile_count: u64 = std.mem.zeroes(u64),
-    required_tile_count: u64 = std.mem.zeroes(u64),
-    completed_tile_size: u64 = std.mem.zeroes(u64),
-    required_resource_count: u64 = std.mem.zeroes(u64),
-    required_resource_count_is_precise: bool = std.mem.zeroes(bool),
-    complete: bool = std.mem.zeroes(bool),
+    download_state: OfflineRegionDownloadState = .inactive,
+    completed_resource_count: u64 = 0,
+    completed_resource_size: u64 = 0,
+    completed_tile_count: u64 = 0,
+    required_tile_count: u64 = 0,
+    completed_tile_size: u64 = 0,
+    required_resource_count: u64 = 0,
+    required_resource_count_is_precise: bool = false,
+    complete: bool = false,
     pub fn fromNative(raw: c.mln_offline_region_status) OfflineRegionStatus {
         return .{
             .download_state = OfflineRegionDownloadState.fromNative(raw.download_state),
@@ -1942,12 +1940,12 @@ pub const OfflineTilePyramidRegionDefinition = struct {
     /// Style URL. Copied during region creation.
     style_url: []const u8 = &.{},
     bounds: LatLngBounds = .{},
-    min_zoom: f64 = std.mem.zeroes(f64),
+    min_zoom: f64 = 0,
     /// Maximum zoom. Positive infinity lets each tile source use its own
     /// maximum zoom.
-    max_zoom: f64 = std.mem.zeroes(f64),
-    pixel_ratio: f32 = std.mem.zeroes(f32),
-    include_ideographs: bool = std.mem.zeroes(bool),
+    max_zoom: f64 = 0,
+    pixel_ratio: f32 = 0,
+    include_ideographs: bool = false,
     pub fn toNative(self: OfflineTilePyramidRegionDefinition, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_offline_tile_pyramid_region_definition {
         _ = allocator;
         _ = roots;
@@ -1979,7 +1977,7 @@ pub const OfflineTilePyramidRegionDefinition = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const OpenglBorrowedTexture = struct {
     /// Borrowed OpenGL texture object name. Required.
-    texture: u32 = std.mem.zeroes(u32),
+    texture: u32 = 0,
     pub fn toNative(self: OpenglBorrowedTexture) c.mln_opengl_borrowed_texture {
         var raw = std.mem.zeroes(c.mln_opengl_borrowed_texture);
         raw.texture = self.texture;
@@ -2052,12 +2050,12 @@ pub const OpenglBorrowedTextureDescriptor = struct {
 /// See `mln_opengl_client_api` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const OpenglClientApi = enum(u32) {
-    /// OpenGL ES, as EGL_OPENGL_ES_API names it.
-    gles = 2,
-    /// Desktop OpenGL, as EGL_OPENGL_API names it.
-    gl = 1,
     /// No client API is named.
     unspecified = 0,
+    /// Desktop OpenGL, as EGL_OPENGL_API names it.
+    gl = 1,
+    /// OpenGL ES, as EGL_OPENGL_ES_API names it.
+    gles = 2,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -2071,7 +2069,7 @@ pub const OpenglContextDescriptor = struct {
     /// Whether the session shares its driver thread and graphics objects with
     /// the host. A private EGL or WGL owned texture and a transferred WebGL
     /// canvas are dedicated to their core worker.
-    ownership: OpenglContextOwnership = std.mem.zeroes(OpenglContextOwnership),
+    ownership: OpenglContextOwnership = .shared,
     data: OpenglContextDescriptorData = .{ .unknown = 0 },
     pub fn toNative(self: OpenglContextDescriptor, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_opengl_context_descriptor {
         var raw = std.mem.zeroes(c.mln_opengl_context_descriptor);
@@ -2124,10 +2122,10 @@ pub const OpenglContextDescriptorData = union(enum) {
 /// See `mln_opengl_context_ownership` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const OpenglContextOwnership = enum(u32) {
-    /// The session keeps its own OpenGL context current on its thread.
-    dedicated = 1,
     /// The session shares its thread with host graphics work.
     shared = 0,
+    /// The session keeps its own OpenGL context current on its thread.
+    dedicated = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -2216,30 +2214,30 @@ pub const OpenglSurfaceDescriptor = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const OpenglTextureFrame = struct {
     /// Session generation that produced this frame.
-    generation: u64 = std.mem.zeroes(u64),
+    generation: u64 = 0,
     /// Physical OpenGL texture width in device pixels.
-    width: u32 = std.mem.zeroes(u32),
+    width: u32 = 0,
     /// Physical OpenGL texture height in device pixels.
-    height: u32 = std.mem.zeroes(u32),
+    height: u32 = 0,
     /// UI-to-device pixel scale used for this frame.
-    scale_factor: f64 = std.mem.zeroes(f64),
+    scale_factor: f64 = 0,
     /// Opaque identity of this frame.
-    frame_id: u64 = std.mem.zeroes(u64),
+    frame_id: u64 = 0,
     /// Ring slot that holds this frame. For a borrowed target, the index of its
     /// texture in the descriptor's textures array.
-    slot: u32 = std.mem.zeroes(u32),
+    slot: u32 = 0,
     /// Borrowed OpenGL texture object name. Valid until frame release.
-    texture: u32 = std.mem.zeroes(u32),
+    texture: u32 = 0,
     /// OpenGL texture target. GL_TEXTURE_2D is the expected target.
-    target: u32 = std.mem.zeroes(u32),
+    target: u32 = 0,
     /// OpenGL internal format, such as GL_RGBA8. Zero for a borrowed texture,
     /// whose format the host chose.
-    internal_format: u32 = std.mem.zeroes(u32),
+    internal_format: u32 = 0,
     /// OpenGL pixel format, such as GL_RGBA. Zero for a borrowed texture.
-    format: u32 = std.mem.zeroes(u32),
+    format: u32 = 0,
     /// OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed
     /// texture.
-    type: u32 = std.mem.zeroes(u32),
+    type: u32 = 0,
     pub fn fromNative(raw: c.mln_opengl_texture_frame) OpenglTextureFrame {
         return .{
             .generation = raw.generation,
@@ -2297,9 +2295,9 @@ pub const PremultipliedRgba8Image = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const ProjectedMeters = struct {
     /// Distance measured northward from the equator, in meters.
-    northing: f64 = std.mem.zeroes(f64),
+    northing: f64 = 0,
     /// Distance measured eastward from the prime meridian, in meters.
-    easting: f64 = std.mem.zeroes(f64),
+    easting: f64 = 0,
     pub fn toNative(self: ProjectedMeters) c.mln_projected_meters {
         var raw = std.mem.zeroes(c.mln_projected_meters);
         raw.northing = self.northing;
@@ -2347,10 +2345,10 @@ pub const ProjectionMode = struct {
 /// See `mln_quaternion` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const Quaternion = struct {
-    x: f64 = std.mem.zeroes(f64),
-    y: f64 = std.mem.zeroes(f64),
-    z: f64 = std.mem.zeroes(f64),
-    w: f64 = std.mem.zeroes(f64),
+    x: f64 = 0,
+    y: f64 = 0,
+    z: f64 = 0,
+    w: f64 = 0,
     pub fn toNative(self: Quaternion) c.mln_quaternion {
         var raw = std.mem.zeroes(c.mln_quaternion);
         raw.x = self.x;
@@ -2426,10 +2424,10 @@ pub const QueueLock = struct {
 /// See `mln_render_abandon_disposition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub const RenderAbandonDisposition = enum(u32) {
-    /// Abandon kept graphics resources that it could not safely destroy.
-    quarantined = 1,
     /// Abandon destroyed every graphics resource, or none remained.
     clean = 0,
+    /// Abandon kept graphics resources that it could not safely destroy.
+    quarantined = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -2437,9 +2435,9 @@ pub const RenderAbandonDisposition = enum(u32) {
 
 pub const RenderAbandonResult = struct {
     /// One `mln_render_abandon_disposition` value.
-    disposition: RenderAbandonDisposition = std.mem.zeroes(RenderAbandonDisposition),
+    disposition: RenderAbandonDisposition = .clean,
     /// Backend resource groups intentionally retained until process exit.
-    quarantined_resource_count: u32 = std.mem.zeroes(u32),
+    quarantined_resource_count: u32 = 0,
     pub fn fromNative(raw: c.mln_render_abandon_result) RenderAbandonResult {
         return .{
             .disposition = RenderAbandonDisposition.fromNative(raw.disposition),
@@ -2469,12 +2467,12 @@ pub const RenderBackendFlag = struct {
 /// See `mln_render_driver_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const RenderDriverKind = enum(u32) {
-    /// The host services driver work on the thread or realm where its graphics
-    /// context is current.
-    caller_graphics_thread = 2,
     /// Native code initializes, services, and tears down transferable graphics
     /// state on a library-owned thread.
     core_worker = 1,
+    /// The host services driver work on the thread or realm where its graphics
+    /// context is current.
+    caller_graphics_thread = 2,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -2510,20 +2508,20 @@ pub const RenderFrameBatchView = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub const RenderFrameResult = struct {
     /// One `mln_render_result` value.
-    disposition: RenderResult = std.mem.zeroes(RenderResult),
-    token: u64 = std.mem.zeroes(u64),
+    disposition: RenderResult = .rendered,
+    token: u64 = 0,
     /// Generation of the map render update the demand evaluated. When
     /// disposition is `MLN_RENDER_RESULT_RENDERED`, the frame drew that update;
     /// compare it with `mln_completion_result.render_update_generation` to find
     /// the first frame that includes a command.
-    map_update_generation: u64 = std.mem.zeroes(u64),
+    map_update_generation: u64 = 0,
     /// The session's target generation when the demand reached its result. See
     /// `mln_render_session_snapshot.generation`.
-    generation: u64 = std.mem.zeroes(u64),
+    generation: u64 = 0,
     /// Position of the frame among the frames that the session rendered,
     /// counting from one. Zero unless disposition is
     /// `MLN_RENDER_RESULT_RENDERED`.
-    frame_generation: u64 = std.mem.zeroes(u64),
+    frame_generation: u64 = 0,
     /// Whether the map asked for another frame while it rendered this one, as
     /// during an ongoing paint transition. Set only when disposition is
     /// `MLN_RENDER_RESULT_RENDERED`, and false for every other outcome. It
@@ -2531,7 +2529,7 @@ pub const RenderFrameResult = struct {
     /// `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`. A camera transition does
     /// not set it: the map publishes an update for each of the transition's
     /// frames instead, which a render-if-needed demand renders.
-    needs_repaint: bool = std.mem.zeroes(bool),
+    needs_repaint: bool = false,
     /// The view that this frame drew, from the transform of the map update that
     /// it rendered. A host that displays the frame builds its projection with
     /// `mln_map_projection_create()` to place overlays where the frame drew
@@ -2556,8 +2554,8 @@ pub const RenderFrameResult = struct {
 /// See `mln_render_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RenderMode = enum(u32) {
-    full = 1,
     partial = 0,
+    full = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -2568,21 +2566,21 @@ pub const RenderMode = enum(u32) {
 /// See `mln_render_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub const RenderResult = enum(u32) {
-    /// A newer IF_NEEDED demand with the same flags replaced this demand.
-    superseded = 4,
-    /// The target could not produce a frame. The attempt consumes nothing, so a
-    /// later demand with the same flags renders what this one would have. This
-    /// result does not cause a map update, so the host demands again when the
-    /// target can be ready, such as after a paced delay.
-    target_not_ready = 3,
+    /// A frame was rendered for acquisition, presentation, or ordered readback.
+    rendered = 0,
     /// No newer map update was available, the map had no complete frame to
     /// draw, or the update extent differed from the target. The map publishes
     /// another update when it has one. A demand with
     /// `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` waits for that update instead, and
     /// finishes with this result only when a barrier ends its wait.
     no_update = 1,
-    /// A frame was rendered for acquisition, presentation, or ordered readback.
-    rendered = 0,
+    /// The target could not produce a frame. The attempt consumes nothing, so a
+    /// later demand with the same flags renders what this one would have. This
+    /// result does not cause a map update, so the host demands again when the
+    /// target can be ready, such as after a paced delay.
+    target_not_ready = 3,
+    /// A newer IF_NEEDED demand with the same flags replaced this demand.
+    superseded = 4,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -2648,12 +2646,12 @@ pub const RenderSessionAttachOptions = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const RenderSessionCapabilities = struct {
     /// One `mln_render_driver_kind` value.
-    driver: RenderDriverKind = std.mem.zeroes(RenderDriverKind),
+    driver: RenderDriverKind = @fromBackingInt(@intCast(0)),
     /// Granted texture ring depth: the slot count of a session-owned ring, or
     /// the texture count of a borrowed one. Zero for a surface.
-    texture_ring_depth: u32 = std.mem.zeroes(u32),
+    texture_ring_depth: u32 = 0,
     /// A bitwise OR of `mln_render_session_capability_flag` values.
-    flags: RenderSessionCapabilityFlag = std.mem.zeroes(RenderSessionCapabilityFlag),
+    flags: RenderSessionCapabilityFlag = .{},
     pub fn fromNative(raw: c.mln_render_session_capabilities) RenderSessionCapabilities {
         return .{
             .driver = RenderDriverKind.fromNative(raw.driver),
@@ -2685,24 +2683,24 @@ pub const RenderSessionCapabilityFlag = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub const RenderSessionSnapshot = struct {
     /// One `mln_render_session_state` value.
-    state: RenderSessionState = std.mem.zeroes(RenderSessionState),
+    state: RenderSessionState = @fromBackingInt(@intCast(0)),
     /// Logical extent applied by the driver.
     extent: LogicalExtent,
     /// Increases when the session's lifecycle state, target, or applied extent
     /// changes. An acquired texture frame reports the value it rendered under.
-    generation: u64 = std.mem.zeroes(u64),
+    generation: u64 = 0,
     /// Generation of the latest map render update that the session has seen.
-    map_update_generation: u64 = std.mem.zeroes(u64),
+    map_update_generation: u64 = 0,
     /// Map render update generation that the latest rendered frame drew. Zero
     /// before the first frame after attachment or a target replacement.
-    rendered_update_generation: u64 = std.mem.zeroes(u64),
+    rendered_update_generation: u64 = 0,
     /// Frame generation of the latest rendered frame, zero before the first.
-    frame_generation: u64 = std.mem.zeroes(u64),
+    frame_generation: u64 = 0,
     /// Acquired frames that the host has not released or discarded.
-    acquired_frame_count: u32 = std.mem.zeroes(u32),
+    acquired_frame_count: u32 = 0,
     /// True when a map update or an accepted resize arrived after the latest
     /// rendered frame.
-    pending_changes: bool = std.mem.zeroes(bool),
+    pending_changes: bool = false,
     pub fn fromNative(raw: c.mln_render_session_snapshot) RenderSessionSnapshot {
         return .{
             .state = RenderSessionState.fromNative(raw.state),
@@ -2722,15 +2720,15 @@ pub const RenderSessionSnapshot = struct {
 /// See `mln_render_session_state` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub const RenderSessionState = enum(u32) {
-    abandoned = 6,
+    attaching = 1,
+    attached = 2,
+    detaching = 3,
+    detached = 4,
     /// A frame or driver task failed and the session can no longer render. The
     /// map reports the failure as `MLN_RUNTIME_EVENT_MAP_RENDER_ERROR`. A
     /// failed attach reports it through its completion instead.
     target_lost = 5,
-    detached = 4,
-    detaching = 3,
-    attached = 2,
-    attaching = 1,
+    abandoned = 6,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -2856,15 +2854,15 @@ pub const RenderedQueryGeometryData = union(enum) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RenderingStats = struct {
     /// Frame CPU encoding time in seconds.
-    encoding_time: f64 = std.mem.zeroes(f64),
+    encoding_time: f64 = 0,
     /// Frame CPU rendering time in seconds.
-    rendering_time: f64 = std.mem.zeroes(f64),
+    rendering_time: f64 = 0,
     /// Number of frames rendered by the native renderer.
-    frame_count: i64 = std.mem.zeroes(i64),
+    frame_count: i64 = 0,
     /// Draw calls executed during the most recent frame.
-    draw_call_count: i64 = std.mem.zeroes(i64),
+    draw_call_count: i64 = 0,
     /// Total draw calls executed by the native renderer.
-    total_draw_call_count: i64 = std.mem.zeroes(i64),
+    total_draw_call_count: i64 = 0,
     pub fn fromNative(raw: c.mln_rendering_stats) RenderingStats {
         return .{
             .encoding_time = raw.encoding_time,
@@ -2877,26 +2875,26 @@ pub const RenderingStats = struct {
 };
 
 pub const ResourceErrorReason = enum(u32) {
-    other = 5,
-    rate_limit = 4,
-    connection = 3,
-    server = 2,
-    not_found = 1,
     none = 0,
+    not_found = 1,
+    server = 2,
+    connection = 3,
+    rate_limit = 4,
+    other = 5,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
 pub const ResourceKind = enum(u32) {
-    image = 7,
-    sprite_json = 6,
-    sprite_image = 5,
-    glyphs = 4,
-    tile = 3,
-    source = 2,
-    style = 1,
     unknown = 0,
+    style = 1,
+    source = 2,
+    tile = 3,
+    glyphs = 4,
+    sprite_image = 5,
+    sprite_json = 6,
+    image = 7,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -2922,21 +2920,21 @@ pub const ResourceKindMask = struct {
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
-    pub const all = fromNative(255);
+    pub const all: ResourceKindMask = .{ .unknown = true, .style = true, .source = true, .tile = true, .glyphs = true, .sprite_image = true, .sprite_json = true, .image = true };
 };
 
 pub const ResourceLoadingMethod = enum(u32) {
-    network_only = 2,
-    cache_only = 1,
     all = 0,
+    cache_only = 1,
+    network_only = 2,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
 pub const ResourcePriority = enum(u32) {
-    low = 1,
     regular = 0,
+    low = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -2994,8 +2992,8 @@ pub const ResourceProvider = struct {
 };
 
 pub const ResourceProviderDecision = enum(u32) {
-    handle = 1,
     pass_through = 0,
+    handle = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -3007,9 +3005,9 @@ pub const ResourceProviderDecision = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceRange = struct {
     /// First byte offset of the requested range.
-    start: u64 = std.mem.zeroes(u64),
+    start: u64 = 0,
     /// Last byte offset of the requested range, inclusive.
-    end: u64 = std.mem.zeroes(u64),
+    end: u64 = 0,
     pub fn fromNative(raw: c.mln_resource_range) ResourceRange {
         return .{
             .start = raw.start,
@@ -3061,11 +3059,11 @@ pub const ResourceRequestInfo = struct {
     /// URL to fetch, after resource-kind normalization against the runtime's
     /// tile server options and API key.
     resolved_url: ?[]const u8 = null,
-    kind: ResourceKind = std.mem.zeroes(ResourceKind),
-    loading_method: ResourceLoadingMethod = std.mem.zeroes(ResourceLoadingMethod),
-    priority: ResourcePriority = std.mem.zeroes(ResourcePriority),
-    usage: ResourceUsage = std.mem.zeroes(ResourceUsage),
-    storage_policy: ResourceStoragePolicy = std.mem.zeroes(ResourceStoragePolicy),
+    kind: ResourceKind = .unknown,
+    loading_method: ResourceLoadingMethod = .all,
+    priority: ResourcePriority = .regular,
+    usage: ResourceUsage = .online,
+    storage_policy: ResourceStoragePolicy = .permanent,
     range: ?ResourceRange = null,
     prior_modified_unix_ms: ?i64 = null,
     prior_expires_unix_ms: ?i64 = null,
@@ -3095,12 +3093,12 @@ pub const ResourceRequestInfo = struct {
 /// See `mln_resource_response` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceResponse = struct {
-    status: ResourceResponseStatus = std.mem.zeroes(ResourceResponseStatus),
-    error_reason: ResourceErrorReason = std.mem.zeroes(ResourceErrorReason),
+    status: ResourceResponseStatus = .ok,
+    error_reason: ResourceErrorReason = .none,
     /// Response bytes. May be null only when byte_count is 0.
     bytes: []const u8 = &.{},
     error_message: ?[]const u8 = null,
-    must_revalidate: bool = std.mem.zeroes(bool),
+    must_revalidate: bool = false,
     modified_unix_ms: ?i64 = null,
     expires_unix_ms: ?i64 = null,
     etag: ?[]const u8 = null,
@@ -3144,10 +3142,10 @@ pub const ResourceResponse = struct {
 /// See `mln_resource_response_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceResponseStatus = enum(u32) {
-    not_modified = 3,
-    no_content = 2,
-    @"error" = 1,
     ok = 0,
+    @"error" = 1,
+    no_content = 2,
+    not_modified = 3,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -3184,8 +3182,8 @@ pub const ResourceRoute = struct {
 };
 
 pub const ResourceStoragePolicy = enum(u32) {
-    @"volatile" = 1,
     permanent = 0,
+    @"volatile" = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -3237,8 +3235,8 @@ pub const ResourceTransform = struct {
 };
 
 pub const ResourceUsage = enum(u32) {
-    offline = 1,
     online = 0,
+    offline = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -3250,17 +3248,17 @@ pub const ResourceUsage = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEvent = struct {
     /// One of `mln_runtime_event_type`.
-    type: RuntimeEventType = std.mem.zeroes(RuntimeEventType),
+    type: RuntimeEventType = @fromBackingInt(@intCast(0)),
     /// One of `mln_runtime_event_source_type`.
-    source_type: RuntimeEventSourceType = std.mem.zeroes(RuntimeEventSourceType),
+    source_type: RuntimeEventSourceType = .runtime,
     /// Source handle selected by source_type: an `mln_runtime` or an `mln_map`.
-    source: u64 = std.mem.zeroes(u64),
+    source: u64 = 0,
     /// Map snapshot generation that the event reports, or zero when source_type
     /// is `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
-    generation: u64 = std.mem.zeroes(u64),
+    generation: u64 = 0,
     /// Secondary event detail whose meaning type selects; see
     /// `mln_runtime_event_type`.
-    code: i32 = std.mem.zeroes(i32),
+    code: i32 = 0,
     /// Borrowed UTF-8 message bytes, empty when this event carries no message.
     message: []const u8 = &.{},
     /// Typed payload selected by payload_type.
@@ -3356,10 +3354,10 @@ pub const RuntimeEventMask = struct {
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
-    pub const none = fromNative(0);
-    pub const all_map_events = fromNative(8906238);
-    pub const all_runtime_events = fromNative(3670016);
-    pub const all = fromNative(12576254);
+    pub const none: RuntimeEventMask = .{};
+    pub const all_map_events: RuntimeEventMask = .{ .map_camera_will_change = true, .map_camera_is_changing = true, .map_camera_did_change = true, .map_style_loaded = true, .map_loading_started = true, .map_loading_finished = true, .map_loading_failed = true, .map_idle = true, .map_render_error = true, .map_render_frame_started = true, .map_render_frame_finished = true, .map_render_map_started = true, .map_render_map_finished = true, .map_style_image_missing = true, .map_tile_action = true, .map_source_changed = true };
+    pub const all_runtime_events: RuntimeEventMask = .{ .offline_region_status_changed = true, .offline_region_response_error = true, .offline_region_tile_count_limit_exceeded = true };
+    pub const all: RuntimeEventMask = .{ .map_camera_will_change = true, .map_camera_is_changing = true, .map_camera_did_change = true, .map_style_loaded = true, .map_loading_started = true, .map_loading_finished = true, .map_loading_failed = true, .map_idle = true, .map_render_error = true, .map_render_frame_started = true, .map_render_frame_finished = true, .map_render_map_started = true, .map_render_map_finished = true, .map_style_image_missing = true, .map_tile_action = true, .offline_region_status_changed = true, .offline_region_response_error = true, .offline_region_tile_count_limit_exceeded = true, .map_source_changed = true };
 };
 
 /// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
@@ -3367,9 +3365,9 @@ pub const RuntimeEventMask = struct {
 /// See `mln_runtime_event_offline_region_response_error` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventOfflineRegionResponseError = struct {
-    region_id: i64 = std.mem.zeroes(i64),
+    region_id: i64 = 0,
     /// One of `mln_resource_error_reason`.
-    reason: ResourceErrorReason = std.mem.zeroes(ResourceErrorReason),
+    reason: ResourceErrorReason = .none,
     pub fn fromNative(raw: c.mln_runtime_event_offline_region_response_error) RuntimeEventOfflineRegionResponseError {
         return .{
             .region_id = raw.region_id,
@@ -3383,7 +3381,7 @@ pub const RuntimeEventOfflineRegionResponseError = struct {
 /// See `mln_runtime_event_offline_region_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventOfflineRegionStatus = struct {
-    region_id: i64 = std.mem.zeroes(i64),
+    region_id: i64 = 0,
     status: OfflineRegionStatus = .{},
     pub fn fromNative(raw: c.mln_runtime_event_offline_region_status) RuntimeEventOfflineRegionStatus {
         return .{
@@ -3398,8 +3396,8 @@ pub const RuntimeEventOfflineRegionStatus = struct {
 /// See `mln_runtime_event_offline_region_tile_count_limit` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventOfflineRegionTileCountLimit = struct {
-    region_id: i64 = std.mem.zeroes(i64),
-    limit: u64 = std.mem.zeroes(u64),
+    region_id: i64 = 0,
+    limit: u64 = 0,
     pub fn fromNative(raw: c.mln_runtime_event_offline_region_tile_count_limit) RuntimeEventOfflineRegionTileCountLimit {
         return .{
             .region_id = raw.region_id,
@@ -3429,11 +3427,11 @@ pub const RuntimeEventPayload = union(enum) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventRenderFrame = struct {
     /// One of `mln_render_mode`.
-    mode: RenderMode = std.mem.zeroes(RenderMode),
+    mode: RenderMode = .partial,
     /// Whether MapLibre needs another frame after this one.
-    needs_repaint: bool = std.mem.zeroes(bool),
+    needs_repaint: bool = false,
     /// Whether symbol placement changed during this frame.
-    placement_changed: bool = std.mem.zeroes(bool),
+    placement_changed: bool = false,
     stats: RenderingStats = .{},
     pub fn fromNative(raw: c.mln_runtime_event_render_frame) RuntimeEventRenderFrame {
         return .{
@@ -3451,7 +3449,7 @@ pub const RuntimeEventRenderFrame = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventRenderMap = struct {
     /// One of `mln_render_mode`.
-    mode: RenderMode = std.mem.zeroes(RenderMode),
+    mode: RenderMode = .partial,
     pub fn fromNative(raw: c.mln_runtime_event_render_map) RuntimeEventRenderMap {
         return .{
             .mode = RenderMode.fromNative(raw.mode),
@@ -3464,8 +3462,8 @@ pub const RuntimeEventRenderMap = struct {
 /// See `mln_runtime_event_source_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventSourceType = enum(u32) {
-    map = 1,
     runtime = 0,
+    map = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -3477,7 +3475,7 @@ pub const RuntimeEventSourceType = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventTileAction = struct {
     /// One of `mln_tile_operation`.
-    operation: TileOperation = std.mem.zeroes(TileOperation),
+    operation: TileOperation = .requested_from_cache,
     tile_id: TileId = .{},
     pub fn fromNative(raw: c.mln_runtime_event_tile_action) RuntimeEventTileAction {
         return .{
@@ -3492,25 +3490,25 @@ pub const RuntimeEventTileAction = struct {
 /// See `mln_runtime_event_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventType = enum(u32) {
-    map_source_changed = 23,
-    offline_region_tile_count_limit_exceeded = 21,
-    offline_region_response_error = 20,
-    offline_region_status_changed = 19,
-    map_tile_action = 18,
-    map_style_image_missing = 17,
-    map_render_map_finished = 16,
-    map_render_map_started = 15,
-    map_render_frame_finished = 14,
-    map_render_frame_started = 13,
-    map_render_error = 10,
-    map_idle = 8,
-    map_loading_failed = 7,
-    map_loading_finished = 6,
-    map_loading_started = 5,
-    map_style_loaded = 4,
-    map_camera_did_change = 3,
-    map_camera_is_changing = 2,
     map_camera_will_change = 1,
+    map_camera_is_changing = 2,
+    map_camera_did_change = 3,
+    map_style_loaded = 4,
+    map_loading_started = 5,
+    map_loading_finished = 6,
+    map_loading_failed = 7,
+    map_idle = 8,
+    map_render_error = 10,
+    map_render_frame_started = 13,
+    map_render_frame_finished = 14,
+    map_render_map_started = 15,
+    map_render_map_finished = 16,
+    map_style_image_missing = 17,
+    map_tile_action = 18,
+    offline_region_status_changed = 19,
+    offline_region_response_error = 20,
+    offline_region_tile_count_limit_exceeded = 21,
+    map_source_changed = 23,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -3601,8 +3599,8 @@ pub const ScreenLineString = struct {
 /// See `mln_screen_point` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const ScreenPoint = struct {
-    x: f64 = std.mem.zeroes(f64),
-    y: f64 = std.mem.zeroes(f64),
+    x: f64 = 0,
+    y: f64 = 0,
     pub fn toNative(self: ScreenPoint) c.mln_screen_point {
         var raw = std.mem.zeroes(c.mln_screen_point);
         raw.x = self.x;
@@ -3681,27 +3679,27 @@ pub const SourceFeatureQueryOptions = struct {
 /// See `mln_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub const Status = enum(i32) {
-    /// A call named an ID with no live object behind it.
-    not_found = -10,
-    /// A nonblocking drain or acquisition has nothing to return yet.
-    not_ready = -9,
-    /// The render target or graphics receiver was irreversibly lost.
-    target_lost = -8,
-    /// A conflicting driver call or lifecycle transition is in flight.
-    busy = -7,
-    /// The operation reached its terminal cancelled disposition.
-    cancelled = -6,
-    /// Native code failed; the diagnostic describes the error.
-    native_error = -5,
-    /// The entry point or requested behavior is unavailable in this build.
-    unsupported = -4,
-    /// The handle is thread-affine and the call came from the wrong thread.
-    wrong_thread = -3,
-    /// The object is valid but not currently in a state that permits the call.
-    invalid_state = -2,
+    ok = 0,
     /// A pointer, size field, mask, or handle argument was invalid.
     invalid_argument = -1,
-    ok = 0,
+    /// The object is valid but not currently in a state that permits the call.
+    invalid_state = -2,
+    /// The handle is thread-affine and the call came from the wrong thread.
+    wrong_thread = -3,
+    /// The entry point or requested behavior is unavailable in this build.
+    unsupported = -4,
+    /// Native code failed; the diagnostic describes the error.
+    native_error = -5,
+    /// The operation reached its terminal cancelled disposition.
+    cancelled = -6,
+    /// A conflicting driver call or lifecycle transition is in flight.
+    busy = -7,
+    /// The render target or graphics receiver was irreversibly lost.
+    target_lost = -8,
+    /// A nonblocking drain or acquisition has nothing to return yet.
+    not_ready = -9,
+    /// A call named an ID with no live object behind it.
+    not_found = -10,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -3713,9 +3711,9 @@ pub const Status = enum(i32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 pub const StyleExpressionInfo = struct {
     /// Whether the result is the same for every feature and feature state.
-    is_feature_constant: bool = std.mem.zeroes(bool),
+    is_feature_constant: bool = false,
     /// Whether the result is the same at every zoom.
-    is_zoom_constant: bool = std.mem.zeroes(bool),
+    is_zoom_constant: bool = false,
     pub fn fromNative(raw: c.mln_style_expression_info) StyleExpressionInfo {
         return .{
             .is_feature_constant = raw.is_feature_constant,
@@ -3824,11 +3822,11 @@ pub const StyleExpressionOptions = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 pub const StyleExpressionType = struct {
     /// One of `mln_style_expression_type_kind`.
-    kind: StyleExpressionTypeKind = std.mem.zeroes(StyleExpressionTypeKind),
+    kind: StyleExpressionTypeKind = .value,
     /// For an array, its items' kind; ignored for any other kind.
-    item_kind: StyleExpressionTypeKind = std.mem.zeroes(StyleExpressionTypeKind),
+    item_kind: StyleExpressionTypeKind = .value,
     /// For an array, its fixed length, or zero for any length.
-    item_count: u32 = std.mem.zeroes(u32),
+    item_count: u32 = 0,
     pub fn toNative(self: StyleExpressionType) c.mln_style_expression_type {
         var raw = std.mem.zeroes(c.mln_style_expression_type);
         raw.kind = self.kind.toNative();
@@ -3850,20 +3848,20 @@ pub const StyleExpressionType = struct {
 /// See `mln_style_expression_type_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 pub const StyleExpressionTypeKind = enum(u32) {
-    /// An array whose items have item_kind, which is not itself an array.
-    array = 10,
-    variable_anchor_offset_collection = 9,
-    padding = 8,
-    /// A resolved image, as the image expression returns.
-    image = 7,
-    formatted = 6,
-    object = 5,
-    color = 4,
-    boolean = 3,
-    string = 2,
-    number = 1,
     /// Any value.
     value = 0,
+    number = 1,
+    string = 2,
+    boolean = 3,
+    color = 4,
+    object = 5,
+    formatted = 6,
+    /// A resolved image, as the image expression returns.
+    image = 7,
+    padding = 8,
+    variable_anchor_offset_collection = 9,
+    /// An array whose items have item_kind, which is not itself an array.
+    array = 10,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -3875,9 +3873,9 @@ pub const StyleExpressionTypeKind = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleImageInfo = struct {
     /// Image width in pixels.
-    width: u32 = std.mem.zeroes(u32),
+    width: u32 = 0,
     /// Image height in pixels.
-    height: u32 = std.mem.zeroes(u32),
+    height: u32 = 0,
     /// Premultiplied RGBA8 pixels in tightly packed rows of width \* 4 bytes,
     /// top row first.
     pixels: []const u8 = &.{},
@@ -3892,9 +3890,9 @@ pub const StyleImageInfo = struct {
     /// How the image fits text vertically, when it sets this.
     text_fit_height: ?StyleImageTextFit = null,
     /// Sprite pixel ratio.
-    pixel_ratio: f32 = std.mem.zeroes(f32),
+    pixel_ratio: f32 = 0,
     /// Whether the image is a signed distance field icon.
-    sdf: bool = std.mem.zeroes(bool),
+    sdf: bool = false,
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_image_info) status.Error!StyleImageInfo {
         return .{
@@ -3998,9 +3996,9 @@ pub const StyleImageOptions = struct {
 /// See `mln_style_image_text_fit` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleImageTextFit = enum(u32) {
-    proportional = 2,
-    stretch_only = 1,
     stretch_or_shrink = 0,
+    stretch_only = 1,
+    proportional = 2,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -4020,11 +4018,11 @@ pub const StyleLayerInfo = struct {
     /// Source-layer ID. Empty when the layer sets none.
     source_layer: ?[]const u8 = null,
     /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
-    min_zoom: f64 = std.mem.zeroes(f64),
+    min_zoom: f64 = 0,
     /// Highest zoom at which the layer draws; INFINITY with no upper bound.
-    max_zoom: f64 = std.mem.zeroes(f64),
+    max_zoom: f64 = 0,
     /// One of `mln_style_layer_visibility`.
-    visibility: StyleLayerVisibility = std.mem.zeroes(StyleLayerVisibility),
+    visibility: StyleLayerVisibility = .visible,
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_layer_info) status.Error!StyleLayerInfo {
         return .{
@@ -4044,8 +4042,8 @@ pub const StyleLayerInfo = struct {
 /// See `mln_style_layer_visibility` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleLayerVisibility = enum(u32) {
-    none = 1,
     visible = 0,
+    none = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -4056,8 +4054,8 @@ pub const StyleLayerVisibility = enum(u32) {
 /// See `mln_style_raster_dem_encoding` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleRasterDemEncoding = enum(u32) {
-    terrarium = 1,
     mapbox = 0,
+    terrarium = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -4071,9 +4069,9 @@ pub const StyleSourceInfo = struct {
     /// Source ID.
     id: []const u8 = &.{},
     /// One of `mln_style_source_type`.
-    type: StyleSourceType = std.mem.zeroes(StyleSourceType),
+    type: StyleSourceType = .unknown,
     /// Whether the source is marked volatile.
-    is_volatile: bool = std.mem.zeroes(bool),
+    is_volatile: bool = false,
     /// Attribution string, when the source sets one. It may be empty.
     attribution: ?[]const u8 = null,
     /// URL that the source loads from, when it has one.
@@ -4113,11 +4111,11 @@ pub const StyleSourceTileInfo = struct {
     /// Tile URL templates in TileJSON order.
     tile_urls: []const []const u8 = &.{},
     /// Lowest zoom level the TileJSON provides tiles for.
-    min_zoom: f64 = std.mem.zeroes(f64),
+    min_zoom: f64 = 0,
     /// Highest zoom level the TileJSON provides tiles for.
-    max_zoom: f64 = std.mem.zeroes(f64),
+    max_zoom: f64 = 0,
     /// One of `mln_style_tile_scheme`.
-    scheme: StyleTileScheme = std.mem.zeroes(StyleTileScheme),
+    scheme: StyleTileScheme = .xyz,
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_source_tile_info) status.Error!StyleSourceTileInfo {
         return .{
@@ -4138,16 +4136,16 @@ pub const StyleSourceTileInfo = struct {
 /// See `mln_style_source_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleSourceType = enum(u32) {
-    custom_mvt_vector = 9,
-    custom_vector = 8,
-    annotations = 7,
-    video = 6,
-    image = 5,
-    geojson = 4,
-    raster_dem = 3,
-    raster = 2,
-    vector = 1,
     unknown = 0,
+    vector = 1,
+    raster = 2,
+    raster_dem = 3,
+    geojson = 4,
+    image = 5,
+    video = 6,
+    annotations = 7,
+    custom_vector = 8,
+    custom_mvt_vector = 9,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -4158,8 +4156,8 @@ pub const StyleSourceType = enum(u32) {
 /// See `mln_style_tile_scheme` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleTileScheme = enum(u32) {
-    tms = 1,
     xyz = 0,
+    tms = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -4200,8 +4198,8 @@ pub const StyleTransitionOptions = struct {
 /// See `mln_style_vector_tile_encoding` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleVectorTileEncoding = enum(u32) {
-    mlt = 1,
     mvt = 0,
+    mlt = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -4213,13 +4211,13 @@ pub const StyleVectorTileEncoding = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const TextureImageInfo = struct {
     /// Physical image width in device pixels.
-    width: u32 = std.mem.zeroes(u32),
+    width: u32 = 0,
     /// Physical image height in device pixels.
-    height: u32 = std.mem.zeroes(u32),
+    height: u32 = 0,
     /// Bytes per image row.
-    stride: u32 = std.mem.zeroes(u32),
+    stride: u32 = 0,
     /// Required output buffer byte length.
-    byte_length: usize = std.mem.zeroes(usize),
+    byte_length: usize = 0,
     pub fn fromNative(raw: c.mln_texture_image_info) TextureImageInfo {
         return .{
             .width = raw.width,
@@ -4252,11 +4250,11 @@ pub const TextureReadbackResult = struct {
 /// See `mln_tile_id` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const TileId = struct {
-    overscaled_z: u32 = std.mem.zeroes(u32),
-    wrap: i32 = std.mem.zeroes(i32),
-    canonical_z: u32 = std.mem.zeroes(u32),
-    canonical_x: u32 = std.mem.zeroes(u32),
-    canonical_y: u32 = std.mem.zeroes(u32),
+    overscaled_z: u32 = 0,
+    wrap: i32 = 0,
+    canonical_z: u32 = 0,
+    canonical_x: u32 = 0,
+    canonical_y: u32 = 0,
     pub fn fromNative(raw: c.mln_tile_id) TileId {
         return .{
             .overscaled_z = raw.overscaled_z,
@@ -4273,8 +4271,8 @@ pub const TileId = struct {
 /// See `mln_tile_lod_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const TileLodMode = enum(u32) {
-    distance = 1,
     default = 0,
+    distance = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -4285,15 +4283,15 @@ pub const TileLodMode = enum(u32) {
 /// See `mln_tile_operation` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const TileOperation = enum(u32) {
-    null = 8,
-    cancelled = 7,
-    @"error" = 6,
-    end_parse = 5,
-    start_parse = 4,
-    load_from_cache = 3,
-    load_from_network = 2,
-    requested_from_network = 1,
     requested_from_cache = 0,
+    requested_from_network = 1,
+    load_from_network = 2,
+    load_from_cache = 3,
+    start_parse = 4,
+    end_parse = 5,
+    @"error" = 6,
+    cancelled = 7,
+    null = 8,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -4304,10 +4302,10 @@ pub const TileOperation = enum(u32) {
 /// See `mln_unit_bezier` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const UnitBezier = struct {
-    x1: f64 = std.mem.zeroes(f64),
-    y1: f64 = std.mem.zeroes(f64),
-    x2: f64 = std.mem.zeroes(f64),
-    y2: f64 = std.mem.zeroes(f64),
+    x1: f64 = 0,
+    y1: f64 = 0,
+    x2: f64 = 0,
+    y2: f64 = 0,
     pub fn toNative(self: UnitBezier) c.mln_unit_bezier {
         var raw = std.mem.zeroes(c.mln_unit_bezier);
         raw.x1 = self.x1;
@@ -4338,7 +4336,7 @@ pub const UrlMatchFlags = struct {
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
-    pub const exact = fromNative(0);
+    pub const exact: UrlMatchFlags = .{};
 };
 
 /// Three-component vector used by free camera options.
@@ -4346,9 +4344,9 @@ pub const UrlMatchFlags = struct {
 /// See `mln_vec3` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const Vec3 = struct {
-    x: f64 = std.mem.zeroes(f64),
-    y: f64 = std.mem.zeroes(f64),
-    z: f64 = std.mem.zeroes(f64),
+    x: f64 = 0,
+    y: f64 = 0,
+    z: f64 = 0,
     pub fn toNative(self: Vec3) c.mln_vec3 {
         var raw = std.mem.zeroes(c.mln_vec3);
         raw.x = self.x;
@@ -4370,8 +4368,8 @@ pub const Vec3 = struct {
 /// See `mln_viewport_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const ViewportMode = enum(u32) {
-    flipped_y = 1,
     default = 0,
+    flipped_y = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -4383,10 +4381,10 @@ pub const ViewportMode = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const VulkanBorrowedTexture = struct {
     /// Borrowed VkImage. Required.
-    image: u64 = std.mem.zeroes(u64),
+    image: u64 = 0,
     /// Borrowed VkImageView for image. Required. The view must be a 2D color
     /// view that matches image and the descriptor's format.
-    image_view: u64 = std.mem.zeroes(u64),
+    image_view: u64 = 0,
     pub fn toNative(self: VulkanBorrowedTexture) c.mln_vulkan_borrowed_texture {
         var raw = std.mem.zeroes(c.mln_vulkan_borrowed_texture);
         raw.image = self.image;
@@ -4472,21 +4470,21 @@ pub const VulkanBorrowedTextureDescriptor = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const VulkanContextDescriptor = struct {
     /// Borrowed VkInstance. Required.
-    instance: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    instance: ?*anyopaque = null,
     /// Borrowed VkPhysicalDevice. Required.
-    physical_device: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    physical_device: ?*anyopaque = null,
     /// Borrowed VkDevice. Required.
-    device: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    device: ?*anyopaque = null,
     /// Borrowed graphics VkQueue. Required. The session's driver submits to it
     /// from its own thread, so a host that uses the same queue passes
     /// `mln_render_session_attach_options.queue_lock` at attach.
-    graphics_queue: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    graphics_queue: ?*anyopaque = null,
     /// Queue family index for graphics_queue. Must support graphics commands.
-    graphics_queue_family_index: u32 = std.mem.zeroes(u32),
+    graphics_queue_family_index: u32 = 0,
     /// PFN_vkGetInstanceProcAddr for the loader that created the instance.
-    get_instance_proc_addr: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    get_instance_proc_addr: ?*anyopaque = null,
     /// PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device.
-    get_device_proc_addr: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    get_device_proc_addr: ?*anyopaque = null,
     pub fn toNative(self: VulkanContextDescriptor) c.mln_vulkan_context_descriptor {
         var raw = std.mem.zeroes(c.mln_vulkan_context_descriptor);
         raw.instance = self.instance;
@@ -4571,30 +4569,30 @@ pub const VulkanSurfaceDescriptor = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const VulkanTextureFrame = struct {
     /// Session generation that produced this frame.
-    generation: u64 = std.mem.zeroes(u64),
+    generation: u64 = 0,
     /// Physical Vulkan image width in device pixels.
-    width: u32 = std.mem.zeroes(u32),
+    width: u32 = 0,
     /// Physical Vulkan image height in device pixels.
-    height: u32 = std.mem.zeroes(u32),
+    height: u32 = 0,
     /// UI-to-device pixel scale used for this frame.
-    scale_factor: f64 = std.mem.zeroes(f64),
+    scale_factor: f64 = 0,
     /// Opaque identity of this frame.
-    frame_id: u64 = std.mem.zeroes(u64),
+    frame_id: u64 = 0,
     /// Ring slot that holds this frame. For a borrowed target, the index of its
     /// image in the descriptor's textures array.
-    slot: u32 = std.mem.zeroes(u32),
+    slot: u32 = 0,
     /// Borrowed VkImage bit pattern. Valid until frame release.
-    image: u64 = std.mem.zeroes(u64),
+    image: u64 = 0,
     /// Borrowed VkImageView bit pattern. Valid until frame release.
-    image_view: u64 = std.mem.zeroes(u64),
+    image_view: u64 = 0,
     /// Borrowed VkDevice. Valid until frame release.
-    device: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    device: ?*anyopaque = null,
     /// Backend-native VkFormat value.
-    format: u32 = std.mem.zeroes(u32),
+    format: u32 = 0,
     /// Backend-native VkImageLayout value that the image is in:
     /// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for a session-owned ring, and
     /// the descriptor's final_layout for a borrowed one.
-    layout: u32 = std.mem.zeroes(u32),
+    layout: u32 = 0,
     pub fn fromNative(raw: c.mln_vulkan_texture_frame) VulkanTextureFrame {
         return .{
             .generation = raw.generation,
@@ -4655,9 +4653,9 @@ pub const Wake = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const WebglContextDescriptor = struct {
     /// One `mln_webgl_context_kind` value.
-    kind: WebglContextKind = std.mem.zeroes(WebglContextKind),
+    kind: WebglContextKind = .existing,
     /// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
-    context: i32 = std.mem.zeroes(i32),
+    context: i32 = 0,
     /// Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
     /// canvas must still be transferable when attachment starts.
     canvas_selector: []const u8 = &.{},
@@ -4685,11 +4683,11 @@ pub const WebglContextDescriptor = struct {
 /// See `mln_webgl_context_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const WebglContextKind = enum(u32) {
+    /// Use a host-created context on its current browser agent.
+    existing = 0,
     /// Transfer the canvas named by canvas_selector to a native worker and
     /// create a WebGL 2 context there.
     transferred_canvas = 1,
-    /// Use a host-created context on its current browser agent.
-    existing = 0,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -4701,10 +4699,10 @@ pub const WebglContextKind = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const WebgpuBorrowedTexture = struct {
     /// Borrowed WGPUTexture. Required.
-    texture: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    texture: ?*anyopaque = null,
     /// Borrowed WGPUTextureView for texture. Required. The view must be a 2D
     /// color view compatible with texture and the descriptor's format.
-    texture_view: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    texture_view: ?*anyopaque = null,
     pub fn toNative(self: WebgpuBorrowedTexture) c.mln_webgpu_borrowed_texture {
         var raw = std.mem.zeroes(c.mln_webgpu_borrowed_texture);
         raw.texture = self.texture;
@@ -4780,12 +4778,12 @@ pub const WebgpuBorrowedTextureDescriptor = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const WebgpuContextDescriptor = struct {
     /// Borrowed WGPUInstance. Optional for texture targets.
-    instance: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    instance: ?*anyopaque = null,
     /// Borrowed WGPUDevice. Required.
-    device: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    device: ?*anyopaque = null,
     /// Borrowed WGPUQueue. Optional; null uses the device default queue. A
     /// non-null queue must belong to device.
-    queue: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    queue: ?*anyopaque = null,
     pub fn toNative(self: WebgpuContextDescriptor) c.mln_webgpu_context_descriptor {
         var raw = std.mem.zeroes(c.mln_webgpu_context_descriptor);
         raw.instance = self.instance;
@@ -4867,26 +4865,26 @@ pub const WebgpuSurfaceDescriptor = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const WebgpuTextureFrame = struct {
     /// Session generation that produced this frame.
-    generation: u64 = std.mem.zeroes(u64),
+    generation: u64 = 0,
     /// Physical WebGPU texture width in device pixels.
-    width: u32 = std.mem.zeroes(u32),
+    width: u32 = 0,
     /// Physical WebGPU texture height in device pixels.
-    height: u32 = std.mem.zeroes(u32),
+    height: u32 = 0,
     /// UI-to-device pixel scale used for this frame.
-    scale_factor: f64 = std.mem.zeroes(f64),
+    scale_factor: f64 = 0,
     /// Opaque identity of this frame.
-    frame_id: u64 = std.mem.zeroes(u64),
+    frame_id: u64 = 0,
     /// Ring slot that holds this frame. For a borrowed target, the index of its
     /// texture in the descriptor's textures array.
-    slot: u32 = std.mem.zeroes(u32),
+    slot: u32 = 0,
     /// Borrowed WGPUTexture. Valid until frame release.
-    texture: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    texture: ?*anyopaque = null,
     /// Borrowed WGPUTextureView. Valid until frame release.
-    texture_view: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    texture_view: ?*anyopaque = null,
     /// Borrowed WGPUDevice. Valid until frame release.
-    device: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    device: ?*anyopaque = null,
     /// Backend-native WGPUTextureFormat value.
-    format: u32 = std.mem.zeroes(u32),
+    format: u32 = 0,
     pub fn fromNative(raw: c.mln_webgpu_texture_frame) WebgpuTextureFrame {
         return .{
             .generation = raw.generation,
@@ -4911,13 +4909,13 @@ pub const WglContextDescriptor = struct {
     /// Borrowed HDC used to create the session context. Required. A dedicated
     /// owned texture makes its context current on this HDC from its core
     /// worker.
-    device_context: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    device_context: ?*anyopaque = null,
     /// Borrowed HGLRC whose share group the session context joins. Required
     /// under shared ownership. A dedicated session joins no share group, so it
     /// must be null there.
-    share_context: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    share_context: ?*anyopaque = null,
     /// Optional wglGetProcAddress-compatible function for the host loader.
-    get_proc_address: ?*anyopaque = std.mem.zeroes(?*anyopaque),
+    get_proc_address: ?*anyopaque = null,
     pub fn toNative(self: WglContextDescriptor) c.mln_wgl_context_descriptor {
         var raw = std.mem.zeroes(c.mln_wgl_context_descriptor);
         raw.device_context = self.device_context;
@@ -4932,6 +4930,18 @@ pub const WglContextDescriptor = struct {
             .get_proc_address = raw.get_proc_address,
         };
     }
+};
+
+/// The outputs of `logicalExtentPhysicalSize`.
+pub const LogicalExtentPhysicalSizeResult = struct {
+    width: u32,
+    height: u32,
+};
+
+/// The `RenderSession` that a call creates, and the future that completes once it attaches.
+pub const RenderSessionAttachment = struct {
+    session: RenderSession,
+    ready: completion.Future(void),
 };
 
 /// Consumes an acquired frame without consumer GPU synchronization, so it
@@ -5194,7 +5204,7 @@ pub fn logicalExtentDefault() status.Error!LogicalExtent {
 ///
 /// See `mln_logical_extent_physical_size` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-pub fn logicalExtentPhysicalSize(extent: LogicalExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { width: u32, height: u32 } {
+pub fn logicalExtentPhysicalSize(extent: LogicalExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!LogicalExtentPhysicalSizeResult {
     const out = try call.invoke("mln_logical_extent_physical_size", .none, {}, null, diagnostic, .{ extent, call.out(u32), call.out(u32) });
     return .{ .width = out[0], .height = out[1] };
 }
@@ -5275,7 +5285,7 @@ pub fn mapApplyCameraDelta(allocator: std.mem.Allocator, map: Map, delta: Camera
 ///
 /// See `mln_map_attach_metal_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn mapAttachMetalBorrowedTexture(allocator: std.mem.Allocator, map: Map, descriptor: MetalBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn mapAttachMetalBorrowedTexture(allocator: std.mem.Allocator, map: Map, descriptor: MetalBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
     const started = try call.submit("mln_map_attach_metal_borrowed_texture", .handle, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
     return .{ .session = started.outputs, .ready = started.ready };
 }
@@ -5284,7 +5294,7 @@ pub fn mapAttachMetalBorrowedTexture(allocator: std.mem.Allocator, map: Map, des
 ///
 /// See `mln_map_attach_metal_owned_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn mapAttachMetalOwnedTexture(allocator: std.mem.Allocator, map: Map, descriptor: MetalOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn mapAttachMetalOwnedTexture(allocator: std.mem.Allocator, map: Map, descriptor: MetalOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
     const started = try call.submit("mln_map_attach_metal_owned_texture", .handle, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
     return .{ .session = started.outputs, .ready = started.ready };
 }
@@ -5293,7 +5303,7 @@ pub fn mapAttachMetalOwnedTexture(allocator: std.mem.Allocator, map: Map, descri
 ///
 /// See `mln_map_attach_metal_surface` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn mapAttachMetalSurface(allocator: std.mem.Allocator, map: Map, descriptor: MetalSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn mapAttachMetalSurface(allocator: std.mem.Allocator, map: Map, descriptor: MetalSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
     const started = try call.submit("mln_map_attach_metal_surface", .handle, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
     return .{ .session = started.outputs, .ready = started.ready };
 }
@@ -5302,7 +5312,7 @@ pub fn mapAttachMetalSurface(allocator: std.mem.Allocator, map: Map, descriptor:
 ///
 /// See `mln_map_attach_opengl_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn mapAttachOpenglBorrowedTexture(allocator: std.mem.Allocator, map: Map, descriptor: OpenglBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn mapAttachOpenglBorrowedTexture(allocator: std.mem.Allocator, map: Map, descriptor: OpenglBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
     const started = try call.submit("mln_map_attach_opengl_borrowed_texture", .handle, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
     return .{ .session = started.outputs, .ready = started.ready };
 }
@@ -5311,7 +5321,7 @@ pub fn mapAttachOpenglBorrowedTexture(allocator: std.mem.Allocator, map: Map, de
 ///
 /// See `mln_map_attach_opengl_owned_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn mapAttachOpenglOwnedTexture(allocator: std.mem.Allocator, map: Map, descriptor: OpenglOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn mapAttachOpenglOwnedTexture(allocator: std.mem.Allocator, map: Map, descriptor: OpenglOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
     const started = try call.submit("mln_map_attach_opengl_owned_texture", .handle, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
     return .{ .session = started.outputs, .ready = started.ready };
 }
@@ -5320,7 +5330,7 @@ pub fn mapAttachOpenglOwnedTexture(allocator: std.mem.Allocator, map: Map, descr
 ///
 /// See `mln_map_attach_opengl_surface` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn mapAttachOpenglSurface(allocator: std.mem.Allocator, map: Map, descriptor: OpenglSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn mapAttachOpenglSurface(allocator: std.mem.Allocator, map: Map, descriptor: OpenglSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
     const started = try call.submit("mln_map_attach_opengl_surface", .handle, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
     return .{ .session = started.outputs, .ready = started.ready };
 }
@@ -5329,7 +5339,7 @@ pub fn mapAttachOpenglSurface(allocator: std.mem.Allocator, map: Map, descriptor
 ///
 /// See `mln_map_attach_vulkan_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn mapAttachVulkanBorrowedTexture(allocator: std.mem.Allocator, map: Map, descriptor: VulkanBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn mapAttachVulkanBorrowedTexture(allocator: std.mem.Allocator, map: Map, descriptor: VulkanBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
     const started = try call.submit("mln_map_attach_vulkan_borrowed_texture", .handle, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
     return .{ .session = started.outputs, .ready = started.ready };
 }
@@ -5338,7 +5348,7 @@ pub fn mapAttachVulkanBorrowedTexture(allocator: std.mem.Allocator, map: Map, de
 ///
 /// See `mln_map_attach_vulkan_owned_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn mapAttachVulkanOwnedTexture(allocator: std.mem.Allocator, map: Map, descriptor: VulkanOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn mapAttachVulkanOwnedTexture(allocator: std.mem.Allocator, map: Map, descriptor: VulkanOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
     const started = try call.submit("mln_map_attach_vulkan_owned_texture", .handle, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
     return .{ .session = started.outputs, .ready = started.ready };
 }
@@ -5347,7 +5357,7 @@ pub fn mapAttachVulkanOwnedTexture(allocator: std.mem.Allocator, map: Map, descr
 ///
 /// See `mln_map_attach_vulkan_surface` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn mapAttachVulkanSurface(allocator: std.mem.Allocator, map: Map, descriptor: VulkanSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn mapAttachVulkanSurface(allocator: std.mem.Allocator, map: Map, descriptor: VulkanSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
     const started = try call.submit("mln_map_attach_vulkan_surface", .handle, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
     return .{ .session = started.outputs, .ready = started.ready };
 }
@@ -5356,7 +5366,7 @@ pub fn mapAttachVulkanSurface(allocator: std.mem.Allocator, map: Map, descriptor
 ///
 /// See `mln_map_attach_webgpu_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn mapAttachWebgpuBorrowedTexture(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn mapAttachWebgpuBorrowedTexture(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
     const started = try call.submit("mln_map_attach_webgpu_borrowed_texture", .handle, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
     return .{ .session = started.outputs, .ready = started.ready };
 }
@@ -5365,7 +5375,7 @@ pub fn mapAttachWebgpuBorrowedTexture(allocator: std.mem.Allocator, map: Map, de
 ///
 /// See `mln_map_attach_webgpu_owned_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn mapAttachWebgpuOwnedTexture(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn mapAttachWebgpuOwnedTexture(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
     const started = try call.submit("mln_map_attach_webgpu_owned_texture", .handle, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
     return .{ .session = started.outputs, .ready = started.ready };
 }
@@ -5374,7 +5384,7 @@ pub fn mapAttachWebgpuOwnedTexture(allocator: std.mem.Allocator, map: Map, descr
 ///
 /// See `mln_map_attach_webgpu_surface` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn mapAttachWebgpuSurface(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn mapAttachWebgpuSurface(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionAttachment {
     const started = try call.submit("mln_map_attach_webgpu_surface", .handle, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
     return .{ .session = started.outputs, .ready = started.ready };
 }

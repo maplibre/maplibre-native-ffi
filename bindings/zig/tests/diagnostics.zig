@@ -20,7 +20,7 @@ test "a failed command arrives as data and fills the wait's diagnostic" {
     const completion = try future.wait(&diagnostic);
     try testing.expectEqual(maplibre.CommandDisposition.failed, completion.disposition);
     try testing.expectError(error.NativeError, completion.statusError());
-    try testing.expectEqual(@as(?i32, completion.raw_status), diagnostic.raw_status);
+    try testing.expectEqual(completion.raw_status, @backingInt(diagnostic.status.?));
     try testing.expect(diagnostic.message().len != 0);
     try testing.expect(!std.mem.eql(u8, stale, diagnostic.message()));
 }

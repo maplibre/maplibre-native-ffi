@@ -9,8 +9,25 @@ def field_default(values, field) -> str | None:
     value = field.value
     if value.default:
         return None
+    if value.kind == "enum":
+        if value.enum_kind == "bitmask":
+            return ".{}"
+        prefix = enum_member_prefix((key for key, _ in value.enum_values), value.native)
+        zero = next((key for key, number in value.enum_values if number == 0), None)
+        return (
+            "." + identifier(zero.removeprefix(prefix).lower())
+            if zero
+            else "@enumFromInt(0)"
+        )
     if value.kind != "record":
-        return f"std.mem.zeroes({values.public(value)})"
+        public = values.public(value)
+        if public.startswith("?"):
+            return "null"
+        if public == "bool":
+            return "false"
+        if public in SCALARS.values():
+            return "0"
+        return f"std.mem.zeroes({public})"
     # `.{}` builds a record only when each of its public members has a default
     # too, which a member record with a default function lacks.
     members = (
@@ -25,10 +42,29 @@ def field_default(values, field) -> str | None:
     return ".{}"
 
 
+def first_names(enum_values):
+    """Each distinct value under its first name, in header order."""
+    seen = set()
+    for key, number in enum_values:
+        if number not in seen:
+            seen.add(number)
+            yield key, number
+
+
+def flag_literal(single, number) -> str:
+    """A flag set's literal naming the single bits that `number` sets."""
+    members = [f".{local} = true" for local, bit, _ in single if number & bit]
+    unknown = number & ~sum(bit for _, bit, _ in single)
+    if unknown:
+        members.append(f".unknown_bits = {unknown}")
+    return ".{ " + ", ".join(members) + " }" if members else ".{}"
+
+
 class Values:
     def __init__(self, bound):
         self.bound = bound
         self.used = {}
+        self.results = {}
 
     def native_type(self, value):
         return (
@@ -141,15 +177,28 @@ class Values:
             else f"{source}.toNative()"
         )
 
+    def result(self, name, fields, summary):
+        """Names the struct that a call with several results returns."""
+        members = "".join(f"    {label}: {typ},\n" for label, typ in fields)
+        self.results[name] = (
+            f"/// {summary}\npub const {name} = struct {{\n{members}}};\n"
+        )
+        return name
+
     def render(self):
         return "\n".join(
-            documented(
-                self.bound,
-                value.native,
-                self.record(value),
-                f"pub const {self.public(value)} = ",
-            )
-            for _, value in sorted(self.used.items())
+            [
+                *(
+                    documented(
+                        self.bound,
+                        value.native,
+                        self.record(value),
+                        f"pub const {self.public(value)} = ",
+                    )
+                    for _, value in sorted(self.used.items())
+                ),
+                *(code for _, code in sorted(self.results.items())),
+            ]
         )
 
     def record(self, value: ValuePlan):
@@ -278,7 +327,7 @@ class Values:
                 for local, _, key in single
             )
             constants = "".join(
-                f"    pub const {identifier(key.removeprefix(prefix).lower())} = fromNative({number});\n"
+                f"    pub const {identifier(key.removeprefix(prefix).lower())}: {public} = {flag_literal(single, number)};\n"
                 for key, number in value.enum_values
                 if number == 0 or number & (number - 1) != 0
             )
@@ -293,8 +342,6 @@ class Values:
             return f"pub const {public} = struct {{\n{fields}\n    unknown_bits: {raw} = 0,\n    pub const native_bits = [_]{raw}{{ {bits} }};\n    const methods = marshal.FlagMethods(@This());\n{methods}{constants}}};\n"
         members = "\n".join(
             f"{doc(self.bound, key, '    ')}    {identifier(key.removeprefix(prefix).lower())} = {number},"
-            for number, key in {
-                number: key for key, number in reversed(value.enum_values)
-            }.items()
+            for key, number in first_names(value.enum_values)
         )
         return f"pub const {public} = enum({raw}) {{\n{members}\n    _,\n    pub const fromNative = marshal.EnumMethods(@This()).fromNative;\n    pub const toNative = marshal.EnumMethods(@This()).toNative;\n}};\n"

@@ -121,7 +121,7 @@ def lower(api: Api | BoundApi) -> tuple[list[str], list[str], dict[str, str]]:
     )
     for plan in bound.operations:
         function = plan.function
-        previous = dict(value_types.used)
+        previous = dict(value_types.used), dict(value_types.results)
         try:
             # A dispose that takes an optional completion is also its handle's
             # release; its dispose passes none, as every disposer does.
@@ -142,7 +142,7 @@ def lower(api: Api | BoundApi) -> tuple[list[str], list[str], dict[str, str]]:
                 )
             generated.append(function.name)
         except ModelError as error:
-            value_types.used = previous
+            value_types.used, value_types.results = previous
             unsupported[function.name] = str(error)
     return [value_types.render(), *chunks], generated, unsupported
 
@@ -248,8 +248,6 @@ pub const OwnedValue = marshal.OwnedValue;
         "//! Synchronize batch release with getters that copy borrowed storage.\n"
     )
     runtime = """
-/// This whole API under one name, for callers that walk its declarations.
-pub const generated = @This();
 pub const Future = completion.Future;
 pub const CommandCompletion = completion.CommandCompletion;
 pub const Error = status.Error;

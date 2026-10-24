@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const c = @import("c.zig").raw;
+const Status = @import("maplibre_native_ffi.zig").Status;
 
 /// The failure details of one call.
 ///
@@ -17,7 +18,7 @@ const c = @import("c.zig").raw;
 pub const Diagnostic = struct {
     /// The native status of the failure, or null for a failure that the
     /// binding detected.
-    raw_status: ?i32 = null,
+    status: ?Status = null,
     /// The message storage that native calls and the binding write. Read it
     /// through `message`.
     native: c.mln_diagnostic = .{ .size = @sizeOf(c.mln_diagnostic), .message = @splat(0) },

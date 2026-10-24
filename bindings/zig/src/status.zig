@@ -20,7 +20,7 @@ pub const Error = BindingError || std.mem.Allocator.Error;
 /// earlier call.
 pub fn begin(diagnostic: ?*diagnostics.Diagnostic) void {
     const target = diagnostic orelse return;
-    target.raw_status = null;
+    target.status = null;
     target.native.message[0] = 0;
     target.recorded = false;
 }
@@ -44,13 +44,13 @@ pub fn propagate(diagnostic: ?*diagnostics.Diagnostic, result: anytype) @TypeOf(
 }
 
 /// Copies `message`, truncated to the buffer, and `raw_status` into
-/// `diagnostic`.
+/// `diagnostic`'s status.
 pub fn record(diagnostic: ?*diagnostics.Diagnostic, raw_status: ?i32, message: []const u8) void {
     const target = diagnostic orelse return;
     const length = @min(message.len, target.native.message.len - 1);
     @memcpy(target.native.message[0..length], message[0..length]);
     target.native.message[length] = 0;
-    target.raw_status = raw_status;
+    target.status = if (raw_status) |raw| @fromBackingInt(@intCast(raw)) else null;
     target.recorded = true;
 }
 
@@ -83,7 +83,7 @@ pub fn callUnless(
     if (raw_status == c.MLN_STATUS_OK) return true;
     if (absent) |status| if (raw_status == status) return false;
     if (diagnostic) |target| {
-        target.raw_status = raw_status;
+        target.status = @fromBackingInt(@intCast(raw_status));
         target.recorded = true;
     }
     return nativeStatusError(raw_status);
@@ -161,13 +161,13 @@ test "statuses map both ways, keep an unknown code, and carry the diagnostic" {
         }
     }.function;
     try std.testing.expectError(error.UnknownStatus, call(unknown, .{}, &diagnostic));
-    try std.testing.expectEqual(@as(?i32, unknown_raw_status), diagnostic.raw_status);
+    try std.testing.expectEqual(@as(?i32, unknown_raw_status), @backingInt(diagnostic.status.?));
     try std.testing.expectEqualStrings("unknown", diagnostic.message());
 
     record(&diagnostic, -1, &@as([8192]u8, @splat('x')));
     try std.testing.expectEqual(diagnostic.native.message.len - 1, diagnostic.message().len);
     begin(&diagnostic);
-    try std.testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
+    try std.testing.expectEqual(null, diagnostic.status);
     try std.testing.expectEqualStrings("", diagnostic.message());
     // A failure the binding detects records its own message only once, so the
     // first recorded cause wins.
@@ -179,6 +179,6 @@ test "statuses map both ways, keep an unknown code, and carry the diagnostic" {
 test "ABI version validation reports mismatch diagnostics" {
     var diagnostic: diagnostics.Diagnostic = .{};
     try std.testing.expectError(error.AbiVersionMismatch, validateAbiVersionValue(1, 0, &diagnostic));
-    try std.testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
+    try std.testing.expectEqual(null, diagnostic.status);
     try std.testing.expect(std.mem.indexOf(u8, diagnostic.message(), "expected 0, got 1") != null);
 }

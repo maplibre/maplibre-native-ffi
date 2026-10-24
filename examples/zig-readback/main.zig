@@ -1,8 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const build_options = @import("build_options");
-const binding = @import("maplibre_native_ffi");
-const maplibre = binding.generated;
+const maplibre = @import("maplibre_native_ffi");
 
 extern "c" fn MTLCreateSystemDefaultDevice() ?*anyopaque;
 
@@ -40,11 +39,11 @@ const WakeSignal = struct {
     io: std.Io,
     event: std.Io.Event = .unset,
 
-    fn wake(self: *WakeSignal) binding.Wake {
+    fn wake(self: *WakeSignal) maplibre.Wake {
         return .{ .context = self, .callback = notify };
     }
 
-    fn notify(context: ?*anyopaque) binding.Error!void {
+    fn notify(context: ?*anyopaque) maplibre.Error!void {
         const self: *WakeSignal = @ptrCast(@alignCast(context.?));
         self.event.set(self.io);
     }
@@ -73,7 +72,7 @@ fn waitForSessionFuture(
     session: maplibre.RenderSession,
     future: anytype,
     signal: *WakeSignal,
-    diagnostic: ?*binding.Diagnostic,
+    diagnostic: ?*maplibre.Diagnostic,
 ) !@TypeOf(future.*).Value {
     if (uses_caller_driver) {
         const deadline = std.Io.Clock.Timestamp.now(signal.io, .awake).addDuration(native_work_timeout);
@@ -99,7 +98,7 @@ pub fn main(init_args: std.process.Init) !void {
     try logAndValidateRenderBackend();
 
     // Setup calls report into one diagnostic, and a failure prints its details.
-    var diagnostic: binding.Diagnostic = .{};
+    var diagnostic: maplibre.Diagnostic = .{};
     errdefer if (diagnostic.message().len != 0) std.log.err("{s}", .{diagnostic.message()});
 
     var signal = WakeSignal{ .io = init_args.io };
@@ -200,7 +199,7 @@ fn renderWithDriver(
 fn renderStillImage(
     allocator: std.mem.Allocator,
     session: maplibre.RenderSession,
-    still_image: *binding.Future(void),
+    still_image: *maplibre.Future(void),
     signal: *WakeSignal,
 ) !void {
     const deadline = std.Io.Clock.Timestamp.now(signal.io, .awake).addDuration(native_work_timeout);
@@ -277,22 +276,20 @@ const OwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachConte
 
 /// Supplies transferable state to a core worker or a WGL context to the caller
 /// driver.
-const Attachment = struct { session: maplibre.RenderSession, ready: binding.Future(void) };
-
 fn attachOwnedTexture(
     allocator: std.mem.Allocator,
     context: *OwnedTextureContext,
     map: *maplibre.Map,
     signal: *WakeSignal,
     extent: maplibre.LogicalExtent,
-) !Attachment {
+) !maplibre.RenderSessionAttachment {
     var defaults = try maplibre.renderSessionAttachOptionsDefault(allocator);
     defer defaults.deinit();
     var wakes = defaults.value;
     wakes.requested_texture_ring_depth = 1;
     wakes.frame_wake = signal.wake();
     wakes.driver_work_wake = if (uses_caller_driver) signal.wake() else .{};
-    const result = if (build_options.supports_vulkan)
+    return if (build_options.supports_vulkan)
         try maplibre.mapAttachVulkanOwnedTexture(allocator, map.*, .{
             .extent = extent,
             .context = context.descriptor(),
@@ -310,8 +307,7 @@ fn attachOwnedTexture(
             .context = context.descriptor(),
         }, withDriver(wakes, if (supports_egl) .core_worker else .caller_graphics_thread), null)
     else
-        return error.RenderBackendUnavailable;
-    return .{ .session = result.session, .ready = result.ready };
+        error.RenderBackendUnavailable;
 }
 
 fn withDriver(options: maplibre.RenderSessionAttachOptions, driver: maplibre.RenderDriverKind) maplibre.RenderSessionAttachOptions {

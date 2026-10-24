@@ -10,7 +10,7 @@ pub fn logError(
     const details = diagnostic orelse return;
     if (details.message().len == 0) return;
     std.debug.print("diagnostic", .{});
-    if (details.raw_status) |raw_status| std.debug.print(" ({d})", .{raw_status});
+    if (details.status) |status| std.debug.print(" ({d})", .{@backingInt(status)});
     std.debug.print(": {s}\n", .{details.message()});
 }
 

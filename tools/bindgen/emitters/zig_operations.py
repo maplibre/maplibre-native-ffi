@@ -8,7 +8,7 @@ retains callback roots, and decodes outputs and completion results.
 
 from dataclasses import replace
 
-from ..names import camel
+from ..names import camel, pascal
 from ..semantic import output_member
 from .zig import (
     DIAGNOSTIC_PARAMETER,
@@ -33,7 +33,6 @@ RESERVED = {
     "released",
     "out",
     "text",
-    "generated",
 }
 
 
@@ -250,8 +249,19 @@ def operation(plan, values, *, discard=False):
             return_type = "void"
             body = [f"return call.discard({head}, {allocator}, {diagnostic}, {args});"]
         elif results:
-            fields = ", ".join(f"{label}: {typ}" for label, typ in results)
-            return_type = f"struct {{ {fields}, ready: {future} }}"
+            # A call that creates an owner returns it with the completion that
+            # reports when it is ready, as every attach call does.
+            attachment = len(results) == 1 and plan.owned_outputs
+            return_type = values.result(
+                results[0][1] + "Attachment"
+                if attachment
+                else pascal(plan.name.removeprefix("mln_")) + "Result",
+                [*results, ("ready", future)],
+                f"The `{results[0][1]}` that a call creates, and the future that"
+                " completes once it attaches."
+                if attachment
+                else "The outputs of a call, and the future of its completion.",
+            )
             picks = (
                 [f".{results[0][0]} = started.outputs"]
                 if len(results) == 1
@@ -284,10 +294,10 @@ def operation(plan, values, *, discard=False):
         allocator = "allocator" if needs_allocator else "null"
         invoke = f"call.invoke({head}, {allocator}, {diagnostic}, {args})"
         if len(results) > 1:
-            return_type = (
-                "struct { "
-                + ", ".join(f"{label}: {typ}" for label, typ in results)
-                + " }"
+            return_type = values.result(
+                pascal(plan.name.removeprefix("mln_")) + "Result",
+                results,
+                f"The outputs of `{camel(plan.name.removeprefix('mln_'))}`.",
             )
             body = [
                 f"const out = try {invoke};",

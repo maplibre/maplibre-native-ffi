@@ -23,7 +23,7 @@ test "host strings use views and native-lent strings decode" {
     options.value.asset_path = "asset\x00path";
     var diagnostic: maplibre.Diagnostic = .{};
     try testing.expectError(error.InvalidArgument, maplibre.runtimeCreate(testing.allocator, options.value, &diagnostic));
-    try testing.expect(diagnostic.raw_status != null);
+    try testing.expect(diagnostic.status != null);
     try testing.expect(std.mem.indexOf(u8, diagnostic.message(), "embedded NUL") != null);
 
     const fixture = try support.Fixture.create(.{});

@@ -28,7 +28,7 @@ test "copied handles report native invalid state after release" {
     try testing.expect(!map_copy.isClosed());
     var diagnostic: maplibre.Diagnostic = .{};
     try testing.expectError(error.InvalidState, maplibre.mapGetSnapshot(map_copy, &diagnostic));
-    try testing.expectEqual(@as(?i32, -2), diagnostic.raw_status);
+    try testing.expectEqual(.invalid_state, diagnostic.status);
     try testing.expect(diagnostic.message().len != 0);
 
     try support.closeRuntimeHandle(&fixture.runtime);
@@ -111,7 +111,7 @@ test "a refused close leaves the handle usable and a later close succeeds" {
     var diagnostic: maplibre.Diagnostic = .{};
     try testing.expectError(error.InvalidState, maplibre.runtimeRelease(&fixture.runtime, &diagnostic));
     try testing.expect(!fixture.runtime.isClosed());
-    try testing.expectEqual(@as(?i32, -2), diagnostic.raw_status);
+    try testing.expectEqual(.invalid_state, diagnostic.status);
     try fixture.fence();
     try fixture.closeMap();
 }

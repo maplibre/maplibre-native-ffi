@@ -33,7 +33,7 @@ test "generated calls report native failures through the diagnostic" {
     var right: [9]api.ProbePoint = @splat(point);
     var diagnostic: api.Diagnostic = .{};
     try std.testing.expectError(error.InvalidArgument, api.probeRoundtrip(std.testing.allocator, .{ .right = &right }, &diagnostic));
-    try std.testing.expectEqual(@as(?i32, -1), diagnostic.raw_status);
+    try std.testing.expectEqual(.invalid_argument, diagnostic.status);
     try std.testing.expectEqualStrings("right holds more than 8 points", diagnostic.message());
 }
 

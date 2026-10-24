@@ -387,7 +387,7 @@ test "a completion delivers once, and a value that fails to convert reports the 
     FakeSubmission.retire();
     var diagnostic: diagnostics.Diagnostic = .{};
     try std.testing.expectError(error.NativeError, failed.wait(&diagnostic));
-    try std.testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
+    try std.testing.expectEqual(null, diagnostic.status);
     try std.testing.expectEqualStrings(@errorName(error.NativeError), diagnostic.message());
     try std.testing.expectError(error.AlreadyCompleted, failed.wait(null));
 }
@@ -412,7 +412,7 @@ test "a refused submission frees the future and its copy context" {
     defer FakeSubmission.refuse = false;
     var diagnostic: diagnostics.Diagnostic = .{};
     try std.testing.expectError(error.InvalidArgument, submitWithCopyContext(Tracked, CountedContext, &diagnostic, CountedContext.copy, .{}, FakeSubmission.start, .{}));
-    try std.testing.expectEqual(@as(?i32, c.MLN_STATUS_INVALID_ARGUMENT), diagnostic.raw_status);
+    try std.testing.expectEqual(.invalid_argument, diagnostic.status);
     try std.testing.expectEqual(@as(usize, 1), CountedContext.releases);
 }
 
