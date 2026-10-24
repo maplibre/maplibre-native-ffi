@@ -18,7 +18,12 @@ module=entry_test
 sdk="$(dirname "${OHOS_SDK_NATIVE:?OHOS_SDK_NATIVE must name the OpenHarmony native SDK}")"
 tools="$sdk/toolchains"
 signing="$tools/lib"
-es2abc="$sdk/ets/build-tools/ets-loader/bin/ark/build/bin/es2abc"
+# The ArkTS component names its compiler directory for the host it targets.
+case "$(uname -s)" in
+  Darwin) ark=build-mac ;;
+  *) ark=build ;;
+esac
+es2abc="$sdk/ets/build-tools/ets-loader/bin/ark/$ark/bin/es2abc"
 resources="$(cd "$(dirname "$0")/../test/arkts/resources" && pwd)"
 
 for tool in "$es2abc" "$tools/restool" "$signing/app_packing_tool.jar" "$signing/hap-sign-tool.jar"; do
