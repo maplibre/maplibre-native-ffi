@@ -1240,6 +1240,30 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
+   * Reports a custom geometry source error for one canonical tile.
+   *
+   * See `mln_map_set_custom_geometry_source_tile_error` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  public fun setCustomGeometrySourceTileError(
+    sourceId: String,
+    tileId: CanonicalTileId,
+    message: String,
+  ): Deferred<CommandCompletion> =
+    nativeCommand(this, binding) {
+      check(
+        C.mln_map_set_custom_geometry_source_tile_error(
+          handle,
+          view(sourceId),
+          writeCanonicalTileId(tileId),
+          view(message),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
+  /**
    * Sets custom MVT vector source data for one canonical tile.
    *
    * See `mln_map_set_custom_mvt_vector_source_tile_data` in the
@@ -1967,6 +1991,24 @@ public value class MapDiscarding internal constructor(private val owner: Generat
           view(sourceId),
           writeCanonicalTileId(tileId),
           view(data),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
+  public fun setCustomGeometrySourceTileError(
+    sourceId: String,
+    tileId: CanonicalTileId,
+    message: String,
+  ): Unit =
+    nativeDiscard(owner, binding) {
+      check(
+        C.mln_map_set_custom_geometry_source_tile_error(
+          handle,
+          view(sourceId),
+          writeCanonicalTileId(tileId),
+          view(message),
           completion,
           diagnostic,
         ),

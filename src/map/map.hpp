@@ -358,6 +358,10 @@ auto map_set_custom_geometry_source_tile_data(
   MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
   mln_buffer_view data
 ) -> mln_status;
+auto map_set_custom_geometry_source_tile_error(
+  MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view message
+) -> mln_status;
 auto map_invalidate_custom_geometry_source_tile(
   MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id
 ) -> mln_status;

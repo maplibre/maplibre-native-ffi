@@ -1042,6 +1042,10 @@ MLN_API mln_status mln_map_add_custom_geometry_source(
  * source_id and the UTF-8 GeoJSON data are borrowed for the call and copied
  * before return.
  *
+ * MapLibre ignores the data unless fetch_tile requested that tile and
+ * cancel_tile has not cancelled it since. This call still returns MLN_STATUS_OK
+ * after validation.
+ *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
@@ -1060,6 +1064,37 @@ MLN_API mln_status mln_map_set_custom_geometry_source_tile_data(
   mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
   mln_buffer_view data MLN_BINDING("encoding=json"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Reports a custom geometry source error for one canonical tile.
+ *
+ * source_id and the UTF-8 diagnostic message are borrowed for the call. The
+ * function copies accepted bytes before return. An empty message is accepted.
+ *
+ * MapLibre ignores the error unless fetch_tile requested that tile and
+ * cancel_tile has not cancelled it since. This call still returns MLN_STATUS_OK
+ * after validation. The tile stays failed until the host delivers its data or
+ * invalidates it, which fetches it again.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the command was accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
+ *   invalid or empty, tile_id is invalid, message is a null pointer with a
+ *   nonzero size, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
+ * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style source has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom geometry
+ *   source.
+ */
+MLN_BINDING("execution=command")
+MLN_API mln_status mln_map_set_custom_geometry_source_tile_error(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view message, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1159,9 +1194,9 @@ MLN_API mln_status mln_map_add_custom_mvt_vector_source(
  * copies accepted bytes before return. A zero-length view, including a null
  * pointer with size 0, is an empty tile.
  *
- * MapLibre ignores the bytes when that tile is not awaiting a response after
- * fetch_tile, including after cancel_tile, and this call still returns
- * MLN_STATUS_OK after validation.
+ * MapLibre ignores the bytes unless fetch_tile requested that tile and
+ * cancel_tile has not cancelled it since. This call still returns MLN_STATUS_OK
+ * after validation.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
@@ -1189,9 +1224,10 @@ MLN_API mln_status mln_map_set_custom_mvt_vector_source_tile_data(
  * source_id and the UTF-8 diagnostic message are borrowed for the call. The
  * function copies accepted bytes before return. An empty message is accepted.
  *
- * MapLibre ignores the error when that tile is not awaiting a response after
- * fetch_tile, including after cancel_tile, and this call still returns
- * MLN_STATUS_OK after validation.
+ * MapLibre ignores the error unless fetch_tile requested that tile and
+ * cancel_tile has not cancelled it since. This call still returns MLN_STATUS_OK
+ * after validation. The tile stays failed until the host delivers its data or
+ * invalidates it, which fetches it again.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.

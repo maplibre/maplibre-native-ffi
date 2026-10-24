@@ -79,7 +79,7 @@ import type {
 } from "./generated_values.ts";
 
 /** The digest of the C headers that this facade and its addon came from. */
-export const ABI_DIGEST = "07ca730d8814b3be";
+export const ABI_DIGEST = "af0d6ad1b392861e";
 
 /** The index of each completion decoder in the addon's decoder table. */
 export const Decoder = {
@@ -474,6 +474,13 @@ export interface NativeOperations {
     sourceId: string,
     tileId: CanonicalTileId | undefined,
     data: string,
+    completion: number | undefined,
+  ): void;
+  mln_map_set_custom_geometry_source_tile_error(
+    map: bigint,
+    sourceId: string,
+    tileId: CanonicalTileId | undefined,
+    message: string,
     completion: number | undefined,
   ): void;
   mln_map_set_custom_mvt_vector_source_tile_data(

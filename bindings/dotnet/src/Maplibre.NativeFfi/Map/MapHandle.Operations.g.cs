@@ -1560,6 +1560,35 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Reports a custom geometry source error for one canonical tile.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_custom_geometry_source_tile_error</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task<CommandCompletion> SetCustomGeometrySourceTileErrorAsync(
+        string sourceId,
+        CanonicalTileId tileId,
+        string message,
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(this);
+        return scope.Command(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_set_custom_geometry_source_tile_error(
+                    Handle,
+                    scope.Utf8(sourceId),
+                    NativeCanonicalTileId(tileId),
+                    scope.Utf8(message),
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
+        );
+    }
+
+    /// <summary>
     /// Sets custom MVT vector source data for one canonical tile.
     /// </summary>
     /// <remarks>
@@ -2646,6 +2675,27 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                         scope.Utf8(sourceId),
                         NativeCanonicalTileId(tileId),
                         scope.Buffer(data),
+                        completion,
+                        diagnostic
+                    )
+            );
+        }
+
+        public void SetCustomGeometrySourceTileError(
+            string sourceId,
+            CanonicalTileId tileId,
+            string message
+        )
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner);
+            scope.Discard(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_custom_geometry_source_tile_error(
+                        receiverHandle,
+                        scope.Utf8(sourceId),
+                        NativeCanonicalTileId(tileId),
+                        scope.Utf8(message),
                         completion,
                         diagnostic
                     )

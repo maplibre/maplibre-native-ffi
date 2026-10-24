@@ -539,6 +539,15 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
+  fun mln_map_set_custom_geometry_source_tile_error(
+    map: Long,
+    sourceId: Long,
+    tileId: Long,
+    message: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
   fun mln_map_set_custom_mvt_vector_source_tile_data(
     map: Long,
     sourceId: Long,

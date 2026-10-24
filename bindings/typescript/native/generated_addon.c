@@ -3393,6 +3393,52 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_map_set_custom_geometry_source_tile_error(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_map arg_map = 0;
+  mln_buffer_view arg_source_id = {0};
+  mln_canonical_tile_id arg_tile_id;
+  mln_buffer_view arg_message = {0};
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 5)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
+    arg_map = (mln_map)number;
+  }
+  if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
+    goto done;
+  memset(&arg_tile_id, 0, sizeof arg_tile_id);
+  if (!mln_ts_is_absent(call, call->argv[2])) {
+    if (!mln_ts_read_record(call, call->argv[2], "tileId")) goto done;
+    if (!mln_ts_write_canonical_tile_id(
+          call, call->argv[2], &arg_tile_id, "tileId"
+        ))
+      goto done;
+  }
+  if (!mln_ts_read_text_view(call, call->argv[3], &arg_message, "message"))
+    goto done;
+  if (!mln_ts_read_completion(
+        call, call->argv[4], true, &arg_completion, &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_map_set_custom_geometry_source_tile_error(
+    arg_map, arg_source_id, arg_tile_id, arg_message, present_completion,
+    &diagnostic
+  );
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_map_set_custom_mvt_vector_source_tile_data(
   napi_env env, napi_callback_info info
 ) {
@@ -7226,6 +7272,8 @@ static const mln_ts_export exports[] = {
   {"mln_map_set_bounds", mln_ts_export_mln_map_set_bounds},
   {"mln_map_set_custom_geometry_source_tile_data",
    mln_ts_export_mln_map_set_custom_geometry_source_tile_data},
+  {"mln_map_set_custom_geometry_source_tile_error",
+   mln_ts_export_mln_map_set_custom_geometry_source_tile_error},
   {"mln_map_set_custom_mvt_vector_source_tile_data",
    mln_ts_export_mln_map_set_custom_mvt_vector_source_tile_data},
   {"mln_map_set_custom_mvt_vector_source_tile_error",

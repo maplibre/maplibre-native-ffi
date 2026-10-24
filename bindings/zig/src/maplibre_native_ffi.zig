@@ -6288,6 +6288,14 @@ pub fn mapSetCustomGeometrySourceTileData(map: Map, source_id: []const u8, tile_
     return call.submit("mln_map_set_custom_geometry_source_tile_data", .handle, map, call.command, null, diagnostic, .{ source_id, tile_id, data });
 }
 
+/// Reports a custom geometry source error for one canonical tile.
+///
+/// See `mln_map_set_custom_geometry_source_tile_error` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub fn mapSetCustomGeometrySourceTileError(map: Map, source_id: []const u8, tile_id: CanonicalTileId, message: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    return call.submit("mln_map_set_custom_geometry_source_tile_error", .handle, map, call.command, null, diagnostic, .{ source_id, tile_id, message });
+}
+
 /// Sets custom MVT vector source data for one canonical tile.
 ///
 /// See `mln_map_set_custom_mvt_vector_source_tile_data` in the
@@ -7431,6 +7439,11 @@ pub const MapDiscarding = struct {
     pub fn setCustomGeometrySourceTileData(self: MapDiscarding, source_id: []const u8, tile_id: CanonicalTileId, data: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_set_custom_geometry_source_tile_data", .handle, map, null, diagnostic, .{ source_id, tile_id, data });
+    }
+
+    pub fn setCustomGeometrySourceTileError(self: MapDiscarding, source_id: []const u8, tile_id: CanonicalTileId, message: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_custom_geometry_source_tile_error", .handle, map, null, diagnostic, .{ source_id, tile_id, message });
     }
 
     pub fn setCustomMvtVectorSourceTileData(self: MapDiscarding, source_id: []const u8, tile_id: CanonicalTileId, data: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {

@@ -1237,6 +1237,23 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_map_set_custom_geometry_source_tile_error(
+    map: Long,
+    sourceId: Long,
+    tileId: Long,
+    message: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_set_custom_geometry_source_tile_error(
+      map.toULong(),
+      sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
+      tileId.toCPointer<mln_canonical_tile_id>()!!.pointed.readValue(),
+      message.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_map_set_custom_mvt_vector_source_tile_data(
     map: Long,
     sourceId: Long,

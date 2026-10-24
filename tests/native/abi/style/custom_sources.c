@@ -1,6 +1,6 @@
 // Custom geometry and custom MVT vector sources: when the host's callback state
-// is released, delivered tiles becoming features, and an invalidation
-// cancelling and refetching a tile.
+// is released, delivered tiles becoming features, failed tiles being reported,
+// and an invalidation cancelling and refetching a tile.
 //
 // The two kinds share their contracts, so every shared case runs once per kind.
 // The release callback is the only report that the host's state is no longer
@@ -128,6 +128,15 @@ static mln_status deliver_mvt_point(
   );
 }
 
+static mln_status fail_geometry_tile(
+  mln_map map, const mln_completion* completion
+) {
+  return mln_map_set_custom_geometry_source_tile_error(
+    map, MLN_BUFFER_LITERAL("custom-geometry"), root_tile,
+    MLN_BUFFER_LITERAL("provider failed"), completion, NULL
+  );
+}
+
 static mln_status invalidate_geometry_tile(
   mln_map map, const mln_completion* completion
 ) {
@@ -143,6 +152,13 @@ static mln_status invalidate_geometry_region(
   return mln_map_invalidate_custom_geometry_source_region(
     map, MLN_BUFFER_LITERAL("custom-geometry"),
     (mln_lat_lng_bounds){{10.0, 10.0}, {20.0, 20.0}}, completion, NULL
+  );
+}
+
+static mln_status fail_mvt_tile(mln_map map, const mln_completion* completion) {
+  return mln_map_set_custom_mvt_vector_source_tile_error(
+    map, MLN_BUFFER_LITERAL("custom-mvt-vector"), root_tile,
+    MLN_BUFFER_LITERAL("provider failed"), completion, NULL
   );
 }
 
@@ -166,6 +182,8 @@ typedef struct custom_kind {
     const mln_completion* completion
   );
   mln_status (*deliver_point)(mln_map map, const mln_completion* completion);
+  // Fails the root tile with the message "provider failed".
+  mln_status (*fail_root)(mln_map map, const mln_completion* completion);
   mln_status (*invalidate_root)(mln_map map, const mln_completion* completion);
   // Invalidates a region inside the root tile, or null for a kind without
   // region invalidation.
@@ -183,6 +201,7 @@ static const custom_kind kinds[] = {
                   "\"custom-geometry\"}",
     .add = add_geometry_source,
     .deliver_point = deliver_geometry_point,
+    .fail_root = fail_geometry_tile,
     .invalidate_root = invalidate_geometry_tile,
     .invalidate_region = invalidate_geometry_region,
   },
@@ -194,6 +213,7 @@ static const custom_kind kinds[] = {
                   "\"custom-mvt-vector\",\"source-layer\":\"points\"}",
     .add = add_mvt_source,
     .deliver_point = deliver_mvt_point,
+    .fail_root = fail_mvt_tile,
     .invalidate_root = invalidate_mvt_tile,
   },
 };
@@ -481,6 +501,152 @@ static void a_delivered_tile_becomes_features_and_invalidation_refetches_it(
   }
 }
 
+static void jump_to_zoom(mln_map map, double zoom) {
+  mln_camera_update camera = mln_camera_update_default();
+  camera.camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  camera.camera.zoom = zoom;
+  MLN_TEST_AWAIT_OK(
+    mln_map_update_camera(map, &camera, &completion.descriptor, NULL)
+  );
+}
+
+// Zooming in past a tile the host has not answered, beyond the zoom levels
+// MapLibre prefetches below the ideal one, keeps it at most as an optional
+// fallback, which cancels it. Zooming back out requires it again, which fetches
+// it again.
+static void a_cancelled_tile_is_fetched_when_required_again(void) {
+  FOR_EACH_KIND(kind) {
+    mln_runtime runtime = mln_test_create_runtime();
+    mln_map map = mln_test_create_map(runtime);
+    custom_probe probe;
+    mln_test_render_fixture fixture = {0};
+    start_rendering(kind, runtime, map, &probe, &fixture);
+
+    const size_t fetches = atomic_load(&probe.root_fetches);
+    const size_t cancels = atomic_load(&probe.root_cancels);
+    jump_to_zoom(map, 6);
+    probe_target cancelled = {
+      .probe = &probe, .root_fetches = fetches, .root_cancels = cancels + 1
+    };
+    TEST_ASSERT_TRUE_MESSAGE(
+      mln_test_style_render_until(
+        &fixture, probe_reached, &cancelled, "the root tile's cancel"
+      ),
+      kind->name
+    );
+
+    jump_to_zoom(map, 0);
+    probe_target refetched = {
+      .probe = &probe, .root_fetches = fetches + 1, .root_cancels = cancels + 1
+    };
+    TEST_ASSERT_TRUE_MESSAGE(
+      mln_test_style_render_until(
+        &fixture, probe_reached, &refetched, "the root tile's fetch"
+      ),
+      kind->name
+    );
+
+    mln_test_render_fixture_destroy(&fixture);
+    mln_test_destroy_map(map);
+    mln_test_destroy_runtime(runtime);
+  }
+}
+
+// Set from MapLibre's threads, so it lives in static storage that outlives any
+// registration a failing case leaves behind. The expected fragment is written
+// before the callback is installed and only read after.
+static atomic_bool tile_error_logged;
+static char tile_error_fragment[64];
+
+static uint32_t record_tile_error(
+  void* user_data, uint32_t severity, uint32_t event, int64_t code,
+  const char* message
+) {
+  (void)user_data;
+  (void)event;
+  (void)code;
+  if (
+    severity == MLN_LOG_SEVERITY_ERROR &&
+    strstr(message, tile_error_fragment) != NULL
+  ) {
+    mln_test_flag_set(&tile_error_logged);
+  }
+  return 0;
+}
+
+static bool tile_error_reported(void* context) {
+  (void)context;
+  return atomic_load(&tile_error_logged);
+}
+
+static void fail_and_recover_tile(const custom_kind* kind) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  custom_probe probe;
+  mln_test_render_fixture fixture = {0};
+  start_rendering(kind, runtime, map, &probe, &fixture);
+
+  MLN_TEST_OK_MESSAGE(
+    submit_and_settle(kind, map, kind->fail_root), kind->name
+  );
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_style_render_until(
+      &fixture, tile_error_reported, NULL, "the tile's error"
+    ),
+    kind->name
+  );
+
+  const size_t fetches = atomic_load(&probe.root_fetches);
+  MLN_TEST_OK_MESSAGE(
+    submit_and_settle(kind, map, kind->invalidate_root), kind->name
+  );
+  probe_target refetched = {.probe = &probe, .root_fetches = fetches + 1};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_style_render_until(
+      &fixture, probe_reached, &refetched, "the failed tile's fetch"
+    ),
+    kind->name
+  );
+
+  MLN_TEST_OK_MESSAGE(
+    submit_and_settle(kind, map, kind->deliver_point), kind->name
+  );
+  feature_target features = {.fixture = &fixture, .kind = kind};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_style_render_until(
+      &fixture, delivered_feature_found, &features, "the delivered feature"
+    ),
+    kind->name
+  );
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A failed tile reaches MapLibre's tile error report, and invalidating it
+// fetches it again, so the host can retry and then deliver its data. The log
+// callback belongs to the process, so the case clears it even when an assertion
+// fails, and Unity still reports the failure.
+static void a_failed_tile_is_reported_and_invalidation_refetches_it(void) {
+  FOR_EACH_KIND(kind) {
+    atomic_store(&tile_error_logged, false);
+    snprintf(
+      tile_error_fragment, sizeof(tile_error_fragment),
+      "for source %s: provider failed", kind->source_id
+    );
+    const mln_log_handler handler = {
+      .size = sizeof(mln_log_handler),
+      .callback = record_tile_error,
+    };
+    MLN_TEST_OK(mln_log_set_callback(&handler, NULL));
+    if (TEST_PROTECT()) {
+      fail_and_recover_tile(kind);
+    }
+    (void)mln_log_clear_callback(NULL);
+  }
+}
+
 static uint32_t source_type(mln_map map, const char* id) {
   mln_test_completion info =
     mln_test_completion_default(sizeof(mln_style_source_info));
@@ -562,6 +728,12 @@ static void tile_operations_check_their_tile_and_source_kind(void) {
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_set_custom_geometry_source_tile_data(
       map, mvt, root_tile, no_features, &completion.descriptor, NULL
+    )
+  );
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_custom_geometry_source_tile_error(
+      map, mvt, root_tile, missing, &completion.descriptor, NULL
     )
   );
   MLN_TEST_AWAIT_COMMAND(
@@ -726,6 +898,8 @@ MLN_TEST_GROUP {
   RUN_TEST(an_explicit_removal_releases_once);
   RUN_TEST(accepted_adds_release_their_callback_state);
   RUN_TEST(a_delivered_tile_becomes_features_and_invalidation_refetches_it);
+  RUN_TEST(a_failed_tile_is_reported_and_invalidation_refetches_it);
+  RUN_TEST(a_cancelled_tile_is_fetched_when_required_again);
   RUN_TEST(tile_operations_check_their_tile_and_source_kind);
   RUN_TEST(custom_sources_take_and_validate_every_option);
 }

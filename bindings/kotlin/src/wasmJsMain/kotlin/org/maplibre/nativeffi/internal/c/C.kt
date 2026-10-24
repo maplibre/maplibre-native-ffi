@@ -994,6 +994,23 @@ internal actual object C {
       word(outDiagnostic),
     )
 
+  actual fun mln_map_set_custom_geometry_source_tile_error(
+    map: Long,
+    sourceId: Long,
+    tileId: Long,
+    message: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_set_custom_geometry_source_tile_error(
+      map,
+      word(sourceId),
+      word(tileId),
+      word(message),
+      word(completion),
+      word(outDiagnostic),
+    )
+
   actual fun mln_map_set_custom_mvt_vector_source_tile_data(
     map: Long,
     sourceId: Long,
@@ -2759,6 +2776,18 @@ private fun mln_kw_mln_map_set_custom_geometry_source_tile_data(
 ): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_custom_geometry_source_tile_data(p0, p1, p2, p3, p4, p5)",
+  )
+
+private fun mln_kw_mln_map_set_custom_geometry_source_tile_error(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+  p4: Int,
+  p5: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_custom_geometry_source_tile_error(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_set_custom_mvt_vector_source_tile_data(

@@ -1,0 +1,128 @@
+Lets a custom geometry source fail a tile, as a custom vector source can, and
+keeps a failed tile of either kind registered, so invalidating it fetches it
+again. Cancelling a custom geometry tile also forgets it, as the custom vector
+loader already does, so the tile fetches again when it is next required
+(https://github.com/maplibre/maplibre-native-ffi/issues/778).
+Upstream: not proposed
+
+diff --git a/include/mln/style/sources/custom_geometry_source.hpp b/include/mln/style/sources/custom_geometry_source.hpp
+index 9a280fb..1975c87 100644
+--- a/include/mln/style/sources/custom_geometry_source.hpp
++++ b/include/mln/style/sources/custom_geometry_source.hpp
+@@ -43,6 +43,7 @@ public:
+     ~CustomGeometrySource() final;
+     void loadDescription(FileSource&) final;
+     void setTileData(const CanonicalTileID&, const GeoJSON&);
++    void setTileError(const CanonicalTileID&, std::exception_ptr error);
+     void invalidateTile(const CanonicalTileID&);
+     void invalidateRegion(const LatLngBounds&);
+     // Private implementation
+diff --git a/src/mln/style/custom_tile_loader.cpp b/src/mln/style/custom_tile_loader.cpp
+index f4fd6d2..dd0ae7d 100644
+--- a/src/mln/style/custom_tile_loader.cpp
++++ b/src/mln/style/custom_tile_loader.cpp
+@@ -38,6 +38,8 @@ void CustomTileLoader::cancelTile(const OverscaledTileID& tileID) {
+     std::scoped_lock guard(dataMutex);
+     if (tileCallbackMap.contains(tileID.canonical)) {
+         invokeTileCancel(tileID.canonical);
++        // Erase so a subsequent fetchTile for the same tile re-issues the fetch.
++        tileCallbackMap.erase(tileID.canonical);
+     }
+ }
+ 
+@@ -70,6 +72,18 @@ void CustomTileLoader::setTileData(const CanonicalTileID& tileID, const GeoJSON&
+     dataCache[tileID] = std::move(dataPtr);
+ }
+ 
++void CustomTileLoader::setTileError(const CanonicalTileID& tileID, std::exception_ptr error) {
++    std::scoped_lock guard(dataMutex);
++    auto iter = tileCallbackMap.find(tileID);
++    if (iter == tileCallbackMap.end()) return;
++    for (auto& tuple : iter->second) {
++        auto actor = std::get<2>(tuple);
++        actor.invoke(&CustomGeometryTile::setTileError, error);
++    }
++    // Keep the callbacks, so invalidating the failed tile fetches it again.
++    dataCache.erase(tileID);
++}
++
+ void CustomTileLoader::invalidateTile(const CanonicalTileID& tileID) {
+     std::scoped_lock guard(dataMutex);
+     auto tileCallbacks = tileCallbackMap.find(tileID);
+diff --git a/src/mln/style/custom_tile_loader.hpp b/src/mln/style/custom_tile_loader.hpp
+index b2f3f83..08c6f55 100644
+--- a/src/mln/style/custom_tile_loader.hpp
++++ b/src/mln/style/custom_tile_loader.hpp
+@@ -28,6 +28,7 @@ public:
+ 
+     void removeTile(const OverscaledTileID& tileID);
+     void setTileData(const CanonicalTileID& tileID, const GeoJSON& data);
++    void setTileError(const CanonicalTileID& tileID, std::exception_ptr error);
+ 
+     void invalidateTile(const CanonicalTileID&);
+     void invalidateRegion(const LatLngBounds&, Range<uint8_t>);
+diff --git a/src/mln/style/custom_vector_tile_loader.cpp b/src/mln/style/custom_vector_tile_loader.cpp
+index c2077ad..ee7c021 100644
+--- a/src/mln/style/custom_vector_tile_loader.cpp
++++ b/src/mln/style/custom_vector_tile_loader.cpp
+@@ -37,8 +37,6 @@ void CustomVectorTileLoader::cancelTile(const OverscaledTileID& tileID) {
+     if (tileCallbackMap.contains(tileID.canonical)) {
+         invokeTileCancel(tileID.canonical);
+         // Erase so a subsequent fetchTile for the same tile re-issues the fetch.
+-        // Intentionally diverges from CustomTileLoader which omits this — that is a
+-        // latent bug there that needs a separate cleanup.
+         tileCallbackMap.erase(tileID.canonical);
+     }
+ }
+@@ -81,7 +79,7 @@ void CustomVectorTileLoader::setTileError(const CanonicalTileID& tileID, std::ex
+         auto actor = std::get<2>(tuple);
+         actor.invoke(&CustomVectorTile::setTileError, error);
+     }
+-    tileCallbackMap.erase(iter);
++    // Keep the callbacks, so invalidating the failed tile fetches it again.
+     dataCache.erase(tileID);
+ }
+ 
+diff --git a/src/mln/style/sources/custom_geometry_source.cpp b/src/mln/style/sources/custom_geometry_source.cpp
+index 0cfb975..4ea2844 100644
+--- a/src/mln/style/sources/custom_geometry_source.cpp
++++ b/src/mln/style/sources/custom_geometry_source.cpp
+@@ -39,6 +39,10 @@ void CustomGeometrySource::setTileData(const CanonicalTileID& tileID, const GeoJ
+     loader->self().invoke(&CustomTileLoader::setTileData, tileID, data);
+ }
+ 
++void CustomGeometrySource::setTileError(const CanonicalTileID& tileID, std::exception_ptr error) {
++    loader->self().invoke(&CustomTileLoader::setTileError, tileID, error);
++}
++
+ void CustomGeometrySource::invalidateTile(const CanonicalTileID& tileID) {
+     loader->self().invoke(&CustomTileLoader::invalidateTile, tileID);
+ }
+diff --git a/src/mln/tile/custom_geometry_tile.cpp b/src/mln/tile/custom_geometry_tile.cpp
+index da35f25..1172ecc 100644
+--- a/src/mln/tile/custom_geometry_tile.cpp
++++ b/src/mln/tile/custom_geometry_tile.cpp
+@@ -49,6 +49,11 @@ void CustomGeometryTile::setTileData(const GeoJSON& geoJSON) {
+     setData(std::make_unique<GeoJSONTileData>(std::move(featureData)));
+ }
+ 
++void CustomGeometryTile::setTileError(std::exception_ptr error) {
++    if (obsolete) return;
++    GeometryTile::setError(std::move(error));
++}
++
+ void CustomGeometryTile::invalidateTileData() {
+     stale = true;
+     observer->onTileChanged(*this);
+diff --git a/src/mln/tile/custom_geometry_tile.hpp b/src/mln/tile/custom_geometry_tile.hpp
+index 649edcf..1d83882 100644
+--- a/src/mln/tile/custom_geometry_tile.hpp
++++ b/src/mln/tile/custom_geometry_tile.hpp
+@@ -25,6 +25,7 @@ public:
+     ~CustomGeometryTile() override;
+ 
+     void setTileData(const GeoJSON& geoJSON);
++    void setTileError(std::exception_ptr error);
+     void invalidateTileData();
+ 
+     void setNecessity(TileNecessity) final;

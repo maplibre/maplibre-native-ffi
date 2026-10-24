@@ -3585,6 +3585,25 @@ external int mln_map_set_custom_geometry_source_tile_data(
     Pointer<mln_diagnostic>,
   )
 >()
+external int mln_map_set_custom_geometry_source_tile_error(
+  int map,
+  mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id,
+  mln_buffer_view message,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_canonical_tile_id,
+    mln_buffer_view,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
 external int mln_map_set_custom_mvt_vector_source_tile_data(
   int map,
   mln_buffer_view source_id,

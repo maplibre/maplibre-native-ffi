@@ -1350,6 +1350,24 @@ auto map_add_custom_geometry_source(
   return MLN_STATUS_OK;
 }
 
+auto lookup_custom_geometry_source(
+  MapObject& live, mln_buffer_view source_id,
+  mln::style::CustomGeometrySource*& out_source
+) -> mln_status {
+  auto* source =
+    map_native(live).getStyle().getSource(string_from_view(source_id));
+  if (source == nullptr) {
+    set_thread_error("source does not exist");
+    return MLN_STATUS_NOT_FOUND;
+  }
+  out_source = source->as<mln::style::CustomGeometrySource>();
+  if (out_source == nullptr) {
+    set_thread_error("source is not a custom geometry source");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
 auto map_set_custom_geometry_source_tile_data(
   MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
   mln_buffer_view data
@@ -1363,18 +1381,35 @@ auto map_set_custom_geometry_source_tile_data(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
-  if (source == nullptr) {
-    set_thread_error("source does not exist");
-    return MLN_STATUS_NOT_FOUND;
-  }
-  auto* custom_source = source->as<mln::style::CustomGeometrySource>();
-  if (custom_source == nullptr) {
-    set_thread_error("source is not a custom geometry source");
-    return MLN_STATUS_INVALID_ARGUMENT;
+  mln::style::CustomGeometrySource* custom_source = nullptr;
+  const auto source_status =
+    lookup_custom_geometry_source(live, source_id, custom_source);
+  if (source_status != MLN_STATUS_OK) {
+    return source_status;
   }
   custom_source->setTileData(to_native_canonical_tile_id(tile_id), *geojson);
+  return MLN_STATUS_OK;
+}
+
+auto map_set_custom_geometry_source_tile_error(
+  MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view message
+) -> mln_status {
+  const auto tile_status = validate_canonical_tile_id(tile_id);
+  if (tile_status != MLN_STATUS_OK) {
+    return tile_status;
+  }
+
+  mln::style::CustomGeometrySource* custom_source = nullptr;
+  const auto source_status =
+    lookup_custom_geometry_source(live, source_id, custom_source);
+  if (source_status != MLN_STATUS_OK) {
+    return source_status;
+  }
+  custom_source->setTileError(
+    to_native_canonical_tile_id(tile_id),
+    std::make_exception_ptr(std::runtime_error(string_from_view(message)))
+  );
   return MLN_STATUS_OK;
 }
 
@@ -1386,16 +1421,11 @@ auto map_invalidate_custom_geometry_source_tile(
     return tile_status;
   }
 
-  auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
-  if (source == nullptr) {
-    set_thread_error("source does not exist");
-    return MLN_STATUS_NOT_FOUND;
-  }
-  auto* custom_source = source->as<mln::style::CustomGeometrySource>();
-  if (custom_source == nullptr) {
-    set_thread_error("source is not a custom geometry source");
-    return MLN_STATUS_INVALID_ARGUMENT;
+  mln::style::CustomGeometrySource* custom_source = nullptr;
+  const auto source_status =
+    lookup_custom_geometry_source(live, source_id, custom_source);
+  if (source_status != MLN_STATUS_OK) {
+    return source_status;
   }
   custom_source->invalidateTile(to_native_canonical_tile_id(tile_id));
   return MLN_STATUS_OK;
@@ -1409,16 +1439,11 @@ auto map_invalidate_custom_geometry_source_region(
     return bounds_status;
   }
 
-  auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
-  if (source == nullptr) {
-    set_thread_error("source does not exist");
-    return MLN_STATUS_NOT_FOUND;
-  }
-  auto* custom_source = source->as<mln::style::CustomGeometrySource>();
-  if (custom_source == nullptr) {
-    set_thread_error("source is not a custom geometry source");
-    return MLN_STATUS_INVALID_ARGUMENT;
+  mln::style::CustomGeometrySource* custom_source = nullptr;
+  const auto source_status =
+    lookup_custom_geometry_source(live, source_id, custom_source);
+  if (source_status != MLN_STATUS_OK) {
+    return source_status;
   }
   custom_source->invalidateRegion(to_native_lat_lng_bounds(bounds));
   return MLN_STATUS_OK;

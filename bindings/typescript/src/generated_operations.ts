@@ -2141,6 +2141,28 @@ export class MapHandle extends Owner {
   }
 
   /**
+   * Reports a custom geometry source error for one canonical tile.
+   *
+   * See `mln_map_set_custom_geometry_source_tile_error` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  setCustomGeometrySourceTileError(
+    sourceId: string,
+    tileId: CanonicalTileId,
+    message: string,
+  ): Promise<CommandCompletion> {
+    return command((completion) =>
+      native.mln_map_set_custom_geometry_source_tile_error(
+        this.id,
+        sourceId,
+        tileId,
+        message,
+        completion,
+      ),
+    );
+  }
+
+  /**
    * Sets custom MVT vector source data for one canonical tile.
    *
    * See `mln_map_set_custom_mvt_vector_source_tile_data` in the
@@ -2959,6 +2981,26 @@ export class MapHandleDiscarding {
       sourceId,
       tileId,
       data,
+      undefined,
+    );
+  }
+
+  /**
+   * Reports a custom geometry source error for one canonical tile.
+   *
+   * See `mln_map_set_custom_geometry_source_tile_error` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  setCustomGeometrySourceTileError(
+    sourceId: string,
+    tileId: CanonicalTileId,
+    message: string,
+  ): void {
+    native.mln_map_set_custom_geometry_source_tile_error(
+      this.#owner.id,
+      sourceId,
+      tileId,
+      message,
       undefined,
     );
   }

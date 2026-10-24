@@ -1014,6 +1014,18 @@ int32_t mln_kw_mln_map_set_custom_geometry_source_tile_data(
   );
 }
 
+int32_t mln_kw_mln_map_set_custom_geometry_source_tile_error(
+  int64_t map, uintptr_t source_id, uintptr_t tile_id, uintptr_t message,
+  uintptr_t completion, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_map_set_custom_geometry_source_tile_error(
+    (mln_map)map, *(const mln_buffer_view*)(uintptr_t)source_id,
+    *(const mln_canonical_tile_id*)(uintptr_t)tile_id,
+    *(const mln_buffer_view*)(uintptr_t)message,
+    (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_map_set_custom_mvt_vector_source_tile_data(
   int64_t map, uintptr_t source_id, uintptr_t tile_id, uintptr_t data,
   uintptr_t completion, uintptr_t out_diagnostic

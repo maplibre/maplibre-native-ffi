@@ -1308,6 +1308,32 @@ impl MapHandle {
         })
     }
 
+    /// Reports a custom geometry source error for one canonical tile.
+    ///
+    /// See `mln_map_set_custom_geometry_source_tile_error` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn set_custom_geometry_source_tile_error(
+        &self,
+        source_id: &str,
+        tile_id: CanonicalTileId,
+        message: &str,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call();
+        let source_id = call.input(&source_id)?;
+        let tile_id = call.input(&tile_id)?;
+        let message = call.input(&message)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_custom_geometry_source_tile_error(
+                map,
+                source_id,
+                tile_id,
+                message,
+                completion,
+                out_diagnostic,
+            )
+        })
+    }
+
     /// Sets custom MVT vector source data for one canonical tile.
     ///
     /// See `mln_map_set_custom_mvt_vector_source_tile_data` in the
@@ -2231,6 +2257,32 @@ impl MapHandleDiscarding<'_> {
                 source_id,
                 tile_id,
                 data,
+                completion,
+                out_diagnostic,
+            )
+        })
+    }
+
+    /// Reports a custom geometry source error for one canonical tile.
+    ///
+    /// See `mln_map_set_custom_geometry_source_tile_error` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn set_custom_geometry_source_tile_error(
+        &self,
+        source_id: &str,
+        tile_id: CanonicalTileId,
+        message: &str,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call();
+        let source_id = call.input(&source_id)?;
+        let tile_id = call.input(&tile_id)?;
+        let message = call.input(&message)?;
+        call.discard(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_custom_geometry_source_tile_error(
+                map,
+                source_id,
+                tile_id,
+                message,
                 completion,
                 out_diagnostic,
             )

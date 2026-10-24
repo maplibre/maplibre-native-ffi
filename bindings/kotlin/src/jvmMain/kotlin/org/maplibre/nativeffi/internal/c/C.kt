@@ -650,6 +650,17 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
+  private val mln_map_set_custom_geometry_source_tile_error =
+    Ffm.downcall(
+      "mln_map_set_custom_geometry_source_tile_error",
+      JAVA_INT,
+      JAVA_LONG,
+      mln_buffer_view,
+      mln_canonical_tile_id,
+      mln_buffer_view,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_map_set_custom_mvt_vector_source_tile_data =
     Ffm.downcall(
       "mln_map_set_custom_mvt_vector_source_tile_data",
@@ -2345,6 +2356,23 @@ internal actual object C {
       Ffm.value(sourceId, mln_buffer_view),
       Ffm.value(tileId, mln_canonical_tile_id),
       Ffm.value(data, mln_buffer_view),
+      completion,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_map_set_custom_geometry_source_tile_error(
+    map: Long,
+    sourceId: Long,
+    tileId: Long,
+    message: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_set_custom_geometry_source_tile_error.invokeExact(
+      map,
+      Ffm.value(sourceId, mln_buffer_view),
+      Ffm.value(tileId, mln_canonical_tile_id),
+      Ffm.value(message, mln_buffer_view),
       completion,
       outDiagnostic,
     ) as Int

@@ -587,6 +587,33 @@ auto mln_map_set_custom_geometry_source_tile_data(
   });
 }
 
+auto mln_map_set_custom_geometry_source_tile_error(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view message, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (
+      !valid_non_empty_view(source_id, "source_id") ||
+      !valid_view(message, "message")
+    ) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    auto id = OwnedView{source_id};
+    auto owned = OwnedView{message};
+    return mln::core::submit_map_command(
+      map,
+      [id = std::move(id), owned = std::move(owned),
+       tile_id](mln::core::MapObject& live) -> mln_status {
+        return mln::core::map_set_custom_geometry_source_tile_error(
+          live, id.view(), tile_id, owned.view()
+        );
+      },
+      completion
+    );
+  });
+}
+
 auto mln_map_invalidate_custom_geometry_source_tile(
   mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
   const mln_completion* completion, mln_diagnostic* out_diagnostic

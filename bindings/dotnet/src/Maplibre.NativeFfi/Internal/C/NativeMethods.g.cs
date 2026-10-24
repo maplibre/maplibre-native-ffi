@@ -785,6 +785,16 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_set_custom_geometry_source_tile_error(
+        MlnMap map,
+        mln_buffer_view source_id,
+        mln_canonical_tile_id tile_id,
+        mln_buffer_view message,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_set_custom_mvt_vector_source_tile_data(
         MlnMap map,
         mln_buffer_view source_id,

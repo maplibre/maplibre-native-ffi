@@ -8148,6 +8148,17 @@ func (receiver *MapHandle) SetCustomGeometrySourceTileData(sourceId string, tile
 	}, completionCommand, true)
 }
 
+// SetCustomGeometrySourceTileError reports a custom geometry source error for
+// one canonical tile.
+//
+// See mln_map_set_custom_geometry_source_tile_error in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+func (receiver *MapHandle) SetCustomGeometrySourceTileError(sourceId string, tileId CanonicalTileId, message string) (*Future[CommandCompletion], error) {
+	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_custom_geometry_source_tile_error(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(message, arena), completion, diagnostic))
+	}, completionCommand, true)
+}
+
 // SetCustomMvtVectorSourceTileData sets custom MVT vector source data for one
 // canonical tile.
 //
@@ -9412,6 +9423,13 @@ func (view MapHandleDiscarding) SetCustomGeometrySourceTileData(sourceId string,
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_custom_geometry_source_tile_data(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(data, arena), completion, diagnostic))
+	})
+}
+
+func (view MapHandleDiscarding) SetCustomGeometrySourceTileError(sourceId string, tileId CanonicalTileId, message string) error {
+	receiver := view.owner
+	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_custom_geometry_source_tile_error(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(message, arena), completion, diagnostic))
 	})
 }
 

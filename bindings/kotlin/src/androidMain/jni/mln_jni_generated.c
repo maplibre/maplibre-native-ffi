@@ -1228,6 +1228,19 @@ static jint mln_map_set_custom_geometry_source_tile_data_jni(
   );
 }
 
+static jint mln_map_set_custom_geometry_source_tile_error_jni(
+  JNIEnv* env, jclass type, jlong map, jlong source_id, jlong tile_id,
+  jlong message, jlong completion, jlong out_diagnostic
+) {
+  return (jint)mln_map_set_custom_geometry_source_tile_error(
+    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, source_id),
+    MLN_JNI_RECORD(mln_canonical_tile_id, tile_id),
+    MLN_JNI_RECORD(mln_buffer_view, message),
+    MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_map_set_custom_mvt_vector_source_tile_data_jni(
   JNIEnv* env, jclass type, jlong map, jlong source_id, jlong tile_id,
   jlong data, jlong completion, jlong out_diagnostic
@@ -2781,6 +2794,8 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_map_set_bounds", "(JJJJ)I", (void*)mln_map_set_bounds_jni},
   {"mln_map_set_custom_geometry_source_tile_data", "(JJJJJJ)I",
    (void*)mln_map_set_custom_geometry_source_tile_data_jni},
+  {"mln_map_set_custom_geometry_source_tile_error", "(JJJJJJ)I",
+   (void*)mln_map_set_custom_geometry_source_tile_error_jni},
   {"mln_map_set_custom_mvt_vector_source_tile_data", "(JJJJJJ)I",
    (void*)mln_map_set_custom_mvt_vector_source_tile_data_jni},
   {"mln_map_set_custom_mvt_vector_source_tile_error", "(JJJJJJ)I",
@@ -3216,6 +3231,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_map_set_bounds", "(JJJJ)I", (void*)mln_map_set_bounds_jni},
   {"mln_map_set_custom_geometry_source_tile_data", "(JJJJJJ)I",
    (void*)mln_map_set_custom_geometry_source_tile_data_jni},
+  {"mln_map_set_custom_geometry_source_tile_error", "(JJJJJJ)I",
+   (void*)mln_map_set_custom_geometry_source_tile_error_jni},
   {"mln_map_set_custom_mvt_vector_source_tile_data", "(JJJJJJ)I",
    (void*)mln_map_set_custom_mvt_vector_source_tile_data_jni},
   {"mln_map_set_custom_mvt_vector_source_tile_error", "(JJJJJJ)I",

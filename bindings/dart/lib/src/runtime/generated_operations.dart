@@ -4434,6 +4434,20 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
+  void setCustomGeometrySourceTileError(
+    String sourceId,
+    CanonicalTileId tileId,
+    String message,
+  ) => _discard(
+    (arena, completion) => raw.mln_map_set_custom_geometry_source_tile_error(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      _writeCanonicalTileId(tileId, arena).ref,
+      nativeStringView(message, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   void setCustomMvtVectorSourceTileData(
     String sourceId,
     CanonicalTileId tileId,
@@ -5870,6 +5884,25 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       nativeStringView(sourceId, arena).value,
       _writeCanonicalTileId(tileId, arena).ref,
       nativeBufferView(data, arena),
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
+  /// Reports a custom geometry source error for one canonical tile.
+  ///
+  /// See `mln_map_set_custom_geometry_source_tile_error` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  Future<CommandCompletion> setCustomGeometrySourceTileError(
+    String sourceId,
+    CanonicalTileId tileId,
+    String message,
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_custom_geometry_source_tile_error(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      _writeCanonicalTileId(tileId, arena).ref,
+      nativeStringView(message, arena).value,
       completion,
       nativeDiagnostic,
     ),

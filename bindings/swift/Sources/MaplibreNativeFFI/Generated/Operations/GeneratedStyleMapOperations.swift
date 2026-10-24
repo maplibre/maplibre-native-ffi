@@ -557,6 +557,28 @@ public extension MapHandle {
     }
   }
 
+  /// Reports a custom geometry source error for one canonical tile.
+  ///
+  /// See `mln_map_set_custom_geometry_source_tile_error` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  @discardableResult
+  func setCustomGeometrySourceTileError(
+    sourceId bindingArg0: String,
+    tileId bindingArg1: CanonicalTileId,
+    message bindingArg2: String
+  ) async throws -> CommandCompletion {
+    try await nativeCommand { raw, arena, completion, diagnostic in
+      mln_map_set_custom_geometry_source_tile_error(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.nativeValue(),
+        arena.view(bindingArg2),
+        completion,
+        diagnostic
+      )
+    }
+  }
+
   /// Sets custom MVT vector source data for one canonical tile.
   ///
   /// See `mln_map_set_custom_mvt_vector_source_tile_data` in the
@@ -1096,6 +1118,24 @@ public extension MapHandleDiscarding {
     try owner
       .nativeInvoke { raw, arena, diagnostic in
         mln_map_set_custom_geometry_source_tile_data(
+          raw,
+          arena.view(bindingArg0),
+          bindingArg1.nativeValue(),
+          arena.view(bindingArg2),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setCustomGeometrySourceTileError(
+    sourceId bindingArg0: String,
+    tileId bindingArg1: CanonicalTileId,
+    message bindingArg2: String
+  ) throws {
+    try owner
+      .nativeInvoke { raw, arena, diagnostic in
+        mln_map_set_custom_geometry_source_tile_error(
           raw,
           arena.view(bindingArg0),
           bindingArg1.nativeValue(),

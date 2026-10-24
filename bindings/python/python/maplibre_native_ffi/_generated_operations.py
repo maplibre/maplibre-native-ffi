@@ -981,6 +981,18 @@ class _MapHandleOperations(GeneratedOperations):
             source_id, tile_id, data
         )
 
+    def set_custom_geometry_source_tile_error(
+        self, source_id: str, tile_id: CanonicalTileId, message: str
+    ) -> Future[CommandCompletion]:
+        """Reports a custom geometry source error for one canonical tile.
+
+        See `mln_map_set_custom_geometry_source_tile_error` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native.set_custom_geometry_source_tile_error(
+            source_id, tile_id, message
+        )
+
     def set_custom_mvt_vector_source_tile_data(
         self, source_id: str, tile_id: CanonicalTileId, data: bytes
     ) -> Future[CommandCompletion]:
@@ -2415,6 +2427,18 @@ class MapHandleDiscarding:
         """
         return self._native._discard_set_custom_geometry_source_tile_data(
             source_id, tile_id, data
+        )
+
+    def set_custom_geometry_source_tile_error(
+        self, source_id: str, tile_id: CanonicalTileId, message: str
+    ) -> None:
+        """Reports a custom geometry source error for one canonical tile.
+
+        See `mln_map_set_custom_geometry_source_tile_error` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_custom_geometry_source_tile_error(
+            source_id, tile_id, message
         )
 
     def set_custom_mvt_vector_source_tile_data(

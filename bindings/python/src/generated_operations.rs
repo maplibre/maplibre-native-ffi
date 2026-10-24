@@ -7132,6 +7132,60 @@ impl MapHandle {
             })
         }
     }
+    #[pyo3(signature = (source_id, tile_id, message))]
+    fn set_custom_geometry_source_tile_error(
+        &self,
+        py: Python<'_>,
+        source_id: &Bound<'_, PyAny>,
+        tile_id: &Bound<'_, PyAny>,
+        message: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let source_id_value = storage.buffer(source_id.clone(), true)?;
+        let tile_id_value = generated_input_mln_canonical_tile_id(&tile_id.clone(), storage)?;
+        let message_value = storage.buffer(message.clone(), true)?;
+        let handle = self.input();
+        unsafe {
+            call.command(|completion, diagnostic| {
+                sys::mln_map_set_custom_geometry_source_tile_error(
+                    handle,
+                    source_id_value,
+                    tile_id_value,
+                    message_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }
+    }
+    #[pyo3(signature = (source_id, tile_id, message))]
+    fn _discard_set_custom_geometry_source_tile_error(
+        &self,
+        py: Python<'_>,
+        source_id: &Bound<'_, PyAny>,
+        tile_id: &Bound<'_, PyAny>,
+        message: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let source_id_value = storage.buffer(source_id.clone(), true)?;
+        let tile_id_value = generated_input_mln_canonical_tile_id(&tile_id.clone(), storage)?;
+        let message_value = storage.buffer(message.clone(), true)?;
+        let handle = self.input();
+        unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_map_set_custom_geometry_source_tile_error(
+                    handle,
+                    source_id_value,
+                    tile_id_value,
+                    message_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }
+    }
     #[pyo3(signature = (source_id, tile_id, data))]
     fn set_custom_mvt_vector_source_tile_data(
         &self,

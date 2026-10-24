@@ -2275,6 +2275,14 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_map_set_custom_geometry_source_tile_error(
+        map: mln_map,
+        source_id: mln_buffer_view,
+        tile_id: mln_canonical_tile_id,
+        message: mln_buffer_view,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_map_set_custom_mvt_vector_source_tile_data(
         map: mln_map,
         source_id: mln_buffer_view,
