@@ -183,13 +183,21 @@ test("a synchronous call fills a caller-sized output array in input order", asyn
 });
 
 test("caller-sized text returns a result longer than its first storage", () => {
-  using zoom = styleExpressionCreate(
+  const zoom = styleExpressionCreate(
     '["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]',
   );
-  assert.equal(zoom.evaluate({ zoom: 5 }), "50.0");
+  try {
+    assert.equal(zoom.evaluate({ zoom: 5 }), "50.0");
+  } finally {
+    zoom.close();
+  }
 
   // The result outgrows the addon's first storage, so the call runs again.
   const text = `"${"a".repeat(1000)}"`;
-  using long = styleExpressionCreate(text);
-  assert.equal(long.evaluate(), text);
+  const long = styleExpressionCreate(text);
+  try {
+    assert.equal(long.evaluate(), text);
+  } finally {
+    long.close();
+  }
 });

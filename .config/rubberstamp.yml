@@ -218,6 +218,8 @@ ci:
         - mise.ohos.*
         - src/platform/ohos/*
         - tests/native/abi/platform/transport.c
+        - bindings/typescript/src/*
+        - bindings/typescript/test/*
         - third_party/maplibre-native
     web:
       covers: >-
