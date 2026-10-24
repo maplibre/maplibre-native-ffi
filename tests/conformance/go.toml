@@ -27,7 +27,7 @@
 "COMP-01" = "bindings/go/completion_test.go::TestCompletionDeliversExactlyOnce"
 "COMP-02" = "bindings/go/completion_test.go::TestRejectedSubmissionFreesItsCompletionState"
 "COMP-03" = "bindings/go/platform_test.go::TestCollectorRetiresUnclosedMaps"
-"COMP-04" = "bindings/go/completion_test.go::TestFailedCommandDispositionIsData"
+"COMP-04" = { na = "Go applies decision 1 of #993 first: a failed or cancelled command returns an *Error from Await, which completion_test.go::TestFailedCommandReturnsItsError covers" }
 "COMP-05" = "bindings/go/completion_test.go::TestAwaitEndsWithItsContext"
 "COMP-06" = "bindings/go/completion_test.go::TestDiscardedCommandsAreFencedAndSyncRejectionReturnsError"
 "CB-01" = "bindings/go/callbacks_test.go::TestCallbackRootsFollowTheNativeRegistration"

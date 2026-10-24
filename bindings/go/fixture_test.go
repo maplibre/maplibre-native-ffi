@@ -63,12 +63,18 @@ func await[T any](t *testing.T, future *Future[T]) T {
 	return value
 }
 
-// awaitCommitted waits for a command and fails unless it committed.
-func awaitCommitted(t *testing.T, future *Future[CommandCompletion]) {
+// awaitFailure waits for a future and returns its *Error, failing unless the
+// future failed with one.
+func awaitFailure[T any](t *testing.T, future *Future[T]) *Error {
 	t.Helper()
-	if completion := await(t, future); completion.Disposition != CommandDispositionCommitted {
-		t.Fatalf("command %+v, want committed", completion)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout())
+	defer cancel()
+	value, err := future.Await(ctx)
+	var native *Error
+	if !errors.As(err, &native) {
+		t.Fatalf("Await() = %+v, %v; want an *Error", value, err)
 	}
+	return native
 }
 
 type fixture struct {

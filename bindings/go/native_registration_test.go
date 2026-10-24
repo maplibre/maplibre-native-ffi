@@ -39,7 +39,7 @@ func TestNativeRegistrationIsReleasedWhenTheCallIsNotAccepted(t *testing.T) {
 	options.DriverWorkWake.Callback = func() {}
 	// The binding fails the attach before it reaches native code.
 	_, err := f.m.AttachMetalOwnedTexture(MetalOwnedTextureDescriptor{}, options)
-	if !errors.As(err, &rejected) || rejected.Status != StatusInvalidArgument || !strings.Contains(rejected.Diagnostic(), "native registration") {
+	if !errors.As(err, &rejected) || rejected.Status != StatusInvalidArgument || !strings.Contains(rejected.Diagnostic, "native registration") {
 		t.Fatalf("attach with a wake that is both native and a func = %v, want the binding's StatusInvalidArgument", err)
 	}
 	if releases := mixed.releases.Load(); releases != 1 {

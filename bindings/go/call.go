@@ -150,16 +150,16 @@ func bindingDirect[T any](target bindingTarget, call func(arena *bindingArena, r
 	return bindingCall(func() T { return bindingRun(target, call, true) })
 }
 
-func bindingStart[T any](target bindingTarget, start func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32, convert func(*C.mln_completion_result) (T, error), deliversStatus bool) (*Future[T], error) {
-	return bindingStartWith(target, start, convert, func(_ *bindingArena, future *Future[T]) *Future[T] { return future }, deliversStatus)
+func bindingStart[T any](target bindingTarget, start func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32, convert func(*C.mln_completion_result) (T, error)) (*Future[T], error) {
+	return bindingStartWith(target, start, convert, func(_ *bindingArena, future *Future[T]) *Future[T] { return future })
 }
 
-func bindingStartWith[T, R any](target bindingTarget, start func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32, convert func(*C.mln_completion_result) (T, error), result func(arena *bindingArena, future *Future[T]) R, deliversStatus bool) (R, error) {
+func bindingStartWith[T, R any](target bindingTarget, start func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32, convert func(*C.mln_completion_result) (T, error), result func(arena *bindingArena, future *Future[T]) R) (R, error) {
 	return bindingCall(func() R {
 		return bindingRun(target, func(arena *bindingArena, raw uint64) R {
 			future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 				return start(arena, raw, completion, diagnostic)
-			}, convert, deliversStatus)
+			}, convert)
 			if err != nil {
 				panic(bindingFailure{err})
 			}

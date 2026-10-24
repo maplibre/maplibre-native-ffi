@@ -12,23 +12,31 @@ import (
 	"unsafe"
 )
 
-// Error carries the generated native status and a copied diagnostic.
+// Error carries a native status and the diagnostic that native copied for it.
 type Error struct {
 	Status     Status
-	diagnostic string
+	Diagnostic string
+	// Generation is the map snapshot generation that a failed map command
+	// published, and zero for any other failure.
+	Generation uint64
 }
 
 func newBindingError(status Status, diagnostic string) *Error {
-	return &Error{Status: status, diagnostic: diagnostic}
+	return &Error{Status: status, Diagnostic: diagnostic}
 }
 
 func newStatusError(status int32, diagnostic string) *Error {
 	return newBindingError(Status(status), diagnostic)
 }
 
-func (e *Error) Error() string      { return fmt.Sprintf("%s: %s", e.Status, e.diagnostic) }
-func (e *Error) Unwrap() error      { return e.Status }
-func (e *Error) Diagnostic() string { return e.diagnostic }
+func (e *Error) Error() string {
+	if e.Diagnostic == "" {
+		return e.Status.Error()
+	}
+	return e.Status.Error() + ": " + e.Diagnostic
+}
+
+func (e *Error) Unwrap() error { return e.Status }
 
 // ABIVersionMismatchError identifies the incompatible native and binding versions.
 type ABIVersionMismatchError struct {
@@ -37,7 +45,7 @@ type ABIVersionMismatchError struct {
 }
 
 func (e *ABIVersionMismatchError) Error() string {
-	return fmt.Sprintf("unsupported MapLibre Native C ABI version %d; this binding supports %d", e.Actual, e.Expected)
+	return fmt.Sprintf("maplibre: unsupported C ABI version %d; this binding supports %d", e.Actual, e.Expected)
 }
 func (e *ABIVersionMismatchError) Unwrap() error { return StatusUnsupported }
 

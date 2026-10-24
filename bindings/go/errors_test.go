@@ -23,15 +23,15 @@ func TestNativeStatusMapsToTypedErrors(t *testing.T) {
 	if native.Status != StatusInvalidArgument {
 		t.Fatalf("status = %v", native.Status)
 	}
-	if native.Diagnostic() == "" || !strings.Contains(native.Error(), native.Diagnostic()) {
-		t.Fatalf("diagnostic %q missing from %q", native.Diagnostic(), native.Error())
+	if want := "maplibre: invalid argument: " + native.Diagnostic; native.Diagnostic == "" || native.Error() != want {
+		t.Fatalf("Error() = %q, want %q", native.Error(), want)
 	}
 
 	capacity, err := failWithFullDiagnosticForTest(-1)
 	if !errors.As(err, &native) {
 		t.Fatalf("a full diagnostic buffer = %v, want an *Error", err)
 	}
-	if diagnostic := native.Diagnostic(); diagnostic != strings.Repeat("x", capacity) {
+	if diagnostic := native.Diagnostic; diagnostic != strings.Repeat("x", capacity) {
 		t.Fatalf("a full diagnostic buffer read as %d bytes, want its %d", len(diagnostic), capacity)
 	}
 
@@ -42,8 +42,11 @@ func TestNativeStatusMapsToTypedErrors(t *testing.T) {
 	if native.Status != Status(-12345) {
 		t.Fatalf("status = %v", native.Status)
 	}
-	if native.Diagnostic() != "" {
-		t.Fatalf("Diagnostic() = %q, want the earlier call's message cleared", native.Diagnostic())
+	if native.Diagnostic != "" {
+		t.Fatalf("Diagnostic = %q, want the earlier call's message cleared", native.Diagnostic)
+	}
+	if want := "maplibre: status -12345"; native.Error() != want {
+		t.Fatalf("Error() = %q, want %q", native.Error(), want)
 	}
 }
 

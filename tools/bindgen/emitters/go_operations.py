@@ -391,9 +391,9 @@ def operation(plan, values, *, discard=False):
                 + "".join(line + "\n" for line in adoptions)
                 + f"return {converted}\n}}"
             )
-            invocation = f"return bindingStartWith({target}, {start}, {convert}, {result_closure}, {str(plan.execution == 'command').lower()})"
+            invocation = f"return bindingStartWith({target}, {start}, {convert}, {result_closure})"
         else:
-            invocation = f"return bindingStart({target}, {start}, {convert}, {str(plan.execution == 'command').lower()})"
+            invocation = f"return bindingStart({target}, {start}, {convert})"
     elif plan.function.return_type.canonical == "void" or result_type:
         if outputs:
             values.fail(

@@ -63,7 +63,7 @@ func exitWithLiveHandles(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.awaitEvent(t, "the style load", isStyleLoaded)
-	awaitCommitted(t, submitted(f.m.AddCustomGeometrySource("live", CustomGeometrySourceOptions{FetchTile: func(CanonicalTileId) {}})))
+	await(t, submitted(f.m.AddCustomGeometrySource("live", CustomGeometrySourceOptions{FetchTile: func(CanonicalTileId) {}})))
 	_, _ = os.Stdout.WriteString("exiting with live handles\n")
 	os.Exit(0)
 }

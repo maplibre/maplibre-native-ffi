@@ -76,7 +76,7 @@ func newGraphicsFixture(t *testing.T) *renderFixture {
 		frames:     make(chan struct{}, 1),
 		driverWork: make(chan struct{}, 1),
 	}
-	awaitCommitted(t, submitted(r.m.SetStyleJson([]byte(backgroundStyle))))
+	await(t, submitted(r.m.SetStyleJson([]byte(backgroundStyle))))
 	return r
 }
 

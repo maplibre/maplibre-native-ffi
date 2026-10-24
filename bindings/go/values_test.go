@@ -28,9 +28,9 @@ func TestHostStringsUseViewsAndNativeLentStringsDecode(t *testing.T) {
 // when native reports them absent.
 func TestPresenceFieldsRoundTrip(t *testing.T) {
 	f := newFixture(t)
-	awaitCommitted(t, submitted(f.m.SetStyleJson([]byte(emptyStyle))))
+	await(t, submitted(f.m.SetStyleJson([]byte(emptyStyle))))
 	fit := StyleImageTextFitProportional
-	awaitCommitted(t, submitted(f.m.SetStyleImage("patch", PremultipliedRgba8Image{Width: 2, Height: 2, Stride: 8, Pixels: make([]byte, 16)}, &StyleImageOptions{
+	await(t, submitted(f.m.SetStyleImage("patch", PremultipliedRgba8Image{Width: 2, Height: 2, Stride: 8, Pixels: make([]byte, 16)}, &StyleImageOptions{
 		StretchX:      []ImageStretch{{From: 0, To: 1}},
 		Content:       &ImageContent{Left: 0.5, Top: 0.5, Right: 1.5, Bottom: 1.5},
 		TextFitHeight: &fit,
@@ -55,7 +55,7 @@ func TestPresenceFieldsRoundTrip(t *testing.T) {
 	// Go cannot default a struct field to true, so the placement switch is an
 	// optional field too: a literal that sets only a duration leaves it on.
 	duration := 250.0
-	awaitCommitted(t, submitted(f.m.SetStyleTransitionOptions(StyleTransitionOptions{DurationMs: &duration})))
+	await(t, submitted(f.m.SetStyleTransitionOptions(StyleTransitionOptions{DurationMs: &duration})))
 	transitions := await(t, submitted(f.m.GetStyleTransitionOptions()))
 	if transitions.DurationMs == nil || *transitions.DurationMs != duration || transitions.DelayMs != nil {
 		t.Fatalf("transition options = %+v, want only the duration set", transitions)
@@ -69,7 +69,7 @@ func TestPresenceFieldsRoundTrip(t *testing.T) {
 // them afterwards leaves what native received alone.
 func TestArrayInputsAreCopiedAtSubmission(t *testing.T) {
 	f := newFixture(t)
-	awaitCommitted(t, submitted(f.m.SetStyleJson([]byte(emptyStyle))))
+	await(t, submitted(f.m.SetStyleJson([]byte(emptyStyle))))
 	coordinates := []LatLng{
 		{Latitude: 1, Longitude: 1},
 		{Latitude: 1, Longitude: 2},
@@ -82,8 +82,8 @@ func TestArrayInputsAreCopiedAtSubmission(t *testing.T) {
 	marker, markerErr := f.m.SetStyleImage("marker", image, nil)
 	coordinates[0] = LatLng{Latitude: 9, Longitude: 9}
 	pixels[1] = 0
-	awaitCommitted(t, submitted(added, err))
-	awaitCommitted(t, submitted(marker, markerErr))
+	await(t, submitted(added, err))
+	await(t, submitted(marker, markerErr))
 
 	if got := await(t, submitted(f.m.GetImageSourceCoordinates("image"))); len(got) != 4 || got[0] != (LatLng{Latitude: 1, Longitude: 1}) {
 		t.Fatalf("image source coordinates = %v, want the submitted ones", got)

@@ -1138,7 +1138,33 @@ func (value Status) String() string {
 	return fmt.Sprintf("Status(%d)", value)
 }
 
-func (value Status) Error() string { return value.String() }
+func (value Status) Error() string {
+	switch value {
+	case 0:
+		return "maplibre: ok"
+	case -1:
+		return "maplibre: invalid argument"
+	case -2:
+		return "maplibre: invalid state"
+	case -3:
+		return "maplibre: wrong thread"
+	case -4:
+		return "maplibre: unsupported"
+	case -5:
+		return "maplibre: native error"
+	case -6:
+		return "maplibre: cancelled"
+	case -7:
+		return "maplibre: busy"
+	case -8:
+		return "maplibre: target lost"
+	case -9:
+		return "maplibre: not ready"
+	case -10:
+		return "maplibre: not found"
+	}
+	return fmt.Sprintf("maplibre: status %d", int32(value))
+}
 
 // StyleExpressionTypeKind corresponds to mln_style_expression_type_kind. Style
 // expression types that a parsed expression may be required to have.
@@ -6677,7 +6703,7 @@ func LogicalExtentPhysicalSize(extent LogicalExtent) (LogicalExtentPhysicalSizeR
 func (receiver *MapHandle) AddCustomGeometrySource(sourceId string, options CustomGeometrySourceOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_custom_geometry_source(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativeCustomGeometrySourceOptions(options, arena), arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // AddCustomMvtVectorSource adds a custom MVT vector source.
@@ -6687,7 +6713,7 @@ func (receiver *MapHandle) AddCustomGeometrySource(sourceId string, options Cust
 func (receiver *MapHandle) AddCustomMvtVectorSource(sourceId string, options CustomMvtVectorSourceOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_custom_mvt_vector_source(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativeCustomMvtVectorSourceOptions(options, arena), arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // AddGeojsonSourceData adds a GeoJSON source with prepared inline data.
@@ -6697,7 +6723,7 @@ func (receiver *MapHandle) AddCustomMvtVectorSource(sourceId string, options Cus
 func (receiver *MapHandle) AddGeojsonSourceData(sourceId string, data *GeojsonSourceDataHandle) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_geojson_source_data(C.mln_map(raw), bindingView(sourceId, arena), C.mln_geojson_source_data(arena.lease(data.owner())), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // AddGeojsonSourceUrl adds a GeoJSON source with URL data.
@@ -6707,7 +6733,7 @@ func (receiver *MapHandle) AddGeojsonSourceData(sourceId string, data *GeojsonSo
 func (receiver *MapHandle) AddGeojsonSourceUrl(sourceId string, url string, options *GeojsonSourceOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_geojson_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeGeojsonSourceOptions), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // AddImageSourceImage adds an image source with inline image pixels.
@@ -6717,7 +6743,7 @@ func (receiver *MapHandle) AddGeojsonSourceUrl(sourceId string, url string, opti
 func (receiver *MapHandle) AddImageSourceImage(sourceId string, coordinates []LatLng, image PremultipliedRgba8Image) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_image_source_image(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // AddImageSourceUrl adds an image source that loads its image from a URL.
@@ -6727,7 +6753,7 @@ func (receiver *MapHandle) AddImageSourceImage(sourceId string, coordinates []La
 func (receiver *MapHandle) AddImageSourceUrl(sourceId string, coordinates []LatLng, url string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_image_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingView(url, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // AddStyleLayerJson adds one style layer from a full style-spec layer JSON
@@ -6738,7 +6764,7 @@ func (receiver *MapHandle) AddImageSourceUrl(sourceId string, coordinates []LatL
 func (receiver *MapHandle) AddStyleLayerJson(layerJson []byte, beforeLayerId *string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_style_layer_json(C.mln_map(raw), bindingView(layerJson, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // AddStyleSourceJson adds one style source from a style-spec source JSON
@@ -6749,7 +6775,7 @@ func (receiver *MapHandle) AddStyleLayerJson(layerJson []byte, beforeLayerId *st
 func (receiver *MapHandle) AddStyleSourceJson(sourceId string, sourceJson []byte) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_style_source_json(C.mln_map(raw), bindingView(sourceId, arena), bindingView(sourceJson, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // ApplyCameraDelta submits one atomic relative camera update.
@@ -6759,7 +6785,7 @@ func (receiver *MapHandle) AddStyleSourceJson(sourceId string, sourceJson []byte
 func (receiver *MapHandle) ApplyCameraDelta(delta CameraDelta) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_apply_camera_delta(C.mln_map(raw), bindingStore(nativeCameraDelta(delta, arena), arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 type MapAttachMetalBorrowedTextureResult struct {
@@ -6780,7 +6806,7 @@ func (receiver *MapHandle) AttachMetalBorrowedTexture(descriptor MetalBorrowedTe
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachMetalBorrowedTextureResult{Session: adopted, Completion: future}
-	}, false)
+	})
 }
 
 type MapAttachMetalOwnedTextureResult struct {
@@ -6801,7 +6827,7 @@ func (receiver *MapHandle) AttachMetalOwnedTexture(descriptor MetalOwnedTextureD
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachMetalOwnedTextureResult{Session: adopted, Completion: future}
-	}, false)
+	})
 }
 
 type MapAttachMetalSurfaceResult struct {
@@ -6821,7 +6847,7 @@ func (receiver *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor,
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachMetalSurfaceResult{Session: adopted, Completion: future}
-	}, false)
+	})
 }
 
 type MapAttachOpenglBorrowedTextureResult struct {
@@ -6842,7 +6868,7 @@ func (receiver *MapHandle) AttachOpenglBorrowedTexture(descriptor OpenglBorrowed
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachOpenglBorrowedTextureResult{Session: adopted, Completion: future}
-	}, false)
+	})
 }
 
 type MapAttachOpenglOwnedTextureResult struct {
@@ -6863,7 +6889,7 @@ func (receiver *MapHandle) AttachOpenglOwnedTexture(descriptor OpenglOwnedTextur
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachOpenglOwnedTextureResult{Session: adopted, Completion: future}
-	}, false)
+	})
 }
 
 type MapAttachOpenglSurfaceResult struct {
@@ -6883,7 +6909,7 @@ func (receiver *MapHandle) AttachOpenglSurface(descriptor OpenglSurfaceDescripto
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachOpenglSurfaceResult{Session: adopted, Completion: future}
-	}, false)
+	})
 }
 
 type MapAttachVulkanBorrowedTextureResult struct {
@@ -6904,7 +6930,7 @@ func (receiver *MapHandle) AttachVulkanBorrowedTexture(descriptor VulkanBorrowed
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachVulkanBorrowedTextureResult{Session: adopted, Completion: future}
-	}, false)
+	})
 }
 
 type MapAttachVulkanOwnedTextureResult struct {
@@ -6925,7 +6951,7 @@ func (receiver *MapHandle) AttachVulkanOwnedTexture(descriptor VulkanOwnedTextur
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachVulkanOwnedTextureResult{Session: adopted, Completion: future}
-	}, false)
+	})
 }
 
 type MapAttachVulkanSurfaceResult struct {
@@ -6945,7 +6971,7 @@ func (receiver *MapHandle) AttachVulkanSurface(descriptor VulkanSurfaceDescripto
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachVulkanSurfaceResult{Session: adopted, Completion: future}
-	}, false)
+	})
 }
 
 type MapAttachWebgpuBorrowedTextureResult struct {
@@ -6966,7 +6992,7 @@ func (receiver *MapHandle) AttachWebgpuBorrowedTexture(descriptor WebgpuBorrowed
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachWebgpuBorrowedTextureResult{Session: adopted, Completion: future}
-	}, false)
+	})
 }
 
 type MapAttachWebgpuOwnedTextureResult struct {
@@ -6987,7 +7013,7 @@ func (receiver *MapHandle) AttachWebgpuOwnedTexture(descriptor WebgpuOwnedTextur
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachWebgpuOwnedTextureResult{Session: adopted, Completion: future}
-	}, false)
+	})
 }
 
 type MapAttachWebgpuSurfaceResult struct {
@@ -7007,7 +7033,7 @@ func (receiver *MapHandle) AttachWebgpuSurface(descriptor WebgpuSurfaceDescripto
 		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
 		arena.accept(adopted.bindingOwner)
 		return MapAttachWebgpuSurfaceResult{Session: adopted, Completion: future}
-	}, false)
+	})
 }
 
 // BeginCommandGroup begins a command group, which holds this map's render
@@ -7018,7 +7044,7 @@ func (receiver *MapHandle) AttachWebgpuSurface(descriptor WebgpuSurfaceDescripto
 func (receiver *MapHandle) BeginCommandGroup() (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_begin_command_group(C.mln_map(raw), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // CameraForGeometry starts an ordered query for a camera that fits a GeoJSON
@@ -7029,7 +7055,7 @@ func (receiver *MapHandle) BeginCommandGroup() (*Future[CommandCompletion], erro
 func (receiver *MapHandle) CameraForGeometry(geometry []byte, fitOptions *CameraFitOptions) (*Future[CameraOptions], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_camera_for_geometry(C.mln_map(raw), bindingView(geometry, arena), bindingStoreOptional(fitOptions, arena, nativeCameraFitOptions), completion, diagnostic))
-	}, completionOf(copyCameraOptions), false)
+	}, completionOf(copyCameraOptions))
 }
 
 // CameraForLatLngBounds starts an ordered query for a camera that fits
@@ -7040,7 +7066,7 @@ func (receiver *MapHandle) CameraForGeometry(geometry []byte, fitOptions *Camera
 func (receiver *MapHandle) CameraForLatLngBounds(bounds LatLngBounds, fitOptions *CameraFitOptions) (*Future[CameraOptions], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_camera_for_lat_lng_bounds(C.mln_map(raw), nativeLatLngBounds(bounds, arena), bindingStoreOptional(fitOptions, arena, nativeCameraFitOptions), completion, diagnostic))
-	}, completionOf(copyCameraOptions), false)
+	}, completionOf(copyCameraOptions))
 }
 
 // CameraForLatLngs starts an ordered query for a camera that fits geographic
@@ -7051,7 +7077,7 @@ func (receiver *MapHandle) CameraForLatLngBounds(bounds LatLngBounds, fitOptions
 func (receiver *MapHandle) CameraForLatLngs(coordinates []LatLng, fitOptions *CameraFitOptions) (*Future[CameraOptions], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_camera_for_lat_lngs(C.mln_map(raw), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingStoreOptional(fitOptions, arena, nativeCameraFitOptions), completion, diagnostic))
-	}, completionOf(copyCameraOptions), false)
+	}, completionOf(copyCameraOptions))
 }
 
 // CancelCameraTransition cancels the camera transitions of the commands whose
@@ -7062,7 +7088,7 @@ func (receiver *MapHandle) CameraForLatLngs(coordinates []LatLng, fitOptions *Ca
 func (receiver *MapHandle) CancelCameraTransition(transitionId uint64) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_cancel_camera_transition(C.mln_map(raw), C.uint64_t(transitionId), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // CancelTransitions cancels the camera transitions running when this command
@@ -7073,7 +7099,7 @@ func (receiver *MapHandle) CancelCameraTransition(transitionId uint64) (*Future[
 func (receiver *MapHandle) CancelTransitions() (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_cancel_transitions(C.mln_map(raw), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // DumpDebugLogs submits an ordered debug-log command.
@@ -7083,7 +7109,7 @@ func (receiver *MapHandle) CancelTransitions() (*Future[CommandCompletion], erro
 func (receiver *MapHandle) DumpDebugLogs() (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_dump_debug_logs(C.mln_map(raw), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // EndCommandGroup ends the innermost command group that
@@ -7094,7 +7120,7 @@ func (receiver *MapHandle) DumpDebugLogs() (*Future[CommandCompletion], error) {
 func (receiver *MapHandle) EndCommandGroup() (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_end_command_group(C.mln_map(raw), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // GetCamera starts an ordered camera read.
@@ -7104,7 +7130,7 @@ func (receiver *MapHandle) EndCommandGroup() (*Future[CommandCompletion], error)
 func (receiver *MapHandle) GetCamera() (*Future[CameraQueryResult], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_camera(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(copyCameraQueryResult), false)
+	}, completionOf(copyCameraQueryResult))
 }
 
 // GetFeatureState starts an ordered read of per-feature state from this map.
@@ -7114,7 +7140,7 @@ func (receiver *MapHandle) GetCamera() (*Future[CameraQueryResult], error) {
 func (receiver *MapHandle) GetFeatureState(selector FeatureStateSelector) (*Future[[]byte], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_feature_state(C.mln_map(raw), bindingStore(nativeFeatureStateSelector(selector, arena), arena), completion, diagnostic))
-	}, completionOf(copyViewBytes), false)
+	}, completionOf(copyViewBytes))
 }
 
 // GetGlobalState queries the global-state JSON object, including style
@@ -7126,7 +7152,7 @@ func (receiver *MapHandle) GetFeatureState(selector FeatureStateSelector) (*Futu
 func (receiver *MapHandle) GetGlobalState() (*Future[[]byte], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_global_state(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(copyViewBytes), false)
+	}, completionOf(copyViewBytes))
 }
 
 // GetImageSourceCoordinates copies image source coordinates.
@@ -7136,7 +7162,7 @@ func (receiver *MapHandle) GetGlobalState() (*Future[[]byte], error) {
 func (receiver *MapHandle) GetImageSourceCoordinates(sourceId string) (*Future[[]LatLng], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_image_source_coordinates(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionListOf(copyLatLng), false)
+	}, completionListOf(copyLatLng))
 }
 
 // GetLoadedStyleJson starts an ordered copy of the last successfully parsed
@@ -7147,7 +7173,7 @@ func (receiver *MapHandle) GetImageSourceCoordinates(sourceId string) (*Future[[
 func (receiver *MapHandle) GetLoadedStyleJson() (*Future[[]byte], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_loaded_style_json(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(copyViewBytes), false)
+	}, completionOf(copyViewBytes))
 }
 
 // GetSnapshot copies the map's latest published snapshot.
@@ -7171,7 +7197,7 @@ func (receiver *MapHandle) GetSnapshot() (MapSnapshot, error) {
 func (receiver *MapHandle) GetStyleImage(imageId string) (*Future[*StyleImageInfo], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_image(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyStyleImageInfo)), false)
+	}, completionNullable(completionOf(copyStyleImageInfo)))
 }
 
 // GetStyleLayer copies the complete metadata of one style layer.
@@ -7181,7 +7207,7 @@ func (receiver *MapHandle) GetStyleImage(imageId string) (*Future[*StyleImageInf
 func (receiver *MapHandle) GetStyleLayer(layerId string) (*Future[*StyleLayerInfo], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_layer(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyStyleLayerInfo)), false)
+	}, completionNullable(completionOf(copyStyleLayerInfo)))
 }
 
 // GetStyleLayerJson serializes one style layer as a full style-spec layer JSON
@@ -7192,7 +7218,7 @@ func (receiver *MapHandle) GetStyleLayer(layerId string) (*Future[*StyleLayerInf
 func (receiver *MapHandle) GetStyleLayerJson(layerId string) (*Future[*[]byte], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_layer_json(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewBytes)), false)
+	}, completionNullable(completionOf(copyViewBytes)))
 }
 
 // GetStyleLayerProperty serializes one layer property as a style-spec JSON
@@ -7203,7 +7229,7 @@ func (receiver *MapHandle) GetStyleLayerJson(layerId string) (*Future[*[]byte], 
 func (receiver *MapHandle) GetStyleLayerProperty(layerId string, propertyName string) (*Future[*[]byte], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_layer_property(C.mln_map(raw), bindingView(layerId, arena), bindingView(propertyName, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewBytes)), false)
+	}, completionNullable(completionOf(copyViewBytes)))
 }
 
 // GetStyleLightProperty serializes one style light property as a style-spec
@@ -7214,7 +7240,7 @@ func (receiver *MapHandle) GetStyleLayerProperty(layerId string, propertyName st
 func (receiver *MapHandle) GetStyleLightProperty(propertyName string) (*Future[*[]byte], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_light_property(C.mln_map(raw), bindingView(propertyName, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewBytes)), false)
+	}, completionNullable(completionOf(copyViewBytes)))
 }
 
 // GetStyleSource copies the complete metadata of one style source.
@@ -7224,7 +7250,7 @@ func (receiver *MapHandle) GetStyleLightProperty(propertyName string) (*Future[*
 func (receiver *MapHandle) GetStyleSource(sourceId string) (*Future[*StyleSourceInfo], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_source(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyStyleSourceInfo)), false)
+	}, completionNullable(completionOf(copyStyleSourceInfo)))
 }
 
 // GetStyleTransitionOptions reads the style's global transition options.
@@ -7234,7 +7260,7 @@ func (receiver *MapHandle) GetStyleSource(sourceId string) (*Future[*StyleSource
 func (receiver *MapHandle) GetStyleTransitionOptions() (*Future[StyleTransitionOptions], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_transition_options(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(copyStyleTransitionOptions), false)
+	}, completionOf(copyStyleTransitionOptions))
 }
 
 // GetStyleUrl starts an ordered copy of the last requested style URL.
@@ -7244,7 +7270,7 @@ func (receiver *MapHandle) GetStyleTransitionOptions() (*Future[StyleTransitionO
 func (receiver *MapHandle) GetStyleUrl() (*Future[string], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_url(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(copyViewText), false)
+	}, completionOf(copyViewText))
 }
 
 // InvalidateCustomGeometrySourceRegion invalidates custom geometry source data
@@ -7255,7 +7281,7 @@ func (receiver *MapHandle) GetStyleUrl() (*Future[string], error) {
 func (receiver *MapHandle) InvalidateCustomGeometrySourceRegion(sourceId string, bounds LatLngBounds) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_invalidate_custom_geometry_source_region(C.mln_map(raw), bindingView(sourceId, arena), nativeLatLngBounds(bounds, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // InvalidateCustomGeometrySourceTile invalidates custom geometry source data
@@ -7266,7 +7292,7 @@ func (receiver *MapHandle) InvalidateCustomGeometrySourceRegion(sourceId string,
 func (receiver *MapHandle) InvalidateCustomGeometrySourceTile(sourceId string, tileId CanonicalTileId) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_invalidate_custom_geometry_source_tile(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // InvalidateCustomMvtVectorSourceTile invalidates custom MVT vector source data
@@ -7277,7 +7303,7 @@ func (receiver *MapHandle) InvalidateCustomGeometrySourceTile(sourceId string, t
 func (receiver *MapHandle) InvalidateCustomMvtVectorSourceTile(sourceId string, tileId CanonicalTileId) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_invalidate_custom_mvt_vector_source_tile(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // LatLngBoundsForCamera starts an ordered wrapped-bounds query for a copied
@@ -7288,7 +7314,7 @@ func (receiver *MapHandle) InvalidateCustomMvtVectorSourceTile(sourceId string, 
 func (receiver *MapHandle) LatLngBoundsForCamera(camera CameraOptions) (*Future[LatLngBounds], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_lat_lng_bounds_for_camera(C.mln_map(raw), bindingStore(nativeCameraOptions(camera, arena), arena), completion, diagnostic))
-	}, completionOf(copyLatLngBounds), false)
+	}, completionOf(copyLatLngBounds))
 }
 
 // LatLngBoundsForCameraUnwrapped starts an ordered unwrapped-bounds query for a
@@ -7299,7 +7325,7 @@ func (receiver *MapHandle) LatLngBoundsForCamera(camera CameraOptions) (*Future[
 func (receiver *MapHandle) LatLngBoundsForCameraUnwrapped(camera CameraOptions) (*Future[LatLngBounds], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_lat_lng_bounds_for_camera_unwrapped(C.mln_map(raw), bindingStore(nativeCameraOptions(camera, arena), arena), completion, diagnostic))
-	}, completionOf(copyLatLngBounds), false)
+	}, completionOf(copyLatLngBounds))
 }
 
 // ListStyleLayers starts an ordered query of every style layer in style order.
@@ -7309,7 +7335,7 @@ func (receiver *MapHandle) LatLngBoundsForCameraUnwrapped(camera CameraOptions) 
 func (receiver *MapHandle) ListStyleLayers() (*Future[[]StyleLayerInfo], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_list_style_layers(C.mln_map(raw), completion, diagnostic))
-	}, completionListOf(copyStyleLayerInfo), false)
+	}, completionListOf(copyStyleLayerInfo))
 }
 
 // ListStyleSources lists every style source in style order.
@@ -7319,7 +7345,7 @@ func (receiver *MapHandle) ListStyleLayers() (*Future[[]StyleLayerInfo], error) 
 func (receiver *MapHandle) ListStyleSources() (*Future[[]StyleSourceInfo], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_list_style_sources(C.mln_map(raw), completion, diagnostic))
-	}, completionListOf(copyStyleSourceInfo), false)
+	}, completionListOf(copyStyleSourceInfo))
 }
 
 // MoveStyleLayer moves one style layer before another layer or to the top.
@@ -7329,7 +7355,7 @@ func (receiver *MapHandle) ListStyleSources() (*Future[[]StyleSourceInfo], error
 func (receiver *MapHandle) MoveStyleLayer(layerId string, beforeLayerId *string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_move_style_layer(C.mln_map(raw), bindingView(layerId, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // MapProjectionCreate creates a standalone projection of a view, such as the
@@ -7500,7 +7526,7 @@ func (receiver *MapProjectionHandle) SetCamera(camera CameraOptions) error {
 func (receiver *MapHandle) Close() (*Future[struct{}], error) {
 	return bindingStart(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_release(C.mln_map(raw), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // RemoveFeatureState removes per-feature state from this map.
@@ -7510,7 +7536,7 @@ func (receiver *MapHandle) Close() (*Future[struct{}], error) {
 func (receiver *MapHandle) RemoveFeatureState(selector FeatureStateSelector) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_remove_feature_state(C.mln_map(raw), bindingStore(nativeFeatureStateSelector(selector, arena), arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // RemoveStyleImage removes one runtime style image by ID.
@@ -7520,7 +7546,7 @@ func (receiver *MapHandle) RemoveFeatureState(selector FeatureStateSelector) (*F
 func (receiver *MapHandle) RemoveStyleImage(imageId string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_remove_style_image(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // RemoveStyleLayer removes one style layer by ID.
@@ -7530,7 +7556,7 @@ func (receiver *MapHandle) RemoveStyleImage(imageId string) (*Future[CommandComp
 func (receiver *MapHandle) RemoveStyleLayer(layerId string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_remove_style_layer(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // RemoveStyleSource removes one style source by ID.
@@ -7540,7 +7566,7 @@ func (receiver *MapHandle) RemoveStyleLayer(layerId string) (*Future[CommandComp
 func (receiver *MapHandle) RemoveStyleSource(sourceId string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_remove_style_source(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // RequestRepaint requests a repaint for a continuous map.
@@ -7550,7 +7576,7 @@ func (receiver *MapHandle) RemoveStyleSource(sourceId string) (*Future[CommandCo
 func (receiver *MapHandle) RequestRepaint() (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_request_repaint(C.mln_map(raw), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // RequestStillImage requests one still image for a static or tile map.
@@ -7560,7 +7586,7 @@ func (receiver *MapHandle) RequestRepaint() (*Future[CommandCompletion], error) 
 func (receiver *MapHandle) RequestStillImage() (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_request_still_image(C.mln_map(raw), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // Resize submits the sole post-creation logical extent update.
@@ -7570,7 +7596,7 @@ func (receiver *MapHandle) RequestStillImage() (*Future[struct{}], error) {
 func (receiver *MapHandle) Resize(extent LogicalExtent) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_resize(C.mln_map(raw), nativeLogicalExtent(extent, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetBounds submits a copied camera-constraint command.
@@ -7580,7 +7606,7 @@ func (receiver *MapHandle) Resize(extent LogicalExtent) (*Future[CommandCompleti
 func (receiver *MapHandle) SetBounds(options BoundOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_bounds(C.mln_map(raw), bindingStore(nativeBoundOptions(options, arena), arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetCustomGeometrySourceTileData sets custom geometry source data for one
@@ -7591,7 +7617,7 @@ func (receiver *MapHandle) SetBounds(options BoundOptions) (*Future[CommandCompl
 func (receiver *MapHandle) SetCustomGeometrySourceTileData(sourceId string, tileId CanonicalTileId, data []byte) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_custom_geometry_source_tile_data(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(data, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetCustomGeometrySourceTileError reports a custom geometry source error for
@@ -7602,7 +7628,7 @@ func (receiver *MapHandle) SetCustomGeometrySourceTileData(sourceId string, tile
 func (receiver *MapHandle) SetCustomGeometrySourceTileError(sourceId string, tileId CanonicalTileId, message string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_custom_geometry_source_tile_error(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(message, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetCustomMvtVectorSourceTileData sets custom MVT vector source data for one
@@ -7613,7 +7639,7 @@ func (receiver *MapHandle) SetCustomGeometrySourceTileError(sourceId string, til
 func (receiver *MapHandle) SetCustomMvtVectorSourceTileData(sourceId string, tileId CanonicalTileId, data []byte) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_custom_mvt_vector_source_tile_data(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(data, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetCustomMvtVectorSourceTileError reports a custom MVT vector source error
@@ -7624,7 +7650,7 @@ func (receiver *MapHandle) SetCustomMvtVectorSourceTileData(sourceId string, til
 func (receiver *MapHandle) SetCustomMvtVectorSourceTileError(sourceId string, tileId CanonicalTileId, message string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_custom_mvt_vector_source_tile_error(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(message, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetDebugOptions submits a debug-overlay command.
@@ -7634,7 +7660,7 @@ func (receiver *MapHandle) SetCustomMvtVectorSourceTileError(sourceId string, ti
 func (receiver *MapHandle) SetDebugOptions(options MapDebugOption) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_debug_options(C.mln_map(raw), C.uint32_t(options), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetEventMask selects which map-originated event types this map queues.
@@ -7644,7 +7670,7 @@ func (receiver *MapHandle) SetDebugOptions(options MapDebugOption) (*Future[Comm
 func (receiver *MapHandle) SetEventMask(mask RuntimeEventMask) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_event_mask(C.mln_map(raw), C.uint64_t(mask), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetFeatureState submits a copied per-feature-state command.
@@ -7654,7 +7680,7 @@ func (receiver *MapHandle) SetEventMask(mask RuntimeEventMask) (*Future[CommandC
 func (receiver *MapHandle) SetFeatureState(selector FeatureStateSelector, state []byte) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_feature_state(C.mln_map(raw), bindingStore(nativeFeatureStateSelector(selector, arena), arena), bindingView(state, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetFreeCameraOptions submits a copied free-camera command.
@@ -7664,7 +7690,7 @@ func (receiver *MapHandle) SetFeatureState(selector FeatureStateSelector, state 
 func (receiver *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_free_camera_options(C.mln_map(raw), bindingStore(nativeFreeCameraOptions(options, arena), arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetGeojsonSourceData updates one GeoJSON source with prepared inline data.
@@ -7674,7 +7700,7 @@ func (receiver *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) (*Fut
 func (receiver *MapHandle) SetGeojsonSourceData(sourceId string, data *GeojsonSourceDataHandle) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geojson_source_data(C.mln_map(raw), bindingView(sourceId, arena), C.mln_geojson_source_data(arena.lease(data.owner())), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetGeojsonSourceSynchronousTiling overrides one GeoJSON source's synchronous
@@ -7685,7 +7711,7 @@ func (receiver *MapHandle) SetGeojsonSourceData(sourceId string, data *GeojsonSo
 func (receiver *MapHandle) SetGeojsonSourceSynchronousTiling(sourceId string, enabled bool) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geojson_source_synchronous_tiling(C.mln_map(raw), bindingView(sourceId, arena), C.bool(enabled), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetGeojsonSourceUrl updates one GeoJSON source to load data from a URL.
@@ -7695,7 +7721,7 @@ func (receiver *MapHandle) SetGeojsonSourceSynchronousTiling(sourceId string, en
 func (receiver *MapHandle) SetGeojsonSourceUrl(sourceId string, url string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geojson_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetGlobalStateProperty submits a global-state JSON value. JSON null restores
@@ -7706,7 +7732,7 @@ func (receiver *MapHandle) SetGeojsonSourceUrl(sourceId string, url string) (*Fu
 func (receiver *MapHandle) SetGlobalStateProperty(propertyName string, value []byte) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_global_state_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetImageSourceCoordinates updates image source coordinates.
@@ -7716,7 +7742,7 @@ func (receiver *MapHandle) SetGlobalStateProperty(propertyName string, value []b
 func (receiver *MapHandle) SetImageSourceCoordinates(sourceId string, coordinates []LatLng) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_image_source_coordinates(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetImageSourceImage updates an image source with inline image pixels.
@@ -7726,7 +7752,7 @@ func (receiver *MapHandle) SetImageSourceCoordinates(sourceId string, coordinate
 func (receiver *MapHandle) SetImageSourceImage(sourceId string, image PremultipliedRgba8Image) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_image_source_image(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetImageSourceUrl updates an image source to load its image from a URL.
@@ -7736,7 +7762,7 @@ func (receiver *MapHandle) SetImageSourceImage(sourceId string, image Premultipl
 func (receiver *MapHandle) SetImageSourceUrl(sourceId string, url string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_image_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetProjectionMode submits copied axonometric rendering option fields.
@@ -7746,7 +7772,7 @@ func (receiver *MapHandle) SetImageSourceUrl(sourceId string, url string) (*Futu
 func (receiver *MapHandle) SetProjectionMode(mode ProjectionMode) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_projection_mode(C.mln_map(raw), bindingStore(nativeProjectionMode(mode, arena), arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetRenderingStatsViewEnabled submits a rendering-stats visibility command.
@@ -7756,7 +7782,7 @@ func (receiver *MapHandle) SetProjectionMode(mode ProjectionMode) (*Future[Comma
 func (receiver *MapHandle) SetRenderingStatsViewEnabled(enabled bool) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_rendering_stats_view_enabled(C.mln_map(raw), C.bool(enabled), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetStyleImage sets one runtime style image.
@@ -7766,7 +7792,7 @@ func (receiver *MapHandle) SetRenderingStatsViewEnabled(enabled bool) (*Future[C
 func (receiver *MapHandle) SetStyleImage(imageId string, image PremultipliedRgba8Image, options *StyleImageOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_image(C.mln_map(raw), bindingView(imageId, arena), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), bindingStoreOptional(options, arena, nativeStyleImageOptions), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetStyleJson queues an inline style JSON command.
@@ -7776,7 +7802,7 @@ func (receiver *MapHandle) SetStyleImage(imageId string, image PremultipliedRgba
 func (receiver *MapHandle) SetStyleJson(json []byte) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_json(C.mln_map(raw), bindingView(json, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetStyleLayerProperty sets one layer property using its MapLibre style-spec
@@ -7787,7 +7813,7 @@ func (receiver *MapHandle) SetStyleJson(json []byte) (*Future[CommandCompletion]
 func (receiver *MapHandle) SetStyleLayerProperty(layerId string, propertyName string, value []byte) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_layer_property(C.mln_map(raw), bindingView(layerId, arena), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetStyleLightJson sets the style light from a style-spec light JSON object.
@@ -7797,7 +7823,7 @@ func (receiver *MapHandle) SetStyleLayerProperty(layerId string, propertyName st
 func (receiver *MapHandle) SetStyleLightJson(lightJson []byte) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_light_json(C.mln_map(raw), bindingView(lightJson, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetStyleLightProperty sets one style light property using its MapLibre
@@ -7808,7 +7834,7 @@ func (receiver *MapHandle) SetStyleLightJson(lightJson []byte) (*Future[CommandC
 func (receiver *MapHandle) SetStyleLightProperty(propertyName string, value []byte) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_light_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetStyleSourceVolatile sets whether one style source stores fetched tiles in
@@ -7819,7 +7845,7 @@ func (receiver *MapHandle) SetStyleLightProperty(propertyName string, value []by
 func (receiver *MapHandle) SetStyleSourceVolatile(sourceId string, isVolatile bool) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_source_volatile(C.mln_map(raw), bindingView(sourceId, arena), C.bool(isVolatile), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetStyleTransitionOptions sets the style's global transition options.
@@ -7829,7 +7855,7 @@ func (receiver *MapHandle) SetStyleSourceVolatile(sourceId string, isVolatile bo
 func (receiver *MapHandle) SetStyleTransitionOptions(options StyleTransitionOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_transition_options(C.mln_map(raw), bindingStore(nativeStyleTransitionOptions(options, arena), arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetStyleUrl queues a style URL command.
@@ -7839,7 +7865,7 @@ func (receiver *MapHandle) SetStyleTransitionOptions(options StyleTransitionOpti
 func (receiver *MapHandle) SetStyleUrl(url string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_url(C.mln_map(raw), bindingView(url, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetTileOptions submits a copied tile-options command.
@@ -7849,7 +7875,7 @@ func (receiver *MapHandle) SetStyleUrl(url string) (*Future[CommandCompletion], 
 func (receiver *MapHandle) SetTileOptions(options MapTileOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_tile_options(C.mln_map(raw), bindingStore(nativeMapTileOptions(options, arena), arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // SetViewportOptions submits a copied viewport-options command.
@@ -7859,7 +7885,7 @@ func (receiver *MapHandle) SetTileOptions(options MapTileOptions) (*Future[Comma
 func (receiver *MapHandle) SetViewportOptions(options MapViewportOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_viewport_options(C.mln_map(raw), bindingStore(nativeMapViewportOptions(options, arena), arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // UpdateCamera submits one atomic camera update.
@@ -7869,7 +7895,7 @@ func (receiver *MapHandle) SetViewportOptions(options MapViewportOptions) (*Futu
 func (receiver *MapHandle) UpdateCamera(update CameraUpdate) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_update_camera(C.mln_map(raw), bindingStore(nativeCameraUpdate(update, arena), arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // NetworkGetStatus reads MapLibre Native's process-global network status.
@@ -7998,7 +8024,7 @@ func (receiver *RenderSessionHandle) AcquireFrame() (*AcquiredFrameHandle, error
 func (receiver *RenderSessionHandle) Barrier() (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_barrier(C.mln_render_session(raw), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // ClearData starts asynchronous renderer-data clearing.
@@ -8008,7 +8034,7 @@ func (receiver *RenderSessionHandle) Barrier() (*Future[struct{}], error) {
 func (receiver *RenderSessionHandle) ClearData() (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_clear_data(C.mln_render_session(raw), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // Detach starts normal graphics-owner teardown and map detachment.
@@ -8018,7 +8044,7 @@ func (receiver *RenderSessionHandle) ClearData() (*Future[struct{}], error) {
 func (receiver *RenderSessionHandle) Detach() (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_detach(C.mln_render_session(raw), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // DrainFrameResults drains every currently queued terminal frame result into an
@@ -8044,7 +8070,7 @@ func (receiver *RenderSessionHandle) DrainFrameResults() (*RenderFrameBatchHandl
 func (receiver *RenderSessionHandle) DumpDebugLogs() (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_dump_debug_logs(C.mln_render_session(raw), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // GetCapabilities returns the immutable capabilities fixed during attachment.
@@ -8084,7 +8110,7 @@ func (receiver *RenderSessionHandle) GetSnapshot() (RenderSessionSnapshot, error
 func (receiver *RenderSessionHandle) QueryFeatureExtensions(sourceId string, feature []byte, extension string, extensionField string, arguments *[]byte) (*Future[[]byte], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_query_feature_extensions(C.mln_render_session(raw), bindingView(sourceId, arena), bindingView(feature, arena), bindingView(extension, arena), bindingView(extensionField, arena), bindingStoreOptional(arguments, arena, bindingView[[]byte]), completion, diagnostic))
-	}, completionOf(copyViewBytes), false)
+	}, completionOf(copyViewBytes))
 }
 
 // QueryRenderedFeatures starts a rendered-feature query against the session's
@@ -8095,7 +8121,7 @@ func (receiver *RenderSessionHandle) QueryFeatureExtensions(sourceId string, fea
 func (receiver *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) (*Future[[]RenderedFeature], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_query_rendered_features(C.mln_render_session(raw), bindingStore(nativeRenderedQueryGeometry(geometry, arena), arena), bindingStoreOptional(options, arena, nativeRenderedFeatureQueryOptions), completion, diagnostic))
-	}, completionListOf(copyRenderedFeature), false)
+	}, completionListOf(copyRenderedFeature))
 }
 
 // QuerySourceFeatures starts a source-feature query against the session's
@@ -8106,7 +8132,7 @@ func (receiver *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQuer
 func (receiver *RenderSessionHandle) QuerySourceFeatures(sourceId string, options *SourceFeatureQueryOptions) (*Future[[]SourceFeature], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_query_source_features(C.mln_render_session(raw), bindingView(sourceId, arena), bindingStoreOptional(options, arena, nativeSourceFeatureQueryOptions), completion, diagnostic))
-	}, completionListOf(copySourceFeature), false)
+	}, completionListOf(copySourceFeature))
 }
 
 // ReadTexture reads back the latest frame of the session's owned texture as
@@ -8117,7 +8143,7 @@ func (receiver *RenderSessionHandle) QuerySourceFeatures(sourceId string, option
 func (receiver *RenderSessionHandle) ReadTexture() (*Future[TextureReadbackResult], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_read_texture(C.mln_render_session(raw), completion, diagnostic))
-	}, completionOf(copyTextureReadbackResult), false)
+	}, completionOf(copyTextureReadbackResult))
 }
 
 // ReduceMemoryUse starts best-effort release of renderer caches.
@@ -8127,7 +8153,7 @@ func (receiver *RenderSessionHandle) ReadTexture() (*Future[TextureReadbackResul
 func (receiver *RenderSessionHandle) ReduceMemoryUse() (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_reduce_memory_use(C.mln_render_session(raw), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // Close retires a detached or abandoned session handle. The call is CPU-only
@@ -8167,7 +8193,7 @@ func (receiver *RenderSessionHandle) RequestFrame(demand FrameDemand) error {
 func (receiver *RenderSessionHandle) Resize(extent LogicalExtent) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_resize(C.mln_render_session(raw), nativeLogicalExtent(extent, arena), completion, diagnostic))
-	}, completionCommand, true)
+	}, completionCommand)
 }
 
 // ServiceDriverWork services every queued item for a caller-graphics-thread
@@ -8192,7 +8218,7 @@ func (receiver *RenderSessionHandle) ServiceDriverWork() error {
 func (receiver *RenderSessionHandle) SetMetalBorrowedTextureTarget(descriptor MetalBorrowedTextureDescriptor) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_metal_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeMetalBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // SetMetalSurfaceTarget starts an ordered Metal surface replacement.
@@ -8202,7 +8228,7 @@ func (receiver *RenderSessionHandle) SetMetalBorrowedTextureTarget(descriptor Me
 func (receiver *RenderSessionHandle) SetMetalSurfaceTarget(descriptor MetalSurfaceDescriptor) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_metal_surface_target(C.mln_render_session(raw), bindingStore(nativeMetalSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // SetOpenglBorrowedTextureTarget starts an ordered replacement of every texture
@@ -8213,7 +8239,7 @@ func (receiver *RenderSessionHandle) SetMetalSurfaceTarget(descriptor MetalSurfa
 func (receiver *RenderSessionHandle) SetOpenglBorrowedTextureTarget(descriptor OpenglBorrowedTextureDescriptor) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_opengl_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeOpenglBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // SetOpenglSurfaceTarget starts an ordered OpenGL surface replacement.
@@ -8223,7 +8249,7 @@ func (receiver *RenderSessionHandle) SetOpenglBorrowedTextureTarget(descriptor O
 func (receiver *RenderSessionHandle) SetOpenglSurfaceTarget(descriptor OpenglSurfaceDescriptor) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_opengl_surface_target(C.mln_render_session(raw), bindingStore(nativeOpenglSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // SetVulkanBorrowedTextureTarget starts an ordered replacement of every image
@@ -8234,7 +8260,7 @@ func (receiver *RenderSessionHandle) SetOpenglSurfaceTarget(descriptor OpenglSur
 func (receiver *RenderSessionHandle) SetVulkanBorrowedTextureTarget(descriptor VulkanBorrowedTextureDescriptor) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_vulkan_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeVulkanBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // SetVulkanSurfaceTarget starts an ordered Vulkan surface replacement.
@@ -8244,7 +8270,7 @@ func (receiver *RenderSessionHandle) SetVulkanBorrowedTextureTarget(descriptor V
 func (receiver *RenderSessionHandle) SetVulkanSurfaceTarget(descriptor VulkanSurfaceDescriptor) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_vulkan_surface_target(C.mln_render_session(raw), bindingStore(nativeVulkanSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // SetWebgpuBorrowedTextureTarget starts an ordered replacement of every texture
@@ -8255,7 +8281,7 @@ func (receiver *RenderSessionHandle) SetVulkanSurfaceTarget(descriptor VulkanSur
 func (receiver *RenderSessionHandle) SetWebgpuBorrowedTextureTarget(descriptor WebgpuBorrowedTextureDescriptor) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_webgpu_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeWebgpuBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // SetWebgpuSurfaceTarget starts an ordered WebGPU surface replacement.
@@ -8265,7 +8291,7 @@ func (receiver *RenderSessionHandle) SetWebgpuBorrowedTextureTarget(descriptor W
 func (receiver *RenderSessionHandle) SetWebgpuSurfaceTarget(descriptor WebgpuSurfaceDescriptor) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_webgpu_surface_target(C.mln_render_session(raw), bindingStore(nativeWebgpuSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // Complete completes a C API resource provider request.
@@ -8361,7 +8387,7 @@ func (receiver *ResourceTransformRequestHandle) Close() error {
 func (receiver *RuntimeHandle) ClearEventHandler() (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_clear_event_handler(C.mln_runtime(raw), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // ClearHttpHeaderTransform clears the runtime-scoped outgoing HTTP header
@@ -8372,7 +8398,7 @@ func (receiver *RuntimeHandle) ClearEventHandler() (*Future[struct{}], error) {
 func (receiver *RuntimeHandle) ClearHttpHeaderTransform() (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_clear_http_header_transform(C.mln_runtime(raw), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // ClearResourceProvider clears the runtime-scoped network resource provider.
@@ -8382,7 +8408,7 @@ func (receiver *RuntimeHandle) ClearHttpHeaderTransform() (*Future[struct{}], er
 func (receiver *RuntimeHandle) ClearResourceProvider() (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_clear_resource_provider(C.mln_runtime(raw), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // ClearResourceTransform clears the runtime-scoped URL transform for network
@@ -8393,7 +8419,7 @@ func (receiver *RuntimeHandle) ClearResourceProvider() (*Future[struct{}], error
 func (receiver *RuntimeHandle) ClearResourceTransform() (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_clear_resource_transform(C.mln_runtime(raw), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // RuntimeCreate creates a runtime.
@@ -8417,7 +8443,7 @@ func RuntimeCreate(options RuntimeOptions) (*RuntimeHandle, error) {
 func (receiver *RuntimeHandle) CreateMap(options MapOptions) (*Future[*MapHandle], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_create_map(C.mln_runtime(raw), bindingStore(nativeMapOptions(options, arena), arena), completion, diagnostic))
-	}, completionOf(func(raw C.mln_map) *MapHandle { return adoptMapHandle(uint64(raw), receiver) }), false)
+	}, completionOf(func(raw C.mln_map) *MapHandle { return adoptMapHandle(uint64(raw), receiver) }))
 }
 
 // CreateOfflineRegion starts creating an offline region.
@@ -8427,7 +8453,7 @@ func (receiver *RuntimeHandle) CreateMap(options MapOptions) (*Future[*MapHandle
 func (receiver *RuntimeHandle) CreateOfflineRegion(definition OfflineRegionDefinition, metadata []byte) (*Future[OfflineRegionInfo], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_create_offline_region(C.mln_runtime(raw), bindingStore(nativeOfflineRegionDefinition(definition, arena), arena), (*C.uint8_t)(arena.bytes(metadata)), bindingCount[C.size_t](len(metadata)), completion, diagnostic))
-	}, completionOf(copyOfflineRegionInfo), false)
+	}, completionOf(copyOfflineRegionInfo))
 }
 
 // DeleteOfflineRegion deletes an offline region.
@@ -8437,7 +8463,7 @@ func (receiver *RuntimeHandle) CreateOfflineRegion(definition OfflineRegionDefin
 func (receiver *RuntimeHandle) DeleteOfflineRegion(regionId int64) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_delete_offline_region(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // GetEventMask reports which runtime-scoped event types this runtime queues.
@@ -8460,7 +8486,7 @@ func (receiver *RuntimeHandle) GetEventMask() (RuntimeEventMask, error) {
 func (receiver *RuntimeHandle) GetOfflineRegion(regionId int64) (*Future[*OfflineRegionInfo], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_get_offline_region(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
-	}, completionNullable(completionOf(copyOfflineRegionInfo)), false)
+	}, completionNullable(completionOf(copyOfflineRegionInfo)))
 }
 
 // GetOfflineRegionStatus starts getting the current download status for an
@@ -8471,7 +8497,7 @@ func (receiver *RuntimeHandle) GetOfflineRegion(regionId int64) (*Future[*Offlin
 func (receiver *RuntimeHandle) GetOfflineRegionStatus(regionId int64) (*Future[OfflineRegionStatus], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_get_offline_region_status(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
-	}, completionOf(copyOfflineRegionStatus), false)
+	}, completionOf(copyOfflineRegionStatus))
 }
 
 // InvalidateOfflineRegion invalidates cached resources for an offline region.
@@ -8481,7 +8507,7 @@ func (receiver *RuntimeHandle) GetOfflineRegionStatus(regionId int64) (*Future[O
 func (receiver *RuntimeHandle) InvalidateOfflineRegion(regionId int64) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_invalidate_offline_region(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // ListOfflineRegions starts listing the offline regions in the runtime
@@ -8492,7 +8518,7 @@ func (receiver *RuntimeHandle) InvalidateOfflineRegion(regionId int64) (*Future[
 func (receiver *RuntimeHandle) ListOfflineRegions() (*Future[[]OfflineRegionInfo], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_list_offline_regions(C.mln_runtime(raw), completion, diagnostic))
-	}, completionListOf(copyOfflineRegionInfo), false)
+	}, completionListOf(copyOfflineRegionInfo))
 }
 
 // MergeOfflineRegions starts merging offline regions from another MapLibre
@@ -8503,7 +8529,7 @@ func (receiver *RuntimeHandle) ListOfflineRegions() (*Future[[]OfflineRegionInfo
 func (receiver *RuntimeHandle) MergeOfflineRegions(sideDatabasePath string) (*Future[[]OfflineRegionInfo], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_merge_offline_regions(C.mln_runtime(raw), bindingView(sideDatabasePath, arena), completion, diagnostic))
-	}, completionListOf(copyOfflineRegionInfo), false)
+	}, completionListOf(copyOfflineRegionInfo))
 }
 
 // Close starts release of a runtime after checking its children.
@@ -8513,7 +8539,7 @@ func (receiver *RuntimeHandle) MergeOfflineRegions(sideDatabasePath string) (*Fu
 func (receiver *RuntimeHandle) Close() (*Future[struct{}], error) {
 	return bindingStart(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_release(C.mln_runtime(raw), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // RunAmbientCacheOperation starts a MapLibre ambient cache maintenance
@@ -8524,7 +8550,7 @@ func (receiver *RuntimeHandle) Close() (*Future[struct{}], error) {
 func (receiver *RuntimeHandle) RunAmbientCacheOperation(operation AmbientCacheOperation) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_run_ambient_cache_operation(C.mln_runtime(raw), C.uint32_t(operation), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // SetEventHandler selects how runtime and map events reach the host.
@@ -8534,7 +8560,7 @@ func (receiver *RuntimeHandle) RunAmbientCacheOperation(operation AmbientCacheOp
 func (receiver *RuntimeHandle) SetEventHandler(handler RuntimeEventHandler) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_event_handler(C.mln_runtime(raw), bindingStore(nativeRuntimeEventHandler(handler, arena), arena), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // SetEventMask selects which runtime-scoped event types this runtime queues.
@@ -8555,7 +8581,7 @@ func (receiver *RuntimeHandle) SetEventMask(mask RuntimeEventMask) error {
 func (receiver *RuntimeHandle) SetHttpHeaderTransform(transform HttpHeaderTransform) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_http_header_transform(C.mln_runtime(raw), bindingStore(nativeHttpHeaderTransform(transform, arena), arena), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // SetMaximumAmbientCacheSize starts a change to this runtime's maximum ambient
@@ -8566,7 +8592,7 @@ func (receiver *RuntimeHandle) SetHttpHeaderTransform(transform HttpHeaderTransf
 func (receiver *RuntimeHandle) SetMaximumAmbientCacheSize(size uint64) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_maximum_ambient_cache_size(C.mln_runtime(raw), C.uint64_t(size), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // SetOfflineRegionDownloadState sets an offline region's native download state.
@@ -8576,7 +8602,7 @@ func (receiver *RuntimeHandle) SetMaximumAmbientCacheSize(size uint64) (*Future[
 func (receiver *RuntimeHandle) SetOfflineRegionDownloadState(regionId int64, state OfflineRegionDownloadState) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_offline_region_download_state(C.mln_runtime(raw), C.mln_offline_region_id(regionId), C.uint32_t(state), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // SetOfflineRegionObserved enables or disables runtime events for an offline
@@ -8587,7 +8613,7 @@ func (receiver *RuntimeHandle) SetOfflineRegionDownloadState(regionId int64, sta
 func (receiver *RuntimeHandle) SetOfflineRegionObserved(regionId int64, observed bool) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_offline_region_observed(C.mln_runtime(raw), C.mln_offline_region_id(regionId), C.bool(observed), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // SetResourceProvider registers or replaces a runtime-scoped network resource
@@ -8598,7 +8624,7 @@ func (receiver *RuntimeHandle) SetOfflineRegionObserved(regionId int64, observed
 func (receiver *RuntimeHandle) SetResourceProvider(provider ResourceProvider) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_resource_provider(C.mln_runtime(raw), bindingStore(nativeResourceProvider(provider, arena), arena), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // SetResourceTransform registers or updates a runtime-scoped URL transform for
@@ -8609,7 +8635,7 @@ func (receiver *RuntimeHandle) SetResourceProvider(provider ResourceProvider) (*
 func (receiver *RuntimeHandle) SetResourceTransform(transform ResourceTransform) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_resource_transform(C.mln_runtime(raw), bindingStore(nativeResourceTransform(transform, arena), arena), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // UpdateOfflineRegionMetadata starts updating opaque binary metadata for an
@@ -8620,7 +8646,7 @@ func (receiver *RuntimeHandle) SetResourceTransform(transform ResourceTransform)
 func (receiver *RuntimeHandle) UpdateOfflineRegionMetadata(regionId int64, metadata []byte) (*Future[OfflineRegionInfo], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_update_offline_region_metadata(C.mln_runtime(raw), C.mln_offline_region_id(regionId), (*C.uint8_t)(arena.bytes(metadata)), bindingCount[C.size_t](len(metadata)), completion, diagnostic))
-	}, completionOf(copyOfflineRegionInfo), false)
+	}, completionOf(copyOfflineRegionInfo))
 }
 
 // StyleExpressionCreate parses a style expression.

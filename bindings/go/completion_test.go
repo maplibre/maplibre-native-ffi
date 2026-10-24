@@ -96,17 +96,17 @@ func TestRejectedSubmissionFreesItsCompletionState(t *testing.T) {
 	handle.Value()
 }
 
-// A failed command is a disposition in the result, not an error from Await,
-// and carries its status and diagnostic.
-func TestFailedCommandDispositionIsData(t *testing.T) {
+// A failed command's Await returns an *Error with its status, diagnostic, and
+// the generation it published.
+func TestFailedCommandReturnsItsError(t *testing.T) {
 	f := newFixture(t)
-	awaitCommitted(t, submitted(f.m.SetStyleJson([]byte(emptyStyle))))
-	completion := await(t, submitted(f.m.RemoveStyleSource("missing")))
-	if completion.Disposition != CommandDispositionFailed || completion.Status != StatusNotFound {
-		t.Fatalf("RemoveStyleSource(missing) = %+v, want a failed NOT_FOUND disposition", completion)
+	committed := await(t, submitted(f.m.SetStyleJson([]byte(emptyStyle))))
+	failure := awaitFailure(t, submitted(f.m.RemoveStyleSource("missing")))
+	if !errors.Is(failure, StatusNotFound) || failure.Diagnostic == "" {
+		t.Fatalf("RemoveStyleSource(missing) = %v, want NOT_FOUND with a diagnostic", failure)
 	}
-	if completion.Diagnostic == "" {
-		t.Fatal("the failed disposition carried no diagnostic")
+	if failure.Generation <= committed.Generation {
+		t.Fatalf("failed command generation = %d, want past %d", failure.Generation, committed.Generation)
 	}
 }
 

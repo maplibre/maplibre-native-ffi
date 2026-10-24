@@ -182,7 +182,7 @@ func rejectedSubmissionForTest() (cgo.Handle, error) {
 	_, err := startCompletion(func(completion *C.mln_completion, _ *C.mln_diagnostic) int32 {
 		submitted = bindingHandleOf(completion.user_data)
 		return int32(C.MLN_STATUS_INVALID_STATE)
-	}, completionUnit, false)
+	}, completionUnit)
 	return submitted, err
 }
 
@@ -245,7 +245,7 @@ func createMapFailingAfterAdoptionForTest(receiver *RuntimeHandle) (*Future[*Map
 			}
 			adoptMapHandle(uint64(value), receiver)
 			panic("conversion failed after adopting the map")
-		}, false)
+		})
 		if err != nil {
 			panic(bindingFailure{err})
 		}

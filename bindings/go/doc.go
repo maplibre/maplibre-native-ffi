@@ -1,5 +1,10 @@
 // Package maplibre is the low-level Go binding for the MapLibre Native C API.
 //
+// The first [RenderSessionHandle.ServiceDriverWork] call fixes a caller-driver
+// session's graphics thread, and the Go scheduler moves goroutines between OS
+// threads. Call [runtime.LockOSThread] on the goroutine that services the
+// session and hold it for the session's lifetime.
+//
 // Acquired frames expose their texture only inside a callback such as
 // [AcquiredFrameHandle.WithOpenglTexture], on the callback's OS thread. Keep
 // servicing a caller-driver render session while its attachment or detachment

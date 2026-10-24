@@ -74,14 +74,14 @@ func isLoadingFailure(url string) func(RuntimeEvent) bool {
 // fails. A submission rejected up front never roots it.
 func TestCallbackRootsFollowTheNativeRegistration(t *testing.T) {
 	f := newFixture(t)
-	awaitCommitted(t, submitted(f.m.SetStyleJson([]byte(emptyStyle))))
+	await(t, submitted(f.m.SetStyleJson([]byte(emptyStyle))))
 	options := CustomGeometrySourceOptions{FetchTile: func(CanonicalTileId) {}}
 
-	awaitCommitted(t, submitted(f.m.AddCustomGeometrySource("removed", options)))
+	await(t, submitted(f.m.AddCustomGeometrySource("removed", options)))
 	if roots := rootCount(f.m.bindingOwner); roots != 1 {
 		t.Fatalf("roots after the add = %d, want 1", roots)
 	}
-	awaitCommitted(t, submitted(f.m.RemoveStyleSource("removed")))
+	await(t, submitted(f.m.RemoveStyleSource("removed")))
 	if roots := rootCount(f.m.bindingOwner); roots != 0 {
 		t.Fatalf("roots after the removal = %d, want 0", roots)
 	}
@@ -98,10 +98,8 @@ func TestCallbackRootsFollowTheNativeRegistration(t *testing.T) {
 		}
 	}
 
-	awaitCommitted(t, submitted(f.m.AddCustomGeometrySource("kept", options)))
-	if completion := await(t, submitted(f.m.AddCustomGeometrySource("kept", options))); completion.Disposition != CommandDispositionFailed {
-		t.Fatalf("add with a taken ID = %+v, want failed", completion)
-	}
+	await(t, submitted(f.m.AddCustomGeometrySource("kept", options)))
+	awaitFailure(t, submitted(f.m.AddCustomGeometrySource("kept", options)))
 	// Native releases a failed command's registration after its completion
 	// returns, and before a later command on the map completes.
 	await(t, submitted(f.m.RequestRepaint()))
@@ -129,11 +127,11 @@ func TestCameraEndHandlerIsRootedUntilItRuns(t *testing.T) {
 	update.Animation.DurationMs = &duration
 	update.Animation.TransitionId = &identity
 	update.Animation.EndHandler = CameraTransitionHandler{Callback: func(end CameraTransitionEnd) { ends <- end }}
-	awaitCommitted(t, submitted(f.m.UpdateCamera(update)))
+	await(t, submitted(f.m.UpdateCamera(update)))
 	if roots := rootCount(f.m.bindingOwner); roots != 1 {
 		t.Fatalf("roots while the ease runs = %d, want 1", roots)
 	}
-	awaitCommitted(t, submitted(f.m.CancelCameraTransition(identity)))
+	await(t, submitted(f.m.CancelCameraTransition(identity)))
 	select {
 	case end := <-ends:
 		if end.Outcome != CameraTransitionOutcomeCancelled || end.Generation == 0 {

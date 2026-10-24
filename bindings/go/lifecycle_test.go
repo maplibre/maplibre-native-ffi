@@ -15,7 +15,7 @@ func TestClosingTwiceIsSafe(t *testing.T) {
 	}
 	_, err := f.m.SetStyleJson([]byte(emptyStyle))
 	var closed *Error
-	if !errors.As(err, &closed) || closed.Status != StatusInvalidState || closed.Diagnostic() == "" {
+	if !errors.As(err, &closed) || closed.Status != StatusInvalidState || closed.Diagnostic == "" {
 		t.Fatalf("SetStyleJson after close = %v, want native invalid state", err)
 	}
 
@@ -39,7 +39,7 @@ func TestRefusedCloseLeavesTheHandleUsable(t *testing.T) {
 	if teardown != nil || !errors.As(err, &native) || !errors.Is(err, StatusInvalidState) {
 		t.Fatalf("runtime close with a live map = (%v, %v), want nil and StatusInvalidState", teardown, err)
 	}
-	if native.Diagnostic() == "" {
+	if native.Diagnostic == "" {
 		t.Fatal("the refusal carried no diagnostic")
 	}
 	await(t, submitted(f.runtime.ClearResourceTransform()))
@@ -51,7 +51,7 @@ func TestRefusedCloseLeavesTheHandleUsable(t *testing.T) {
 // after close, so a host can route events that it drains later.
 func TestHandleIdNamesItsEventsAndOutlivesClose(t *testing.T) {
 	f := newFixture(t)
-	awaitCommitted(t, submitted(f.m.SetStyleJson([]byte(emptyStyle))))
+	await(t, submitted(f.m.SetStyleJson([]byte(emptyStyle))))
 	event := f.awaitEvent(t, "the style load", isStyleLoaded)
 	id := f.m.Id()
 	if event.Source != id {
@@ -126,7 +126,7 @@ func TestChildKeepsItsParentAlive(t *testing.T) {
 	if parent.Value() == nil {
 		t.Fatal("the runtime became unreachable while its map is live")
 	}
-	awaitCommitted(t, submitted(m.SetStyleJson([]byte(emptyStyle))))
+	await(t, submitted(m.SetStyleJson([]byte(emptyStyle))))
 
 	// Closing the map leaves nothing that holds the runtime.
 	await(t, submitted(m.Close()))

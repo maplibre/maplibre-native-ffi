@@ -352,8 +352,15 @@ class Values:
                     f'func (value {typename}) String() string {{ switch value {{ {cases} }}; return fmt.Sprintf("{typename}(%d)", value) }}'
                 )
                 if native == "mln_status":
+                    # Go error strings are lowercase words that name the package.
+                    messages = "\n".join(
+                        f'case {number}: return "maplibre: {key.removeprefix(prefix).lower().replace("_", " ")}"'
+                        for number, key in {
+                            number: key for key, number in value.enum_values
+                        }.items()
+                    )
                     chunks.append(
-                        "func (value Status) Error() string { return value.String() }"
+                        f'func (value Status) Error() string {{ switch value {{ {messages} }}; return fmt.Sprintf("maplibre: status %d", int32(value)) }}'
                     )
             if value.enum_kind == "bitmask":
                 chunks.append(
