@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Pointer;
@@ -7,7 +8,7 @@ namespace Maplibre.NativeFfi.Tests;
 
 #pragma warning disable xUnit1031 // The abandoning helpers must not be async, or a state machine roots what they drop.
 
-/// <summary>What the collector does with abandoned handles, read from standard error.</summary>
+/// <summary>What the collector does with abandoned handles, and where it reports them.</summary>
 [Collection(nameof(GlobalState))]
 public sealed class LeakReportTests
 {
@@ -99,6 +100,46 @@ public sealed class LeakReportTests
         map.GetStyleUrlAsync(TestWaits.Token).GetAwaiter().GetResult();
         return map;
     }
+
+    // A handler receives each report in place of standard error.
+    [Fact]
+    public void ALeakHandlerReceivesTheReportInsteadOfStandardError()
+    {
+        using var standardError = new StandardErrorCapture();
+        var reports = new ConcurrentQueue<LeakReportedEventArgs>();
+        EventHandler<LeakReportedEventArgs> record = (_, args) => reports.Enqueue(args);
+        Maplibre.LeakReported += record;
+        try
+        {
+            var leaked = AbandonDisposable();
+            Gc.Collect();
+            Assert.False(leaked.IsAlive);
+        }
+        finally
+        {
+            Maplibre.LeakReported -= record;
+        }
+
+        var report = Assert.Single(reports);
+        Assert.Equal("RuntimeHandle", report.TypeName);
+        Assert.Contains(
+            $"0x{SyntheticHandles.Runtime(9012).Value:x}; it was disposed when collected.",
+            report.Message,
+            StringComparison.Ordinal
+        );
+        Assert.DoesNotContain("LeakedHandle", standardError.Text, StringComparison.Ordinal);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static unsafe WeakReference AbandonDisposable() =>
+        new(
+            new NativeHandleState<MlnRuntime>(
+                SyntheticHandles.Runtime(9012),
+                (_, _) => mln_status.MLN_STATUS_OK,
+                "RuntimeHandle",
+                (_, _) => mln_status.MLN_STATUS_OK
+            )
+        );
 
     private static int Occurrences(string text, string value)
     {

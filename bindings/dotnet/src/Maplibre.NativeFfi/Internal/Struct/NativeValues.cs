@@ -1,5 +1,3 @@
-using Maplibre.NativeFfi.Error;
-
 namespace Maplibre.NativeFfi.Internal.Struct;
 
 /// <summary>The steps that generated value encoders repeat for each member.</summary>
@@ -58,10 +56,6 @@ internal static class NativeValues
     internal static void Required(object? value, string message)
     {
         if (value is null)
-            throw new MaplibreException(
-                global::Maplibre.NativeFfi.Status.InvalidArgument,
-                message,
-                null
-            );
+            throw new ArgumentException(message);
     }
 }

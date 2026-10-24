@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
 using Xunit;
 

@@ -1,8 +1,12 @@
-namespace Maplibre.NativeFfi.Error;
+namespace Maplibre.NativeFfi;
 
-/// <summary>The loaded C library and this binding have different ABI versions.</summary>
+/// <summary>
+/// The loaded C library and this binding have different ABI versions, so the library is
+/// <see cref="Status.Unsupported" />.
+/// </summary>
 public sealed class AbiVersionMismatchException(uint expected, uint actual)
-    : Exception(
+    : MaplibreException(
+        Status.Unsupported,
         $"MapLibre Native C ABI version {actual} is incompatible with this binding; expected {expected}."
     )
 {

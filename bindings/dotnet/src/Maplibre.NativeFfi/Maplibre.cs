@@ -21,6 +21,18 @@ public static unsafe partial class Maplibre
         CallbackException;
 
     /// <summary>
+    /// Raised when the collector reclaims a handle that was never closed or disposed. With no
+    /// handler, the binding writes the report to standard error.
+    /// </summary>
+    /// <remarks>
+    /// A handler runs on the finalizer thread, so it should return quickly. An exception that a
+    /// handler throws is discarded.
+    /// </remarks>
+    public static event EventHandler<LeakReportedEventArgs>? LeakReported;
+
+    internal static EventHandler<LeakReportedEventArgs>? LeakReportedHandlers => LeakReported;
+
+    /// <summary>
     /// Loads the native library and checks its C ABI version. The library is the one that .NET's
     /// native library probing finds, such as a runtime package's.
     /// </summary>

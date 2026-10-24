@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Loader;
 using Maplibre.NativeFfi.Internal.Pointer;
@@ -35,22 +34,6 @@ internal sealed unsafe partial class NativeCallScope
         ArgumentNullException.ThrowIfNull(argument, name);
         (arguments ??= []).Add(argument);
         return argument.State.Handle;
-    }
-
-    /// <summary>Encodes a NUL-terminated string parameter, which cannot carry an embedded NUL.</summary>
-    internal sbyte* CStringArgument(
-        string text,
-        [CallerArgumentExpression(nameof(text))] string? name = null
-    )
-    {
-        ArgumentNullException.ThrowIfNull(text, name);
-        if (text.Contains('\0'))
-            throw new MaplibreException(
-                global::Maplibre.NativeFfi.Status.InvalidArgument,
-                $"{name} contains an embedded NUL character.",
-                null
-            );
-        return Terminated(text);
     }
 
     internal Task<CommandCompletion> Command(

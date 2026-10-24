@@ -222,8 +222,8 @@ namespace Maplibre.NativeFfi.Internal.C {
     try {
       NativeSnapshot(copy with { Camera = null! }, scope);
       Check(false);
-    } catch (Maplibre.NativeFfi.Error.MaplibreException error) {
-      Check(error.Diagnostic == "Snapshot.Camera must not be null.");
+    } catch (ArgumentException error) {
+      Check(error.Message == "Snapshot.Camera must not be null.");
     }
     // A field named after a C# keyword keeps its value in both directions.
     Check(CopyMetric(new mln_metric { @event = 4 }).Event == 4);
@@ -278,7 +278,6 @@ mln_status mln_map_set_hooks(mln_map map, const mln_hooks *hooks, mln_diagnostic
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Maplibre.NativeFfi;
-using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Callback;
 using Maplibre.NativeFfi.Internal.Memory;
@@ -355,7 +354,7 @@ namespace Maplibre.NativeFfi.Internal.Callback {
                 # The probe compiles the generated raw types, and declares the
                 # diagnostic and handle interface that the runtime supplies.
                 "Internal/C/NativeMethods.cs",
-                "Error/MaplibreException.cs",
+                "MaplibreException.cs",
                 "NativePointer.cs",
             ):
                 (root / Path(path).name).write_text((source / path).read_text())

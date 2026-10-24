@@ -1,4 +1,4 @@
-namespace Maplibre.NativeFfi.Error;
+namespace Maplibre.NativeFfi;
 
 /// <summary>A native or binding status failure.</summary>
 public class MaplibreException : Exception

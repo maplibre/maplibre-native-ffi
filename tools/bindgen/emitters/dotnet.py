@@ -569,7 +569,7 @@ def emit_operation(
         ):
             parameters.append(f"string {name}")
             scoped = True
-            args.append(f"scope.CStringArgument({name})")
+            args.append(f"scope.CString({name})")
         elif (
             parameter.name in input_plans
             and input_plans[parameter.name].kind == "array"

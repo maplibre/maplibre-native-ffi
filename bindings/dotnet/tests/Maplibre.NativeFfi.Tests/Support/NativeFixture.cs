@@ -150,8 +150,7 @@ internal sealed class NativeFixture : IAsyncDisposable
             probe();
             return true;
         }
-        catch (global::Maplibre.NativeFfi.Error.MaplibreException error)
-            when (error.Status == Status.InvalidState)
+        catch (MaplibreException error) when (error.Status == Status.InvalidState)
         {
             return false;
         }

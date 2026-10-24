@@ -2,16 +2,34 @@ namespace Maplibre.NativeFfi.Internal.Pointer;
 
 internal static class NativeLeakReporter
 {
-    /// <summary>Writes a leak report to standard error, where a host sees what it leaked.</summary>
-    internal static void Report(string message)
+    /// <summary>
+    /// Reports a leaked handle to each <see cref="Maplibre.LeakReported" /> handler, or to
+    /// standard error when there is none.
+    /// </summary>
+    internal static void Report(string typeName, string message)
     {
-        try
+        // Leak reporting must not throw from finalizers or best-effort Dispose paths.
+        var handlers = Maplibre.LeakReportedHandlers;
+        if (handlers is null)
         {
-            Console.Error.WriteLine($"Maplibre.NativeFfi LeakedHandle: {message}");
+            try
+            {
+                Console.Error.WriteLine($"Maplibre.NativeFfi LeakedHandle: {message}");
+            }
+            catch { }
+            return;
         }
-        catch
+        var args = new LeakReportedEventArgs(typeName, message);
+        foreach (var handler in handlers.GetInvocationList())
         {
-            // Leak reporting must not throw from finalizers or best-effort Dispose paths.
+            try
+            {
+                ((EventHandler<LeakReportedEventArgs>)handler)(null, args);
+            }
+            catch
+            {
+                // One handler's failure must neither escape the finalizer nor skip the others.
+            }
         }
     }
 }

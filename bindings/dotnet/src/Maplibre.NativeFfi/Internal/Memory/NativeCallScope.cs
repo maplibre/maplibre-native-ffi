@@ -103,16 +103,15 @@ internal sealed unsafe partial class NativeCallScope : IDisposable
         return *pointer;
     }
 
-    internal sbyte* CString(string text)
+    /// <summary>Encodes a NUL-terminated string, which cannot carry an embedded NUL.</summary>
+    internal sbyte* CString(
+        string text,
+        [CallerArgumentExpression(nameof(text))] string? name = null
+    )
     {
-        ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(text, name);
         if (text.Contains('\0'))
-            throw new ArgumentException("String contains a null character.", nameof(text));
-        return Terminated(text);
-    }
-
-    private sbyte* Terminated(string text)
-    {
+            throw new ArgumentException("The string contains an embedded NUL character.", name);
         var count = Encoding.UTF8.GetByteCount(text);
         var pointer = Allocate<byte>(checked(count + 1));
         Encoding.UTF8.GetBytes(text, new Span<byte>(pointer, count));

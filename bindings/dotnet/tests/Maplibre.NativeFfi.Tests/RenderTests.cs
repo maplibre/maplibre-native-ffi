@@ -1,4 +1,3 @@
-using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.Pointer;
 using Xunit;
 

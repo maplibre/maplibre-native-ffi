@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
-using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
 
 namespace Maplibre.NativeFfi.Internal.Loader;
@@ -33,19 +32,7 @@ internal static class NativeLibraryLoader
                 );
             }
 
-            nint handle;
-            try
-            {
-                handle = NativeLibrary.Load(libraryPath);
-            }
-            catch (Exception error) when (error is DllNotFoundException or BadImageFormatException)
-            {
-                throw new MaplibreException(
-                    global::Maplibre.NativeFfi.Status.Unsupported,
-                    $"MapLibre Native C library could not be loaded from '{libraryPath}'.",
-                    error
-                );
-            }
+            var handle = NativeLibrary.Load(libraryPath);
             try
             {
                 resolvedHandle = ValidateAndCacheResolvedHandle(handle);
@@ -117,19 +104,8 @@ internal static class NativeLibraryLoader
 
     private static unsafe uint ReadAbiVersion(nint handle)
     {
-        try
-        {
-            var version = NativeLibrary.GetExport(handle, "mln_c_version");
-            return ((delegate* unmanaged[Cdecl]<uint>)version)();
-        }
-        catch (EntryPointNotFoundException error)
-        {
-            throw new MaplibreException(
-                global::Maplibre.NativeFfi.Status.InvalidState,
-                "MapLibre Native C library does not export the required mln_c_version entry point.",
-                error
-            );
-        }
+        var version = NativeLibrary.GetExport(handle, "mln_c_version");
+        return ((delegate* unmanaged[Cdecl]<uint>)version)();
     }
 
     private static nint ValidateAndCacheResolvedHandle(nint handle)
@@ -156,29 +132,7 @@ internal static class NativeLibraryLoader
             return;
         }
 
-        uint actualVersion;
-        try
-        {
-            actualVersion = NativeMethods.mln_c_version();
-        }
-        catch (DllNotFoundException error)
-        {
-            throw new MaplibreException(
-                global::Maplibre.NativeFfi.Status.Unsupported,
-                "MapLibre Native C library could not be loaded.",
-                error
-            );
-        }
-        catch (EntryPointNotFoundException error)
-        {
-            throw new MaplibreException(
-                global::Maplibre.NativeFfi.Status.InvalidState,
-                "MapLibre Native C library does not export the required mln_c_version entry point.",
-                error
-            );
-        }
-
-        ValidateAbiVersion(actualVersion);
+        ValidateAbiVersion(NativeMethods.mln_c_version());
         abiValidated = true;
     }
 

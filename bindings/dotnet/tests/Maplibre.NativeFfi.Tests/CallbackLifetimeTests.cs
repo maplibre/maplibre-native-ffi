@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Maplibre.NativeFfi.Error;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;

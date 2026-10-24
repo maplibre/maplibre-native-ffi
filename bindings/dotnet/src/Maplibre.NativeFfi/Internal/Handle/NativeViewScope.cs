@@ -1,5 +1,3 @@
-using Maplibre.NativeFfi.Error;
-
 namespace Maplibre.NativeFfi.Internal.Pointer;
 
 internal sealed class NativeViewScope

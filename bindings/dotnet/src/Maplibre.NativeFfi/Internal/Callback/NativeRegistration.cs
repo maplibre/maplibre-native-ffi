@@ -1,5 +1,3 @@
-using Maplibre.NativeFfi.Error;
-
 namespace Maplibre.NativeFfi.Internal.Callback;
 
 /// <summary>
