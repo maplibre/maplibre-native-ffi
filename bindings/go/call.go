@@ -201,13 +201,6 @@ func bindingView[T ~string | ~[]byte](value T, arena *bindingArena) C.mln_buffer
 	return C.mln_buffer_view{data: arena.bytes([]byte(value)), size: C.size_t(len(value))}
 }
 
-func bindingOptionalView[T ~string | ~[]byte](value *T, arena *bindingArena) C.mln_buffer_view {
-	if value == nil {
-		return C.mln_buffer_view{}
-	}
-	return bindingView(*value, arena)
-}
-
 // Copy completion values before native reuses their storage.
 
 func completionOf[N, T any](copy func(N) T) func(*C.mln_completion_result) (T, error) {

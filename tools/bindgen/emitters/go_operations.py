@@ -5,7 +5,7 @@ from dataclasses import replace
 from ..model import ModelError
 from ..semantic import output_member
 from .go import GO_KEYWORDS, documented_operation, name, native_call
-from .go_values import Values, absent, public
+from .go_values import Values, public
 
 
 def element(value):
@@ -44,20 +44,16 @@ def argument(values, value, expr):
         if value.length == "nul":
             return (
                 f"func() *C.char {{ if {expr} == nil {{ return nil }}; return arena.cstring(*{expr}) }}()"
-                if absent(value)
+                if value.nullable
                 else f"arena.cstring({expr})"
             )
         if value.ctype.pointee:
             if value.nullable:
                 return f"({values.c_type(value)})(func() unsafe.Pointer {{ if {expr} == nil {{ return nil }}; p := arena.bytes([]byte(*{expr})); if p == nil {{ p = arena.allocate(1) }}; return p }}())"
-            if value.optional == "empty":
-                return f"({values.c_type(value)})(func() unsafe.Pointer {{ if {expr} == nil {{ return nil }}; return arena.bytes([]byte(*{expr})) }}())"
             data = f"[]byte({expr})" if value.encoding == "utf8" else expr
             return f"({values.c_type(value)})(arena.bytes({data}))"
         if value.nullable:
             return f"func() C.mln_buffer_view {{ if {expr} == nil {{ return C.mln_buffer_view{{}} }}; v := bindingView(*{expr}, arena); if v.data == nil {{ v.data = arena.allocate(1) }}; return v }}()"
-        if value.optional == "empty":
-            return f"bindingOptionalView({expr}, arena)"
         return f"bindingView({expr}, arena)"
     if value.kind == "array":
         if value.ctype.kind == "array":
@@ -76,7 +72,7 @@ def converter(values, value):
         return f"native{public(value.native)}"
     if (
         value.kind == "buffer"
-        and not absent(value)
+        and not value.nullable
         and not value.ctype.pointee
         and value.length != "nul"
     ):
@@ -95,9 +91,7 @@ def copier(values, value):
         return f"copy{public(value.native)}"
     if value.kind == "buffer" and not value.ctype.pointee and value.length != "nul":
         text = "Text" if value.encoding == "utf8" else "Bytes"
-        if value.optional == "empty" and not value.nullable:
-            values.fail(value, "empty completion buffer requires a copier")
-        if not absent(value):
+        if not value.nullable:
             return f"copyView{text}"
     return f"func(raw C.{value.native}) {values.type(value)} {{ return {values.copy(value, 'raw')} }}"
 
@@ -188,7 +182,7 @@ def operation(plan, values, *, discard=False):
             counted = counts[p.name]
             length = (
                 f"func() int {{ if {labels[counted.name]} == nil {{ return 0 }}; return len(*{labels[counted.name]}) }}()"
-                if counted.value.kind == "buffer" and absent(counted.value)
+                if counted.value.kind == "buffer" and counted.value.nullable
                 else f"len({labels[counted.name]})"
             )
             arguments[p.name] = f"bindingCount[C.{p.value.native}]({length})"

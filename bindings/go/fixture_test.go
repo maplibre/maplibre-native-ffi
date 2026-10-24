@@ -110,8 +110,7 @@ func newRuntimeFixture(t *testing.T) *fixture {
 	t.Helper()
 	f := &fixture{pendingEvents: make(chan RuntimeEvent, 4096)}
 	options := DefaultRuntimeOptions()
-	cache := ":memory:"
-	options.CachePath = &cache
+	options.CachePath = ":memory:"
 	runtime, err := RuntimeCreate(options)
 	if err != nil {
 		t.Fatalf("RuntimeCreate: %v", err)
@@ -135,11 +134,10 @@ func newRuntimeFixture(t *testing.T) *fixture {
 // denyingProvider fails every request, so no test reaches the network.
 func denyingProvider() ResourceProvider {
 	return ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) ResourceProviderDecision {
-		message := "the test fixture serves no resources"
 		_ = request.Complete(ResourceResponse{
 			Status:       ResourceResponseStatusError,
 			ErrorReason:  ResourceErrorReasonNotFound,
-			ErrorMessage: &message,
+			ErrorMessage: "the test fixture serves no resources",
 		})
 		_ = request.Close()
 		return ResourceProviderDecisionHandle

@@ -45,10 +45,6 @@ def scalar(ctype, carrier=None):
     }[carrier or ctype.canonical]
 
 
-def absent(value):
-    return value.nullable or value.optional == "empty"
-
-
 class Values:
     def __init__(self, api):
         self.api = api
@@ -128,7 +124,7 @@ class Values:
             self.fail(value, "missing Go type")
         if (
             optional
-            and absent(value)
+            and value.nullable
             and value.kind not in {"array", "handle", "union"}
         ):
             result = "*" + result
@@ -178,8 +174,8 @@ class Values:
             if value.length == "nul":
                 copy = f"C.GoString({expr})"
                 return (
-                    f"func() *string {{ if {expr} == nil {{ return nil }}; value := {copy}; {'if value == "" { return nil }; ' if value.optional == 'empty' else ''}return &value }}()"
-                    if absent(value)
+                    f"func() *string {{ if {expr} == nil {{ return nil }}; value := {copy}; return &value }}()"
+                    if value.nullable
                     else copy
                 )
             if value.ctype.pointee:
@@ -194,12 +190,9 @@ class Values:
             copy = f"bindingBytes({pointer}, uint64({size}))"
             if value.encoding == "utf8":
                 copy = f"bindingString({pointer}, uint64({size}))"
-            condition = (
-                f"{size} == 0" if value.optional == "empty" else f"{pointer} == nil"
-            )
             return (
-                f"func() {self.type(value)} {{ if {condition} {{ return nil }}; value := {copy}; return &value }}()"
-                if absent(value)
+                f"func() {self.type(value)} {{ if {pointer} == nil {{ return nil }}; value := {copy}; return &value }}()"
+                if value.nullable
                 else copy
             )
         if value.kind == "array":
@@ -235,11 +228,11 @@ class Values:
         self.fail(value, "missing copied value conversion")
 
     def native(self, value, expr, dest, scope="raw"):
-        if value.kind == "buffer" and absent(value):
+        if value.kind == "buffer" and value.nullable:
             converted = self.native(
-                replace(value, nullable=False, optional=None), f"(*{expr})", dest, scope
+                replace(value, nullable=False), f"(*{expr})", dest, scope
             )
-            if value.nullable and value.length != "nul":
+            if value.length != "nul":
                 pointer = dest if value.ctype.pointee else dest + ".data"
                 assignment = (
                     f"({self.c_type(value)})(arena.allocate(1))"

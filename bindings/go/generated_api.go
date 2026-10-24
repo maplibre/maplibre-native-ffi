@@ -4164,11 +4164,11 @@ type ResourceResponse struct {
 	ErrorReason ResourceErrorReason
 	// Response bytes. May be null only when byte_count is 0.
 	Bytes            []byte
-	ErrorMessage     *string
+	ErrorMessage     string
 	MustRevalidate   bool
 	ModifiedUnixMs   *int64
 	ExpiresUnixMs    *int64
-	Etag             *string
+	Etag             string
 	RetryAfterUnixMs *int64
 }
 
@@ -4180,15 +4180,11 @@ func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_r
 	raw.error_reason = C.uint32_t(input.ErrorReason)
 	raw.bytes = (*C.uint8_t)(arena.bytes(input.Bytes))
 	raw.byte_count = bindingCountLike(raw.byte_count, len(input.Bytes))
-	if input.ErrorMessage != nil {
-		raw.error_message = C.mln_buffer_view{data: arena.bytes([]byte((*input.ErrorMessage))), size: C.size_t(len((*input.ErrorMessage)))}
-	}
+	raw.error_message = C.mln_buffer_view{data: arena.bytes([]byte(input.ErrorMessage)), size: C.size_t(len(input.ErrorMessage))}
 	raw.must_revalidate = C.bool(input.MustRevalidate)
 	bindingMasked(&raw.fields, C.MLN_RESOURCE_RESPONSE_MODIFIED, &raw.modified_unix_ms, input.ModifiedUnixMs, arena, bindingNumber[int64, C.int64_t])
 	bindingMasked(&raw.fields, C.MLN_RESOURCE_RESPONSE_EXPIRES, &raw.expires_unix_ms, input.ExpiresUnixMs, arena, bindingNumber[int64, C.int64_t])
-	if input.Etag != nil {
-		raw.etag = C.mln_buffer_view{data: arena.bytes([]byte((*input.Etag))), size: C.size_t(len((*input.Etag)))}
-	}
+	raw.etag = C.mln_buffer_view{data: arena.bytes([]byte(input.Etag)), size: C.size_t(len(input.Etag))}
 	bindingMasked(&raw.fields, C.MLN_RESOURCE_RESPONSE_RETRY_AFTER, &raw.retry_after_unix_ms, input.RetryAfterUnixMs, arena, bindingNumber[int64, C.int64_t])
 	return raw
 }
@@ -4442,39 +4438,23 @@ func copyRuntimeEventTileAction(raw C.mln_runtime_event_tile_action) RuntimeEven
 type RuntimeOptions struct {
 	// Directory root for asset:// URLs. Copied during runtime creation. Empty
 	// selects /android_asset on Android and . elsewhere.
-	AssetPath *string
+	AssetPath string
 	// Cache database path. Copied during runtime creation.
-	CachePath *string
+	CachePath string
 }
 
 func copyRuntimeOptions(raw C.mln_runtime_options) RuntimeOptions {
 	var result RuntimeOptions
-	result.AssetPath = func() *string {
-		if raw.asset_path.size == 0 {
-			return nil
-		}
-		value := bindingString(raw.asset_path.data, uint64(raw.asset_path.size))
-		return &value
-	}()
-	result.CachePath = func() *string {
-		if raw.cache_path.size == 0 {
-			return nil
-		}
-		value := bindingString(raw.cache_path.data, uint64(raw.cache_path.size))
-		return &value
-	}()
+	result.AssetPath = bindingString(raw.asset_path.data, uint64(raw.asset_path.size))
+	result.CachePath = bindingString(raw.cache_path.data, uint64(raw.cache_path.size))
 	return result
 }
 
 func nativeRuntimeOptions(input RuntimeOptions, arena *bindingArena) C.mln_runtime_options {
 	raw := C.mln_runtime_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	if input.AssetPath != nil {
-		raw.asset_path = C.mln_buffer_view{data: arena.bytes([]byte((*input.AssetPath))), size: C.size_t(len((*input.AssetPath)))}
-	}
-	if input.CachePath != nil {
-		raw.cache_path = C.mln_buffer_view{data: arena.bytes([]byte((*input.CachePath))), size: C.size_t(len((*input.CachePath)))}
-	}
+	raw.asset_path = C.mln_buffer_view{data: arena.bytes([]byte(input.AssetPath)), size: C.size_t(len(input.AssetPath))}
+	raw.cache_path = C.mln_buffer_view{data: arena.bytes([]byte(input.CachePath)), size: C.size_t(len(input.CachePath))}
 	return raw
 }
 
@@ -4945,9 +4925,9 @@ type StyleLayerInfo struct {
 	// The style-spec layer type string.
 	Type string
 	// Source ID. Empty for a layer type that takes no source.
-	SourceId *string
+	SourceId string
 	// Source-layer ID. Empty when the layer sets none.
-	SourceLayer *string
+	SourceLayer string
 	// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
 	MinZoom float64
 	// Highest zoom at which the layer draws; INFINITY with no upper bound.
@@ -4960,20 +4940,8 @@ func copyStyleLayerInfo(raw C.mln_style_layer_info) StyleLayerInfo {
 	var result StyleLayerInfo
 	result.Id = bindingString(raw.id.data, uint64(raw.id.size))
 	result.Type = bindingString(raw._type.data, uint64(raw._type.size))
-	result.SourceId = func() *string {
-		if raw.source_id.size == 0 {
-			return nil
-		}
-		value := bindingString(raw.source_id.data, uint64(raw.source_id.size))
-		return &value
-	}()
-	result.SourceLayer = func() *string {
-		if raw.source_layer.size == 0 {
-			return nil
-		}
-		value := bindingString(raw.source_layer.data, uint64(raw.source_layer.size))
-		return &value
-	}()
+	result.SourceId = bindingString(raw.source_id.data, uint64(raw.source_id.size))
+	result.SourceLayer = bindingString(raw.source_layer.data, uint64(raw.source_layer.size))
 	result.MinZoom = float64(raw.min_zoom)
 	result.MaxZoom = float64(raw.max_zoom)
 	result.Visibility = StyleLayerVisibility(raw.visibility)
@@ -6761,9 +6729,9 @@ func (receiver *MapHandle) AddImageSourceUrl(sourceId string, coordinates []LatL
 //
 // See mln_map_add_style_layer_json in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) AddStyleLayerJson(layerJson []byte, beforeLayerId *string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddStyleLayerJson(layerJson []byte, beforeLayerId string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_style_layer_json(C.mln_map(raw), bindingView(layerJson, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
+		return int32(C.mln_map_add_style_layer_json(C.mln_map(raw), bindingView(layerJson, arena), bindingView(beforeLayerId, arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -7376,9 +7344,9 @@ func (receiver *MapHandle) ListStyleSources() (*Future[[]StyleSourceInfo], error
 //
 // See mln_map_move_style_layer in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) MoveStyleLayer(layerId string, beforeLayerId *string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) MoveStyleLayer(layerId string, beforeLayerId string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_move_style_layer(C.mln_map(raw), bindingView(layerId, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
+		return int32(C.mln_map_move_style_layer(C.mln_map(raw), bindingView(layerId, arena), bindingView(beforeLayerId, arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -8077,7 +8045,7 @@ func (receiver *RenderSessionHandle) Detach() (*Future[struct{}], error) {
 func (receiver *RenderSessionHandle) Close() (*Future[struct{}], error) {
 	return bindingStart(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_dispose(C.mln_render_session(raw), completion, diagnostic))
-	}, completionUnit, false)
+	}, completionUnit)
 }
 
 // DrainFrameResults drains every currently queued terminal frame result into an
@@ -8776,10 +8744,10 @@ func (view MapHandleDiscarding) AddImageSourceUrl(sourceId string, coordinates [
 	})
 }
 
-func (view MapHandleDiscarding) AddStyleLayerJson(layerJson []byte, beforeLayerId *string) error {
+func (view MapHandleDiscarding) AddStyleLayerJson(layerJson []byte, beforeLayerId string) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_style_layer_json(C.mln_map(raw), bindingView(layerJson, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
+		return int32(C.mln_map_add_style_layer_json(C.mln_map(raw), bindingView(layerJson, arena), bindingView(beforeLayerId, arena), completion, diagnostic))
 	})
 }
 
@@ -8853,10 +8821,10 @@ func (view MapHandleDiscarding) InvalidateCustomMvtVectorSourceTile(sourceId str
 	})
 }
 
-func (view MapHandleDiscarding) MoveStyleLayer(layerId string, beforeLayerId *string) error {
+func (view MapHandleDiscarding) MoveStyleLayer(layerId string, beforeLayerId string) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_move_style_layer(C.mln_map(raw), bindingView(layerId, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
+		return int32(C.mln_map_move_style_layer(C.mln_map(raw), bindingView(layerId, arena), bindingView(beforeLayerId, arena), completion, diagnostic))
 	})
 }
 
