@@ -10,30 +10,36 @@ api=${1:?$usage}
 abi=${2:?$usage}
 avd_name="api-$api-$abi"
 adb="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}/platform-tools/adb"
+# The emulator takes the AVD as `-avd <name>` or `@<name>`.
+avd_pattern="(-avd |@)$avd_name( |\$)"
 
-# Succeeds while an emulator process runs the AVD.
-avd_running() {
-  pgrep -f -- "-avd $avd_name( |\$)" >/dev/null
-}
-
-if ! avd_running; then
+# The emulator's console names the AVD it runs, booted or not.
+serial=
+if [[ -x "$adb" ]]; then
+  while read -r device _; do
+    [[ "$device" == emulator-* ]] || continue
+    if [[ "$("$adb" -s "$device" emu avd name </dev/null 2>/dev/null | sed -n 's/\r$//;1p')" == "$avd_name" ]]; then
+      serial=$device
+      break
+    fi
+  done < <("$adb" devices | tr -d '\r')
+fi
+if [[ -z "$serial" ]] && ! pgrep -f -- "$avd_pattern" >/dev/null; then
   echo "Android emulator $avd_name is not running."
   exit 0
 fi
 
 # `emu kill` lets the guest shut down; the signals below are for an emulator
 # that no longer answers adb.
-serial=$(ANDROID_SERIAL='' "$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh" "$abi" "$api") ||
-  serial=
 if [[ -n "$serial" ]]; then
   "$adb" -s "$serial" emu kill >/dev/null 2>&1 || true
 fi
 for ((attempt = 0; attempt < 30; attempt++)); do
-  avd_running || exit 0
+  pgrep -f -- "$avd_pattern" >/dev/null || exit 0
   sleep 1
 done
-pkill -f -- "-avd $avd_name( |\$)" || true
+pkill -f -- "$avd_pattern" || true
 sleep 5
-if avd_running; then
-  pkill -KILL -f -- "-avd $avd_name( |\$)" || true
+if pgrep -f -- "$avd_pattern" >/dev/null; then
+  pkill -KILL -f -- "$avd_pattern" || true
 fi

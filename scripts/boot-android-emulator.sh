@@ -44,9 +44,10 @@ ready_serial() {
 }
 
 # Succeeds while an emulator process runs the AVD, including one that has only
-# just started and that adb does not list yet.
+# just started and that adb does not list yet. The emulator takes the AVD as
+# `-avd <name>` or `@<name>`.
 avd_running() {
-  pgrep -f -- "-avd $avd_name( |\$)" >/dev/null
+  pgrep -f -- "(-avd |@)$avd_name( |\$)" >/dev/null
 }
 
 if serial=$(ready_serial); then
@@ -123,13 +124,18 @@ if ! emulator_current; then
   fi
 fi
 
-if ! "$sdk_root/emulator/emulator" -list-avds 2>/dev/null | tr -d '\r' | grep -qx "$avd_name"; then
+avd_exists() {
+  "$sdk_root/emulator/emulator" -list-avds 2>/dev/null | tr -d '\r' | grep -qx "$avd_name"
+}
+if ! avd_exists; then
   # avdmanager succeeds without creating anything when the AVD home is missing,
   # as it is on a fresh runner. `no` declines the custom hardware profile
   # prompt. Everything the suite depends on is a launch flag below rather than
-  # a stored device setting.
+  # a stored device setting. When another session creates the AVD at the same
+  # moment, avdmanager fails here, and that session's AVD serves both.
   mkdir -p "$ANDROID_AVD_HOME"
-  "$avdmanager" create avd --name "$avd_name" --package "$image" --device pixel_6 <<<"no"
+  "$avdmanager" create avd --name "$avd_name" --package "$image" --device pixel_6 <<<"no" ||
+    avd_exists
 fi
 
 # The console listens on an even port and adb on the next one. adb lists the

@@ -107,13 +107,14 @@ class AndroidEmulatorPackagesTest(unittest.TestCase):
         )
         # Stop at AVD creation so the tests exercise provisioning without a device.
         self.write_command(
-            tools / "avdmanager", 'touch "$CAPTURE_PATH/avd-reached"\nexit 73\n'
+            tools / "avdmanager", 'touch "$CAPTURE_PATH/avd-reached"\nexit 1\n'
         )
         # Retries back off without waiting.
         self.write_command(commands / "sleep", "")
         self.environment = os.environ | {
             "ANDROID_HOME": str(self.sdk),
             "MISE_MONOREPO_ROOT": str(self.directory),
+            "ANDROID_AVD_HOME": str(self.directory / "avd"),
             "CAPTURE_PATH": str(self.directory),
             "PATH": f"{commands}{os.pathsep}{os.defpath}",
             "EMULATOR_REVISION": "37.3.5",
@@ -154,8 +155,7 @@ class AndroidEmulatorPackagesTest(unittest.TestCase):
 
     def test_transient_download_failures_recover_before_avd_creation(self):
         result = self.provision(failures=2)
-        self.assertEqual(result.returncode, 73, result.stderr)
-        self.assertTrue((self.directory / "avd-reached").exists())
+        self.assertTrue((self.directory / "avd-reached").exists(), result.stderr)
         for attempt in range(1, 4):
             self.assertEqual(
                 self.arguments(attempt),
@@ -184,7 +184,7 @@ class AndroidEmulatorPackagesTest(unittest.TestCase):
         (self.sdk / "system-images/android-26/default/x86_64").mkdir(parents=True)
         self.install_emulator("37.2.12")
         result = self.provision()
-        self.assertEqual(result.returncode, 73, result.stderr)
+        self.assertTrue((self.directory / "avd-reached").exists(), result.stderr)
         self.assertEqual(self.install_count(), 1)
         self.assertEqual(
             self.arguments(1),
@@ -196,7 +196,7 @@ class AndroidEmulatorPackagesTest(unittest.TestCase):
         (self.sdk / "system-images/android-26/default/x86_64").mkdir(parents=True)
         self.install_emulator("37.10.0")
         result = self.provision()
-        self.assertEqual(result.returncode, 73, result.stderr)
+        self.assertTrue((self.directory / "avd-reached").exists(), result.stderr)
         self.assertEqual(self.install_count(), 0)
 
     def test_an_update_that_stays_below_the_minimum_stops_before_avd_creation(self):
