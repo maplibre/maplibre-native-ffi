@@ -2914,7 +2914,7 @@ final class RenderSessionAttachOptions extends _Value {
     Wake? frameWake,
     Wake? driverWorkWake,
     this.queueLock,
-  }) : driver = driver ?? renderSessionAttachOptionsDefault().driver,
+  }) : driver = driver ?? RenderDriverKind.coreWorker,
        requestedTextureRingDepth =
            requestedTextureRingDepth ??
            renderSessionAttachOptionsDefault().requestedTextureRingDepth,
@@ -2926,7 +2926,8 @@ final class RenderSessionAttachOptions extends _Value {
            driverWorkWake ?? renderSessionAttachOptionsDefault().driverWorkWake;
 
   /// One `mln_render_driver_kind` value. Defaults to
-  /// `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
+  /// `RenderDriverKind.coreWorker`, because an isolate cannot service a
+  /// caller-graphics-thread driver.
   final RenderDriverKind driver;
 
   /// Requested slot count of a session-owned texture ring, from one to

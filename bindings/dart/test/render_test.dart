@@ -41,6 +41,18 @@ void main() {
     _expectRed(await within(worker.session.readTexture(), 'texture readback'));
   }, skip: _wglSkip);
 
+  test('an attach with default options completes on its own', () async {
+    final map = await openRenderMap(emptyStyleJson);
+    // Nothing services driver work, so only a core-worker default completes.
+    final attachment = TestGraphics.open().attachOwnedTexture(
+      map,
+      LogicalExtent(width: renderSize, height: renderSize, scaleFactor: 1),
+      RenderSessionAttachOptions(),
+    );
+    addTearDown(() => releaseSession(attachment.session));
+    await within(attachment.completed, 'attachment');
+  }, skip: _wglSkip);
+
   test('a drain before any demand returns no batch', () async {
     final map = await openRenderMap(_redStyleJson);
     final worker = await WorkerSession.attach(map);

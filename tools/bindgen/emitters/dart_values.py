@@ -47,9 +47,42 @@ def owner_names(handle) -> tuple[str, str]:
     return name + "Handle", "Native" + name
 
 
+CALLER_DRIVER_NOTE = (
+    "An isolate cannot service a caller-graphics-thread driver, because Dart "
+    "can resume it on another native thread after any `await`. Host native "
+    "code services such a session by passing its `id` to "
+    "`mln_render_session_service_driver_work` on the graphics thread."
+)
+
+# Field defaults that Dart replaces, keyed like `BoundApi.doc`. Dart attaches
+# through a core worker by default, for the reason CALLER_DRIVER_NOTE gives.
+DEFAULTS = {
+    "mln_render_session_attach_options.driver": "RenderDriverKind.coreWorker",
+}
+
+# Summaries that Dart replaces, keyed like `BoundApi.doc`.
+SUMMARIES = {
+    "mln_render_session_attach_options.driver": (
+        "One `mln_render_driver_kind` value. Defaults to "
+        "`RenderDriverKind.coreWorker`, because an isolate cannot service a "
+        "caller-graphics-thread driver."
+    ),
+}
+
+# Paragraphs about what Dart adds to a declaration's C contract.
+NOTES = {
+    "mln_render_session_service_driver_work": (CALLER_DRIVER_NOTE,),
+}
+
+
 def doc(bound: BoundApi, native: str, indent: str = "") -> str:
     """The dartdoc comment of a declaration, or empty when it has none."""
-    return docs.line_comment(bound.doc(native), indent)
+    found = bound.doc(native)
+    if found is not None and native in SUMMARIES:
+        found = replace(found, summary=SUMMARIES[native])
+    if found is not None and native in NOTES:
+        found = replace(found, notes=(*found.notes, *NOTES[native]))
+    return docs.line_comment(found, indent)
 
 
 class Unsupported(ValueError):
@@ -1074,7 +1107,10 @@ class Values:
             for name, typ, field in members:
                 if value.default and not typ.endswith("?"):
                     args.append(f"{typ}? {name}")
-                    fallback = f"{name} ?? {camel(value.default.removeprefix('mln_'))}().{name}"
+                    fallback = f"{name} ?? " + DEFAULTS.get(
+                        f"{value.native}.{field.name}",
+                        f"{camel(value.default.removeprefix('mln_'))}().{name}",
+                    )
                     expression = (
                         f"List.unmodifiable({fallback})"
                         if typ.startswith("List<")

@@ -6945,6 +6945,11 @@ final class RenderSessionHandle implements Finalizable {
   /// The target context must be current. Core-worker sessions return
   /// `MLN_STATUS_INVALID_STATE`.
   ///
+  /// An isolate cannot service a caller-graphics-thread driver, because Dart
+  /// can resume it on another native thread after any `await`. Host native code
+  /// services such a session by passing its `id` to
+  /// `mln_render_session_service_driver_work` on the graphics thread.
+  ///
   /// See `mln_render_session_service_driver_work` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   void serviceDriverWork() => _check(
