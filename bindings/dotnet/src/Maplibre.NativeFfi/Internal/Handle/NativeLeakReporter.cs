@@ -1,35 +1,38 @@
+using System.Diagnostics;
+
 namespace Maplibre.NativeFfi.Internal.Pointer;
 
 internal static class NativeLeakReporter
 {
     /// <summary>
-    /// Reports a leaked handle to each <see cref="Maplibre.LeakReported" /> handler, or to
-    /// standard error when there is none.
+    /// Writes a leak report as a trace warning, which the host's trace listeners route. The
+    /// default listener writes only to an attached debugger, so with no other listener the
+    /// report goes to standard error instead.
     /// </summary>
-    internal static void Report(string typeName, string message)
+    internal static void Report(string message)
     {
-        // Leak reporting must not throw from finalizers or best-effort Dispose paths.
-        var handlers = Maplibre.LeakReportedHandlers;
-        if (handlers is null)
+        try
         {
-            try
-            {
-                Console.Error.WriteLine($"Maplibre.NativeFfi LeakedHandle: {message}");
-            }
-            catch { }
-            return;
+            var text = $"Maplibre.NativeFfi LeakedHandle: {message}";
+            if (HasHostListener())
+                Trace.TraceWarning(text);
+            else
+                Console.Error.WriteLine(text);
         }
-        var args = new LeakReportedEventArgs(typeName, message);
-        foreach (var handler in handlers.GetInvocationList())
+        catch
         {
-            try
-            {
-                ((EventHandler<LeakReportedEventArgs>)handler)(null, args);
-            }
-            catch
-            {
-                // One handler's failure must neither escape the finalizer nor skip the others.
-            }
+            // Leak reporting must not throw from finalizers or best-effort Dispose paths.
         }
+    }
+
+    private static bool HasHostListener()
+    {
+        lock (Trace.Listeners)
+        {
+            foreach (TraceListener listener in Trace.Listeners)
+                if (listener is not DefaultTraceListener)
+                    return true;
+        }
+        return false;
     }
 }

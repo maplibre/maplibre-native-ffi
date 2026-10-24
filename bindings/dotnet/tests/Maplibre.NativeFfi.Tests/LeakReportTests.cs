@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Pointer;
@@ -13,12 +14,12 @@ namespace Maplibre.NativeFfi.Tests;
 public sealed class LeakReportTests
 {
     // An abandoned handle retires through its native disposal on the finalizer thread, and the
-    // finalizer reports the leak on standard error once, whether or not that disposal succeeds.
+    // finalizer reports the leak once, whether or not that disposal succeeds.
     // A handle whose disposal fails is reported and destroyed by nothing.
     [Fact]
     public void AnAbandonedHandleIsDisposedAndReportedAsALeak()
     {
-        using var standardError = new StandardErrorCapture();
+        using var reports = new LeakCapture();
         using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
         var (map, mapId, undisposable) = Abandon(runtime);
 
@@ -27,12 +28,12 @@ public sealed class LeakReportTests
         Assert.False(map.IsAlive);
         Assert.False(undisposable.IsAlive);
         var report = $"Leaked MapHandle native handle 0x{mapId:x}; it was disposed when collected.";
-        Assert.Contains(report, standardError.Text, StringComparison.Ordinal);
-        Assert.Equal(1, Occurrences(standardError.Text, report));
+        Assert.Contains(report, reports.Text, StringComparison.Ordinal);
+        Assert.Equal(1, Occurrences(reports.Text, report));
         Assert.Equal(
             1,
             Occurrences(
-                standardError.Text,
+                reports.Text,
                 $"Leaked RuntimeHandle native handle 0x{SyntheticHandles.Runtime(5678).Value:x}; native disposal failed"
             )
         );
@@ -59,7 +60,7 @@ public sealed class LeakReportTests
     [Fact]
     public void UnreachableHandlesAreReclaimedAndReported()
     {
-        using var standardError = new StandardErrorCapture();
+        using var reports = new LeakCapture();
         var (runtime, runtimeId, map, mapId) = CreateUnreachableRuntimeAndMap();
 
         Gc.Collect();
@@ -70,12 +71,9 @@ public sealed class LeakReportTests
         Assert.False(map.IsAlive);
         Assert.Equal(
             1,
-            Occurrences(standardError.Text, $"Leaked RuntimeHandle native handle 0x{runtimeId:x};")
+            Occurrences(reports.Text, $"Leaked RuntimeHandle native handle 0x{runtimeId:x};")
         );
-        Assert.Equal(
-            1,
-            Occurrences(standardError.Text, $"Leaked MapHandle native handle 0x{mapId:x};")
-        );
+        Assert.Equal(1, Occurrences(reports.Text, $"Leaked MapHandle native handle 0x{mapId:x};"));
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -101,14 +99,15 @@ public sealed class LeakReportTests
         return map;
     }
 
-    // A handler receives each report in place of standard error.
+    // A host that added no trace listener has only the default one, which writes to an attached
+    // debugger alone, so the report goes to standard error instead.
     [Fact]
-    public void ALeakHandlerReceivesTheReportInsteadOfStandardError()
+    public void WithoutAHostTraceListenerTheReportGoesToStandardError()
     {
         using var standardError = new StandardErrorCapture();
-        var reports = new ConcurrentQueue<LeakReportedEventArgs>();
-        EventHandler<LeakReportedEventArgs> record = (_, args) => reports.Enqueue(args);
-        Maplibre.LeakReported += record;
+        var installed = Trace.Listeners.Cast<TraceListener>().ToArray();
+        Trace.Listeners.Clear();
+        Trace.Listeners.Add(new DefaultTraceListener());
         try
         {
             var leaked = AbandonDisposable();
@@ -117,17 +116,47 @@ public sealed class LeakReportTests
         }
         finally
         {
-            Maplibre.LeakReported -= record;
+            Trace.Listeners.Clear();
+            Trace.Listeners.AddRange(installed);
         }
 
-        var report = Assert.Single(reports);
-        Assert.Equal("RuntimeHandle", report.TypeName);
         Assert.Contains(
-            $"0x{SyntheticHandles.Runtime(9012).Value:x}; it was disposed when collected.",
-            report.Message,
+            $"Maplibre.NativeFfi LeakedHandle: Leaked RuntimeHandle native handle 0x{SyntheticHandles.Runtime(9012).Value:x}; it was disposed when collected.",
+            standardError.Text,
             StringComparison.Ordinal
         );
-        Assert.DoesNotContain("LeakedHandle", standardError.Text, StringComparison.Ordinal);
+    }
+
+    /// <summary>Records the leak warnings that reach the trace listeners until disposed.</summary>
+    private sealed class LeakCapture : TraceListener
+    {
+        private readonly ConcurrentQueue<string> warnings = new();
+
+        internal LeakCapture() => Trace.Listeners.Add(this);
+
+        internal string Text => string.Join('\n', warnings);
+
+        public override void TraceEvent(
+            TraceEventCache? eventCache,
+            string source,
+            TraceEventType eventType,
+            int id,
+            string? message
+        )
+        {
+            if (eventType == TraceEventType.Warning && message is not null)
+                warnings.Enqueue(message);
+        }
+
+        public override void Write(string? message) { }
+
+        public override void WriteLine(string? message) { }
+
+        protected override void Dispose(bool disposing)
+        {
+            Trace.Listeners.Remove(this);
+            base.Dispose(disposing);
+        }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

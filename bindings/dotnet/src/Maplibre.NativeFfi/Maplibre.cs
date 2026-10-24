@@ -3,6 +3,11 @@ using Maplibre.NativeFfi.Internal.Loader;
 namespace Maplibre.NativeFfi;
 
 /// <summary>Process-global MapLibre Native FFI entry points.</summary>
+/// <remarks>
+/// A handle that the collector reclaims before it is closed or disposed is reported as a leak
+/// through <see cref="System.Diagnostics.Trace.TraceWarning(string)" />, or on standard error
+/// when the host has added no trace listener.
+/// </remarks>
 public static unsafe partial class Maplibre
 {
     /// <summary>
@@ -19,18 +24,6 @@ public static unsafe partial class Maplibre
 
     internal static EventHandler<CallbackExceptionEventArgs>? CallbackExceptionHandlers =>
         CallbackException;
-
-    /// <summary>
-    /// Raised when the collector reclaims a handle that was never closed or disposed. With no
-    /// handler, the binding writes the report to standard error.
-    /// </summary>
-    /// <remarks>
-    /// A handler runs on the finalizer thread, so it should return quickly. An exception that a
-    /// handler throws is discarded.
-    /// </remarks>
-    public static event EventHandler<LeakReportedEventArgs>? LeakReported;
-
-    internal static EventHandler<LeakReportedEventArgs>? LeakReportedHandlers => LeakReported;
 
     /// <summary>
     /// Loads the native library and checks its C ABI version. The library is the one that .NET's
