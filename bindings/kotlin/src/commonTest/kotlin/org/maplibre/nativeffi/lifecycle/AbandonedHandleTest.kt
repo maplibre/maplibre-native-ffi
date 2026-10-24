@@ -71,7 +71,7 @@ private suspend fun startStyleLoad(runtime: RuntimeHandle, holder: MapHolder) {
 }
 
 /** Requests collections until [done] completes, waiting on it between requests. */
-private suspend fun awaitWhileCollecting(what: String, done: Deferred<Unit>) {
+internal suspend fun awaitWhileCollecting(what: String, done: Deferred<Unit>) {
   val deadline = TimeSource.Monotonic.markNow() + WAIT_TIMEOUT
   while (deadline.hasNotPassedNow()) {
     requestCollection()
