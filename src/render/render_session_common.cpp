@@ -1251,14 +1251,20 @@ auto quarantine_slot_locked(
   resume_parked_demand_locked(session, wakes);
 }
 
-// Joins the core worker after stop_worker is set. Only the teardown lane reaps
-// a worker, so a worker never joins itself, and the browser main thread never
-// waits for a Web Worker that starts only once that thread yields.
+// Releases the core worker after stop_worker is set. The teardown lane reaps a
+// retired session's worker, and a failed attach reaps its own on the attaching
+// thread. On the browser main thread, a worker whose Web Worker has not started
+// yet starts only after that thread yields, so a join there would never
+// return. The worker is detached instead; it holds its own session reference
+// and finds nothing left to run.
 auto reap_core_worker(mln_render_session_object& session) -> void {
   if (session.join_worker) {
     session.join_worker();
   } else if (session.worker.joinable()) {
-    session.worker.join();
+    if (on_browser_main_thread())
+      session.worker.detach();
+    else
+      session.worker.join();
   }
 }
 

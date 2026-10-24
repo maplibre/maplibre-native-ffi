@@ -93,7 +93,12 @@ inline auto configure_transferred_webgl_worker(
       static_cast<void>(call.release());
       return MLN_STATUS_OK;
     };
+  // Detaches where reap_core_worker detaches a default worker.
   session.join_worker = [thread]() {
+    if (on_browser_main_thread()) {
+      static_cast<void>(pthread_detach(*thread));
+      return;
+    }
     static_cast<void>(pthread_join(*thread, nullptr));
   };
 #else
