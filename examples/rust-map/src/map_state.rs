@@ -38,24 +38,30 @@ impl MapState {
             event_mask: RuntimeEventMask::empty(),
             ..MapOptions::default()
         };
-        let map = match runtime.create_map(&map_options).and_then(|future| {
-            future.wait(Duration::from_secs(30)).unwrap_or_else(|_| {
-                Err(maplibre_native_ffi::Error::new(
-                    maplibre_native_ffi::Status::NotReady,
-                    "map creation timed out",
-                ))
-            })
-        }) {
-            Ok(map) => map,
+        let (map, ready) = match runtime.create_map(&map_options) {
+            Ok(created) => created,
             Err(error) => {
                 let mut message = format!("map creation failed: {error}");
                 append_cleanup_result(&mut message, "runtime", close_runtime(runtime));
                 return Err(message.into());
             }
         };
+        let ready = ready
+            .wait(Duration::from_secs(30))
+            .unwrap_or_else(|_| {
+                Err(maplibre_native_ffi::Error::new(
+                    maplibre_native_ffi::Status::NotReady,
+                    "map creation timed out",
+                ))
+            })
+            .map_err(|error| format!("map creation failed: {error}"));
+        // The map is ours from the call, so a failed creation still closes it.
         let mut state = Self { map, runtime };
-        if let Err(error) = state.configure() {
-            let mut message = format!("map initialization failed: {error}");
+        if let Err(mut message) = ready.and_then(|()| {
+            state
+                .configure()
+                .map_err(|error| format!("map initialization failed: {error}"))
+        }) {
             if let Err(error) = state.close() {
                 append_error(&mut message, error.to_string());
             }

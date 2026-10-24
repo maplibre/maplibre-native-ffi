@@ -109,7 +109,7 @@ void main() {
       );
       final session = attachment.session;
       addTearDown(() => releaseSession(session));
-      await within(attachment.completed, 'attachment');
+      await within(attachment.ready, 'attachment');
 
       session.requestFrame(FrameDemand(flags: FrameDemandFlag.none, token: 1));
       await wakes.wait('the frame wake');
@@ -147,7 +147,7 @@ void main() {
         _options(queueLock: queueLock),
       );
       addTearDown(() => releaseSession(attachment.session));
-      await within(attachment.completed, 'attachment');
+      await within(attachment.ready, 'attachment');
       await within(attachment.session.close(), 'session close');
       await releases.wait('the release of the accepted queue lock');
     } else {

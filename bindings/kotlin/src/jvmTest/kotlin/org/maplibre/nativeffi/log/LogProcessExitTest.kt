@@ -63,14 +63,19 @@ object LogProcessExitProbe {
       runSuspendTest {
         val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
         runtime.setTestProvider(denyingProvider()).await()
-        val map = runtime.createMap(smallMapOptions()).await()
+        val (map, ready) = runtime.createMap(smallMapOptions())
+        ready.await()
         liveHandles = listOf(runtime, map)
         warnFromStyle(map, received)
       }
     } else {
       runSuspendTest {
         GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
-          runtime.createMap(smallMapOptions()).await().use { map -> warnFromStyle(map, received) }
+          val (map, ready) = runtime.createMap(smallMapOptions())
+          map.use {
+            ready.await()
+            warnFromStyle(it, received)
+          }
         }
       }
     }

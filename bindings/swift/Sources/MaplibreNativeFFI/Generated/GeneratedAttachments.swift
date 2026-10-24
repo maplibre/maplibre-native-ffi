@@ -3,9 +3,18 @@
 internal import MaplibreNativeC
 import Foundation
 
-public struct RenderSessionAttachment: Sendable {
-  public let session: RenderSessionHandle; public let completion: Task<
-    Void,
-    Error
-  >
+/// A new session and the task that reports it ready.
+public struct NewRenderSession: Sendable {
+  /// The session, which the caller owns before it is ready.
+  public let session: RenderSessionHandle
+  /// Finishes once the session is ready, and throws if it fails.
+  public let ready: Task<Void, Error>
+}
+
+/// A new map and the task that reports it ready.
+public struct NewMap: Sendable {
+  /// The map, which the caller owns before it is ready.
+  public let map: MapHandle
+  /// Finishes once the map is ready, and throws if it fails.
+  public let ready: Task<Void, Error>
 }

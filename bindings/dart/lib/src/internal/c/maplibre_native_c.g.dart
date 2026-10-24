@@ -4593,6 +4593,7 @@ external int mln_runtime_create(
   Int32 Function(
     mln_runtime,
     Pointer<mln_map_options>,
+    Pointer<mln_map>,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
@@ -4600,6 +4601,7 @@ external int mln_runtime_create(
 external int mln_runtime_create_map(
   int runtime,
   Pointer<mln_map_options> options,
+  Pointer<mln_map> out_map,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

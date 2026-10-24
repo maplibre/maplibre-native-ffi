@@ -15,6 +15,7 @@ import org.maplibre.nativeffi.generated.FrameDemandFlag
 import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
+import org.maplibre.nativeffi.generated.NewRenderSession
 import org.maplibre.nativeffi.generated.OpenglClientApi
 import org.maplibre.nativeffi.generated.OpenglContextDescriptor
 import org.maplibre.nativeffi.generated.OpenglContextDescriptorData
@@ -23,7 +24,6 @@ import org.maplibre.nativeffi.generated.OpenglOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderResult
 import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
-import org.maplibre.nativeffi.generated.RenderSessionAttachment
 import org.maplibre.nativeffi.graphicsProperties
 import org.maplibre.nativeffi.libraryProperties
 import org.maplibre.nativeffi.render.NativePointer
@@ -148,7 +148,7 @@ object RenderSessionExitProbe {
    * Attaches an owned texture that a core worker drives on the build's backend. An OpenGL core
    * worker owns a dedicated context, which EGL creates from the display and config.
    */
-  private suspend fun attachCoreWorkerTexture(map: MapHandle): RenderSessionAttachment {
+  private suspend fun attachCoreWorkerTexture(map: MapHandle): NewRenderSession {
     val options = RenderSessionAttachOptions(driver = RenderDriverKind.CORE_WORKER)
     if (TestGraphics.backend != TestBackend.EGL) {
       return TestGraphics.attachOwnedTexture(map, WIDTH, HEIGHT, options)

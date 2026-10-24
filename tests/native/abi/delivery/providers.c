@@ -69,6 +69,8 @@ static void the_host_completes_a_drained_request(void) {
   TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_STYLE, request->request->kind);
   const mln_resource_request handle = request->handle;
   MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
+  // A delivery's owned handle transfers once.
+  MLN_TEST_INVALID_STATE(mln_delivery_batch_take(batch, 0, NULL));
   mln_delivery_batch_release(batch);
 
   const mln_resource_response response = style_response();

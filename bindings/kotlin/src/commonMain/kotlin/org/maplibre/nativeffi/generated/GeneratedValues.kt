@@ -4340,8 +4340,15 @@ public data class StyleExpressionInfo(
   public val isZoomConstant: Boolean,
 )
 
-public data class RenderSessionAttachment(
+/** A new session and the completion that reports it ready. */
+public data class NewRenderSession(
   public val session: RenderSessionHandle,
+  public val ready: kotlinx.coroutines.Deferred<Unit>,
+)
+
+/** A new map and the completion that reports it ready. */
+public data class NewMap(
+  public val map: MapHandle,
   public val ready: kotlinx.coroutines.Deferred<Unit>,
 )
 

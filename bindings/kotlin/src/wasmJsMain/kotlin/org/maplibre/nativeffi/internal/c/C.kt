@@ -1728,10 +1728,17 @@ internal actual object C {
   actual fun mln_runtime_create_map(
     runtime: Long,
     options: Long,
+    outMap: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_runtime_create_map(runtime, word(options), word(completion), word(outDiagnostic))
+    mln_kw_mln_runtime_create_map(
+      runtime,
+      word(options),
+      word(outMap),
+      word(completion),
+      word(outDiagnostic),
+    )
 
   actual fun mln_runtime_create_offline_region(
     runtime: Long,
@@ -3342,9 +3349,9 @@ private fun mln_kw_mln_runtime_create(p0: Int, p1: Int, p2: Int, p3: Int): Int =
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_create(p0, p1, p2, p3)",
   )
 
-private fun mln_kw_mln_runtime_create_map(p0: Long, p1: Int, p2: Int, p3: Int): Int =
+private fun mln_kw_mln_runtime_create_map(p0: Long, p1: Int, p2: Int, p3: Int, p4: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_create_map(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_create_map(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_runtime_create_offline_region(

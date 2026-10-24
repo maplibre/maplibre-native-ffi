@@ -57,7 +57,7 @@ final class TestGraphics: @unchecked Sendable {
       height: 32,
       scaleFactor: 1
     )
-  ) throws -> RenderSessionAttachment {
+  ) throws -> NewRenderSession {
     switch backend {
     case MLN_TEST_GRAPHICS_BACKEND_METAL:
       #if canImport(Metal)

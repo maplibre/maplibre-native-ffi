@@ -129,7 +129,8 @@ mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
  *   out_session is null or does not point to the null handle; or the
  *   requested driver kind is unknown, or options carry a malformed wake or
  *   queue lock.
- * - MLN_STATUS_INVALID_STATE when map has been released.
+ * - MLN_STATUS_INVALID_STATE when map has been released, or its creation has
+ *   not succeeded.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or options
  *   enable a queue lock.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
@@ -162,7 +163,8 @@ MLN_API mln_status mln_map_attach_metal_surface(
  *   out_session is null or does not point to the null handle; or the
  *   requested driver kind is unknown, or options carry a malformed wake or
  *   queue lock.
- * - MLN_STATUS_INVALID_STATE when map has been released.
+ * - MLN_STATUS_INVALID_STATE when map has been released, or its creation has
+ *   not succeeded.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
@@ -198,7 +200,8 @@ MLN_API mln_status mln_map_attach_vulkan_surface(
  *   out_session is null or does not point to the null handle; or the
  *   requested driver kind is unknown, or options carry a malformed wake or
  *   queue lock.
- * - MLN_STATUS_INVALID_STATE when map has been released.
+ * - MLN_STATUS_INVALID_STATE when map has been released, or its creation has
+ *   not succeeded.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, its
  *   context provider is unavailable; the requested driver does not match the
  *   context placement; or options enable a queue lock.
@@ -232,7 +235,8 @@ MLN_API mln_status mln_map_attach_opengl_surface(
  *   out_session is null or does not point to the null handle; or the
  *   requested driver kind is unknown, or options carry a malformed wake or
  *   queue lock.
- * - MLN_STATUS_INVALID_STATE when map has been released.
+ * - MLN_STATUS_INVALID_STATE when map has been released, or its creation has
+ *   not succeeded.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
  *   requested driver is not MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, or
  *   options enable a queue lock.

@@ -105,7 +105,6 @@ internal static unsafe class NativeCompletion
                 result->status,
                 ValueStructs.CopyUtf8View(result->diagnostic)
             ),
-            CancellationToken.None,
             out pending,
             acceptErrorStatus: true
         );
@@ -116,34 +115,23 @@ internal static unsafe class NativeCompletion
         out Pending<bool> pending
     ) => Start(completion, static _ => true, out pending);
 
-    /// <summary>Starts a completion whose value <paramref name="convert"/> copies.</summary>
-    internal static mln_completion* Start<T>(
-        mln_completion* completion,
-        CompletionConverter<T> convert,
-        out Pending<T> pending
-    ) => Start(completion, convert, CancellationToken.None, out pending);
-
     /// <summary>
-    /// Fills <paramref name="completion"/> for one native call and returns it.
-    /// The caller passes the result to <see cref="Pending{T}.Submitted"/>.
+    /// Fills <paramref name="completion"/> for one native call, whose value
+    /// <paramref name="convert"/> copies, and returns it. The caller passes the
+    /// result to <see cref="Pending{T}.Submitted"/>.
     /// </summary>
     /// <remarks>
     /// A generated call starts its completion as the last argument that can
-    /// throw, so a started completion always reaches its submission. Only a
-    /// call that delivers an owner takes a token: cancelling it cancels the
-    /// task, not the native work, and the binding disposes an owner that
-    /// arrives after cancellation, which a caller's own <c>WaitAsync</c> would
-    /// leave to the finalizer.
+    /// throw, so a started completion always reaches its submission.
     /// </remarks>
     internal static mln_completion* Start<T>(
         mln_completion* completion,
         CompletionConverter<T> convert,
-        CancellationToken cancellationToken,
         out Pending<T> pending,
         bool acceptErrorStatus = false
     )
     {
-        var state = new State<T>(convert, acceptErrorStatus, cancellationToken);
+        var state = new State<T>(convert, acceptErrorStatus);
         var root = GCHandle.Alloc(state);
         *completion = new mln_completion
         {
@@ -176,7 +164,6 @@ internal static unsafe class NativeCompletion
         {
             if (status == mln_status.MLN_STATUS_OK)
                 return state.Task;
-            state.Reject();
             root.Free();
             NativeStatus.Check(status, NativeDiagnostic.Current);
             throw new UnreachableException();
@@ -214,31 +201,17 @@ internal static unsafe class NativeCompletion
         private readonly TaskCompletionSource<T> source = new(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
-        private readonly CancellationTokenRegistration cancellation;
 
-        // Registering before submission leaves the completion nothing to race:
-        // native code calls Complete only after this constructor returns.
-        internal State(
-            CompletionConverter<T> convert,
-            bool acceptErrorStatus,
-            CancellationToken cancellationToken
-        )
+        internal State(CompletionConverter<T> convert, bool acceptErrorStatus)
         {
             this.convert = convert;
             this.acceptErrorStatus = acceptErrorStatus;
-            cancellation = cancellationToken.Register(
-                static (state, token) => ((TaskCompletionSource<T>)state!).TrySetCanceled(token),
-                source
-            );
         }
 
         internal Task<T> Task => source.Task;
 
-        internal void Reject() => cancellation.Dispose();
-
         internal override void Complete(mln_completion_result* result)
         {
-            cancellation.Dispose();
             T value;
             try
             {
@@ -254,10 +227,7 @@ internal static unsafe class NativeCompletion
                 source.TrySetException(error);
                 return;
             }
-            // A cancelled wait leaves the value to no one, so an owned handle
-            // is disposed now rather than by its finalizer.
-            if (!source.TrySetResult(value))
-                (value as IDisposable)?.Dispose();
+            source.TrySetResult(value);
         }
     }
 }

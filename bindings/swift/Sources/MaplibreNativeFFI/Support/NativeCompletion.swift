@@ -40,31 +40,22 @@ private final class NativeCompletionState<Value: Sendable>:
       converted = .failure(error)
     }
 
-    let (waiter, unreceived) = lock.withLock {
-      () -> (CheckedContinuation<Value, Error>?, Bool) in
+    let waiter = lock.withLock { () -> CheckedContinuation<Value, Error>? in
       if let waiter = self.waiter {
         self.waiter = nil
-        return (waiter, false)
+        return waiter
       }
-      if cancelled {
-        return (nil, true)
+      if !cancelled {
+        result = converted
       }
-      result = converted
-      return (nil, false)
+      return nil
     }
     waiter?.resume(with: converted)
-    // A cancelled wait has no receiver left, so the binding retires a created
-    // handle itself rather than leaving it to be reported as the caller's leak.
-    if unreceived, case let .success(value) = converted,
-       let owner = value as? any NativeReceiver
-    {
-      owner.retireUnreceived()
-    }
   }
 
   /// Suspends until the completion runs. Cancelling the waiting task ends the
   /// wait with `CancellationError`; the native work still finishes, and a
-  /// created handle it delivers afterwards is disposed.
+  /// result it delivers afterwards is dropped.
   func value() async throws -> Value {
     try await withTaskCancellationHandler {
       try await withCheckedThrowingContinuation { continuation in

@@ -52,28 +52,9 @@ Future<_Unreachable> _unreachableRuntimeWithProvider() async {
 Future<(MapHandle, WeakReference<RuntimeHandle>)>
 _mapWithoutItsRuntime() async {
   final runtime = runtimeCreate(runtimeOptionsDefault());
-  final map = await within(
-    runtime.createMap(mapOptionsDefault()),
-    'map creation',
-  );
+  final NewMap(:map, :ready) = runtime.createMap(mapOptionsDefault());
+  await within(ready, 'map creation');
   return (map, WeakReference(runtime));
-}
-
-/// Starts a map creation and drops its future, keeping a weak reference to
-/// the map it delivers.
-Future<WeakReference<MapHandle>> _droppedMapCreation(
-  RuntimeHandle runtime,
-) async {
-  WeakReference<MapHandle>? delivered;
-  unawaited(
-    runtime
-        .createMap(mapOptionsDefault())
-        .then((map) => delivered = WeakReference(map)),
-  );
-  // The creation's completion reaches the shared port before a later
-  // runtime command's.
-  await within(runtime.clearResourceTransform(), 'a later runtime command');
-  return delivered!;
 }
 
 /// Creates a runtime and keeps only its identity and a weak reference to it.
@@ -188,29 +169,6 @@ void main() {
     await within(runtime.target!.close(), 'runtime close');
   });
 
-  test('a dropped creation is disposed once its owner is collected', () async {
-    final runtime = runtimeCreate(runtimeOptionsDefault());
-    addTearDown(() => closeIfLive(runtime.close));
-    final map = await _droppedMapCreation(runtime);
-    expect(map.target, isNotNull);
-    // The live map holds off the runtime's release.
-    expect(
-      runtime.close,
-      throwsA(
-        isA<MaplibreException>().having(
-          (error) => error.status,
-          'status',
-          Status.invalidState,
-        ),
-      ),
-    );
-
-    // Collecting the map runs its native finalizer, which disposes the map
-    // outside any callback, and then the runtime releases.
-    await collectGarbageUntil(() => map.target == null, 'the dropped map');
-    await within(runtime.clearResourceTransform(), 'a later runtime command');
-    await within(runtime.close(), 'runtime close');
-  });
   for (final identicalCallback in [false, true]) {
     test(
       'wake ports retain ${identicalCallback ? "identical callbacks" : "equal method tear-offs"} independently',

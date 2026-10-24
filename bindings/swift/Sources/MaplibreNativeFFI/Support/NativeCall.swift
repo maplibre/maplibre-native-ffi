@@ -9,14 +9,6 @@ protocol NativeReceiver: AnyObject {
   var handle: NativeHandleState<Native> { get }
 }
 
-extension NativeReceiver {
-  /// Disposes the handle of an owner that the binding created but no caller
-  /// received, without reporting a leak.
-  func retireUnreceived() {
-    handle.retire()
-  }
-}
-
 /// A native call that reports a status into a diagnostic. It receives the
 /// receiver's raw id, or 0 without a handle receiver, and the input arena.
 typealias NativeStatusCall = (

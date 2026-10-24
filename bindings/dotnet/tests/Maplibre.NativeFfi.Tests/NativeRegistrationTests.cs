@@ -42,7 +42,7 @@ public sealed unsafe class NativeRegistrationTests
             },
             fixture =>
             {
-                fixture.Await(fixture.Session.Attached, "the attachment");
+                fixture.Await(fixture.Session.Ready, "the session to be ready");
                 fixture.RenderFrame();
                 var elapsed = Stopwatch.StartNew();
                 TestWaits.Wait(frame.Called, elapsed, "the frame wake");
@@ -114,7 +114,7 @@ public sealed unsafe class NativeRegistrationTests
             configure,
             fixture =>
             {
-                fixture.Await(fixture.Session.Attached, "the attachment");
+                fixture.Await(fixture.Session.Ready, "the session to be ready");
                 fixture.RenderFrame();
                 Assert.True(host.Locks > 0);
                 Assert.Equal(0, host.Releases);

@@ -300,10 +300,7 @@ struct CompletionResult<&mln_runtime_clear_resource_transform> {
 };
 template <>
 struct CompletionResult<&mln_runtime_create_map> {
-  static constexpr bool has_value = true;
-  using type = mln_map;
-  static constexpr bool array = false;
-  static constexpr bool nullable = false;
+  static constexpr bool has_value = false;
 };
 template <>
 struct CompletionResult<&mln_runtime_create_offline_region> {

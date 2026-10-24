@@ -19,7 +19,6 @@
 # the error it reports instead.
 "COMP-01" = "bindings/zig/src/completion.zig::a completion delivers once, and a value that fails to convert reports the error once"
 "COMP-02" = "bindings/zig/src/completion.zig::a refused submission frees the future and its copy context"
-"COMP-03" = "bindings/zig/tests/lifecycle.zig::discarding a creation future retires the map it creates"
 "COMP-04" = { na = "Zig applies decision 1 of #993 first: a failed or cancelled command returns its error from wait, which diagnostics.zig::a failed command returns its error and fills the wait's diagnostic covers" }
 "COMP-05" = "bindings/zig/src/completion.zig::a pending future polls without blocking and deinit abandons it"
 "COMP-06" = "bindings/zig/tests/generated_workflows.zig::discarded commands are fenced and synchronous rejection returns an error"

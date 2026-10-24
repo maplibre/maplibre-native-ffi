@@ -28,9 +28,8 @@
 "LIFE-04" = "bindings/typescript/test/platform.test.ts::an abandoned runtime with a live map is disposed and reported when collected"
 "LIFE-05" = "bindings/typescript/test/lifecycle.test.ts::a map keeps its runtime reachable"
 "LIFE-06" = "bindings/typescript/test/lifecycle.test.ts::a handle id names its events and outlives close"
-"COMP-01" = "bindings/typescript/test/completions.test.ts::a completion delivers once and disposes a value that fails to convert"
+"COMP-01" = "bindings/typescript/test/completions.test.ts::a completion delivers once and reports a value that fails to convert"
 "COMP-02" = "bindings/typescript/test/completions.test.ts::a submission native rejects frees its completion state"
-"COMP-03" = "bindings/typescript/test/completions.test.ts::a dropped map creation is disposed once collected"
 "COMP-04" = { na = "TypeScript applies decision 1 of #993 first: a failed or cancelled command rejects with MaplibreError, which completions.test.ts::a failed command rejects with its status and generation covers" }
 # A Promise cannot be cancelled. A waiter races it against an AbortSignal, and
 # AwaitableWake.next() takes the signal itself.

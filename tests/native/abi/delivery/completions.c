@@ -188,37 +188,6 @@ static void a_later_completion_follows_earlier_queued_completions(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static mln_map create_map_through(
-  mln_runtime runtime, mln_delivery_queue queue, mln_delivery_batch* out_batch
-) {
-  const mln_completion completion = mln_test_queue_completion(queue, NULL);
-  MLN_TEST_OK(mln_runtime_create_map(runtime, NULL, &completion, NULL));
-  const mln_completion_result* result =
-    await_completion(queue, NULL, out_batch);
-  MLN_TEST_OK(result->status);
-  TEST_ASSERT_EQUAL_size_t(1, result->value_count);
-  TEST_ASSERT_EQUAL_UINT32(sizeof(mln_map), result->value_size);
-  const mln_map map = *(const mln_map*)result->value;
-  TEST_ASSERT_TRUE(mln_test_map_is_live(map));
-  return map;
-}
-
-// The batch owns a created map until the host takes it. Releasing the batch
-// without taking disposes the map, so the runtime then has no child.
-static void an_untaken_map_is_disposed_with_its_batch(void) {
-  mln_test_delivery_queue queue;
-  mln_test_delivery_queue_create(&queue);
-  mln_runtime runtime = mln_test_create_runtime();
-
-  mln_delivery_batch batch = MLN_HANDLE_NULL;
-  const mln_map map = create_map_through(runtime, queue.handle, &batch);
-  mln_delivery_batch_release(batch);
-  TEST_ASSERT_FALSE(mln_test_map_is_live(map));
-
-  mln_test_delivery_queue_release(&queue);
-  mln_test_destroy_runtime(runtime);
-}
-
 // A list result's strings live in the batch, past the map and runtime that
 // produced them.
 static void list_results_outlive_the_runtime(void) {
@@ -268,7 +237,7 @@ static void runtime_release_completes_through_the_queue(void) {
   mln_test_delivery_queue_release(&queue);
 }
 
-// Gates the runtime worker so a create_map completion arrives only after the
+// Gates the runtime worker so a query's completion arrives only after the
 // test releases the queue it names.
 static void a_completion_for_a_released_queue_is_discarded(void) {
   mln_test_delivery_queue queue;
@@ -285,12 +254,11 @@ static void a_completion_for_a_released_queue_is_discarded(void) {
 
   const mln_completion completion =
     mln_test_queue_completion(queue.handle, NULL);
-  MLN_TEST_OK(mln_runtime_create_map(runtime, NULL, &completion, NULL));
+  MLN_TEST_OK(mln_map_get_style_url(parking, &completion, NULL));
   mln_test_delivery_queue_release(&queue);
   mln_test_gate_release(&gate);
 
-  // The refused completion disposed its map on the runtime worker, so after a
-  // later query on that worker the runtime has no child.
+  // A later query on the same worker runs after the refused completion.
   MLN_TEST_OK(mln_test_map_fence(parking));
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&queue.wakes));
   mln_test_destroy_map(parking);
@@ -319,7 +287,6 @@ MLN_TEST_GROUP {
   RUN_TEST(a_rejected_submission_queues_nothing);
   RUN_TEST(a_command_validates_a_present_completion);
   RUN_TEST(a_later_completion_follows_earlier_queued_completions);
-  RUN_TEST(an_untaken_map_is_disposed_with_its_batch);
   RUN_TEST(list_results_outlive_the_runtime);
   RUN_TEST(runtime_release_completes_through_the_queue);
   RUN_TEST(runtime_release_can_finish_before_queued_results_are_drained);

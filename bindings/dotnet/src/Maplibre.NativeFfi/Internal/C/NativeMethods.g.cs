@@ -1373,6 +1373,7 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_runtime_create_map(
         MlnRuntime runtime,
         mln_map_options* options,
+        MlnMap* out_map,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

@@ -123,7 +123,7 @@ PRIMITIVES = {
 
 
 CALLER_DRIVER_NOTE = (
-    "With a caller-graphics-thread driver, `Attached`, `DetachAsync`, "
+    "With a caller-graphics-thread driver, `Ready`, `DetachAsync`, "
     "`BarrierAsync`, and `ResizeAsync` progress only through "
     "`ServiceDriverWork`, so awaiting one on the graphics thread without "
     "servicing driver work never completes."
@@ -844,9 +844,9 @@ def emit_operation(
         if asynchronous:
             body = prologue + [
                 *submitted(function, args, unit_start()),
-                "var nativeAttachment = nativePending.Submitted(nativeStatus);",
+                "var nativeReady = nativePending.Submitted(nativeStatus);",
                 "scope.Accept();",
-                f"return {result_type}.Adopt({parent}{local}, nativeAttachment);",
+                f"return {result_type}.Adopt({parent}{local}, nativeReady);",
             ]
         elif plan.absence:
             # The scope accepts its inputs only after a call that publishes.
@@ -870,29 +870,6 @@ def emit_operation(
                 if scoped:
                     body.append("scope.Accept();")
                 body.append(f"return {constructor};")
-    elif execution == "lifecycle" and plan.result and plan.result.ownership == "owned":
-        owner = plan.completion.result_owner if plan.completion else None
-        if owner is None or owner.handle.native not in owners:
-            raise Unsupported("owned completion requires its generated owner")
-        result = owner.handle.native
-        parent = (
-            "this, "
-            if owner.parent_parameter and owner.parent_parameter == plan.receiver
-            else ""
-        )
-        result_type = f"Task<{owners[result]}>"
-        name += "Async"
-        parameters.append("CancellationToken cancellationToken = default")
-        # A handle that arrives after cancellation is disposed, not leaked.
-        adopt = f"nativeResult => {owners[result]}.Adopt({parent}NativeCompletion.Value<{raw_handle(bound.handles[result])}>(nativeResult))"
-        body = prologue + [
-            *submitted(
-                function,
-                args,
-                f"NativeCompletion.Start<{owners[result]}>(&nativeCompletion, {'' if parent else 'static '}{adopt}, cancellationToken, out var nativePending)",
-            ),
-            "return scope.Accepted(nativePending.Submitted(nativeStatus));",
-        ]
     elif not asynchronous:
         if (
             handle_plan
@@ -1126,15 +1103,15 @@ def emit(api: Api | BoundApi) -> Emission:
         if immediate_completion:
             fields.append(
                 "/// <summary>\n"
-                "    /// Completes once the driver owns the target, and faults with a\n"
-                '    /// <see cref="MaplibreException" /> when the attachment fails.\n'
+                "    /// Completes once the handle is ready, and faults with a\n"
+                '    /// <see cref="MaplibreException" /> when it fails to become ready.\n'
                 "    /// </summary>\n"
-                "    public Task Attached { get; }"
+                "    public Task Ready { get; }"
             )
         constructor = []
         if immediate_completion:
             constructor.append(
-                "Attached = completion.ContinueWith(static (finished, retained) => { GC.KeepAlive(retained); return finished; }, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();"
+                "Ready = completion.ContinueWith(static (finished, retained) => { GC.KeepAlive(retained); return finished; }, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();"
             )
         constructor.append(
             f"state = new(handle, {destroy}, nameof({owner}), Abandon{', protectsCopies: true' if handle.native == 'mln_render_frame_batch' else ''}{', retainedParent: parent' if handle.parent else ''});"

@@ -2159,12 +2159,14 @@ internal actual object C {
   actual fun mln_runtime_create_map(
     runtime: Long,
     options: Long,
+    outMap: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_runtime_create_map(
       runtime.toULong(),
       options.toCPointer(),
+      outMap.toCPointer(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )

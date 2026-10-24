@@ -86,14 +86,12 @@ void main() {
 
   test('a refused close leaves the handle usable for a later close', () async {
     final runtime = runtimeCreate(runtimeOptionsDefault());
-    final map = await within(
-      runtime.createMap(mapOptionsDefault()),
-      'map creation',
-    );
+    final NewMap(:map, :ready) = runtime.createMap(mapOptionsDefault());
     addTearDown(() async {
       await closeIfLive(map.close);
       await closeIfLive(runtime.close);
     });
+    await within(ready, 'map creation');
 
     // The live map makes native refuse the release before teardown starts.
     expect(

@@ -1530,14 +1530,14 @@ MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
 /**
  * Starts release of a runtime after checking its children.
  *
- * The call rejects a runtime that has live or pending children and leaves it
- * open. A runtime's children are its maps, including a map whose creation was
- * accepted but has not completed. Resource request handles are not children:
- * one that a provider still holds, or has released with its failure still
- * queued, leaves this call free to succeed. A successful call consumes the
- * public handle before returning. Previously accepted work and native teardown
- * continue in submission order; callback user data remains native-owned until
- * its release callback runs. This function may be called from any thread.
+ * The call rejects a runtime that has live children and leaves it open. A
+ * runtime's children are its maps, including one that is still creating.
+ * Resource request handles are not children: one that a provider still holds,
+ * or has released with its failure still queued, leaves this call free to
+ * succeed. A successful call consumes the public handle before returning.
+ * Previously accepted work and native teardown continue in submission order;
+ * callback user data remains native-owned until its release callback runs.
+ * This function may be called from any thread.
  *
  * The completion runs after every earlier accepted submission, including
  * released maps' teardown and each submission's completion and release
@@ -1599,7 +1599,7 @@ MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
  *   completion is invalid.
  * - MLN_STATUS_INVALID_STATE when runtime has been released, or the runtime has
- *   a live or pending child or is already closing.
+ *   a live child or is already closing.
  * - MLN_STATUS_NATIVE_ERROR when the completion could not be allocated.
  */
 MLN_BINDING("execution=lifecycle")
@@ -1612,9 +1612,9 @@ MLN_API mln_status mln_runtime_release(
  * Consumes a runtime handle without observing its asynchronous retirement.
  *
  * A successful call consumes the handle before returning. A failed call
- * retains caller ownership. Retirement waits for live and pending children and
- * accepted work. Existing children retain their own cleanup obligations;
- * dispose or release them to let the runtime finish retiring. Teardown may
+ * retains caller ownership. Retirement waits for live children and accepted
+ * work. Existing children retain their own cleanup obligations; dispose or
+ * release them to let the runtime finish retiring. Teardown may
  * allocate; allocation failure after acceptance terminates the process.
  *
  * Returns:

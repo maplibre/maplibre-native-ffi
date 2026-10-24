@@ -9,6 +9,7 @@ import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MetalContextDescriptor
 import org.maplibre.nativeffi.generated.MetalOwnedTextureDescriptor
+import org.maplibre.nativeffi.generated.NewRenderSession
 import org.maplibre.nativeffi.generated.OpenglClientApi
 import org.maplibre.nativeffi.generated.OpenglContextDescriptor
 import org.maplibre.nativeffi.generated.OpenglContextDescriptorData
@@ -18,7 +19,6 @@ import org.maplibre.nativeffi.generated.OpenglOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.RenderBackendFlag
 import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
-import org.maplibre.nativeffi.generated.RenderSessionAttachment
 import org.maplibre.nativeffi.generated.VulkanContextDescriptor
 import org.maplibre.nativeffi.generated.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.WebglContextDescriptor
@@ -184,7 +184,7 @@ internal object TestGraphics {
     height: Int,
     options: RenderSessionAttachOptions,
     canvas: TestCanvas? = null,
-  ): RenderSessionAttachment {
+  ): NewRenderSession {
     val extent = LogicalExtent(width.toUInt(), height.toUInt(), 1.0)
     if (canvas != null) {
       return map.attachOpenglOwnedTexture(

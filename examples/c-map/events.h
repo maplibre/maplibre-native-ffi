@@ -50,8 +50,6 @@ void app_events_wait_driver(void);
 typedef struct awaited_completion {
   SDL_Semaphore* signal;
   mln_status status;
-  /// The map a map creation completes with.
-  mln_map map;
 } awaited_completion;
 
 /// Prepares completion and returns the descriptor to submit with it.

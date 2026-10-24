@@ -265,11 +265,11 @@ final class MetalRenderTarget {
   }
 
   private static func finishAttachment(
-    _ attachment: RenderSessionAttachment
+    _ created: NewRenderSession
   ) async throws -> RenderSessionHandle {
-    let session = attachment.session
+    let session = created.session
     do {
-      try await attachment.completion.value
+      try await created.ready.value
       return session
     } catch {
       _ = try? session.abandon()

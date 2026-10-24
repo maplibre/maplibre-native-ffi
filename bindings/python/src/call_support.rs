@@ -2,7 +2,7 @@
 /// arguments borrow, and the native call with the interpreter detached.
 ///
 /// Every native call that a method makes goes through `status`,
-/// `status_unless`, `run`, `command`, `complete`, or `complete_owned`. Each is unsafe with the
+/// `status_unless`, `run`, `command`, or `complete`. Each is unsafe with the
 /// contract of `generated_native_call`: the closure only reads the converted
 /// arguments, which this call's storage keeps rooted, and calls native code.
 struct GeneratedCall<'py> {
@@ -72,7 +72,6 @@ impl<'py> GeneratedCall<'py> {
                 unsafe { generated_native_call(py, || submit(completion, diagnostic)) }
             },
             py_command,
-            None,
         )
     }
 
@@ -102,31 +101,6 @@ impl<'py> GeneratedCall<'py> {
                 unsafe { generated_native_call(py, || submit(completion, diagnostic)) }
             },
             convert,
-            None,
-        )
-    }
-
-    /// Submits an operation whose completion transfers a handle, which
-    /// `discard` disposes when the interpreter has gone or the future was
-    /// cancelled first.
-    unsafe fn complete_owned<C>(
-        &mut self,
-        submit: impl FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
-        convert: C,
-        discard: unsafe fn(&sys::mln_completion_result),
-    ) -> PyResult<Py<PyAny>>
-    where
-        C: FnOnce(Python<'_>, &sys::mln_completion_result) -> PyResult<Py<PyAny>> + Send + 'static,
-    {
-        let py = self.py;
-        submit_python_future(
-            py,
-            |completion, diagnostic| {
-                // SAFETY: the caller upholds the native call contract.
-                unsafe { generated_native_call(py, || submit(completion, diagnostic)) }
-            },
-            convert,
-            Some(discard),
         )
     }
 

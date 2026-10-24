@@ -450,13 +450,6 @@ def lower_function(
             lowered.shape, lowered.returns = "command", "Promise<CommandCompletion>"
         elif plan.result is None:
             lowered.shape, lowered.returns = "run", "Promise<void>"
-        elif completion.result_owner:
-            owner = completion.result_owner
-            check_owner(bound, owner)
-            lowered.decoder = natives.decoder(plan.result)
-            lowered.owned = owner
-            lowered.shape = "query_owned"
-            lowered.returns = f"Promise<{owner_class(owner.handle)}>"
         else:
             result = plan.result
             values.check(result, "out")
@@ -588,7 +581,7 @@ def lower_function(
 
 
 def attachment_name(owned: OwnedOutputPlan) -> str:
-    return owner_class(owned.handle).removesuffix("Handle") + "Attachment"
+    return "New" + owner_class(owned.handle).removesuffix("Handle")
 
 
 def scoped_name(native: str) -> str:

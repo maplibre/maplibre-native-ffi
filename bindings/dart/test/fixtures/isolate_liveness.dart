@@ -26,7 +26,8 @@ Future<(RuntimeHandle, MapHandle)> _register() async {
       callback: (_, request) => request.close(),
     ),
   );
-  final map = await runtime.createMap(mapOptionsDefault());
+  final NewMap(:map, :ready) = runtime.createMap(mapOptionsDefault());
+  await ready;
   await map.setStyleJson(_json(_styleJson));
   await map.addCustomGeometrySource(
     'source',

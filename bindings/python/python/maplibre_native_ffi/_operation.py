@@ -3,8 +3,6 @@
 from contextlib import contextmanager
 from typing import Any
 
-from ._future import map_future
-
 
 class GeneratedOperations:
     """Keep generated method signatures visible on the public handle class."""
@@ -33,14 +31,6 @@ def _adopt_value(raw, owner, parent=None):
     from . import _generated_owners
 
     return getattr(_generated_owners, owner)._from_native(raw, parent)
-
-
-def _adopt_future(source, owner, parent):
-    # A handle that arrives after its wait was cancelled gets no public owner,
-    # so it is disposed now, as collecting it would.
-    return map_future(
-        source, lambda raw: _adopt_value(raw, owner, parent), lambda raw: raw._dispose()
-    )
 
 
 @contextmanager

@@ -242,14 +242,14 @@ MLN_API mln_status mln_delivery_queue_create(
  * Releases a delivery queue. A null handle is a no-op.
  *
  * The call consumes the handle, closes the queue, and returns without blocking.
- * It discards pending items: an untaken owned completion value is disposed,
- * an untaken provider request is released, which fails it, and an untaken
- * transform request is released, which keeps its URL.
+ * It discards pending items: an untaken provider request is released, which
+ * fails it, and an untaken transform request is released, which keeps its
+ * URL.
  *
  * Registrations that still name the queue keep working, but the queue refuses
- * their later pushes: a completion is discarded and its owned value disposed,
- * a log record goes to the platform logger, a provider request fails, a
- * transform request keeps its URL, and other queued callbacks are dropped.
+ * their later pushes: a completion is discarded, a log record goes to the
+ * platform logger, a provider request fails, a transform request keeps its
+ * URL, and other queued callbacks are dropped.
  *
  * No wake call starts after release. The wake's release_user_data runs once
  * in-flight wake calls return, on whichever thread finishes last. The host may
@@ -291,10 +291,8 @@ MLN_API mln_status mln_delivery_queue_drain(
 /**
  * Transfers the owned handles of one delivery to the caller.
  *
- * An owned completion value, such as the mln_map from
- * mln_runtime_create_map(), or a resource or transform request's handle
- * becomes the caller's to release. A delivery that owns nothing is unchanged.
- * The delivery's view stays readable.
+ * A resource or transform request's handle becomes the caller's to release. A
+ * delivery that owns nothing is unchanged. The delivery's view stays readable.
  *
  * Returns:
  * - MLN_STATUS_OK when the delivery's handles now belong to the caller, or the
@@ -311,10 +309,8 @@ MLN_API mln_status mln_delivery_batch_take(
 /**
  * Releases an owned delivery batch. A null handle is a no-op.
  *
- * Owned values that the host did not take are disposed: a map without
- * blocking, as mln_map_dispose() does, and a request handle through its
- * release function: a provider request fails, and a transform request keeps
- * its URL.
+ * Request handles that the host did not take are released: a provider
+ * request fails, and a transform request keeps its URL.
  */
 MLN_API void mln_delivery_batch_release(mln_delivery_batch batch) MLN_NOEXCEPT;
 

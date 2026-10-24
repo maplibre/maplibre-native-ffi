@@ -190,29 +190,26 @@ mln_runtime mln_test_create_runtime_with_options(mln_runtime_options options) {
 mln_status mln_test_map_create_status(
   mln_runtime runtime, const mln_map_options* options, mln_map* out_map
 ) {
-  mln_test_completion completion =
-    mln_test_completion_default(sizeof(*out_map));
+  mln_test_completion completion = mln_test_completion_default(0);
+  mln_map map = MLN_HANDLE_NULL;
   mln_status status = mln_runtime_create_map(
-    runtime, options, &completion.descriptor, MLN_TEST_DIAGNOSTIC
+    runtime, options, &map, &completion.descriptor, MLN_TEST_DIAGNOSTIC
   );
   if (status != MLN_STATUS_OK) {
     completion.descriptor.release_user_data(completion.descriptor.user_data);
     mln_test_completion_destroy(&completion);
     return status;
   }
-  if (!mln_test_completion_wait(&completion, -1)) {
-    status = MLN_STATUS_NATIVE_ERROR;
-  } else {
-    status = mln_test_completion_status(&completion);
-    if (
-      status == MLN_STATUS_OK &&
-      !mln_test_completion_copy_value(&completion, out_map, sizeof(*out_map))
-    ) {
-      status = MLN_STATUS_NATIVE_ERROR;
-    }
-  }
+  status = mln_test_completion_wait(&completion, -1)
+             ? mln_test_completion_status(&completion)
+             : MLN_STATUS_NATIVE_ERROR;
   mln_test_completion_destroy(&completion);
-  return status;
+  if (status != MLN_STATUS_OK) {
+    (void)mln_map_dispose(map, MLN_TEST_DIAGNOSTIC);
+    return status;
+  }
+  *out_map = map;
+  return MLN_STATUS_OK;
 }
 
 mln_status mln_test_map_start_close(
@@ -314,19 +311,16 @@ mln_map mln_test_create_map_with_options(
   mln_runtime runtime, const mln_map_options* options
 ) {
   mln_map map = MLN_HANDLE_NULL;
-  mln_test_completion completion = mln_test_completion_default(sizeof(map));
+  mln_test_completion completion = mln_test_completion_default(0);
   reserve_map_slot();
   MLN_TEST_OK(mln_runtime_create_map(
-    runtime, options, &completion.descriptor, MLN_TEST_DIAGNOSTIC
+    runtime, options, &map, &completion.descriptor, MLN_TEST_DIAGNOSTIC
   ));
-  TEST_ASSERT_TRUE(mln_test_completion_wait(&completion, -1));
-  MLN_TEST_OK(mln_test_completion_status(&completion));
-  TEST_ASSERT_TRUE(
-    mln_test_completion_copy_value(&completion, &map, sizeof(map))
-  );
-  mln_test_completion_destroy(&completion);
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
   track_map(map);
+  TEST_ASSERT_TRUE(mln_test_completion_wait(&completion, -1));
+  MLN_TEST_OK(mln_test_completion_status(&completion));
+  mln_test_completion_destroy(&completion);
   return map;
 }
 

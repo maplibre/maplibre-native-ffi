@@ -111,14 +111,16 @@ pub fn main(init_args: std.process.Init) !void {
     var options = maplibre.mapOptionsDefault();
     options.map_mode = .static;
     options.event_mask = .{};
-    var map_future = try runtime.createMap(options, &diagnostic);
-    defer map_future.deinit();
-    var map = try map_future.wait(&diagnostic);
+    var created = try runtime.createMap(options, &diagnostic);
+    // The map is ours from the call, so a failed creation still releases it.
+    var map = created.map;
     defer if (map.release(null)) |future| {
         var teardown = future;
         _ = teardown.wait(null) catch {};
         teardown.deinit();
     } else |_| map.deinit();
+    defer created.ready.deinit();
+    try created.ready.wait(&diagnostic);
 
     var resize = try map.resize(.{ .width = width, .height = height, .scale_factor = 1.0 }, &diagnostic);
     resize.deinit();
@@ -281,7 +283,7 @@ fn attachOwnedTexture(
     map: *maplibre.Map,
     signal: *WakeSignal,
     extent: maplibre.LogicalExtent,
-) !maplibre.RenderSessionAttachment {
+) !maplibre.NewRenderSession {
     var defaults = try maplibre.renderSessionAttachOptionsDefault(allocator);
     defer defaults.deinit();
     var wakes = defaults.value;

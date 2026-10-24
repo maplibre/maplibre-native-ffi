@@ -1,5 +1,5 @@
-//! Handle ownership: the ABI check at creation, close, parent retention,
-//! discarded creations, and exit.
+//! Handle ownership: the ABI check at creation, close, parent retention, and
+//! exit.
 
 use std::sync::mpsc;
 
@@ -108,24 +108,6 @@ fn a_map_keeps_its_runtime_alive_after_the_runtime_handle_drops() {
     set_reporter(None);
     let leaked = leaks(&reports);
     assert!(leaked.is_empty(), "{leaked:?}");
-}
-
-#[test]
-fn a_dropped_map_creation_future_retires_the_map() {
-    let fixture = Fixture::new();
-    let created = fixture
-        .runtime()
-        .create_map(&MapOptions::default())
-        .unwrap();
-    // A later query fences the creation, so the map exists when its future
-    // drops, and dropping the future is what retires it.
-    fixture.fence();
-    drop(created);
-
-    // A runtime closes only once all of its maps have retired.
-    let (runtime, map) = fixture.into_parts();
-    wait_for(map.release());
-    wait_for(runtime.release());
 }
 
 /// Set in the child process that the exit test runs.

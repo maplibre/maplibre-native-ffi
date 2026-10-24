@@ -45,7 +45,6 @@ public sealed class CompletionTests
         NativeCompletion.Start(
             &first,
             static result => NativeCompletion.Value<int>(result),
-            CancellationToken.None,
             out var firstPending
         );
         var converted = firstPending.Submitted(mln_status.MLN_STATUS_OK);
@@ -59,7 +58,6 @@ public sealed class CompletionTests
         NativeCompletion.Start(
             &second,
             static result => NativeCompletion.Value<int>(result),
-            CancellationToken.None,
             out var secondPending
         );
         var unconverted = secondPending.Submitted(mln_status.MLN_STATUS_OK);
@@ -133,7 +131,6 @@ public sealed class CompletionTests
                     GC.KeepAlive(captured);
                     return 0;
                 },
-                CancellationToken.None,
                 out var pending
             );
             _ = pending.Submitted(mln_status.MLN_STATUS_INVALID_ARGUMENT);
@@ -155,7 +152,7 @@ public sealed class CompletionTests
 
     // A still image on a static map with no session stays pending until the map closes, so every
     // outcome below comes from the wait rather than from native. A caller abandons a wait with
-    // WaitAsync, and only a creation takes a token, so the binding can dispose its late map.
+    // WaitAsync.
     [Fact]
     public async Task AWaitCanTimeOutOrBeCancelled()
     {
@@ -179,55 +176,5 @@ public sealed class CompletionTests
         // The native request is still outstanding, and closing the map retires it.
         Assert.False(stillImage.IsCompleted);
         await fixture.Map.CloseAsync();
-
-        // Native creates this map although its wait ended before submission.
-        var created = fixture.Runtime.CreateMapAsync(NativeFixture.SmallMap, cancellation.Token);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => created);
-        // Runtime release refuses a runtime that still owns a map, so it succeeds only because
-        // the binding disposed the map that arrived after the wait. The creation runs on the
-        // worker before a later runtime command completes.
-        await fixture.Runtime.ClearResourceTransformAsync();
-        await fixture.Runtime.CloseAsync().WaitAsync(TestWaits.Deadline, TestWaits.Token);
-    }
-
-    [Fact]
-    public async Task AValueThatArrivesAfterCancellationIsDisposed()
-    {
-        using var cancellation = new CancellationTokenSource();
-        var (task, deliver) = SubmitHeld(cancellation.Token);
-
-        cancellation.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
-        var late = deliver();
-
-        Assert.True(late.Disposed);
-    }
-
-    private sealed class Probe : IDisposable
-    {
-        internal bool Disposed { get; private set; }
-
-        public void Dispose() => Disposed = true;
-    }
-
-    // The fake call accepts its completion, and the returned delivery plays native's part.
-    private static unsafe (Task<Probe> Task, Func<Probe> Deliver) SubmitHeld(
-        CancellationToken cancellationToken
-    )
-    {
-        mln_completion completion;
-        var probe = new Probe();
-        NativeCompletion.Start(&completion, _ => probe, cancellationToken, out var pending);
-        var task = pending.Submitted(mln_status.MLN_STATUS_OK);
-        var held = completion;
-        return (
-            task,
-            () =>
-            {
-                Deliver(held, null, 0);
-                held.release_user_data(held.user_data);
-                return probe;
-            }
-        );
     }
 }

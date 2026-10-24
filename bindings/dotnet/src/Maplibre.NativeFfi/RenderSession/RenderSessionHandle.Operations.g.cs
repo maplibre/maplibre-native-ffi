@@ -9,7 +9,7 @@ namespace Maplibre.NativeFfi;
 /// A render session, which renders one map to one render target.
 /// </summary>
 /// <remarks>
-/// <para>With a caller-graphics-thread driver, <c>Attached</c>,
+/// <para>With a caller-graphics-thread driver, <c>Ready</c>,
 /// <c>DetachAsync</c>, <c>BarrierAsync</c>, and <c>ResizeAsync</c> progress
 /// only through <c>ServiceDriverWork</c>, so awaiting one on the graphics
 /// thread without servicing driver work never completes.</para>
@@ -25,14 +25,14 @@ public sealed unsafe partial class RenderSessionHandle
     private volatile Task teardown = Task.CompletedTask;
 
     /// <summary>
-    /// Completes once the driver owns the target, and faults with a
-    /// <see cref="MaplibreException" /> when the attachment fails.
+    /// Completes once the handle is ready, and faults with a
+    /// <see cref="MaplibreException" /> when it fails to become ready.
     /// </summary>
-    public Task Attached { get; }
+    public Task Ready { get; }
 
     internal RenderSessionHandle(MapHandle parent, MlnRenderSession handle, Task completion)
     {
-        Attached = completion
+        Ready = completion
             .ContinueWith(
                 static (finished, retained) =>
                 {
@@ -512,7 +512,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// Core-worker sessions return <c>MLN_STATUS_INVALID_STATE</c>.
     /// </summary>
     /// <remarks>
-    /// <para>With a caller-graphics-thread driver, <c>Attached</c>,
+    /// <para>With a caller-graphics-thread driver, <c>Ready</c>,
     /// <c>DetachAsync</c>, <c>BarrierAsync</c>, and <c>ResizeAsync</c> progress
     /// only through <c>ServiceDriverWork</c>, so awaiting one on the graphics
     /// thread without servicing driver work never completes.</para>

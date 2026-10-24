@@ -54,9 +54,9 @@ test(
   "using disposes an attached session, and the map's release then lets the host destroy its graphics objects",
   async () => {
     const map = await openRenderMap();
-    const { session, completed, destroyGraphics } =
+    const { session, ready, destroyGraphics } =
       attachSessionOverOwnGraphics(map);
-    await bounded(completed, "the attachment");
+    await bounded(ready, "the attachment");
     requestFrame(session, 1n);
     session[Symbol.dispose]();
     session[Symbol.dispose]();
@@ -71,9 +71,9 @@ test(
   "await using waits until an attached session has retired, so the host may destroy its graphics objects",
   async () => {
     const map = await openRenderMap();
-    const { session, completed, destroyGraphics } =
+    const { session, ready, destroyGraphics } =
       attachSessionOverOwnGraphics(map);
-    await bounded(completed, "the attachment");
+    await bounded(ready, "the attachment");
     requestFrame(session, 1n);
     await bounded(session[Symbol.asyncDispose](), "the disposal");
     await session[Symbol.asyncDispose]();
@@ -177,8 +177,8 @@ test("a native registration reaches native unchanged, a call consumes it, and a 
   // Native code calls the probe's wake with the probe's context directly.
   const probe = new NativeProbe();
   const frameWake = nativeWake(probe);
-  const { session, completed } = attachSession(map, { frameWake });
-  await bounded(completed, "the attachment");
+  const { session, ready } = attachSession(map, { frameWake });
+  await bounded(ready, "the attachment");
   requestFrame(session, 1n);
   await probe.arrival("wake");
 
@@ -238,8 +238,8 @@ test("a native queue lock reaches a session whose target takes one", async () =>
     assert.deepEqual(probe.events, ["release"]);
     return;
   }
-  const { session, completed } = attachSession(map, { queueLock });
-  await bounded(completed, "the attachment");
+  const { session, ready } = attachSession(map, { queueLock });
+  await bounded(ready, "the attachment");
   requestFrame(session, 1n);
   await probe.arrival("unlock");
   await bounded(session.detach(), "the detach");

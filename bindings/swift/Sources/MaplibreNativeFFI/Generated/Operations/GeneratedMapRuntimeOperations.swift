@@ -8,14 +8,17 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_create_map` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  func createMap(options bindingArg0: MapOptions) async throws -> MapHandle {
-    try await nativeStart(copying: { try MapHandle(adopting: $0, parent: self)
-    }) { raw, arena, completion, diagnostic in mln_runtime_create_map(
+  func createMap(options bindingArg0: MapOptions) throws -> NewMap {
+    var value0: mln_map = 0
+    return try nativeAttach(as: NewMap
+      .init)
+    { raw, arena, completion, diagnostic in mln_runtime_create_map(
       raw,
       arena.store(bindingArg0.nativeValue()),
+      &value0,
       completion,
       diagnostic
-    ) }
+    ) } adopt: { try MapHandle(adopting: value0, parent: self) }
   }
 
   /// Starts creating an offline region.

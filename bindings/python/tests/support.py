@@ -38,6 +38,15 @@ def result[T](future: Future[T]) -> T:
     return future.result(timeout=TIMEOUT)
 
 
+def ready_map(
+    runtime: mln.RuntimeHandle, options: mln.MapOptions | None = None
+) -> mln.MapHandle:
+    """Create a map and wait until it is ready."""
+    created = runtime.create_map(options)
+    result(created.ready)
+    return created.map
+
+
 @contextlib.contextmanager
 def leak_reports() -> Iterator[list[str]]:
     """Collect the ResourceWarning messages that unclosed handles report.
@@ -138,8 +147,8 @@ class Harness:
         return mln.ResourceProviderDecision.HANDLE
 
     def create_map(self, **options: object) -> mln.MapHandle:
-        map_handle = result(
-            self.runtime.create_map(replace(mln.MapOptions.default(), **options))
+        map_handle = ready_map(
+            self.runtime, replace(mln.MapOptions.default(), **options)
         )
         self._maps.append(map_handle)
         return map_handle

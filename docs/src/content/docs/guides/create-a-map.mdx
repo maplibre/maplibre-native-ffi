@@ -19,8 +19,11 @@ and delivery queue registration.
 
 <Code code={region(createMap, "runtime")} lang="c" title="create-map.c" />
 
-A browser host creates the runtime on a Web Worker. Map creation completes
-asynchronously with the map handle.
+A browser host creates the runtime on a Web Worker.
+
+Map creation returns the map at once, and its completion reports when the map
+is ready. Commands sent before then run once the map is ready, but attaching a
+render target waits for the completion.
 
 ## Choose the initial map state
 

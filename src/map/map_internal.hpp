@@ -34,6 +34,9 @@ struct MapObject {
   std::shared_ptr<MapObject> disposal_owner;
   std::shared_ptr<Completion> release_completion;
   std::atomic_bool disposal_requested = false;
+  // Set on the runtime worker once the native map exists. A map whose
+  // creation failed keeps it false until it retires.
+  std::atomic_bool created = false;
   // This map's own handle, so worker-side code that already holds the object
   // can name it in an event without resolving the table again.
   mln_map self = MLN_HANDLE_NULL;

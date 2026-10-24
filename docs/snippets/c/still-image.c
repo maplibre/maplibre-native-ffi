@@ -98,14 +98,13 @@ static mln_status attach_owned_texture(still_image_job* job) {
   // #endregion attach
 }
 
-static void map_created(void* user_data, const mln_completion_result* result) {
+static void map_ready(void* user_data, const mln_completion_result* result) {
   still_image_job* job = user_data;
-  if (result->status != MLN_STATUS_OK || result->value_count != 1) {
+  if (result->status != MLN_STATUS_OK) {
     job->status = result->status;
     job->finished(job->user_data, job);
     return;
   }
-  job->map = *(const mln_map*)result->value;
   job->status = attach_owned_texture(job);
   if (job->status != MLN_STATUS_OK) job->finished(job->user_data, job);
 }
@@ -119,10 +118,12 @@ mln_status start_still_image(still_image_job* job) {
   options.map_mode = MLN_MAP_MODE_STATIC;
   const mln_completion completion = {
     .size = sizeof(mln_completion),
-    .callback = map_created,
+    .callback = map_ready,
     .user_data = job,
   };
-  return mln_runtime_create_map(job->runtime, &options, &completion, NULL);
+  return mln_runtime_create_map(
+    job->runtime, &options, &job->map, &completion, NULL
+  );
   // #endregion create
 }
 

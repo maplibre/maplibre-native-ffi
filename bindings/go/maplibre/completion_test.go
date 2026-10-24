@@ -28,9 +28,8 @@ func TestDiscardedCommandsAreFencedAndSyncRejectionReturnsError(t *testing.T) {
 	}
 }
 
-// A value that fails to convert, whether by error or by panic, fails the future instead of
-// unwinding into native, and an owned value that a failed conversion adopted
-// is disposed: its map no longer holds the runtime open.
+// A value that fails to convert, whether by error or by panic, fails the
+// future instead of unwinding into native.
 func TestCompletionDeliversExactlyOnce(t *testing.T) {
 	future, deliver := int32CompletionForTest(func(value int32) (int32, error) { return value, nil })
 	first := int32(7)
@@ -52,17 +51,6 @@ func TestCompletionDeliversExactlyOnce(t *testing.T) {
 	if _, err := panicking.Await(context.Background()); !errors.Is(err, StatusNativeError) {
 		t.Fatalf("a panicking conversion: %v, want StatusNativeError", err)
 	}
-
-	f := newRuntimeFixture(t)
-	owned, err := createMapFailingAfterAdoptionForTest(f.runtime)
-	if err != nil {
-		t.Fatal(err)
-	}
-	receive(t, owned.Done(), "the failing map creation")
-	if _, err := owned.Await(context.Background()); !errors.Is(err, StatusNativeError) {
-		t.Fatalf("a conversion that failed after adopting its map: %v, want StatusNativeError", err)
-	}
-	closeOnceCollected(t, f.runtime, "the disposal of the map the failed conversion adopted")
 }
 
 // An array result is read at the completion's value_size, which a native

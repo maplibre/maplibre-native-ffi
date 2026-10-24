@@ -65,7 +65,7 @@ final class WorkerSession {
     );
     worker = WorkerSession._(attachment.session);
     addTearDown(() => releaseSession(worker.session));
-    await within(attachment.completed, 'attachment');
+    await within(attachment.ready, 'attachment');
     return worker;
   }
 

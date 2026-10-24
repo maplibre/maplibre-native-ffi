@@ -28,11 +28,11 @@ auto mln_map_options_default(void) noexcept -> mln_map_options {
 }
 
 auto mln_runtime_create_map(
-  mln_runtime runtime, const mln_map_options* options,
+  mln_runtime runtime, const mln_map_options* options, mln_map* out_map,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::create_map_start(runtime, options, completion);
+    return mln::core::create_map_start(runtime, options, out_map, completion);
   });
 }
 

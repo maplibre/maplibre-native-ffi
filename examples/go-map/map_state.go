@@ -29,17 +29,18 @@ func newRuntimeMapState(v viewport, smoke bool) (*runtimeMapState, error) {
 	mapOptions := maplibre.DefaultMapOptions()
 	mapOptions.InitialExtent = v.extent()
 	mapOptions.EventMask = 0
-	mapFuture, err := runtimeHandle.CreateMap(mapOptions)
+	mapHandle, ready, err := runtimeHandle.CreateMap(mapOptions)
 	if err != nil {
 		_ = state.Close()
 		return nil, fmt.Errorf("map create failed: %w", err)
 	}
-	mapHandle, err := mapFuture.Await(context.Background())
-	if err != nil {
-		_ = state.Close()
-		return nil, fmt.Errorf("map create failed: %w", err)
-	}
+	// The map is ours from the call, so Close releases it even when its
+	// creation fails.
 	state.mapRef = mapHandle
+	if _, err = ready.Await(context.Background()); err != nil {
+		_ = state.Close()
+		return nil, fmt.Errorf("map create failed: %w", err)
+	}
 	if smoke {
 		_, err = mapHandle.SetStyleJson([]byte(smokeStyle))
 	} else {

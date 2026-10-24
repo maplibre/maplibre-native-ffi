@@ -92,11 +92,11 @@ final class RuntimeFixture {
 
   /// Creates a map that a teardown closes.
   Future<MapHandle> openMap([MapOptions? options]) async {
-    final map = await within(
-      runtime.createMap(options ?? mapOptionsDefault()),
-      'map creation',
+    final NewMap(:map, :ready) = runtime.createMap(
+      options ?? mapOptionsDefault(),
     );
     addTearDown(() => closeIfLive(map.close));
+    await within(ready, 'map creation');
     return map;
   }
 

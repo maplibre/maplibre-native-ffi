@@ -46,8 +46,8 @@ export interface Addon extends NativeOperations {
    * null when the batch could not be allocated.
    */
   drain(): DrainedEntry[] | undefined | null;
-  /** Converts a drained completion's value, taking its handle if `take`. */
-  completionValue(index: number, decoder: number, take: boolean): unknown;
+  /** Converts a drained completion's value. */
+  completionValue(index: number, decoder: number): unknown;
   /** Takes the owned handles of a drained delivery from the batch. */
   deliveryTake(index: number): void;
   batchRelease(): void;

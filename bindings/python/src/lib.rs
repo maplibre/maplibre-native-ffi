@@ -356,7 +356,6 @@ type PyCompletionConverter =
 struct PyCompletionBridge {
     future: Py<PyAny>,
     convert: Mutex<Option<PyCompletionConverter>>,
-    discard: Option<unsafe fn(&sys::mln_completion_result)>,
 }
 
 fn new_python_future(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
@@ -383,10 +382,9 @@ unsafe extern "C" fn complete_python_future(
         // release callback. The result is borrowed for this callback.
         let bridge = unsafe { &*user_data.cast::<PyCompletionBridge>() };
         let result = unsafe { &*result };
-        let attached = Python::try_attach(|py| {
+        let _ = Python::try_attach(|py| {
             // Claim the future before converting, as an executor claims its
-            // work. A future that cancel() abandoned first takes no value, so
-            // the binding disposes what the result transfers.
+            // work. A future that cancel() abandoned first takes no value.
             let claimed = bridge
                 .future
                 .bind(py)
@@ -394,10 +392,10 @@ unsafe extern "C" fn complete_python_future(
                 .and_then(|claimed| claimed.is_truthy());
             match claimed {
                 Ok(true) => {}
-                Ok(false) => return true,
+                Ok(false) => return,
                 Err(error) => {
                     error.write_unraisable(py, None);
-                    return true;
+                    return;
                 }
             }
             let converted = if result.status == sys::MLN_STATUS_OK {
@@ -423,16 +421,7 @@ unsafe extern "C" fn complete_python_future(
             if let Err(error) = call {
                 error.write_unraisable(py, None);
             }
-            false
         });
-        // Without an interpreter, or with an abandoned future, nothing adopts
-        // the value that the result transfers.
-        if attached.unwrap_or(true)
-            && result.status == sys::MLN_STATUS_OK
-            && let Some(discard) = bridge.discard
-        {
-            unsafe { discard(result) };
-        }
     })) {
         generated_report_panic(payload);
     }
@@ -451,15 +440,8 @@ unsafe extern "C" fn release_python_future(user_data: *mut c_void) {
 
 /// Submits a completion-based call and returns the future it resolves.
 ///
-/// `convert` receives only a result whose status is OK. `discard` disposes a
-/// value that the result transfers when nothing adopts it: the interpreter has
-/// already gone, or the caller cancelled the future first.
-fn submit_python_future<S, C>(
-    py: Python<'_>,
-    submit: S,
-    convert: C,
-    discard: Option<unsafe fn(&sys::mln_completion_result)>,
-) -> PyResult<Py<PyAny>>
+/// `convert` receives only a result whose status is OK.
+fn submit_python_future<S, C>(py: Python<'_>, submit: S, convert: C) -> PyResult<Py<PyAny>>
 where
     S: FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
     C: FnOnce(Python<'_>, &sys::mln_completion_result) -> PyResult<Py<PyAny>> + Send + 'static,
@@ -468,7 +450,6 @@ where
     let bridge = Box::new(PyCompletionBridge {
         future: future.clone_ref(py),
         convert: Mutex::new(Some(Box::new(convert))),
-        discard,
     });
     let bridge = Box::into_raw(bridge);
     let completion = sys::mln_completion {

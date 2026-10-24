@@ -5975,6 +5975,7 @@ static napi_value mln_ts_export_mln_runtime_create_map(
   mln_ts_call* call = &call_state;
   mln_runtime arg_runtime = 0;
   mln_map_options arg_options;
+  mln_map arg_out_map = MLN_HANDLE_NULL;
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
@@ -5996,9 +5997,10 @@ static napi_value mln_ts_export_mln_runtime_create_map(
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_runtime_create_map(
-    arg_runtime, &arg_options, present_completion, &diagnostic
+    arg_runtime, &arg_options, &arg_out_map, present_completion, &diagnostic
   );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_map);
 done:
   return mln_ts_end(call);
 }

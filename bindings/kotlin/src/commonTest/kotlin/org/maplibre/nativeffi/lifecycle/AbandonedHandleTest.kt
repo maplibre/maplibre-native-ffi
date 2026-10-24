@@ -65,8 +65,9 @@ private class MapHolder {
 
 /** Creates a map in [holder] and starts its style load, keeping no other reference to the map. */
 private suspend fun startStyleLoad(runtime: RuntimeHandle, holder: MapHolder) {
-  val map = runtime.createMap(smallMapOptions()).awaitWithin("the map")
+  val (map, ready) = runtime.createMap(smallMapOptions())
   holder.map = map
+  ready.awaitWithin("the map")
   map.setStyleUrl(ABANDONED_STYLE_URL).awaitWithin("the style command")
 }
 

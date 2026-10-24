@@ -200,7 +200,10 @@ pub const Fixture = struct {
         var map_options = maplibre.mapOptionsDefault();
         map_options.initial_extent = options.extent;
         map_options.map_mode = options.map_mode;
-        self.map = try resolve(try self.runtime.createMap(map_options, null));
+        const created = try self.runtime.createMap(map_options, null);
+        self.map = created.map;
+        errdefer self.map.deinit();
+        try resolve(created.ready);
         return self;
     }
 

@@ -15,9 +15,7 @@ import Testing
       try await runtime.setResourceProvider(denyingProvider(
         routes: ["custom://exit.json": emptyStyle]
       ))
-      let map = try await runtime.createMap(options: MapOptions(
-        initialExtent: LogicalExtent(width: 8, height: 8, scaleFactor: 1)
-      ))
+      let map = try await MapFixture.makeMap(on: runtime)
       try await map.setStyleUrl("custom://exit.json")
       // Keeps both handles referenced through the exit, so that neither one's
       // deinit retires it first.

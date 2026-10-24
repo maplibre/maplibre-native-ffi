@@ -291,8 +291,7 @@ class Conventions:
     def function(self, function: Function) -> dict[str, str]:
         """A function without a completion runs immediately, and a drain
         reports nothing queued as an absent output; a completion without a
-        result delivers none, and a result is one borrowed value unless it is a
-        handle, which the completion transfers."""
+        result delivers none, and a result is one borrowed value."""
         explicit = function.metadata
         defaults = {}
         if not has_completion(function):
@@ -305,15 +304,10 @@ class Conventions:
                 defaults.update(self.value(function.return_type, explicit))
             return defaults
         result = explicit.get("result", "void")
-        handle = self.typedefs.get(result)
         defaults.update(
             result="void",
             shape="none" if result == "void" else "value",
-            ownership="value"
-            if result == "void"
-            else "owned"
-            if handle and handle.metadata.get("kind") == "handle"
-            else "borrowed",
+            ownership="value" if result == "void" else "borrowed",
         )
         if result == BUFFER_VIEW:
             defaults["encoding"] = "utf8"
@@ -714,12 +708,16 @@ def validate(api: Api) -> None:
             ownership = metadata.get("ownership")
             if result == "void" and ownership != "value":
                 errors.append(f"{context}: void completion requires ownership=value")
-            if ownership == "owned":
-                handle = api.typedefs_by_name.get(result or "")
-                if handle is None or handle.metadata.get("kind") != "handle":
-                    errors.append(
-                        f"{context}: owned completion requires a declared handle type"
-                    )
+            # A handle that only a completion carries leaks if the host drops
+            # the completion, so a function returns a new handle through an
+            # out parameter at acceptance instead.
+            handle = api.typedefs_by_name.get(result or "")
+            if ownership == "owned" or (
+                handle is not None and handle.metadata.get("kind") == "handle"
+            ):
+                errors.append(
+                    f"{context}: a completion cannot deliver a handle; return it through an out parameter"
+                )
             if "encoding" in metadata and result != BUFFER_VIEW:
                 errors.append(f"{context}: encoded completion requires a buffer view")
             if metadata.get("optional") == "empty" and result != BUFFER_VIEW:
