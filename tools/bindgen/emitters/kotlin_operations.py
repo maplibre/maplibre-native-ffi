@@ -22,6 +22,9 @@ EXECUTIONS = {
     "event_batch",
 }
 
+# The locals that generated bodies declare, which a parameter must not shadow.
+# A parameter can share a helper function's name, because Kotlin resolves a call
+# to the function when the parameter's type has no `invoke`.
 LOCALS = {
     "handle",
     "completion",
@@ -34,18 +37,6 @@ LOCALS = {
     "bindingCallbacks",
     "scope",
     "block",
-    "adopt",
-    "adoptRegistered",
-    "attach",
-    "allocate",
-    "sized",
-    "check",
-    "present",
-    "argument",
-    "array",
-    "bytes",
-    "cString",
-    "view",
 }
 
 

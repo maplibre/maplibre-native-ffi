@@ -26,4 +26,7 @@ internal constructor(
   public override fun close() {
     release()
   }
+
+  override fun toString(): String =
+    "MapProjectionHandle(id=0x${binding.handle.toString(16)}, closed=${binding.isReleased})"
 }

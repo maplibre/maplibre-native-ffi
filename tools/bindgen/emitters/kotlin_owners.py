@@ -103,13 +103,19 @@ def owner(bound, native, plans):
             "  public override val isClosed: Boolean get() = binding.isReleased"
         )
     elif native == "mln_render_session":
-        body.append("  public val isClosed: Boolean get() = binding.isReleased")
+        body.append(
+            "  /** Whether a release or dispose has ended the handle. */\n"
+            "  public val isClosed: Boolean get() = binding.isReleased"
+        )
     if closes and not closes.inherited:
         body.append(
             f"  public override fun close() {{ {closes.method}() }}"
             if closes.member == "close"
             else f"  public override fun release(): kotlinx.coroutines.Deferred<Unit> = {closes.method}()"
         )
+    body.append(
+        f'  override fun toString(): String = "{owner_class}(id=0x${{binding.handle.toString(16)}}, closed=${{binding.isReleased}})"'
+    )
     return (
         "// Generated from handle ownership plans by tools/bindgen. Do not edit.\n"
         "package org.maplibre.nativeffi.generated\n\n"

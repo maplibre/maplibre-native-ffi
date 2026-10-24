@@ -304,10 +304,10 @@ public object GeneratedApi {
    * See `mln_map_projection_create` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
-  public fun mapProjectionCreate(viewValue: MapView): MapProjectionHandle =
+  public fun mapProjectionCreate(view: MapView): MapProjectionHandle =
     nativeCall(null, null) {
       val out = allocate(8, 8)
-      check(C.mln_map_projection_create(writeMapView(viewValue), out, diagnostic))
+      check(C.mln_map_projection_create(writeMapView(view), out, diagnostic))
       adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle(it) }
     }
 

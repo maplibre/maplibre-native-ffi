@@ -45,6 +45,15 @@ class HandleLifecycleTest {
   }
 
   @Test
+  fun aHandleNamesItsIdAndWhetherItIsClosed() {
+    val data = GeneratedApi.geojsonSourceDataCreate(POINT_JSON.encodeToByteArray())
+    val id = "0x" + data.id.toString(16)
+    assertEquals("GeojsonSourceDataHandle(id=$id, closed=false)", data.toString())
+    data.close()
+    assertEquals("GeojsonSourceDataHandle(id=$id, closed=true)", data.toString())
+  }
+
+  @Test
   fun useLeavesAnOwnerThatItsBlockReleased() = runSuspendTest {
     GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
       runtime.release().awaitWithin("the runtime teardown")

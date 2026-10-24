@@ -23,4 +23,7 @@ internal constructor(
    */
   public val id: ULong
     get() = binding.handle.toULong()
+
+  override fun toString(): String =
+    "AcquiredFrameHandle(id=0x${binding.handle.toString(16)}, closed=${binding.isReleased})"
 }

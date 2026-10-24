@@ -24,10 +24,14 @@ internal constructor(
   public val id: ULong
     get() = binding.handle.toULong()
 
+  /** Whether a release or dispose has ended the handle. */
   public val isClosed: Boolean
     get() = binding.isReleased
 
   public override fun close() {
     dispose()
   }
+
+  override fun toString(): String =
+    "RenderSessionHandle(id=0x${binding.handle.toString(16)}, closed=${binding.isReleased})"
 }

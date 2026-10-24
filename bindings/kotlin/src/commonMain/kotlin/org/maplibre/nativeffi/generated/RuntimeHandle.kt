@@ -25,4 +25,7 @@ internal constructor(
 
   public override val isClosed: Boolean
     get() = binding.isReleased
+
+  override fun toString(): String =
+    "RuntimeHandle(id=0x${binding.handle.toString(16)}, closed=${binding.isReleased})"
 }

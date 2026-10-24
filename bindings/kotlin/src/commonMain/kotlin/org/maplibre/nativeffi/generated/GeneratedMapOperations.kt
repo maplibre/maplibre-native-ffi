@@ -1721,10 +1721,15 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_update_camera(handle, writeCameraUpdate(update), completion, diagnostic))
     }
 
+  /**
+   * This handle's commands without their completions. A discarding call returns once native accepts
+   * the command, and native logs a command that fails as a warning.
+   */
   public val discarding: MapDiscarding
     get() = MapDiscarding(this)
 }
 
+/** The commands of a [MapHandle] that drop their completions. */
 @JvmInline
 public value class MapDiscarding internal constructor(private val owner: GeneratedMapOperations) {
   private val binding
@@ -1733,6 +1738,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
   private val bindingCallbacks
     get() = owner.bindingCallbacks
 
+  /** [MapHandle.addCustomGeometrySource] without its completion. */
   public fun addCustomGeometrySource(sourceId: String, options: CustomGeometrySourceOptions): Unit =
     nativeDiscard(owner, binding, bindingCallbacks) {
       check(
@@ -1746,6 +1752,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.addCustomMvtVectorSource] without its completion. */
   public fun addCustomMvtVectorSource(
     sourceId: String,
     options: CustomMvtVectorSourceOptions,
@@ -1762,6 +1769,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.addGeojsonSourceData] without its completion. */
   public fun addGeojsonSourceData(sourceId: String, data: GeojsonSourceDataHandle): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -1775,6 +1783,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.addGeojsonSourceUrl] without its completion. */
   public fun addGeojsonSourceUrl(
     sourceId: String,
     url: String,
@@ -1793,6 +1802,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.addImageSourceImage] without its completion. */
   public fun addImageSourceImage(
     sourceId: String,
     coordinates: List<LatLng>,
@@ -1812,6 +1822,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.addImageSourceUrl] without its completion. */
   public fun addImageSourceUrl(sourceId: String, coordinates: List<LatLng>, url: String): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -1827,6 +1838,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.addStyleLayerJson] without its completion. */
   public fun addStyleLayerJson(layerJson: ByteArray, beforeLayerId: String? = null): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -1840,6 +1852,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.addStyleSourceJson] without its completion. */
   public fun addStyleSourceJson(sourceId: String, sourceJson: ByteArray): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -1853,16 +1866,19 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.applyCameraDelta] without its completion. */
   public fun applyCameraDelta(delta: CameraDelta): Unit =
     nativeDiscard(owner, binding, bindingCallbacks) {
       check(C.mln_map_apply_camera_delta(handle, writeCameraDelta(delta), completion, diagnostic))
     }
 
+  /** [MapHandle.beginCommandGroup] without its completion. */
   public fun beginCommandGroup(): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_begin_command_group(handle, completion, diagnostic))
     }
 
+  /** [MapHandle.cancelCameraTransition] without its completion. */
   public fun cancelCameraTransition(transitionId: ULong): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -1870,21 +1886,25 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.cancelTransitions] without its completion. */
   public fun cancelTransitions(): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_cancel_transitions(handle, completion, diagnostic))
     }
 
+  /** [MapHandle.dumpDebugLogs] without its completion. */
   public fun dumpDebugLogs(): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_dump_debug_logs(handle, completion, diagnostic))
     }
 
+  /** [MapHandle.endCommandGroup] without its completion. */
   public fun endCommandGroup(): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_end_command_group(handle, completion, diagnostic))
     }
 
+  /** [MapHandle.invalidateCustomGeometrySourceRegion] without its completion. */
   public fun invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -1898,6 +1918,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.invalidateCustomGeometrySourceTile] without its completion. */
   public fun invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileId): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -1911,6 +1932,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.invalidateCustomMvtVectorSourceTile] without its completion. */
   public fun invalidateCustomMvtVectorSourceTile(sourceId: String, tileId: CanonicalTileId): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -1924,6 +1946,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.moveStyleLayer] without its completion. */
   public fun moveStyleLayer(layerId: String, beforeLayerId: String? = null): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -1937,6 +1960,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.removeFeatureState] without its completion. */
   public fun removeFeatureState(selector: FeatureStateSelector): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -1949,36 +1973,43 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.removeStyleImage] without its completion. */
   public fun removeStyleImage(imageId: String): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_remove_style_image(handle, view(imageId), completion, diagnostic))
     }
 
+  /** [MapHandle.removeStyleLayer] without its completion. */
   public fun removeStyleLayer(layerId: String): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_remove_style_layer(handle, view(layerId), completion, diagnostic))
     }
 
+  /** [MapHandle.removeStyleSource] without its completion. */
   public fun removeStyleSource(sourceId: String): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_remove_style_source(handle, view(sourceId), completion, diagnostic))
     }
 
+  /** [MapHandle.requestRepaint] without its completion. */
   public fun requestRepaint(): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_request_repaint(handle, completion, diagnostic))
     }
 
+  /** [MapHandle.resize] without its completion. */
   public fun resize(extent: LogicalExtent): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_resize(handle, writeLogicalExtent(extent), completion, diagnostic))
     }
 
+  /** [MapHandle.setBounds] without its completion. */
   public fun setBounds(options: BoundOptions): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_set_bounds(handle, writeBoundOptions(options), completion, diagnostic))
     }
 
+  /** [MapHandle.setCustomGeometrySourceTileData] without its completion. */
   public fun setCustomGeometrySourceTileData(
     sourceId: String,
     tileId: CanonicalTileId,
@@ -1997,6 +2028,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setCustomGeometrySourceTileError] without its completion. */
   public fun setCustomGeometrySourceTileError(
     sourceId: String,
     tileId: CanonicalTileId,
@@ -2015,6 +2047,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setCustomMvtVectorSourceTileData] without its completion. */
   public fun setCustomMvtVectorSourceTileData(
     sourceId: String,
     tileId: CanonicalTileId,
@@ -2033,6 +2066,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setCustomMvtVectorSourceTileError] without its completion. */
   public fun setCustomMvtVectorSourceTileError(
     sourceId: String,
     tileId: CanonicalTileId,
@@ -2051,16 +2085,19 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setDebugOptions] without its completion. */
   public fun setDebugOptions(options: MapDebugOption): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_set_debug_options(handle, options.rawValue.toInt(), completion, diagnostic))
     }
 
+  /** [MapHandle.setEventMask] without its completion. */
   public fun setEventMask(mask: RuntimeEventMask): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_set_event_mask(handle, mask.rawValue.toLong(), completion, diagnostic))
     }
 
+  /** [MapHandle.setFeatureState] without its completion. */
   public fun setFeatureState(selector: FeatureStateSelector, state: ByteArray): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -2074,6 +2111,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setFreeCameraOptions] without its completion. */
   public fun setFreeCameraOptions(options: FreeCameraOptions): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -2086,6 +2124,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setGeojsonSourceData] without its completion. */
   public fun setGeojsonSourceData(sourceId: String, data: GeojsonSourceDataHandle): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -2099,6 +2138,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setGeojsonSourceSynchronousTiling] without its completion. */
   public fun setGeojsonSourceSynchronousTiling(sourceId: String, enabled: Boolean): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -2112,6 +2152,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setGeojsonSourceUrl] without its completion. */
   public fun setGeojsonSourceUrl(sourceId: String, url: String): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -2119,6 +2160,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setGlobalStateProperty] without its completion. */
   public fun setGlobalStateProperty(propertyName: String, value: ByteArray): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -2132,6 +2174,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setImageSourceCoordinates] without its completion. */
   public fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -2146,6 +2189,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setImageSourceImage] without its completion. */
   public fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -2159,6 +2203,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setImageSourceUrl] without its completion. */
   public fun setImageSourceUrl(sourceId: String, url: String): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -2166,6 +2211,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setProjectionMode] without its completion. */
   public fun setProjectionMode(mode: ProjectionMode): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -2173,11 +2219,13 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setRenderingStatsViewEnabled] without its completion. */
   public fun setRenderingStatsViewEnabled(enabled: Boolean): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_set_rendering_stats_view_enabled(handle, enabled, completion, diagnostic))
     }
 
+  /** [MapHandle.setStyleImage] without its completion. */
   public fun setStyleImage(
     imageId: String,
     image: PremultipliedRgba8Image,
@@ -2196,11 +2244,13 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setStyleJson] without its completion. */
   public fun setStyleJson(json: ByteArray): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_set_style_json(handle, view(json), completion, diagnostic))
     }
 
+  /** [MapHandle.setStyleLayerProperty] without its completion. */
   public fun setStyleLayerProperty(layerId: String, propertyName: String, value: ByteArray): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -2215,11 +2265,13 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setStyleLightJson] without its completion. */
   public fun setStyleLightJson(lightJson: ByteArray): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_set_style_light_json(handle, view(lightJson), completion, diagnostic))
     }
 
+  /** [MapHandle.setStyleLightProperty] without its completion. */
   public fun setStyleLightProperty(propertyName: String, value: ByteArray): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -2233,6 +2285,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setStyleSourceVolatile] without its completion. */
   public fun setStyleSourceVolatile(sourceId: String, isVolatile: Boolean): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -2246,6 +2299,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setStyleTransitionOptions] without its completion. */
   public fun setStyleTransitionOptions(options: StyleTransitionOptions): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -2258,11 +2312,13 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setStyleUrl] without its completion. */
   public fun setStyleUrl(url: String): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_set_style_url(handle, view(url), completion, diagnostic))
     }
 
+  /** [MapHandle.setTileOptions] without its completion. */
   public fun setTileOptions(options: MapTileOptions): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -2270,6 +2326,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.setViewportOptions] without its completion. */
   public fun setViewportOptions(options: MapViewportOptions): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -2282,6 +2339,7 @@ public value class MapDiscarding internal constructor(private val owner: Generat
       )
     }
 
+  /** [MapHandle.updateCamera] without its completion. */
   public fun updateCamera(update: CameraUpdate): Unit =
     nativeDiscard(owner, binding, bindingCallbacks) {
       check(C.mln_map_update_camera(handle, writeCameraUpdate(update), completion, diagnostic))

@@ -470,16 +470,22 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
       )
     }
 
+  /**
+   * This handle's commands without their completions. A discarding call returns once native accepts
+   * the command, and native logs a command that fails as a warning.
+   */
   public val discarding: RenderSessionDiscarding
     get() = RenderSessionDiscarding(this)
 }
 
+/** The commands of a [RenderSessionHandle] that drop their completions. */
 @JvmInline
 public value class RenderSessionDiscarding
 internal constructor(private val owner: GeneratedRenderSessionOperations) {
   private val binding
     get() = owner.binding
 
+  /** [RenderSessionHandle.resize] without its completion. */
   public fun resize(extent: LogicalExtent): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_render_session_resize(handle, writeLogicalExtent(extent), completion, diagnostic))

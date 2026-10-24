@@ -22,11 +22,12 @@ from . import kotlin_callbacks, kotlin_owners
 from .kotlin_native import NativeShims
 from .kotlin_operations import (
     Native,
+    method_name,
     operation,
     owner_disposal,
     receiver_value,
 )
-from .kotlin_values import Unsupported, Values, generated_owners
+from .kotlin_values import Unsupported, Values, generated_owners, owner_name
 from .kotlin_values import name as value_name
 
 COMMON = "src/commonMain/kotlin/org/maplibre/nativeffi"
@@ -218,8 +219,14 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
             commands = [p for p in plans if p.completion and p.completion.discardable]
             if commands:
                 view = f"{family}Discarding"
+                owner = owner_name(bound.handles[receiver])
                 source = source.removesuffix("}\n") + (
+                    "  /**\n"
+                    "   * This handle's commands without their completions. A discarding call returns once native\n"
+                    "   * accepts the command, and native logs a command that fails as a warning.\n"
+                    "   */\n"
                     f"  public val discarding: {view} get() = {view}(this)\n}}\n\n"
+                    f"/** The commands of a [{owner}] that drop their completions. */\n"
                     f"@JvmInline\npublic value class {view} internal constructor(private val owner: {class_name}) {{\n"
                     f"  private val binding get() = owner.binding\n"
                     + (
@@ -228,7 +235,9 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                         else ""
                     )
                     + "\n".join(
-                        operation(p, values, native, discard=True) for p in commands
+                        f"  /** [{owner}.{method_name(p)}] without its completion. */\n"
+                        + operation(p, values, native, discard=True)
+                        for p in commands
                     )
                     + "}\n"
                 )
