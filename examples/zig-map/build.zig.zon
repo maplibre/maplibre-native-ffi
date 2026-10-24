@@ -2,10 +2,8 @@
     .name = .zig_map,
     .version = "0.16.0",
     .dependencies = .{
-        // Pinned to the mitchellh/zig-objc#36 head for Zig 0.17 support.
-        // Move this back to an upstream main commit once #36 merges.
         .zig_objc = .{
-            .url = "https://github.com/mitchellh/zig-objc/archive/3352c12a868f8787ab71bf2ca6eab9fcfb635c52.tar.gz",
+            .url = "https://github.com/mitchellh/zig-objc/archive/bee663fdfaa0c554235dc36b1dce88d136a190ec.tar.gz",
             .hash = "zig_objc-0.0.0-Ir_Sp_4tAQDXtPi51nW_jD9LOEzBvU9lofwO9Pzi6IB4",
         },
         .maplibre_native_ffi = .{ .path = "../.." },
