@@ -14,7 +14,8 @@ class AndroidEmulatorRunnerTest(unittest.TestCase):
         self.directory = Path(temporary.name)
         sdk = self.directory / "sdk"
         (sdk / "platform-tools").mkdir(parents=True)
-        # The test's own command ends as FAKE_TEST_ADB_STATUS says, after it
+        # The ABI query ends as FAKE_ABI_ADB_STATUS says. The test's own
+        # command ends as FAKE_TEST_ADB_STATUS says, after it
         # prints FAKE_TEST_OUTPUT, and when FAKE_EMULATOR_EXITS is set, the
         # emulator's console stops naming its AVD from then on. A push ends as
         # FAKE_PUSH_ADB_STATUS says. The device log holds an adbd line among
@@ -24,7 +25,7 @@ class AndroidEmulatorRunnerTest(unittest.TestCase):
         adb.write_text(
             "#!/usr/bin/env bash\n"
             'case "$*" in\n'
-            '  *"getprop ro.product.cpu.abi"*) echo x86_64 ;;\n'
+            '  *"getprop ro.product.cpu.abi"*) echo x86_64; exit "$FAKE_ABI_ADB_STATUS" ;;\n'
             '  *"getprop ro.build.version.sdk"*) echo 26 ;;\n'
             f'  *"emu avd name"*) [[ ! -e "{exited}" ]] || exit 1; echo api-26-x86_64 ;;\n'
             "  *__MLN_FFI_TEST_STATUS__*)\n"
@@ -55,6 +56,7 @@ class AndroidEmulatorRunnerTest(unittest.TestCase):
             "FAKE_TEST_OUTPUT": "",
             "FAKE_TEST_ADB_STATUS": "0",
             "FAKE_PUSH_ADB_STATUS": "0",
+            "FAKE_ABI_ADB_STATUS": "0",
         }
 
     def run_test(self, **environment):
@@ -115,6 +117,12 @@ class AndroidEmulatorRunnerTest(unittest.TestCase):
         self.assertIn(
             "adb exited 1 during the push of libmaplibre-native-c.so.", result.stderr
         )
+        self.assertIn("the adbd line", result.stderr)
+
+    def test_a_failed_device_query_exits_with_the_adb_status(self):
+        result = self.run_test(FAKE_ABI_ADB_STATUS="255")
+        self.assertEqual(result.returncode, 255, result.stderr)
+        self.assertIn("adb exited 255 during the ABI query.", result.stderr)
         self.assertIn("the adbd line", result.stderr)
 
 

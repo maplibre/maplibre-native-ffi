@@ -51,6 +51,9 @@ timeout_scale=${MLN_TEST_TIMEOUT_SCALE:-3}
 # has a directory of its own and removes it when it ends.
 remote_dir=/data/local/tmp/maplibre-native-ffi-$$
 fixture_dir=${MLN_FFI_TEST_FIXTURE_DIR:-}
+# The AVD of the emulator the tests run on, once the device is known; a device
+# that is no emulator has none.
+avd_name=
 adb="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}/platform-tools/adb"
 
 for local_file in "$native_library" ${extra_libraries[@]+"${extra_libraries[@]}"} "${test_executables[@]}"; do
@@ -142,8 +145,6 @@ else
     serial=$("$serial_script" "$abi" "$emulator_api")
   fi
 fi
-# Names the emulator's AVD, so a failure can report on the emulator; a device
-# that is no emulator has none.
 avd_name=$("$adb" -s "$serial" emu avd name 2>/dev/null | sed -n 's/\r$//;1p') || avd_name=
 
 remove_remote_dir() {
