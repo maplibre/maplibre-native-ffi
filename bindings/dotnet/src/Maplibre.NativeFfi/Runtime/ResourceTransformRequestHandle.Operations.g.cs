@@ -67,16 +67,4 @@ public sealed unsafe partial class ResourceTransformRequestHandle
         );
         scope.Accept();
     }
-
-    /// <summary>
-    /// Releases a resource transform request.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_resource_transform_request_release</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
-    /// </remarks>
-    public void Close()
-    {
-        state.Close();
-    }
 }

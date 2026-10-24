@@ -2272,8 +2272,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Submits each command without a completion. Native logs a failure as
+    /// a warning, and the caller sees none.
+    /// </summary>
     public DiscardingCommands Discarding => new(this);
 
+    /// <summary>
+    /// The commands of a handle, each submitted without a completion.
+    /// Native logs a failure as a warning, and the caller sees none.
+    /// </summary>
     public readonly struct DiscardingCommands
     {
         private readonly MapHandle owner;

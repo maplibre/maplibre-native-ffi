@@ -35,7 +35,7 @@ public sealed class ResourceProviderTests
         handle.Complete(StyleResponse());
         await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
 
-        handle.Close();
+        handle.Dispose();
     }
 
     // A request outside the routes passes through to native loading, which refuses the scheme.
@@ -76,7 +76,7 @@ public sealed class ResourceProviderTests
                                 ErrorReason = ResourceErrorReason.NotFound,
                             }
                     );
-                    handle.Close();
+                    handle.Dispose();
                     if (request.Kind == ResourceKind.Source)
                         sourceRequested.TrySetResult();
                     return ResourceProviderDecision.Handle;
@@ -192,7 +192,7 @@ public sealed class ResourceProviderTests
         await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
         Assert.True(Gc.IsAlive(captured));
 
-        handle.Close();
+        handle.Dispose();
         Assert.False(Gc.IsAlive(captured));
         Assert.Equal(0, calls);
     }
@@ -219,7 +219,7 @@ public sealed class ResourceProviderTests
 
         Assert.True(cancelled);
         Assert.False(Gc.IsAlive(captured));
-        handle.Close();
+        handle.Dispose();
         Assert.Equal(0, calls);
     }
 

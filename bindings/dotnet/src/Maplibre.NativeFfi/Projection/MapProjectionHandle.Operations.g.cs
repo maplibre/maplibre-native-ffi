@@ -253,18 +253,6 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Releases a standalone projection.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_projection_release</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
-    /// </remarks>
-    public void Close()
-    {
-        state.Close();
-    }
-
-    /// <summary>
     /// Applies a camera update to a standalone projection.
     /// </summary>
     /// <remarks>

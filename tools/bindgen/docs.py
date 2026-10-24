@@ -218,14 +218,18 @@ def xml_comment(doc: Doc | None, indent: str = "") -> str:
         return ""
     width = WIDTH - len(indent) - 4
     lines = ["<summary>", *_wrap(_xml_text(doc.summary), width), "</summary>"]
+    remarks = [_xml_text(note) for note in doc.notes]
     if doc.url:
+        remarks.append(
+            f"See <c>{_xml_escape(doc.symbol)}</c> in the "
+            f'<see href="{_xml_escape(doc.url)}">C API reference</see>.'
+        )
+    if len(remarks) > 1:
+        remarks = [f"<para>{remark}</para>" for remark in remarks]
+    if remarks:
         lines += [
             "<remarks>",
-            *_wrap(
-                f"See <c>{_xml_escape(doc.symbol)}</c> in the "
-                f'<see href="{_xml_escape(doc.url)}">C API reference</see>.',
-                width,
-            ),
+            *(line for remark in remarks for line in _wrap(remark, width)),
             "</remarks>",
         ]
     return "".join(f"{indent}/// {line}\n" for line in lines)

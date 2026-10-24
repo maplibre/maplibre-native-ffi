@@ -9,17 +9,26 @@ namespace Maplibre.NativeFfi;
 /// A render session, which renders one map to one render target.
 /// </summary>
 /// <remarks>
-/// See <c>mln_render_session</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
+/// <para>With a caller-graphics-thread driver, <c>Attached</c>,
+/// <c>DetachAsync</c>, <c>BarrierAsync</c>, and <c>ResizeAsync</c> progress
+/// only through <c>ServiceDriverWork</c>, so awaiting one on the graphics
+/// thread without servicing driver work never completes.</para>
+/// <para>See <c>mln_render_session</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.</para>
 /// </remarks>
 public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwner<MlnRenderSession>
 {
     private readonly NativeHandleState<MlnRenderSession> state;
-    public Task Completion { get; }
+
+    /// <summary>
+    /// Completes once the driver owns the target, and faults with a
+    /// <see cref="MaplibreException" /> when the attachment fails.
+    /// </summary>
+    public Task Attached { get; }
 
     internal RenderSessionHandle(MapHandle parent, MlnRenderSession handle, Task completion)
     {
-        Completion = completion
+        Attached = completion
             .ContinueWith(
                 static (finished, retained) =>
                 {
@@ -444,8 +453,12 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// Core-worker sessions return <c>MLN_STATUS_INVALID_STATE</c>.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_service_driver_work</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para>With a caller-graphics-thread driver, <c>Attached</c>,
+    /// <c>DetachAsync</c>, <c>BarrierAsync</c>, and <c>ResizeAsync</c> progress
+    /// only through <c>ServiceDriverWork</c>, so awaiting one on the graphics
+    /// thread without servicing driver work never completes.</para>
+    /// <para>See <c>mln_render_session_service_driver_work</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// </remarks>
     public void ServiceDriverWork()
     {
@@ -661,8 +674,16 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         );
     }
 
+    /// <summary>
+    /// Submits each command without a completion. Native logs a failure as
+    /// a warning, and the caller sees none.
+    /// </summary>
     public DiscardingCommands Discarding => new(this);
 
+    /// <summary>
+    /// The commands of a handle, each submitted without a completion.
+    /// Native logs a failure as a warning, and the caller sees none.
+    /// </summary>
     public readonly struct DiscardingCommands
     {
         private readonly RenderSessionHandle owner;

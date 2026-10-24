@@ -72,7 +72,7 @@ public sealed class ResourceTransformTests
                     if (url == styleUrl)
                         received.TrySetResult(request);
                     else
-                        request.Close();
+                        request.Dispose();
                 }
             ),
             TestWaits.Token
@@ -83,7 +83,7 @@ public sealed class ResourceTransformTests
         await Task.Run(() =>
         {
             request.Complete("unsupported://rewritten.json");
-            request.Close();
+            request.Dispose();
         });
         // The online source cannot load the rewritten scheme.
         await fixture.WaitForMapEventAsync(RuntimeEventType.MapLoadingFailed);

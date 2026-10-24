@@ -34,7 +34,7 @@ internal sealed class NativeFixture : IAsyncDisposable
                         ErrorMessage = "The test fixture serves no resources.",
                     }
                 );
-                request.Close();
+                request.Dispose();
                 return ResourceProviderDecision.Handle;
             },
         };

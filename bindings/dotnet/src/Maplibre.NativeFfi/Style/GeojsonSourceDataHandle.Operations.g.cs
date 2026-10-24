@@ -72,16 +72,4 @@ public sealed unsafe partial class GeojsonSourceDataHandle
         scope.Accept();
         return GeojsonSourceDataHandle.Adopt(outData);
     }
-
-    /// <summary>
-    /// Releases prepared GeoJSON source data.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_geojson_source_data_release</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public void Close()
-    {
-        state.Close();
-    }
 }

@@ -64,16 +64,4 @@ public sealed unsafe partial class RenderFrameBatchHandle
         Check(NativeMethods.mln_render_frame_batch_get(read.Handle, &outView, Diagnostic));
         return CopyRenderFrameBatchView(outView);
     }
-
-    /// <summary>
-    /// Releases a frame-result batch.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_render_frame_batch_release</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
-    /// </remarks>
-    public void Close()
-    {
-        state.Close();
-    }
 }

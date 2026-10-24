@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
@@ -119,9 +119,26 @@ PRIMITIVES = {
 }
 
 
+CALLER_DRIVER_NOTE = (
+    "With a caller-graphics-thread driver, `Attached`, `DetachAsync`, "
+    "`BarrierAsync`, and `ResizeAsync` progress only through "
+    "`ServiceDriverWork`, so awaiting one on the graphics thread without "
+    "servicing driver work never completes."
+)
+
+# Paragraphs about what .NET adds to a declaration's C contract.
+NOTES = {
+    "mln_render_session": (CALLER_DRIVER_NOTE,),
+    "mln_render_session_service_driver_work": (CALLER_DRIVER_NOTE,),
+}
+
+
 def doc(bound: BoundApi, native: str, indent: str = "") -> str:
     """The XML doc comment of a declaration, or empty when it has none."""
-    return docs.xml_comment(bound.doc(native), indent)
+    found = bound.doc(native)
+    if found is not None and native in NOTES:
+        found = replace(found, notes=(*found.notes, *NOTES[native]))
+    return docs.xml_comment(found, indent)
 
 
 def owner_name(handle: HandlePlan | str) -> str:
@@ -769,6 +786,9 @@ def emit_operation(
             and handle_plan.release == function.name
             and len(function.parameters) == 1
         ):
+            # Dispose already runs the release when no separate dispose exists.
+            if handle_plan.dispose in {None, handle_plan.release}:
+                return owners[receiver], "", set()
             return (
                 owners[receiver],
                 "    public void Close() { state.Close(); }\n",
@@ -897,7 +917,8 @@ def emit(api: Api | BoundApi) -> Emission:
         except Unsupported as error:
             unsupported[function.name] = f"{function.location}: {error}"
             continue
-        methods[owner].append(doc(bound, function.name, "    ") + emitted)
+        if emitted:
+            methods[owner].append(doc(bound, function.name, "    ") + emitted)
         if plan.receiver and plan.completion and plan.completion.discardable:
             _, discarded, _ = emit_operation(plan, bound, discard=True)
             discards[owner].append(discarded)
@@ -970,11 +991,17 @@ def emit(api: Api | BoundApi) -> Emission:
         if asynchronous_release:
             fields.append("private volatile Task teardown = Task.CompletedTask;")
         if immediate_completion:
-            fields.append("public Task Completion { get; }")
+            fields.append(
+                "/// <summary>\n"
+                "    /// Completes once the driver owns the target, and faults with a\n"
+                '    /// <see cref="MaplibreException" /> when the attachment fails.\n'
+                "    /// </summary>\n"
+                "    public Task Attached { get; }"
+            )
         constructor = []
         if immediate_completion:
             constructor.append(
-                "Completion = completion.ContinueWith(static (finished, retained) => { GC.KeepAlive(retained); return finished; }, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();"
+                "Attached = completion.ContinueWith(static (finished, retained) => { GC.KeepAlive(retained); return finished; }, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();"
             )
         constructor.append(
             f"state = new(handle, {destroy}, nameof({owner}), Abandon{', protectsCopies: true' if handle.native == 'mln_render_frame_batch' else ''}{', retainedParent: parent' if handle.parent else ''});"
@@ -1042,7 +1069,15 @@ def emit(api: Api | BoundApi) -> Emission:
     for owner, body in sorted(methods.items()):
         if owner in discards:
             body.append(
-                "    public DiscardingCommands Discarding => new(this);\n"
+                "    /// <summary>\n"
+                "    /// Submits each command without a completion. Native logs a failure as\n"
+                "    /// a warning, and the caller sees none.\n"
+                "    /// </summary>\n"
+                "    public DiscardingCommands Discarding => new(this);\n\n"
+                "    /// <summary>\n"
+                "    /// The commands of a handle, each submitted without a completion.\n"
+                "    /// Native logs a failure as a warning, and the caller sees none.\n"
+                "    /// </summary>\n"
                 "    public readonly struct DiscardingCommands\n    {\n"
                 f"        private readonly {owner} owner;\n"
                 f"        internal DiscardingCommands({owner} owner) {{ this.owner = owner; }}\n"

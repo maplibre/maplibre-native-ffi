@@ -58,6 +58,19 @@ class RenderTests(unittest.TestCase):
         "https://example.invalid/api_8h.html",  # lint: not-fetched
     )
 
+    def test_xml_comment_puts_notes_before_the_reference_in_remarks(self):
+        url = "https://example.invalid/x_8h.html"  # lint: not-fetched
+        doc = Doc("mln_x", "Does x.", url, ("Uses `y`.",))
+        comment = docs.xml_comment(doc)
+        remarks = ElementTree.fromstring(
+            "<doc>"
+            + " ".join(line.removeprefix("/// ") for line in comment.splitlines())
+            + "</doc>"
+        ).find("remarks")
+        paragraphs = remarks.findall("para")
+        self.assertEqual(paragraphs[0].find("c").text, "y")
+        self.assertEqual(paragraphs[1].find("see").get("href"), doc.url)
+
     def test_xml_param_documents_a_positional_property(self):
         param = docs.xml_param(self.doc, "Range", "    ")
         element = ElementTree.fromstring(

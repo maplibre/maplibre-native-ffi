@@ -92,18 +92,6 @@ public sealed unsafe partial class ResourceRequestHandle
     }
 
     /// <summary>
-    /// Releases the provider's reference to a resource request handle.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_resource_request_release</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
-    /// </remarks>
-    public void Close()
-    {
-        state.Close();
-    }
-
-    /// <summary>
     /// Registers a callback that runs when MapLibre cancels a C API resource
     /// provider request.
     /// </summary>

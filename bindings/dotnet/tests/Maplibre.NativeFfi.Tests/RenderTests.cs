@@ -16,7 +16,7 @@ public sealed class RenderTests
             backend,
             fixture =>
             {
-                fixture.Await(fixture.Session.Completion, "the attachment");
+                fixture.Await(fixture.Session.Attached, "the attachment");
                 fixture.RenderFrame();
 
                 var image = fixture.Await(
@@ -48,7 +48,7 @@ public sealed class RenderTests
             fixture =>
             {
                 var session = fixture.Session;
-                fixture.Await(session.Completion, "the attachment");
+                fixture.Await(session.Attached, "the attachment");
                 // Native reports both calls as not ready, which reads as null.
                 Assert.Null(session.DrainFrameResults());
                 Assert.Null(session.AcquireFrame());
@@ -66,8 +66,8 @@ public sealed class RenderTests
             {
                 var session = fixture.Session;
                 // Only the graphics thread services the session, and it has not yet.
-                Assert.False(session.Completion.IsCompleted);
-                fixture.Await(session.Completion, "the attachment");
+                Assert.False(session.Attached.IsCompleted);
+                fixture.Await(session.Attached, "the attachment");
                 Assert.Equal(
                     RenderDriverKind.CallerGraphicsThread,
                     session.GetCapabilities().Driver
@@ -92,7 +92,7 @@ public sealed class RenderTests
             fixture =>
             {
                 var session = fixture.Session;
-                fixture.Await(session.Completion, "the attachment");
+                fixture.Await(session.Attached, "the attachment");
                 var rendered = fixture.RenderFrame();
                 using var frame =
                     session.AcquireFrame()

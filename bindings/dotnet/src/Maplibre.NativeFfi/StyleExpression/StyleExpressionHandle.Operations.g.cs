@@ -127,16 +127,4 @@ public sealed unsafe partial class StyleExpressionHandle
         Check(NativeMethods.mln_style_expression_get_info(Handle, &outInfo, Diagnostic));
         return CopyStyleExpressionInfo(outInfo);
     }
-
-    /// <summary>
-    /// Releases a style expression.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_style_expression_release</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html">C API reference</see>.
-    /// </remarks>
-    public void Close()
-    {
-        state.Close();
-    }
 }
