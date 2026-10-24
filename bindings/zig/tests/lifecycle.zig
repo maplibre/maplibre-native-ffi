@@ -116,10 +116,9 @@ test "a refused close leaves the handle usable and a later close succeeds" {
     try fixture.closeMap();
 }
 
-fn ignoreEvents(_: ?*anyopaque, _: maplibre.EventBatchView) maplibre.Error!void {}
+fn ignoreEvents(_: *support.Counter, _: maplibre.EventBatchView) void {}
 
-fn countRelease(context: ?*anyopaque) void {
-    const counter: *support.Counter = @ptrCast(@alignCast(context.?));
+fn countRelease(counter: *support.Counter) void {
     counter.add();
 }
 
@@ -131,11 +130,7 @@ test "a child map keeps its disposed runtime's callbacks alive" {
     var options = try maplibre.runtimeOptionsDefault(testing.allocator);
     defer options.deinit();
     var runtime = try maplibre.runtimeCreate(testing.allocator, options.value, null);
-    try support.resolve(try maplibre.runtimeSetEventHandler(testing.allocator, runtime, .{
-        .callback = ignoreEvents,
-        .context = &handler_releases,
-        .release_context = countRelease,
-    }, null));
+    try support.resolve(try maplibre.runtimeSetEventHandler(testing.allocator, runtime, .init(&handler_releases, ignoreEvents, countRelease), null));
     var map = try support.resolve(try maplibre.runtimeCreateMap(testing.allocator, runtime, maplibre.mapOptionsDefault(), null));
 
     runtime.deinit();

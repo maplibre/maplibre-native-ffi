@@ -7,15 +7,16 @@ const testing = std.testing;
 const maplibre = @import("maplibre_native_ffi");
 const support = @import("fixture.zig");
 
-fn fetchNothing(_: ?*anyopaque, _: maplibre.CanonicalTileId) maplibre.Error!void {}
+fn fetchNothing(_: *support.Counter, _: maplibre.CanonicalTileId) void {}
 
-fn countRelease(context: ?*anyopaque) void {
-    const counter: *support.Counter = @ptrCast(@alignCast(context.?));
+fn countRelease(counter: *support.Counter) void {
     counter.add();
 }
 
 fn customSource(counter: *support.Counter, max_zoom: ?f64) maplibre.CustomGeometrySourceOptions {
-    return .{ .fetch_tile = fetchNothing, .context = counter, .release_context = countRelease, .max_zoom = max_zoom };
+    var options = maplibre.CustomGeometrySourceOptions.init(counter, fetchNothing, null, countRelease);
+    options.max_zoom = max_zoom;
+    return options;
 }
 
 // The binding roots a registration's context from submission until native
@@ -55,19 +56,17 @@ const LogProbe = struct {
     saw_parse_error: support.Flag = .{},
     releases: support.Counter = .{},
 
-    fn record(context: ?*anyopaque, severity: maplibre.LogSeverity, event: maplibre.LogEvent, _: i64, message: []const u8) maplibre.Error!u32 {
-        const self: *LogProbe = @ptrCast(@alignCast(context.?));
+    fn record(self: *LogProbe, severity: maplibre.LogSeverity, event: maplibre.LogEvent, _: i64, message: []const u8) maplibre.Error!u32 {
         if (severity == .@"error" and event == .parse_style and message.len != 0) self.saw_parse_error.set();
         return 1;
     }
 
-    fn released(context: ?*anyopaque) void {
-        const self: *LogProbe = @ptrCast(@alignCast(context.?));
+    fn released(self: *LogProbe) void {
         self.releases.add();
     }
 
     fn handler(self: *LogProbe) maplibre.LogHandler {
-        return .{ .callback = record, .context = self, .release_context = released };
+        return .init(self, record, released);
     }
 };
 
@@ -126,8 +125,7 @@ const DeferringProvider = struct {
     taken: support.Counter = .{},
     handles: [4]maplibre.ResourceRequest = undefined,
 
-    fn provide(context: ?*anyopaque, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
-        const self: *DeferringProvider = @ptrCast(@alignCast(context.?));
+    fn provide(self: *DeferringProvider, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
         if (!std.mem.eql(u8, request.requested_url orelse "", self.url)) {
             try maplibre.resourceRequestComplete(std.heap.smp_allocator, handle, .{ .status = .@"error", .error_reason = .not_found }, null);
             var owned = handle;
@@ -141,7 +139,7 @@ const DeferringProvider = struct {
     }
 
     fn install(self: *DeferringProvider, fixture: *support.Fixture) !void {
-        try fixture.setProvider(.{ .callback = provide, .context = self });
+        try fixture.setProvider(.init(self, provide, null));
     }
 
     fn take(self: *DeferringProvider, fixture: *support.Fixture) !maplibre.ResourceRequest {
@@ -210,13 +208,11 @@ const CancelProbe = struct {
     cancels: support.Counter = .{},
     releases: support.Counter = .{},
 
-    fn cancelled(context: ?*anyopaque) maplibre.Error!void {
-        const self: *CancelProbe = @ptrCast(@alignCast(context.?));
+    fn cancelled(self: *CancelProbe) maplibre.Error!void {
         self.cancels.add();
     }
 
-    fn released(context: ?*anyopaque) void {
-        const self: *CancelProbe = @ptrCast(@alignCast(context.?));
+    fn released(self: *CancelProbe) void {
         self.releases.add();
     }
 };
@@ -242,11 +238,7 @@ test "a registration that reports cancellation is never rooted" {
     }.ready);
 
     var probe = CancelProbe{};
-    try testing.expect(try maplibre.resourceRequestSetCancelCallback(testing.allocator, handle, .{
-        .callback = CancelProbe.cancelled,
-        .context = &probe,
-        .release_context = CancelProbe.released,
-    }, null));
+    try testing.expect(try maplibre.resourceRequestSetCancelCallback(testing.allocator, handle, .init(&probe, CancelProbe.cancelled, CancelProbe.released), null));
     maplibre.resourceRequestRelease(&handle);
     try fixture.releaseRuntimeWhenChildless();
     try testing.expectEqual(@as(usize, 0), probe.cancels.get());
@@ -266,8 +258,7 @@ const HeaderProbe = struct {
         result.* = if (maplibre.httpHeaderTransformResponseSetHeader(response, "X-Test", "other", null)) null else |err| err;
     }
 
-    fn transform(context: ?*anyopaque, kind: maplibre.ResourceKind, _: []const u8, response: maplibre.HttpHeaderTransformResponse) maplibre.Error!void {
-        const self: *HeaderProbe = @ptrCast(@alignCast(context.?));
+    fn transform(self: *HeaderProbe, kind: maplibre.ResourceKind, _: []const u8, response: maplibre.HttpHeaderTransformResponse) maplibre.Error!void {
         if (kind != .style or self.calls.load(.acquire) != 0) return;
         const thread = std.Thread.spawn(.{}, setHeaderOnThread, .{ response, &self.other_thread }) catch return error.OutOfMemory;
         thread.join();
@@ -286,7 +277,7 @@ test "a scoped response rejects use after its callback and from another thread" 
     defer fixture.destroy();
     try fixture.setProvider(.{ .callback = passThrough });
     var probe = HeaderProbe{};
-    try support.resolve(try maplibre.runtimeSetHttpHeaderTransform(testing.allocator, fixture.runtime, .{ .callback = HeaderProbe.transform, .context = &probe }, null));
+    try support.resolve(try maplibre.runtimeSetHttpHeaderTransform(testing.allocator, fixture.runtime, .init(&probe, HeaderProbe.transform, null), null));
 
     try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, "http://127.0.0.1:1/style.json", null));
     var failed = try fixture.waitForEvent(.map_loading_failed);
@@ -304,8 +295,7 @@ const TransformProbe = struct {
     saved: ?maplibre.ResourceTransformRequest = null,
     taken: support.Counter = .{},
 
-    fn transform(context: ?*anyopaque, kind: maplibre.ResourceKind, _: []const u8, request: maplibre.ResourceTransformRequest) maplibre.Error!void {
-        const self: *TransformProbe = @ptrCast(@alignCast(context.?));
+    fn transform(self: *TransformProbe, kind: maplibre.ResourceKind, _: []const u8, request: maplibre.ResourceTransformRequest) maplibre.Error!void {
         if (kind != .style or self.saved != null) {
             var owned = request;
             return maplibre.resourceTransformRequestRelease(&owned);
@@ -333,7 +323,7 @@ test "a transform request is answered from another thread after its callback" {
     defer fixture.destroy();
     try fixture.setProvider(.{ .callback = passThrough });
     var probe = TransformProbe{};
-    try support.resolve(try maplibre.runtimeSetResourceTransform(testing.allocator, fixture.runtime, .{ .callback = TransformProbe.transform, .context = &probe }, null));
+    try support.resolve(try maplibre.runtimeSetResourceTransform(testing.allocator, fixture.runtime, .init(&probe, TransformProbe.transform, null), null));
 
     try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, "unsupported://original.json", null));
     try probe.taken.waitFor(1);
@@ -362,8 +352,7 @@ const RoutedProvider = struct {
     sources: support.Counter = .{},
     others: support.Counter = .{},
 
-    fn provide(context: ?*anyopaque, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
-        const self: *RoutedProvider = @ptrCast(@alignCast(context.?));
+    fn provide(self: *RoutedProvider, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
         const url = request.requested_url orelse "";
         const is_style = request.kind == .style and std.mem.eql(u8, url, routed_style_url);
         const is_source = request.kind == .source and std.mem.eql(u8, url, routed_source_url);
@@ -408,11 +397,9 @@ test "a provider receives only the requests its routes match" {
         .{ .kinds = .{ .tile = true }, .flags = .{ .glob = true }, .url = try scratch.allocator().dupe(u8, "**") },
         fallback.value,
     });
-    const registered = try maplibre.runtimeSetResourceProvider(testing.allocator, fixture.runtime, .{
-        .callback = RoutedProvider.provide,
-        .context = &provider,
-        .routes = routes,
-    }, null);
+    var routed = maplibre.ResourceProvider.init(&provider, RoutedProvider.provide, null);
+    routed.routes = routes;
+    const registered = try maplibre.runtimeSetResourceProvider(testing.allocator, fixture.runtime, routed, null);
     _ = scratch.reset(.free_all);
     try support.resolve(registered);
 

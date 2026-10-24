@@ -262,7 +262,7 @@ def declaration(values, value):
         else ""
     )
     encoder = (
-        f"""    pub fn toNative(self: {typ}, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.{value.native} {{
+        f"""    pub fn toNative(self: {typ}, allocator: std.mem.Allocator, roots: *callbacks.Roots) status.Error!c.{value.native} {{
 {write_use}{roots_use}        var raw = {initial};
 {chr(10).join(writes)}
         return raw;

@@ -40,11 +40,10 @@ const WakeSignal = struct {
     event: std.Io.Event = .unset,
 
     fn wake(self: *WakeSignal) maplibre.Wake {
-        return .{ .context = self, .callback = notify };
+        return .init(self, notify, null);
     }
 
-    fn notify(context: ?*anyopaque) maplibre.Error!void {
-        const self: *WakeSignal = @ptrCast(@alignCast(context.?));
+    fn notify(self: *WakeSignal) maplibre.Error!void {
         self.event.set(self.io);
     }
 

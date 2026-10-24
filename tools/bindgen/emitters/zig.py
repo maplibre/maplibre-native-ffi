@@ -153,7 +153,7 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
 const std = @import("std");
 const c = @import("c.zig").raw;
 const call = @import("call.zig");
-const callback = @import("callback.zig");
+const callbacks = @import("callback.zig");
 const completion = @import("completion.zig");
 const diagnostics = @import("diagnostics.zig");
 const marshal = @import("marshal.zig");
@@ -245,6 +245,7 @@ pub const OwnedValue = marshal.OwnedValue;
         "//! Callback contexts stay valid until release_context runs after native retirement.\n"
         "//! GPU descriptors are borrowed only inside the scoped getter callback.\n"
         "//! Callback errors are logged through std.log; native receives the failure value.\n"
+        "//! Text that a callback receives is borrowed from native until the callback returns.\n"
         "//! Synchronize batch release with getters that copy borrowed storage.\n"
     )
     runtime = """

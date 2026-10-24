@@ -26,7 +26,7 @@ RESERVED = {
     "status",
     "completion",
     "owner",
-    "callback",
+    "callbacks",
     "marshal",
     "diagnostics",
     "started",

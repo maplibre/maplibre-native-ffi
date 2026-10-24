@@ -51,11 +51,10 @@ pub const Signal = struct {
     }
 
     pub fn wake(self: *Signal) maplibre.Wake {
-        return .{ .context = self, .callback = onWake };
+        return .init(self, onWake, null);
     }
 
-    fn onWake(context: ?*anyopaque) maplibre.Error!void {
-        const self: *Signal = @ptrCast(@alignCast(context.?));
+    fn onWake(self: *Signal) maplibre.Error!void {
         self.notify();
     }
 
@@ -131,19 +130,17 @@ pub const EndProbe = struct {
     outcome: maplibre.CameraTransitionOutcome = .completed,
     releases: Counter = .{},
 
-    fn record(context: ?*anyopaque, end: maplibre.CameraTransitionEnd) maplibre.Error!void {
-        const self: *EndProbe = @ptrCast(@alignCast(context.?));
+    fn record(self: *EndProbe, end: maplibre.CameraTransitionEnd) maplibre.Error!void {
         self.outcome = end.outcome;
         _ = self.ends.fetchAdd(1, .release);
     }
 
-    fn released(context: ?*anyopaque) void {
-        const self: *EndProbe = @ptrCast(@alignCast(context.?));
+    fn released(self: *EndProbe) void {
         self.releases.add();
     }
 
     pub fn handler(self: *EndProbe) maplibre.CameraTransitionHandler {
-        return .{ .callback = record, .context = self, .release_context = released };
+        return .init(self, record, released);
     }
 };
 
@@ -198,10 +195,7 @@ pub const Fixture = struct {
         runtime_options.value.asset_path = options.asset_path;
         self.runtime = try maplibre.runtimeCreate(testing.allocator, runtime_options.value, null);
         errdefer closeRuntimeHandle(&self.runtime) catch self.runtime.deinit();
-        try resolve(try maplibre.runtimeSetEventHandler(testing.allocator, self.runtime, .{
-            .callback = receiveEvents,
-            .context = self,
-        }, null));
+        try resolve(try maplibre.runtimeSetEventHandler(testing.allocator, self.runtime, .init(self, receiveEvents, null), null));
         try self.setProvider(denying_provider);
         var map_options = maplibre.mapOptionsDefault();
         map_options.initial_extent = options.extent;
@@ -210,8 +204,7 @@ pub const Fixture = struct {
         return self;
     }
 
-    fn receiveEvents(context: ?*anyopaque, batch: maplibre.EventBatchView) maplibre.Error!void {
-        const self: *Fixture = @ptrCast(@alignCast(context.?));
+    fn receiveEvents(self: *Fixture, batch: maplibre.EventBatchView) maplibre.Error!void {
         std.Io.Threaded.mutexLockUncancelable(&self.event_mutex);
         defer self.event_mutex.unlock(testing.io);
         for (batch.events) |event| {

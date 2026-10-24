@@ -2,6 +2,7 @@
 
 import re
 
+from ..model import ModelError
 from ..names import camel
 from .zig import identifier
 from .zig_dynamic_values import decode
@@ -36,7 +37,8 @@ def parts(values, value):
     )
     registration = value.registration
     public = values.public(value)
-    root_type = f"callback.Registration({public})"
+    constructors = []
+    root_type = f"callbacks.Registration({public})"
     for field in value.fields:
         if field.name not in registration.callbacks:
             continue
@@ -49,9 +51,11 @@ def parts(values, value):
             if plan.result.ctype.kind == "void" or plan.status
             else values.public(plan.result)
         )
+        argument_types = [values.public(p.value) for p in parameters]
         fields.append(
-            f"    {local}: ?*const fn (?*anyopaque{''.join(', ' + values.public(p.value) for p in parameters)}) status.Error!{result} = null,"
+            f"    {local}: ?*const fn (?*anyopaque{''.join(', ' + t for t in argument_types)}) anyerror!{result} = null,"
         )
+        constructors.append((local, argument_types, result))
         captures.append(f"            .{local} = null,")
         writes.append(
             f"        raw.{local} = if (self.{local} != null) {local}Trampoline else null;"
@@ -100,6 +104,8 @@ def parts(values, value):
                 parameter.value.kind == "reference" and parameter.value.element.response
             ):
                 converted.append(f".{'{'} .native = @ptrCast({raw}) {'}'}")
+            elif parameter.value.kind == "buffer":
+                converted.append(borrow(parameter.value, raw))
             else:
                 expression = decode(values, parameter.value, raw)
                 for name, source in names.items():
@@ -109,12 +115,12 @@ def parts(values, value):
             (names[p.name] for p in parameters if p.value.unwrapped.response), None
         )
         scope = (
-            f"var scope: callback.Scope = .{{}}; scope.enter(@intFromPtr({response})); defer scope.leave();"
+            f"var scope: callbacks.Scope = .{{}}; scope.enter(@intFromPtr({response})); defer scope.leave();"
             if response
             else ""
         )
         call = f"host(state.value.context{''.join(', ' + expression for expression in converted)})"
-        report = f'callback.reportError("{plan.native}", err);'
+        report = f'callbacks.reportError("{plan.native}", err);'
         if plan.result.ctype.kind == "void":
             action = f"try {call}; {transfer}"
         elif plan.status:
@@ -131,7 +137,7 @@ def parts(values, value):
             decision_setup = f"const request = {request_type}.adopt({raw_request}); "
             action = f"const result = {call} catch |err| {{ {report} {fallback} }}; {transfer}return result.toNative();"
         ownership_setup = "var ownership_transferred = false; " if owned else ""
-        body = f"fn invoke({', '.join(names[p.name] + ': marshal.CallbackArg(c.' + plan.native + ', ' + str(i) + ')' for i, p in enumerate(plan.parameters))}) status.Error!marshal.CallbackResult(c.{plan.native}) {{ const state = {root_type}.get({names[plan.context]}); const host = state.value.{local} orelse {{ {fallback} }}; {scope} {decision_setup} {ownership_setup}{''.join(owned)}"
+        body = f"fn invoke({', '.join(names[p.name] + ': marshal.CallbackArg(c.' + plan.native + ', ' + str(i) + ')' for i, p in enumerate(plan.parameters))}) anyerror!marshal.CallbackResult(c.{plan.native}) {{ const state = {root_type}.get({names[plan.context]}); const host = state.value.{local} orelse {{ {fallback} }}; {scope} {decision_setup} {ownership_setup}{''.join(owned)}"
         if any("allocator" in expression for expression in converted):
             body += "var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator); defer arena.deinit(); const allocator = arena.allocator(); "
         used = set(
@@ -166,4 +172,44 @@ def parts(values, value):
     writes.append(
         f"        if (!({empty})) {{ const retained = try roots.retain({public}, self); raw.{identifier(registration.user_data)} = retained; raw.{identifier(registration.release)} = {root_type}.releaseNative; }}"
     )
+    trampolines.append(constructor(public, constructors))
     return fields, writes, captures, trampolines
+
+
+def borrow(value, source):
+    """Text that native lends for the callback's duration, without a copy."""
+    if value.length != "nul" or value.buffer_form == "view":
+        raise ModelError([f"Zig: {value.native}: callback text must be NUL-terminated"])
+    if value.nullable or value.optional == "empty":
+        return f"if ({source}) |text| std.mem.span(text) else null"
+    return f"std.mem.span({source} orelse return error.NativeError)"
+
+
+def constructor(public, callbacks):
+    """`init`, which erases a typed context pointer for each callback."""
+    parameters = "".join(f"comptime {local}: anytype, " for local, _, _ in callbacks)
+    members = []
+    for local, argument_types, result in callbacks:
+        arguments = [
+            f"argument_{index}: {typ}" for index, typ in enumerate(argument_types)
+        ]
+        forwarded = "".join(
+            f", argument_{index}" for index in range(len(argument_types))
+        )
+        members.append(
+            f".{local} = if (@TypeOf({local}) == @TypeOf(null)) null else struct {{ fn call(erased: ?*anyopaque{''.join(', ' + a for a in arguments)}) anyerror!{result} {{ return {local}(@as(Context, @ptrCast(@alignCast(erased.?))){forwarded}); }} }}.call,"
+        )
+    return f"""    /// Builds a `{public}` whose callbacks receive `context`, a pointer, as
+    /// its own type. Each callback takes the context and then the arguments
+    /// of its field, and may return any error; pass null to leave one unset.
+    /// Native runs `release`, when it is not null, once it releases the
+    /// registration.
+    pub fn init(context: anytype, {parameters}comptime release: ?fn (@TypeOf(context)) void) {public} {{
+        const Context = @TypeOf(context);
+        if (@typeInfo(Context) != .pointer) @compileError("a {public} context must be a pointer");
+        return .{{
+            .context = @ptrCast(@constCast(context)),
+            .release_context = if (release == null) null else struct {{ fn call(erased: ?*anyopaque) void {{ release.?(@as(Context, @ptrCast(@alignCast(erased.?)))); }} }}.call,
+            {" ".join(members)}
+        }};
+    }}"""

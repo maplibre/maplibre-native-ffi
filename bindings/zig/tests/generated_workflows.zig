@@ -18,8 +18,7 @@ const ProviderProbe = struct {
     runtime: maplibre.Runtime,
     calls: std.atomic.Value(usize) = .init(0),
     releases: std.atomic.Value(usize) = .init(0),
-    fn provide(context: ?*anyopaque, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
-        const self: *@This() = @ptrCast(@alignCast(context.?));
+    fn provide(self: *@This(), request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
         _ = self.calls.fetchAdd(1, .seq_cst);
         if (request.kind != .style) return .pass_through;
         var cleared = try maplibre.runtimeClearResourceTransform(self.runtime, null);
@@ -29,8 +28,7 @@ const ProviderProbe = struct {
         owned.deinit();
         return .pass_through;
     }
-    fn release(context: ?*anyopaque) void {
-        const self: *@This() = @ptrCast(@alignCast(context.?));
+    fn release(self: *@This()) void {
         _ = self.releases.fetchAdd(1, .seq_cst);
     }
 };
@@ -39,7 +37,7 @@ test "a provider can deinit its request inside its callback" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
     var probe = ProviderProbe{ .runtime = fixture.runtime };
-    try fixture.setProvider(.{ .context = &probe, .callback = ProviderProbe.provide, .release_context = ProviderProbe.release });
+    try fixture.setProvider(.init(&probe, ProviderProbe.provide, ProviderProbe.release));
     _ = try support.resolve(try maplibre.mapSetStyleUrl(fixture.map, "binding-test://style", null));
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     loaded.deinit();
