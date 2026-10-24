@@ -15,7 +15,9 @@ class AndroidEmulatorRunnerTest(unittest.TestCase):
         sdk = self.directory / "sdk"
         (sdk / "platform-tools").mkdir(parents=True)
         # The test's own command ends as FAKE_TEST_ADB_STATUS says, after it
-        # prints FAKE_TEST_OUTPUT; every other adb command succeeds.
+        # prints FAKE_TEST_OUTPUT, and a push ends as FAKE_PUSH_ADB_STATUS says.
+        # The device log holds an adbd line among others; every other adb
+        # command succeeds.
         adb = sdk / "platform-tools/adb"
         adb.write_text(
             "#!/usr/bin/env bash\n"
@@ -25,6 +27,10 @@ class AndroidEmulatorRunnerTest(unittest.TestCase):
             "  *__MLN_FFI_TEST_STATUS__*)\n"
             '    printf "%b" "$FAKE_TEST_OUTPUT"\n'
             '    exit "$FAKE_TEST_ADB_STATUS" ;;\n'
+            '  *" push "*) exit "$FAKE_PUSH_ADB_STATUS" ;;\n'
+            '  *" logcat "*)\n'
+            '    echo "I adbd    : the adbd line"\n'
+            '    echo "I vold    : the last line" ;;\n'
             "esac\n"
         )
         adb.chmod(0o755)
@@ -43,6 +49,7 @@ class AndroidEmulatorRunnerTest(unittest.TestCase):
             "MISE_MONOREPO_ROOT": str(self.directory),
             "FAKE_TEST_OUTPUT": "",
             "FAKE_TEST_ADB_STATUS": "0",
+            "FAKE_PUSH_ADB_STATUS": "0",
         }
 
     def run_test(self, emulator_pid, **environment):
@@ -75,6 +82,7 @@ class AndroidEmulatorRunnerTest(unittest.TestCase):
         self.assertIn("test returned no exit status; adb exited 255.", result.stderr)
         self.assertIn("emulator at emulator-5554 exited", result.stderr)
         self.assertIn("the renderer gave up", result.stderr)
+        self.assertIn("the adbd line", result.stderr)
 
     def test_a_running_emulator_is_reported_without_its_log(self):
         result = self.run_test(os.getpid(), FAKE_TEST_ADB_STATUS="255")
@@ -88,6 +96,30 @@ class AndroidEmulatorRunnerTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 3, result.stderr)
         self.assertNotIn("no exit status", result.stderr)
+        self.assertNotIn("the adbd line", result.stderr)
+
+    def test_a_lost_transport_after_a_reported_status_names_the_shell(self):
+        result = self.run_test(
+            os.getpid(),
+            FAKE_TEST_OUTPUT="\\n__MLN_FFI_TEST_STATUS__=0\\n",
+            FAKE_TEST_ADB_STATUS="255",
+        )
+        self.assertEqual(result.returncode, 255, result.stderr)
+        self.assertIn(
+            "adb exited 255 during the shell that ran test, after it reported exit status 0.",
+            result.stderr,
+        )
+        self.assertIn("emulator at emulator-5554 is still running", result.stderr)
+        self.assertIn("the adbd line", result.stderr)
+        self.assertIn("the last line", result.stderr)
+
+    def test_a_failed_push_names_what_it_pushed(self):
+        result = self.run_test(os.getpid(), FAKE_PUSH_ADB_STATUS="1")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(
+            "adb exited 1 during the push of libmaplibre-native-c.so.", result.stderr
+        )
+        self.assertIn("the adbd line", result.stderr)
 
 
 if __name__ == "__main__":
