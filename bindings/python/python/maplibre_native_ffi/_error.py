@@ -4,11 +4,18 @@ from ._generated_values import Status
 
 
 class MaplibreError(Exception):
-    """A failed call's status and diagnostic."""
+    """A failed call's status and diagnostic.
 
-    def __init__(self, status: Status | int, diagnostic: str = "") -> None:
+    ``generation`` is the map snapshot generation that a failed map command
+    published, and zero for any other failure.
+    """
+
+    def __init__(
+        self, status: Status | int, diagnostic: str = "", generation: int = 0
+    ) -> None:
         self.status = Status(status)
         self.diagnostic = diagnostic
+        self.generation = generation
         super().__init__(f"{self.status.name}: {diagnostic}")
 
 

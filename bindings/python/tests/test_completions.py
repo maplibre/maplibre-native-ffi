@@ -96,14 +96,17 @@ def test_a_done_callback_runs_off_the_native_thread_and_can_wait_on_native(
     assert second.generation > first.generation
 
 
-def test_a_failed_command_resolves_with_its_status(map_handle: mln.MapHandle) -> None:
-    result(map_handle.set_style_json(EMPTY_STYLE))
+def test_a_failed_command_raises_its_status_and_generation(
+    map_handle: mln.MapHandle,
+) -> None:
+    committed = result(map_handle.set_style_json(EMPTY_STYLE))
 
-    completion = result(map_handle.set_style_source_volatile("missing", True))
+    with pytest.raises(mln.MaplibreError) as raised:
+        result(map_handle.set_style_source_volatile("missing", True))
 
-    assert completion.disposition == mln.CommandDisposition.FAILED
-    assert completion.native_status_code == int(mln.Status.NOT_FOUND)
-    assert completion.diagnostic
+    assert raised.value.status == mln.Status.NOT_FOUND
+    assert raised.value.diagnostic
+    assert raised.value.generation > committed.generation
 
 
 def test_cancelling_a_wait_abandons_it_and_releases_the_late_map(

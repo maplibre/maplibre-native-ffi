@@ -2,18 +2,14 @@
 
 from dataclasses import dataclass
 
-from ._generated_values import CommandDisposition
-
 
 @dataclass(frozen=True, slots=True)
 class CommandCompletion:
-    """Terminal result of an accepted map command."""
+    """The generations that a committed map command published.
 
-    disposition: CommandDisposition
+    A command future raises ``MaplibreError`` instead when the command fails
+    or is cancelled.
+    """
+
     generation: int
     render_update_generation: int
-    native_status_code: int
-    diagnostic: str
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "disposition", CommandDisposition(self.disposition))

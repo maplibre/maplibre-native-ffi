@@ -14,9 +14,7 @@ def _jump(map_handle: mln.MapHandle, camera: mln.CameraOptions) -> None:
     update = replace(
         mln.CameraUpdate.default(), mode=mln.CameraUpdateMode.JUMP, camera=camera
     )
-    assert result(map_handle.update_camera(update)).disposition == (
-        mln.CommandDisposition.COMMITTED
-    )
+    result(map_handle.update_camera(update))
 
 
 def test_host_strings_use_views_and_native_lent_strings_decode(

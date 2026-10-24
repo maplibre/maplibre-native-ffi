@@ -59,13 +59,12 @@ def test_a_registration_is_rooted_until_native_releases_it(
     # An accepted one stays rooted while native holds it.
     fetch = _Retiring()
     fetch_retired = fetch.retired
-    committed = result(
+    result(
         map_handle.add_custom_geometry_source(
             "custom",
             mln.CustomGeometrySourceOptions(fetch_tile=fetch, min_zoom=0, max_zoom=2),
         )
     )
-    assert committed.disposition == mln.CommandDisposition.COMMITTED
     del fetch
     gc.collect()
     assert not fetch_retired.is_set()
@@ -73,13 +72,12 @@ def test_a_registration_is_rooted_until_native_releases_it(
     # A command that fails releases its registration once it completes.
     duplicate = _Retiring()
     duplicate_retired = duplicate.retired
-    failed = result(
-        map_handle.add_custom_geometry_source(
-            "custom", mln.CustomGeometrySourceOptions(fetch_tile=duplicate)
-        )
+    failed = map_handle.add_custom_geometry_source(
+        "custom", mln.CustomGeometrySourceOptions(fetch_tile=duplicate)
     )
-    assert failed.disposition == mln.CommandDisposition.FAILED
-    del duplicate
+    with pytest.raises(mln.MaplibreError):
+        result(failed)
+    del duplicate, failed
     assert duplicate_retired.wait(TIMEOUT)
 
     # Removing the source releases the accepted one.

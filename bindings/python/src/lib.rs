@@ -356,7 +356,6 @@ type PyCompletionConverter =
 struct PyCompletionBridge {
     future: Py<PyAny>,
     convert: Mutex<Option<PyCompletionConverter>>,
-    accept_error_status: bool,
     discard: Option<unsafe fn(&sys::mln_completion_result)>,
 }
 
@@ -401,7 +400,7 @@ unsafe extern "C" fn complete_python_future(
                     return true;
                 }
             }
-            let converted = if result.status == sys::MLN_STATUS_OK || bridge.accept_error_status {
+            let converted = if result.status == sys::MLN_STATUS_OK {
                 match bridge
                     .convert
                     .lock()
@@ -412,10 +411,7 @@ unsafe extern "C" fn complete_python_future(
                     None => Err(invalid_state_error("native completion ran more than once")),
                 }
             } else {
-                Err(map_error(Error::from_status_and_diagnostic(
-                    result.status,
-                    copy_completion_diagnostic(result),
-                )))
+                completion_error(py, result)
             };
             let call = match converted {
                 Ok(value) => bridge.future.bind(py).call_method1("set_result", (value,)),
@@ -455,15 +451,13 @@ unsafe extern "C" fn release_python_future(user_data: *mut c_void) {
 
 /// Submits a completion-based call and returns the future it resolves.
 ///
-/// With `accept_error_status`, `convert` also receives a failed result, for a
-/// command whose completion reports its own disposition. `discard` disposes a
+/// `convert` receives only a result whose status is OK. `discard` disposes a
 /// value that the result transfers when nothing adopts it: the interpreter has
 /// already gone, or the caller cancelled the future first.
 fn submit_python_future<S, C>(
     py: Python<'_>,
     submit: S,
     convert: C,
-    accept_error_status: bool,
     discard: Option<unsafe fn(&sys::mln_completion_result)>,
 ) -> PyResult<Py<PyAny>>
 where
@@ -474,7 +468,6 @@ where
     let bridge = Box::new(PyCompletionBridge {
         future: future.clone_ref(py),
         convert: Mutex::new(Some(Box::new(convert))),
-        accept_error_status,
         discard,
     });
     let bridge = Box::into_raw(bridge);
@@ -500,6 +493,8 @@ fn py_none(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<P
     Ok(py.None())
 }
 
+/// Copies a committed command's generations. A failed or cancelled command
+/// completes with a non-OK status, which `completion_error` raises instead.
 fn py_command(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
     if !result.value.is_null() || result.value_count != 0 {
         return Err(native_error("command completion returned a value"));
@@ -507,14 +502,19 @@ fn py_command(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<P
     Ok(py
         .import("maplibre_native_ffi._completion")?
         .getattr("CommandCompletion")?
-        .call1((
-            result.disposition,
-            result.generation,
-            result.render_update_generation,
-            result.status,
-            copy_completion_diagnostic(result),
-        ))?
+        .call1((result.generation, result.render_update_generation))?
         .unbind())
+}
+
+/// The error a failed completion raises, with the generation that a failed
+/// map command published.
+fn completion_error(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
+    let error = map_error(Error::from_status_and_diagnostic(
+        result.status,
+        copy_completion_diagnostic(result),
+    ));
+    error.value(py).setattr("generation", result.generation)?;
+    Err(error)
 }
 
 fn copy_completion_diagnostic(result: &sys::mln_completion_result) -> String {

@@ -59,8 +59,7 @@ impl<'py> GeneratedCall<'py> {
         unsafe { generated_native_call(self.py, call) }
     }
 
-    /// Submits an ordered command, whose completion reports its own
-    /// disposition.
+    /// Submits an ordered command, whose future raises unless it commits.
     unsafe fn command(
         &mut self,
         submit: impl FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
@@ -73,7 +72,6 @@ impl<'py> GeneratedCall<'py> {
                 unsafe { generated_native_call(py, || submit(completion, diagnostic)) }
             },
             py_command,
-            true,
             None,
         )
     }
@@ -104,7 +102,6 @@ impl<'py> GeneratedCall<'py> {
                 unsafe { generated_native_call(py, || submit(completion, diagnostic)) }
             },
             convert,
-            false,
             None,
         )
     }
@@ -129,7 +126,6 @@ impl<'py> GeneratedCall<'py> {
                 unsafe { generated_native_call(py, || submit(completion, diagnostic)) }
             },
             convert,
-            false,
             Some(discard),
         )
     }
