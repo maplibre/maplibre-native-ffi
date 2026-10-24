@@ -42,7 +42,7 @@ pub fn main(init_args: std.process.Init) !void {
     const smoke = isSmokeRun(init_args);
     try validateNativeRenderBackend();
 
-    try maplibre.logSetCallback(std.heap.smp_allocator, .{ .callback = diagnostics.logRecord }, null);
+    try maplibre.logSetCallback(.{ .callback = diagnostics.logRecord }, null);
     defer maplibre.logClearCallback(null) catch {};
 
     if (uses_egl) {

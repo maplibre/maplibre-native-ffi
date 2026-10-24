@@ -232,7 +232,7 @@ const MetalOwnedTextureBackend = struct {
 
     fn attach(self: *MetalOwnedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = maplibre.mapAttachMetalOwnedTexture(std.heap.smp_allocator, map.*, .{
+        const attachment = maplibre.mapAttachMetalOwnedTexture(map.*, .{
             .extent = render_target.extent(viewport),
             .context = .{ .device = (self.compositor.view.device.value.?) },
             .pixel_format = MTLPixelFormatBGRA8Unorm,
@@ -388,7 +388,7 @@ const MetalSurfaceBackend = struct {
 
     fn attach(self: *MetalSurfaceBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = maplibre.mapAttachMetalSurface(std.heap.smp_allocator, map.*, .{
+        const attachment = maplibre.mapAttachMetalSurface(map.*, .{
             .extent = render_target.extent(viewport),
             .context = .{ .device = (self.view.device.value.?) },
             .layer = (self.view.layer.value.?),

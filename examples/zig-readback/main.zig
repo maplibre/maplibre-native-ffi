@@ -101,7 +101,7 @@ pub fn main(init_args: std.process.Init) !void {
     errdefer if (diagnostic.message().len != 0) std.log.err("{s}", .{diagnostic.message()});
 
     var signal = WakeSignal{ .io = init_args.io };
-    var runtime = try maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:" }, &diagnostic);
+    var runtime = try maplibre.runtimeCreate(.{ .cache_path = ":memory:" }, &diagnostic);
     defer if (maplibre.runtimeRelease(&runtime, null)) |future| {
         var teardown = future;
         _ = teardown.wait(null) catch {};
@@ -111,7 +111,7 @@ pub fn main(init_args: std.process.Init) !void {
     var options = maplibre.mapOptionsDefault();
     options.map_mode = .static;
     options.event_mask = .{};
-    var map_future = try maplibre.runtimeCreateMap(allocator, runtime, options, &diagnostic);
+    var map_future = try maplibre.runtimeCreateMap(runtime, options, &diagnostic);
     defer map_future.deinit();
     var map = try map_future.wait(&diagnostic);
     defer if (maplibre.mapRelease(&map, null)) |future| {
@@ -203,7 +203,7 @@ fn renderStillImage(
 ) !void {
     const deadline = std.Io.Clock.Timestamp.now(signal.io, .awake).addDuration(native_work_timeout);
     var next_token: u64 = 1;
-    try maplibre.renderSessionRequestFrame(allocator, session, .{ .token = next_token, .flags = .{ .if_needed = true, .wait_for_update = true } }, null);
+    try maplibre.renderSessionRequestFrame(session, .{ .token = next_token, .flags = .{ .if_needed = true, .wait_for_update = true } }, null);
     while (true) {
         signal.reset();
         if (uses_caller_driver) _ = try maplibre.renderSessionServiceDriverWork(session, null);
@@ -224,7 +224,7 @@ fn renderStillImage(
         }
         if (demand) {
             next_token += 1;
-            try maplibre.renderSessionRequestFrame(allocator, session, .{ .token = next_token, .flags = .{ .if_needed = true, .wait_for_update = true } }, null);
+            try maplibre.renderSessionRequestFrame(session, .{ .token = next_token, .flags = .{ .if_needed = true, .wait_for_update = true } }, null);
         }
         try signal.wait(deadline);
     }
@@ -289,19 +289,19 @@ fn attachOwnedTexture(
     wakes.frame_wake = signal.wake();
     wakes.driver_work_wake = if (uses_caller_driver) signal.wake() else .{};
     return if (build_options.supports_vulkan)
-        try maplibre.mapAttachVulkanOwnedTexture(allocator, map.*, .{
+        try maplibre.mapAttachVulkanOwnedTexture(map.*, .{
             .extent = extent,
             .context = context.descriptor(),
         }, withDriver(wakes, .core_worker), null)
     else if (build_options.supports_metal)
-        try maplibre.mapAttachMetalOwnedTexture(allocator, map.*, .{
+        try maplibre.mapAttachMetalOwnedTexture(map.*, .{
             .extent = extent,
             .context = context.descriptor(),
             // MTLPixelFormatBGRA8Unorm, the format Apple's drawables use.
             .pixel_format = 80,
         }, withDriver(wakes, .core_worker), null)
     else if (build_options.supports_opengl)
-        try maplibre.mapAttachOpenglOwnedTexture(allocator, map.*, .{
+        try maplibre.mapAttachOpenglOwnedTexture(map.*, .{
             .extent = extent,
             .context = context.descriptor(),
         }, withDriver(wakes, if (supports_egl) .core_worker else .caller_graphics_thread), null)
@@ -589,7 +589,7 @@ fn setInitialCamera(allocator: std.mem.Allocator, map: *maplibre.Map) !void {
         .bearing = 12.0,
         .pitch = 30.0,
     };
-    var completion = try maplibre.mapUpdateCamera(allocator, map.*, update.value, null);
+    var completion = try maplibre.mapUpdateCamera(map.*, update.value, null);
     completion.deinit();
 }
 

@@ -146,9 +146,23 @@ fn Held(comptime function: anytype, comptime offset: usize, comptime Args: type)
             else
                 @typeInfo(Param(function, offset + index)).pointer.child
         else
-            void;
+            InputSlot(Field, Param(function, offset + index));
     }
     return @Tuple(&types);
+}
+
+/// The storage of an input that native takes by pointer to one value, which
+/// the call encodes in place, or void for an input passed another way.
+fn InputSlot(comptime Input: type, comptime Parameter: type) type {
+    if (Input == Parameter or @typeInfo(Parameter) != .pointer) return void;
+    const Item = @typeInfo(Parameter).pointer.child;
+    if (@typeInfo(Item) == .@"opaque") return void;
+    const Value = if (@typeInfo(Input) == .optional) @typeInfo(Input).optional.child else Input;
+    if (Value == CString or isHandle(Value)) return void;
+    // Bytes passed by pointer to a view are one value, not an array.
+    if (Item == c.mln_buffer_view and Value == []const u8) return Item;
+    if (@typeInfo(Value) == .pointer and @typeInfo(Value).pointer.size == .slice) return void;
+    return Item;
 }
 
 fn Native(comptime function: anytype, comptime count: usize) type {
@@ -219,6 +233,8 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
                         if (Field.sets_size) self.held[index].size = @sizeOf(@TypeOf(self.held[index]));
                         native[offset + index] = &self.held[index];
                     }
+                } else if (comptime InputSlot(Field, Parameter) != void) {
+                    native[offset + index] = try self.encodeInto(Parameter, &self.held[index], input);
                 } else {
                     native[offset + index] = try self.encode(Parameter, input);
                 }
@@ -265,31 +281,39 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
             }
             switch (@typeInfo(Input)) {
                 .@"struct", .@"enum", .@"union" => if (@hasDecl(Input, "toNative")) {
-                    return switch (@typeInfo(@TypeOf(Input.toNative)).@"fn".param_types.len) {
-                        1 => self.encode(Target, input.toNative()),
-                        else => try input.toNative(self.inputAllocator(), &self.roots),
+                    // A record's toNative takes the allocator and the roots
+                    // only when its encoding uses them.
+                    const parameters = @typeInfo(@TypeOf(Input.toNative)).@"fn".param_types;
+                    const native = switch (parameters.len) {
+                        1 => input.toNative(),
+                        2 => if (parameters[1] == std.mem.Allocator) input.toNative(self.inputAllocator()) else input.toNative(&self.roots),
+                        else => input.toNative(self.inputAllocator(), &self.roots),
                     };
+                    return self.encode(Target, try settled(@TypeOf(native), native));
                 },
                 else => {},
             }
             return input;
         }
 
+        /// Encodes an input that native reads through a pointer into `slot`.
+        fn encodeInto(self: *Self, comptime Target: type, slot: anytype, input: anytype) Error!Target {
+            if (@typeInfo(@TypeOf(input)) == .optional) {
+                return if (input) |present| self.encodeInto(Target, slot, present) else null;
+            }
+            slot.* = try self.encode(@TypeOf(slot.*), input);
+            return slot;
+        }
+
         fn encodePointer(self: *Self, comptime Target: type, comptime Item: type, comptime is_const: bool, input: anytype) Error!Target {
             const Input = @TypeOf(input);
             if (!is_const) @compileError(name ++ ": a mutable pointer parameter needs an output marker");
-            // Bytes passed by pointer to a view are one value, not an array.
-            const one_view = Item == c.mln_buffer_view and Input == []const u8;
-            if (!one_view and @typeInfo(Input) == .pointer and @typeInfo(Input).pointer.size == .slice) {
-                const Element = @typeInfo(Input).pointer.child;
-                if (Element == Item or (Input == []const u8 and @sizeOf(Item) == 1)) return @ptrCast(input.ptr);
-                const items = try self.inputAllocator().alloc(Item, input.len);
-                for (input, items) |item, *target| target.* = try self.encode(Item, item);
-                return items.ptr;
-            }
-            const stored = try self.inputAllocator().create(Item);
-            stored.* = try self.encode(Item, input);
-            return stored;
+            if (@typeInfo(Input) != .pointer or @typeInfo(Input).pointer.size != .slice) @compileError(name ++ ": a pointer to one value needs an input slot");
+            const Element = @typeInfo(Input).pointer.child;
+            if (Element == Item or (Input == []const u8 and @sizeOf(Item) == 1)) return @ptrCast(input.ptr);
+            const items = try self.inputAllocator().alloc(Item, input.len);
+            for (input, items) |item, *target| target.* = try self.encode(Item, item);
+            return items.ptr;
         }
 
         /// Copies borrowed outputs before the operation returns.
@@ -329,6 +353,18 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
             });
         }
     };
+}
+
+/// The payload of a value that is an error union, or the value itself.
+fn Settled(comptime T: type) type {
+    return switch (@typeInfo(T)) {
+        .error_union => |union_info| union_info.payload,
+        else => T,
+    };
+}
+
+fn settled(comptime T: type, native: T) Error!Settled(T) {
+    return native;
 }
 
 fn outputIndices(comptime Args: type) []const usize {

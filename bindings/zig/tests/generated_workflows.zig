@@ -23,7 +23,7 @@ const ProviderProbe = struct {
         if (request.kind != .style) return .pass_through;
         var cleared = try maplibre.runtimeClearResourceTransform(self.runtime, null);
         cleared.deinit();
-        try maplibre.resourceRequestComplete(std.heap.smp_allocator, handle, .{ .bytes = support.style_json }, null);
+        try maplibre.resourceRequestComplete(handle, .{ .bytes = support.style_json }, null);
         var owned = handle;
         owned.deinit();
         return .pass_through;

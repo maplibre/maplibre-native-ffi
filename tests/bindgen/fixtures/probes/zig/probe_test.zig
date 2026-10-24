@@ -85,7 +85,7 @@ test "generated owned callback arguments are released on conversion and host err
     defer roots.deinit();
     var probe = QueryProbe{};
     const handler = api.QueryHandler{ .callback = QueryProbe.receive, .context = &probe };
-    const raw = try handler.toNative(std.testing.allocator, &roots);
+    const raw = try handler.toNative(&roots);
     released_query = 0;
     raw.callback.?(raw.context, null, 41);
     try std.testing.expectEqual(@as(u64, 41), released_query);

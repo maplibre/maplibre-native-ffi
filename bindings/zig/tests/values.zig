@@ -22,7 +22,7 @@ test "host strings use views and native-lent strings decode" {
     defer options.deinit();
     options.value.asset_path = "asset\x00path";
     var diagnostic: maplibre.Diagnostic = .{};
-    try testing.expectError(error.InvalidArgument, maplibre.runtimeCreate(testing.allocator, options.value, &diagnostic));
+    try testing.expectError(error.InvalidArgument, maplibre.runtimeCreate(options.value, &diagnostic));
     try testing.expect(diagnostic.status != null);
     try testing.expect(std.mem.indexOf(u8, diagnostic.message(), "embedded NUL") != null);
 
@@ -47,9 +47,9 @@ test "optional fields and masks round-trip through presence bits" {
     defer update.deinit();
     update.value.mode = .jump;
     update.value.camera = .{ .zoom = 3.0, .pitch = 30.0 };
-    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, fixture.map, update.value, null));
+    try support.expectCommitted(try maplibre.mapUpdateCamera(fixture.map, update.value, null));
     update.value.camera = .{ .zoom = 5.0 };
-    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, fixture.map, update.value, null));
+    try support.expectCommitted(try maplibre.mapUpdateCamera(fixture.map, update.value, null));
     const snapshot = try maplibre.mapGetSnapshot(fixture.map, null);
     try testing.expectEqual(@as(?f64, 5.0), snapshot.view.camera.zoom);
     try testing.expectApproxEqAbs(@as(f64, 30.0), snapshot.view.camera.pitch.?, 1e-9);
@@ -120,7 +120,7 @@ test "open enums keep unknown values and 64-bit carriers round-trip" {
     update.value.mode = .ease;
     update.value.camera = .{ .zoom = 4.0 };
     update.value.animation = .{ .duration_ms = 60_000, .transition_id = transition_id, .end_handler = ended.handler() };
-    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, fixture.map, update.value, null));
+    try support.expectCommitted(try maplibre.mapUpdateCamera(fixture.map, update.value, null));
     try support.expectCommitted(try maplibre.mapCancelCameraTransition(fixture.map, transition_id & 0x7fff_ffff_ffff_ffff, null));
     try testing.expectEqual(@as(u32, 0), ended.ends.load(.acquire));
     try support.expectCommitted(try maplibre.mapCancelCameraTransition(fixture.map, transition_id, null));
@@ -160,7 +160,7 @@ test "native record defaults round trip through generated conversion" {
 test "synchronous calls fill caller-sized outputs in input order" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
-    var projection = try maplibre.mapProjectionCreate(testing.allocator, (try maplibre.mapGetSnapshot(fixture.map, null)).view, null);
+    var projection = try maplibre.mapProjectionCreate((try maplibre.mapGetSnapshot(fixture.map, null)).view, null);
     defer maplibre.mapProjectionRelease(&projection);
     const coordinates = [_]maplibre.LatLng{ .{ .latitude = 0, .longitude = 0 }, .{ .latitude = 10, .longitude = 20 }, .{ .latitude = -12, .longitude = -30 } };
     var points = try maplibre.mapProjectionPixelsForLatLngs(testing.allocator, projection, &coordinates, null);
@@ -187,7 +187,7 @@ test "synchronous calls fill caller-sized outputs in input order" {
 }
 
 test "caller-sized text returns results longer than its first storage" {
-    var zoom = try maplibre.styleExpressionCreate(testing.allocator, "[\"interpolate\", [\"linear\"], [\"zoom\"], 0, 0, 10, 100]", null, null);
+    var zoom = try maplibre.styleExpressionCreate("[\"interpolate\", [\"linear\"], [\"zoom\"], 0, 0, 10, 100]", null, null);
     defer maplibre.styleExpressionRelease(&zoom);
     var level = try maplibre.styleExpressionEvaluate(testing.allocator, zoom, .{ .zoom = 5, .available_images = &.{} }, null);
     defer level.deinit();
@@ -198,7 +198,7 @@ test "caller-sized text returns results longer than its first storage" {
     @memset(&text, 'a');
     text[0] = '"';
     text[text.len - 1] = '"';
-    var long = try maplibre.styleExpressionCreate(testing.allocator, &text, null, null);
+    var long = try maplibre.styleExpressionCreate(&text, null, null);
     defer maplibre.styleExpressionRelease(&long);
     var result = try maplibre.styleExpressionEvaluate(testing.allocator, long, null, null);
     defer result.deinit();

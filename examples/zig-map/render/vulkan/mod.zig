@@ -299,7 +299,7 @@ const VulkanOwnedTextureBackend = struct {
 
     fn attach(self: *VulkanOwnedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = maplibre.mapAttachVulkanOwnedTexture(std.heap.smp_allocator, map.*, .{
+        const attachment = maplibre.mapAttachVulkanOwnedTexture(map.*, .{
             .extent = render_target.extent(viewport),
             .context = vulkanContextDescriptor(&self.compositor.context),
         }, options, &diagnostic) catch |err| {
@@ -555,7 +555,7 @@ const VulkanSurfaceBackend = struct {
 
     fn attach(self: *VulkanSurfaceBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = maplibre.mapAttachVulkanSurface(std.heap.smp_allocator, map.*, .{
+        const attachment = maplibre.mapAttachVulkanSurface(map.*, .{
             .extent = render_target.extent(viewport),
             .context = vulkanContextDescriptor(&self.context),
             .surface = vulkanHandleToBinding(self.context.surface),

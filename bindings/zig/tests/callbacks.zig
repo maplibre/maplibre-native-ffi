@@ -31,13 +31,13 @@ test "a callback registration is rooted until native releases it" {
     var retained = support.Counter{};
     var refused = support.Counter{};
     var duplicate = support.Counter{};
-    try support.expectCommitted(try maplibre.mapAddCustomGeometrySource(testing.allocator, fixture.map, "removed", customSource(&removed, null), null));
-    try support.expectCommitted(try maplibre.mapAddCustomGeometrySource(testing.allocator, fixture.map, "retained", customSource(&retained, null), null));
-    try testing.expectError(error.InvalidArgument, maplibre.mapAddCustomGeometrySource(testing.allocator, fixture.map, "refused", customSource(&refused, 33.0), null));
+    try support.expectCommitted(try maplibre.mapAddCustomGeometrySource(fixture.map, "removed", customSource(&removed, null), null));
+    try support.expectCommitted(try maplibre.mapAddCustomGeometrySource(fixture.map, "retained", customSource(&retained, null), null));
+    try testing.expectError(error.InvalidArgument, maplibre.mapAddCustomGeometrySource(fixture.map, "refused", customSource(&refused, 33.0), null));
 
     // A registration that native accepted and then failed to commit is native's
     // to release.
-    try testing.expectError(error.InvalidArgument, support.resolve(try maplibre.mapAddCustomGeometrySource(testing.allocator, fixture.map, "removed", customSource(&duplicate, null), null)));
+    try testing.expectError(error.InvalidArgument, support.resolve(try maplibre.mapAddCustomGeometrySource(fixture.map, "removed", customSource(&duplicate, null), null)));
     try duplicate.waitFor(1);
 
     try support.expectCommitted(try maplibre.mapRemoveStyleSource(fixture.map, "removed", null));
@@ -75,9 +75,9 @@ const LogProbe = struct {
 test "replacing the process-global log callback releases the previous one" {
     var first = LogProbe{};
     var replacement = LogProbe{};
-    try maplibre.logSetCallback(testing.allocator, first.handler(), null);
+    try maplibre.logSetCallback(first.handler(), null);
     defer maplibre.logClearCallback(null) catch |err| std.log.err("log callback clear failed: {s}", .{@errorName(err)});
-    try maplibre.logSetCallback(testing.allocator, replacement.handler(), null);
+    try maplibre.logSetCallback(replacement.handler(), null);
     try first.releases.waitFor(1);
 
     const fixture = try support.Fixture.create(.{});
@@ -94,7 +94,7 @@ const failing_style_url = "custom://failing-provider.json";
 
 fn completeThenFail(_: ?*anyopaque, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
     if (std.mem.eql(u8, request.requested_url orelse "", failing_style_url)) {
-        try maplibre.resourceRequestComplete(testing.allocator, handle, .{ .bytes = support.style_json }, null);
+        try maplibre.resourceRequestComplete(handle, .{ .bytes = support.style_json }, null);
         var owned = handle;
         maplibre.resourceRequestRelease(&owned);
     }
@@ -127,7 +127,7 @@ const DeferringProvider = struct {
 
     fn provide(self: *DeferringProvider, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
         if (!std.mem.eql(u8, request.requested_url orelse "", self.url)) {
-            try maplibre.resourceRequestComplete(std.heap.smp_allocator, handle, .{ .status = .@"error", .error_reason = .not_found }, null);
+            try maplibre.resourceRequestComplete(handle, .{ .status = .@"error", .error_reason = .not_found }, null);
             var owned = handle;
             maplibre.resourceRequestRelease(&owned);
             return .handle;
@@ -151,7 +151,7 @@ const DeferringProvider = struct {
 };
 
 fn completeOnThread(handle: maplibre.ResourceRequest, result: *?anyerror) void {
-    maplibre.resourceRequestComplete(std.heap.smp_allocator, handle, .{ .bytes = support.style_json }, null) catch |err| {
+    maplibre.resourceRequestComplete(handle, .{ .bytes = support.style_json }, null) catch |err| {
         result.* = err;
         return;
     };
@@ -171,14 +171,14 @@ test "a decision handle answers its request later from another thread" {
     try testing.expect(!try maplibre.resourceRequestIsCancelled(handle, null));
 
     var diagnostic: maplibre.Diagnostic = .{};
-    try testing.expectError(error.InvalidArgument, maplibre.resourceRequestComplete(testing.allocator, handle, .{ .etag = "bad\x00tag" }, &diagnostic));
+    try testing.expectError(error.InvalidArgument, maplibre.resourceRequestComplete(handle, .{ .etag = "bad\x00tag" }, &diagnostic));
     try testing.expect(diagnostic.status != null);
 
     var thread_result: ?anyerror = error.NotRun;
     const thread = try std.Thread.spawn(.{}, completeOnThread, .{ handle, &thread_result });
     thread.join();
     try testing.expectEqual(@as(?anyerror, null), thread_result);
-    try testing.expectError(error.InvalidState, maplibre.resourceRequestComplete(testing.allocator, handle, .{ .bytes = support.style_json }, null));
+    try testing.expectError(error.InvalidState, maplibre.resourceRequestComplete(handle, .{ .bytes = support.style_json }, null));
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     loaded.deinit();
 }
@@ -198,8 +198,8 @@ test "released request handle copies stay closed after later requests" {
 
     var live = try provider.take(fixture);
     defer maplibre.resourceRequestRelease(&live);
-    try testing.expectError(error.InvalidState, maplibre.resourceRequestComplete(testing.allocator, stale_copy, .{ .bytes = support.style_json }, null));
-    try maplibre.resourceRequestComplete(testing.allocator, live, .{ .bytes = support.style_json }, null);
+    try testing.expectError(error.InvalidState, maplibre.resourceRequestComplete(stale_copy, .{ .bytes = support.style_json }, null));
+    try maplibre.resourceRequestComplete(live, .{ .bytes = support.style_json }, null);
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     loaded.deinit();
 }
@@ -238,7 +238,7 @@ test "a registration that reports cancellation is never rooted" {
     }.ready);
 
     var probe = CancelProbe{};
-    try testing.expect(try maplibre.resourceRequestSetCancelCallback(testing.allocator, handle, .init(&probe, CancelProbe.cancelled, CancelProbe.released), null));
+    try testing.expect(try maplibre.resourceRequestSetCancelCallback(handle, .init(&probe, CancelProbe.cancelled, CancelProbe.released), null));
     maplibre.resourceRequestRelease(&handle);
     try fixture.releaseRuntimeWhenChildless();
     try testing.expectEqual(@as(usize, 0), probe.cancels.get());
@@ -323,7 +323,7 @@ test "a transform request is answered from another thread after its callback" {
     defer fixture.destroy();
     try fixture.setProvider(.{ .callback = passThrough });
     var probe = TransformProbe{};
-    try support.resolve(try maplibre.runtimeSetResourceTransform(testing.allocator, fixture.runtime, .init(&probe, TransformProbe.transform, null), null));
+    try support.resolve(try maplibre.runtimeSetResourceTransform(fixture.runtime, .init(&probe, TransformProbe.transform, null), null));
 
     try support.expectCommitted(try maplibre.mapSetStyleUrl(fixture.map, "unsupported://original.json", null));
     try probe.taken.waitFor(1);
@@ -357,9 +357,9 @@ const RoutedProvider = struct {
         const is_style = request.kind == .style and std.mem.eql(u8, url, routed_style_url);
         const is_source = request.kind == .source and std.mem.eql(u8, url, routed_source_url);
         if (is_style) {
-            try maplibre.resourceRequestComplete(std.heap.smp_allocator, handle, .{ .bytes = routed_style_json }, null);
+            try maplibre.resourceRequestComplete(handle, .{ .bytes = routed_style_json }, null);
         } else {
-            try maplibre.resourceRequestComplete(std.heap.smp_allocator, handle, .{ .status = .@"error", .error_reason = .not_found }, null);
+            try maplibre.resourceRequestComplete(handle, .{ .status = .@"error", .error_reason = .not_found }, null);
         }
         var owned = handle;
         maplibre.resourceRequestRelease(&owned);
@@ -431,7 +431,7 @@ test "a camera end handler inside a command is released after it runs" {
     update.value.mode = .ease;
     update.value.camera = .{ .zoom = 4.0 };
     update.value.animation = .{ .duration_ms = 60_000, .transition_id = 3, .end_handler = ended.handler() };
-    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, fixture.map, update.value, null));
+    try support.expectCommitted(try maplibre.mapUpdateCamera(fixture.map, update.value, null));
     try testing.expectEqual(@as(usize, 0), ended.releases.get());
     try support.expectCommitted(try maplibre.mapCancelCameraTransition(fixture.map, 3, null));
     try testing.expectEqual(@as(u32, 1), ended.ends.load(.acquire));
@@ -443,7 +443,7 @@ test "a camera end handler inside a command is released after it runs" {
     defer delta.deinit();
     delta.value.scale = -1;
     delta.value.animation.end_handler = rejected.handler();
-    try testing.expectError(error.InvalidArgument, maplibre.mapApplyCameraDelta(testing.allocator, fixture.map, delta.value, null));
+    try testing.expectError(error.InvalidArgument, maplibre.mapApplyCameraDelta(fixture.map, delta.value, null));
     try fixture.fence();
     try testing.expectEqual(@as(usize, 0), rejected.releases.get());
     try testing.expectEqual(@as(u32, 0), rejected.ends.load(.acquire));

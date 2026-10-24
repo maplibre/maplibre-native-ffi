@@ -239,9 +239,11 @@ pub const OwnedValue = marshal.OwnedValue;
     docs = (
         "//! Low-level Zig binding for the MapLibre Native C API. Release owners\n"
         "//! explicitly or call deinit.\n"
-        "//! OwnedValue snapshots and futures retain their allocator until deinit.\n"
+        "//! A call takes an allocator only to convert its inputs or to own its result.\n"
+        "//! OwnedValue snapshots and futures retain their storage until deinit.\n"
         "//! Each has unique ownership: move it rather than copy it, since deinit on two\n"
         "//! copies releases the native value twice.\n"
+        "//! Futures and callback registrations keep their state in std.heap.smp_allocator.\n"
         "//! Callback contexts stay valid until release_context runs after native retirement.\n"
         "//! GPU descriptors are borrowed only inside the scoped getter callback.\n"
         "//! Callback errors are logged through std.log; native receives the failure value.\n"

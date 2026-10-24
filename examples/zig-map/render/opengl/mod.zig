@@ -515,7 +515,7 @@ const OpenGLOwnedTextureBackend = struct {
 
     fn attach(self: *OpenGLOwnedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = maplibre.mapAttachOpenglOwnedTexture(std.heap.smp_allocator, map.*, .{
+        const attachment = maplibre.mapAttachOpenglOwnedTexture(map.*, .{
             .extent = render_target.extent(viewport),
             .context = self.compositor.context.descriptor(),
         }, options, &diagnostic) catch |err| {
@@ -712,7 +712,7 @@ const OpenGLSurfaceBackend = struct {
 
     fn attach(self: *OpenGLSurfaceBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = maplibre.mapAttachOpenglSurface(std.heap.smp_allocator, map.*, .{
+        const attachment = maplibre.mapAttachOpenglSurface(map.*, .{
             .extent = render_target.extent(viewport),
             .context = self.context.descriptor(),
             .surface = self.context.surface(),
@@ -735,7 +735,7 @@ const OpenGLSurfaceBackend = struct {
         };
         if (!replaced) return self.session.resize(viewport);
         var diagnostic: maplibre.Diagnostic = .{};
-        var completion = maplibre.renderSessionSetOpenglSurfaceTarget(std.heap.smp_allocator, self.session.handle.?, .{
+        var completion = maplibre.renderSessionSetOpenglSurfaceTarget(self.session.handle.?, .{
             .extent = render_target.extent(viewport),
             .context = self.context.descriptor(),
             .surface = self.context.surface(),

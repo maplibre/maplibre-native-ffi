@@ -17,7 +17,7 @@ pub const MapState = struct {
     /// needs no network.
     pub fn init(allocator: std.mem.Allocator, viewport: types.Viewport, smoke: bool) !MapState {
         var diagnostic: maplibre.Diagnostic = .{};
-        var runtime = maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:" }, &diagnostic) catch |err| {
+        var runtime = maplibre.runtimeCreate(.{ .cache_path = ":memory:" }, &diagnostic) catch |err| {
             diagnostics.logError("runtime create failed", err, &diagnostic);
             return types.AppError.RuntimeCreateFailed;
         };
@@ -31,7 +31,7 @@ pub const MapState = struct {
         map_options.initial_extent = render_target.extent(viewport);
         map_options.map_mode = .continuous;
         map_options.event_mask = .{};
-        var map_future = maplibre.runtimeCreateMap(allocator, runtime, map_options, &diagnostic) catch |err| {
+        var map_future = maplibre.runtimeCreateMap(runtime, map_options, &diagnostic) catch |err| {
             diagnostics.logError("map create failed", err, &diagnostic);
             return types.AppError.MapCreateFailed;
         };
@@ -80,7 +80,7 @@ pub const MapState = struct {
         var delta = try maplibre.cameraDeltaDefault(self.allocator);
         defer delta.deinit();
         delta.value.offset = .{ .x = dx, .y = dy };
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, delta.value, &self.diagnostic));
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.map, delta.value, &self.diagnostic));
     }
 
     pub fn moveByAnimated(self: *MapState, dx: f64, dy: f64, duration_ms: f64) !void {
@@ -88,7 +88,7 @@ pub const MapState = struct {
         defer delta.deinit();
         delta.value.offset = .{ .x = dx, .y = dy };
         delta.value.animation.duration_ms = duration_ms;
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, delta.value, &self.diagnostic));
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.map, delta.value, &self.diagnostic));
     }
 
     pub fn scaleBy(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint) !void {
@@ -96,7 +96,7 @@ pub const MapState = struct {
         defer delta.deinit();
         delta.value.scale = scale;
         delta.value.anchor = anchor;
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, delta.value, &self.diagnostic));
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.map, delta.value, &self.diagnostic));
     }
 
     pub fn scaleByAnimated(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint, duration_ms: f64) !void {
@@ -105,7 +105,7 @@ pub const MapState = struct {
         delta.value.scale = scale;
         delta.value.anchor = anchor;
         delta.value.animation.duration_ms = duration_ms;
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, delta.value, &self.diagnostic));
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.map, delta.value, &self.diagnostic));
     }
 
     pub fn adjustOrientation(self: *MapState, bearing: f64, pitch: f64) !void {
@@ -113,7 +113,7 @@ pub const MapState = struct {
         defer delta.deinit();
         delta.value.bearing = bearing;
         delta.value.pitch = pitch;
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, delta.value, &self.diagnostic));
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.map, delta.value, &self.diagnostic));
     }
 
     pub fn adjustBearingAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
@@ -121,7 +121,7 @@ pub const MapState = struct {
         defer update.deinit();
         update.value.bearing = delta;
         update.value.animation.duration_ms = duration_ms;
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, update.value, &self.diagnostic));
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.map, update.value, &self.diagnostic));
     }
 
     pub fn adjustPitchAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
@@ -129,7 +129,7 @@ pub const MapState = struct {
         defer update.deinit();
         update.value.pitch = delta;
         update.value.animation.duration_ms = duration_ms;
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, update.value, &self.diagnostic));
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.map, update.value, &self.diagnostic));
     }
 
     pub fn resetOrientation(self: *MapState, duration_ms: f64) !void {
@@ -142,7 +142,7 @@ pub const MapState = struct {
     }
 
     fn updateCamera(self: *MapState, update: maplibre.CameraUpdate) !void {
-        try self.cameraMutation(maplibre.mapUpdateCamera(self.allocator, self.map, update, &self.diagnostic));
+        try self.cameraMutation(maplibre.mapUpdateCamera(self.map, update, &self.diagnostic));
     }
 
     /// Ends any running camera transition, so a starting gesture takes over
@@ -195,7 +195,7 @@ fn setCamera(
         .bearing = 12.0,
         .pitch = 30.0,
     };
-    var completion = maplibre.mapUpdateCamera(allocator, map.*, update.value, diagnostic) catch |err| {
+    var completion = maplibre.mapUpdateCamera(map.*, update.value, diagnostic) catch |err| {
         diagnostics.logError("camera jump failed", err, diagnostic);
         return types.AppError.CameraJumpFailed;
     };

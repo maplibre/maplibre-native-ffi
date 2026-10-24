@@ -15,7 +15,7 @@ from .zig import (
     failure,
     identifier,
 )
-from .zig_dynamic_values import dynamic
+from .zig_dynamic_values import dynamic, encoding
 
 RESERVED = {
     "allocator",
@@ -216,13 +216,11 @@ def operation(plan, values, *, discard=False):
             arguments.append(local + ".native")
             continue
         if target.kind != "handle":
-            needs_allocator |= (
-                value.kind == "reference"
-                or dynamic(value)
-                and value.kind != "buffer"
-                or value.kind == "buffer"
-                and value.length == "nul"
-            )
+            # The call encodes a value native reads through a pointer in its
+            # own storage, so only what that value holds can allocate.
+            needs_allocator |= encoding(
+                value.element if value.kind == "reference" else value
+            )[0]
         if value.kind == "buffer" and value.length == "nul":
             arguments.append(
                 f"if ({local}) |text| call.cString(text) else null"

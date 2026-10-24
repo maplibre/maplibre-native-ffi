@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 
+from ..model import ModelError
 from .rust_dynamic_values import dynamic
 from .zig import doc, identifier
 from .zig_values import field_default
@@ -56,11 +57,56 @@ def encode(values, value, source, depth=0):
         return f"blk: {{ {storage} for ({source}, 0..) |{item}, index| items[index] = {encode(values, value.element, item, depth + 1)}; break :blk items{'' if fixed else '.ptr'}; }}"
     if value.kind in {"scalar", "native_pointer"}:
         return source
-    return (
-        f"try {source}.toNative(allocator, roots)"
-        if dynamic(value)
-        else f"{source}.toNative()"
+    return to_native(value, source)
+
+
+def encoding(value) -> tuple[bool, bool]:
+    """Whether encoding `value` allocates, and whether it retains callback roots."""
+    if value.registration:
+        allocates, roots = fields_encoding(value)
+        return allocates, True
+    if value.kind == "buffer":
+        return value.length == "nul", False
+    if value.kind == "reference":
+        return True, encoding(value.element)[1]
+    if value.kind == "array":
+        allocates, roots = encoding(value.element)
+        if value.ctype.kind == "array":
+            return allocates, roots
+        return value.element.kind != "scalar" or allocates, roots
+    if value.kind in {"record", "union"}:
+        return fields_encoding(value)
+    return False, False
+
+
+def fields_encoding(value) -> tuple[bool, bool]:
+    hidden = (
+        {
+            *value.registration.callbacks,
+            value.registration.user_data,
+            value.registration.release,
+        }
+        if value.registration
+        else set()
     )
+    parts = [
+        encoding(field.value)
+        for field in value.fields
+        if field.name not in hidden and (field.public or value.kind == "union")
+    ]
+    return any(a for a, _ in parts), any(r for _, r in parts)
+
+
+def to_native_parameters(value) -> list[str]:
+    """The arguments that a record's `toNative` takes after `self`."""
+    allocates, roots = encoding(value)
+    return [*(["allocator"] if allocates else []), *(["roots"] if roots else [])]
+
+
+def to_native(value, source):
+    if not dynamic(value):
+        return f"{source}.toNative()"
+    return f"try {source}.toNative({', '.join(to_native_parameters(value))})"
 
 
 def decode(values, value, source, context="raw"):
@@ -235,13 +281,20 @@ def declaration(values, value):
     initial = (
         f"c.{value.default}()" if value.default else f"std.mem.zeroes(c.{value.native})"
     )
-    write_use = (
-        ""
-        if any("allocator" in line for line in writes)
-        else "        _ = allocator;\n"
-    )
-    roots_use = (
-        "" if any("roots" in line for line in writes) else "        _ = roots;\n"
+    encoder_parameters = to_native_parameters(value)
+    for name in ("allocator", "roots"):
+        if (name in encoder_parameters) != any(name in line for line in writes):
+            raise ModelError(
+                [
+                    f"Zig: {value.native}: toNative {name} use disagrees with its encoding"
+                ]
+            )
+    signature = "".join(
+        {
+            "allocator": ", allocator: std.mem.Allocator",
+            "roots": ", roots: *callbacks.Roots",
+        }[name]
+        for name in encoder_parameters
     )
     capture_use = (
         ""
@@ -262,8 +315,8 @@ def declaration(values, value):
         else ""
     )
     encoder = (
-        f"""    pub fn toNative(self: {typ}, allocator: std.mem.Allocator, roots: *callbacks.Roots) status.Error!c.{value.native} {{
-{write_use}{roots_use}        var raw = {initial};
+        f"""    pub fn toNative(self: {typ}{signature}) status.Error!c.{value.native} {{
+        var raw = {initial};
 {chr(10).join(writes)}
         return raw;
     }}

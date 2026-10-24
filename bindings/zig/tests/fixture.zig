@@ -159,7 +159,7 @@ pub fn expectCommitted(future_value: maplibre.Future(maplibre.CommandCompletion)
 /// Answers every request with a not-found error, so no test reaches the
 /// network by accident.
 fn denyResource(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, request: maplibre.ResourceRequest) maplibre.Error!maplibre.ResourceProviderDecision {
-    try maplibre.resourceRequestComplete(std.heap.smp_allocator, request, .{
+    try maplibre.resourceRequestComplete(request, .{
         .status = .@"error",
         .error_reason = .not_found,
         .error_message = "the Zig test fixture serves no resources",
@@ -193,14 +193,14 @@ pub const Fixture = struct {
         var runtime_options = try maplibre.runtimeOptionsDefault(testing.allocator);
         defer runtime_options.deinit();
         runtime_options.value.asset_path = options.asset_path;
-        self.runtime = try maplibre.runtimeCreate(testing.allocator, runtime_options.value, null);
+        self.runtime = try maplibre.runtimeCreate(runtime_options.value, null);
         errdefer closeRuntimeHandle(&self.runtime) catch self.runtime.deinit();
-        try resolve(try maplibre.runtimeSetEventHandler(testing.allocator, self.runtime, .init(self, receiveEvents, null), null));
+        try resolve(try maplibre.runtimeSetEventHandler(self.runtime, .init(self, receiveEvents, null), null));
         try self.setProvider(denying_provider);
         var map_options = maplibre.mapOptionsDefault();
         map_options.initial_extent = options.extent;
         map_options.map_mode = options.map_mode;
-        self.map = try resolve(try maplibre.runtimeCreateMap(testing.allocator, self.runtime, map_options, null));
+        self.map = try resolve(try maplibre.runtimeCreateMap(self.runtime, map_options, null));
         return self;
     }
 
@@ -419,20 +419,20 @@ pub const OwnedTexture = struct {
         options.frame_wake = self.wakes.wake();
         options.driver_work_wake = self.wakes.wake();
         const attachment = if (build_options.supports_metal)
-            try maplibre.mapAttachMetalOwnedTexture(testing.allocator, map, .{
+            try maplibre.mapAttachMetalOwnedTexture(map, .{
                 .extent = extent,
                 .context = .{ .device = self.graphics.context.metal_device },
                 // MTLPixelFormatBGRA8Unorm.
                 .pixel_format = 80,
             }, options, null)
         else if (build_options.supports_vulkan)
-            try maplibre.mapAttachVulkanOwnedTexture(testing.allocator, map, .{ .extent = extent, .context = self.graphics.vulkanContext() }, options, null)
+            try maplibre.mapAttachVulkanOwnedTexture(map, .{ .extent = extent, .context = self.graphics.vulkanContext() }, options, null)
         else attachment: {
             var descriptor = try maplibre.openglOwnedTextureDescriptorDefault(testing.allocator);
             defer descriptor.deinit();
             descriptor.value.extent = extent;
             descriptor.value.context = self.graphics.openglContext();
-            break :attachment try maplibre.mapAttachOpenglOwnedTexture(testing.allocator, map, descriptor.value, options, null);
+            break :attachment try maplibre.mapAttachOpenglOwnedTexture(map, descriptor.value, options, null);
         };
         self.session = attachment.session;
         errdefer self.release();
@@ -497,7 +497,7 @@ pub const OwnedTexture = struct {
     pub fn renderFrame(self: *OwnedTexture) !maplibre.RenderFrameResult {
         const token = self.next_token;
         self.next_token += 1;
-        try maplibre.renderSessionRequestFrame(testing.allocator, self.session, .{ .flags = .{}, .token = token }, null);
+        try maplibre.renderSessionRequestFrame(self.session, .{ .flags = .{}, .token = token }, null);
         const Context = struct { owner: *OwnedTexture, token: u64, result: ?maplibre.RenderFrameResult = null };
         var context = Context{ .owner = self, .token = token };
         try self.wakes.waitUntil(&context, struct {

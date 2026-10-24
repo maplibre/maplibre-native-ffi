@@ -100,7 +100,7 @@ pub const Session = struct {
     pub fn requestFrame(self: *Session, force: bool) !void {
         self.next_token += 1;
         var diagnostic: maplibre.Diagnostic = .{};
-        maplibre.renderSessionRequestFrame(std.heap.smp_allocator, self.handle.?, .{
+        maplibre.renderSessionRequestFrame(self.handle.?, .{
             .flags = .{ .if_needed = !force, .wait_for_update = !force, .present = self.presents },
             .token = self.next_token,
         }, &diagnostic) catch |err| {
@@ -209,7 +209,7 @@ fn abandon(handle: maplibre.RenderSession) void {
 pub fn releaseFrame(frame: *?maplibre.AcquiredFrame) void {
     var owned = frame.* orelse return;
     frame.* = null;
-    maplibre.acquiredFrameRelease(std.heap.smp_allocator, &owned, null, null) catch |err| {
+    maplibre.acquiredFrameRelease(&owned, null, null) catch |err| {
         diagnostics.logError("texture release failed", err, null);
     };
 }
