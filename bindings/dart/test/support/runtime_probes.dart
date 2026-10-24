@@ -56,6 +56,10 @@ RegistrationProbe? logRegistrationProbeForTesting() {
   return pending.isEmpty ? null : RegistrationProbe(pending.last);
 }
 
+/// The completions this isolate's delivery queue still waits for.
+int pendingCompletionCountForTesting() =>
+    (_field(isolateDeliveryQueue, '_pendingCompletions', _queue) as Map).length;
+
 List<RuntimeEvent> decodeRuntimeEventBatchForTesting(
   raw.mln_event_batch_view batch,
 ) {

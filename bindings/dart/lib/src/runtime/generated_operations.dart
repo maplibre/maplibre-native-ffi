@@ -5758,7 +5758,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// See `mln_map_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<void> close() => _state.closeAsync(
-    (handle) => _run(
+    (handle) => _submit(
       (arena, completion) =>
           raw.mln_map_release(handle.raw, completion, nativeDiagnostic),
     ),
@@ -6717,7 +6717,7 @@ final class RenderSessionHandle implements Finalizable {
   /// See `mln_render_session_dispose` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   Future<void> close() => _state.closeAsync(
-    (handle) => _run(
+    (handle) => _submit(
       (arena, completion) => raw.mln_render_session_dispose(
         handle.raw,
         completion,
@@ -7446,7 +7446,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   /// See `mln_runtime_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   Future<void> close() => _state.closeAsync(
-    (handle) => _run(
+    (handle) => _submit(
       (arena, completion) =>
           raw.mln_runtime_release(handle.raw, completion, nativeDiagnostic),
     ),

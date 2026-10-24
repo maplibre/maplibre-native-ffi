@@ -74,6 +74,11 @@ void _discard(_NativeStart start) =>
 Future<void> _run(_NativeStart start) =>
     startNativeCompletion(start: _withArena(start), decode: (_) {});
 
+/// Starts an operation like [_run], but throws at the call if native rejects
+/// it.
+Future<void> _submit(_NativeStart start) =>
+    submitNativeCompletion(start: _withArena(start), decode: (_) {});
+
 Future<T> _query<T>(_CompletionValue<T> value, _NativeStart start) =>
     startNativeCompletion(
       start: _withArena(start),
@@ -125,7 +130,7 @@ A _attach<T extends Object, A>(
   A Function(T owner, Future<void> completed) attachment,
 ) {
   var handle = 0;
-  final completed = startNativeCompletion<void>(
+  final completed = submitNativeCompletion<void>(
     start: (completion) => withNativeArena((arena) {
       final output = arena<Uint64>();
       final status = start(arena, completion, output);

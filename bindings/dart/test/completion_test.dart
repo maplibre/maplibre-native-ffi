@@ -1,5 +1,5 @@
 // Completions: the shared receive port, conversion failures, rejected
-// submissions, failed dispositions, and waits that give up.
+// submissions, failed commands, and waits that give up.
 import 'dart:async';
 import 'dart:ffi';
 
@@ -109,18 +109,20 @@ void main() {
   });
 
   test('a submission native rejects frees its completion state', () async {
-    var rejections = 0;
-    expect(
-      () => startNativeCompletion<void>(
-        // The null runtime is never live, so native refuses the command.
-        start: (completion) => raw.mln_runtime_clear_resource_transform(
-          0,
-          completion,
-          nativeDiagnostic,
-        ),
-        decode: (_) {},
-        onRejected: () => rejections += 1,
+    final pending = pendingCompletionCountForTesting();
+    // The null runtime is never live, so native refuses the command, and the
+    // returned future reports it.
+    final rejected = startNativeCompletion<void>(
+      start: (completion) => raw.mln_runtime_clear_resource_transform(
+        0,
+        completion,
+        nativeDiagnostic,
       ),
+      decode: (_) {},
+    );
+    expect(pendingCompletionCountForTesting(), pending);
+    await expectLater(
+      rejected,
       throwsA(
         isA<MaplibreException>().having(
           (error) => error.status,
@@ -129,7 +131,6 @@ void main() {
         ),
       ),
     );
-    expect(rejections, 1);
 
     // A later submission still completes through the shared port.
     final fixture = await openRuntime();
@@ -139,18 +140,45 @@ void main() {
     );
   });
 
-  test('a failed command reports its disposition as data', () async {
-    final fixture = await openRuntime();
-    final map = await fixture.openStyledMap();
+  test(
+    'a failed command fails its future with its status and generation',
+    () async {
+      final fixture = await openRuntime();
+      final map = await fixture.openStyledMap();
 
-    final completion = await within(
-      map.removeStyleSource('missing-source'),
-      'source removal',
-    );
-    expect(completion.disposition, CommandDisposition.failed);
-    expect(completion.status, Status.notFound);
-    expect(completion.diagnostic, isNotEmpty);
-  });
+      final MaplibreException error;
+      try {
+        await within(map.removeStyleSource('missing-source'), 'source removal');
+        fail('the removal of a missing source unexpectedly committed');
+      } on MaplibreException catch (caught) {
+        error = caught;
+      }
+      expect(error.status, Status.notFound);
+      expect(error.diagnostic, isNotEmpty);
+      expect(error.generation, map.getSnapshot().generation);
+    },
+  );
+
+  test(
+    'a rejected release fails its future and leaves the owner open',
+    () async {
+      final fixture = await openRuntime();
+      await fixture.openMap();
+      // A runtime with a live map refuses its release.
+      final release = fixture.runtime.close();
+      await expectLater(
+        release,
+        throwsA(
+          isA<MaplibreException>().having(
+            (error) => error.status,
+            'status',
+            Status.invalidState,
+          ),
+        ),
+      );
+      await within(fixture.runtime.clearResourceTransform(), 'a later command');
+    },
+  );
 
   test('a wait that times out leaves its completion to arrive later', () async {
     final fixture = await openRuntime();

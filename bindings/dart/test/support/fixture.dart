@@ -137,12 +137,7 @@ Future<RuntimeFixture> openRuntime({
 }
 
 Future<void> expectCommitted(Future<CommandCompletion> command) async {
-  final completion = await within(command, 'a command');
-  expect(
-    completion.disposition,
-    CommandDisposition.committed,
-    reason: completion.diagnostic,
-  );
+  await within(command, 'a command');
 }
 
 /// Registers a provider that claims the requests its routes match. Native

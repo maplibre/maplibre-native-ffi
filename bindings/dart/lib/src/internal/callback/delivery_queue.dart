@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:isolate';
 
+import '../../error/maplibre_exception.dart';
+import '../../values.dart';
 import '../c/maplibre_native_c.dart';
 import '../c/maplibre_native_c.g.dart' as raw;
 import '../memory/memory.dart';
@@ -29,7 +31,6 @@ final class _PendingCompletion<T> implements _PendingCompletionBase {
     this.completer,
     this.decode,
     this.submissionStack,
-    this.acceptErrorStatus,
     this.ownsHandle,
   );
 
@@ -38,17 +39,17 @@ final class _PendingCompletion<T> implements _PendingCompletionBase {
   final Completer<T> completer;
   final NativeCompletionDecoder<T> decode;
   final StackTrace submissionStack;
-  final bool acceptErrorStatus;
   final bool ownsHandle;
 
   @override
   void finish(int batch, int index, raw.mln_completion_result result) {
     try {
-      if (!acceptErrorStatus) {
-        checkNativeStatus(result.status, () {
-          final diagnostic = copyCompletionDiagnostic(result.diagnostic);
-          return diagnostic.isEmpty ? 'native operation failed' : diagnostic;
-        });
+      if (result.status != nativeStatusOk) {
+        throw MaplibreException(
+          Status.fromRawValue(result.status),
+          copyCompletionDiagnostic(result.diagnostic),
+          generation: result.generation,
+        );
       }
       if (ownsHandle) _take(batch, index);
       final value = decode(result);
@@ -270,23 +271,35 @@ final class DeliveryQueue implements Finalizable {
 /// This isolate's delivery queue.
 final isolateDeliveryQueue = DeliveryQueue._();
 
+/// Starts a native completion and returns its future, which fails if native
+/// rejects the call or completes it with an error status.
 Future<T> startNativeCompletion<T>({
   required NativeCompletionStart start,
   required NativeCompletionDecoder<T> decode,
-  bool acceptErrorStatus = false,
   bool ownsHandle = false,
-  void Function()? onRejected,
+}) {
+  try {
+    return submitNativeCompletion(
+      start: start,
+      decode: decode,
+      ownsHandle: ownsHandle,
+    );
+  } catch (error, stack) {
+    return Future.error(error, stack);
+  }
+}
+
+/// Starts a native completion like [startNativeCompletion], but throws at the
+/// call if native rejects it, for a caller that acts on acceptance.
+Future<T> submitNativeCompletion<T>({
+  required NativeCompletionStart start,
+  required NativeCompletionDecoder<T> decode,
+  bool ownsHandle = false,
 }) {
   final queue = isolateDeliveryQueue;
   final completer = Completer<T>();
   final token = queue._addCompletion(
-    _PendingCompletion<T>(
-      completer,
-      decode,
-      StackTrace.current,
-      acceptErrorStatus,
-      ownsHandle,
-    ),
+    _PendingCompletion<T>(completer, decode, StackTrace.current, ownsHandle),
   );
   try {
     withNativeArena((arena) {
@@ -299,7 +312,6 @@ Future<T> startNativeCompletion<T>({
     });
   } catch (_) {
     queue._removeCompletion(token);
-    onRejected?.call();
     rethrow;
   }
   return completer.future;

@@ -117,39 +117,44 @@ RawReceivePort _wakePort(
   return port;
 }
 
-/// Starts a command and decodes its receipt, including failed dispositions.
-Future<CommandCompletion> _startCommand(
-  NativeCompletionStart start, {
-  void Function()? onRejected,
-}) => startNativeCompletion(
-  start: start,
-  onRejected: onRejected,
-  acceptErrorStatus: true,
-  decode: (result) => CommandCompletion(
-    disposition: CommandDisposition.fromRawValue(result.disposition),
-    generation: result.generation,
-    renderUpdateGeneration: result.render_update_generation,
-    status: Status.fromRawValue(result.status),
-    diagnostic: copyCompletionDiagnostic(result.diagnostic),
-  ),
-);
+/// Starts a command, whose future fails unless native commits it.
+Future<CommandCompletion> _startCommand(NativeCompletionStart start) =>
+    startNativeCompletion(
+      start: start,
+      decode: (result) => CommandCompletion(
+        generation: result.generation,
+        renderUpdateGeneration: result.render_update_generation,
+      ),
+    );
 
+/// The generations that a committed map command published. A command's
+/// future fails with [MaplibreException] instead when native reports it
+/// failed or cancelled.
 final class CommandCompletion {
   const CommandCompletion({
-    required this.disposition,
     required this.generation,
     required this.renderUpdateGeneration,
-    required this.status,
-    required this.diagnostic,
   });
 
-  final CommandDisposition disposition;
+  /// The map snapshot generation that the command published.
   final int generation;
 
   /// The first map render update that includes the command.
   final int renderUpdateGeneration;
-  final Status status;
-  final String diagnostic;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CommandCompletion &&
+      other.generation == generation &&
+      other.renderUpdateGeneration == renderUpdateGeneration;
+
+  @override
+  int get hashCode => Object.hash(generation, renderUpdateGeneration);
+
+  @override
+  String toString() =>
+      'CommandCompletion(generation=$generation, '
+      'renderUpdateGeneration=$renderUpdateGeneration)';
 }
 
 T _adoptOwned<T>(int handle, T Function() adopt, void Function(int) dispose) {

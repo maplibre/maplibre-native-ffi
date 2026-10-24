@@ -68,8 +68,15 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   }
 
   /// Submits a release and detaches cleanup once native accepts it.
-  Future<void> closeAsync(Future<void> Function(H) close) {
-    final completion = close(_handle);
+  /// [submit] throws if native rejects the release, which leaves the owner
+  /// open and fails the returned future.
+  Future<void> closeAsync(Future<void> Function(H) submit) {
+    final Future<void> completion;
+    try {
+      completion = submit(_handle);
+    } catch (error, stack) {
+      return Future.error(error, stack);
+    }
     _closed = true;
     _detachOwnerFinalizer();
     return completion;

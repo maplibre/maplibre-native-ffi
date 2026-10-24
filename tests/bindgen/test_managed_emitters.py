@@ -83,7 +83,7 @@ mln_status mln_measurement_create(mln_measurement *out_measurement BIND("directi
         generated = dart.generate(api)
         # The release passes a completion, as an asynchronous release does.
         self.assertIn(
-            "Future<void> close() => _state.closeAsync((handle) => _run((arena, completion) => "
+            "Future<void> close() => _state.closeAsync((handle) => _submit((arena, completion) => "
             "raw.mln_measurement_dispose(handle.raw, completion, nativeDiagnostic)));",
             generated,
         )

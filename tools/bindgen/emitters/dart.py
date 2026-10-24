@@ -429,7 +429,9 @@ def lower_function(
             raise Unsupported("command requires a resultless receipt")
         operation = f"_command({start})"
     elif plan.result is None:
-        public, operation = "void", f"_run({start})"
+        # A release reports native rejection at the call, so its owner can
+        # tell whether native accepted it.
+        public, operation = "void", f"{'_submit' if plan.consumes else '_run'}({start})"
     elif plan.completion.result_owner:
         public, decode = adopt_owner(
             plan.completion.result_owner, "handle", receiver, function, values
