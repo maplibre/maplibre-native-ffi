@@ -448,8 +448,8 @@ pub fn projection_mode_default() -> Result<ProjectionMode> {
     Ok(unsafe { from_native(value) }?)
 }
 
-/// Returns default caller-graphics-thread attachment policy with no wakes
-/// and a one-slot texture ring.
+/// Returns attachment options initialized for this C API version, with each
+/// field at its documented default.
 ///
 /// See `mln_render_session_attach_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).

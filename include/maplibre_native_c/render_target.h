@@ -423,8 +423,8 @@ typedef struct mln_opengl_context_descriptor {
 } mln_opengl_context_descriptor;
 
 /**
- * Returns default caller-graphics-thread attachment policy with no wakes and a
- * one-slot texture ring.
+ * Returns attachment options initialized for this C API version, with each
+ * field at its documented default.
  */
 MLN_API mln_render_session_attach_options
 mln_render_session_attach_options_default(void) MLN_NOEXCEPT;
