@@ -892,6 +892,8 @@ def emit_operation(
 
 def emit(api: Api | BoundApi) -> Emission:
     methods: dict[str, list[str]] = defaultdict(list)
+    # Process globals go beside the other declarations of their header.
+    globals_by_directory: dict[str, list[str]] = defaultdict(list)
     discards: dict[str, list[str]] = defaultdict(list)
     records: dict[str, set[str]] = defaultdict(set)
     supported = []
@@ -918,6 +920,14 @@ def emit(api: Api | BoundApi) -> Emission:
             owner, emitted, used_records = emit_operation(plan, bound)
         except Unsupported as error:
             unsupported[function.name] = f"{function.location}: {error}"
+            continue
+        if owner == "Maplibre":
+            directory = directory_for(function.location.path)
+            globals_by_directory[directory].append(
+                doc(bound, function.name, "    ") + emitted
+            )
+            records[owner].update(used_records)
+            supported.append(function.name)
             continue
         if emitted:
             methods[owner].append(doc(bound, function.name, "    ") + emitted)
@@ -1114,7 +1124,16 @@ def emit(api: Api | BoundApi) -> Emission:
             + OPERATION_HELPERS
             + f"namespace {NAMESPACE};\n\n"
             + handle_doc
-            + f"public {'static' if owner == 'Maplibre' else 'sealed'} unsafe partial class {owner}{bases}\n{{\n"
+            + f"public sealed unsafe partial class {owner}{bases}\n{{\n"
+            + "\n".join(body)
+            + "}\n"
+        )
+    for directory, body in sorted(globals_by_directory.items()):
+        files[f"{directory}/Maplibre.Operations.g.cs"] = (
+            HEADER
+            + OPERATION_HELPERS
+            + f"namespace {NAMESPACE};\n\n"
+            + "public static unsafe partial class Maplibre\n{\n"
             + "\n".join(body)
             + "}\n"
         )
