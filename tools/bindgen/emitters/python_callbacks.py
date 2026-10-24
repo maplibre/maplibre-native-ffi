@@ -142,7 +142,11 @@ def sources(values, plan):
             for p in parameters
         )
         result_type = (
-            "None" if callback.result.native == "void" else values.type(callback.result)
+            "None"
+            if callback.result.native == "void"
+            else values.type(callback.result)
+            if callback.decision
+            else values.type(callback.result) + " | None"
         )
         fields.append(f"    {name}: Callable[[{types}], {result_type}] | None = None")
         signature = ", ".join(["self"] + [p.name for p in parameters])
@@ -207,10 +211,12 @@ def sources(values, plan):
         )
         if len(parameters) == 1:
             copied += ","
+        # A callback that returns None answers zero, which is OK for a
+        # status and "not consumed" for a log record.
         result = (
             "Ok(())"
             if callback.result.native == "void"
-            else f"result.extract::<{ffi_type(callback.result)}>()"
+            else f"if result.is_none() {{ Ok(0) }} else {{ result.extract::<{ffi_type(callback.result)}>() }}"
         )
         failure = (
             "()"

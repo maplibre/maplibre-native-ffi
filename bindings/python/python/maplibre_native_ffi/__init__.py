@@ -14,6 +14,13 @@ native logs its failure as a warning. User done callbacks run on host worker
 threads in registration order for each future; a callback can submit another
 operation and wait for its result. Use ``asyncio.wrap_future`` to await a
 binding future from an asyncio task.
+
+Event, log, wake, transform, and provider callbacks run on native threads,
+with the interpreter attached, while native waits for them to return. Hand
+work that touches thread-bound state, such as an asyncio loop or a Tk or Qt
+widget, to its thread, for example with ``loop.call_soon_threadsafe``. A
+callback must not wait for a binding future, since native may deliver its
+completion on the thread that the callback holds.
 """
 
 from ._completion import CommandCompletion

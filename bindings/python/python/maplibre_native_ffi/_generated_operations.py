@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Buffer, Callable, Sequence
+from collections.abc import Buffer, Sequence
 from concurrent.futures import Future
-from typing import TYPE_CHECKING, NamedTuple, TypeVar
+from contextlib import AbstractContextManager
+from typing import TYPE_CHECKING, NamedTuple
 
 from . import _native
 from ._completion import CommandCompletion
 from ._future import map_future
-from ._generated_values import _maybe
-from ._operation import GeneratedOperations, _adopt_future, _adopt_value, _with_view
-
-R = TypeVar("R")
 from ._generated_values import (
     AmbientCacheOperation,
     BoundOptions,
@@ -95,7 +92,9 @@ from ._generated_values import (
     WebgpuOwnedTextureDescriptor,
     WebgpuSurfaceDescriptor,
     WebgpuTextureFrame,
+    _maybe,
 )
+from ._operation import GeneratedOperations, _adopt_future, _adopt_value, _view
 
 if TYPE_CHECKING:
     from ._generated_owners import (
@@ -178,49 +177,46 @@ class MapAttachWebgpuSurfaceResult(NamedTuple):
 class _AcquiredFrameHandleOperations(GeneratedOperations):
     _native: _native._AcquiredFrameHandle
 
-    def with_metal_texture(self, callback: Callable[[MetalTextureFrame], R]) -> R:
+    def metal_texture(self) -> AbstractContextManager[MetalTextureFrame]:
         """Copies Metal-native metadata from an acquired frame.
 
         See `mln_acquired_frame_get_metal_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 
-        Native resources remain valid only during the callback.
+        Native resources remain valid only inside the `with` block.
         """
-        return _with_view(
+        return _view(
             self,
-            lambda: self._native.with_metal_texture(),
+            lambda: self._native.metal_texture(),
             lambda raw: MetalTextureFrame._from_native(raw),
-            callback,
         )
 
-    def with_opengl_texture(self, callback: Callable[[OpenglTextureFrame], R]) -> R:
+    def opengl_texture(self) -> AbstractContextManager[OpenglTextureFrame]:
         """Copies OpenGL-native metadata from an acquired frame.
 
         See `mln_acquired_frame_get_opengl_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 
-        Native resources remain valid only during the callback.
+        Native resources remain valid only inside the `with` block.
         """
-        return _with_view(
+        return _view(
             self,
-            lambda: self._native.with_opengl_texture(),
+            lambda: self._native.opengl_texture(),
             lambda raw: OpenglTextureFrame._from_native(raw),
-            callback,
         )
 
-    def with_producer_sync(self, callback: Callable[[GpuSync], R]) -> R:
+    def producer_sync(self) -> AbstractContextManager[GpuSync]:
         """Copies the producer synchronization for an acquired texture frame.
 
         See `mln_acquired_frame_get_producer_sync` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 
-        Native resources remain valid only during the callback.
+        Native resources remain valid only inside the `with` block.
         """
-        return _with_view(
+        return _view(
             self,
-            lambda: self._native.with_producer_sync(),
+            lambda: self._native.producer_sync(),
             lambda raw: GpuSync._from_native(raw),
-            callback,
         )
 
     def get_result(self) -> RenderFrameResult:
@@ -231,34 +227,32 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         """
         return RenderFrameResult._from_native(self._native.get_result())
 
-    def with_vulkan_texture(self, callback: Callable[[VulkanTextureFrame], R]) -> R:
+    def vulkan_texture(self) -> AbstractContextManager[VulkanTextureFrame]:
         """Copies Vulkan-native metadata from an acquired frame.
 
         See `mln_acquired_frame_get_vulkan_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 
-        Native resources remain valid only during the callback.
+        Native resources remain valid only inside the `with` block.
         """
-        return _with_view(
+        return _view(
             self,
-            lambda: self._native.with_vulkan_texture(),
+            lambda: self._native.vulkan_texture(),
             lambda raw: VulkanTextureFrame._from_native(raw),
-            callback,
         )
 
-    def with_webgpu_texture(self, callback: Callable[[WebgpuTextureFrame], R]) -> R:
+    def webgpu_texture(self) -> AbstractContextManager[WebgpuTextureFrame]:
         """Copies WebGPU-native metadata from an acquired frame.
 
         See `mln_acquired_frame_get_webgpu_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 
-        Native resources remain valid only during the callback.
+        Native resources remain valid only inside the `with` block.
         """
-        return _with_view(
+        return _view(
             self,
-            lambda: self._native.with_webgpu_texture(),
+            lambda: self._native.webgpu_texture(),
             lambda raw: WebgpuTextureFrame._from_native(raw),
-            callback,
         )
 
     def close(self, consumer_completion: GpuSync | None = None) -> None:

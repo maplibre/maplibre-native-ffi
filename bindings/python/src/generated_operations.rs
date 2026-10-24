@@ -730,7 +730,11 @@ unsafe extern "C" fn generated_callback_mln_http_header_transform_callback(
                     },
                 )?,
             ))?;
-            result.extract::<sys::mln_status>()
+            if result.is_none() {
+                Ok(0)
+            } else {
+                result.extract::<sys::mln_status>()
+            }
         },
     );
 
@@ -801,7 +805,11 @@ unsafe extern "C" fn generated_callback_mln_log_handler_callback(
                 generated_value(py, code)?,
                 unsafe { generated_c_string(py, message, false) }?,
             ))?;
-            result.extract::<u32>()
+            if result.is_none() {
+                Ok(0)
+            } else {
+                result.extract::<u32>()
+            }
         },
     );
 
@@ -4855,7 +4863,7 @@ unsafe extern "C" fn generated_dispose_mln_style_expression(
 #[pymethods]
 impl AcquiredFrameHandle {
     #[pyo3(signature = ())]
-    fn with_metal_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+    fn metal_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
         let mut out_frame: sys::mln_metal_texture_frame = unsafe { std::mem::zeroed() };
@@ -4868,7 +4876,7 @@ impl AcquiredFrameHandle {
         generated_copy_mln_metal_texture_frame(py, &out_frame)
     }
     #[pyo3(signature = ())]
-    fn with_opengl_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+    fn opengl_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
         let mut out_frame: sys::mln_opengl_texture_frame = unsafe { std::mem::zeroed() };
@@ -4881,7 +4889,7 @@ impl AcquiredFrameHandle {
         generated_copy_mln_opengl_texture_frame(py, &out_frame)
     }
     #[pyo3(signature = ())]
-    fn with_producer_sync(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+    fn producer_sync(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
         let mut out_sync: sys::mln_gpu_sync = unsafe { sys::mln_gpu_sync_default() };
@@ -4907,7 +4915,7 @@ impl AcquiredFrameHandle {
         generated_copy_mln_render_frame_result(py, &out_result)
     }
     #[pyo3(signature = ())]
-    fn with_vulkan_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+    fn vulkan_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
         let mut out_frame: sys::mln_vulkan_texture_frame = unsafe { std::mem::zeroed() };
@@ -4920,7 +4928,7 @@ impl AcquiredFrameHandle {
         generated_copy_mln_vulkan_texture_frame(py, &out_frame)
     }
     #[pyo3(signature = ())]
-    fn with_webgpu_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+    fn webgpu_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
         let mut out_frame: sys::mln_webgpu_texture_frame = unsafe { std::mem::zeroed() };

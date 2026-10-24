@@ -243,10 +243,13 @@ class OwnedTexture:
         self, frame: mln.AcquiredFrameHandle, callback: Callable[[object], T]
     ) -> T:
         if self.backend == "metal":
-            return frame.with_metal_texture(callback)
-        if self.backend == "vulkan":
-            return frame.with_vulkan_texture(callback)
-        return frame.with_opengl_texture(callback)
+            view = frame.metal_texture()
+        elif self.backend == "vulkan":
+            view = frame.vulkan_texture()
+        else:
+            view = frame.opengl_texture()
+        with view as texture:
+            return callback(texture)
 
     def render(self, *, wait_for_update: bool = False) -> mln.RenderFrameResult:
         """Render one frame, whether or not the map has a newer update."""

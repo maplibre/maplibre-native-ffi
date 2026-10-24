@@ -1618,7 +1618,8 @@ class HttpHeaderTransform:
     """
 
     callback: (
-        Callable[[ResourceKind, str, HttpHeaderTransformResponseScope], Status] | None
+        Callable[[ResourceKind, str, HttpHeaderTransformResponseScope], Status | None]
+        | None
     ) = None
     rules: Sequence[HttpHeaderRule] = ()
     """Header rules for a transform without a callback; empty with one."""
@@ -1723,7 +1724,7 @@ class LogHandler:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
     """
 
-    callback: Callable[[LogSeverity, LogEvent, int, str], int] | None = None
+    callback: Callable[[LogSeverity, LogEvent, int, str], int | None] | None = None
 
     def _invoke_callback(self, severity, event, code, message):
         callback = self.callback

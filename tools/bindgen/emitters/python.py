@@ -176,7 +176,7 @@ def operation(
     if release:
         name = "close"
     if plan.view:
-        name = "with_" + plan.view.stem
+        name = plan.view.stem
     if iskeyword(name) or name in RUST_KEYWORDS:
         name += "_"
     if not safe_identifier(name):
@@ -688,14 +688,9 @@ def operation(
             raise unsupported(function, "borrowed view needs one typed output")
         invoke = f"self._native.{name}({', '.join(python_arguments)})"
         converted = values.facade_copy(outputs[0][1], "raw")
-        expression = (
-            f"_with_view(self, lambda: {invoke}, lambda raw: {converted}, callback)"
-        )
-        py_parameters.append(f"callback: Callable[[{public_result}], R]")
-        public_result = "R"
-    native_stub_parameters = [
-        p for p in py_parameters if not (plan.view and p.startswith("callback:"))
-    ]
+        expression = f"_view(self, lambda: {invoke}, lambda raw: {converted})"
+        public_result = f"AbstractContextManager[{public_result}]"
+    native_stub_parameters = py_parameters
     signature = ", ".join(["self", *py_parameters])
     facade_setup = (
         f"        raw = self._native.{name}({', '.join(python_arguments)})\n"
@@ -705,7 +700,7 @@ def operation(
     documentation = docs.docstring(
         values.api.doc(function.name),
         "        ",
-        ("Native resources remain valid only during the callback.",)
+        ("Native resources remain valid only inside the `with` block.",)
         if plan.view
         else (),
     )
@@ -985,7 +980,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         if not values.records.get(record, values.enums.get(record)).response
     )
     files["python/maplibre_native_ffi/_generated_operations.py"] = (
-        f'"""{notice}"""\n\nfrom __future__ import annotations\n\nfrom collections.abc import Buffer, Sequence\nfrom concurrent.futures import Future\nfrom dataclasses import dataclass\nfrom typing import TYPE_CHECKING, Any, Callable, NamedTuple, TypeVar\nfrom . import _native\nfrom ._completion import CommandCompletion\nfrom ._future import map_future\nfrom ._operation import GeneratedOperations, _adopt_future, _adopt_value, _with_view\nfrom ._generated_values import _maybe\nR = TypeVar("R")\n{imports}\nif TYPE_CHECKING:\n    from ._generated_owners import {", ".join([*OWNERS.values(), *scope_owners.values()]) or "__name__"}\n\n'
+        f'"""{notice}"""\n\nfrom __future__ import annotations\n\nfrom collections.abc import Buffer, Sequence\nfrom concurrent.futures import Future\nfrom contextlib import AbstractContextManager\nfrom dataclasses import dataclass\nfrom typing import TYPE_CHECKING, Any, Callable, NamedTuple\nfrom . import _native\nfrom ._completion import CommandCompletion\nfrom ._future import map_future\nfrom ._operation import GeneratedOperations, _adopt_future, _adopt_value, _view\nfrom ._generated_values import _maybe\n{imports}\nif TYPE_CHECKING:\n    from ._generated_owners import {", ".join([*OWNERS.values(), *scope_owners.values()]) or "__name__"}\n\n'
         + "\n".join(sorted(records))
         + "\n".join(
             f"class _{owner}Operations(GeneratedOperations):\n    _native: _native._{owner}\n\n{chr(10).join(methods)}"

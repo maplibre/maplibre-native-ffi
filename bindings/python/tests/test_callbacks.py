@@ -342,6 +342,30 @@ def test_replacing_the_log_callback_releases_the_previous_one(
     assert second_retired.wait(TIMEOUT)
 
 
+def test_a_log_handler_that_returns_none_leaves_records_unconsumed(
+    map_handle: mln.MapHandle, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reports: list[object] = []
+    monkeypatch.setattr(sys, "unraisablehook", reports.append)
+
+    class Unconsuming(_Retiring):
+        def __call__(self, *_: object) -> None:
+            self.called.set()
+
+    handler = Unconsuming()
+    logged, retired = handler.called, handler.retired
+    try:
+        mln.log_set_callback(mln.LogHandler(handler))
+        del handler
+        map_handle.set_style_json(b"{")
+        assert logged.wait(TIMEOUT)
+    finally:
+        mln.log_clear_callback()
+    # Once native releases the handler, no call of it is in flight.
+    assert retired.wait(TIMEOUT)
+    assert reports == []
+
+
 def test_a_registration_reported_as_rejected_is_not_rooted(harness: Harness) -> None:
     handles: list[mln.ResourceRequestHandle] = []
     provided = threading.Event()

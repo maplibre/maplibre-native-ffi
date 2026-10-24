@@ -1,5 +1,6 @@
 """Attach generated operations to their public owner for introspection."""
 
+from contextlib import contextmanager
 from typing import Any
 
 from ._future import map_future
@@ -42,9 +43,10 @@ def _adopt_future(source, owner, parent):
     )
 
 
-def _with_view(owner, read, convert, callback):
+@contextmanager
+def _view(owner, read, convert):
     with owner._native._read_scope():
-        return callback(convert(read()))
+        yield convert(read())
 
 
 def _wrap_response(raw, name):

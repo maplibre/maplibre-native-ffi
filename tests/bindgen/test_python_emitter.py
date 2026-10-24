@@ -49,7 +49,7 @@ class PythonEmitterTests(unittest.TestCase):
                 GeneratedOperations=GeneratedOperations,
                 _adopt_future=None,
                 _adopt_value=None,
-                _with_view=None,
+                _view=None,
             ),
             "fixture._lifecycle": module(
                 "_lifecycle", NativeHandleMixin=NativeHandleMixin

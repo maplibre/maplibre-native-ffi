@@ -8,7 +8,6 @@ import weakref
 from collections import deque
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
-from concurrent.futures._base import CANCELLED
 from threading import Lock
 
 _callback_executor = ThreadPoolExecutor(thread_name_prefix="maplibre-callback")
@@ -27,6 +26,10 @@ class NativeFuture[T](Future[T]):
         self._callback_lock = Lock()
         self._pending_callbacks: deque[Callable[[Future[T]], object]] = deque()
         self._dispatching = False
+        # Whether set_running_or_notify_cancel has run, which it does once:
+        # for the claim, or to wake waiters after a cancel.
+        self._settle_lock = Lock()
+        self._settled = False
 
     def add_done_callback(self, fn: Callable[[Future[T]], object]) -> None:
         def dispatch(_: Future[T]) -> None:
@@ -61,9 +64,7 @@ class NativeFuture[T](Future[T]):
         """
         if not super().cancel():
             return False
-        with self._condition:
-            if self._state == CANCELLED:
-                self.set_running_or_notify_cancel()
+        self._settle()
         return True
 
     def _claim(self) -> bool:
@@ -72,9 +73,15 @@ class NativeFuture[T](Future[T]):
         A cancelled future takes no result, so the caller disposes any value
         that the result transfers.
         """
-        with self._condition:
-            if self.cancelled():
+        return self._settle()
+
+    def _settle(self) -> bool:
+        # A pending future becomes running and takes the result. A cancelled
+        # one notifies the waiters that ``Future.cancel`` leaves to an executor.
+        with self._settle_lock:
+            if self._settled:
                 return False
+            self._settled = True
             return self.set_running_or_notify_cancel()
 
 
