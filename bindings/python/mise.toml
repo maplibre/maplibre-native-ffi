@@ -93,6 +93,21 @@ MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" 
   uv run --project . --no-sync python -m pytest
 '''
 
+# The default interpreter is the newest Python. This runs the suite against the
+# same wheels on the oldest Python that requires-python admits.
+[tasks."test:floor"]
+description = "Run the Python suite on the oldest supported Python."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = ":_install", args = ["{{usage.preset}}"] }]
+run = '''
+venv="$MISE_MONOREPO_ROOT/build/$usage_preset/python-floor"
+uv venv --quiet --allow-existing --python 3.12 "$venv"
+uv pip install --quiet --python "$venv" "pytest>=9,<10"
+uv pip install --quiet --python "$venv" --reinstall --no-index dist/*.whl
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  "$venv/bin/python" -m pytest
+'''
+
 [tasks._test-android]
 hide = true
 usage = 'arg "<preset>"'

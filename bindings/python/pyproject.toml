@@ -10,10 +10,12 @@ name = "maplibre-native-ffi"
 version = "0.0.0"
 description = "Low-level Python bindings for MapLibre Native FFI"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 license = "BSD-2-Clause"
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: 3.15",
 ]

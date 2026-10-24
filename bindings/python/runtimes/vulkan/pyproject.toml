@@ -8,10 +8,12 @@ build-backend = "maturin"
 name = "maplibre-native-ffi-runtime-vulkan"
 version = "0.0.0"
 description = "Vulkan runtime for the maplibre-native-ffi Python binding"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 license = "BSD-2-Clause"
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: 3.15",
   "Programming Language :: Rust",

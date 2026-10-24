@@ -105,9 +105,15 @@ commands = [
 platforms = ["linux-gnu", "macos"]
 commands = [{ task = "//examples/c-map:smoke", display = true }]
 
+# One target runs the suite again on the oldest supported Python.
 [[suites]]
 platforms = ["linux-gnu", "macos", "windows"]
-commands = [{ task = "//bindings/python:test" }]
+commands = [
+  { task = "//bindings/python:test" },
+  { task = "//bindings/python:test:floor", include = [
+    "linux-gnu-x64-vulkan",
+  ] },
+]
 
 [[suites]]
 platforms = ["linux-gnu", "macos", "windows"]
