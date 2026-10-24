@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
-import 'package:maplibre_native_ffi/src/internal/value/uint64.dart';
 import 'package:test/test.dart';
 
 import 'support/fixture.dart';
@@ -121,19 +120,8 @@ void main() {
   );
 
   test('integer narrowing is checked and 64-bit carriers round-trip', () async {
-    final maximum = (BigInt.one << 64) - BigInt.one;
-    expect(uint64ToNative(maximum, 'value'), -1);
-    expect(uint64FromNative(-1), maximum);
-    expect(
-      () => uint64ToNative(maximum + BigInt.one, 'value'),
-      throwsA(
-        isA<MaplibreException>().having(
-          (error) => error.status,
-          'status',
-          Status.invalidArgument,
-        ),
-      ),
-    );
+    // A uint64_t crosses as its bit pattern, so -1 is the largest identity.
+    const maximum = -1;
 
     // A value outside a 32-bit field's range is rejected before it crosses,
     // rather than truncated into a valid one.

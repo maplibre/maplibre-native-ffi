@@ -162,7 +162,7 @@ final class TestGraphics {
               device: pointer(context.metalDevice),
             ),
             // MTLPixelFormatBGRA8Unorm.
-            pixelFormat: BigInt.from(80),
+            pixelFormat: 80,
           ),
           options,
         );

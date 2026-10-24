@@ -1161,19 +1161,19 @@ final class WebglContextKind extends _Enum {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class MetalTextureFrame extends _Value {
   const MetalTextureFrame({
-    required this.generation,
+    this.generation = 0,
     this.width = 0,
     this.height = 0,
     this.scaleFactor = 0,
-    required this.frameId,
+    this.frameId = 0,
     this.slot = 0,
     this.texture = NativePointer.nullPointer,
     this.device = NativePointer.nullPointer,
-    required this.pixelFormat,
+    this.pixelFormat = 0,
   });
 
   /// Session generation that produced this frame.
-  final BigInt generation;
+  final int generation;
 
   /// Physical Metal texture width in device pixels.
   final int width;
@@ -1185,7 +1185,7 @@ final class MetalTextureFrame extends _Value {
   final double scaleFactor;
 
   /// Opaque identity of this frame.
-  final BigInt frameId;
+  final int frameId;
 
   /// Ring slot that holds this frame. For a borrowed target, the index of its
   /// texture in the descriptor's textures array.
@@ -1198,7 +1198,7 @@ final class MetalTextureFrame extends _Value {
   final NativePointer device;
 
   /// Backend-native pixel format value. Metal uses MTLPixelFormat.
-  final BigInt pixelFormat;
+  final int pixelFormat;
 
   @override
   List<Object?> get _members => [
@@ -1220,11 +1220,11 @@ final class MetalTextureFrame extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class OpenglTextureFrame extends _Value {
   const OpenglTextureFrame({
-    required this.generation,
+    this.generation = 0,
     this.width = 0,
     this.height = 0,
     this.scaleFactor = 0,
-    required this.frameId,
+    this.frameId = 0,
     this.slot = 0,
     this.texture = 0,
     this.target = 0,
@@ -1234,7 +1234,7 @@ final class OpenglTextureFrame extends _Value {
   });
 
   /// Session generation that produced this frame.
-  final BigInt generation;
+  final int generation;
 
   /// Physical OpenGL texture width in device pixels.
   final int width;
@@ -1246,7 +1246,7 @@ final class OpenglTextureFrame extends _Value {
   final double scaleFactor;
 
   /// Opaque identity of this frame.
-  final BigInt frameId;
+  final int frameId;
 
   /// Ring slot that holds this frame. For a borrowed target, the index of its
   /// texture in the descriptor's textures array.
@@ -1289,7 +1289,7 @@ final class OpenglTextureFrame extends _Value {
 /// See `mln_gpu_sync` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class GpuSync extends _Value {
-  GpuSync({GpuSyncKind? kind, BigInt? object})
+  GpuSync({GpuSyncKind? kind, int? object})
     : kind = kind ?? gpuSyncDefault().kind,
       object = object ?? gpuSyncDefault().object;
 
@@ -1297,7 +1297,7 @@ final class GpuSync extends _Value {
   final GpuSyncKind kind;
 
   /// Bit pattern of the GLsync pointer.
-  final BigInt object;
+  final int object;
 
   @override
   List<Object?> get _members => [kind, object];
@@ -1511,31 +1511,31 @@ final class MapView extends _Value {
 final class RenderFrameResult extends _Value {
   const RenderFrameResult({
     this.disposition = const RenderResult.fromRawValue(0),
-    required this.token,
-    required this.mapUpdateGeneration,
-    required this.generation,
-    required this.frameGeneration,
+    this.token = 0,
+    this.mapUpdateGeneration = 0,
+    this.generation = 0,
+    this.frameGeneration = 0,
     this.needsRepaint = false,
     required this.view,
   });
 
   /// One `mln_render_result` value.
   final RenderResult disposition;
-  final BigInt token;
+  final int token;
 
   /// Generation of the map render update the demand evaluated. When disposition
   /// is `MLN_RENDER_RESULT_RENDERED`, the frame drew that update; compare it
   /// with `mln_completion_result.render_update_generation` to find the first
   /// frame that includes a command.
-  final BigInt mapUpdateGeneration;
+  final int mapUpdateGeneration;
 
   /// The session's target generation when the demand reached its result. See
   /// `mln_render_session_snapshot.generation`.
-  final BigInt generation;
+  final int generation;
 
   /// Position of the frame among the frames that the session rendered, counting
   /// from one. Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.
-  final BigInt frameGeneration;
+  final int frameGeneration;
 
   /// Whether the map asked for another frame while it rendered this one, as
   /// during an ongoing paint transition. Set only when disposition is
@@ -1571,21 +1571,21 @@ final class RenderFrameResult extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class VulkanTextureFrame extends _Value {
   const VulkanTextureFrame({
-    required this.generation,
+    this.generation = 0,
     this.width = 0,
     this.height = 0,
     this.scaleFactor = 0,
-    required this.frameId,
+    this.frameId = 0,
     this.slot = 0,
-    required this.image,
-    required this.imageView,
+    this.image = 0,
+    this.imageView = 0,
     this.device = NativePointer.nullPointer,
     this.format = 0,
     this.layout = 0,
   });
 
   /// Session generation that produced this frame.
-  final BigInt generation;
+  final int generation;
 
   /// Physical Vulkan image width in device pixels.
   final int width;
@@ -1597,17 +1597,17 @@ final class VulkanTextureFrame extends _Value {
   final double scaleFactor;
 
   /// Opaque identity of this frame.
-  final BigInt frameId;
+  final int frameId;
 
   /// Ring slot that holds this frame. For a borrowed target, the index of its
   /// image in the descriptor's textures array.
   final int slot;
 
   /// Borrowed VkImage bit pattern. Valid until frame release.
-  final BigInt image;
+  final int image;
 
   /// Borrowed VkImageView bit pattern. Valid until frame release.
-  final BigInt imageView;
+  final int imageView;
 
   /// Borrowed VkDevice. Valid until frame release.
   final NativePointer device;
@@ -1642,11 +1642,11 @@ final class VulkanTextureFrame extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class WebgpuTextureFrame extends _Value {
   const WebgpuTextureFrame({
-    required this.generation,
+    this.generation = 0,
     this.width = 0,
     this.height = 0,
     this.scaleFactor = 0,
-    required this.frameId,
+    this.frameId = 0,
     this.slot = 0,
     this.texture = NativePointer.nullPointer,
     this.textureView = NativePointer.nullPointer,
@@ -1655,7 +1655,7 @@ final class WebgpuTextureFrame extends _Value {
   });
 
   /// Session generation that produced this frame.
-  final BigInt generation;
+  final int generation;
 
   /// Physical WebGPU texture width in device pixels.
   final int width;
@@ -1667,7 +1667,7 @@ final class WebgpuTextureFrame extends _Value {
   final double scaleFactor;
 
   /// Opaque identity of this frame.
-  final BigInt frameId;
+  final int frameId;
 
   /// Ring slot that holds this frame. For a borrowed target, the index of its
   /// texture in the descriptor's textures array.
@@ -1722,7 +1722,7 @@ final class UnitBezier extends _Value {
 final class CameraTransitionEnd extends _Value {
   const CameraTransitionEnd({
     this.outcome = const CameraTransitionOutcome.fromRawValue(0),
-    required this.generation,
+    this.generation = 0,
   });
 
   /// One of `mln_camera_transition_outcome`.
@@ -1732,7 +1732,7 @@ final class CameraTransitionEnd extends _Value {
   /// transitions left it. The map events of the change that ended them carry
   /// this generation and are queued before the callback runs. Zero for
   /// `MLN_CAMERA_TRANSITION_OUTCOME_CLOSED`.
-  final BigInt generation;
+  final int generation;
 
   @override
   List<Object?> get _members => [outcome, generation];
@@ -1784,7 +1784,7 @@ final class AnimationOptions extends _Value {
 
   /// Caller-chosen identity of the command that these options animate, which
   /// `mln_map_cancel_camera_transition()` matches.
-  final BigInt? transitionId;
+  final int? transitionId;
 
   /// Reports the end of the command's transitions. Disabled by default.
   final CameraTransitionHandler endHandler;
@@ -2022,7 +2022,7 @@ final class CustomMvtVectorSourceOptions {
 /// See `mln_frame_demand` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 final class FrameDemand extends _Value {
-  FrameDemand({FrameDemandFlag? flags, BigInt? token})
+  FrameDemand({FrameDemandFlag? flags, int? token})
     : flags = flags ?? frameDemandDefault().flags,
       token = token ?? frameDemandDefault().token;
 
@@ -2031,7 +2031,7 @@ final class FrameDemand extends _Value {
   final FrameDemandFlag flags;
 
   /// Host identity returned with the terminal frame result.
-  final BigInt token;
+  final int token;
 
   @override
   List<Object?> get _members => [flags, token];
@@ -2472,7 +2472,7 @@ final class MetalOwnedTextureDescriptor extends _Value {
   MetalOwnedTextureDescriptor({
     LogicalExtent? extent,
     MetalContextDescriptor? context,
-    BigInt? pixelFormat,
+    int? pixelFormat,
   }) : extent = extent ?? metalOwnedTextureDescriptorDefault().extent,
        context = context ?? metalOwnedTextureDescriptorDefault().context,
        pixelFormat =
@@ -2488,7 +2488,7 @@ final class MetalOwnedTextureDescriptor extends _Value {
   /// Backend-native MTLPixelFormat value of the ring's textures: either
   /// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Defaults to
   /// MTLPixelFormatRGBA8Unorm. Readback returns RGBA8 for either format.
-  final BigInt pixelFormat;
+  final int pixelFormat;
 
   @override
   List<Object?> get _members => [extent, context, pixelFormat];
@@ -2849,14 +2849,14 @@ final class VulkanContextDescriptor extends _Value {
 /// See `mln_vulkan_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class VulkanBorrowedTexture extends _Value {
-  const VulkanBorrowedTexture({required this.image, required this.imageView});
+  const VulkanBorrowedTexture({this.image = 0, this.imageView = 0});
 
   /// Borrowed VkImage. Required.
-  final BigInt image;
+  final int image;
 
   /// Borrowed VkImageView for image. Required. The view must be a 2D color view
   /// that matches image and the descriptor's format.
-  final BigInt imageView;
+  final int imageView;
 
   @override
   List<Object?> get _members => [image, imageView];
@@ -2965,7 +2965,7 @@ final class VulkanSurfaceDescriptor extends _Value {
   VulkanSurfaceDescriptor({
     LogicalExtent? extent,
     VulkanContextDescriptor? context,
-    BigInt? surface,
+    int? surface,
   }) : extent = extent ?? vulkanSurfaceDescriptorDefault().extent,
        context = context ?? vulkanSurfaceDescriptorDefault().context,
        surface = surface ?? vulkanSurfaceDescriptorDefault().surface;
@@ -2980,7 +2980,7 @@ final class VulkanSurfaceDescriptor extends _Value {
   final VulkanContextDescriptor context;
 
   /// Borrowed VkSurfaceKHR bit pattern. Required.
-  final BigInt surface;
+  final int surface;
 
   @override
   List<Object?> get _members => [extent, context, surface];
@@ -3152,8 +3152,8 @@ final class WebgpuSurfaceDescriptor extends _Value {
 /// See `mln_camera_query_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class CameraQueryResult extends _Value {
-  const CameraQueryResult({required this.generation, required this.camera});
-  final BigInt generation;
+  const CameraQueryResult({this.generation = 0, required this.camera});
+  final int generation;
   final CameraOptions camera;
 
   @override
@@ -3232,13 +3232,13 @@ final class MapTileOptions extends _Value {
 final class MapSnapshot extends _Value {
   const MapSnapshot({
     this.debugOptions = const MapDebugOption.fromRawValue(0),
-    required this.generation,
+    this.generation = 0,
     this.fullyLoaded = false,
     this.renderingStatsViewEnabled = false,
     this.gestureInProgress = false,
     this.transitionInProgress = false,
     this.eventMask = const RuntimeEventMask.fromRawValue(0),
-    required this.latestRenderUpdateGeneration,
+    this.latestRenderUpdateGeneration = 0,
     required this.tile,
     required this.bounds,
     required this.freeCamera,
@@ -3247,7 +3247,7 @@ final class MapSnapshot extends _Value {
 
   /// Debug overlay mask of `mln_map_debug_option` values.
   final MapDebugOption debugOptions;
-  final BigInt generation;
+  final int generation;
 
   /// True once every requested style and tile resource finished loading.
   final bool fullyLoaded;
@@ -3263,7 +3263,7 @@ final class MapSnapshot extends _Value {
   /// Generation of the latest render update the map published. A rendered frame
   /// at or past it draws map state that includes every command this snapshot
   /// observes, though animations and resource loads finish in later frames.
-  final BigInt latestRenderUpdateGeneration;
+  final int latestRenderUpdateGeneration;
   final MapTileOptions tile;
   final BoundOptions bounds;
   final FreeCameraOptions freeCamera;
@@ -3713,10 +3713,10 @@ final class RenderSessionSnapshot extends _Value {
   const RenderSessionSnapshot({
     required this.state,
     required this.extent,
-    required this.generation,
-    required this.mapUpdateGeneration,
-    required this.renderedUpdateGeneration,
-    required this.frameGeneration,
+    this.generation = 0,
+    this.mapUpdateGeneration = 0,
+    this.renderedUpdateGeneration = 0,
+    this.frameGeneration = 0,
     this.acquiredFrameCount = 0,
     this.pendingChanges = false,
   });
@@ -3729,17 +3729,17 @@ final class RenderSessionSnapshot extends _Value {
 
   /// Increases when the session's lifecycle state, target, or applied extent
   /// changes. An acquired texture frame reports the value it rendered under.
-  final BigInt generation;
+  final int generation;
 
   /// Generation of the latest map render update that the session has seen.
-  final BigInt mapUpdateGeneration;
+  final int mapUpdateGeneration;
 
   /// Map render update generation that the latest rendered frame drew. Zero
   /// before the first frame after attachment or a target replacement.
-  final BigInt renderedUpdateGeneration;
+  final int renderedUpdateGeneration;
 
   /// Frame generation of the latest rendered frame, zero before the first.
-  final BigInt frameGeneration;
+  final int frameGeneration;
 
   /// Acquired frames that the host has not released or discarded.
   final int acquiredFrameCount;
@@ -4212,24 +4212,24 @@ final class OfflineRegionInfo extends _Value {
 final class OfflineRegionStatus extends _Value {
   const OfflineRegionStatus({
     this.downloadState = const OfflineRegionDownloadState.fromRawValue(0),
-    required this.completedResourceCount,
-    required this.completedResourceSize,
-    required this.completedTileCount,
-    required this.requiredTileCount,
-    required this.completedTileSize,
-    required this.requiredResourceCount,
+    this.completedResourceCount = 0,
+    this.completedResourceSize = 0,
+    this.completedTileCount = 0,
+    this.requiredTileCount = 0,
+    this.completedTileSize = 0,
+    this.requiredResourceCount = 0,
     this.requiredResourceCountIsPrecise = false,
     this.complete = false,
   });
 
   /// One of `mln_offline_region_download_state`.
   final OfflineRegionDownloadState downloadState;
-  final BigInt completedResourceCount;
-  final BigInt completedResourceSize;
-  final BigInt completedTileCount;
-  final BigInt requiredTileCount;
-  final BigInt completedTileSize;
-  final BigInt requiredResourceCount;
+  final int completedResourceCount;
+  final int completedResourceSize;
+  final int completedTileCount;
+  final int requiredTileCount;
+  final int completedTileSize;
+  final int requiredResourceCount;
   final bool requiredResourceCountIsPrecise;
   final bool complete;
 
@@ -4378,7 +4378,7 @@ final class RuntimeEventTileAction extends _Value {
 final class RuntimeEventOfflineRegionStatus extends _Value {
   const RuntimeEventOfflineRegionStatus({
     this.regionId = 0,
-    required this.status,
+    this.status = const OfflineRegionStatus(),
   });
   final int regionId;
   final OfflineRegionStatus status;
@@ -4412,10 +4412,10 @@ final class RuntimeEventOfflineRegionResponseError extends _Value {
 final class RuntimeEventOfflineRegionTileCountLimit extends _Value {
   const RuntimeEventOfflineRegionTileCountLimit({
     this.regionId = 0,
-    required this.limit,
+    this.limit = 0,
   });
   final int regionId;
-  final BigInt limit;
+  final int limit;
 
   @override
   List<Object?> get _members => [regionId, limit];
@@ -4429,8 +4429,8 @@ final class RuntimeEvent {
   const RuntimeEvent({
     required this.type,
     this.sourceType = const RuntimeEventSourceType.fromRawValue(0),
-    required this.source,
-    required this.generation,
+    this.source = 0,
+    this.generation = 0,
     this.code = 0,
     required this.message,
     required this.payload,
@@ -4443,11 +4443,11 @@ final class RuntimeEvent {
   final RuntimeEventSourceType sourceType;
 
   /// Source handle selected by source_type: an `mln_runtime` or an `mln_map`.
-  final BigInt source;
+  final int source;
 
   /// Map snapshot generation that the event reports, or zero when source_type
   /// is `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
-  final BigInt generation;
+  final int generation;
 
   /// Secondary event detail whose meaning type selects; see
   /// `mln_runtime_event_type`.
@@ -4553,13 +4553,13 @@ final class HttpHeaderTransform {
 /// See `mln_resource_range` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class ResourceRange extends _Value {
-  const ResourceRange({required this.start, required this.end});
+  const ResourceRange({this.start = 0, this.end = 0});
 
   /// First byte offset of the requested range.
-  final BigInt start;
+  final int start;
 
   /// Last byte offset of the requested range, inclusive.
-  final BigInt end;
+  final int end;
 
   @override
   List<Object?> get _members => [start, end];

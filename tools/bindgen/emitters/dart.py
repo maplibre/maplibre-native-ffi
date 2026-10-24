@@ -24,6 +24,11 @@ from .dart_values import (
     owner_names,
 )
 
+# Functions that only host platform code can call. `mln_android_init` takes a
+# `JNIEnv*` and a `Context`, which an isolate has no safe way to obtain, so a
+# Flutter app's Android host code calls it before the isolate starts.
+HOST_ONLY = {"mln_android_init"}
+
 
 def native_call(function, arguments):
     """Call a C function, passing the isolate's diagnostic when it takes one."""
@@ -523,6 +528,8 @@ def lower(api: Api | BoundApi):
         {name: "\n".join(reasons) for name, reasons in bound.unsupported.items()}
     )
     for plan in bound.operations:
+        if plan.name in HOST_ONLY:
+            continue
         try:
             # Failed attempts cannot leave unrenderable value fragments behind.
             local_values = Values(bound)
@@ -624,9 +631,7 @@ def render_owner(native, handle, bodies, bound, roots):
         "  ///\n"
         "  /// It stays readable after close, so events drained later still match\n"
         "  /// this handle.\n"
-        "  BigInt get id => uint64FromNative(_state.handleId);\n\n"
-        + "".join(bodies)
-        + "}\n"
+        "  int get id => _state.handleId;\n\n" + "".join(bodies) + "}\n"
     )
 
 

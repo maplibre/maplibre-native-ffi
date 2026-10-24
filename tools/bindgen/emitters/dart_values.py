@@ -21,7 +21,7 @@ SCALARS = {
     "int16_t": ("int", "Int16"),
     "uint32_t": ("int", "Uint32"),
     "int32_t": ("int", "Int32"),
-    "uint64_t": ("BigInt", "Uint64"),
+    "uint64_t": ("int", "Uint64"),
     "int64_t": ("int", "Int64"),
     "size_t": ("int", "Size"),
     "ptrdiff_t": ("int", "IntPtr"),
@@ -29,8 +29,8 @@ SCALARS = {
     "uintptr_t": ("int", "UintPtr"),
     "int": ("int", "Int"),
     "unsigned int": ("int", "UnsignedInt"),
-    "unsigned long": ("BigInt", "UnsignedLong"),
-    "unsigned long long": ("BigInt", "Uint64"),
+    "unsigned long": ("int", "UnsignedLong"),
+    "unsigned long long": ("int", "Uint64"),
     "long": ("int", "Long"),
     "long long": ("int", "Int64"),
     "unsigned char": ("int", "Uint8"),
@@ -44,7 +44,7 @@ SCALARS = {
 def owner_names(handle) -> tuple[str, str]:
     """The public owner class and native handle type for a handle plan."""
     name = pascal(handle.stem)
-    return name + "Handle", "Native" + name
+    return name + "Handle", "_Native" + name
 
 
 CALLER_DRIVER_NOTE = (
@@ -378,14 +378,9 @@ class Values:
                 f"{value.native}: optional value requires enclosing storage"
             )
         if value.kind == "scalar":
-            public, ffi = self.scalar(value)
-            if public == "BigInt":
-                bits = f"uint64ToNative({expression}, '{value.native}')"
-                return (
-                    f"sizeOf<UnsignedLong>() == 4 ? _nativeInteger({bits}, 0, 4294967295) : {bits}"
-                    if ffi == "UnsignedLong"
-                    else bits
-                )
+            _, ffi = self.scalar(value)
+            if ffi == "UnsignedLong":
+                return f"sizeOf<UnsignedLong>() == 4 ? _nativeInteger({expression}, 0, 4294967295) : {expression}"
             widths = {
                 "Uint8": (0, 255),
                 "Int8": (-128, 127),
@@ -450,11 +445,7 @@ class Values:
         if value.kind == "native_pointer":
             result = f"NativePointer({expression}.address)"
         elif value.kind == "scalar":
-            result = (
-                f"uint64FromNative({expression})"
-                if self.scalar(value)[0] == "BigInt"
-                else expression
-            )
+            result = expression
         elif value.kind == "enum":
             result = f"{public_name(value.native)}.fromRawValue({expression})"
         elif value.kind == "record":

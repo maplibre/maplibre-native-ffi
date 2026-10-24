@@ -3,25 +3,25 @@ part of 'runtime.dart';
 
 MetalTextureFrame _readMetalTextureFrame(raw.mln_metal_texture_frame source) =>
     MetalTextureFrame(
-      generation: uint64FromNative(source.generation),
+      generation: source.generation,
       width: source.width,
       height: source.height,
       scaleFactor: source.scale_factor,
-      frameId: uint64FromNative(source.frame_id),
+      frameId: source.frame_id,
       slot: source.slot,
       texture: NativePointer(source.texture.address),
       device: NativePointer(source.device.address),
-      pixelFormat: uint64FromNative(source.pixel_format),
+      pixelFormat: source.pixel_format,
     );
 
 OpenglTextureFrame _readOpenglTextureFrame(
   raw.mln_opengl_texture_frame source,
 ) => OpenglTextureFrame(
-  generation: uint64FromNative(source.generation),
+  generation: source.generation,
   width: source.width,
   height: source.height,
   scaleFactor: source.scale_factor,
-  frameId: uint64FromNative(source.frame_id),
+  frameId: source.frame_id,
   slot: source.slot,
   texture: source.texture,
   target: source.target,
@@ -38,14 +38,12 @@ Pointer<raw.mln_gpu_sync> _writeGpuSync(
   final result = into ?? arena<raw.mln_gpu_sync>();
   result.ref = raw.mln_gpu_sync_default();
   result.ref.kind = value.kind.rawValue;
-  result.ref.object = uint64ToNative(value.object, 'uint64_t');
+  result.ref.object = value.object;
   return result;
 }
 
-GpuSync _readGpuSync(raw.mln_gpu_sync source) => GpuSync(
-  kind: GpuSyncKind.fromRawValue(source.kind),
-  object: uint64FromNative(source.object),
-);
+GpuSync _readGpuSync(raw.mln_gpu_sync source) =>
+    GpuSync(kind: GpuSyncKind.fromRawValue(source.kind), object: source.object);
 
 Pointer<raw.mln_lat_lng> _writeLatLng(
   LatLng value,
@@ -300,10 +298,10 @@ MapView _readMapView(raw.mln_map_view source) => MapView(
 RenderFrameResult _readRenderFrameResult(raw.mln_render_frame_result source) =>
     RenderFrameResult(
       disposition: RenderResult.fromRawValue(source.disposition),
-      token: uint64FromNative(source.token),
-      mapUpdateGeneration: uint64FromNative(source.map_update_generation),
-      generation: uint64FromNative(source.generation),
-      frameGeneration: uint64FromNative(source.frame_generation),
+      token: source.token,
+      mapUpdateGeneration: source.map_update_generation,
+      generation: source.generation,
+      frameGeneration: source.frame_generation,
       needsRepaint: source.needs_repaint,
       view: _readMapView(source.view),
     );
@@ -311,14 +309,14 @@ RenderFrameResult _readRenderFrameResult(raw.mln_render_frame_result source) =>
 VulkanTextureFrame _readVulkanTextureFrame(
   raw.mln_vulkan_texture_frame source,
 ) => VulkanTextureFrame(
-  generation: uint64FromNative(source.generation),
+  generation: source.generation,
   width: source.width,
   height: source.height,
   scaleFactor: source.scale_factor,
-  frameId: uint64FromNative(source.frame_id),
+  frameId: source.frame_id,
   slot: source.slot,
-  image: uint64FromNative(source.image),
-  imageView: uint64FromNative(source.image_view),
+  image: source.image,
+  imageView: source.image_view,
   device: NativePointer(source.device.address),
   format: source.format,
   layout: source.layout,
@@ -327,11 +325,11 @@ VulkanTextureFrame _readVulkanTextureFrame(
 WebgpuTextureFrame _readWebgpuTextureFrame(
   raw.mln_webgpu_texture_frame source,
 ) => WebgpuTextureFrame(
-  generation: uint64FromNative(source.generation),
+  generation: source.generation,
   width: source.width,
   height: source.height,
   scaleFactor: source.scale_factor,
-  frameId: uint64FromNative(source.frame_id),
+  frameId: source.frame_id,
   slot: source.slot,
   texture: NativePointer(source.texture.address),
   textureView: NativePointer(source.texture_view.address),
@@ -359,7 +357,7 @@ CameraTransitionEnd _readCameraTransitionEnd(
   raw.mln_camera_transition_end source,
 ) => CameraTransitionEnd(
   outcome: CameraTransitionOutcome.fromRawValue(source.outcome),
-  generation: uint64FromNative(source.generation),
+  generation: source.generation,
 );
 
 void _deliverCameraTransitionEndCallback(
@@ -429,7 +427,7 @@ Pointer<raw.mln_animation_options> _writeAnimationOptions(
   }
   if (value.transitionId != null) {
     result.ref.fields |= raw.MLN_ANIMATION_OPTION_TRANSITION_ID;
-    result.ref.transition_id = uint64ToNative(value.transitionId!, 'uint64_t');
+    result.ref.transition_id = value.transitionId!;
   }
   result.ref.end_handler = registrations
       .add(
@@ -455,7 +453,7 @@ AnimationOptions _readAnimationOptions(raw.mln_animation_options source) =>
           : null,
       transitionId:
           (source.fields & raw.MLN_ANIMATION_OPTION_TRANSITION_ID) != 0
-          ? uint64FromNative(source.transition_id)
+          ? source.transition_id
           : null,
       endHandler: const CameraTransitionHandler(),
     );
@@ -824,13 +822,13 @@ Pointer<raw.mln_frame_demand> _writeFrameDemand(
   final result = into ?? arena<raw.mln_frame_demand>();
   result.ref = raw.mln_frame_demand_default();
   result.ref.flags = value.flags.rawValue;
-  result.ref.token = uint64ToNative(value.token, 'uint64_t');
+  result.ref.token = value.token;
   return result;
 }
 
 FrameDemand _readFrameDemand(raw.mln_frame_demand source) => FrameDemand(
   flags: FrameDemandFlag.fromRawValue(source.flags),
-  token: uint64FromNative(source.token),
+  token: source.token,
 );
 
 Pointer<raw.mln_vec3> _writeVec3(
@@ -1286,7 +1284,7 @@ _writeMetalOwnedTextureDescriptor(
   result.ref = raw.mln_metal_owned_texture_descriptor_default();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeMetalContextDescriptor(value.context, arena).ref;
-  result.ref.pixel_format = uint64ToNative(value.pixelFormat, 'uint64_t');
+  result.ref.pixel_format = value.pixelFormat;
   return result;
 }
 
@@ -1295,7 +1293,7 @@ MetalOwnedTextureDescriptor _readMetalOwnedTextureDescriptor(
 ) => MetalOwnedTextureDescriptor(
   extent: _readLogicalExtent(source.extent),
   context: _readMetalContextDescriptor(source.context),
-  pixelFormat: uint64FromNative(source.pixel_format),
+  pixelFormat: source.pixel_format,
 );
 
 Pointer<raw.mln_metal_surface_descriptor> _writeMetalSurfaceDescriptor(
@@ -1605,23 +1603,14 @@ Pointer<raw.mln_vulkan_borrowed_texture> _writeVulkanBorrowedTexture(
   Pointer<raw.mln_vulkan_borrowed_texture>? into,
 }) {
   final result = into ?? arena<raw.mln_vulkan_borrowed_texture>();
-  result.ref.image = uint64ToNative(
-    value.image,
-    'mln_vulkan_non_dispatchable_handle',
-  );
-  result.ref.image_view = uint64ToNative(
-    value.imageView,
-    'mln_vulkan_non_dispatchable_handle',
-  );
+  result.ref.image = value.image;
+  result.ref.image_view = value.imageView;
   return result;
 }
 
 VulkanBorrowedTexture _readVulkanBorrowedTexture(
   raw.mln_vulkan_borrowed_texture source,
-) => VulkanBorrowedTexture(
-  image: uint64FromNative(source.image),
-  imageView: uint64FromNative(source.image_view),
-);
+) => VulkanBorrowedTexture(image: source.image, imageView: source.image_view);
 
 Pointer<raw.mln_vulkan_borrowed_texture_descriptor>
 _writeVulkanBorrowedTextureDescriptor(
@@ -1711,10 +1700,7 @@ Pointer<raw.mln_vulkan_surface_descriptor> _writeVulkanSurfaceDescriptor(
   result.ref = raw.mln_vulkan_surface_descriptor_default();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
-  result.ref.surface = uint64ToNative(
-    value.surface,
-    'mln_vulkan_non_dispatchable_handle',
-  );
+  result.ref.surface = value.surface;
   return result;
 }
 
@@ -1723,7 +1709,7 @@ VulkanSurfaceDescriptor _readVulkanSurfaceDescriptor(
 ) => VulkanSurfaceDescriptor(
   extent: _readLogicalExtent(source.extent),
   context: _readVulkanContextDescriptor(source.context),
-  surface: uint64FromNative(source.surface),
+  surface: source.surface,
 );
 
 Pointer<raw.mln_webgpu_context_descriptor> _writeWebgpuContextDescriptor(
@@ -1864,7 +1850,7 @@ WebgpuSurfaceDescriptor _readWebgpuSurfaceDescriptor(
 
 CameraQueryResult _readCameraQueryResult(raw.mln_camera_query_result source) =>
     CameraQueryResult(
-      generation: uint64FromNative(source.generation),
+      generation: source.generation,
       camera: _readCameraOptions(source.camera),
     );
 
@@ -1959,15 +1945,13 @@ MapTileOptions _readMapTileOptions(
 
 MapSnapshot _readMapSnapshot(raw.mln_map_snapshot source) => MapSnapshot(
   debugOptions: MapDebugOption.fromRawValue(source.debug_options),
-  generation: uint64FromNative(source.generation),
+  generation: source.generation,
   fullyLoaded: source.fully_loaded,
   renderingStatsViewEnabled: source.rendering_stats_view_enabled,
   gestureInProgress: source.gesture_in_progress,
   transitionInProgress: source.transition_in_progress,
   eventMask: RuntimeEventMask.fromRawValue(source.event_mask),
-  latestRenderUpdateGeneration: uint64FromNative(
-    source.latest_render_update_generation,
-  ),
+  latestRenderUpdateGeneration: source.latest_render_update_generation,
   tile: _readMapTileOptions(source.tile),
   bounds: _readBoundOptions(source.bounds),
   freeCamera: _readFreeCameraOptions(source.free_camera),
@@ -2297,10 +2281,10 @@ RenderSessionSnapshot _readRenderSessionSnapshot(
 ) => RenderSessionSnapshot(
   state: RenderSessionState.fromRawValue(source.state),
   extent: _readLogicalExtent(source.extent),
-  generation: uint64FromNative(source.generation),
-  mapUpdateGeneration: uint64FromNative(source.map_update_generation),
-  renderedUpdateGeneration: uint64FromNative(source.rendered_update_generation),
-  frameGeneration: uint64FromNative(source.frame_generation),
+  generation: source.generation,
+  mapUpdateGeneration: source.map_update_generation,
+  renderedUpdateGeneration: source.rendered_update_generation,
+  frameGeneration: source.frame_generation,
   acquiredFrameCount: source.acquired_frame_count,
   pendingChanges: source.pending_changes,
 );
@@ -2714,12 +2698,12 @@ OfflineRegionStatus _readOfflineRegionStatus(
   raw.mln_offline_region_status source,
 ) => OfflineRegionStatus(
   downloadState: OfflineRegionDownloadState.fromRawValue(source.download_state),
-  completedResourceCount: uint64FromNative(source.completed_resource_count),
-  completedResourceSize: uint64FromNative(source.completed_resource_size),
-  completedTileCount: uint64FromNative(source.completed_tile_count),
-  requiredTileCount: uint64FromNative(source.required_tile_count),
-  completedTileSize: uint64FromNative(source.completed_tile_size),
-  requiredResourceCount: uint64FromNative(source.required_resource_count),
+  completedResourceCount: source.completed_resource_count,
+  completedResourceSize: source.completed_resource_size,
+  completedTileCount: source.completed_tile_count,
+  requiredTileCount: source.required_tile_count,
+  completedTileSize: source.completed_tile_size,
+  requiredResourceCount: source.required_resource_count,
   requiredResourceCountIsPrecise: source.required_resource_count_is_precise,
   complete: source.complete,
 );
@@ -2781,7 +2765,7 @@ _readRuntimeEventOfflineRegionTileCountLimit(
   raw.mln_runtime_event_offline_region_tile_count_limit source,
 ) => RuntimeEventOfflineRegionTileCountLimit(
   regionId: source.region_id,
-  limit: uint64FromNative(source.limit),
+  limit: source.limit,
 );
 
 RuntimeEvent _readRuntimeEvent(
@@ -2790,8 +2774,8 @@ RuntimeEvent _readRuntimeEvent(
 }) => RuntimeEvent(
   type: RuntimeEventType.fromRawValue(source.type),
   sourceType: RuntimeEventSourceType.fromRawValue(source.source_type),
-  source: uint64FromNative(source.source),
-  generation: uint64FromNative(source.generation),
+  source: source.source,
+  generation: source.generation,
   code: source.code,
   message: utf8.decode(_copyBufferView(source.message)),
   payload: switch (source.payload_type) {
@@ -2919,10 +2903,7 @@ _NativeRegistration<raw.mln_http_header_transform> _prepareHttpHeaderTransform(
 }
 
 ResourceRange _readResourceRange(raw.mln_resource_range source) =>
-    ResourceRange(
-      start: uint64FromNative(source.start),
-      end: uint64FromNative(source.end),
-    );
+    ResourceRange(start: source.start, end: source.end);
 
 ResourceRequestInfo _readResourceRequestInfo(
   raw.mln_resource_request_info source,
@@ -2968,7 +2949,7 @@ void _deliverResourceProviderCallback(
   try {
     _check(raw.mln_delivery_batch_take(batch, index, nativeDiagnostic));
     final adopted = owner = ResourceRequestHandle._(
-      NativeResourceRequest(payload.handle),
+      _NativeResourceRequest(payload.handle),
     );
     callback(_readResourceRequestInfo(payload.request.ref), adopted);
   } catch (_) {
@@ -3027,7 +3008,7 @@ void _deliverResourceTransformCallback(
   try {
     _check(raw.mln_delivery_batch_take(batch, index, nativeDiagnostic));
     final adopted = owner = ResourceTransformRequestHandle._(
-      NativeResourceTransformRequest(payload.request),
+      _NativeResourceTransformRequest(payload.request),
     );
     callback(
       ResourceKind.fromRawValue(payload.kind),
@@ -3288,21 +3269,6 @@ final _resultUint8ListOrNull = _CompletionValue(
       : _copyBufferView(element.cast<raw.mln_buffer_view>().ref),
 );
 
-/// Initializes Android platform services.
-///
-/// See `mln_android_init` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-void androidInit(NativePointer jniEnv, NativePointer context) {
-  ensureAbiVersion();
-  return _check(
-    raw.mln_android_init(
-      Pointer<Void>.fromAddress(jniEnv.address).cast(),
-      Pointer<Void>.fromAddress(context.address).cast(),
-      nativeDiagnostic,
-    ),
-  );
-}
-
 /// Returns empty animation options initialized for this C API version.
 ///
 /// See `mln_animation_options_default` in the
@@ -3434,7 +3400,7 @@ GeojsonSourceDataHandle geojsonSourceDataCreate(
   );
   return _adoptOwned(
     outData.value,
-    () => GeojsonSourceDataHandle._(NativeGeojsonSourceData(outData.value)),
+    () => GeojsonSourceDataHandle._(_NativeGeojsonSourceData(outData.value)),
     (handle) {
       raw.mln_geojson_source_data_release(handle);
     },
@@ -3585,7 +3551,7 @@ MapProjectionHandle mapProjectionCreate(MapView view) =>
       );
       return _adoptOwned(
         outProjection.value,
-        () => MapProjectionHandle._(NativeMapProjection(outProjection.value)),
+        () => MapProjectionHandle._(_NativeMapProjection(outProjection.value)),
         (handle) {
           raw.mln_map_projection_release(handle);
         },
@@ -3799,7 +3765,7 @@ RuntimeHandle runtimeCreate(RuntimeOptions options) => withNativeArena((arena) {
   );
   return _adoptOwned(
     outRuntime.value,
-    () => RuntimeHandle._(NativeRuntime(outRuntime.value)),
+    () => RuntimeHandle._(_NativeRuntime(outRuntime.value)),
     (handle) {
       _check(raw.mln_runtime_dispose(handle, nativeDiagnostic));
     },
@@ -3846,7 +3812,7 @@ StyleExpressionHandle styleExpressionCreate(
   );
   return _adoptOwned(
     outExpression.value,
-    () => StyleExpressionHandle._(NativeStyleExpression(outExpression.value)),
+    () => StyleExpressionHandle._(_NativeStyleExpression(outExpression.value)),
     (handle) {
       raw.mln_style_expression_release(handle);
     },
@@ -3966,7 +3932,7 @@ WebgpuSurfaceDescriptor webgpuSurfaceDescriptorDefault() {
 }
 
 /// Issued `mln_acquired_frame` handle id.
-extension type const NativeAcquiredFrame(int raw) implements NativeHandle {}
+extension type const _NativeAcquiredFrame(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_acquired_frame` handle.
 ///
@@ -3975,19 +3941,19 @@ extension type const NativeAcquiredFrame(int raw) implements NativeHandle {}
 /// See `mln_acquired_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class AcquiredFrameHandle implements Finalizable {
-  AcquiredFrameHandle._(this._parent, NativeAcquiredFrame handle)
+  AcquiredFrameHandle._(this._parent, _NativeAcquiredFrame handle)
     : _state = NativeHandleState(handle, 'AcquiredFrameHandle');
   // Keeps the parent owner reachable while this owner lives.
   // ignore: unused_field
   final RenderSessionHandle _parent;
-  final NativeHandleState<NativeAcquiredFrame> _state;
-  NativeAcquiredFrame get _handle => _state.handle;
+  final NativeHandleState<_NativeAcquiredFrame> _state;
+  _NativeAcquiredFrame get _handle => _state.handle;
 
   /// The native handle id, which runtime events report as their source.
   ///
   /// It stays readable after close, so events drained later still match
   /// this handle.
-  BigInt get id => uint64FromNative(_state.handleId);
+  int get id => _state.handleId;
 
   /// Consumes an acquired frame without consumer GPU synchronization, so it
   /// quarantines the frame's slot of the texture ring.
@@ -4130,7 +4096,8 @@ final class AcquiredFrameHandle implements Finalizable {
 }
 
 /// Issued `mln_geojson_source_data` handle id.
-extension type const NativeGeojsonSourceData(int raw) implements NativeHandle {}
+extension type const _NativeGeojsonSourceData(int raw)
+    implements NativeHandle {}
 
 /// Owner of one native `mln_geojson_source_data` handle.
 ///
@@ -4139,16 +4106,16 @@ extension type const NativeGeojsonSourceData(int raw) implements NativeHandle {}
 /// See `mln_geojson_source_data` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class GeojsonSourceDataHandle implements Finalizable {
-  GeojsonSourceDataHandle._(NativeGeojsonSourceData handle)
+  GeojsonSourceDataHandle._(_NativeGeojsonSourceData handle)
     : _state = NativeHandleState(handle, 'GeojsonSourceDataHandle');
-  final NativeHandleState<NativeGeojsonSourceData> _state;
-  NativeGeojsonSourceData get _handle => _state.handle;
+  final NativeHandleState<_NativeGeojsonSourceData> _state;
+  _NativeGeojsonSourceData get _handle => _state.handle;
 
   /// The native handle id, which runtime events report as their source.
   ///
   /// It stays readable after close, so events drained later still match
   /// this handle.
-  BigInt get id => uint64FromNative(_state.handleId);
+  int get id => _state.handleId;
 
   /// Releases prepared GeoJSON source data.
   ///
@@ -4161,7 +4128,7 @@ final class GeojsonSourceDataHandle implements Finalizable {
 }
 
 extension type MapHandleDiscarding._(MapHandle _owner) {
-  NativeMap get _handle => _owner._handle;
+  _NativeMap get _handle => _owner._handle;
   _CallbackRoots get _callbackRoots => _owner._callbackRoots;
   void addCustomGeometrySource(
     String sourceId,
@@ -4300,10 +4267,10 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void cancelCameraTransition(BigInt transitionId) => _discard(
+  void cancelCameraTransition(int transitionId) => _discard(
     (arena, completion) => raw.mln_map_cancel_camera_transition(
       _handle.raw,
-      uint64ToNative(transitionId, 'uint64_t'),
+      transitionId,
       completion,
       nativeDiagnostic,
     ),
@@ -4716,7 +4683,7 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
 }
 
 /// Issued `mln_map` handle id.
-extension type const NativeMap(int raw) implements NativeHandle {}
+extension type const _NativeMap(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_map` handle.
 ///
@@ -4725,7 +4692,7 @@ extension type const NativeMap(int raw) implements NativeHandle {}
 /// See `mln_map` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class MapHandle implements Finalizable, _CallbackRootOwner {
-  MapHandle._(this._parent, NativeMap handle)
+  MapHandle._(this._parent, _NativeMap handle)
     : _state = NativeHandleState(handle, 'MapHandle');
   // Keeps the parent owner reachable while this owner lives.
   // ignore: unused_field
@@ -4733,15 +4700,15 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   // Roots this owner's callback registrations for as long as it lives.
   @override
   final _callbackRoots = _CallbackRoots();
-  final NativeHandleState<NativeMap> _state;
-  NativeMap get _handle => _state.handle;
+  final NativeHandleState<_NativeMap> _state;
+  _NativeMap get _handle => _state.handle;
   MapHandleDiscarding get discarding => MapHandleDiscarding._(this);
 
   /// The native handle id, which runtime events report as their source.
   ///
   /// It stays readable after close, so events drained later still match
   /// this handle.
-  BigInt get id => uint64FromNative(_state.handleId);
+  int get id => _state.handleId;
 
   /// Adds a custom geometry source.
   ///
@@ -4949,7 +4916,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       (handle) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -4984,7 +4951,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       (handle) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -5019,7 +4986,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       (handle) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -5054,7 +5021,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       (handle) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -5089,7 +5056,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       (handle) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -5124,7 +5091,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       (handle) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -5159,7 +5126,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       (handle) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -5194,7 +5161,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       (handle) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -5229,7 +5196,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       (handle) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -5264,7 +5231,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       (handle) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -5299,7 +5266,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       (handle) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -5334,7 +5301,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       (handle) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle))
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -5424,11 +5391,11 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_cancel_camera_transition` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  Future<CommandCompletion> cancelCameraTransition(BigInt transitionId) =>
+  Future<CommandCompletion> cancelCameraTransition(int transitionId) =>
       _command(
         (arena, completion) => raw.mln_map_cancel_camera_transition(
           _handle.raw,
-          uint64ToNative(transitionId, 'uint64_t'),
+          transitionId,
           completion,
           nativeDiagnostic,
         ),
@@ -6352,7 +6319,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
 }
 
 /// Issued `mln_map_projection` handle id.
-extension type const NativeMapProjection(int raw) implements NativeHandle {}
+extension type const _NativeMapProjection(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_map_projection` handle.
 ///
@@ -6361,16 +6328,16 @@ extension type const NativeMapProjection(int raw) implements NativeHandle {}
 /// See `mln_map_projection` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class MapProjectionHandle implements Finalizable {
-  MapProjectionHandle._(NativeMapProjection handle)
+  MapProjectionHandle._(_NativeMapProjection handle)
     : _state = NativeHandleState(handle, 'MapProjectionHandle');
-  final NativeHandleState<NativeMapProjection> _state;
-  NativeMapProjection get _handle => _state.handle;
+  final NativeHandleState<_NativeMapProjection> _state;
+  _NativeMapProjection get _handle => _state.handle;
 
   /// The native handle id, which runtime events report as their source.
   ///
   /// It stays readable after close, so events drained later still match
   /// this handle.
-  BigInt get id => uint64FromNative(_state.handleId);
+  int get id => _state.handleId;
 
   /// Copies the projection camera into out_camera.
   ///
@@ -6583,7 +6550,7 @@ final class MapProjectionHandle implements Finalizable {
 }
 
 /// Issued `mln_render_frame_batch` handle id.
-extension type const NativeRenderFrameBatch(int raw) implements NativeHandle {}
+extension type const _NativeRenderFrameBatch(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_render_frame_batch` handle.
 ///
@@ -6592,16 +6559,16 @@ extension type const NativeRenderFrameBatch(int raw) implements NativeHandle {}
 /// See `mln_render_frame_batch` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class RenderFrameBatchHandle implements Finalizable {
-  RenderFrameBatchHandle._(NativeRenderFrameBatch handle)
+  RenderFrameBatchHandle._(_NativeRenderFrameBatch handle)
     : _state = NativeHandleState(handle, 'RenderFrameBatchHandle');
-  final NativeHandleState<NativeRenderFrameBatch> _state;
-  NativeRenderFrameBatch get _handle => _state.handle;
+  final NativeHandleState<_NativeRenderFrameBatch> _state;
+  _NativeRenderFrameBatch get _handle => _state.handle;
 
   /// The native handle id, which runtime events report as their source.
   ///
   /// It stays readable after close, so events drained later still match
   /// this handle.
-  BigInt get id => uint64FromNative(_state.handleId);
+  int get id => _state.handleId;
 
   /// Borrows the result view stored by an owned frame-result batch.
   ///
@@ -6627,7 +6594,7 @@ final class RenderFrameBatchHandle implements Finalizable {
 }
 
 extension type RenderSessionHandleDiscarding._(RenderSessionHandle _owner) {
-  NativeRenderSession get _handle => _owner._handle;
+  _NativeRenderSession get _handle => _owner._handle;
   void resize(LogicalExtent extent) => _discard(
     (arena, completion) => raw.mln_render_session_resize(
       _handle.raw,
@@ -6639,7 +6606,7 @@ extension type RenderSessionHandleDiscarding._(RenderSessionHandle _owner) {
 }
 
 /// Issued `mln_render_session` handle id.
-extension type const NativeRenderSession(int raw) implements NativeHandle {}
+extension type const _NativeRenderSession(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_render_session` handle.
 ///
@@ -6648,13 +6615,13 @@ extension type const NativeRenderSession(int raw) implements NativeHandle {}
 /// See `mln_render_session` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class RenderSessionHandle implements Finalizable {
-  RenderSessionHandle._(this._parent, NativeRenderSession handle)
+  RenderSessionHandle._(this._parent, _NativeRenderSession handle)
     : _state = NativeHandleState(handle, 'RenderSessionHandle');
   // Keeps the parent owner reachable while this owner lives.
   // ignore: unused_field
   final MapHandle _parent;
-  final NativeHandleState<NativeRenderSession> _state;
-  NativeRenderSession get _handle => _state.handle;
+  final NativeHandleState<_NativeRenderSession> _state;
+  _NativeRenderSession get _handle => _state.handle;
   RenderSessionHandleDiscarding get discarding =>
       RenderSessionHandleDiscarding._(this);
 
@@ -6662,7 +6629,7 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// It stays readable after close, so events drained later still match
   /// this handle.
-  BigInt get id => uint64FromNative(_state.handleId);
+  int get id => _state.handleId;
 
   /// Irreversibly ends session work and destroys the session's graphics objects
   /// where that is safe.
@@ -6697,7 +6664,7 @@ final class RenderSessionHandle implements Finalizable {
     }
     return _adoptOwned(
       outFrame.value,
-      () => AcquiredFrameHandle._(this, NativeAcquiredFrame(outFrame.value)),
+      () => AcquiredFrameHandle._(this, _NativeAcquiredFrame(outFrame.value)),
       (handle) {
         _check(raw.mln_acquired_frame_discard(handle, nativeDiagnostic));
       },
@@ -6788,7 +6755,7 @@ final class RenderSessionHandle implements Finalizable {
     }
     return _adoptOwned(
       outBatch.value,
-      () => RenderFrameBatchHandle._(NativeRenderFrameBatch(outBatch.value)),
+      () => RenderFrameBatchHandle._(_NativeRenderFrameBatch(outBatch.value)),
       (handle) {
         raw.mln_render_frame_batch_release(handle);
       },
@@ -7115,7 +7082,7 @@ final class RenderSessionHandle implements Finalizable {
 }
 
 /// Issued `mln_resource_request` handle id.
-extension type const NativeResourceRequest(int raw) implements NativeHandle {}
+extension type const _NativeResourceRequest(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_resource_request` handle.
 ///
@@ -7124,19 +7091,19 @@ extension type const NativeResourceRequest(int raw) implements NativeHandle {}
 /// See `mln_resource_request` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
-  ResourceRequestHandle._(NativeResourceRequest handle)
+  ResourceRequestHandle._(_NativeResourceRequest handle)
     : _state = NativeHandleState(handle, 'ResourceRequestHandle');
   // Roots this owner's callback registrations for as long as it lives.
   @override
   final _callbackRoots = _CallbackRoots();
-  final NativeHandleState<NativeResourceRequest> _state;
-  NativeResourceRequest get _handle => _state.handle;
+  final NativeHandleState<_NativeResourceRequest> _state;
+  _NativeResourceRequest get _handle => _state.handle;
 
   /// The native handle id, which runtime events report as their source.
   ///
   /// It stays readable after close, so events drained later still match
   /// this handle.
-  BigInt get id => uint64FromNative(_state.handleId);
+  int get id => _state.handleId;
 
   /// Completes a C API resource provider request.
   ///
@@ -7215,7 +7182,7 @@ final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
 }
 
 /// Issued `mln_resource_transform_request` handle id.
-extension type const NativeResourceTransformRequest(int raw)
+extension type const _NativeResourceTransformRequest(int raw)
     implements NativeHandle {}
 
 /// Owner of one native `mln_resource_transform_request` handle.
@@ -7225,16 +7192,16 @@ extension type const NativeResourceTransformRequest(int raw)
 /// See `mln_resource_transform_request` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class ResourceTransformRequestHandle implements Finalizable {
-  ResourceTransformRequestHandle._(NativeResourceTransformRequest handle)
+  ResourceTransformRequestHandle._(_NativeResourceTransformRequest handle)
     : _state = NativeHandleState(handle, 'ResourceTransformRequestHandle');
-  final NativeHandleState<NativeResourceTransformRequest> _state;
-  NativeResourceTransformRequest get _handle => _state.handle;
+  final NativeHandleState<_NativeResourceTransformRequest> _state;
+  _NativeResourceTransformRequest get _handle => _state.handle;
 
   /// The native handle id, which runtime events report as their source.
   ///
   /// It stays readable after close, so events drained later still match
   /// this handle.
-  BigInt get id => uint64FromNative(_state.handleId);
+  int get id => _state.handleId;
 
   /// Answers a resource transform request with a replacement URL.
   ///
@@ -7261,7 +7228,7 @@ final class ResourceTransformRequestHandle implements Finalizable {
 }
 
 /// Issued `mln_runtime` handle id.
-extension type const NativeRuntime(int raw) implements NativeHandle {}
+extension type const _NativeRuntime(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_runtime` handle.
 ///
@@ -7270,19 +7237,19 @@ extension type const NativeRuntime(int raw) implements NativeHandle {}
 /// See `mln_runtime` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
-  RuntimeHandle._(NativeRuntime handle)
+  RuntimeHandle._(_NativeRuntime handle)
     : _state = NativeHandleState(handle, 'RuntimeHandle');
   // Roots this owner's callback registrations for as long as it lives.
   @override
   final _callbackRoots = _CallbackRoots();
-  final NativeHandleState<NativeRuntime> _state;
-  NativeRuntime get _handle => _state.handle;
+  final NativeHandleState<_NativeRuntime> _state;
+  _NativeRuntime get _handle => _state.handle;
 
   /// The native handle id, which runtime events report as their source.
   ///
   /// It stays readable after close, so events drained later still match
   /// this handle.
-  BigInt get id => uint64FromNative(_state.handleId);
+  int get id => _state.handleId;
 
   /// Stops event delivery and retires the previous handler.
   ///
@@ -7345,7 +7312,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
     ),
     (handle) => _adoptOwned(
       handle,
-      () => MapHandle._(this, NativeMap(handle)),
+      () => MapHandle._(this, _NativeMap(handle)),
       (handle) {
         _check(raw.mln_map_dispose(handle, nativeDiagnostic));
       },
@@ -7551,10 +7518,10 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_set_maximum_ambient_cache_size` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  Future<void> setMaximumAmbientCacheSize(BigInt size) => _run(
+  Future<void> setMaximumAmbientCacheSize(int size) => _run(
     (arena, completion) => raw.mln_runtime_set_maximum_ambient_cache_size(
       _handle.raw,
-      uint64ToNative(size, 'uint64_t'),
+      size,
       completion,
       nativeDiagnostic,
     ),
@@ -7650,7 +7617,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
 }
 
 /// Issued `mln_style_expression` handle id.
-extension type const NativeStyleExpression(int raw) implements NativeHandle {}
+extension type const _NativeStyleExpression(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_style_expression` handle.
 ///
@@ -7659,16 +7626,16 @@ extension type const NativeStyleExpression(int raw) implements NativeHandle {}
 /// See `mln_style_expression` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class StyleExpressionHandle implements Finalizable {
-  StyleExpressionHandle._(NativeStyleExpression handle)
+  StyleExpressionHandle._(_NativeStyleExpression handle)
     : _state = NativeHandleState(handle, 'StyleExpressionHandle');
-  final NativeHandleState<NativeStyleExpression> _state;
-  NativeStyleExpression get _handle => _state.handle;
+  final NativeHandleState<_NativeStyleExpression> _state;
+  _NativeStyleExpression get _handle => _state.handle;
 
   /// The native handle id, which runtime events report as their source.
   ///
   /// It stays readable after close, so events drained later still match
   /// this handle.
-  BigInt get id => uint64FromNative(_state.handleId);
+  int get id => _state.handleId;
 
   /// Evaluates a parsed expression and writes its result as UTF-8 JSON.
   ///
@@ -7742,11 +7709,11 @@ final class ScopedMetalTextureFrame {
   final _NativeViewScope _scope;
   T withView<T>(T Function(ScopedMetalTextureFrame) use) =>
       _scope.use(() => use(this));
-  BigInt get generation => _scope.active(_value).generation;
+  int get generation => _scope.active(_value).generation;
   int get width => _scope.active(_value).width;
   int get height => _scope.active(_value).height;
   double get scaleFactor => _scope.active(_value).scaleFactor;
-  BigInt get frameId => _scope.active(_value).frameId;
+  int get frameId => _scope.active(_value).frameId;
   int get slot => _scope.active(_value).slot;
   ScopedNativePointer get texture => ScopedNativePointer(
     _value.texture.address,
@@ -7758,7 +7725,7 @@ final class ScopedMetalTextureFrame {
     checkValid: _scope.checkActive,
     debugName: 'MetalTextureFrame.device',
   );
-  BigInt get pixelFormat => _scope.active(_value).pixelFormat;
+  int get pixelFormat => _scope.active(_value).pixelFormat;
 }
 
 final class ScopedOpenglTextureFrame {
@@ -7772,11 +7739,11 @@ final class ScopedOpenglTextureFrame {
   final _NativeViewScope _scope;
   T withView<T>(T Function(ScopedOpenglTextureFrame) use) =>
       _scope.use(() => use(this));
-  BigInt get generation => _scope.active(_value).generation;
+  int get generation => _scope.active(_value).generation;
   int get width => _scope.active(_value).width;
   int get height => _scope.active(_value).height;
   double get scaleFactor => _scope.active(_value).scaleFactor;
-  BigInt get frameId => _scope.active(_value).frameId;
+  int get frameId => _scope.active(_value).frameId;
   int get slot => _scope.active(_value).slot;
   int get texture => _scope.active(_value).texture;
   int get target => _scope.active(_value).target;
@@ -7796,7 +7763,7 @@ final class ScopedGpuSync {
   final _NativeViewScope _scope;
   T withView<T>(T Function(ScopedGpuSync) use) => _scope.use(() => use(this));
   GpuSyncKind get kind => _scope.active(_value).kind;
-  BigInt get object => _scope.active(_value).object;
+  int get object => _scope.active(_value).object;
 }
 
 final class ScopedVulkanTextureFrame {
@@ -7810,14 +7777,14 @@ final class ScopedVulkanTextureFrame {
   final _NativeViewScope _scope;
   T withView<T>(T Function(ScopedVulkanTextureFrame) use) =>
       _scope.use(() => use(this));
-  BigInt get generation => _scope.active(_value).generation;
+  int get generation => _scope.active(_value).generation;
   int get width => _scope.active(_value).width;
   int get height => _scope.active(_value).height;
   double get scaleFactor => _scope.active(_value).scaleFactor;
-  BigInt get frameId => _scope.active(_value).frameId;
+  int get frameId => _scope.active(_value).frameId;
   int get slot => _scope.active(_value).slot;
-  BigInt get image => _scope.active(_value).image;
-  BigInt get imageView => _scope.active(_value).imageView;
+  int get image => _scope.active(_value).image;
+  int get imageView => _scope.active(_value).imageView;
   ScopedNativePointer get device => ScopedNativePointer(
     _value.device.address,
     checkValid: _scope.checkActive,
@@ -7838,11 +7805,11 @@ final class ScopedWebgpuTextureFrame {
   final _NativeViewScope _scope;
   T withView<T>(T Function(ScopedWebgpuTextureFrame) use) =>
       _scope.use(() => use(this));
-  BigInt get generation => _scope.active(_value).generation;
+  int get generation => _scope.active(_value).generation;
   int get width => _scope.active(_value).width;
   int get height => _scope.active(_value).height;
   double get scaleFactor => _scope.active(_value).scaleFactor;
-  BigInt get frameId => _scope.active(_value).frameId;
+  int get frameId => _scope.active(_value).frameId;
   int get slot => _scope.active(_value).slot;
   ScopedNativePointer get texture => ScopedNativePointer(
     _value.texture.address,

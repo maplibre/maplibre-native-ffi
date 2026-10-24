@@ -15,7 +15,6 @@ import '../internal/lifecycle/lifecycle.dart';
 import '../internal/lifecycle/native_handles.dart';
 import '../internal/memory/memory.dart';
 import '../internal/status/status.dart';
-import '../internal/value/uint64.dart';
 import '../render/native_pointer.dart';
 import '../values.dart';
 
@@ -128,8 +127,8 @@ Future<CommandCompletion> _startCommand(
   acceptErrorStatus: true,
   decode: (result) => CommandCompletion(
     disposition: CommandDisposition.fromRawValue(result.disposition),
-    generation: uint64FromNative(result.generation),
-    renderUpdateGeneration: uint64FromNative(result.render_update_generation),
+    generation: result.generation,
+    renderUpdateGeneration: result.render_update_generation,
     status: Status.fromRawValue(result.status),
     diagnostic: copyCompletionDiagnostic(result.diagnostic),
   ),
@@ -145,10 +144,10 @@ final class CommandCompletion {
   });
 
   final CommandDisposition disposition;
-  final BigInt generation;
+  final int generation;
 
   /// The first map render update that includes the command.
-  final BigInt renderUpdateGeneration;
+  final int renderUpdateGeneration;
   final Status status;
   final String diagnostic;
 }

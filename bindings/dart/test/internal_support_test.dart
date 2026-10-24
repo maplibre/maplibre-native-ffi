@@ -225,8 +225,8 @@ void main() {
       expect(unknownEvent.type.rawValue, 0xfeed);
       expect(unknownEvent.code, 17);
       expect(unknownEvent.sourceType.rawValue, 0xbeef);
-      expect(unknownEvent.source, BigInt.from(0xcafe));
-      expect(unknownEvent.generation, BigInt.from(0x100000005));
+      expect(unknownEvent.source, 0xcafe);
+      expect(unknownEvent.generation, 0x100000005);
       expect(unknownEvent.message, 'copied message');
       final unknownPayload = unknownEvent.payload;
       expect(unknownPayload, isA<RuntimeEventPayloadUnknown>());
@@ -241,7 +241,7 @@ void main() {
       final renderMapEvent = decoded[1];
       expect(renderMapEvent.type, RuntimeEventType.mapRenderMapFinished);
       expect(renderMapEvent.sourceType, RuntimeEventSourceType.map);
-      expect(renderMapEvent.source, BigInt.from(0xfeed));
+      expect(renderMapEvent.source, 0xfeed);
       expect(renderMapEvent.message, isEmpty);
       expect(
         (renderMapEvent.payload as RuntimeEventPayloadRenderMap).value.mode,

@@ -43,7 +43,7 @@ void main() {
     final worker = await WorkerSession.attach(map);
 
     final result = await worker.renderFrame();
-    expect(result.frameGeneration, greaterThan(BigInt.zero));
+    expect(result.frameGeneration, greaterThan(0));
     _expectRed(await within(worker.session.readTexture(), 'texture readback'));
   }, skip: _wglSkip);
 

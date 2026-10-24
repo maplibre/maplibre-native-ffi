@@ -98,7 +98,7 @@ void main() {
             mode: CameraUpdateMode.ease,
             animation: AnimationOptions(
               durationMs: 60000,
-              transitionId: BigInt.from(3),
+              transitionId: 3,
               endHandler: CameraTransitionHandler(callback: ended.complete),
             ),
           ),
@@ -106,10 +106,10 @@ void main() {
       );
       final probe = singleRegistrationProbeForTesting(map)!;
       expect(probe.closed, isFalse);
-      await expectCommitted(map.cancelCameraTransition(BigInt.from(3)));
+      await expectCommitted(map.cancelCameraTransition(3));
       final end = await within(ended.future, 'the end handler');
       expect(end.outcome, CameraTransitionOutcome.cancelled);
-      expect(end.generation, isNot(BigInt.zero));
+      expect(end.generation, isNot(0));
       await within(probe.released, 'the release after the end');
       expect(singleRegistrationProbeForTesting(map), isNull);
 

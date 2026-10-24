@@ -72,7 +72,8 @@ final class WorkerSession {
   /// Demands frames until one renders, and returns its result.
   Future<RenderFrameResult> renderFrame() async {
     for (var attempt = 0; attempt < _frameAttempts; attempt++) {
-      final token = _requestFrame(session, _nextToken++);
+      final token = _nextToken++;
+      _requestFrame(session, token);
       var result = _takeResult(session, token);
       while (result == null) {
         await _frames.wait('frame $token');
@@ -90,17 +91,15 @@ Future<void> releaseSession(RenderSessionHandle session) =>
     closeIfLive(session.close);
 
 /// Demands a forced frame, which renders whether or not the map changed.
-BigInt _requestFrame(RenderSessionHandle session, int value) {
-  final token = BigInt.from(value);
+void _requestFrame(RenderSessionHandle session, int token) {
   session.requestFrame(
     FrameDemand(flags: const FrameDemandFlag.fromRawValue(0), token: token),
   );
-  return token;
 }
 
 /// Drains the session's frame results and returns the one for [token], or
 /// null while it has not arrived.
-RenderFrameResult? _takeResult(RenderSessionHandle session, BigInt token) {
+RenderFrameResult? _takeResult(RenderSessionHandle session, int token) {
   final batch = session.drainFrameResults();
   if (batch == null) return null;
   try {

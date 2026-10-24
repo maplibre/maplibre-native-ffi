@@ -112,10 +112,7 @@ void main() {
       await within(attachment.completed, 'attachment');
 
       session.requestFrame(
-        FrameDemand(
-          flags: const FrameDemandFlag.fromRawValue(0),
-          token: BigInt.one,
-        ),
+        FrameDemand(flags: const FrameDemandFlag.fromRawValue(0), token: 1),
       );
       await wakes.wait('the frame wake');
       expect(wakes.contexts.toSet(), {2});
