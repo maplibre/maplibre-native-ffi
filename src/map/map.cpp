@@ -3689,9 +3689,10 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
     if (handle_table<MapObject>().resolve_locked(map) != owned.get()) {
       return recorded_handle_fault_status();
     }
-    // The attached session is the map's only child. Once the host disposed
-    // it, only its own retirement can detach it, so the map's retirement
-    // waits for that.
+    // Render sessions are the map's only children. Once the host disposed the
+    // attached one, only its own retirement can detach it, so the map's
+    // retirement waits for that. A child can outlive its cleared pointer
+    // while a detach finishes, which the map waits for too.
     if (
       owned->render_target_session != nullptr &&
       !owned->render_target_session_disposed
@@ -3699,8 +3700,7 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
       set_thread_error("map still has an attached render session");
       return MLN_STATUS_INVALID_STATE;
     }
-    const auto close_status =
-      owned->control.begin_close(owned->render_target_session != nullptr);
+    const auto close_status = owned->control.begin_close(true);
     if (close_status != MLN_STATUS_OK) {
       return close_status;
     }
