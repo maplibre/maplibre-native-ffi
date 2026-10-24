@@ -4,12 +4,13 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension AcquiredFrameHandle {
-  /// Consumes an acquired frame and quarantines its slot of the texture ring.
+  /// Consumes an acquired frame without consumer GPU synchronization, so it
+  /// quarantines the frame's slot of the texture ring.
   ///
-  /// See `mln_acquired_frame_dispose` in the
+  /// See `mln_acquired_frame_discard` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  func dispose() throws {
-    try nativeClose { raw, diagnostic in mln_acquired_frame_dispose(
+  func discard() throws {
+    try nativeClose { raw, diagnostic in mln_acquired_frame_discard(
       raw,
       diagnostic
     ) }
@@ -58,18 +59,18 @@ public extension AcquiredFrameHandle {
 }
 
 public extension AcquiredFrameHandle {
-  /// Releases an acquired frame after optional consumer GPU work.
+  /// Releases an acquired frame after the host's GPU work that reads it.
   ///
   /// See `mln_acquired_frame_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  func release(consumerCompletion: GpuSync) throws {
+  func release(consumerCompletion: GpuSync?) throws {
     let arena = NativeInputArena()
     defer { withExtendedLifetime(arena) {} }
     try handle.closeOnce { live in
       var raw = live.raw
       try checkStatus { diagnostic in mln_acquired_frame_release(
         raw,
-        arena.store(consumerCompletion.nativeValue()),
+        consumerCompletion.map { arena.store($0.nativeValue()) },
         diagnostic
       ) }
     }

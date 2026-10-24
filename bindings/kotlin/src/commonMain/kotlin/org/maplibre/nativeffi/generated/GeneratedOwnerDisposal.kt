@@ -6,7 +6,7 @@ import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 internal object GeneratedOwnerDisposal {
   fun acquiredFrame(handle: Long) {
-    NativeDiagnostics.check { diagnostic -> C.mln_acquired_frame_dispose(handle, diagnostic) }
+    NativeDiagnostics.check { diagnostic -> C.mln_acquired_frame_discard(handle, diagnostic) }
   }
 
   fun geojsonSourceData(handle: Long) {

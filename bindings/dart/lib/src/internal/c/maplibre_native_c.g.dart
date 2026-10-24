@@ -2172,7 +2172,7 @@ const MLN_WEBGL_CONTEXT_EXISTING = 0;
 const MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS = 1;
 
 @Native<Int32 Function(mln_acquired_frame, Pointer<mln_diagnostic>)>()
-external int mln_acquired_frame_dispose(
+external int mln_acquired_frame_discard(
   int frame,
   Pointer<mln_diagnostic> out_diagnostic,
 );

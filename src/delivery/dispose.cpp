@@ -17,7 +17,7 @@ auto dispose_owner(core::HandleKind kind, std::uint64_t handle) noexcept
   auto dispose = [&]() -> mln_status {
     switch (kind) {
       case core::HandleKind::AcquiredFrame:
-        return core::acquired_frame_dispose(handle);
+        return core::acquired_frame_discard(handle);
       case core::HandleKind::DeliveryBatch:
         release_delivery_batch(handle);
         return MLN_STATUS_OK;

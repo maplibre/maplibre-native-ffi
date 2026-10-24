@@ -30,7 +30,7 @@ namespace Maplibre.NativeFfi;
 /// Frame generation of the latest rendered frame, zero before the first.
 /// </param>
 /// <param name="AcquiredFrameCount">
-/// Acquired frames that the host has not released or disposed.
+/// Acquired frames that the host has not released or discarded.
 /// </param>
 /// <param name="PendingChanges">
 /// True when a map update or an accepted resize arrived after the latest

@@ -197,7 +197,7 @@ typedef struct mln_render_session_snapshot {
   uint64_t rendered_update_generation;
   /** Frame generation of the latest rendered frame, zero before the first. */
   uint64_t frame_generation;
-  /** Acquired frames that the host has not released or disposed. */
+  /** Acquired frames that the host has not released or discarded. */
   uint32_t acquired_frame_count;
   /**
    * True when a map update or an accepted resize arrived after the latest
@@ -275,7 +275,7 @@ MLN_API mln_status mln_render_session_get_snapshot(
  *   or every slot of its texture ring is quarantined.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
- * A slot is quarantined when its frame is disposed, or when its release fails
+ * A slot is quarantined when its frame is discarded, or when its release fails
  * to wait for consumer synchronization. A demand accepted before the last
  * usable slot was quarantined receives MLN_RENDER_RESULT_TARGET_NOT_READY.
  */
@@ -395,14 +395,17 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
 ) MLN_NOEXCEPT;
 
 /**
- * Releases an acquired frame after optional consumer GPU work.
+ * Releases an acquired frame after the host's GPU work that reads it.
  *
- * The call consumes frame on success. A synchronization kind the backend does
- * not support fails with MLN_STATUS_UNSUPPORTED before the handle is consumed,
- * so the caller keeps frame ownership. After abandonment the call closes the
- * handle without graphics work. When the driver fails to wait for the consumer
+ * consumer_completion states when that work completes, as mln_gpu_sync_kind
+ * describes. Null means MLN_GPU_SYNC_CPU_COMPLETE: the host's GPU reads
+ * completed before this call. The call consumes frame on success. A
+ * synchronization kind the backend does not support fails with
+ * MLN_STATUS_UNSUPPORTED before the handle is consumed, so the caller keeps
+ * frame ownership. After abandonment the call closes the handle without
+ * graphics work. When the driver fails to wait for the consumer
  * synchronization, the host's GPU may still read the frame's texture, so the
- * frame's slot is quarantined as mln_acquired_frame_dispose() quarantines it.
+ * frame's slot is quarantined as mln_acquired_frame_discard() quarantines it.
  *
  * Returns:
  * - MLN_STATUS_OK when the frame is consumed and its slot retirement queued.
@@ -416,7 +419,8 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_acquired_frame_release(
-  mln_acquired_frame frame, const mln_gpu_sync* consumer_completion,
+  mln_acquired_frame frame,
+  const mln_gpu_sync* consumer_completion MLN_BINDING("nullable=true"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -424,18 +428,19 @@ MLN_API mln_status mln_acquired_frame_release(
  * Begins an allocation-free scope that borrows an acquired frame.
  *
  * Native objects that the frame's getters lend, such as backend textures and
- * devices, stay valid until the scope ends, even when another thread disposes
- * the frame or its session. The scope retains the frame and its session.
- * Disposal rejects later scopes immediately and waits for active scopes to end
- * before it retires graphics resources. Explicit frame release and session
- * abandonment report MLN_STATUS_BUSY while a scope is active. Each successful
- * call requires exactly one mln_acquired_frame_view_end() call, on any thread.
+ * devices, stay valid until the scope ends, even when another thread discards
+ * the frame or disposes its session. The scope retains the frame and its
+ * session. Discard and disposal reject later scopes immediately and wait for
+ * active scopes to end before they retire graphics resources. Explicit frame
+ * release and session abandonment report MLN_STATUS_BUSY while a scope is
+ * active. Each successful call requires exactly one
+ * mln_acquired_frame_view_end() call, on any thread.
  *
  * Returns:
  * - MLN_STATUS_OK when *out_scope receives the scope.
  * - MLN_STATUS_INVALID_ARGUMENT when frame is an invalid handle or out_scope is
  *   null.
- * - MLN_STATUS_INVALID_STATE when frame has been released or disposed.
+ * - MLN_STATUS_INVALID_STATE when frame has been released or discarded.
  * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target, or
  *   disposal of the session has begun.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
@@ -618,7 +623,7 @@ MLN_API mln_status mln_render_session_service_driver_work(
  * leave the session attached. Once accepted, earlier driver work reaches a
  * terminal result before graphics resources are destroyed.
  *
- * When a disposed frame or a failed release quarantined a slot of a
+ * When a discarded frame or a failed release quarantined a slot of a
  * session-owned texture ring, the host's GPU may still read that slot's
  * texture. Detach then keeps the ring and its graphics context until the
  * process exits, and destroys the rest. When it keeps a ring, detach waits for
@@ -748,18 +753,19 @@ MLN_API mln_status mln_render_session_dispose(
 ) MLN_NOEXCEPT;
 
 /**
- * Consumes an acquired frame and quarantines its slot of the texture ring.
+ * Consumes an acquired frame without consumer GPU synchronization, so it
+ * quarantines the frame's slot of the texture ring.
  *
- * This cleanup path supplies no consumer GPU synchronization, so the host's
- * GPU may still read the frame's texture. The session keeps that texture and
- * never renders into its slot again, unless a replacement of a borrowed ring
- * gives the slot a new texture. Rendering continues on the other slots, and a
- * view already open on the frame stays valid until it ends. Once every slot
- * is quarantined, frame requests return MLN_STATUS_INVALID_STATE. Detach of a
- * session with a quarantined slot of a session-owned ring keeps the ring
- * allocated until the process exits; see mln_render_session_detach(). An
- * explicit release with consumer synchronization returns the slot to the ring
- * instead.
+ * Discard cleans up a frame whose consumer synchronization is unknown, such as
+ * one its owner dropped without releasing it. The host's GPU may still read
+ * the frame's texture, so the session keeps that texture and never renders
+ * into its slot again, unless a replacement of a borrowed ring gives the slot
+ * a new texture. Rendering continues on the other slots, and a view already
+ * open on the frame stays valid until it ends. Once every slot is quarantined,
+ * frame requests return MLN_STATUS_INVALID_STATE. Detach of a session with a
+ * quarantined slot of a session-owned ring keeps the ring allocated until the
+ * process exits; see mln_render_session_detach(). A release returns the slot
+ * to the ring instead.
  *
  * The call is CPU-only and may run on any native thread. It starts no thread.
  * It allocates only when it quarantines the last slot while a frame demand
@@ -769,7 +775,7 @@ MLN_API mln_status mln_render_session_dispose(
  * invalid handle, or MLN_STATUS_INVALID_STATE for a frame that has been
  * released.
  */
-MLN_API mln_status mln_acquired_frame_dispose(
+MLN_API mln_status mln_acquired_frame_discard(
   mln_acquired_frame frame, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

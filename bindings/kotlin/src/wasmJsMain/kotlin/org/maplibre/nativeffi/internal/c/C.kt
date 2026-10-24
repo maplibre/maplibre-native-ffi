@@ -7,8 +7,8 @@ import org.maplibre.nativeffi.internal.call.ThreadStart
 
 /** The C wrapper behind each C function, in the module that `Maplibre.loadModule` loads. */
 internal actual object C {
-  actual fun mln_acquired_frame_dispose(frame: Long, outDiagnostic: Long): Int =
-    mln_kw_mln_acquired_frame_dispose(frame, word(outDiagnostic))
+  actual fun mln_acquired_frame_discard(frame: Long, outDiagnostic: Long): Int =
+    mln_kw_mln_acquired_frame_discard(frame, word(outDiagnostic))
 
   actual fun mln_acquired_frame_get_metal_texture(
     frame: Long,
@@ -2046,9 +2046,9 @@ internal actual object C {
   }
 }
 
-private fun mln_kw_mln_acquired_frame_dispose(p0: Long, p1: Int): Int =
+private fun mln_kw_mln_acquired_frame_discard(p0: Long, p1: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_dispose(p0, p1)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_discard(p0, p1)",
   )
 
 private fun mln_kw_mln_acquired_frame_get_metal_texture(p0: Long, p1: Int, p2: Int): Int =

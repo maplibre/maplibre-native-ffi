@@ -157,9 +157,14 @@ pub const OwnedValue = marshal.OwnedValue;
                 else status_call(function, ["raw"], "null")
             )
         public = pascal(handle.native.removeprefix("mln_"))
+        dispose = (
+            "null"
+            if handle.scoped_release is None
+            else f"struct {{ fn dispose(raw: u64) status.Error!void {{ {' '.join(calls)} }} }}.dispose"
+        )
         owners.append(
             doc(bound, handle.native)
-            + f'pub const {public} = owner.Handle("{handle.native}", struct {{ fn dispose(raw: u64) status.Error!void {{ {" ".join(calls)} }} }}.dispose);'
+            + f'pub const {public} = owner.Handle("{handle.native}", {dispose});'
         )
     from .zig_operations import operation
     from .zig_values import Values

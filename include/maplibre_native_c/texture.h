@@ -989,8 +989,8 @@ MLN_API mln_status mln_render_session_read_texture(
  * Copies Metal-native metadata from an acquired frame.
  *
  * The texture and device pointers are borrowed and remain valid only until
- * mln_acquired_frame_release(). A host that may dispose the frame or its
- * session from another thread uses them inside an
+ * mln_acquired_frame_release(). A host that may discard the frame or dispose
+ * its session from another thread uses them inside an
  * mln_acquired_frame_view_begin() scope.
  *
  * Returns:
@@ -1015,8 +1015,8 @@ MLN_API mln_status mln_acquired_frame_get_metal_texture(
  *
  * The image and image view handles and the device pointer are borrowed and
  * remain valid only until mln_acquired_frame_release(). A host that may
- * dispose the frame or its session from another thread uses them inside an
- * mln_acquired_frame_view_begin() scope.
+ * discard the frame or dispose its session from another thread uses them
+ * inside an mln_acquired_frame_view_begin() scope.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -1040,8 +1040,8 @@ MLN_API mln_status mln_acquired_frame_get_vulkan_texture(
  *
  * The caller driver's context must be current on this thread. The texture name
  * is borrowed and remains valid only until mln_acquired_frame_release(). A
- * host that may dispose the frame or its session from another thread uses it
- * inside an mln_acquired_frame_view_begin() scope.
+ * host that may discard the frame or dispose its session from another thread
+ * uses it inside an mln_acquired_frame_view_begin() scope.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -1064,8 +1064,8 @@ MLN_API mln_status mln_acquired_frame_get_opengl_texture(
  * Copies WebGPU-native metadata from an acquired frame.
  *
  * The texture, view, and device pointers are borrowed and remain valid only
- * until mln_acquired_frame_release(). A host that may dispose the frame or its
- * session from another thread uses them inside an
+ * until mln_acquired_frame_release(). A host that may discard the frame or
+ * dispose its session from another thread uses them inside an
  * mln_acquired_frame_view_begin() scope.
  *
  * Returns:

@@ -90,7 +90,7 @@ public sealed class RenderTests
                 var session = fixture.Session;
                 fixture.Await(session.Attached, "the attachment");
                 var rendered = fixture.RenderFrame();
-                using var frame =
+                var frame =
                     session.AcquireFrame()
                     ?? throw new InvalidOperationException("No rendered frame is ready");
                 Assert.Equal(rendered.FrameGeneration, frame.GetResult().FrameGeneration);
@@ -103,9 +103,7 @@ public sealed class RenderTests
                     // while it is in scope.
                     var busy = Assert.Throws<MaplibreException>(() => session.Abandon());
                     Assert.Equal(Status.Busy, busy.Status);
-                    var inUse = Assert.Throws<MaplibreException>(() =>
-                        frame.Release(GpuSync.Default)
-                    );
+                    var inUse = Assert.Throws<MaplibreException>(() => frame.Release(null));
                     Assert.Equal(Status.Busy, inUse.Status);
                     escaped = width;
                 }
@@ -124,7 +122,7 @@ public sealed class RenderTests
 
                 Assert.NotNull(escaped);
                 Assert.Throws<MaplibreException>(() => escaped());
-                frame.Release(GpuSync.Default);
+                frame.Release(null);
                 Assert.Throws<MaplibreException>(() => frame.GetResult());
             }
         );

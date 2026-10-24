@@ -38,6 +38,9 @@ class PythonEmitterTests(unittest.TestCase):
         class NativeHandleMixin:
             pass
 
+        class ScopedHandleMixin(NativeHandleMixin):
+            pass
+
         modules = {
             "fixture": types.ModuleType("fixture"),
             "fixture._enum": module("_enum", UnknownIntEnum=enum.IntEnum),
@@ -52,7 +55,9 @@ class PythonEmitterTests(unittest.TestCase):
                 _view=None,
             ),
             "fixture._lifecycle": module(
-                "_lifecycle", NativeHandleMixin=NativeHandleMixin
+                "_lifecycle",
+                NativeHandleMixin=NativeHandleMixin,
+                ScopedHandleMixin=ScopedHandleMixin,
             ),
         }
         generated = types.SimpleNamespace(NativeHandleMixin=NativeHandleMixin)

@@ -1178,8 +1178,8 @@ void dispose_when_parked(void* argument) {
   auto& disposal = *static_cast<ParkedDisposal*>(argument);
   disposal.parked =
     disposal.points->wait_for_hits(SyncPoint::RenderFrameDemandParked, 1);
-  disposal.first_status = mln_acquired_frame_dispose(disposal.first, nullptr);
-  disposal.second_status = mln_acquired_frame_dispose(disposal.second, nullptr);
+  disposal.first_status = mln_acquired_frame_discard(disposal.first, nullptr);
+  disposal.second_status = mln_acquired_frame_discard(disposal.second, nullptr);
   disposal.points->release(SyncPoint::RenderFrameDemandParked);
   disposal.done = true;
 }

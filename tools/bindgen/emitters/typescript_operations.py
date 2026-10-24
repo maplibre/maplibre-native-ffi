@@ -63,7 +63,7 @@ def construct(bound, entry: Lowered, owned, handle_expression: str) -> str:
 
 def disposer(handle) -> str:
     # The handle has no owner yet, so the disposal passes no owner token.
-    return f"(disposed) => native.{handle.dispose}(disposed, undefined)"
+    return f"(disposed) => native.{handle.cleanup}(disposed, undefined)"
 
 
 def holder(entry: Lowered) -> str:
@@ -232,14 +232,16 @@ def render_owner(bound, values, natives, native: str, handle, methods) -> str:
             f"  get discarding(): {public}Discarding {{\n"
             f"    return new {public}Discarding(ADOPT, this);\n  }}\n"
         )
-    asynchronous = next((e.method for e in methods if e.shape == "close_async"), None)
+    # A handle without scoped cleanup gets neither `using` nor `await using`.
+    scoped = [] if handle.scoped_release is None else methods
+    asynchronous = next((e.method for e in scoped if e.shape == "close_async"), None)
     synchronous = next(
-        (e.method for e in methods if e.shape == "close" and e.method == "dispose"),
+        (e.method for e in scoped if e.shape == "close" and e.method == "dispose"),
         None,
     ) or next(
         (
             e.method
-            for e in methods
+            for e in scoped
             if e.shape == "close" and all(d == "undefined" for _, _, d in e.parameters)
         ),
         None,

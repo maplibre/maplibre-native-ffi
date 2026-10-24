@@ -285,7 +285,7 @@ func TestFrameViewIsScopedToItsCallback(t *testing.T) {
 		foreign := make(chan [2]error, 1)
 		go func() {
 			_, viewErr := view.Width()
-			foreign <- [2]error{viewErr, frame.Close(GpuSync{Kind: GpuSyncKindCpuComplete})}
+			foreign <- [2]error{viewErr, frame.Close(nil)}
 		}()
 		result := <-foreign
 		if !errors.Is(result[0], StatusInvalidState) {
@@ -302,7 +302,7 @@ func TestFrameViewIsScopedToItsCallback(t *testing.T) {
 	if _, err := expired.Width(); !errors.Is(err, StatusInvalidState) {
 		t.Fatalf("expired view read = %v, want StatusInvalidState", err)
 	}
-	if err := frame.Close(GpuSync{Kind: GpuSyncKindCpuComplete}); err != nil {
+	if err := frame.Close(&GpuSync{Kind: GpuSyncKindCpuComplete}); err != nil {
 		t.Fatalf("frame close after the view: %v", err)
 	}
 	if err := withFrameView(frame, func(frameView) error { return nil }); !errors.Is(err, StatusInvalidState) {
@@ -319,7 +319,7 @@ func TestFrameViewSurvivesYielding(t *testing.T) {
 		t.Fatalf("AcquireFrame = %v, %v; want a rendered frame", frame, err)
 	}
 	defer func() {
-		if err := frame.Close(GpuSync{Kind: GpuSyncKindCpuComplete}); err != nil {
+		if err := frame.Close(nil); err != nil {
 			t.Errorf("frame close: %v", err)
 		}
 	}()

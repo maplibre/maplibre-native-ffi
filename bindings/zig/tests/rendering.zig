@@ -85,7 +85,7 @@ test "a drain before any demand returns no batch" {
 
 // A scoped view leases its frame for the callback. Inside the scope, releasing
 // that frame or abandoning its session reports busy, and a host error passes
-// through. Disposing a sibling frame, which has no consumer fence, leaves the
+// through. Discarding a sibling frame, which has no consumer fence, leaves the
 // view readable. Once the scope returns, the frame releases normally.
 test "a scoped frame view holds its frame until the scope returns" {
     const fixture = try createFixture();
@@ -93,12 +93,10 @@ test "a scoped frame view holds its frame until the scope returns" {
     const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
     defer owned.close();
     _ = try owned.renderUntilRendered();
-    var frame = (try maplibre.renderSessionAcquireFrame(owned.session, null)).?;
-    defer frame.deinit();
+    const frame = (try maplibre.renderSessionAcquireFrame(owned.session, null)).?;
     try support.expectCommitted(try maplibre.mapRequestRepaint(fixture.map, null));
     _ = try owned.renderUntilRendered();
-    var sibling = (try maplibre.renderSessionAcquireFrame(owned.session, null)).?;
-    defer sibling.deinit();
+    const sibling = (try maplibre.renderSessionAcquireFrame(owned.session, null)).?;
 
     const width = try support.getOwnedTexture(u32, frame, {}, struct {
         fn use(_: void, view: support.OwnedTextureFrame) anyerror!u32 {
@@ -109,7 +107,7 @@ test "a scoped frame view holds its frame until the scope returns" {
 
     const Probe = struct {
         frame: maplibre.AcquiredFrame,
-        sibling: *maplibre.AcquiredFrame,
+        sibling: maplibre.AcquiredFrame,
         session: maplibre.RenderSession,
         fn inspect(self: @This(), _: maplibre.GpuSync) anyerror!void {
             // The native scope keeps the frame and its session busy.
@@ -117,30 +115,30 @@ test "a scoped frame view holds its frame until the scope returns" {
             try testing.expectError(error.Busy, maplibre.acquiredFrameRelease(testing.allocator, self.frame, try maplibre.gpuSyncDefault(), &diagnostic));
             try testing.expectEqual(@as(?i32, -7), diagnostic.raw_status);
             try testing.expectError(error.Busy, maplibre.renderSessionAbandon(self.session, null));
-            self.sibling.deinit();
+            try maplibre.acquiredFrameDiscard(self.sibling, null);
             try maplibre.acquiredFrameGetProducerSync(void, self.frame, {}, struct {
                 fn use(_: void, _: maplibre.GpuSync) anyerror!void {}
             }.use, null);
             return error.HostConsumerFailed;
         }
     };
-    try testing.expectError(error.HostConsumerFailed, maplibre.acquiredFrameGetProducerSync(void, frame, Probe{ .frame = frame, .sibling = &sibling, .session = owned.session }, Probe.inspect, null));
-    try maplibre.acquiredFrameRelease(testing.allocator, frame, try maplibre.gpuSyncDefault(), null);
+    try testing.expectError(error.HostConsumerFailed, maplibre.acquiredFrameGetProducerSync(void, frame, Probe{ .frame = frame, .sibling = sibling, .session = owned.session }, Probe.inspect, null));
+    try maplibre.acquiredFrameRelease(testing.allocator, frame, null, null);
 }
 
 // A frame anchors its session and a session its map. Disposing the map first
-// leaves its children to retire with it, and each dispose is safe in any order.
+// leaves its children to retire with it, and each cleanup is safe in any order.
 test "disposing a parent graph retires its acquired frame and session" {
     const fixture = try createFixture();
     defer fixture.destroy();
     const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
     defer owned.close();
     _ = try owned.renderUntilRendered();
-    var frame = (try maplibre.renderSessionAcquireFrame(owned.session, null)).?;
+    const frame = (try maplibre.renderSessionAcquireFrame(owned.session, null)).?;
 
     fixture.map.deinit();
     fixture.map_open = false;
-    frame.deinit();
+    try maplibre.acquiredFrameDiscard(frame, null);
     owned.session.deinit();
     owned.attached = false;
     try testing.expectError(error.InvalidState, maplibre.acquiredFrameGetResult(frame, null));

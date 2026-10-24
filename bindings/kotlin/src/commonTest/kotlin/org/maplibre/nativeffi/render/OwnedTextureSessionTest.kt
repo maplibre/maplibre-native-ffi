@@ -80,8 +80,8 @@ class OwnedTextureSessionTest {
         // The view borrows the frame, so neither the frame nor its session can go away under it.
         assertFailsWithStatus(Status.BUSY) { frame.release() }
         assertFailsWithStatus(Status.BUSY) { session.abandon() }
-        // Disposing another frame leaves this view readable until its block ends.
-        sibling.dispose()
+        // Discarding another frame leaves this view readable until its block ends.
+        sibling.discard()
         assertEquals(kind, sync.kind)
       }
       assertFailsWith<IllegalStateException> { escaped!!.kind }

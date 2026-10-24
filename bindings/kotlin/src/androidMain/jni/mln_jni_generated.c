@@ -6,10 +6,10 @@
 
 #include "mln_jni.h"
 
-static jint mln_acquired_frame_dispose_jni(
+static jint mln_acquired_frame_discard_jni(
   JNIEnv* env, jclass type, jlong frame, jlong out_diagnostic
 ) {
-  return (jint)mln_acquired_frame_dispose(
+  return (jint)mln_acquired_frame_discard(
     (mln_acquired_frame)frame, MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -2602,8 +2602,8 @@ static void mln_webgpu_surface_descriptor_default_jni(
 }
 
 const JNINativeMethod mln_jni_methods[] = {
-  {"mln_acquired_frame_dispose", "(JJ)I",
-   (void*)mln_acquired_frame_dispose_jni},
+  {"mln_acquired_frame_discard", "(JJ)I",
+   (void*)mln_acquired_frame_discard_jni},
   {"mln_acquired_frame_get_metal_texture", "(JJJ)I",
    (void*)mln_acquired_frame_get_metal_texture_jni},
   {"mln_acquired_frame_get_opengl_texture", "(JJJ)I",
@@ -3033,8 +3033,8 @@ const size_t mln_jni_method_count =
   sizeof mln_jni_methods / sizeof mln_jni_methods[0];
 
 const JNINativeMethod mln_jni_critical_methods[] = {
-  {"mln_acquired_frame_dispose", "(JJ)I",
-   (void*)mln_acquired_frame_dispose_jni},
+  {"mln_acquired_frame_discard", "(JJ)I",
+   (void*)mln_acquired_frame_discard_jni},
   {"mln_acquired_frame_get_metal_texture", "(JJJ)I",
    (void*)mln_acquired_frame_get_metal_texture_jni},
   {"mln_acquired_frame_get_opengl_texture", "(JJJ)I",

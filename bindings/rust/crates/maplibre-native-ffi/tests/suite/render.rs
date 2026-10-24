@@ -80,12 +80,12 @@ fn a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it() {
         .unwrap()
         .expect("a rendered frame");
 
-    let no_sync = GpuSync::default();
+    let cpu_complete = GpuSync::default();
     let (size, (frame_release, session_abandon)) = with_frame_view(&frame, || {
         // Releasing a sibling frame leaves this view's texture alone.
-        sibling.release(&no_sync).unwrap();
+        sibling.release(Some(&cpu_complete)).unwrap();
         (
-            frame.release(&no_sync).unwrap_err().status(),
+            frame.release(None).unwrap_err().status(),
             session.handle.abandon().unwrap_err().status(),
         )
     })
@@ -96,7 +96,7 @@ fn a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it() {
     assert_eq!(session_abandon, Status::Busy);
 
     // Once the view's scope ends, both close.
-    frame.release(&no_sync).unwrap();
+    frame.release(None).unwrap();
     session.close();
 }
 

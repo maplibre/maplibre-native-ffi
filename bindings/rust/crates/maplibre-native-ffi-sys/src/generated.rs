@@ -1712,7 +1712,7 @@ native_handles!(
 );
 
 unsafe extern "C" {
-    pub fn mln_acquired_frame_dispose(
+    pub fn mln_acquired_frame_discard(
         frame: mln_acquired_frame,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

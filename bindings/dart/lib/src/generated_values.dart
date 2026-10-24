@@ -3741,7 +3741,7 @@ final class RenderSessionSnapshot extends _Value {
   /// Frame generation of the latest rendered frame, zero before the first.
   final BigInt frameGeneration;
 
-  /// Acquired frames that the host has not released or disposed.
+  /// Acquired frames that the host has not released or discarded.
   final int acquiredFrameCount;
 
   /// True when a map update or an accepted resize arrived after the latest

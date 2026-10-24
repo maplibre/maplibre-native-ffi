@@ -349,7 +349,7 @@ static void a_borrowed_retarget_returns_quarantined_slots_to_service(void) {
     );
     mln_acquired_frame frame = MLN_HANDLE_NULL;
     MLN_TEST_OK(acquire(fixture, &frame));
-    MLN_TEST_OK(mln_acquired_frame_dispose(frame, NULL));
+    MLN_TEST_OK(mln_acquired_frame_discard(frame, NULL));
   }
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags = 0;

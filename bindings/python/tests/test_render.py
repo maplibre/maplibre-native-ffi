@@ -413,8 +413,8 @@ def test_a_frame_view_holds_its_owners_until_its_scope_ends(
             return _texture_name(backend, view)
 
         assert target.with_texture(frame, inspect) != 0
-        with frame:
-            frame.get_result()
+        frame.get_result()
+        frame.close()
         with pytest.raises(
             mln.MaplibreError,
             check=lambda error: error.status == mln.Status.INVALID_STATE,
@@ -471,22 +471,23 @@ def test_finalizing_a_sibling_frame_leaves_an_active_view_intact(
     driver = _default_driver(backend)
     with OwnedTexture(harness, backend, driver, ring_depth=2) as target:
         target.render_red()
-        with target.session.acquire_frame() as frame:
-            target.render()
-            siblings = [target.session.acquire_frame()]
-            retired = weakref.ref(siblings[0])
+        frame = target.session.acquire_frame()
+        target.render()
+        siblings = [target.session.acquire_frame()]
+        retired = weakref.ref(siblings[0])
 
-            def inspect(view: object) -> int:
-                # The collector finalizes the sibling while this frame's view
-                # is open, and the view is still the frame's.
-                with leak_reports() as reports:
-                    siblings.clear()
-                    gc.collect()
-                assert retired() is None
-                assert reports == ["AcquiredFrameHandle was not explicitly closed"]
-                return _texture_name(backend, view)
+        def inspect(view: object) -> int:
+            # The collector finalizes the sibling while this frame's view
+            # is open, and the view is still the frame's.
+            with leak_reports() as reports:
+                siblings.clear()
+                gc.collect()
+            assert retired() is None
+            assert reports == ["AcquiredFrameHandle was not explicitly closed"]
+            return _texture_name(backend, view)
 
-            assert target.with_texture(frame, inspect) != 0
+        assert target.with_texture(frame, inspect) != 0
+        frame.close()
         with pytest.raises(
             mln.MaplibreError,
             check=lambda error: error.status == mln.Status.INVALID_STATE,

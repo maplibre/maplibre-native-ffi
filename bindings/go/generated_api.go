@@ -3846,7 +3846,7 @@ type RenderSessionSnapshot struct {
 	RenderedUpdateGeneration uint64
 	// Frame generation of the latest rendered frame, zero before the first.
 	FrameGeneration uint64
-	// Acquired frames that the host has not released or disposed.
+	// Acquired frames that the host has not released or discarded.
 	AcquiredFrameCount uint32
 	// True when a map update or an accepted resize arrived after the latest
 	// rendered frame.
@@ -6230,7 +6230,7 @@ func (view WebgpuTextureFrameView) Format() (uint32, error) {
 type AcquiredFrameHandle struct{ *bindingOwner }
 
 func adoptAcquiredFrameHandle(raw uint64, parent any) *AcquiredFrameHandle {
-	owner := &AcquiredFrameHandle{bindingAdopt(raw, parent, "AcquiredFrameHandle", false, func(raw uint64) { C.mln_acquired_frame_dispose(C.mln_acquired_frame(raw), nil) })}
+	owner := &AcquiredFrameHandle{bindingAdopt(raw, parent, "AcquiredFrameHandle", false, func(raw uint64) { C.mln_acquired_frame_discard(C.mln_acquired_frame(raw), nil) })}
 	return owner
 }
 
@@ -6432,6 +6432,17 @@ func (receiver *RenderSessionHandle) Discarding() RenderSessionHandleDiscarding 
 	return RenderSessionHandleDiscarding{receiver}
 }
 
+// Discard consumes an acquired frame without consumer GPU synchronization, so
+// it quarantines the frame's slot of the texture ring.
+//
+// See mln_acquired_frame_discard in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+func (receiver *AcquiredFrameHandle) Discard() error {
+	return bindingDo(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_discard(C.mln_acquired_frame(raw), diagnostic))
+	})
+}
+
 // WithMetalTexture copies Metal-native metadata from an acquired frame.
 //
 // See mln_acquired_frame_get_metal_texture in the C API reference:
@@ -6525,13 +6536,13 @@ func (receiver *AcquiredFrameHandle) WithWebgpuTexture(callback func(WebgpuTextu
 	})
 }
 
-// Close releases an acquired frame after optional consumer GPU work.
+// Close releases an acquired frame after the host's GPU work that reads it.
 //
 // See mln_acquired_frame_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-func (receiver *AcquiredFrameHandle) Close(consumerCompletion GpuSync) error {
+func (receiver *AcquiredFrameHandle) Close(consumerCompletion *GpuSync) error {
 	return bindingDo(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_acquired_frame_release(C.mln_acquired_frame(raw), bindingStore(nativeGpuSync(consumerCompletion, arena), arena), diagnostic))
+		return int32(C.mln_acquired_frame_release(C.mln_acquired_frame(raw), bindingStoreOptional(consumerCompletion, arena, nativeGpuSync), diagnostic))
 	})
 }
 

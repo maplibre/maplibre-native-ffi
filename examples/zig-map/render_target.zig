@@ -209,11 +209,7 @@ fn abandon(handle: maplibre.RenderSession) void {
 pub fn releaseFrame(frame: *?maplibre.AcquiredFrame) void {
     const owned = frame.* orelse return;
     frame.* = null;
-    const sync = maplibre.gpuSyncDefault() catch |err| {
-        diagnostics.logError("sync defaults failed", err, null);
-        return;
-    };
-    maplibre.acquiredFrameRelease(std.heap.smp_allocator, owned, sync, null) catch |err| {
+    maplibre.acquiredFrameRelease(std.heap.smp_allocator, owned, null, null) catch |err| {
         diagnostics.logError("texture release failed", err, null);
     };
 }

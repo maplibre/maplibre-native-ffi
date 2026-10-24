@@ -4802,7 +4802,7 @@ fn _default_webgpu_surface_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
 unsafe extern "C" fn generated_dispose_mln_acquired_frame(
     handle: sys::mln_acquired_frame,
 ) -> sys::mln_status {
-    unsafe { sys::mln_acquired_frame_dispose(handle, std::ptr::null_mut()) }
+    unsafe { sys::mln_acquired_frame_discard(handle, std::ptr::null_mut()) }
 }
 
 unsafe extern "C" fn generated_dispose_mln_geojson_source_data(
@@ -4862,6 +4862,17 @@ unsafe extern "C" fn generated_dispose_mln_style_expression(
 
 #[pymethods]
 impl AcquiredFrameHandle {
+    #[pyo3(signature = ())]
+    fn discard(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.status(|diagnostic| sys::mln_acquired_frame_discard(handle, diagnostic)) }?;
+        reservation.commit();
+        Ok(py.None())
+    }
     #[pyo3(signature = ())]
     fn metal_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
@@ -4941,29 +4952,6 @@ impl AcquiredFrameHandle {
         generated_copy_mln_webgpu_texture_frame(py, &out_frame)
     }
     #[pyo3(signature = (consumer_completion=None))]
-    fn _exit(
-        &self,
-        py: Python<'_>,
-        consumer_completion: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let consumer_completion = consumer_completion.unwrap_or_else(|| py.None().into_bound(py));
-        let consumer_completion_value =
-            generated_input_mln_gpu_sync(&consumer_completion.clone(), storage)?;
-        let Some(mut reservation) = self.reserve(true)? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_acquired_frame_release(handle, &consumer_completion_value, diagnostic)
-            })
-        }?;
-        reservation.commit();
-        Ok(py.None())
-    }
-    #[pyo3(signature = (consumer_completion=None))]
     fn close(
         &self,
         py: Python<'_>,
@@ -4973,14 +4961,20 @@ impl AcquiredFrameHandle {
         let storage = &mut call.storage;
         let consumer_completion = consumer_completion.unwrap_or_else(|| py.None().into_bound(py));
         let consumer_completion_value =
-            generated_input_mln_gpu_sync(&consumer_completion.clone(), storage)?;
+            generated_maybe(&consumer_completion, |consumer_completion| {
+                generated_input_mln_gpu_sync(&consumer_completion, storage)
+            })?;
         let Some(mut reservation) = self.reserve(true)? else {
             return Ok(py.None());
         };
         let handle = reservation.handle();
         unsafe {
             call.status(|diagnostic| {
-                sys::mln_acquired_frame_release(handle, &consumer_completion_value, diagnostic)
+                sys::mln_acquired_frame_release(
+                    handle,
+                    generated_pointer(&consumer_completion_value),
+                    diagnostic,
+                )
             })
         }?;
         reservation.commit();

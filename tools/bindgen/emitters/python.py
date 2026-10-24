@@ -776,7 +776,7 @@ def state_owner(owner: str, handle: HandlePlan, bound: BoundApi) -> str:
     )
     dispose = (
         f"Some(generated_dispose_{native})"
-        if handle.dispose and handle.dispose not in RUNTIME_EXPORTS
+        if handle.cleanup and handle.cleanup not in RUNTIME_EXPORTS
         else "None"
     )
     exit_release = "None"
@@ -888,15 +888,15 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     rust_values, public_values = values.sources()
     rust_values += "\n".join(default_native)
     for handle in bound.handles.values():
-        if not handle.dispose or handle.dispose in bound.source.runtime_exports:
+        if not handle.cleanup or handle.cleanup in bound.source.runtime_exports:
             continue
         state_owned = handle.native in OWNERS
         if not state_owned and handle.native not in values.disposed:
             continue
-        support = bound.operations_by_name.get(handle.dispose)
+        support = bound.operations_by_name.get(handle.cleanup)
         if support and isinstance(support.support, DisposeSupport):
-            errors.pop(handle.dispose, None)
-        disposer = bound.source.functions_by_name[handle.dispose]
+            errors.pop(handle.cleanup, None)
+        disposer = bound.source.functions_by_name[handle.cleanup]
         call = f"unsafe {{ {native_call(disposer, ['handle'], diagnostic='std::ptr::null_mut()')} }}"
         if ctype(disposer.return_type) == "void":
             call += "; sys::MLN_STATUS_OK"
@@ -1025,7 +1025,13 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
         return value
 """)
     for native, owner in OWNERS.items():
-        owner_classes.append(f'''class {owner}(_{owner}Operations, NativeHandleMixin):
+        # A handle without scoped cleanup, such as a frame, has no `with` block.
+        mixin = (
+            "NativeHandleMixin"
+            if bound.handles[native].scoped_release is None
+            else "ScopedHandleMixin"
+        )
+        owner_classes.append(f'''class {owner}(_{owner}Operations, {mixin}):
 {docs.docstring(bound.doc(native), "    ")}    __module__ = "maplibre_native_ffi"
     _handle_name = "{owner}"
 
@@ -1040,7 +1046,7 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
         return owner
 ''')
     files["python/maplibre_native_ffi/_generated_owners.py"] = (
-        f'"""{notice}"""\nfrom ._lifecycle import NativeHandleMixin\n'
+        f'"""{notice}"""\nfrom ._lifecycle import NativeHandleMixin, ScopedHandleMixin\n'
         + "\n".join(
             f"from ._generated_operations import _{owner}Operations"
             for owner in [*OWNERS.values(), *scope_owners.values()]

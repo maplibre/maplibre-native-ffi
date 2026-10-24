@@ -1108,7 +1108,7 @@ auto render_session_dispose_quarantined(mln_render_session session)
 auto render_session_abandon_keeping_graphics(
   mln_render_session session, mln_render_abandon_result* out_result
 ) -> mln_status;
-auto acquired_frame_dispose(mln_acquired_frame frame) -> mln_status;
+auto acquired_frame_discard(mln_acquired_frame frame) -> mln_status;
 // Features a query copied out of the renderer. The completion borrows views of
 // these strings, so the list stays alive until the callback returns.
 struct RenderedFeatureRecord {

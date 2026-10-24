@@ -533,7 +533,7 @@ void disposal_abandons_a_session_with_an_acquired_frame() {
   attach_observed(map, fixture, released);
   auto frame = mln_test_render_and_acquire(&fixture, 1);
   MLN_TEST_OK(mln_render_session_dispose(fixture.session, nullptr));
-  MLN_TEST_OK(mln_acquired_frame_dispose(frame, nullptr));
+  MLN_TEST_OK(mln_acquired_frame_discard(frame, nullptr));
   TEST_ASSERT_TRUE(wake_released(released));
   TEST_ASSERT_EQUAL_INT(0, sync_points.hits(SyncPoint::RenderDisposalDetached));
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
@@ -653,9 +653,9 @@ void a_held_view_parks_its_retirements_without_stalling_others() {
   auto other_weak = std::weak_ptr{other.session};
   void* scope = nullptr;
   MLN_TEST_OK(mln_acquired_frame_view_begin(held.frame, &scope, nullptr));
-  MLN_TEST_OK(mln_acquired_frame_dispose(held.frame, nullptr));
+  MLN_TEST_OK(mln_acquired_frame_discard(held.frame, nullptr));
   MLN_TEST_OK(mln_render_session_dispose(held.session->self, nullptr));
-  MLN_TEST_OK(mln_acquired_frame_dispose(other.frame, nullptr));
+  MLN_TEST_OK(mln_acquired_frame_discard(other.frame, nullptr));
   MLN_TEST_OK(mln_render_session_dispose(other.session->self, nullptr));
   other.session.reset();
   // The lane runs in submission order, so the other session retiring means
@@ -682,7 +682,7 @@ void a_held_view_holds_the_release_of_its_disposed_sessions_map() {
   auto held = attach_fake_texture_session(held_map);
   void* scope = nullptr;
   MLN_TEST_OK(mln_acquired_frame_view_begin(held.frame, &scope, nullptr));
-  MLN_TEST_OK(mln_acquired_frame_dispose(held.frame, nullptr));
+  MLN_TEST_OK(mln_acquired_frame_discard(held.frame, nullptr));
   MLN_TEST_OK(mln_render_session_dispose(held.session->self, nullptr));
   held.session.reset();
   auto held_release = Result{};
@@ -748,7 +748,7 @@ void a_running_driver_call_parks_its_retirement_without_stalling_others() {
   auto other = attach_fake_texture_session(other_map);
   auto other_weak = std::weak_ptr{other.session};
   MLN_TEST_OK(mln_render_session_dispose(busy_id, nullptr));
-  MLN_TEST_OK(mln_acquired_frame_dispose(other.frame, nullptr));
+  MLN_TEST_OK(mln_acquired_frame_discard(other.frame, nullptr));
   MLN_TEST_OK(mln_render_session_dispose(other.session->self, nullptr));
   other.session.reset();
   TEST_ASSERT_TRUE(expired(other_weak));
@@ -835,7 +835,7 @@ void a_serviced_driver_call_parks_its_retirement_without_stalling_others() {
   auto other = attach_fake_texture_session(other_map);
   auto other_weak = std::weak_ptr{other.session};
   const auto busy_disposed = mln_render_session_dispose(busy_id, nullptr);
-  const auto frame_disposed = mln_acquired_frame_dispose(other.frame, nullptr);
+  const auto frame_discarded = mln_acquired_frame_discard(other.frame, nullptr);
   const auto other_disposed =
     mln_render_session_dispose(other.session->self, nullptr);
   other.session.reset();
@@ -851,7 +851,7 @@ void a_serviced_driver_call_parks_its_retirement_without_stalling_others() {
   MLN_TEST_OK(enqueued);
   TEST_ASSERT_TRUE(entered);
   MLN_TEST_OK(busy_disposed);
-  MLN_TEST_OK(frame_disposed);
+  MLN_TEST_OK(frame_discarded);
   MLN_TEST_OK(other_disposed);
   TEST_ASSERT_NULL_MESSAGE(checks.failure(), checks.failure());
   TEST_ASSERT_TRUE(other_retired);

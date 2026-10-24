@@ -3989,12 +3989,13 @@ final class AcquiredFrameHandle implements Finalizable {
   /// this handle.
   BigInt get id => uint64FromNative(_state.handleId);
 
-  /// Consumes an acquired frame and quarantines its slot of the texture ring.
+  /// Consumes an acquired frame without consumer GPU synchronization, so it
+  /// quarantines the frame's slot of the texture ring.
   ///
-  /// See `mln_acquired_frame_dispose` in the
+  /// See `mln_acquired_frame_discard` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  void dispose() => _state.close(
-    (handle) => raw.mln_acquired_frame_dispose(handle.raw, nativeDiagnostic),
+  void discard() => _state.close(
+    (handle) => raw.mln_acquired_frame_discard(handle.raw, nativeDiagnostic),
   );
 
   /// Copies Metal-native metadata from an acquired frame.
@@ -4111,15 +4112,17 @@ final class AcquiredFrameHandle implements Finalizable {
     );
   });
 
-  /// Releases an acquired frame after optional consumer GPU work.
+  /// Releases an acquired frame after the host's GPU work that reads it.
   ///
   /// See `mln_acquired_frame_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  void release(GpuSync consumerCompletion) => _state.close(
+  void release({GpuSync? consumerCompletion}) => _state.close(
     (handle) => withNativeArena(
       (arena) => raw.mln_acquired_frame_release(
         handle.raw,
-        _writeGpuSync(consumerCompletion, arena),
+        consumerCompletion == null
+            ? nullptr
+            : _writeGpuSync(consumerCompletion, arena),
         nativeDiagnostic,
       ),
     ),
@@ -6671,7 +6674,7 @@ final class RenderSessionHandle implements Finalizable {
       outFrame.value,
       () => AcquiredFrameHandle._(this, NativeAcquiredFrame(outFrame.value)),
       (handle) {
-        _check(raw.mln_acquired_frame_dispose(handle, nativeDiagnostic));
+        _check(raw.mln_acquired_frame_discard(handle, nativeDiagnostic));
       },
     );
   });

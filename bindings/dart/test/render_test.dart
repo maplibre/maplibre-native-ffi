@@ -74,7 +74,7 @@ void main() {
         // The view borrows the frame, so neither the frame nor its session
         // can go away while it is open.
         expect(
-          () => frame.release(gpuSyncDefault()),
+          () => frame.release(consumerCompletion: gpuSyncDefault()),
           throwsA(
             isA<MaplibreException>().having(
               (error) => error.status,
@@ -97,7 +97,7 @@ void main() {
       // A view that escapes its scope refuses every read.
       expect(readEscapedWidth, throwsA(isA<MaplibreException>()));
 
-      frame.release(gpuSyncDefault());
+      frame.release();
       expect(frame.getResult, throwsA(isA<MaplibreException>()));
     },
     skip: _openglFrameSkip,

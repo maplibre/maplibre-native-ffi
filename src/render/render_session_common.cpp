@@ -4517,7 +4517,7 @@ auto render_session_dispose_quarantined(mln_render_session session)
   return MLN_STATUS_OK;
 }
 
-auto acquired_frame_dispose(mln_acquired_frame frame) -> mln_status {
+auto acquired_frame_discard(mln_acquired_frame frame) -> mln_status {
   auto live = handle_table<mln_acquired_frame_object>().lease(frame);
   if (live == nullptr) return recorded_handle_fault_status();
   auto expected = true;

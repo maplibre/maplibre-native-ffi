@@ -56,7 +56,13 @@ def consumed(plan, owner, values):
             None,
         )
     is_release = function.name == handle.release
-    method = "close" if is_release else "dispose"
+    method = (
+        "close"
+        if is_release
+        else "discard"
+        if function.name == handle.discard
+        else "dispose"
+    )
     if plan.completion:
         return (
             f"""{documented}func close() async throws {{
@@ -110,7 +116,7 @@ def owner_declarations(bound):
     for handle in public_handles(bound):
         owner = owner_name(handle)
         raw = "Native" + owner
-        cleanup = handle.dispose or handle.release
+        cleanup = handle.cleanup or handle.release
         function = bound.source.functions_by_name[cleanup]
         # Abandoned disposal has no caller to report a diagnostic to.
         expression = f"{cleanup}(raw{', nil' if function.diagnostic else ''})"

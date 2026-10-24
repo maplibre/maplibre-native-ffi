@@ -8,8 +8,8 @@ import org.maplibre.nativeffi.internal.cinterop.*
 
 /** The cinterop call behind each C function. */
 internal actual object C {
-  actual fun mln_acquired_frame_dispose(frame: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_acquired_frame_dispose(
+  actual fun mln_acquired_frame_discard(frame: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_acquired_frame_discard(
       frame.toULong(),
       outDiagnostic.toCPointer(),
     )

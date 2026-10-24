@@ -12,7 +12,7 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_acquired_frame</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
 /// </remarks>
-public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwner<MlnAcquiredFrame>
+public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquiredFrame>
 {
     private readonly NativeHandleState<MlnAcquiredFrame> state;
 
@@ -32,7 +32,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         );
 
     private static mln_status Abandon(MlnAcquiredFrame live, mln_diagnostic* diagnostic) =>
-        NativeMethods.mln_acquired_frame_dispose(live, diagnostic);
+        NativeMethods.mln_acquired_frame_discard(live, diagnostic);
 
     NativeHandleState<MlnAcquiredFrame> INativeOwner<MlnAcquiredFrame>.State => state;
     internal MlnAcquiredFrame Handle => state.Handle;
@@ -40,7 +40,15 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
     // Runtime events report their source by this identity.
     public ulong Id => state.Handle.Value;
 
-    public void Dispose()
+    /// <summary>
+    /// Consumes an acquired frame without consumer GPU synchronization, so it
+    /// quarantines the frame's slot of the texture ring.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_acquired_frame_discard</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// </remarks>
+    public void Discard()
     {
         state.Retire();
     }
@@ -216,16 +224,18 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Releases an acquired frame after optional consumer GPU work.
+    /// Releases an acquired frame after the host's GPU work that reads it.
     /// </summary>
     /// <remarks>
     /// See <c>mln_acquired_frame_release</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
     /// </remarks>
-    public void Release(GpuSync consumerCompletion)
+    public void Release(GpuSync? consumerCompletion)
     {
         using var scope = new NativeCallScope();
-        var nativeConsumerCompletion = scope.Value(NativeGpuSync(consumerCompletion));
+        var nativeConsumerCompletion = consumerCompletion is null
+            ? null
+            : scope.Value(NativeGpuSync(consumerCompletion.Value));
         state.Release(
             (live, diagnostic) =>
                 NativeMethods.mln_acquired_frame_release(live, nativeConsumerCompletion, diagnostic)

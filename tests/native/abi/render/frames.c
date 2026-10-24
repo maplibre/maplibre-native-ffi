@@ -547,8 +547,8 @@ static void disposing_a_frame_quarantines_only_its_slot(void) {
   void* open = NULL;
   MLN_TEST_OK(mln_acquired_frame_view_begin(disposed, &open, NULL));
 
-  MLN_TEST_OK(mln_acquired_frame_dispose(disposed, MLN_TEST_DIAGNOSTIC));
-  MLN_TEST_INVALID_STATE(mln_acquired_frame_dispose(disposed, NULL));
+  MLN_TEST_OK(mln_acquired_frame_discard(disposed, MLN_TEST_DIAGNOSTIC));
+  MLN_TEST_INVALID_STATE(mln_acquired_frame_discard(disposed, NULL));
   void* stale = NULL;
   MLN_TEST_INVALID_STATE(mln_acquired_frame_view_begin(disposed, &stale, NULL));
   TEST_ASSERT_NULL(stale);
@@ -600,8 +600,8 @@ static void a_fully_quarantined_ring_takes_no_more_demands(void) {
   mln_test_render_request_forced(&fixture, 4);
   expect_parked_demand(&fixture);
 
-  MLN_TEST_OK(mln_acquired_frame_dispose(first, NULL));
-  MLN_TEST_OK(mln_acquired_frame_dispose(second, NULL));
+  MLN_TEST_OK(mln_acquired_frame_discard(first, NULL));
+  MLN_TEST_OK(mln_acquired_frame_discard(second, NULL));
   mln_render_frame_result results[2];
   mln_test_render_wait_for_result_list(&fixture, 2, results);
   for (size_t index = 0; index < 2; index += 1) {

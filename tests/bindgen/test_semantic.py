@@ -545,6 +545,30 @@ mln_status release_frame(
         self.assertEqual(model.handles["frame"].release_inputs, ("consumer",))
         self.assertIsNone(model.handles["frame"].dispose)
 
+    def test_a_discard_cleans_up_a_dropped_owner_but_no_scope(self):
+        source = """
+typedef unsigned long frame BIND("kind=handle;release=release_frame;discard=discard_frame");
+typedef struct sync { unsigned kind; unsigned long object; } sync;
+mln_status release_frame(
+  frame value, const sync *consumer BIND("nullable=true"),
+  mln_diagnostic *out_diagnostic);
+mln_status discard_frame(frame value, mln_diagnostic *out_diagnostic);
+"""
+        model = bind(self.parse(source), require_complete=True)
+        handle = model.handles["frame"]
+        self.assertEqual(handle.cleanup, "discard_frame")
+        self.assertEqual(handle.finalize, ("discard_frame",))
+        # A scope cannot supply the consumer sync that a release needs.
+        self.assertIsNone(handle.scoped_release)
+        discard = model.operations_by_name["discard_frame"]
+        self.assertEqual((discard.role, discard.consumes), ("public", "success"))
+        with self.assertRaisesRegex(
+            ModelError, "a handle takes a dispose or a discard, not both"
+        ):
+            bind(
+                self.parse(source.replace("discard=", "dispose=discard_frame;discard="))
+            )
+
     def test_resource_decision_protocol_uses_verified_relationships(self):
         source = """
 typedef enum decision : unsigned { DELEGATE = 0, CLAIM = 1 } decision;

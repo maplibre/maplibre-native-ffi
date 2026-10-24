@@ -33,11 +33,7 @@ pub const validateAbiVersion = status.validateAbiVersion;
 ///
 /// See `mln_acquired_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const AcquiredFrame = owner.Handle("mln_acquired_frame", struct {
-    fn dispose(raw: u64) status.Error!void {
-        try status.call(c.mln_acquired_frame_dispose, .{raw}, null);
-    }
-}.dispose);
+pub const AcquiredFrame = owner.Handle("mln_acquired_frame", null);
 /// Prepared GeoJSON data that sources retain independently of its handle.
 ///
 /// See `mln_geojson_source_data` in the
@@ -2698,7 +2694,7 @@ pub const RenderSessionSnapshot = struct {
     rendered_update_generation: u64 = std.mem.zeroes(u64),
     /// Frame generation of the latest rendered frame, zero before the first.
     frame_generation: u64 = std.mem.zeroes(u64),
-    /// Acquired frames that the host has not released or disposed.
+    /// Acquired frames that the host has not released or discarded.
     acquired_frame_count: u32 = std.mem.zeroes(u32),
     /// True when a map update or an accepted resize arrived after the latest
     /// rendered frame.
@@ -4934,12 +4930,13 @@ pub const WglContextDescriptor = struct {
     }
 };
 
-/// Consumes an acquired frame and quarantines its slot of the texture ring.
+/// Consumes an acquired frame without consumer GPU synchronization, so it
+/// quarantines the frame's slot of the texture ring.
 ///
-/// See `mln_acquired_frame_dispose` in the
+/// See `mln_acquired_frame_discard` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn acquiredFrameDispose(frame: AcquiredFrame, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_acquired_frame_dispose", .handle, frame, null, diagnostic, .{});
+pub fn acquiredFrameDiscard(frame: AcquiredFrame, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    return call.invoke("mln_acquired_frame_discard", .handle, frame, null, diagnostic, .{});
 }
 
 /// Copies Metal-native metadata from an acquired frame.
@@ -4990,11 +4987,11 @@ pub fn acquiredFrameGetWebgpuTexture(comptime Result: type, handle: AcquiredFram
     return call.scopedView("mln_acquired_frame_get_webgpu_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", WebgpuTextureFrame, Result, handle, context, use, diagnostic);
 }
 
-/// Releases an acquired frame after optional consumer GPU work.
+/// Releases an acquired frame after the host's GPU work that reads it.
 ///
 /// See `mln_acquired_frame_release` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn acquiredFrameRelease(allocator: std.mem.Allocator, frame: AcquiredFrame, consumer_completion: GpuSync, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+pub fn acquiredFrameRelease(allocator: std.mem.Allocator, frame: AcquiredFrame, consumer_completion: ?GpuSync, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     return call.invoke("mln_acquired_frame_release", .handle, frame, allocator, diagnostic, .{consumer_completion});
 }
 

@@ -250,7 +250,7 @@ final class MetalRenderTarget {
   }
 
   private func releaseHeldFrame() throws {
-    try heldFrame?.release(consumerCompletion: .default)
+    try heldFrame?.release(consumerCompletion: nil)
     heldFrame = nil
   }
 

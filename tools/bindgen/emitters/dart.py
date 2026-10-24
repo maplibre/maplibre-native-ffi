@@ -45,9 +45,9 @@ def adopt_owner(owned, expression, receiver, function, values):
     result = f"{public}._({arguments})"
     if values.bound.operations_by_name[function.name].registrations:
         result = f"({result}.._state.retain(registrations))"
-    if not owned.handle.dispose:
+    if not owned.handle.cleanup:
         raise Unsupported("owned adoption requires a native disposer")
-    dispose = values.bound.source.functions_by_name[owned.handle.dispose]
+    dispose = values.bound.source.functions_by_name[owned.handle.cleanup]
     cleanup = native_call(dispose, ["handle"])
     if dispose.return_type.kind != "void":
         cleanup = f"_check({cleanup})"

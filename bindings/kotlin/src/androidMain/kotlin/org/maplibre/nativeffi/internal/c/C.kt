@@ -9,7 +9,7 @@ internal actual object C {
     Jni.load()
   }
 
-  @JvmStatic actual external fun mln_acquired_frame_dispose(frame: Long, outDiagnostic: Long): Int
+  @JvmStatic actual external fun mln_acquired_frame_discard(frame: Long, outDiagnostic: Long): Int
 
   @JvmStatic
   actual external fun mln_acquired_frame_get_metal_texture(

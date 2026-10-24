@@ -42,17 +42,6 @@ class NativeHandleMixin:
     def __repr__(self) -> str:
         return f"{type(self).__name__}(id={self.id}, closed={self._native._is_closed})"
 
-    def __enter__(self) -> Self:
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        self._native._exit()
-
     def __del__(self) -> None:
         # Finalizers cannot report warning-delivery failures, including during
         # interpreter shutdown when Python globals may be partially torn down.
@@ -63,3 +52,18 @@ class NativeHandleMixin:
                     ResourceWarning,
                     stacklevel=1,
                 )
+
+
+class ScopedHandleMixin(NativeHandleMixin):
+    """The ``with`` block of a handle whose scope can clean it up."""
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self._native._exit()

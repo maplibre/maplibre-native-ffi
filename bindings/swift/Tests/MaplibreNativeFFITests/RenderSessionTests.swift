@@ -167,14 +167,14 @@ private func withOwnedTextureSession<Result>(
     }
     #expect(throws: MaplibreError.self) { try escaped.width }
 
-    try first.release(consumerCompletion: .default)
+    try first.release(consumerCompletion: nil)
   }
 }
 
-/// A frame the host drops without releasing is disposed by its finalizer,
+/// A frame the host drops without releasing is discarded by its finalizer,
 /// which hands the frame back to its session without consumer
 /// synchronization.
-@Test func droppingAnUnreleasedFrameDisposesIt() async throws {
+@Test func droppingAnUnreleasedFrameDiscardsIt() async throws {
   try await withOwnedTextureSession { rendered in
     let session = rendered.session
     try await session.awaitRenderedFrame()

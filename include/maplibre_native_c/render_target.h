@@ -193,7 +193,7 @@ typedef enum mln_gpu_sync_kind : uint32_t {
    * with glClientWaitSync. EGL targets use GLsync, not EGLSync.
    *
    * The session owns producer fences. The host borrows one until it releases
-   * or disposes the acquired frame and must never delete it. A view scope
+   * or discards the acquired frame and must never delete it. A view scope
    * extends that borrowing.
    *
    * The host inserts a consumer fence after its reads and calls glFlush in

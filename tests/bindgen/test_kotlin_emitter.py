@@ -161,10 +161,9 @@ class KotlinLayoutTests(unittest.TestCase):
             "override fun close() { dispose() }",
             owners[owner.format("RenderSessionHandle")],
         )
-        self.assertIn(
-            "override fun close() { release() }",
-            owners[owner.format("AcquiredFrameHandle")],
-        )
+        # A frame's release needs the host's consumer sync and its discard
+        # quarantines a slot, so a frame has no `use`.
+        self.assertNotIn("AutoCloseable", owners[owner.format("AcquiredFrameHandle")])
 
     def test_split_registrations_take_a_form_per_target(self):
         _functions, _unsupported, bodies, split, values, _native = kotlin.lowered(

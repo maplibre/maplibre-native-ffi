@@ -8,10 +8,10 @@
 
 #include "mln_kw_runtime.h"
 
-int32_t mln_kw_mln_acquired_frame_dispose(
+int32_t mln_kw_mln_acquired_frame_discard(
   int64_t frame, uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_acquired_frame_dispose(
+  return (int32_t)mln_acquired_frame_discard(
     (mln_acquired_frame)frame, (mln_diagnostic*)out_diagnostic
   );
 }

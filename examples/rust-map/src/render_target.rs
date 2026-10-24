@@ -21,7 +21,7 @@ use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 
 use maplibre_native_ffi::{
-    AcquiredFrameHandle, Error, FrameDemand, FrameDemandFlag, GpuSync, LogicalExtent, NativeFuture,
+    AcquiredFrameHandle, Error, FrameDemand, FrameDemandFlag, LogicalExtent, NativeFuture,
     RenderDriverKind, RenderResult, RenderSessionAttachOptions, RenderSessionHandle, Status,
 };
 
@@ -236,7 +236,7 @@ impl Session {
     /// replacement ring only while the host holds none of its frames.
     pub fn release_held(&mut self) -> maplibre_native_ffi::Result<()> {
         match self.held.take() {
-            Some(frame) => frame.release(&GpuSync::default()),
+            Some(frame) => frame.release(None),
             None => Ok(()),
         }
     }

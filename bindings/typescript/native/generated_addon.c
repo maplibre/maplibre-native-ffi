@@ -3,7 +3,7 @@
 
 #include "generated_addon.h"
 
-static napi_value mln_ts_export_mln_acquired_frame_dispose(
+static napi_value mln_ts_export_mln_acquired_frame_discard(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
@@ -20,7 +20,7 @@ static napi_value mln_ts_export_mln_acquired_frame_dispose(
   if (!mln_ts_read_owner(call, call->argv[1])) goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_acquired_frame_dispose(arg_frame, &diagnostic);
+  status = mln_acquired_frame_discard(arg_frame, &diagnostic);
   if (status == MLN_STATUS_OK) mln_ts_consume(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
@@ -210,6 +210,7 @@ static napi_value mln_ts_export_mln_acquired_frame_release(
   mln_ts_call* call = &call_state;
   mln_acquired_frame arg_frame = 0;
   mln_gpu_sync arg_consumer_completion;
+  const void* present_consumer_completion = NULL;
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 3)) return NULL;
@@ -219,16 +220,20 @@ static napi_value mln_ts_export_mln_acquired_frame_release(
     arg_frame = (mln_acquired_frame)number;
   }
   if (!mln_ts_read_owner(call, call->argv[1])) goto done;
-  arg_consumer_completion = mln_gpu_sync_default();
-  if (!mln_ts_read_record(call, call->argv[2], "consumerCompletion")) goto done;
-  if (!mln_ts_write_gpu_sync(
-        call, call->argv[2], &arg_consumer_completion, "consumerCompletion"
-      ))
-    goto done;
+  if (!mln_ts_is_absent(call, call->argv[2])) {
+    arg_consumer_completion = mln_gpu_sync_default();
+    if (!mln_ts_read_record(call, call->argv[2], "consumerCompletion"))
+      goto done;
+    if (!mln_ts_write_gpu_sync(
+          call, call->argv[2], &arg_consumer_completion, "consumerCompletion"
+        ))
+      goto done;
+    present_consumer_completion = &arg_consumer_completion;
+  }
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_acquired_frame_release(
-    arg_frame, &arg_consumer_completion, &diagnostic
+    arg_frame, present_consumer_completion, &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_consume(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
@@ -7108,7 +7113,7 @@ static napi_value mln_ts_export_mln_acquired_frame_view_end(
 }
 
 static const mln_ts_export exports[] = {
-  {"mln_acquired_frame_dispose", mln_ts_export_mln_acquired_frame_dispose},
+  {"mln_acquired_frame_discard", mln_ts_export_mln_acquired_frame_discard},
   {"mln_acquired_frame_get_metal_texture",
    mln_ts_export_mln_acquired_frame_get_metal_texture},
   {"mln_acquired_frame_get_opengl_texture",

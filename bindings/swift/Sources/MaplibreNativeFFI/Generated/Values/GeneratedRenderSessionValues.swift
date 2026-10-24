@@ -272,7 +272,7 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
   public var renderedUpdateGeneration: UInt64
   /// Frame generation of the latest rendered frame, zero before the first.
   public var frameGeneration: UInt64
-  /// Acquired frames that the host has not released or disposed.
+  /// Acquired frames that the host has not released or discarded.
   public var acquiredFrameCount: UInt32
   /// True when a map update or an accepted resize arrived after the latest
   /// rendered frame.

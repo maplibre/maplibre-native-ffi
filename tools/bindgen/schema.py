@@ -99,6 +99,7 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "release",
         "parent",
         "dispose",
+        "discard",
         "view_begin",
         "view_end",
         "default_function",
@@ -982,6 +983,10 @@ def validate(api: Api) -> None:
                 or api.typedefs_by_name[parent].metadata.get("kind") != "handle"
             ):
                 errors.append(f"{context}: parent requires a declared handle")
+            if "dispose" in typedef.metadata and "discard" in typedef.metadata:
+                errors.append(
+                    f"{context}: a handle takes a dispose or a discard, not both"
+                )
             if "view_begin" in typedef.metadata or "view_end" in typedef.metadata:
                 begin = api.functions_by_name.get(
                     typedef.metadata.get("view_begin", "")
@@ -1269,6 +1274,7 @@ FUNCTION_REFERENCES = {
     "typedef": (
         "release",
         "dispose",
+        "discard",
         "abandon",
         "view_begin",
         "view_end",

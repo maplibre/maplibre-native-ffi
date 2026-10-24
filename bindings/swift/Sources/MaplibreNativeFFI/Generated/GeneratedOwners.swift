@@ -5,7 +5,7 @@ import Foundation
 
 struct NativeAcquiredFrameHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned() -> Bool {
-    mln_acquired_frame_dispose(
+    mln_acquired_frame_discard(
       raw,
       nil
     ) == MLN_STATUS_OK

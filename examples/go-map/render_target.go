@@ -375,7 +375,7 @@ func releaseFrame(frame *maplibre.AcquiredFrameHandle) error {
 	if frame == nil {
 		return nil
 	}
-	return frame.Close(maplibre.GpuSync{Kind: maplibre.GpuSyncKindCpuComplete})
+	return frame.Close(nil)
 }
 
 func requireCPUCompleteProducer(frame *maplibre.AcquiredFrameHandle) error {

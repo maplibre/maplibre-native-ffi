@@ -745,26 +745,17 @@ export class AcquiredFrameHandle extends Owner {
   ) {
     super(key, handle, "AcquiredFrameHandle", { parent, registrations });
   }
-  /**
-   * Calls `dispose()`, for `await using`.
-   * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
-   */
-  declare [Symbol.asyncDispose]: () => Promise<void>;
-  /**
-   * Calls `dispose()`, for `using`.
-   * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
-   */
-  declare [Symbol.dispose]: () => void;
 
   /**
-   * Consumes an acquired frame and quarantines its slot of the texture ring.
+   * Consumes an acquired frame without consumer GPU synchronization, so it
+   * quarantines the frame's slot of the texture ring.
    *
-   * See `mln_acquired_frame_dispose` in the
+   * See `mln_acquired_frame_discard` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
-  dispose(): void {
+  discard(): void {
     closeSync(this, (handle, token) =>
-      native.mln_acquired_frame_dispose(handle, token),
+      native.mln_acquired_frame_discard(handle, token),
     );
   }
 
@@ -779,12 +770,12 @@ export class AcquiredFrameHandle extends Owner {
   }
 
   /**
-   * Releases an acquired frame after optional consumer GPU work.
+   * Releases an acquired frame after the host's GPU work that reads it.
    *
    * See `mln_acquired_frame_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
-  release(consumerCompletion: GpuSync = {}): void {
+  release(consumerCompletion?: GpuSync): void {
     closeSync(this, (handle, token) =>
       native.mln_acquired_frame_release(handle, token, consumerCompletion),
     );
@@ -905,7 +896,7 @@ export class AcquiredFrameHandle extends Owner {
     );
   }
 }
-defineDisposers(AcquiredFrameHandle, undefined, "dispose");
+defineDisposers(AcquiredFrameHandle, undefined, undefined);
 
 /**
  * Prepared GeoJSON data that sources retain independently of its handle.
@@ -3628,7 +3619,7 @@ export class RenderSessionHandle extends Owner {
       : adopt(
           handle,
           () => new AcquiredFrameHandle(ADOPT, handle, this),
-          (disposed) => native.mln_acquired_frame_dispose(disposed, undefined),
+          (disposed) => native.mln_acquired_frame_discard(disposed, undefined),
         );
   }
 

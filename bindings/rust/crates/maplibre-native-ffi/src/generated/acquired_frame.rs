@@ -9,19 +9,20 @@ native_owner! {
     /// See `mln_acquired_frame` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     #[must_use = "`AcquiredFrameHandle` must be released with `AcquiredFrameHandle::release`"]
-    pub struct AcquiredFrameHandle(mln_acquired_frame) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_acquired_frame_dispose(raw, out_diagnostic) }), counted false;
+    pub struct AcquiredFrameHandle(mln_acquired_frame) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_acquired_frame_discard(raw, out_diagnostic) }), counted false;
 }
 
 impl AcquiredFrameHandle {
-    /// Consumes an acquired frame and quarantines its slot of the texture ring.
+    /// Consumes an acquired frame without consumer GPU synchronization, so it
+    /// quarantines the frame's slot of the texture ring.
     ///
-    /// See `mln_acquired_frame_dispose` in the
+    /// See `mln_acquired_frame_discard` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn dispose(&self) -> Result<()> {
+    pub fn discard(&self) -> Result<()> {
         self.inner.close(|frame| {
             let mut call = Call::new(frame, None);
             call.status(|frame, out_diagnostic| unsafe {
-                sys::mln_acquired_frame_dispose(frame, out_diagnostic)
+                sys::mln_acquired_frame_discard(frame, out_diagnostic)
             })
         })
     }
@@ -157,14 +158,14 @@ impl AcquiredFrameHandle {
         Ok(callback(&value))
     }
 
-    /// Releases an acquired frame after optional consumer GPU work.
+    /// Releases an acquired frame after the host's GPU work that reads it.
     ///
     /// See `mln_acquired_frame_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn release(&self, consumer_completion: &GpuSync) -> Result<()> {
+    pub fn release(&self, consumer_completion: Option<&GpuSync>) -> Result<()> {
         self.inner.close(|frame| {
             let mut call = Call::new(frame, None);
-            let consumer_completion = call.reference(&consumer_completion)?;
+            let consumer_completion = call.optional_reference(consumer_completion.as_ref())?;
             call.status(|frame, out_diagnostic| unsafe {
                 sys::mln_acquired_frame_release(frame, consumer_completion, out_diagnostic)
             })

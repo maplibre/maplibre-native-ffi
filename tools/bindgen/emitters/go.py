@@ -85,11 +85,11 @@ def lower(api):
         if handle.dispose in bound.source.runtime_exports:
             continue
         owner = values.owner(native)
-        disposer = handle.dispose or handle.release
+        disposer = handle.cleanup or handle.release
         declaration = next(
             (p.function for p in bound.operations if p.name == disposer), None
         )
-        if not handle.dispose and (
+        if not handle.cleanup and (
             not declaration
             or declaration.return_type.canonical != "void"
             or len(declaration.parameters) != 1

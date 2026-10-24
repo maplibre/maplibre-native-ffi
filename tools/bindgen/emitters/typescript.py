@@ -87,7 +87,7 @@ def simple_disposer(bound: BoundApi, native: str | None) -> bool:
 def check_owner(bound: BoundApi, owned: OwnedOutputPlan) -> None:
     if owned.handle.native not in bound.public_handles:
         raise Unsupported("owned output requires a generated class")
-    if not simple_disposer(bound, owned.handle.dispose):
+    if not simple_disposer(bound, owned.handle.cleanup):
         raise Unsupported("owned output requires an immediate disposer")
 
 

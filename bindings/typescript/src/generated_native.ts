@@ -79,7 +79,7 @@ import type {
 } from "./generated_values.ts";
 
 /** The digest of the C headers that this facade and its addon came from. */
-export const ABI_DIGEST = "af0d6ad1b392861e";
+export const ABI_DIGEST = "95ee89c36d540d12";
 
 /** The index of each completion decoder in the addon's decoder table. */
 export const Decoder = {
@@ -107,7 +107,7 @@ export const Decoder = {
 
 /** The addon function of each generated operation, by C function name. */
 export interface NativeOperations {
-  mln_acquired_frame_dispose(frame: bigint, token: object | undefined): void;
+  mln_acquired_frame_discard(frame: bigint, token: object | undefined): void;
   mln_acquired_frame_get_metal_texture(frame: bigint): MetalTextureFrame;
   mln_acquired_frame_get_opengl_texture(frame: bigint): OpenglTextureFrame;
   mln_acquired_frame_get_producer_sync(frame: bigint): GpuSync;

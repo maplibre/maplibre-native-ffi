@@ -938,7 +938,7 @@ static void detach_destroys_a_borrowed_ring_with_a_disposed_frame(void) {
   );
   mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 1);
   TEST_ASSERT_GREATER_THAN_INT(0, live_object_total());
-  MLN_TEST_OK(mln_acquired_frame_dispose(frame, NULL));
+  MLN_TEST_OK(mln_acquired_frame_discard(frame, NULL));
 
   detach(&fixture);
   assert_no_live_objects();

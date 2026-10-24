@@ -17,10 +17,10 @@ def module_name(native: str) -> str:
 
 def disposer(bound: BoundApi, handle: HandlePlan):
     """The single-handle call `Drop` makes; an implicit release must be unconditional."""
-    plan = bound.operations_by_name.get(handle.dispose or handle.release)
+    plan = bound.operations_by_name.get(handle.cleanup or handle.release)
     if plan is None or len(plan.function.parameters) != 1:
         return None
-    if not handle.dispose and plan.function.return_type.kind != "void":
+    if not handle.cleanup and plan.function.return_type.kind != "void":
         return None
     return plan.function
 

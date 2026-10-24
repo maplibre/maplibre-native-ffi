@@ -356,6 +356,13 @@ def emit_operation(
         else "Maplibre"
     )
     handle_plan = bound.handles.get(receiver)
+    if handle_plan and function.name == handle_plan.discard:
+        # Retirement runs the discard, since it is the handle's cleanup.
+        return (
+            owner_class,
+            method(f"public void {pascal(plan.member)}()", ["state.Retire();"]),
+            set(),
+        )
     if (
         plan.consumes
         and handle_plan
@@ -376,8 +383,20 @@ def emit_operation(
             declarations.append(f"{values.public_type(value)} {name}")
             local = f"native{pascal(name)}"
             if value.kind == "reference" and value.element:
+                source = name + (
+                    ".Value"
+                    if value.nullable and not values.is_reference_type(value.element)
+                    else ""
+                )
+                encoded = f"scope.Value({values.encode(value.element, source)})"
                 body.append(
-                    f"var {local} = scope.Value({values.encode(value.element, name)});"
+                    f"var {local} = "
+                    + (
+                        f"{name} is null ? null : {encoded}"
+                        if value.nullable
+                        else encoded
+                    )
+                    + ";"
                 )
             else:
                 body.append(f"var {local} = {values.encode(value, name)};")
@@ -1067,7 +1086,7 @@ def emit(api: Api | BoundApi) -> Emission:
         extra = ", Task completion" if immediate_completion else ""
         extra_argument = ", completion" if immediate_completion else ""
         adopt_extra = ", Task completion" if immediate_completion else ""
-        cleanup = handle.dispose or handle.release
+        cleanup = handle.cleanup or handle.release
         cleanup_function = api.functions_by_name[cleanup]
         # Abandon disposes a handle that no owner can close any more.
         abandon = (
@@ -1117,7 +1136,11 @@ def emit(api: Api | BoundApi) -> Emission:
             f"    internal {native_type} Handle => state.Handle;\n"
             "    // Runtime events report their source by this identity.\n"
             "    public ulong Id => state.Handle.Value;\n"
-            f"    public void Dispose() {{ state.Retire(); }}\n"
+            + (
+                ""
+                if handle.scoped_release is None
+                else "    public void Dispose() { state.Retire(); }\n"
+            )
         )
         methods[owner].insert(0, declarations)
     used_records = default_records | (
@@ -1188,8 +1211,13 @@ def emit(api: Api | BoundApi) -> Emission:
             owners[native]: raw_handle(bound.handles[native])
             for native in created_handles
         }
+        scoped_owners = {
+            owners[native]
+            for native in created_handles
+            if bound.handles[native].scoped_release is not None
+        }
         interfaces = [
-            *(["IDisposable"] if owner in handle_types else []),
+            *(["IDisposable"] if owner in scoped_owners else []),
             *(["IAsyncDisposable"] if owner in async_disposable else []),
             *(
                 [f"INativeOwner<{handle_types[owner]}>"]
@@ -1294,7 +1322,7 @@ def emit(api: Api | BoundApi) -> Emission:
             + "\n}\n"
         )
     for native in created_handles:
-        dispose = bound.handles[native].dispose
+        dispose = bound.handles[native].cleanup
         if dispose and dispose not in supported:
             supported.append(dispose)
             unsupported.pop(dispose, None)

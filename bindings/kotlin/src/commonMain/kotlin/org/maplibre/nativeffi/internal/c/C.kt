@@ -7,7 +7,7 @@ package org.maplibre.nativeffi.internal.c
  * is written to the trailing `returned` address.
  */
 internal expect object C {
-  fun mln_acquired_frame_dispose(frame: Long, outDiagnostic: Long): Int
+  fun mln_acquired_frame_discard(frame: Long, outDiagnostic: Long): Int
 
   fun mln_acquired_frame_get_metal_texture(frame: Long, outFrame: Long, outDiagnostic: Long): Int
 

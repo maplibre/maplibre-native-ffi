@@ -1972,7 +1972,7 @@ export interface RenderSessionSnapshot {
    */
   readonly frameGeneration: bigint;
   /**
-   * Acquired frames that the host has not released or disposed.
+   * Acquired frames that the host has not released or discarded.
    */
   readonly acquiredFrameCount: number;
   /**

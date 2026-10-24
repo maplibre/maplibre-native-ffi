@@ -212,11 +212,11 @@ auto mln_render_session_dispose(
   });
 }
 
-auto mln_acquired_frame_dispose(
+auto mln_acquired_frame_discard(
   mln_acquired_frame frame, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::acquired_frame_dispose(frame);
+    return mln::core::acquired_frame_discard(frame);
   });
 }
 

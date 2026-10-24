@@ -13,7 +13,7 @@ public class AcquiredFrameHandle
 internal constructor(
   handle: Long,
   @Suppress("unused") private val parent: RenderSessionHandle,
-) : GeneratedAcquiredFrameOperations(), AutoCloseable {
+) : GeneratedAcquiredFrameOperations() {
   internal override val binding =
     HandleState("AcquiredFrameHandle", handle, GeneratedOwnerDisposal::acquiredFrame)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
@@ -23,8 +23,4 @@ internal constructor(
    */
   public val id: ULong
     get() = binding.handle.toULong()
-
-  public override fun close() {
-    release()
-  }
 }

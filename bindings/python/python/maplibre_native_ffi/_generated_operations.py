@@ -177,6 +177,15 @@ class MapAttachWebgpuSurfaceResult(NamedTuple):
 class _AcquiredFrameHandleOperations(GeneratedOperations):
     _native: _native._AcquiredFrameHandle
 
+    def discard(self) -> None:
+        """Consumes an acquired frame without consumer GPU synchronization, so
+        it quarantines the frame's slot of the texture ring.
+
+        See `mln_acquired_frame_discard` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+        """
+        return self._native.discard()
+
     def metal_texture(self) -> AbstractContextManager[MetalTextureFrame]:
         """Copies Metal-native metadata from an acquired frame.
 
@@ -256,7 +265,7 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         )
 
     def close(self, consumer_completion: GpuSync | None = None) -> None:
-        """Releases an acquired frame after optional consumer GPU work.
+        """Releases an acquired frame after the host's GPU work that reads it.
 
         See `mln_acquired_frame_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

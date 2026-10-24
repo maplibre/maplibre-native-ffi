@@ -10,13 +10,14 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
   internal abstract val binding: HandleState
 
   /**
-   * Consumes an acquired frame and quarantines its slot of the texture ring.
+   * Consumes an acquired frame without consumer GPU synchronization, so it quarantines the frame's
+   * slot of the texture ring.
    *
-   * See `mln_acquired_frame_dispose` in the
+   * See `mln_acquired_frame_discard` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
-  public fun dispose(): Unit =
-    nativeClose(this, binding) { check(C.mln_acquired_frame_dispose(handle, diagnostic)) }
+  public fun discard(): Unit =
+    nativeClose(this, binding) { check(C.mln_acquired_frame_discard(handle, diagnostic)) }
 
   /**
    * Copies Metal-native metadata from an acquired frame.
@@ -122,13 +123,19 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
     }
 
   /**
-   * Releases an acquired frame after optional consumer GPU work.
+   * Releases an acquired frame after the host's GPU work that reads it.
    *
    * See `mln_acquired_frame_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
-  public fun release(consumerCompletion: GpuSync = GeneratedApi.gpuSyncDefault()): Unit =
+  public fun release(consumerCompletion: GpuSync? = null): Unit =
     nativeClose(this, binding) {
-      check(C.mln_acquired_frame_release(handle, writeGpuSync(consumerCompletion), diagnostic))
+      check(
+        C.mln_acquired_frame_release(
+          handle,
+          consumerCompletion?.let { writeGpuSync(it) } ?: 0L,
+          diagnostic,
+        ),
+      )
     }
 }

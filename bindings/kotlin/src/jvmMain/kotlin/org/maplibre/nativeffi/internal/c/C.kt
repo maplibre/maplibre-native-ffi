@@ -7,8 +7,8 @@ import java.lang.foreign.ValueLayout.*
 
 /** The FFM downcall behind each C function. */
 internal actual object C {
-  private val mln_acquired_frame_dispose =
-    Ffm.downcall("mln_acquired_frame_dispose", JAVA_INT, JAVA_LONG, JAVA_LONG)
+  private val mln_acquired_frame_discard =
+    Ffm.downcall("mln_acquired_frame_discard", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_acquired_frame_get_metal_texture =
     Ffm.downcall("mln_acquired_frame_get_metal_texture", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_acquired_frame_get_opengl_texture =
@@ -1335,8 +1335,8 @@ internal actual object C {
   private val mln_webgpu_surface_descriptor_default =
     Ffm.downcall("mln_webgpu_surface_descriptor_default", mln_webgpu_surface_descriptor)
 
-  actual fun mln_acquired_frame_dispose(frame: Long, outDiagnostic: Long): Int =
-    mln_acquired_frame_dispose.invokeExact(frame, outDiagnostic) as Int
+  actual fun mln_acquired_frame_discard(frame: Long, outDiagnostic: Long): Int =
+    mln_acquired_frame_discard.invokeExact(frame, outDiagnostic) as Int
 
   actual fun mln_acquired_frame_get_metal_texture(
     frame: Long,

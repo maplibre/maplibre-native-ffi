@@ -425,9 +425,15 @@ internal abstract class TextureRenderTarget : RenderTarget
         {
             return;
         }
-        using (frame)
+        try
         {
-            frame.Release(GpuSync.Default);
+            frame.Release(null);
+        }
+        catch
+        {
+            // A frame whose release failed may still be read, so discard quarantines its slot.
+            frame.Discard();
+            throw;
         }
     }
 }

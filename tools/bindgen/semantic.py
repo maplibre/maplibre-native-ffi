@@ -53,6 +53,10 @@ class HandlePlan:
     finalize: tuple[str, ...] = ()
     view_begin: str | None = None
     view_end: str | None = None
+    # The cleanup of a handle without a dispose that is safe only for an owner
+    # its host dropped, such as a frame whose consumer sync is unknown. A
+    # finalizer or destructor runs it, but no scoped cleanup does.
+    discard: str | None = None
     # Whether the handle is a root whose release is a lifecycle operation that
     # reports retirement through its completion, so a host can wait for it.
     observable_root_release: bool = False
@@ -63,12 +67,22 @@ class HandlePlan:
         return public_stem(self.native)
 
     @property
-    def scoped_release(self) -> str:
+    def cleanup(self) -> str | None:
+        """The operation that cleans up an owner in any state: its dispose,
+        or its discard."""
+        return self.dispose or self.discard
+
+    @property
+    def scoped_release(self) -> str | None:
         """The operation that scoped cleanup, such as `use` or `with`, calls.
 
         A handle with an abandon operation releases only after detach or
-        abandon, so its scope disposes it instead, which accepts any state.
+        abandon, so its scope disposes it instead, which accepts any state. A
+        handle with a discard has no scoped cleanup: its release needs what
+        only the host knows, and its discard is safe only for a dropped owner.
         """
+        if self.discard:
+            return None
         return self.dispose if self.abandon and self.dispose else self.release
 
 
@@ -592,8 +606,12 @@ class Binder:
                     if not is_completion(parameter.type)
                     and parameter.metadata.get("direction", "in") != "out"
                 ),
-                (typedef.metadata["dispose"],)
-                if typedef.metadata.get("dispose")
+                (cleanup,)
+                if (
+                    cleanup := typedef.metadata.get(
+                        "dispose", typedef.metadata.get("discard")
+                    )
+                )
                 else tuple(
                     filter(
                         None,
@@ -602,6 +620,7 @@ class Binder:
                 ),
                 view_begin=typedef.metadata.get("view_begin"),
                 view_end=typedef.metadata.get("view_end"),
+                discard=typedef.metadata.get("discard"),
                 observable_root_release=self.observable_root_release(typedef),
             )
             for name, typedef in self.typedefs.items()
@@ -1064,7 +1083,7 @@ class Binder:
             if (
                 result.ownership == "owned"
                 and result.handle
-                and not result.handle.dispose
+                and not result.handle.cleanup
             ):
                 raise ModelError(
                     [
@@ -1176,7 +1195,7 @@ class Binder:
             )
         consumes = None
         for handle in self.handles.values():
-            if function.name in {handle.release, handle.dispose}:
+            if function.name in {handle.release, handle.cleanup}:
                 consumes = handle.release_consumes
                 if function.name == handle.dispose and function.name != handle.release:
                     support = DisposeSupport(handle)

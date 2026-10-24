@@ -3738,7 +3738,7 @@ pub struct RenderSessionSnapshot {
     pub rendered_update_generation: u64,
     /// Frame generation of the latest rendered frame, zero before the first.
     pub frame_generation: u64,
-    /// Acquired frames that the host has not released or disposed.
+    /// Acquired frames that the host has not released or discarded.
     pub acquired_frame_count: u32,
     /// True when a map update or an accepted resize arrived after the latest
     /// rendered frame.

@@ -86,7 +86,7 @@ def delivery_capture(bound: BoundApi) -> str:
         _validate_capture_ownership(plan)
         owned = plan.kind == "handle" and plan.ownership == "owned"
         if owned:
-            assert plan.handle is not None and plan.handle.dispose is not None
+            assert plan.handle is not None and plan.handle.cleanup is not None
         output.extend(
             _element(
                 native,

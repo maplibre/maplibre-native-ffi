@@ -13,7 +13,7 @@ from ._generated_operations import (
     _RuntimeHandleOperations,
     _StyleExpressionHandleOperations,
 )
-from ._lifecycle import NativeHandleMixin
+from ._lifecycle import NativeHandleMixin, ScopedHandleMixin
 
 
 class HttpHeaderTransformResponseScope(_HttpHeaderTransformResponseScopeOperations):
@@ -50,7 +50,7 @@ class AcquiredFrameHandle(_AcquiredFrameHandleOperations, NativeHandleMixin):
         return owner
 
 
-class GeojsonSourceDataHandle(_GeojsonSourceDataHandleOperations, NativeHandleMixin):
+class GeojsonSourceDataHandle(_GeojsonSourceDataHandleOperations, ScopedHandleMixin):
     """Prepared GeoJSON data that sources retain independently of its handle.
 
     See `mln_geojson_source_data` in the
@@ -71,7 +71,7 @@ class GeojsonSourceDataHandle(_GeojsonSourceDataHandleOperations, NativeHandleMi
         return owner
 
 
-class MapHandle(_MapHandleOperations, NativeHandleMixin):
+class MapHandle(_MapHandleOperations, ScopedHandleMixin):
     """A map, which holds map state independent of any render target.
 
     See `mln_map` in the
@@ -92,7 +92,7 @@ class MapHandle(_MapHandleOperations, NativeHandleMixin):
         return owner
 
 
-class MapProjectionHandle(_MapProjectionHandleOperations, NativeHandleMixin):
+class MapProjectionHandle(_MapProjectionHandleOperations, ScopedHandleMixin):
     """A standalone projection of one map view.
 
     See `mln_map_projection` in the
@@ -113,7 +113,7 @@ class MapProjectionHandle(_MapProjectionHandleOperations, NativeHandleMixin):
         return owner
 
 
-class RenderFrameBatchHandle(_RenderFrameBatchHandleOperations, NativeHandleMixin):
+class RenderFrameBatchHandle(_RenderFrameBatchHandleOperations, ScopedHandleMixin):
     """An owned batch of frame results from one drain.
 
     See `mln_render_frame_batch` in the
@@ -134,7 +134,7 @@ class RenderFrameBatchHandle(_RenderFrameBatchHandleOperations, NativeHandleMixi
         return owner
 
 
-class RenderSessionHandle(_RenderSessionHandleOperations, NativeHandleMixin):
+class RenderSessionHandle(_RenderSessionHandleOperations, ScopedHandleMixin):
     """A render session, which renders one map to one render target.
 
     See `mln_render_session` in the
@@ -155,7 +155,7 @@ class RenderSessionHandle(_RenderSessionHandleOperations, NativeHandleMixin):
         return owner
 
 
-class ResourceRequestHandle(_ResourceRequestHandleOperations, NativeHandleMixin):
+class ResourceRequestHandle(_ResourceRequestHandleOperations, ScopedHandleMixin):
     """A resource request that a resource provider handles.
 
     See `mln_resource_request` in the
@@ -177,7 +177,7 @@ class ResourceRequestHandle(_ResourceRequestHandleOperations, NativeHandleMixin)
 
 
 class ResourceTransformRequestHandle(
-    _ResourceTransformRequestHandleOperations, NativeHandleMixin
+    _ResourceTransformRequestHandleOperations, ScopedHandleMixin
 ):
     """A resource URL transform that waits for its host's answer.
 
@@ -199,7 +199,7 @@ class ResourceTransformRequestHandle(
         return owner
 
 
-class RuntimeHandle(_RuntimeHandleOperations, NativeHandleMixin):
+class RuntimeHandle(_RuntimeHandleOperations, ScopedHandleMixin):
     """A runtime: the native scheduler thread and event store for its maps.
 
     See `mln_runtime` in the
@@ -220,7 +220,7 @@ class RuntimeHandle(_RuntimeHandleOperations, NativeHandleMixin):
         return owner
 
 
-class StyleExpressionHandle(_StyleExpressionHandleOperations, NativeHandleMixin):
+class StyleExpressionHandle(_StyleExpressionHandleOperations, ScopedHandleMixin):
     """A parsed style expression, immutable and independent of any map.
 
     See `mln_style_expression` in the

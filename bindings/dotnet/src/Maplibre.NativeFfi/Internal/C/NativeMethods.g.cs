@@ -6,7 +6,7 @@ namespace Maplibre.NativeFfi.Internal.C;
 internal static unsafe partial class NativeMethods
 {
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_acquired_frame_dispose(
+    internal static partial mln_status mln_acquired_frame_discard(
         MlnAcquiredFrame frame,
         mln_diagnostic* out_diagnostic
     );

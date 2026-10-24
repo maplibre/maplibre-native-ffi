@@ -516,7 +516,7 @@ def multiple_outputs(plan, values, native):
 
 
 def disposal_method(handle):
-    return identifier(handle.dispose.removeprefix(handle.native + "_"))
+    return identifier(handle.cleanup.removeprefix(handle.native + "_"))
 
 
 def disposal(handle):
@@ -690,11 +690,11 @@ def owner_disposal(bound, native):
     """The any-thread disposal of every public handle, for leak cleanup."""
     lines = []
     for handle in bound.handles.values():
-        if not handle.dispose or handle.dispose in bound.source.runtime_exports:
+        if not handle.cleanup or handle.cleanup in bound.source.runtime_exports:
             continue
         method = name(handle.native)
         method = method[0].lower() + method[1:]
-        function = bound.source.functions_by_name[handle.dispose]
+        function = bound.source.functions_by_name[handle.cleanup]
         call = (
             native.call(function, ["handle"])
             if not function.diagnostic
