@@ -52,7 +52,7 @@ cascade = true
 shell = "bash -e -c"
 
 [vars]
-actionlint_version = "1.7.12"
+jactionlint_version = "2.3.0"
 # The Android SDK tool installs the command-line tools and nothing else, so this is
 # their version; the packages below are what .mise/bin/sync-android-packages adds.
 # Gradle reads the package versions from the environment, which `[env]` sets from
@@ -106,8 +106,8 @@ zig_version = "0.17.0"
 "aqua:jdx/hk" = "{{vars.hk_version}}" # Linter orchestration
 "aqua:dprint/dprint" = "{{vars.dprint_version}}" # Formatter orchestration
 "github:sargunv/jvl" = "{{vars.jvl_version}}" # JSON validator
-"aqua:rhysd/actionlint" = "{{vars.actionlint_version}}" # GH Actions linter
-"aqua:koalaman/shellcheck" = "{{vars.shellcheck_version}}" # Shell script linter (used by actionlint)
+"github:jdx/jactionlint" = "{{vars.jactionlint_version}}" # GH Actions linter
+"aqua:koalaman/shellcheck" = "{{vars.shellcheck_version}}" # Shell script linter (used by jactionlint)
 "aqua:Kitware/CMake" = "{{vars.cmake_version}}"
 ninja = "{{vars.ninja_version}}"
 "github:EmbarkStudios/cargo-about" = "{{vars.cargo_about_version}}" # Rust dependency notices

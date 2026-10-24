@@ -196,8 +196,6 @@ runs:
     - name: Use Windows OpenGL software driver
       if: ${{ runner.os == 'Windows' && endsWith(inputs.target, '-wgl') }}
       uses: ./.github/actions/setup-windows-opengl-software
-      with:
-        scope: system
 
     - name: Cache Cargo packages
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
