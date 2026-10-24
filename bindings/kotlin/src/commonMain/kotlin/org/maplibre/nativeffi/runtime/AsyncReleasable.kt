@@ -19,11 +19,22 @@ public interface AsyncReleasable {
 
 /**
  * Runs [block] and suspends until this owner's native release has finished. An owner that [block]
- * already closed is left as it is.
+ * already closed is left as it is. When [block] throws, its throwable propagates with any release
+ * failure added as suppressed, as the standard library's `use` does. When [block] returns, a
+ * release failure propagates.
  */
-public suspend inline fun <T : AsyncReleasable, R> T.use(block: suspend (T) -> R): R =
-  try {
-    block(this)
-  } finally {
-    if (!isClosed) withContext(NonCancellable) { release().await() }
-  }
+public suspend inline fun <T : AsyncReleasable, R> T.use(block: suspend (T) -> R): R {
+  val result =
+    try {
+      block(this)
+    } catch (failure: Throwable) {
+      try {
+        if (!isClosed) withContext(NonCancellable) { release().await() }
+      } catch (releaseFailure: Throwable) {
+        failure.addSuppressed(releaseFailure)
+      }
+      throw failure
+    }
+  if (!isClosed) withContext(NonCancellable) { release().await() }
+  return result
+}

@@ -4,7 +4,9 @@ import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
@@ -13,6 +15,7 @@ import org.maplibre.nativeffi.TestWeakReference
 import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitCollected
 import org.maplibre.nativeffi.awaitWithin
+import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.RuntimeEventType
@@ -62,6 +65,40 @@ class HandleLifecycleTest {
     map.release().awaitWithin("the map release")
     runtime.release().awaitWithin("the retried runtime release")
     assertFailsWithStatus(Status.INVALID_STATE) { runtime.getEventMask() }
+  }
+
+  @Test
+  fun useKeepsTheBlockFailureAndSuppressesTheRefusedRelease() = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    lateinit var map: MapHandle
+
+    // The live map makes native refuse the runtime release after the block throws.
+    val failure =
+      assertFailsWith<IllegalStateException> {
+        runtime.use {
+          map = it.createMap(smallMapOptions()).awaitWithin("the map")
+          error("the block failure")
+        }
+      }
+    assertEquals("the block failure", failure.message)
+    val suppressed = failure.suppressedExceptions.single()
+    assertEquals(Status.INVALID_STATE, assertIs<MaplibreException>(suppressed).status)
+
+    map.release().awaitWithin("the map release")
+    runtime.release().awaitWithin("the retried runtime release")
+  }
+
+  @Test
+  fun useReportsARefusedReleaseAfterTheBlockReturns() = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    lateinit var map: MapHandle
+
+    assertFailsWithStatus(Status.INVALID_STATE) {
+      runtime.use { map = it.createMap(smallMapOptions()).awaitWithin("the map") }
+    }
+
+    map.release().awaitWithin("the map release")
+    runtime.release().awaitWithin("the retried runtime release")
   }
 
   @Test
