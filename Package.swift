@@ -13,13 +13,21 @@ let testDependencies: [Target.Dependency] = [
   "GraphicsSupport",
 ]
 
+/// The simulator test runner is a root executable target, which SwiftPM builds
+/// by --product without listing it here for consumers.
 let products: [Product] = [
   .library(name: "MaplibreNativeFFI", targets: ["MaplibreNativeFFI"]),
-  .executable(
-    name: "MaplibreNativeFFIIOSSimulatorTests",
-    targets: ["MaplibreNativeFFIIOSSimulatorTests"]
-  ),
 ]
+
+/// Only the API reference task needs the DocC plugin, so consumers don't
+/// resolve it.
+let dependencies: [Package.Dependency] =
+  Context.environment["MLN_FFI_SWIFT_DOCC"] == nil ? [] : [
+    .package(
+      url: "https://github.com/swiftlang/swift-docc-plugin",
+      from: "1.4.3"
+    ),
+  ]
 
 let targets: [Target] = [
   .target(
@@ -73,11 +81,6 @@ let package = Package(
     .tvOS("15.0"),
   ],
   products: products,
-  dependencies: [
-    .package(
-      url: "https://github.com/swiftlang/swift-docc-plugin",
-      from: "1.4.3"
-    ),
-  ],
+  dependencies: dependencies,
   targets: targets
 )

@@ -11,6 +11,12 @@
   "linux/arm64",
 ] }
 
+# The manifest adds the DocC plugin only under this variable, so consumers
+# don't resolve it. Every task here sets it, so the repository's
+# Package.resolved keeps the plugin's pins.
+[env]
+MLN_FFI_SWIFT_DOCC = "1"
+
 # The manifest lives at the repository root, so SwiftPM runs from there.
 [tasks.api]
 description = "Generate DocC HTML API reference for the Swift binding."
