@@ -1,7 +1,6 @@
 package org.maplibre.nativeffi
 
 import kotlinx.coroutines.Deferred
-import org.maplibre.nativeffi.error.CallbackException
 
 /** A weak reference that the garbage collector clears once nothing else reaches its value. */
 internal expect class TestWeakReference(value: Any) {
@@ -27,11 +26,12 @@ internal expect suspend fun awaitCollected(reference: TestWeakReference): Boolea
 internal expect suspend fun requestCollection()
 
 /**
- * Routes each callback failure that the binding hands to the platform's handler to [sink], and
- * returns the function that restores the previous handler. Returns null on Android, where the
- * failure goes to the log, which a test cannot read back.
+ * Offers each throwable that reaches the platform's handler, where the binding reports callback
+ * failures and leaked handles, to [sink], which returns whether it took it. The previous handler
+ * receives the rest. Returns the function that restores the previous handler, or null on Android,
+ * where the binding's reports go to the log.
  */
-internal expect fun interceptCallbackFailures(sink: (CallbackException) -> Unit): (() -> Unit)?
+internal expect fun interceptUncaught(sink: (Throwable) -> Boolean): (() -> Unit)?
 
 /**
  * Waits until native's releases and deliveries so far have reached Kotlin. A threaded target runs

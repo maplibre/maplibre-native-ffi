@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.internal.lifecycle
 
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import org.maplibre.nativeffi.internal.callback.reportUncaught
 
 /**
  * What a generated owner tracks about its native [handle].
@@ -35,8 +36,9 @@ internal open class HandleState(
   }
 
   /**
-   * Disposes a handle that its owner never released, then prints the leak and any disposal failure.
-   * Does nothing for a released handle.
+   * Disposes a handle that its owner never released, then reports the leak, with any disposal
+   * failure as its cause, where the binding reports callback failures. Does nothing for a released
+   * handle.
    */
   fun disposeLeaked() {
     if (!released.compareAndSet(false, true)) return
@@ -47,7 +49,11 @@ internal open class HandleState(
       } catch (error: Throwable) {
         error
       }
-    val leak = "Leaked $typeName native handle 0x${handle.toString(16)}; close it explicitly."
-    println(if (failure == null) leak else "$leak Disposing it failed: ${failure.message}")
+    reportUncaught(
+      IllegalStateException(
+        "Leaked $typeName native handle 0x${handle.toString(16)}; close it explicitly.",
+        failure,
+      ),
+    )
   }
 }

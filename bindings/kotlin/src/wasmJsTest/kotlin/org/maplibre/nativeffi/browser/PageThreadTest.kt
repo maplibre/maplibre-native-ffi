@@ -15,11 +15,11 @@ import org.maplibre.nativeffi.awaitDeliveries
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.RuntimeEventType
+import org.maplibre.nativeffi.interceptUncaught
 import org.maplibre.nativeffi.internal.callback.NativeRoots
 import org.maplibre.nativeffi.requestCollection
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.smallMapOptions
-import org.maplibre.nativeffi.withConsoleLog
 import org.maplibre.nativeffi.withMap
 
 /** Kotlin on the browser page, which never blocks, drives runtimes and maps. */
@@ -73,7 +73,12 @@ class PageThreadTest {
   @Test
   fun aCancelledCreationReleasesTheRuntimeItReceives() = runSuspendTest {
     val leaks = mutableListOf<String>()
-    withConsoleLog({ line -> if (line.startsWith("Leaked RuntimeHandle ")) leaks += line }) {
+    val restore =
+      interceptUncaught { failure ->
+        val message = failure.message.orEmpty()
+        message.startsWith("Leaked RuntimeHandle ").also { if (it) leaks += message }
+      }!!
+    try {
       val roots = NativeRoots.countForTesting()
       val creation =
         async(start = CoroutineStart.UNDISPATCHED) {
@@ -89,6 +94,8 @@ class PageThreadTest {
       awaitDeliveries()
       assertEquals(roots, NativeRoots.countForTesting(), "the creation's root outlived it")
       assertEquals(emptyList(), leaks, "the cancelled creation's runtime leaked")
+    } finally {
+      restore()
     }
   }
 

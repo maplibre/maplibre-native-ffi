@@ -2,19 +2,17 @@
 
 package org.maplibre.nativeffi.internal.callback
 
-import org.maplibre.nativeffi.error.CallbackException
-
-internal actual fun platformReportCallbackFailure(failure: CallbackException) {
+internal actual fun platformReportUncaught(failure: Throwable) {
   // The page reports the failure as an uncaught error, to its error event and the console, and
-  // keeps running. The error's mlnCallbackFailure property holds the exception.
+  // keeps running. The error's mlnFailure property holds the throwable.
   reportError(failure.stackTraceToString(), failure.toJsReference())
 }
 
-private fun reportError(message: String, failure: JsReference<CallbackException>): Unit =
+private fun reportError(message: String, failure: JsReference<Throwable>): Unit =
   js(
     """{
       const error = new Error(message);
-      error.mlnCallbackFailure = failure;
+      error.mlnFailure = failure;
       globalThis.reportError(error);
     }""",
   )

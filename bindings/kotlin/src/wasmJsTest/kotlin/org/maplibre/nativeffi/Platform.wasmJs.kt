@@ -11,7 +11,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
-import org.maplibre.nativeffi.error.CallbackException
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LogEvent
 import org.maplibre.nativeffi.generated.QueuedLogHandler
@@ -77,9 +76,9 @@ internal actual suspend fun requestCollection() {
   collectGarbage()
 }
 
-// The page reports a callback failure through globalThis.reportError, which this replaces until
-// the restore, as the other platforms replace their uncaught exception handlers.
-internal actual fun interceptCallbackFailures(sink: (CallbackException) -> Unit): (() -> Unit)? {
+// The page receives the binding's reports through globalThis.reportError, which this replaces
+// until the restore, as the other platforms replace their uncaught exception handlers.
+internal actual fun interceptUncaught(sink: (Throwable) -> Boolean): (() -> Unit)? {
   val previous = replaceReportError { failure -> sink(failure.get()) }
   return { restoreReportError(previous) }
 }
@@ -110,27 +109,13 @@ internal actual suspend fun awaitDeliveries() {
     }
 }
 
-/**
- * Runs [block] while each line that console.log writes also goes to [sink]. Kotlin's println writes
- * to console.log, where a handle's leak report goes.
- */
-internal suspend fun <T> withConsoleLog(sink: (String) -> Unit, block: suspend () -> T): T {
-  val previous = replaceConsoleLog(sink)
-  try {
-    return block()
-  } finally {
-    restoreConsoleLog(previous)
-  }
-}
-
-private fun replaceReportError(sink: (JsReference<CallbackException>) -> Unit): JsAny =
+private fun replaceReportError(sink: (JsReference<Throwable>) -> Boolean): JsAny =
   js(
     """{
       const previous = globalThis.reportError;
       globalThis.reportError = (error) => {
-        const failure = error && error.mlnCallbackFailure;
-        if (failure === undefined) previous.call(globalThis, error);
-        else sink(failure);
+        const failure = error && error.mlnFailure;
+        if (failure === undefined || !sink(failure)) previous.call(globalThis, error);
       };
       return previous;
     }""",
@@ -143,17 +128,3 @@ private fun weakRef(value: JsReference<Any>): JsAny = js("new WeakRef(value)")
 private fun deref(reference: JsAny): JsReference<Any>? = js("reference.deref()")
 
 private fun collectGarbage(): Unit = js("globalThis.gc()")
-
-private fun replaceConsoleLog(sink: (String) -> Unit): JsAny =
-  js(
-    """{
-      const previous = console.log;
-      console.log = (...lines) => {
-        sink(String(lines[0]));
-        previous.apply(console, lines);
-      };
-      return previous;
-    }""",
-  )
-
-private fun restoreConsoleLog(previous: JsAny): Unit = js("console.log = previous")

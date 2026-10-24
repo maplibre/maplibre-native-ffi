@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.lifecycle
 
-import java.io.PrintStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
@@ -13,8 +12,8 @@ import org.maplibre.nativeffi.runChildJvm
 import org.maplibre.nativeffi.runSuspendTest
 
 /**
- * The leak report for an abandoned handle reaches standard output from the leak-report worker. The
- * probe runs in a child JVM, so the test reads the output the way a host sees it.
+ * The leak report for an abandoned handle reaches the leak-report worker's uncaught exception
+ * handler. The probe runs in a child JVM, so its default handler sees only the probe's reports.
  */
 class AbandonedHandleJvmTest {
   @Test
@@ -32,19 +31,12 @@ class AbandonedHandleJvmTest {
 object AbandonedMapProbe {
   @JvmStatic
   fun main(args: Array<String>) {
-    val stdout = System.out
     val reported = CountDownLatch(1)
-    // Tags each line with the thread that printed it.
-    System.setOut(
-      object : PrintStream(stdout, true) {
-        override fun println(x: String?) {
-          super.println("[${Thread.currentThread().name}] $x")
-          if (x?.startsWith("Leaked MapHandle ") == true) reported.countDown()
-        }
-
-        override fun println(x: Any?) = println(x?.toString())
-      },
-    )
+    // Prints each report with the thread that reported it.
+    Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+      println("[${thread.name}] ${error.message}")
+      if (error.message?.startsWith("Leaked MapHandle ") == true) reported.countDown()
+    }
     Maplibre.loadNativeLibrary()
     runSuspendTest { abandonAMapAndAwaitItsDisposal() }
     // The report follows the disposal that cancelled the request.

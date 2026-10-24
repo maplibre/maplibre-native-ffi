@@ -3,20 +3,28 @@ package org.maplibre.nativeffi.lifecycle
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.interceptUncaught
 import org.maplibre.nativeffi.runSuspendTest
-import org.maplibre.nativeffi.withConsoleLog
 
 /**
- * The leak report for an abandoned handle reaches console.log from the FinalizationRegistry task
- * that disposes it. The JVM reports from its leak-report worker; see AbandonedHandleJvmTest.
+ * The leak report for an abandoned handle reaches the page's reportError from the
+ * FinalizationRegistry task that disposes it. The JVM reports from its leak-report worker; see
+ * AbandonedHandleJvmTest.
  */
 class AbandonedHandleWasmTest {
   @Test
   fun anAbandonedMapIsReportedOnConsoleLog() = runSuspendTest {
     val reports = mutableListOf<String>()
-    withConsoleLog({ line -> if (line.startsWith("Leaked MapHandle ")) reports += line }) {
-      // The task that disposes the map writes the report before the cancel reaches the page.
+    val restore =
+      interceptUncaught { failure ->
+        val message = failure.message.orEmpty()
+        message.startsWith("Leaked MapHandle ").also { if (it) reports += message }
+      }!!
+    try {
+      // The task that disposes the map reports before the cancel reaches the page.
       abandonAMapAndAwaitItsDisposal()
+    } finally {
+      restore()
     }
     val report = reports.singleOrNull()
     assertNotNull(report, "expected one leak report, got $reports")

@@ -18,7 +18,6 @@ import kotlinx.cinterop.get
 import kotlinx.cinterop.nativeHeap
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.staticCFunction
-import org.maplibre.nativeffi.error.CallbackException
 import platform.posix.pthread_create
 import platform.posix.pthread_join
 import platform.posix.pthread_tVar
@@ -84,10 +83,8 @@ internal actual suspend fun requestCollection() {
   GC.collect()
 }
 
-internal actual fun interceptCallbackFailures(sink: (CallbackException) -> Unit): (() -> Unit)? {
+internal actual fun interceptUncaught(sink: (Throwable) -> Boolean): (() -> Unit)? {
   val previous = getUnhandledExceptionHook()
-  setUnhandledExceptionHook { error ->
-    if (error is CallbackException) sink(error) else previous?.invoke(error)
-  }
+  setUnhandledExceptionHook { error -> if (!sink(error)) previous?.invoke(error) }
   return { setUnhandledExceptionHook(previous) }
 }

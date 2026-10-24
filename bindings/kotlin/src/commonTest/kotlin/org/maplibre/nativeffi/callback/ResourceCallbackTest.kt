@@ -30,7 +30,7 @@ import org.maplibre.nativeffi.generated.ResourceTransformRequestHandle
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.generated.UrlMatchFlags
-import org.maplibre.nativeffi.interceptCallbackFailures
+import org.maplibre.nativeffi.interceptUncaught
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.serve
 import org.maplibre.nativeffi.setTestProvider
@@ -93,9 +93,11 @@ class ResourceCallbackTest {
       false
     }
     val reports = AtomicReference(emptyList<CallbackException>())
-    val restore = interceptCallbackFailures { failure ->
+    val restore = interceptUncaught { failure ->
       // Other tests' callbacks may fail concurrently, so only this exception counts.
-      if (failure.cause === thrown) reports.update { it + failure }
+      (failure is CallbackException && failure.cause === thrown).also { taken ->
+        if (taken) reports.update { it + failure as CallbackException }
+      }
     }
     try {
       withMap(provider = provider) {
