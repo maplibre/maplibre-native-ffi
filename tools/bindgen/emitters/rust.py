@@ -353,7 +353,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
 
     # Caller-sized text passes its storage, capacity, and length to a closure
     # that the runtime calls again when the text did not fit.
-    text = next((p for p in plan.outputs if p.result_length), None)
+    text = plan.caller_sized_text
     text_parameters = (
         {text.name, text.value.length, text.result_length} if text else set()
     )
@@ -366,8 +366,6 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         if parameter.name in text_parameters:
             args.append(local)
             if parameter.name == text.name:
-                if text.value.encoding != "json":
-                    raise Unsupported("caller-sized text needs a text decoding")
                 prelude.append(f"let mut {local} = Vec::new();")
                 outputs.append(("Vec<u8>", local))
         elif parameter.name in lengths:

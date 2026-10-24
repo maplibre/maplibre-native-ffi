@@ -163,8 +163,8 @@ def operation(plan, values, *, discard=False):
     }
     # Caller-sized text passes its storage, capacity, and length to a closure
     # that the runtime calls again when the text did not fit.
-    text = next((p for p in plan.outputs if p.result_length), None)
-    signature, setup, arguments = [], [], {}
+    text = plan.caller_sized_text
+    signature, setup, body_setup, arguments = [], [], [], {}
     for p in plan.inputs:
         if p.name == receiver_name:
             continue
@@ -186,7 +186,11 @@ def operation(plan, values, *, discard=False):
         if value.kind == "array" and value.length and value.length.isdigit():
             values.fail(value, "fixed-length array parameters need a check")
         arguments[p.name] = argument(values, value, labels[p.name])
-    body_setup = []
+        if text:
+            # Converted once, before the calls that fit the text.
+            local = "native" + name(p.name)
+            body_setup.append(f"{local} := {arguments[p.name]}")
+            arguments[p.name] = local
     if plan.scoped_receiver:
         values.require(handle)
         arguments[receiver.name] = "receiver.native"
@@ -202,8 +206,6 @@ def operation(plan, values, *, discard=False):
             arguments[p.name] = local
             continue
         if p is text:
-            if p.value.encoding != "json":
-                values.fail(p.value, "caller-sized text needs a text decoding")
             setup.append(f"var {local} []byte")
             arguments[p.name] = local
             outputs.append((p, p.value, local))

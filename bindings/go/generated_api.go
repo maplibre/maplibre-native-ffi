@@ -9184,8 +9184,9 @@ func StyleExpressionCreate(expression []byte, options *StyleExpressionOptions) (
 func (receiver *StyleExpressionHandle) Evaluate(inputs *StyleExpressionInputs) ([]byte, error) {
 	var outJson []byte
 	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		nativeInputs := bindingStoreOptional(inputs, arena, nativeStyleExpressionInputs)
 		return int32(bindingCallerSizedText(&outJson, func(outJson *C.char, jsonCapacity C.size_t, outJsonLength *C.size_t) int32 {
-			return int32(C.mln_style_expression_evaluate(C.mln_style_expression(raw), bindingStoreOptional(inputs, arena, nativeStyleExpressionInputs), outJson, jsonCapacity, outJsonLength, diagnostic))
+			return int32(C.mln_style_expression_evaluate(C.mln_style_expression(raw), nativeInputs, outJson, jsonCapacity, outJsonLength, diagnostic))
 		}))
 	}, func(arena *bindingArena) []byte {
 		return outJson

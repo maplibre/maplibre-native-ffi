@@ -134,7 +134,7 @@ def operation(
     }
     # Caller-sized text passes its storage, capacity, and length to a closure
     # that the runtime calls again when the text did not fit.
-    text = next((p for p in plan.outputs if p.result_length), None)
+    text = plan.caller_sized_text
     text_arguments = (
         {
             text.name: "bindingTextStorage",
@@ -208,6 +208,14 @@ def operation(
             raise unsupported(
                 function, f"parameter {param.name}: unsupported {native(param.type)}"
             )
+    # Text that did not fit calls again, so its inputs convert once, before
+    # the first call.
+    hoisted = []
+    if text:
+        for index, argument in enumerate(arguments):
+            if argument not in text_arguments.values():
+                hoisted.append(f"let bindingInput{index} = {argument}")
+                arguments[index] = f"bindingInput{index}"
     method = camel(plan.member)
     if method in {"close", "deinit"}:
         raise unsupported(function, "method name is reserved by the handle runtime")
@@ -399,12 +407,13 @@ def operation(
         output_plans = {parameter.name: parameter.value for parameter in plan.outputs}
         capture, storage, types = [], [], []
         if text:
-            if text.value.encoding != "json" or outputs:
-                raise unsupported(function, "caller-sized text needs a text decoding")
             storage.append("  var bindingText = Data()")
             types.append("Data")
             capture.append("bindingText")
-            call = f"try NativeString.callerSized(&bindingText) {{ bindingTextStorage, bindingTextCapacity, bindingTextLength in {call} }}"
+            fit = f"NativeString.callerSized(&bindingText) {{ bindingTextStorage, bindingTextCapacity, bindingTextLength in {call} }}"
+            call = "\n".join(
+                [*hoisted, f"return {'try ' if 'try ' in call else ''}{fit}"]
+            )
         for index, output in enumerate(outputs):
             value = output_plans[output.name]
             output_plan = next(p for p in plan.outputs if p.name == output.name)

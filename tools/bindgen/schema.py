@@ -485,11 +485,12 @@ def value_metadata_errors(
 
 
 def caller_sized_text_errors(function, parameter, parameters, context) -> list[str]:
-    """A caller-sized text output fills storage that a binding allocates.
+    """A caller-sized JSON text output fills storage that a binding allocates.
 
-    The binding passes the storage's capacity in the input that `length`
-    names, and native reports the text's length, without its terminator, in
-    the output that `result_length` names, whether or not the text fit. A
+    The text is the function's only output besides its length. The binding
+    passes the storage's capacity in the input that `length` names, and
+    native reports the text's length, without its terminator, in the output
+    that `result_length` names, whether or not the text fit. A
     binding that passed too little storage calls again with enough, so the
     function must report the same text for the same inputs. The capacity and
     the reported length belong to the binding, so neither counts anything
@@ -505,8 +506,8 @@ def caller_sized_text_errors(function, parameter, parameters, context) -> list[s
         or pointee.const
     ):
         errors.append(f"{context}: result_length requires a mutable character output")
-    if metadata.get("encoding", "utf8") not in {"utf8", "json"}:
-        errors.append(f"{context}: result_length requires text encoding")
+    if metadata.get("encoding") != "json":
+        errors.append(f"{context}: result_length requires encoding=json")
     if has_completion(function) or not is_status(function.return_type):
         errors.append(
             f"{context}: result_length requires an immediate function that returns a status"
@@ -546,6 +547,12 @@ def caller_sized_text_errors(function, parameter, parameters, context) -> list[s
         errors.append(
             f"{context}: a caller-sized text output owns its capacity and length"
         )
+    if any(
+        other.metadata.get("direction") == "out"
+        and other.name not in {parameter.name, metadata["result_length"]}
+        for other in function.parameters
+    ):
+        errors.append(f"{context}: a caller-sized text output must be the only output")
     later = function.parameters[function.parameters.index(parameter) + 1 :]
     if any(
         other.metadata.get("direction", "in") == "in"

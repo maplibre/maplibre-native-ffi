@@ -389,9 +389,7 @@ def emit_operation(
     outputs_by_name = {parameter.name: parameter for parameter in plan.outputs}
     # Caller-sized text starts in scope memory of a guessed size, and the call
     # runs again with enough memory when the text did not fit.
-    text = next((p for p in plan.outputs if p.result_length), None)
-    if text and (text.value.encoding != "json" or asynchronous):
-        raise Unsupported("caller-sized text needs a text decoding")
+    text = plan.caller_sized_text
     text_storage, text_capacity, text_length = (
         (camel(text.name), camel(text.value.length), camel(text.result_length))
         if text

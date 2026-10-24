@@ -7605,15 +7605,16 @@ final class StyleExpressionHandle implements Finalizable {
   Uint8List evaluate({StyleExpressionInputs? inputs}) =>
       withNativeArena((arena) {
         final text = _CallerSizedText();
+        final nativeInputs = inputs == null
+            ? nullptr
+            : _writeStyleExpressionInputs(inputs, arena);
         _check(
           text.call(
             arena,
             (textStorage, textCapacity, textLength) =>
                 raw.mln_style_expression_evaluate(
                   _handle.raw,
-                  inputs == null
-                      ? nullptr
-                      : _writeStyleExpressionInputs(inputs, arena),
+                  nativeInputs,
                   textStorage,
                   textCapacity,
                   textLength,

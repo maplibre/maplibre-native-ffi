@@ -118,7 +118,7 @@ def lower_function(
     }
     # Caller-sized text passes its storage, capacity, and length to a closure
     # that the runtime calls again when the text did not fit.
-    text = next((p for p in plan.outputs if p.result_length), None)
+    text = plan.caller_sized_text
     text_arguments = (
         {
             text.name: "textStorage",
@@ -155,8 +155,6 @@ def lower_function(
             local += "Value"
         if parameter.name in text_arguments:
             if parameter.name == text.name:
-                if text.value.encoding != "json" or plan.completion:
-                    raise Unsupported("caller-sized text needs a text decoding")
                 setup.append("final text = _CallerSizedText();")
                 returns.append(("Uint8List", "text.text"))
             args.append(text_arguments[parameter.name])
@@ -287,6 +285,15 @@ def lower_function(
             args.append(values.native(value, local))
     if optional:
         signature.append("{" + ", ".join(optional) + "}")
+    if text:
+        # Text that did not fit calls again, so its inputs convert once,
+        # before the first call.
+        for index, parameter in enumerate(function.parameters):
+            if parameter.name in text_arguments or (receiver and index == 0):
+                continue
+            local = "native" + pascal(parameter.name)
+            setup.append(f"final {local} = {args[index]};")
+            args[index] = local
     call = native_call(function, args)
     if text:
         call = f"text.call(arena, (textStorage, textCapacity, textLength) => {call})"

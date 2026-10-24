@@ -163,7 +163,7 @@ def signature(plan, values):
         if plan.outputs
         else plan.result
     )
-    if any(p.result_length for p in plan.outputs):
+    if plan.caller_sized_text:
         result_type, result = "ByteArray", None
     elif len(plan.outputs) > 1:
         result_type = outputs_signature(plan, values)
@@ -386,7 +386,7 @@ def operation(plan, values, native, *, discard=False):
         raise Unsupported(f"blocks={plan.blocks} needs one owned output")
     if plan.consumes:
         return lifecycle(plan, values, native)
-    text = next((p for p in plan.outputs if p.result_length), None)
+    text = plan.caller_sized_text
     if text:
         return caller_sized_text(plan, values, native, text)
     if len(plan.outputs) > 1:
@@ -450,14 +450,20 @@ def caller_sized_text(plan, values, native, text):
     """Text that native writes into storage the call sizes.
 
     The call starts with storage of a guessed size and calls again with
-    enough storage while the reported length does not fit.
+    enough storage while the reported length does not fit. Its inputs convert
+    once, before the first call.
     """
-    if text.value.encoding != "json" or plan.completion:
-        raise Unsupported("caller-sized text needs a text decoding")
     method, params, _inputs, _result, result_type = signature(plan, values)
-    inputs = dict(
-        zip((p.name for p in plan.inputs), call_arguments(plan, values), strict=True)
-    )
+    setup, inputs = [], {}
+    for parameter, argument in zip(
+        plan.inputs, call_arguments(plan, values), strict=True
+    ):
+        if parameter.name in {plan.receiver, text.value.length}:
+            inputs[parameter.name] = argument
+            continue
+        local = "native" + name(parameter.name)
+        setup.append(f"val {local} = {argument}")
+        inputs[parameter.name] = local
     length = next(p for p in plan.outputs if p.name == text.result_length)
     carriers = {
         text.name: "textStorage",
@@ -471,16 +477,21 @@ def caller_sized_text(plan, values, native, text):
     written = values.decode(length.value.unwrapped, "textLength")
     # The capacity stays a signed Long: comparing two ULongs needs
     # Long.compareUnsigned, which Android adds above the binding's API floor.
-    grow = (
-        f"textCapacity = {written}.toLong() + 1; "
-        f"textStorage = allocate(textCapacity, 1); {call}"
-    )
-    setup = [
-        "var textCapacity = 256L",
+    setup += [
         f"val textLength = {values.storage(length.value.unwrapped.ctype)}",
+        "var textCapacity = 256L",
         "var textStorage = allocate(textCapacity, 1)",
-        call,
-        f"while ({written}.toLong() >= textCapacity) {{ {grow} }}",
+        "while (true) { "
+        + "; ".join(
+            [
+                call,
+                f"val written = {written}.toLong()",
+                "if (written < textCapacity) break",
+                "textCapacity = written + 1",
+                "textStorage = allocate(textCapacity, 1)",
+            ]
+        )
+        + " }",
         f"readBytes(textStorage, {written})",
     ]
     helper = call_helper(plan)

@@ -123,7 +123,7 @@ def operation(plan, values, *, discard=False):
     # Caller-sized text marks its storage, capacity, and length, which the
     # call fills in and passes again with enough storage when the text did
     # not fit.
-    text = next((p for p in plan.outputs if p.result_length), None)
+    text = plan.caller_sized_text
     text_markers = (
         {
             text.name: "call.text()",
@@ -143,8 +143,6 @@ def operation(plan, values, *, discard=False):
             continue
         if name in text_markers:
             if name == text.name:
-                if text.value.encoding != "json":
-                    raise failure(function, "caller-sized text needs a text decoding")
                 needs_allocator = True
                 results.append(
                     (identifier(output_member(name)), "OwnedValue([]const u8)")

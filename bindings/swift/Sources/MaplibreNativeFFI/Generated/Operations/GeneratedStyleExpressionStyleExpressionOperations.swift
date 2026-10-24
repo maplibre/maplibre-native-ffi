@@ -13,11 +13,13 @@ public extension StyleExpressionHandle {
   {
     var bindingText = Data()
     return try nativeInvoke { raw, arena, diagnostic in
-      try NativeString
+      let bindingInput0 = try bindingArg0
+        .map { try arena.store($0.nativeValue(arena: arena)) }
+      return NativeString
         .callerSized(&bindingText) { bindingTextStorage, bindingTextCapacity, bindingTextLength in
-          try mln_style_expression_evaluate(
+          mln_style_expression_evaluate(
             raw,
-            bindingArg0.map { try arena.store($0.nativeValue(arena: arena)) },
+            bindingInput0,
             bindingTextStorage,
             bindingTextCapacity,
             bindingTextLength,

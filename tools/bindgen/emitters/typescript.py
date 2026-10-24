@@ -167,9 +167,7 @@ def lower_function(
     returned: list[tuple[str, object]] = []
     # Caller-sized text starts in call memory of a guessed size, and the call
     # runs again with enough memory when the text did not fit.
-    text = next((p for p in plan.outputs if p.result_length), None)
-    if text and text.value.encoding != "json":
-        raise Unsupported("caller-sized text needs a text decoding")
+    text = plan.caller_sized_text
 
     def output_count(name):
         sized_by = outputs[name].sized_by
@@ -534,8 +532,6 @@ def lower_function(
             lowered.shape = "owned"
             lowered.returns = owner_class(lowered.owned.handle)
     elif text:
-        if returned:
-            raise Unsupported("caller-sized text requires no other output")
         body.append(
             f"call->result = mln_ts_text(env, arg_{text.name}, arg_{text.result_length});"
         )

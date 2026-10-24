@@ -197,7 +197,7 @@ def operation(
     }
     # Caller-sized text passes its storage, capacity, and length to a closure
     # that the runtime calls again when the text did not fit.
-    text = next((p for p in plan.outputs if p.result_length), None)
+    text = plan.caller_sized_text
     if text:
         counts.add(text.value.length)
     used_names = set(LOCAL_NAMES) | {p.name for p in plan.inputs}
@@ -340,8 +340,6 @@ def operation(
         if text and output.name == text.result_length:
             continue
         if output is text:
-            if text.value.encoding != "json":
-                raise unsupported(function, "caller-sized text needs a text decoding")
             setup.append(f"        let mut {output.name}: Vec<u8> = Vec::new();")
             for control in (output.name, output.value.length, output.result_length):
                 arguments[control] = control

@@ -23,18 +23,13 @@ diff --git a/src/mln/style/expression/expression.cpp b/src/mln/style/expression/
 index 4083c7f..f1443b2 100644
 --- a/src/mln/style/expression/expression.cpp
 +++ b/src/mln/style/expression/expression.cpp
-@@ -148,6 +148,17 @@ EvaluationResult Expression::evaluate(std::optional<mln::Value> accumulated, con
+@@ -148,6 +148,12 @@ EvaluationResult Expression::evaluate(std::optional<mln::Value> accumulated, con
      return this->evaluate(EvaluationContext(std::move(accumulated), &f));
  }
  
 +EvaluationResult Expression::evaluate(const Feature& feature, EvaluationContext params) const {
-+    std::optional<GeoJSONFeature> f;
-+    if (params.canonical) {
-+        f.emplace(feature, *params.canonical);
-+    } else {
-+        f.emplace(feature);
-+    }
-+    params.feature = &*f;
++    const auto f = params.canonical ? GeoJSONFeature(feature, *params.canonical) : GeoJSONFeature(feature);
++    params.feature = &f;
 +    return this->evaluate(params);
 +}
 +
