@@ -283,7 +283,7 @@ fn attachOwnedTexture(
     map: *maplibre.Map,
     signal: *WakeSignal,
     extent: maplibre.LogicalExtent,
-) !maplibre.RenderSessionAttachment {
+) !maplibre.NewRenderSession {
     var defaults = try maplibre.renderSessionAttachOptionsDefault(allocator);
     defer defaults.deinit();
     var wakes = defaults.value;
