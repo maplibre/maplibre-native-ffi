@@ -73,11 +73,10 @@ static void drain_all(mln_delivery_queue queue, seen_deliveries* seen) {
     for (size_t index = 0; index < drain.view.delivery_count; index += 1) {
       const mln_delivery* delivery = mln_test_delivery_at(&drain.view, index);
       // Keep only this case's dump records and every retirement.
-      if (
-        delivery->type == MLN_DELIVERY_TYPE_LOG_RECORD &&
-        !is_dump_record(delivery->payload.log_record.message)
-      ) {
-        continue;
+      if (delivery->type == MLN_DELIVERY_TYPE_LOG_RECORD) {
+        const mln_buffer_view message = delivery->payload.log_record.message;
+        TEST_ASSERT_TRUE(mln_test_lent_text_is_terminated(message));
+        if (!is_dump_record(message.data)) continue;
       }
       TEST_ASSERT_TRUE(seen->count < max_seen);
       const size_t slot = seen->count++;
@@ -86,10 +85,9 @@ static void drain_all(mln_delivery_queue queue, seen_deliveries* seen) {
       if (delivery->type == MLN_DELIVERY_TYPE_LOG_RECORD) {
         seen->records[slot] = delivery->payload.log_record;
         strncpy(
-          seen->messages[slot], delivery->payload.log_record.message,
+          seen->messages[slot], delivery->payload.log_record.message.data,
           sizeof(seen->messages[slot]) - 1
         );
-        seen->records[slot].message = seen->messages[slot];
       }
     }
     mln_delivery_batch_release(drain.batch);
@@ -129,7 +127,7 @@ LOG_STATE_CASE(a_queue_handler_copies_each_record) {
     );
     TEST_ASSERT_EQUAL_UINT32(MLN_LOG_EVENT_GENERAL, seen.records[index].event);
     TEST_ASSERT_EQUAL_INT64(-1, seen.records[index].code);
-    TEST_ASSERT_EQUAL_STRING(expected[index], seen.records[index].message);
+    TEST_ASSERT_EQUAL_STRING(expected[index], seen.messages[index]);
   }
   // Clearing the handler retires it after its final record.
   TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_RETIRED, seen.types[3]);
@@ -164,7 +162,7 @@ LOG_STATE_CASE(replace_and_clear_retire_a_queue_handler_once) {
 
 static bool ignore_log_record(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
-  const char* message
+  mln_buffer_view message
 ) {
   (void)user_data;
   (void)severity;

@@ -1014,14 +1014,16 @@ impl FromNative<sys::mln_egl_context_descriptor> for EglContextDescriptor {
 pub struct FeatureStateSelector {
     /// Source ID. Required and borrowed for the duration of the call.
     pub source_id: String,
-    /// Optional source layer ID. Required for vector-source disambiguation.
-    pub source_layer_id: Option<String>,
+    /// Source layer ID, or empty for none. Required for vector-source
+    /// disambiguation.
+    pub source_layer_id: String,
     /// Optional feature ID. Required by set and get, optional for remove. A
     /// numeric feature ID matches its decimal text, such as "7" for the GeoJSON
-    /// id 7.
+    /// id 7. Its field bit tells an absent ID from the empty ID "".
     pub feature_id: Option<String>,
-    /// Optional state key. Used only by remove and requires feature_id.
-    pub state_key: Option<String>,
+    /// State key, or empty to select every key. Used only by remove, and
+    /// requires feature_id.
+    pub state_key: String,
 }
 impl ToNative<sys::mln_feature_state_selector> for FeatureStateSelector {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_feature_state_selector> {
@@ -1029,18 +1031,12 @@ impl ToNative<sys::mln_feature_state_selector> for FeatureStateSelector {
         raw.size = std::mem::size_of::<sys::mln_feature_state_selector>() as _;
         raw.fields = 0;
         raw.source_id = to_native(&self.source_id, arena)?;
-        if let Some(item) = &self.source_layer_id {
-            raw.fields |= sys::MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
-            raw.source_layer_id = to_native(&*item, arena)?;
-        }
+        raw.source_layer_id = to_native(&self.source_layer_id, arena)?;
         if let Some(item) = &self.feature_id {
             raw.fields |= sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
             raw.feature_id = to_native(&*item, arena)?;
         }
-        if let Some(item) = &self.state_key {
-            raw.fields |= sys::MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
-            raw.state_key = to_native(&*item, arena)?;
-        }
+        raw.state_key = to_native(&self.state_key, arena)?;
         Ok(raw)
     }
 }
@@ -1178,9 +1174,9 @@ pub struct GeojsonSourceOptions {
     /// Highest zoom that clusters points. Defaults to 17.
     pub cluster_max_zoom: Option<f64>,
     /// Cluster aggregation expressions keyed by property name, as a JSON object
-    /// whose members follow the MapLibre Style Spec clusterProperties form. The
-    /// UTF-8 bytes are borrowed for the call.
-    pub cluster_properties: Option<Vec<u8>>,
+    /// whose members follow the MapLibre Style Spec clusterProperties form, or
+    /// empty for none. The UTF-8 bytes are borrowed for the call.
+    pub cluster_properties: Vec<u8>,
     /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
     pub buffer: Option<u32>,
     /// Cluster radius in pixels within \[0, 4095\]. Defaults to 50.
@@ -1223,10 +1219,7 @@ impl ToNative<sys::mln_geojson_source_options> for GeojsonSourceOptions {
             raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
             raw.cluster_max_zoom = *item;
         }
-        if let Some(item) = &self.cluster_properties {
-            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
-            raw.cluster_properties = to_native(&*item, arena)?;
-        }
+        raw.cluster_properties = to_native(&self.cluster_properties, arena)?;
         if let Some(item) = &self.buffer {
             raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_BUFFER;
             raw.buffer = *item;
@@ -1265,13 +1258,7 @@ impl FromNative<sys::mln_geojson_source_options> for GeojsonSourceOptions {
                 .then_some(raw.tolerance),
             cluster_max_zoom: (raw.fields & sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM != 0)
                 .then_some(raw.cluster_max_zoom),
-            cluster_properties: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES,
-                    raw.cluster_properties,
-                )
-            }?,
+            cluster_properties: unsafe { from_native(raw.cluster_properties) }?,
             buffer: (raw.fields & sys::MLN_GEOJSON_SOURCE_OPTION_BUFFER != 0).then_some(raw.buffer),
             cluster_radius: (raw.fields & sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS != 0)
                 .then_some(raw.cluster_radius),
@@ -1492,7 +1479,7 @@ impl HttpHeaderTransform {
     unsafe extern "C" fn callback_trampoline(
         user_data: *mut std::ffi::c_void,
         kind: sys::mln_resource_kind,
-        url: *const std::ffi::c_char,
+        url: sys::mln_buffer_view,
         out_response: *mut sys::mln_http_header_transform_response,
     ) -> sys::mln_status {
         // SAFETY: native passes the registration that this trampoline's
@@ -1504,7 +1491,7 @@ impl HttpHeaderTransform {
             || {
                 Ok(callback::require(&state.callback)?(
                     ResourceKind::from_raw(kind),
-                    unsafe { maplibre_core::string::borrow_c_string(url) }?,
+                    unsafe { maplibre_core::string::borrow_string_view(url) }?,
                     &mut HttpHeaderTransformResponse::new(out_response)?,
                 ))
             },
@@ -1776,7 +1763,7 @@ impl LogHandler {
         severity: sys::mln_log_severity,
         event: sys::mln_log_event,
         code: i64,
-        message: *const std::ffi::c_char,
+        message: sys::mln_buffer_view,
     ) -> bool {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
@@ -1786,7 +1773,7 @@ impl LogHandler {
                 LogSeverity::from_raw(severity),
                 LogEvent::from_raw(event),
                 code,
-                unsafe { maplibre_core::string::borrow_c_string(message) }?,
+                unsafe { maplibre_core::string::borrow_string_view(message) }?,
             );
             Ok(value)
         })
@@ -3591,32 +3578,18 @@ pub enum RenderSessionState: u32 {
 pub struct RenderedFeature {
     pub feature: Vec<u8>,
     pub layer_id: String,
-    pub source_id: Option<String>,
-    pub source_layer_id: Option<String>,
-    pub state: Option<Vec<u8>>,
+    pub source_id: String,
+    pub source_layer_id: String,
+    pub state: Vec<u8>,
 }
 impl FromNative<sys::mln_rendered_feature> for RenderedFeature {
     unsafe fn from_native(raw: sys::mln_rendered_feature) -> Result<Self> {
         Ok(Self {
             feature: unsafe { from_native(raw.feature) }?,
             layer_id: unsafe { from_native(raw.layer_id) }?,
-            source_id: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_RENDERED_FEATURE_SOURCE_ID,
-                    raw.source_id,
-                )
-            }?,
-            source_layer_id: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_RENDERED_FEATURE_SOURCE_LAYER_ID,
-                    raw.source_layer_id,
-                )
-            }?,
-            state: unsafe {
-                convert::present(raw.fields, sys::MLN_RENDERED_FEATURE_STATE, raw.state)
-            }?,
+            source_id: unsafe { from_native(raw.source_id) }?,
+            source_layer_id: unsafe { from_native(raw.source_layer_id) }?,
+            state: unsafe { from_native(raw.state) }?,
         })
     }
 }
@@ -3629,8 +3602,8 @@ impl FromNative<sys::mln_rendered_feature> for RenderedFeature {
 pub struct RenderedFeatureQueryOptions {
     /// Optional style layer IDs. When absent, all rendered layers are queried.
     pub layer_ids: Option<Vec<String>>,
-    /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-    pub filter: Option<Vec<u8>>,
+    /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
+    pub filter: Vec<u8>,
 }
 impl Default for RenderedFeatureQueryOptions {
     fn default() -> Self {
@@ -3650,10 +3623,7 @@ impl ToNative<sys::mln_rendered_feature_query_options> for RenderedFeatureQueryO
         }
         raw.layer_id_count =
             convert::count(self.layer_ids.as_ref().map_or(0, |items| items.len()))?;
-        if let Some(item) = &self.filter {
-            raw.fields |= sys::MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
-            raw.filter = to_native(&*item, arena)?;
-        }
+        raw.filter = to_native(&self.filter, arena)?;
         Ok(raw)
     }
 }
@@ -3665,13 +3635,7 @@ impl FromNative<sys::mln_rendered_feature_query_options> for RenderedFeatureQuer
             } else {
                 None
             },
-            filter: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER,
-                    raw.filter,
-                )
-            }?,
+            filter: unsafe { from_native(raw.filter) }?,
         })
     }
 }
@@ -4009,10 +3973,10 @@ impl ToNative<sys::mln_resource_request_cancel_handler> for ResourceRequestCance
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ResourceRequestInfo {
     /// URL entering the network layer, before tile server normalization.
-    pub requested_url: Option<String>,
+    pub requested_url: String,
     /// URL to fetch, after resource-kind normalization against the runtime's
     /// tile server options and API key.
-    pub resolved_url: Option<String>,
+    pub resolved_url: String,
     pub kind: ResourceKind,
     pub loading_method: ResourceLoadingMethod,
     pub priority: ResourcePriority,
@@ -4021,7 +3985,8 @@ pub struct ResourceRequestInfo {
     pub range: Option<ResourceRange>,
     pub prior_modified_unix_ms: Option<i64>,
     pub prior_expires_unix_ms: Option<i64>,
-    pub prior_etag: Option<String>,
+    /// Entity tag of the cached copy, or empty when there is none.
+    pub prior_etag: String,
     pub prior_data: Vec<u8>,
 }
 impl FromNative<sys::mln_resource_request_info> for ResourceRequestInfo {
@@ -4057,11 +4022,11 @@ pub struct ResourceResponse {
     pub error_reason: ResourceErrorReason,
     /// Response bytes. May be null only when byte_count is 0.
     pub bytes: Vec<u8>,
-    pub error_message: Option<String>,
+    pub error_message: String,
     pub must_revalidate: bool,
     pub modified_unix_ms: Option<i64>,
     pub expires_unix_ms: Option<i64>,
-    pub etag: Option<String>,
+    pub etag: String,
     pub retry_after_unix_ms: Option<i64>,
 }
 impl ToNative<sys::mln_resource_response> for ResourceResponse {
@@ -4196,7 +4161,7 @@ impl ResourceTransform {
     unsafe extern "C" fn callback_trampoline(
         user_data: *mut std::ffi::c_void,
         kind: sys::mln_resource_kind,
-        url: *const std::ffi::c_char,
+        url: sys::mln_buffer_view,
         request: sys::mln_resource_transform_request,
     ) {
         // SAFETY: native passes the registration that this trampoline's
@@ -4206,7 +4171,7 @@ impl ResourceTransform {
             let request = ResourceTransformRequestHandle::adopt(request, None)?;
             callback::require(&state.callback)?(
                 ResourceKind::from_raw(kind),
-                unsafe { maplibre_core::string::borrow_c_string(url) }?,
+                unsafe { maplibre_core::string::borrow_string_view(url) }?,
                 request,
             );
             Ok(())
@@ -4598,9 +4563,10 @@ pub enum RuntimeEventType: u32 {
 pub struct RuntimeOptions {
     /// Directory root for asset:// URLs. Copied during runtime creation. Empty
     /// selects `/android_asset` on Android and `.` elsewhere.
-    pub asset_path: Option<String>,
-    /// Cache database path. Copied during runtime creation.
-    pub cache_path: Option<String>,
+    pub asset_path: String,
+    /// Cache database path. Copied during runtime creation. Empty selects an
+    /// in-memory cache.
+    pub cache_path: String,
 }
 impl Default for RuntimeOptions {
     fn default() -> Self {
@@ -4620,8 +4586,8 @@ impl ToNative<sys::mln_runtime_options> for RuntimeOptions {
 impl FromNative<sys::mln_runtime_options> for RuntimeOptions {
     unsafe fn from_native(raw: sys::mln_runtime_options) -> Result<Self> {
         Ok(Self {
-            asset_path: unsafe { convert::nonempty(raw.asset_path) }?,
-            cache_path: unsafe { convert::nonempty(raw.cache_path) }?,
+            asset_path: unsafe { from_native(raw.asset_path) }?,
+            cache_path: unsafe { from_native(raw.cache_path) }?,
         })
     }
 }
@@ -4703,19 +4669,13 @@ impl FromNative<sys::mln_screen_point> for ScreenPoint {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SourceFeature {
     pub feature: Vec<u8>,
-    pub source_layer_id: Option<String>,
+    pub source_layer_id: String,
 }
 impl FromNative<sys::mln_source_feature> for SourceFeature {
     unsafe fn from_native(raw: sys::mln_source_feature) -> Result<Self> {
         Ok(Self {
             feature: unsafe { from_native(raw.feature) }?,
-            source_layer_id: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_SOURCE_FEATURE_SOURCE_LAYER_ID,
-                    raw.source_layer_id,
-                )
-            }?,
+            source_layer_id: unsafe { from_native(raw.source_layer_id) }?,
         })
     }
 }
@@ -4729,8 +4689,8 @@ pub struct SourceFeatureQueryOptions {
     /// Optional source-layer IDs. Required by vector sources; ignored by
     /// GeoJSON.
     pub source_layer_ids: Option<Vec<String>>,
-    /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-    pub filter: Option<Vec<u8>>,
+    /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
+    pub filter: Vec<u8>,
 }
 impl Default for SourceFeatureQueryOptions {
     fn default() -> Self {
@@ -4753,10 +4713,7 @@ impl ToNative<sys::mln_source_feature_query_options> for SourceFeatureQueryOptio
                 .as_ref()
                 .map_or(0, |items| items.len()),
         )?;
-        if let Some(item) = &self.filter {
-            raw.fields |= sys::MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
-            raw.filter = to_native(&*item, arena)?;
-        }
+        raw.filter = to_native(&self.filter, arena)?;
         Ok(raw)
     }
 }
@@ -4772,13 +4729,7 @@ impl FromNative<sys::mln_source_feature_query_options> for SourceFeatureQueryOpt
             } else {
                 None
             },
-            filter: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER,
-                    raw.filter,
-                )
-            }?,
+            filter: unsafe { from_native(raw.filter) }?,
         })
     }
 }
@@ -4829,11 +4780,11 @@ pub struct StyleExpressionInputs {
     /// The value of the elevation expression outside a color-relief layer.
     pub elevation: Option<f64>,
     /// One UTF-8 GeoJSON Feature that feature data expressions read.
-    pub feature: Option<Vec<u8>>,
+    pub feature: Vec<u8>,
     /// A UTF-8 JSON object that the feature-state expression reads.
-    pub feature_state: Option<Vec<u8>>,
+    pub feature_state: Vec<u8>,
     /// A UTF-8 JSON object that the global-state expression reads.
-    pub global_state: Option<Vec<u8>>,
+    pub global_state: Vec<u8>,
     /// The tile that holds the feature, which the within and distance
     /// expressions need to place its geometry.
     pub canonical_tile_id: Option<CanonicalTileId>,
@@ -4865,18 +4816,9 @@ impl ToNative<sys::mln_style_expression_inputs> for StyleExpressionInputs {
             raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_ELEVATION;
             raw.elevation = *item;
         }
-        if let Some(item) = &self.feature {
-            raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_FEATURE;
-            raw.feature = to_native(&*item, arena)?;
-        }
-        if let Some(item) = &self.feature_state {
-            raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE;
-            raw.feature_state = to_native(&*item, arena)?;
-        }
-        if let Some(item) = &self.global_state {
-            raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE;
-            raw.global_state = to_native(&*item, arena)?;
-        }
+        raw.feature = to_native(&self.feature, arena)?;
+        raw.feature_state = to_native(&self.feature_state, arena)?;
+        raw.global_state = to_native(&self.global_state, arena)?;
         if let Some(item) = &self.canonical_tile_id {
             raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID;
             raw.canonical_tile_id = to_native(&*item, arena)?;
@@ -4896,27 +4838,9 @@ impl FromNative<sys::mln_style_expression_inputs> for StyleExpressionInputs {
                 .then_some(raw.color_ramp_parameter),
             elevation: (raw.fields & sys::MLN_STYLE_EXPRESSION_INPUT_ELEVATION != 0)
                 .then_some(raw.elevation),
-            feature: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_EXPRESSION_INPUT_FEATURE,
-                    raw.feature,
-                )
-            }?,
-            feature_state: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE,
-                    raw.feature_state,
-                )
-            }?,
-            global_state: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE,
-                    raw.global_state,
-                )
-            }?,
+            feature: unsafe { from_native(raw.feature) }?,
+            feature_state: unsafe { from_native(raw.feature_state) }?,
+            global_state: unsafe { from_native(raw.global_state) }?,
             canonical_tile_id: unsafe {
                 convert::present(
                     raw.fields,
@@ -5220,9 +5144,9 @@ pub struct StyleLayerInfo {
     /// The style-spec layer type string.
     pub r#type: String,
     /// Source ID. Empty for a layer type that takes no source.
-    pub source_id: Option<String>,
+    pub source_id: String,
     /// Source-layer ID. Empty when the layer sets none.
-    pub source_layer: Option<String>,
+    pub source_layer: String,
     /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
     pub min_zoom: f64,
     /// Highest zoom at which the layer draws; INFINITY with no upper bound.
@@ -5234,8 +5158,8 @@ impl FromNative<sys::mln_style_layer_info> for StyleLayerInfo {
         Ok(Self {
             id: unsafe { from_native(raw.id) }?,
             r#type: unsafe { from_native(raw.type_) }?,
-            source_id: unsafe { convert::nonempty(raw.source_id) }?,
-            source_layer: unsafe { convert::nonempty(raw.source_layer) }?,
+            source_id: unsafe { from_native(raw.source_id) }?,
+            source_layer: unsafe { from_native(raw.source_layer) }?,
             min_zoom: raw.min_zoom,
             max_zoom: raw.max_zoom,
             visibility: StyleLayerVisibility::from_raw(raw.visibility),
@@ -5286,10 +5210,10 @@ pub struct StyleSourceInfo {
     pub r#type: StyleSourceType,
     /// Whether the source is marked volatile.
     pub is_volatile: bool,
-    /// Attribution string, when the source sets one. It may be empty.
-    pub attribution: Option<String>,
-    /// URL that the source loads from, when it has one.
-    pub url: Option<String>,
+    /// Attribution string, or empty when the source sets none.
+    pub attribution: String,
+    /// URL that the source loads from, or empty when it has none.
+    pub url: String,
     /// Inline TileJSON metadata, when the source was defined with it.
     pub tilejson: Option<StyleSourceTileInfo>,
     /// Geographic bounds, when inline TileJSON sets them.
@@ -5307,14 +5231,8 @@ impl FromNative<sys::mln_style_source_info> for StyleSourceInfo {
             id: unsafe { from_native(raw.id) }?,
             r#type: StyleSourceType::from_raw(raw.type_),
             is_volatile: raw.is_volatile,
-            attribution: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_SOURCE_INFO_ATTRIBUTION,
-                    raw.attribution,
-                )
-            }?,
-            url: unsafe { convert::present(raw.fields, sys::MLN_STYLE_SOURCE_INFO_URL, raw.url) }?,
+            attribution: unsafe { from_native(raw.attribution) }?,
+            url: unsafe { from_native(raw.url) }?,
             tilejson: unsafe {
                 convert::present(
                     raw.fields,

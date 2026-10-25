@@ -22,7 +22,7 @@ internal object WasmUpcalls {
         LogSeverity(severity.toUInt()),
         LogEvent(event.toUInt()),
         code,
-        readCString(message),
+        readViewString(message),
       )
       true
     }

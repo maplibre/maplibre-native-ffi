@@ -282,9 +282,9 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
   /// Highest zoom that clusters points. Defaults to 17.
   public var clusterMaxZoom: Double?
   /// Cluster aggregation expressions keyed by property name, as a JSON object
-  /// whose members follow the MapLibre Style Spec clusterProperties form. The
-  /// UTF-8 bytes are borrowed for the call.
-  public var clusterProperties: Data?
+  /// whose members follow the MapLibre Style Spec clusterProperties form, or
+  /// empty for none. The UTF-8 bytes are borrowed for the call.
+  public var clusterProperties: Data
   /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
   public var buffer: UInt32?
   /// Cluster radius in pixels within \[0, 4095\]. Defaults to 50.
@@ -307,7 +307,7 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
     maxZoom: Double? = GeojsonSourceOptions.default.maxZoom,
     tolerance: Double? = GeojsonSourceOptions.default.tolerance,
     clusterMaxZoom: Double? = GeojsonSourceOptions.default.clusterMaxZoom,
-    clusterProperties: Data? = GeojsonSourceOptions.default.clusterProperties,
+    clusterProperties: Data = GeojsonSourceOptions.default.clusterProperties,
     buffer: UInt32? = GeojsonSourceOptions.default.buffer,
     clusterRadius: UInt32? = GeojsonSourceOptions.default.clusterRadius,
     clusterMinPoints: UInt32? = GeojsonSourceOptions.default.clusterMinPoints,
@@ -340,12 +340,10 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
       .rawValue != 0 ? raw.tolerance : nil
     clusterMaxZoom = raw.fields & MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
       .rawValue != 0 ? raw.cluster_max_zoom : nil
-    clusterProperties = raw
-      .fields & MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
-      .rawValue != 0 ? try NativeString.copyData(
-        data: raw.cluster_properties.data,
-        size: raw.cluster_properties.size
-      ) : nil
+    clusterProperties = try NativeString.copyData(
+      data: raw.cluster_properties.data,
+      size: raw.cluster_properties.size
+    )
     buffer = raw.fields & MLN_GEOJSON_SOURCE_OPTION_BUFFER.rawValue != 0 ? raw
       .buffer : nil
     clusterRadius = raw.fields & MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
@@ -383,10 +381,7 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
       raw.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM.rawValue; raw
         .cluster_max_zoom = item
     }
-    if let item = clusterProperties {
-      raw.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES.rawValue; raw
-        .cluster_properties = arena.view(item)
-    }
+    raw.cluster_properties = arena.view(clusterProperties)
     if let item = buffer {
       raw.fields |= MLN_GEOJSON_SOURCE_OPTION_BUFFER.rawValue; raw
         .buffer = item
@@ -774,9 +769,9 @@ public struct StyleLayerInfo: Equatable, Hashable, Sendable {
   /// The style-spec layer type string.
   public var type: String
   /// Source ID. Empty for a layer type that takes no source.
-  public var sourceId: String?
+  public var sourceId: String
   /// Source-layer ID. Empty when the layer sets none.
-  public var sourceLayer: String?
+  public var sourceLayer: String
   /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
   public var minZoom: Double
   /// Highest zoom at which the layer draws; INFINITY with no upper bound.
@@ -789,8 +784,8 @@ public struct StyleLayerInfo: Equatable, Hashable, Sendable {
   public init(
     id: String = "",
     type: String = "",
-    sourceId: String? = nil,
-    sourceLayer: String? = nil,
+    sourceId: String = "",
+    sourceLayer: String = "",
     minZoom: Double = 0,
     maxZoom: Double = 0,
     visibility: StyleLayerVisibility = .init(rawValue: 0)
@@ -810,11 +805,11 @@ public struct StyleLayerInfo: Equatable, Hashable, Sendable {
   ) throws {
     id = try NativeString.copyUTF8(data: raw.id.data, size: raw.id.size)
     type = try NativeString.copyUTF8(data: raw.type.data, size: raw.type.size)
-    sourceId = raw.source_id.size == 0 ? nil : try NativeString.copyUTF8(
+    sourceId = try NativeString.copyUTF8(
       data: raw.source_id.data,
       size: raw.source_id.size
     )
-    sourceLayer = raw.source_layer.size == 0 ? nil : try NativeString.copyUTF8(
+    sourceLayer = try NativeString.copyUTF8(
       data: raw.source_layer.data,
       size: raw.source_layer.size
     )
@@ -880,10 +875,10 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
   public var type: StyleSourceType
   /// Whether the source is marked volatile.
   public var isVolatile: Bool
-  /// Attribution string, when the source sets one. It may be empty.
-  public var attribution: String?
-  /// URL that the source loads from, when it has one.
-  public var url: String?
+  /// Attribution string, or empty when the source sets none.
+  public var attribution: String
+  /// URL that the source loads from, or empty when it has none.
+  public var url: String
   /// Inline TileJSON metadata, when the source was defined with it.
   public var tilejson: StyleSourceTileInfo?
   /// Geographic bounds, when inline TileJSON sets them.
@@ -902,8 +897,8 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
     id: String = "",
     type: StyleSourceType = .init(rawValue: 0),
     isVolatile: Bool = false,
-    attribution: String? = nil,
-    url: String? = nil,
+    attribution: String = "",
+    url: String = "",
     tilejson: StyleSourceTileInfo? = nil,
     bounds: LatLngBounds? = nil,
     tileSize: UInt32? = nil,
@@ -929,16 +924,11 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
     id = try NativeString.copyUTF8(data: raw.id.data, size: raw.id.size)
     type = StyleSourceType(rawValue: raw.type.rawValue)
     isVolatile = raw.is_volatile
-    attribution = raw.fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION
-      .rawValue != 0 ? try NativeString.copyUTF8(
-        data: raw.attribution.data,
-        size: raw.attribution.size
-      ) : nil
-    url = raw.fields & MLN_STYLE_SOURCE_INFO_URL
-      .rawValue != 0 ? try NativeString.copyUTF8(
-        data: raw.url.data,
-        size: raw.url.size
-      ) : nil
+    attribution = try NativeString.copyUTF8(
+      data: raw.attribution.data,
+      size: raw.attribution.size
+    )
+    url = try NativeString.copyUTF8(data: raw.url.data, size: raw.url.size)
     tilejson = raw.fields & MLN_STYLE_SOURCE_INFO_TILEJSON
       .rawValue != 0 ? try StyleSourceTileInfo(raw: raw.tilejson) : nil
     bounds = raw.fields & MLN_STYLE_SOURCE_INFO_BOUNDS

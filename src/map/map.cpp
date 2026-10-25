@@ -4180,9 +4180,7 @@ auto map_remove_feature_state(
       optional_selector_string(
         *selector, MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, selector->feature_id
       ),
-      optional_selector_string(
-        *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
-      )
+      optional_text(selector->state_key)
     )
   ) {
     live.map->triggerRepaint();

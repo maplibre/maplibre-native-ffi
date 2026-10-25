@@ -75,7 +75,6 @@ static void every_option(mln_geojson_source_options* options) {
     MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM | MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM |
     MLN_GEOJSON_SOURCE_OPTION_TOLERANCE |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES |
     MLN_GEOJSON_SOURCE_OPTION_BUFFER |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
@@ -97,10 +96,6 @@ static void every_option(mln_geojson_source_options* options) {
 
 static void undersized(mln_geojson_source_options* options) {
   options->size = sizeof(uint32_t);
-}
-static void empty_cluster_properties(mln_geojson_source_options* options) {
-  every_option(options);
-  options->cluster_properties = MLN_BUFFER_LITERAL("");
 }
 static void cluster_properties_not_json(mln_geojson_source_options* options) {
   every_option(options);
@@ -170,11 +165,6 @@ static const geojson_data_case geojson_data_cases[] = {
   {"bytes after the document", trailing_bytes, 0, NULL, {NULL}},
   {"an embedded NUL", embedded_nul, sizeof(embedded_nul) - 1, NULL, {NULL}},
   {"undersized options", EMPTY_COLLECTION, 0, undersized, {NULL}},
-  {"empty cluster properties",
-   POINT_COLLECTION("a"),
-   0,
-   empty_cluster_properties,
-   {"must not be empty"}},
   {"cluster properties that are not JSON",
    POINT_COLLECTION("a"),
    0,
@@ -488,7 +478,6 @@ static void prepared_data_must_match_the_source_options(void) {
 
   mln_geojson_source_options source = mln_geojson_source_options_default();
   clustered(&source);
-  source.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
   source.cluster_properties = MLN_BUFFER_LITERAL(
     "{\"total\":[\"+\",[\"get\",\"rank\"]],\"top\":[\"max\",[\"get\","
     "\"rank\"]]}"
@@ -519,6 +508,8 @@ static void prepared_data_must_match_the_source_options(void) {
      MLN_STATUS_INVALID_ARGUMENT},
     {"one member dropped", "{\"total\":[\"+\",[\"get\",\"rank\"]]}",
      MLN_STATUS_INVALID_ARGUMENT},
+    // Empty cluster properties are none, which prepare but do not match.
+    {"empty, so none", "", MLN_STATUS_INVALID_ARGUMENT},
   };
   for (size_t index = 0; index < sizeof(cases) / sizeof(cases[0]); index += 1) {
     mln_geojson_source_options variant = source;

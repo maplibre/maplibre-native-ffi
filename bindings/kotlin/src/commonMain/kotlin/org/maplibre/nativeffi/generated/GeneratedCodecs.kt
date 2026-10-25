@@ -36,32 +36,29 @@ internal fun NativeArena.putGeojsonSourceOptions(target: Long, value: GeojsonSou
     fields = fields or 8u
     writeF64(target + 32, it)
   }
-  value.clusterProperties?.let {
-    fields = fields or 16u
-    putView(target + 40, it)
-  }
+  putView(target + 40, value.clusterProperties)
   value.buffer?.let {
-    fields = fields or 32u
+    fields = fields or 16u
     writeU32(target + w(48, 56), it)
   }
   value.clusterRadius?.let {
-    fields = fields or 64u
+    fields = fields or 32u
     writeU32(target + w(52, 60), it)
   }
   value.clusterMinPoints?.let {
-    fields = fields or 128u
+    fields = fields or 64u
     writeU32(target + w(56, 64), it)
   }
   value.lineMetrics?.let {
-    fields = fields or 256u
+    fields = fields or 128u
     writeBool(target + w(60, 68), it)
   }
   value.cluster?.let {
-    fields = fields or 512u
+    fields = fields or 256u
     writeBool(target + w(61, 69), it)
   }
   value.synchronousTiling?.let {
-    fields = fields or 1024u
+    fields = fields or 512u
     writeBool(target + w(62, 70), it)
   }
   writeU32(target + 4, fields)
@@ -489,18 +486,12 @@ internal fun NativeArena.putFeatureStateSelector(target: Long, value: FeatureSta
   writeU32(target, w(40, 72).toUInt())
   var fields = 0u
   putView(target + 8, value.sourceId)
-  value.sourceLayerId?.let {
-    fields = fields or 1u
-    putView(target + w(16, 24), it)
-  }
+  putView(target + w(16, 24), value.sourceLayerId)
   value.featureId?.let {
-    fields = fields or 2u
+    fields = fields or 1u
     putView(target + w(24, 40), it)
   }
-  value.stateKey?.let {
-    fields = fields or 4u
-    putView(target + w(32, 56), it)
-  }
+  putView(target + w(32, 56), value.stateKey)
   writeU32(target + 4, fields)
 }
 
@@ -805,10 +796,7 @@ internal fun NativeArena.putRenderedFeatureQueryOptions(
     )
     writeSize(target + w(12, 16), it.size.toULong())
   }
-  value.filter?.let {
-    fields = fields or 2u
-    putView(target + w(16, 24), it)
-  }
+  putView(target + w(16, 24), value.filter)
   writeU32(target + 4, fields)
 }
 
@@ -832,10 +820,7 @@ internal fun NativeArena.putSourceFeatureQueryOptions(
     )
     writeSize(target + w(12, 16), it.size.toULong())
   }
-  value.filter?.let {
-    fields = fields or 2u
-    putView(target + w(16, 24), it)
-  }
+  putView(target + w(16, 24), value.filter)
   writeU32(target + 4, fields)
 }
 
@@ -990,20 +975,11 @@ internal fun NativeArena.putStyleExpressionInputs(target: Long, value: StyleExpr
     fields = fields or 4u
     writeF64(target + 24, it)
   }
-  value.feature?.let {
-    fields = fields or 8u
-    putView(target + 32, it)
-  }
-  value.featureState?.let {
-    fields = fields or 16u
-    putView(target + w(40, 48), it)
-  }
-  value.globalState?.let {
-    fields = fields or 32u
-    putView(target + w(48, 64), it)
-  }
+  putView(target + 32, value.feature)
+  putView(target + w(40, 48), value.featureState)
+  putView(target + w(48, 64), value.globalState)
   value.canonicalTileId?.let {
-    fields = fields or 64u
+    fields = fields or 8u
     putCanonicalTileId(target + w(56, 80), it)
   }
   writeAddress(
@@ -1241,13 +1217,13 @@ internal fun readGeojsonSourceOptions(source: Long): GeojsonSourceOptions {
     maxZoom = if ((fields and 2u) != 0u) readF64(source + 16) else null,
     tolerance = if ((fields and 4u) != 0u) readF64(source + 24) else null,
     clusterMaxZoom = if ((fields and 8u) != 0u) readF64(source + 32) else null,
-    clusterProperties = if ((fields and 16u) != 0u) readView(source + 40) else null,
-    buffer = if ((fields and 32u) != 0u) readU32(source + w(48, 56)) else null,
-    clusterRadius = if ((fields and 64u) != 0u) readU32(source + w(52, 60)) else null,
-    clusterMinPoints = if ((fields and 128u) != 0u) readU32(source + w(56, 64)) else null,
-    lineMetrics = if ((fields and 256u) != 0u) readBool(source + w(60, 68)) else null,
-    cluster = if ((fields and 512u) != 0u) readBool(source + w(61, 69)) else null,
-    synchronousTiling = if ((fields and 1024u) != 0u) readBool(source + w(62, 70)) else null,
+    clusterProperties = readView(source + 40),
+    buffer = if ((fields and 16u) != 0u) readU32(source + w(48, 56)) else null,
+    clusterRadius = if ((fields and 32u) != 0u) readU32(source + w(52, 60)) else null,
+    clusterMinPoints = if ((fields and 64u) != 0u) readU32(source + w(56, 64)) else null,
+    lineMetrics = if ((fields and 128u) != 0u) readBool(source + w(60, 68)) else null,
+    cluster = if ((fields and 256u) != 0u) readBool(source + w(61, 69)) else null,
+    synchronousTiling = if ((fields and 512u) != 0u) readBool(source + w(62, 70)) else null,
   )
 }
 
@@ -1400,7 +1376,7 @@ internal fun readRenderedFeatureQueryOptions(source: Long): RenderedFeatureQuery
           readViewString(item)
         }
       else null,
-    filter = if ((fields and 2u) != 0u) readView(source + w(16, 24)) else null,
+    filter = readView(source + w(16, 24)),
   )
 }
 
@@ -1413,8 +1389,8 @@ internal fun readResourceRoute(source: Long): ResourceRoute =
 
 internal fun readRuntimeOptions(source: Long): RuntimeOptions =
   RuntimeOptions(
-    assetPath = readViewString(source + w(4, 8)).takeIf { it.isNotEmpty() },
-    cachePath = readViewString(source + w(12, 24)).takeIf { it.isNotEmpty() },
+    assetPath = readViewString(source + w(4, 8)),
+    cachePath = readViewString(source + w(12, 24)),
   )
 
 internal fun readSourceFeatureQueryOptions(source: Long): SourceFeatureQueryOptions {
@@ -1430,7 +1406,7 @@ internal fun readSourceFeatureQueryOptions(source: Long): SourceFeatureQueryOpti
           readViewString(item)
         }
       else null,
-    filter = if ((fields and 2u) != 0u) readView(source + w(16, 24)) else null,
+    filter = readView(source + w(16, 24)),
   )
 }
 
@@ -1440,10 +1416,10 @@ internal fun readStyleExpressionInputs(source: Long): StyleExpressionInputs {
     zoom = if ((fields and 1u) != 0u) readF64(source + 8) else null,
     colorRampParameter = if ((fields and 2u) != 0u) readF64(source + 16) else null,
     elevation = if ((fields and 4u) != 0u) readF64(source + 24) else null,
-    feature = if ((fields and 8u) != 0u) readView(source + 32) else null,
-    featureState = if ((fields and 16u) != 0u) readView(source + w(40, 48)) else null,
-    globalState = if ((fields and 32u) != 0u) readView(source + w(48, 64)) else null,
-    canonicalTileId = if ((fields and 64u) != 0u) readCanonicalTileId(source + w(56, 80)) else null,
+    feature = readView(source + 32),
+    featureState = readView(source + w(40, 48)),
+    globalState = readView(source + w(48, 64)),
+    canonicalTileId = if ((fields and 8u) != 0u) readCanonicalTileId(source + w(56, 80)) else null,
     availableImages =
       readArray(
         readAddress(source + w(68, 96)),
@@ -1601,8 +1577,8 @@ internal fun readStyleLayerInfo(source: Long): StyleLayerInfo =
   StyleLayerInfo(
     id = readViewString(source),
     type = readViewString(source + w(8, 16)),
-    sourceId = readViewString(source + w(16, 32)).takeIf { it.isNotEmpty() },
-    sourceLayer = readViewString(source + w(24, 48)).takeIf { it.isNotEmpty() },
+    sourceId = readViewString(source + w(16, 32)),
+    sourceLayer = readViewString(source + w(24, 48)),
     minZoom = readF64(source + w(32, 64)),
     maxZoom = readF64(source + w(40, 72)),
     visibility = StyleLayerVisibility(readU32(source + w(48, 80))),
@@ -1614,15 +1590,15 @@ internal fun readStyleSourceInfo(source: Long): StyleSourceInfo {
     id = readViewString(source),
     type = StyleSourceType(readU32(source + w(8, 16))),
     isVolatile = readBool(source + w(16, 24)),
-    attribution = if ((fields and 64u) != 0u) readViewString(source + w(20, 32)) else null,
-    url = if ((fields and 1u) != 0u) readViewString(source + w(28, 48)) else null,
-    tilejson = if ((fields and 2u) != 0u) readStyleSourceTileInfo(source + w(40, 64)) else null,
-    bounds = if ((fields and 4u) != 0u) readLatLngBounds(source + w(72, 104)) else null,
-    tileSize = if ((fields and 8u) != 0u) readU32(source + w(104, 136)) else null,
+    attribution = readViewString(source + w(20, 32)),
+    url = readViewString(source + w(28, 48)),
+    tilejson = if ((fields and 1u) != 0u) readStyleSourceTileInfo(source + w(40, 64)) else null,
+    bounds = if ((fields and 2u) != 0u) readLatLngBounds(source + w(72, 104)) else null,
+    tileSize = if ((fields and 4u) != 0u) readU32(source + w(104, 136)) else null,
     vectorEncoding =
-      if ((fields and 16u) != 0u) StyleVectorTileEncoding(readU32(source + w(108, 140))) else null,
+      if ((fields and 8u) != 0u) StyleVectorTileEncoding(readU32(source + w(108, 140))) else null,
     rasterEncoding =
-      if ((fields and 32u) != 0u) StyleRasterDemEncoding(readU32(source + w(112, 144))) else null,
+      if ((fields and 16u) != 0u) StyleRasterDemEncoding(readU32(source + w(112, 144))) else null,
   )
 }
 
@@ -1667,24 +1643,17 @@ internal fun readRenderSessionSnapshot(source: Long): RenderSessionSnapshot =
     pendingChanges = readBool(source + 60),
   )
 
-internal fun readRenderedFeature(source: Long): RenderedFeature {
-  val fields = readU32(source)
-  return RenderedFeature(
-    feature = readView(source + w(4, 8)),
-    layerId = readViewString(source + w(12, 24)),
-    sourceId = if ((fields and 1u) != 0u) readViewString(source + w(20, 40)) else null,
-    sourceLayerId = if ((fields and 2u) != 0u) readViewString(source + w(28, 56)) else null,
-    state = if ((fields and 4u) != 0u) readView(source + w(36, 72)) else null,
+internal fun readRenderedFeature(source: Long): RenderedFeature =
+  RenderedFeature(
+    feature = readView(source),
+    layerId = readViewString(source + w(8, 16)),
+    sourceId = readViewString(source + w(16, 32)),
+    sourceLayerId = readViewString(source + w(24, 48)),
+    state = readView(source + w(32, 64)),
   )
-}
 
-internal fun readSourceFeature(source: Long): SourceFeature {
-  val fields = readU32(source)
-  return SourceFeature(
-    feature = readView(source + w(4, 8)),
-    sourceLayerId = if ((fields and 1u) != 0u) readViewString(source + w(12, 24)) else null,
-  )
-}
+internal fun readSourceFeature(source: Long): SourceFeature =
+  SourceFeature(feature = readView(source), sourceLayerId = readViewString(source + w(8, 16)))
 
 internal fun readTextureReadbackResult(source: Long): TextureReadbackResult =
   TextureReadbackResult(data = readView(source), info = readTextureImageInfo(source + w(8, 16)))
@@ -2000,18 +1969,18 @@ internal fun readEventBatchView(source: Long): List<RuntimeEvent> =
 internal fun readResourceRequestInfo(source: Long): ResourceRequestInfo {
   val fields = readU32(source + 4)
   return ResourceRequestInfo(
-    requestedUrl = readCStringOrNull(readAddress(source + 8)),
-    resolvedUrl = readCStringOrNull(readAddress(source + w(12, 16))),
-    kind = ResourceKind(readU32(source + w(16, 24))),
-    loadingMethod = ResourceLoadingMethod(readU32(source + w(20, 28))),
-    priority = ResourcePriority(readU32(source + w(24, 32))),
-    usage = ResourceUsage(readU32(source + w(28, 36))),
-    storagePolicy = ResourceStoragePolicy(readU32(source + w(32, 40))),
-    range = if ((fields and 1u) != 0u) readResourceRange(source + w(40, 48)) else null,
-    priorModifiedUnixMs = if ((fields and 2u) != 0u) readI64(source + w(56, 64)) else null,
-    priorExpiresUnixMs = if ((fields and 4u) != 0u) readI64(source + w(64, 72)) else null,
-    priorEtag = readCStringOrNull(readAddress(source + w(72, 80))),
-    priorData = readBytes(readAddress(source + w(76, 88)), readSize(source + w(80, 96))),
+    requestedUrl = readViewString(source + 8),
+    resolvedUrl = readViewString(source + w(16, 24)),
+    kind = ResourceKind(readU32(source + w(24, 40))),
+    loadingMethod = ResourceLoadingMethod(readU32(source + w(28, 44))),
+    priority = ResourcePriority(readU32(source + w(32, 48))),
+    usage = ResourceUsage(readU32(source + w(36, 52))),
+    storagePolicy = ResourceStoragePolicy(readU32(source + w(40, 56))),
+    range = if ((fields and 1u) != 0u) readResourceRange(source + w(48, 64)) else null,
+    priorModifiedUnixMs = if ((fields and 2u) != 0u) readI64(source + w(64, 80)) else null,
+    priorExpiresUnixMs = if ((fields and 4u) != 0u) readI64(source + w(72, 88)) else null,
+    priorEtag = readViewString(source + w(80, 96)),
+    priorData = readBytes(readAddress(source + w(88, 112)), readSize(source + w(92, 120))),
   )
 }
 

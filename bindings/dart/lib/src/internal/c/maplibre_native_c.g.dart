@@ -50,7 +50,7 @@ typedef mln_http_header_transform_callbackFunction =
     Int32 Function(
       Pointer<Void> user_data,
       Uint32 kind,
-      Pointer<Char> url,
+      mln_buffer_view url,
       Pointer<mln_http_header_transform_response> out_response,
     );
 typedef mln_log_callback = Pointer<NativeFunction<mln_log_callbackFunction>>;
@@ -60,7 +60,7 @@ typedef mln_log_callbackFunction =
       Uint32 severity,
       Uint32 event,
       Int64 code,
-      Pointer<Char> message,
+      mln_buffer_view message,
     );
 typedef mln_queue_lock_callback =
     Pointer<NativeFunction<mln_queue_lock_callbackFunction>>;
@@ -84,7 +84,7 @@ typedef mln_resource_transform_callbackFunction =
     Void Function(
       Pointer<Void> user_data,
       Uint32 kind,
-      Pointer<Char> url,
+      mln_buffer_view url,
       mln_resource_transform_request request,
     );
 typedef mln_runtime_event_callback =
@@ -527,7 +527,7 @@ final class mln_log_delivery extends Struct {
   external int event;
   @Int64()
   external int code;
-  external Pointer<Char> message;
+  external mln_buffer_view message;
 }
 
 final class mln_log_handler extends Struct {
@@ -970,8 +970,6 @@ final class mln_render_session_snapshot extends Struct {
 }
 
 final class mln_rendered_feature extends Struct {
-  @Uint32()
-  external int fields;
   external mln_buffer_view feature;
   external mln_buffer_view layer_id;
   external mln_buffer_view source_id;
@@ -1063,8 +1061,8 @@ final class mln_resource_request_info extends Struct {
   external int size;
   @Uint32()
   external int fields;
-  external Pointer<Char> requested_url;
-  external Pointer<Char> resolved_url;
+  external mln_buffer_view requested_url;
+  external mln_buffer_view resolved_url;
   @Uint32()
   external int kind;
   @Uint32()
@@ -1080,7 +1078,7 @@ final class mln_resource_request_info extends Struct {
   external int prior_modified_unix_ms;
   @Int64()
   external int prior_expires_unix_ms;
-  external Pointer<Char> prior_etag;
+  external mln_buffer_view prior_etag;
   external Pointer<Uint8> prior_data;
   @Size()
   external int prior_data_size;
@@ -1131,7 +1129,7 @@ final class mln_resource_transform extends Struct {
 final class mln_resource_transform_delivery extends Struct {
   @Uint32()
   external int kind;
-  external Pointer<Char> url;
+  external mln_buffer_view url;
   @Uint64()
   external int request;
 }
@@ -1245,8 +1243,6 @@ final class mln_screen_point extends Struct {
 }
 
 final class mln_source_feature extends Struct {
-  @Uint32()
-  external int fields;
   external mln_buffer_view feature;
   external mln_buffer_view source_layer_id;
 }
@@ -1723,9 +1719,7 @@ const MLN_DELIVERY_TYPE_RUNTIME_EVENTS = 9;
 const MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM = 10;
 
 // mln_feature_state_selector_field
-const MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID = 1;
-const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID = 2;
-const MLN_FEATURE_STATE_SELECTOR_STATE_KEY = 4;
+const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID = 1;
 
 // mln_frame_demand_flag
 const MLN_FRAME_DEMAND_IF_NEEDED = 1;
@@ -1741,13 +1735,12 @@ const MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM = 1;
 const MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM = 2;
 const MLN_GEOJSON_SOURCE_OPTION_TOLERANCE = 4;
 const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM = 8;
-const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES = 16;
-const MLN_GEOJSON_SOURCE_OPTION_BUFFER = 32;
-const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 64;
-const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 128;
-const MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 256;
-const MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 512;
-const MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 1024;
+const MLN_GEOJSON_SOURCE_OPTION_BUFFER = 16;
+const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 32;
+const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 64;
+const MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 128;
+const MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 256;
+const MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 512;
 
 // mln_gesture_phase
 const MLN_GESTURE_PHASE_NONE = 0;
@@ -1900,14 +1893,8 @@ const MLN_RENDER_SESSION_STATE_DETACHED = 4;
 const MLN_RENDER_SESSION_STATE_TARGET_LOST = 5;
 const MLN_RENDER_SESSION_STATE_ABANDONED = 6;
 
-// mln_rendered_feature_field
-const MLN_RENDERED_FEATURE_SOURCE_ID = 1;
-const MLN_RENDERED_FEATURE_SOURCE_LAYER_ID = 2;
-const MLN_RENDERED_FEATURE_STATE = 4;
-
 // mln_rendered_feature_query_option_field
 const MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS = 1;
-const MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER = 2;
 
 // mln_rendered_query_geometry_type
 const MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT = 1;
@@ -2035,12 +2022,8 @@ const MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 17;
 const MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 18;
 const MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19;
 
-// mln_source_feature_field
-const MLN_SOURCE_FEATURE_SOURCE_LAYER_ID = 1;
-
 // mln_source_feature_query_option_field
 const MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS = 1;
-const MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER = 2;
 
 // mln_status
 const MLN_STATUS_OK = 0;
@@ -2059,10 +2042,7 @@ const MLN_STATUS_NOT_FOUND = -10;
 const MLN_STYLE_EXPRESSION_INPUT_ZOOM = 1;
 const MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER = 2;
 const MLN_STYLE_EXPRESSION_INPUT_ELEVATION = 4;
-const MLN_STYLE_EXPRESSION_INPUT_FEATURE = 8;
-const MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE = 16;
-const MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE = 32;
-const MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID = 64;
+const MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID = 8;
 
 // mln_style_expression_option_field
 const MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE = 1;
@@ -2108,13 +2088,11 @@ const MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX = 0;
 const MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM = 1;
 
 // mln_style_source_info_field
-const MLN_STYLE_SOURCE_INFO_URL = 1;
-const MLN_STYLE_SOURCE_INFO_TILEJSON = 2;
-const MLN_STYLE_SOURCE_INFO_BOUNDS = 4;
-const MLN_STYLE_SOURCE_INFO_TILE_SIZE = 8;
-const MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 16;
-const MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 32;
-const MLN_STYLE_SOURCE_INFO_ATTRIBUTION = 64;
+const MLN_STYLE_SOURCE_INFO_TILEJSON = 1;
+const MLN_STYLE_SOURCE_INFO_BOUNDS = 2;
+const MLN_STYLE_SOURCE_INFO_TILE_SIZE = 4;
+const MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 8;
+const MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 16;
 
 // mln_style_source_type
 const MLN_STYLE_SOURCE_TYPE_UNKNOWN = 0;
@@ -4157,7 +4135,7 @@ external int mln_render_session_get_snapshot(
     mln_buffer_view,
     mln_buffer_view,
     mln_buffer_view,
-    Pointer<mln_buffer_view>,
+    mln_buffer_view,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
@@ -4168,7 +4146,7 @@ external int mln_render_session_query_feature_extensions(
   mln_buffer_view feature,
   mln_buffer_view extension,
   mln_buffer_view extension_field,
-  Pointer<mln_buffer_view> arguments,
+  mln_buffer_view arguments,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

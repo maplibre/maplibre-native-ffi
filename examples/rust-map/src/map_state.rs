@@ -26,7 +26,7 @@ impl MapState {
     /// Creates the runtime and map.
     pub fn new(viewport: Viewport) -> Result<Self, Box<dyn Error>> {
         let runtime_options = RuntimeOptions {
-            cache_path: Some(":memory:".into()),
+            cache_path: ":memory:".into(),
             ..Default::default()
         };
         let runtime = maplibre_native_ffi::runtime_create(&runtime_options)

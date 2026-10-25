@@ -30,7 +30,7 @@ internal object Deliveries {
               readI32(payload),
               readI32(payload + 4),
               readI64(payload + 8),
-              readAddress(payload + 16),
+              payload + 16,
             )
           }
           else -> Unit
@@ -91,8 +91,8 @@ internal object Deliveries {
             Upcalls.resourceTransformCallback(
               token,
               readI32(payload),
-              readAddress(payload + 4),
-              readI64(payload + 8),
+              payload + 4,
+              readI64(payload + 16),
             )
           }
           else -> Unit

@@ -51,9 +51,11 @@ Follow these rules, which keep the ABI open to growth:
   its end. Small value types, such as coordinates and IDs, carry no size and
   never change; a change adds a new type.
 - An input struct whose defaults are not all zero has `mln_<struct>_default()`.
-- An optional member has its own bit in the struct's `fields` mask.
-- Strings that the host passes in use `mln_buffer_view`, and strings that native
-  returns use NUL-terminated `const char*`.
+- An optional member has its own bit in the struct's `fields` mask. Text is the
+  exception: empty text means absent, and text has a bit only where the empty
+  string is a value of its own, as a feature ID is.
+- Text uses `mln_buffer_view` in both directions. Text that native lends to the
+  host is also NUL-terminated after its bytes.
 - A synchronous function that returns text of a length the caller cannot know
   writes it into a buffer the caller passes, reports its length whether or not
   it fit, and returns the same text for the same inputs, so a binding can call

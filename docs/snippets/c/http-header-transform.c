@@ -8,14 +8,15 @@ static const char trusted_prefix[] = "https://tiles.example.com/";
 static const char header_name[] = "Authorization";
 
 static mln_status add_authorization(
-  void* user_data, uint32_t kind, const char* url,
+  void* user_data, uint32_t kind, mln_buffer_view url,
   mln_http_header_transform_response* out_response
 ) {
   // #region match
   const char* token = user_data;
   (void)kind;
 
-  if (strncmp(url, trusted_prefix, sizeof(trusted_prefix) - 1) != 0) {
+  // Native ends the URL with a NUL, so it also reads as a C string.
+  if (strncmp(url.data, trusted_prefix, sizeof(trusted_prefix) - 1) != 0) {
     return MLN_STATUS_OK;  // Every other origin gets no header.
   }
   // #endregion match

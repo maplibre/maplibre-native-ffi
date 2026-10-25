@@ -57,7 +57,6 @@ ANNOTATION_VALUES = {
     "encoding": frozenset({"json", "bytes"}),
     "direction": frozenset({"out"}),
     "nullable": frozenset({"true"}),
-    "optional": frozenset({"empty"}),
     "lifetime": frozenset({"call", "owner", "process"}),
     "synchronous": frozenset({"true"}),
     "capture": frozenset({"manual"}),
@@ -65,9 +64,8 @@ ANNOTATION_VALUES = {
     "consumes": frozenset({"success"}),
 }
 
-# The same semantic vocabulary applies to all target languages. A field's
-# optional=empty means that its empty representation denotes absence.
-COMMON_KEYS = frozenset({"ownership", "encoding", "nullable", "optional", "lifetime"})
+# The same semantic vocabulary applies to all target languages.
+COMMON_KEYS = frozenset({"ownership", "encoding", "nullable", "lifetime"})
 FUNCTION_KEYS = COMMON_KEYS | frozenset(
     {
         "execution",
@@ -483,10 +481,6 @@ def metadata_errors(
     ]
     if "kind" in metadata and metadata["kind"] not in kinds:
         errors.append(f"{context}: unsupported kind={metadata['kind']!r}")
-    if metadata.get("nullable") == "true" and "optional" in metadata:
-        errors.append(
-            f"{context}: nullable and optional specify different absence representations"
-        )
     return errors
 
 
@@ -501,8 +495,6 @@ def value_metadata_errors(
         errors.append(
             f"{context}: encoding requires a buffer view or character pointer"
         )
-    if metadata.get("optional") == "empty" and not is_buffer:
-        errors.append(f"{context}: optional=empty requires a buffer view")
     if "length" in metadata and type_.kind not in {"pointer", "array"}:
         errors.append(f"{context}: length requires a pointer or array")
     return errors
@@ -751,10 +743,6 @@ def validate(api: Api) -> None:
                 )
             if "encoding" in metadata and result != BUFFER_VIEW:
                 errors.append(f"{context}: encoded completion requires a buffer view")
-            if metadata.get("optional") == "empty" and result != BUFFER_VIEW:
-                errors.append(
-                    f"{context}: optional=empty requires a buffer view result"
-                )
         else:
             if execution in COMPLETION_EXECUTIONS:
                 errors.append(

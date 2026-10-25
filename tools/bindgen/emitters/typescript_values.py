@@ -484,7 +484,7 @@ class Values:
             return entry.form in {"queue", "wake", "native"} and all(
                 f.value.nullable for f in entry.callbacks
             )
-        return bool(value.nullable or value.optional)
+        return bool(value.nullable)
 
     def omittable(self, record: ValuePlan, field: FieldPlan) -> bool:
         """Whether an input may leave a member out and keep its default."""

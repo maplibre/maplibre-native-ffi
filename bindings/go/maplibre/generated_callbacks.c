@@ -4,14 +4,14 @@ extern void mlnGoCallbackRelease(void*);
 void binding_release(void* p) { mlnGoCallbackRelease(p); }
 extern bool mlnGo_mln_log_handler_callback(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
-  char* message
+  mln_buffer_view message
 );
 bool binding_mln_log_handler_callback(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
-  const char* message
+  mln_buffer_view message
 ) {
   return mlnGo_mln_log_handler_callback(
-    (void*)user_data, severity, event, code, (char*)message
+    (void*)user_data, severity, event, code, message
   );
 }
 extern void mlnGo_mln_custom_geometry_source_options_fetch_tile(
@@ -95,15 +95,15 @@ void binding_mln_runtime_event_handler_callback(
   );
 }
 extern mln_status mlnGo_mln_http_header_transform_callback(
-  void* user_data, mln_resource_kind kind, char* url,
+  void* user_data, mln_resource_kind kind, mln_buffer_view url,
   mln_http_header_transform_response* out_response
 );
 mln_status binding_mln_http_header_transform_callback(
-  void* user_data, mln_resource_kind kind, const char* url,
+  void* user_data, mln_resource_kind kind, mln_buffer_view url,
   mln_http_header_transform_response* out_response
 ) {
   return mlnGo_mln_http_header_transform_callback(
-    (void*)user_data, kind, (char*)url,
+    (void*)user_data, kind, url,
     (mln_http_header_transform_response*)out_response
   );
 }
@@ -120,14 +120,12 @@ void binding_mln_resource_provider_callback(
   );
 }
 extern void mlnGo_mln_resource_transform_callback(
-  void* user_data, mln_resource_kind kind, char* url,
+  void* user_data, mln_resource_kind kind, mln_buffer_view url,
   mln_resource_transform_request request
 );
 void binding_mln_resource_transform_callback(
-  void* user_data, mln_resource_kind kind, const char* url,
+  void* user_data, mln_resource_kind kind, mln_buffer_view url,
   mln_resource_transform_request request
 ) {
-  mlnGo_mln_resource_transform_callback(
-    (void*)user_data, kind, (char*)url, request
-  );
+  mlnGo_mln_resource_transform_callback((void*)user_data, kind, url, request);
 }

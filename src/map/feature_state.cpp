@@ -16,8 +16,7 @@
 namespace {
 
 constexpr uint32_t feature_state_selector_known_fields =
-  MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID |
-  MLN_FEATURE_STATE_SELECTOR_FEATURE_ID | MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
+  MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
 
 auto validate_string_view(mln_buffer_view string) -> bool {
   if (string.size > 0 && string.data == nullptr) {
@@ -219,10 +218,7 @@ auto validate_feature_state_selector(
     set_thread_error("feature state source_id must not be empty");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    selector_has_field(*selector, MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID) &&
-    !validate_string_view(selector->source_layer_id)
-  ) {
+  if (!validate_string_view(selector->source_layer_id)) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (
@@ -231,10 +227,7 @@ auto validate_feature_state_selector(
   ) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    selector_has_field(*selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY) &&
-    !validate_string_view(selector->state_key)
-  ) {
+  if (!validate_string_view(selector->state_key)) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -244,10 +237,7 @@ auto validate_feature_state_selector(
     set_thread_error("feature state selector requires feature_id");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    selector_has_field(*selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY) &&
-    !has_feature_id
-  ) {
+  if (selector->state_key.size != 0 && !has_feature_id) {
     set_thread_error("feature state selector state_key requires feature_id");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -264,12 +254,16 @@ auto optional_selector_string(
   return string_from_view(value);
 }
 
+auto optional_text(mln_buffer_view value) -> std::optional<std::string> {
+  if (value.size == 0) {
+    return std::nullopt;
+  }
+  return string_from_view(value);
+}
+
 auto feature_state_source_layer(const mln_feature_state_selector& selector)
   -> FeatureStateLayerId {
-  return optional_selector_string(
-    selector, MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID,
-    selector.source_layer_id
-  );
+  return optional_text(selector.source_layer_id);
 }
 
 auto feature_state_needs_warmup(

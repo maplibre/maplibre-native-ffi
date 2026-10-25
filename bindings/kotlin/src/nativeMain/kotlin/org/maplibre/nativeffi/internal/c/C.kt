@@ -1839,7 +1839,7 @@ internal actual object C {
       feature.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       extension.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       extensionField.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      arguments.toCPointer(),
+      arguments.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )

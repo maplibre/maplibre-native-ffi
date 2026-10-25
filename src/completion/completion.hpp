@@ -37,7 +37,9 @@ class CompletionSink final {
   ~CompletionSink() = default;
 
   // Delivers one terminal result. A value that a queue cannot copy turns into
-  // MLN_STATUS_NATIVE_ERROR, and its owned handles are disposed.
+  // MLN_STATUS_NATIVE_ERROR, and its owned handles are disposed. A nonempty
+  // diagnostic must be NUL-terminated after its bytes, as a std::string or a
+  // literal is, since the callback borrows it.
   auto deliver(
     mln_status status, mln_command_disposition disposition,
     CommandGenerations generations, std::string_view diagnostic,

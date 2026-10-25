@@ -553,17 +553,13 @@ internal static unsafe class GeneratedValues
     )
     {
         Required(value.SourceId, "FeatureStateSelector.SourceId must not be null.");
+        Required(value.SourceLayerId, "FeatureStateSelector.SourceLayerId must not be null.");
+        Required(value.StateKey, "FeatureStateSelector.StateKey must not be null.");
         var native = new mln_feature_state_selector();
         native.fields = 0;
         native.size = (uint)sizeof(mln_feature_state_selector);
         native.source_id = scope.Utf8(value.SourceId);
-        native.fields |= Put(
-            value.SourceLayerId,
-            ref native.source_layer_id,
-            MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID,
-            scope,
-            static (present, scope) => scope.Utf8(present)
-        );
+        native.source_layer_id = scope.Utf8(value.SourceLayerId);
         native.fields |= Put(
             value.FeatureId,
             ref native.feature_id,
@@ -571,13 +567,7 @@ internal static unsafe class GeneratedValues
             scope,
             static (present, scope) => scope.Utf8(present)
         );
-        native.fields |= Put(
-            value.StateKey,
-            ref native.state_key,
-            MLN_FEATURE_STATE_SELECTOR_STATE_KEY,
-            scope,
-            static (present, scope) => scope.Utf8(present)
-        );
+        native.state_key = scope.Utf8(value.StateKey);
         return native;
     }
 
@@ -641,11 +631,7 @@ internal static unsafe class GeneratedValues
             ClusterMaxZoom = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM)
                 ? value.cluster_max_zoom
                 : null,
-            ClusterPropertiesStorage = ValueArray.Optional(
-                value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES)
-                    ? ValueStructs.CopyBufferView(value.cluster_properties)
-                    : null
-            ),
+            ClusterPropertiesStorage = new(ValueStructs.CopyBufferView(value.cluster_properties)),
             Buffer = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_BUFFER) ? value.buffer : null,
             ClusterRadius = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS)
                 ? value.cluster_radius
@@ -692,13 +678,7 @@ internal static unsafe class GeneratedValues
             ref native.cluster_max_zoom,
             MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
         );
-        native.fields |= Put(
-            value.ClusterPropertiesStorage?.Items,
-            ref native.cluster_properties,
-            MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES,
-            scope,
-            static (present, scope) => scope.Buffer(present)
-        );
+        native.cluster_properties = scope.Buffer(value.ClusterPropertiesStorage.Items);
         native.fields |= Put(value.Buffer, ref native.buffer, MLN_GEOJSON_SOURCE_OPTION_BUFFER);
         native.fields |= Put(
             value.ClusterRadius,
@@ -796,7 +776,7 @@ internal static unsafe class GeneratedValues
     private static mln_status InvokeHttpHeaderTransformCallback(
         void* user_data,
         mln_resource_kind kind,
-        sbyte* url,
+        mln_buffer_view url,
         mln_http_header_transform_response* out_response
     )
     {
@@ -807,7 +787,7 @@ internal static unsafe class GeneratedValues
             {
                 ((HttpHeaderTransform)NativeCallbackRoot.Value(user_data)).Callback?.Invoke(
                     (ResourceKind)kind,
-                    NativeCallScope.CopyCString(url),
+                    RuntimeStructs.CopyUtf8((sbyte*)url.data, url.size),
                     responseOutResponse
                 );
             }
@@ -900,7 +880,7 @@ internal static unsafe class GeneratedValues
         mln_log_severity severity,
         mln_log_event @event,
         long code,
-        sbyte* message
+        mln_buffer_view message
     )
     {
         try
@@ -913,7 +893,7 @@ internal static unsafe class GeneratedValues
                         (LogSeverity)severity,
                         (LogEvent)@event,
                         code,
-                        NativeCallScope.CopyCString(message)
+                        RuntimeStructs.CopyUtf8((sbyte*)message.data, message.size)
                     )
                         ? 1
                         : 0
@@ -1736,24 +1716,16 @@ internal static unsafe class GeneratedValues
         );
 
     internal static RenderedFeature CopyRenderedFeature(mln_rendered_feature value) =>
-        new()
+        default(RenderedFeature) with
         {
             FeatureStorage = new(ValueStructs.CopyBufferView(value.feature)),
             LayerId = RuntimeStructs.CopyUtf8((sbyte*)value.layer_id.data, value.layer_id.size),
-            SourceId = value.fields.HasFlag(MLN_RENDERED_FEATURE_SOURCE_ID)
-                ? RuntimeStructs.CopyUtf8((sbyte*)value.source_id.data, value.source_id.size)
-                : null,
-            SourceLayerId = value.fields.HasFlag(MLN_RENDERED_FEATURE_SOURCE_LAYER_ID)
-                ? RuntimeStructs.CopyUtf8(
-                    (sbyte*)value.source_layer_id.data,
-                    value.source_layer_id.size
-                )
-                : null,
-            StateStorage = ValueArray.Optional(
-                value.fields.HasFlag(MLN_RENDERED_FEATURE_STATE)
-                    ? ValueStructs.CopyBufferView(value.state)
-                    : null
+            SourceId = RuntimeStructs.CopyUtf8((sbyte*)value.source_id.data, value.source_id.size),
+            SourceLayerId = RuntimeStructs.CopyUtf8(
+                (sbyte*)value.source_layer_id.data,
+                value.source_layer_id.size
             ),
+            StateStorage = new(ValueStructs.CopyBufferView(value.state)),
         };
 
     internal static RenderedFeatureQueryOptions CopyRenderedFeatureQueryOptions(
@@ -1770,11 +1742,7 @@ internal static unsafe class GeneratedValues
                     )
                     : null
             ),
-            FilterStorage = ValueArray.Optional(
-                value.fields.HasFlag(MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER)
-                    ? ValueStructs.CopyBufferView(value.filter)
-                    : null
-            ),
+            FilterStorage = new(ValueStructs.CopyBufferView(value.filter)),
         };
 
     internal static mln_rendered_feature_query_options NativeRenderedFeatureQueryOptions(
@@ -1794,13 +1762,7 @@ internal static unsafe class GeneratedValues
             );
             native.layer_id_count = checked((nuint)fieldLayerIds.Length);
         }
-        native.fields |= Put(
-            value.FilterStorage?.Items,
-            ref native.filter,
-            MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER,
-            scope,
-            static (present, scope) => scope.Buffer(present)
-        );
+        native.filter = scope.Buffer(value.FilterStorage.Items);
         return native;
     }
 
@@ -1926,12 +1888,14 @@ internal static unsafe class GeneratedValues
     internal static ResourceRequestInfo CopyResourceRequestInfo(mln_resource_request_info value) =>
         new()
         {
-            RequestedUrl =
-                value.requested_url == null
-                    ? null
-                    : NativeCallScope.CopyCString(value.requested_url),
-            ResolvedUrl =
-                value.resolved_url == null ? null : NativeCallScope.CopyCString(value.resolved_url),
+            RequestedUrl = RuntimeStructs.CopyUtf8(
+                (sbyte*)value.requested_url.data,
+                value.requested_url.size
+            ),
+            ResolvedUrl = RuntimeStructs.CopyUtf8(
+                (sbyte*)value.resolved_url.data,
+                value.resolved_url.size
+            ),
             Kind = (ResourceKind)value.kind,
             LoadingMethod = (ResourceLoadingMethod)value.loading_method,
             Priority = (ResourcePriority)value.priority,
@@ -1946,8 +1910,10 @@ internal static unsafe class GeneratedValues
             PriorExpiresUnixMs = value.fields.HasFlag(MLN_RESOURCE_REQUEST_PRIOR_EXPIRES)
                 ? value.prior_expires_unix_ms
                 : null,
-            PriorEtag =
-                value.prior_etag == null ? null : NativeCallScope.CopyCString(value.prior_etag),
+            PriorEtag = RuntimeStructs.CopyUtf8(
+                (sbyte*)value.prior_etag.data,
+                value.prior_etag.size
+            ),
             PriorDataStorage = new(
                 NativeCallScope.CopyArray<byte>(
                     (byte*)value.prior_data,
@@ -1961,6 +1927,8 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
+        Required(value.ErrorMessage, "ResourceResponse.ErrorMessage must not be null.");
+        Required(value.Etag, "ResourceResponse.Etag must not be null.");
         var native = new mln_resource_response();
         native.fields = 0;
         native.size = (uint)sizeof(mln_resource_response);
@@ -1969,7 +1937,7 @@ internal static unsafe class GeneratedValues
         var bufferBytes = scope.Buffer(value.BytesStorage.Items);
         native.bytes = (byte*)bufferBytes.data;
         native.byte_count = checked((nuint)bufferBytes.size);
-        native.error_message = scope.Utf8(value.ErrorMessage ?? "");
+        native.error_message = scope.Utf8(value.ErrorMessage);
         native.must_revalidate = (byte)(value.MustRevalidate ? 1 : 0);
         native.fields |= Put(
             value.ModifiedUnixMs,
@@ -1981,7 +1949,7 @@ internal static unsafe class GeneratedValues
             ref native.expires_unix_ms,
             MLN_RESOURCE_RESPONSE_EXPIRES
         );
-        native.etag = scope.Utf8(value.Etag ?? "");
+        native.etag = scope.Utf8(value.Etag);
         native.fields |= Put(
             value.RetryAfterUnixMs,
             ref native.retry_after_unix_ms,
@@ -2014,7 +1982,7 @@ internal static unsafe class GeneratedValues
     private static void InvokeResourceTransformCallback(
         void* user_data,
         mln_resource_kind kind,
-        sbyte* url,
+        mln_buffer_view url,
         MlnResourceTransformRequest request
     )
     {
@@ -2024,7 +1992,7 @@ internal static unsafe class GeneratedValues
             ownedRequest = ResourceTransformRequestHandle.Adopt(request);
             ((ResourceTransform)NativeCallbackRoot.Value(user_data)).Callback?.Invoke(
                 (ResourceKind)kind,
-                NativeCallScope.CopyCString(url),
+                RuntimeStructs.CopyUtf8((sbyte*)url.data, url.size),
                 ownedRequest
             );
         }
@@ -2181,12 +2149,8 @@ internal static unsafe class GeneratedValues
 
     internal static RuntimeOptions CopyRuntimeOptions(mln_runtime_options value) =>
         new(
-            value.asset_path.size == 0
-                ? null
-                : RuntimeStructs.CopyUtf8((sbyte*)value.asset_path.data, value.asset_path.size),
-            value.cache_path.size == 0
-                ? null
-                : RuntimeStructs.CopyUtf8((sbyte*)value.cache_path.data, value.cache_path.size)
+            RuntimeStructs.CopyUtf8((sbyte*)value.asset_path.data, value.asset_path.size),
+            RuntimeStructs.CopyUtf8((sbyte*)value.cache_path.data, value.cache_path.size)
         );
 
     internal static mln_runtime_options NativeRuntimeOptions(
@@ -2194,10 +2158,12 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
+        Required(value.AssetPath, "RuntimeOptions.AssetPath must not be null.");
+        Required(value.CachePath, "RuntimeOptions.CachePath must not be null.");
         var native = NativeMethods.mln_runtime_options_default();
         native.size = (uint)sizeof(mln_runtime_options);
-        native.asset_path = scope.Utf8(value.AssetPath ?? "");
-        native.cache_path = scope.Utf8(value.CachePath ?? "");
+        native.asset_path = scope.Utf8(value.AssetPath);
+        native.cache_path = scope.Utf8(value.CachePath);
         return native;
     }
 
@@ -2234,15 +2200,13 @@ internal static unsafe class GeneratedValues
     }
 
     internal static SourceFeature CopySourceFeature(mln_source_feature value) =>
-        new()
+        default(SourceFeature) with
         {
             FeatureStorage = new(ValueStructs.CopyBufferView(value.feature)),
-            SourceLayerId = value.fields.HasFlag(MLN_SOURCE_FEATURE_SOURCE_LAYER_ID)
-                ? RuntimeStructs.CopyUtf8(
-                    (sbyte*)value.source_layer_id.data,
-                    value.source_layer_id.size
-                )
-                : null,
+            SourceLayerId = RuntimeStructs.CopyUtf8(
+                (sbyte*)value.source_layer_id.data,
+                value.source_layer_id.size
+            ),
         };
 
     internal static SourceFeatureQueryOptions CopySourceFeatureQueryOptions(
@@ -2259,11 +2223,7 @@ internal static unsafe class GeneratedValues
                     )
                     : null
             ),
-            FilterStorage = ValueArray.Optional(
-                value.fields.HasFlag(MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER)
-                    ? ValueStructs.CopyBufferView(value.filter)
-                    : null
-            ),
+            FilterStorage = new(ValueStructs.CopyBufferView(value.filter)),
         };
 
     internal static mln_source_feature_query_options NativeSourceFeatureQueryOptions(
@@ -2283,13 +2243,7 @@ internal static unsafe class GeneratedValues
             );
             native.source_layer_id_count = checked((nuint)fieldSourceLayerIds.Length);
         }
-        native.fields |= Put(
-            value.FilterStorage?.Items,
-            ref native.filter,
-            MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER,
-            scope,
-            static (present, scope) => scope.Buffer(present)
-        );
+        native.filter = scope.Buffer(value.FilterStorage.Items);
         return native;
     }
 
@@ -2310,21 +2264,9 @@ internal static unsafe class GeneratedValues
             Elevation = value.fields.HasFlag(MLN_STYLE_EXPRESSION_INPUT_ELEVATION)
                 ? value.elevation
                 : null,
-            FeatureStorage = ValueArray.Optional(
-                value.fields.HasFlag(MLN_STYLE_EXPRESSION_INPUT_FEATURE)
-                    ? ValueStructs.CopyBufferView(value.feature)
-                    : null
-            ),
-            FeatureStateStorage = ValueArray.Optional(
-                value.fields.HasFlag(MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE)
-                    ? ValueStructs.CopyBufferView(value.feature_state)
-                    : null
-            ),
-            GlobalStateStorage = ValueArray.Optional(
-                value.fields.HasFlag(MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE)
-                    ? ValueStructs.CopyBufferView(value.global_state)
-                    : null
-            ),
+            FeatureStorage = new(ValueStructs.CopyBufferView(value.feature)),
+            FeatureStateStorage = new(ValueStructs.CopyBufferView(value.feature_state)),
+            GlobalStateStorage = new(ValueStructs.CopyBufferView(value.global_state)),
             CanonicalTileId = value.fields.HasFlag(MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID)
                 ? CopyCanonicalTileId(value.canonical_tile_id)
                 : null,
@@ -2356,27 +2298,9 @@ internal static unsafe class GeneratedValues
             ref native.elevation,
             MLN_STYLE_EXPRESSION_INPUT_ELEVATION
         );
-        native.fields |= Put(
-            value.FeatureStorage?.Items,
-            ref native.feature,
-            MLN_STYLE_EXPRESSION_INPUT_FEATURE,
-            scope,
-            static (present, scope) => scope.Buffer(present)
-        );
-        native.fields |= Put(
-            value.FeatureStateStorage?.Items,
-            ref native.feature_state,
-            MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE,
-            scope,
-            static (present, scope) => scope.Buffer(present)
-        );
-        native.fields |= Put(
-            value.GlobalStateStorage?.Items,
-            ref native.global_state,
-            MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE,
-            scope,
-            static (present, scope) => scope.Buffer(present)
-        );
+        native.feature = scope.Buffer(value.FeatureStorage.Items);
+        native.feature_state = scope.Buffer(value.FeatureStateStorage.Items);
+        native.global_state = scope.Buffer(value.GlobalStateStorage.Items);
         native.fields |= Put(
             value.CanonicalTileId,
             ref native.canonical_tile_id,
@@ -2564,12 +2488,8 @@ internal static unsafe class GeneratedValues
         new(
             RuntimeStructs.CopyUtf8((sbyte*)value.id.data, value.id.size),
             RuntimeStructs.CopyUtf8((sbyte*)value.type.data, value.type.size),
-            value.source_id.size == 0
-                ? null
-                : RuntimeStructs.CopyUtf8((sbyte*)value.source_id.data, value.source_id.size),
-            value.source_layer.size == 0
-                ? null
-                : RuntimeStructs.CopyUtf8((sbyte*)value.source_layer.data, value.source_layer.size),
+            RuntimeStructs.CopyUtf8((sbyte*)value.source_id.data, value.source_id.size),
+            RuntimeStructs.CopyUtf8((sbyte*)value.source_layer.data, value.source_layer.size),
             value.min_zoom,
             value.max_zoom,
             (StyleLayerVisibility)value.visibility
@@ -2581,12 +2501,11 @@ internal static unsafe class GeneratedValues
             Id = RuntimeStructs.CopyUtf8((sbyte*)value.id.data, value.id.size),
             Type = (StyleSourceType)value.type,
             IsVolatile = value.is_volatile != 0,
-            Attribution = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_ATTRIBUTION)
-                ? RuntimeStructs.CopyUtf8((sbyte*)value.attribution.data, value.attribution.size)
-                : null,
-            Url = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_URL)
-                ? RuntimeStructs.CopyUtf8((sbyte*)value.url.data, value.url.size)
-                : null,
+            Attribution = RuntimeStructs.CopyUtf8(
+                (sbyte*)value.attribution.data,
+                value.attribution.size
+            ),
+            Url = RuntimeStructs.CopyUtf8((sbyte*)value.url.data, value.url.size),
             Tilejson = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_TILEJSON)
                 ? CopyStyleSourceTileInfo(value.tilejson)
                 : null,

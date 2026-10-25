@@ -391,8 +391,8 @@ func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {
 		allKindsRoute,
 	}
 	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Routes: routes, Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) {
-		offer(requests, routed{*request.RequestedUrl, request.Kind})
-		if *request.RequestedUrl != "custom://routed/style.json" {
+		offer(requests, routed{request.RequestedUrl, request.Kind})
+		if request.RequestedUrl != "custom://routed/style.json" {
 			deny(request, handle)
 			return
 		}

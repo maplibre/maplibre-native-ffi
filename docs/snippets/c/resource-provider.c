@@ -20,9 +20,11 @@ static void serve_bundled_asset(
   const uint8_t* bytes = NULL;
   size_t size = 0;
 
+  // Native ends the URL with a NUL, so it also reads as a C string.
+  const char* url = request->resolved_url.data;
   if (
-    strncmp(request->resolved_url, "app://", 6) != 0 ||
-    !asset_store_find(store, request->resolved_url, &bytes, &size)
+    strncmp(url, "app://", 6) != 0 ||
+    !asset_store_find(store, url, &bytes, &size)
   ) {
     // Declining hands the request to the built-in loader.
     if (mln_resource_request_pass_through(handle, NULL) != MLN_STATUS_OK) {

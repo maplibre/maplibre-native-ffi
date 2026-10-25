@@ -65,7 +65,19 @@ static void the_host_completes_a_drained_request(void) {
   TEST_ASSERT_EQUAL_UINT32(
     sizeof(mln_resource_request_info), request->request->size
   );
-  TEST_ASSERT_EQUAL_STRING(style_url, request->request->requested_url);
+  // The copy keeps each URL NUL-terminated and leaves the absent entity tag
+  // empty.
+  TEST_ASSERT_TRUE(
+    mln_test_lent_text_is_terminated(request->request->requested_url)
+  );
+  TEST_ASSERT_TRUE(
+    mln_test_lent_text_is_terminated(request->request->resolved_url)
+  );
+  TEST_ASSERT_TRUE(
+    mln_test_lent_text_is_terminated(request->request->prior_etag)
+  );
+  TEST_ASSERT_EQUAL_size_t(0, request->request->prior_etag.size);
+  TEST_ASSERT_EQUAL_STRING(style_url, request->request->requested_url.data);
   TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_STYLE, request->request->kind);
   const mln_resource_request handle = request->handle;
   MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
@@ -520,7 +532,7 @@ static void routes_filter_a_queue_provider(void) {
   const mln_resource_request_delivery* request = NULL;
   const mln_delivery_batch batch = await_request(queue.handle, NULL, &request);
   TEST_ASSERT_EQUAL_STRING(
-    "custom://routed/style.json", request->request->requested_url
+    "custom://routed/style.json", request->request->requested_url.data
   );
   const mln_resource_request handle = request->handle;
   MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
@@ -538,7 +550,7 @@ static void routes_filter_a_queue_provider(void) {
 
 // Answers every transform with the URL in user_data.
 static void transform_to(
-  void* user_data, uint32_t kind, const char* url,
+  void* user_data, uint32_t kind, mln_buffer_view url,
   mln_resource_transform_request request
 ) {
   (void)kind;

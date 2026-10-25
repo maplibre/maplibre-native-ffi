@@ -20,7 +20,6 @@ char* circle_radius_json(const char* feature) {
 
   // #region inputs
   mln_style_expression_inputs inputs = mln_style_expression_inputs_default();
-  inputs.fields = MLN_STYLE_EXPRESSION_INPUT_FEATURE;
   inputs.feature = mln_buffer_view_from_cstr(feature);
   // #endregion inputs
 

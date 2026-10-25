@@ -605,8 +605,7 @@ auto to_rendered_query_options(
     );
     return std::nullopt;
   }
-  constexpr auto known_fields = MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS |
-                                MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
+  constexpr auto known_fields = MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
   if ((options->fields & ~known_fields) != 0) {
     mln::core::set_thread_error("rendered feature query has unknown fields");
     return std::nullopt;
@@ -624,7 +623,7 @@ auto to_rendered_query_options(
     }
     layer_ids = make_string_vector(views);
   }
-  if ((options->fields & MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER) != 0) {
+  if (options->filter.size != 0) {
     auto converted_filter = mln::core::to_native_style_filter(&options->filter);
     if (!converted_filter) {
       return std::nullopt;
@@ -648,8 +647,7 @@ auto to_source_query_options(const mln_source_feature_query_options* options)
     return std::nullopt;
   }
   constexpr auto known_fields =
-    MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS |
-    MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
+    MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
   if ((options->fields & ~known_fields) != 0) {
     mln::core::set_thread_error("source feature query has unknown fields");
     return std::nullopt;
@@ -671,7 +669,7 @@ auto to_source_query_options(const mln_source_feature_query_options* options)
     }
     source_layer_ids = make_string_vector(views);
   }
-  if ((options->fields & MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER) != 0) {
+  if (options->filter.size != 0) {
     auto converted_filter = mln::core::to_native_style_filter(&options->filter);
     if (!converted_filter) {
       return std::nullopt;
@@ -746,17 +744,10 @@ auto create_rendered_feature_result(
     auto record = mln::core::RenderedFeatureRecord{};
     record.feature = serialize_geojson_feature(feature);
     record.layer_id = feature.layer;
-    if (!feature.source.empty()) {
-      record.source_id = feature.source;
-      record.fields |= MLN_RENDERED_FEATURE_SOURCE_ID;
-    }
-    if (!feature.sourceLayer.empty()) {
-      record.source_layer_id = feature.sourceLayer;
-      record.fields |= MLN_RENDERED_FEATURE_SOURCE_LAYER_ID;
-    }
+    record.source_id = feature.source;
+    record.source_layer_id = feature.sourceLayer;
     if (!feature.state.empty()) {
       record.state = mln::core::serialize_json_value(mln::Value{feature.state});
-      record.fields |= MLN_RENDERED_FEATURE_STATE;
     }
     list->features.push_back(std::move(record));
   }
@@ -773,10 +764,7 @@ auto create_source_feature_result(
   for (const auto& feature : features) {
     auto record = mln::core::SourceFeatureRecord{};
     record.feature = serialize_geojson_feature(feature);
-    if (!feature.sourceLayer.empty()) {
-      record.source_layer_id = feature.sourceLayer;
-      record.fields |= MLN_SOURCE_FEATURE_SOURCE_LAYER_ID;
-    }
+    record.source_layer_id = feature.sourceLayer;
     list->features.push_back(std::move(record));
   }
   out_result = std::move(list);
@@ -796,12 +784,12 @@ auto validate_non_empty_string(mln_buffer_view string, const char* name)
   return true;
 }
 
-auto to_feature_extension_arguments(const mln_buffer_view* arguments)
+auto to_feature_extension_arguments(mln_buffer_view arguments)
   -> std::optional<std::optional<std::map<std::string, mln::Value>>> {
-  if (arguments == nullptr) {
+  if (arguments.size == 0) {
     return std::optional<std::map<std::string, mln::Value>>{std::nullopt};
   }
-  auto converted = mln::core::to_native_json_value(*arguments);
+  auto converted = mln::core::to_native_json_value(arguments);
   if (!converted) {
     return std::nullopt;
   }
@@ -2578,7 +2566,7 @@ auto render_session_query_source_features(
 
 auto validate_feature_extension_query(
   mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension,
-  mln_buffer_view extension_field, const mln_buffer_view* arguments
+  mln_buffer_view extension_field, mln_buffer_view arguments
 ) -> mln_status {
   if (
     !validate_non_empty_string(source_id, "source_id") ||
@@ -2594,7 +2582,7 @@ auto validate_feature_extension_query(
 auto render_session_query_feature_extensions(
   mln_render_session session, mln_buffer_view source_id,
   mln_buffer_view feature, mln_buffer_view extension,
-  mln_buffer_view extension_field, const mln_buffer_view* arguments,
+  mln_buffer_view extension_field, mln_buffer_view arguments,
   std::string& out_result
 ) -> mln_status {
   mln_render_session_object* live = nullptr;

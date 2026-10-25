@@ -897,6 +897,7 @@ static void expect_revalidation_of_cached_style(
   TEST_ASSERT_NOT_NULL(request);
   TEST_ASSERT_TRUE(request->has_prior_etag);
   TEST_ASSERT_EQUAL_STRING("\"v1\"", request->prior_etag);
+  TEST_ASSERT_TRUE(request->text_terminated);
   TEST_ASSERT_BITS_HIGH(
     MLN_RESOURCE_REQUEST_PRIOR_MODIFIED | MLN_RESOURCE_REQUEST_PRIOR_EXPIRES,
     request->fields
@@ -933,7 +934,9 @@ static void a_not_modified_answer_delivers_the_cached_style(void) {
   const mln_test_provider_request* initial =
     mln_test_provider_request_at(provider, cached_style_url, 0);
   TEST_ASSERT_NOT_NULL(initial);
+  // An absent entity tag is empty lent text.
   TEST_ASSERT_FALSE(initial->has_prior_etag);
+  TEST_ASSERT_TRUE(initial->text_terminated);
   TEST_ASSERT_BITS_LOW(MLN_RESOURCE_REQUEST_PRIOR_MODIFIED, initial->fields);
   TEST_ASSERT_EQUAL_size_t(0, initial->prior_data_size);
 

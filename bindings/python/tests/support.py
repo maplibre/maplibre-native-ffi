@@ -30,7 +30,9 @@ def ok_response(data: bytes = EMPTY_STYLE) -> mln.ResourceResponse:
         status=mln.ResourceResponseStatus.OK,
         error_reason=mln.ResourceErrorReason.NONE,
         bytes=data,
+        error_message="",
         must_revalidate=False,
+        etag="",
     )
 
 
@@ -103,6 +105,7 @@ def denied_response() -> mln.ResourceResponse:
         bytes=b"",
         must_revalidate=False,
         error_message="the test provider serves no such resource",
+        etag="",
     )
 
 
@@ -135,7 +138,7 @@ class Harness:
     def _provide(
         self, request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
     ) -> None:
-        route = self.routes.get(request.requested_url or "")
+        route = self.routes.get(request.requested_url)
         if route is not None:
             route(request, handle)
             return

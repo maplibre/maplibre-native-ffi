@@ -35,7 +35,7 @@ public sealed class ResourceTransformTests
         {
             size = (uint)sizeof(mln_http_header_transform_response),
         };
-        var url = scope.CString("transform-test://é/style.json");
+        var url = scope.Utf8("transform-test://é/style.json");
         Assert.Equal(
             mln_status.MLN_STATUS_NATIVE_ERROR,
             native.callback(
@@ -82,7 +82,7 @@ public sealed class ResourceTransformTests
         {
             size = (uint)sizeof(mln_http_header_transform_response),
         };
-        var url = scope.CString("transform-test://style.json");
+        var url = scope.Utf8("transform-test://style.json");
         var responsePointer = &response;
         mln_status Invoke(Exception? exception)
         {

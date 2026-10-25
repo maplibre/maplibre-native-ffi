@@ -590,14 +590,9 @@ fn generated_copy_mln_geojson_source_options(
             || generated_value(py, value.cluster_max_zoom),
         )?,
     )?;
-    dict.set_item(
-        "cluster_properties",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES != 0,
-            || unsafe { generated_bytes(py, value.cluster_properties) },
-        )?,
-    )?;
+    dict.set_item("cluster_properties", unsafe {
+        generated_bytes(py, value.cluster_properties)
+    }?)?;
     dict.set_item(
         "buffer",
         generated_optional(
@@ -688,7 +683,7 @@ fn generated_copy_mln_http_header_rule(
 unsafe extern "C" fn generated_callback_mln_http_header_transform_callback(
     user_data: *mut std::ffi::c_void,
     kind: sys::mln_resource_kind,
-    url: *const std::ffi::c_char,
+    url: sys::mln_buffer_view,
     out_response: *mut sys::mln_http_header_transform_response,
 ) -> sys::mln_status {
     let outcome = generated_invoke(
@@ -700,7 +695,7 @@ unsafe extern "C" fn generated_callback_mln_http_header_transform_callback(
             };
             match callback.bind(py).call1((
                 generated_value(py, kind)?,
-                unsafe { generated_c_string(py, url, false) }?,
+                generated_text(py, url)?,
                 Py::new(
                     py,
                     HttpHeaderTransformResponseScope {
@@ -771,7 +766,7 @@ unsafe extern "C" fn generated_callback_mln_log_handler_callback(
     severity: sys::mln_log_severity,
     event: sys::mln_log_event,
     code: i64,
-    message: *const std::ffi::c_char,
+    message: sys::mln_buffer_view,
 ) -> bool {
     let outcome = generated_invoke(
         || false,
@@ -783,7 +778,7 @@ unsafe extern "C" fn generated_callback_mln_log_handler_callback(
                 generated_value(py, severity)?,
                 generated_value(py, event)?,
                 generated_value(py, code)?,
-                unsafe { generated_c_string(py, message, false) }?,
+                generated_text(py, message)?,
             ))?;
             if result.is_none() {
                 Ok(false)
@@ -1523,30 +1518,12 @@ fn generated_copy_mln_rendered_feature(
     let dict = PyDict::new(py);
     dict.set_item("feature", unsafe { generated_bytes(py, value.feature) }?)?;
     dict.set_item("layer_id", generated_text(py, value.layer_id)?)?;
-    dict.set_item(
-        "source_id",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_RENDERED_FEATURE_SOURCE_ID != 0,
-            || generated_text(py, value.source_id),
-        )?,
-    )?;
+    dict.set_item("source_id", generated_text(py, value.source_id)?)?;
     dict.set_item(
         "source_layer_id",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_RENDERED_FEATURE_SOURCE_LAYER_ID != 0,
-            || generated_text(py, value.source_layer_id),
-        )?,
+        generated_text(py, value.source_layer_id)?,
     )?;
-    dict.set_item(
-        "state",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_RENDERED_FEATURE_STATE != 0,
-            || unsafe { generated_bytes(py, value.state) },
-        )?,
-    )?;
+    dict.set_item("state", unsafe { generated_bytes(py, value.state) }?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1569,14 +1546,7 @@ fn generated_copy_mln_rendered_feature_query_options(
             },
         )?,
     )?;
-    dict.set_item(
-        "filter",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER != 0,
-            || unsafe { generated_bytes(py, value.filter) },
-        )?,
-    )?;
+    dict.set_item("filter", unsafe { generated_bytes(py, value.filter) }?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1668,12 +1638,8 @@ fn generated_copy_mln_resource_request_info(
     value: &sys::mln_resource_request_info,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("requested_url", unsafe {
-        generated_c_string(py, value.requested_url, true)
-    }?)?;
-    dict.set_item("resolved_url", unsafe {
-        generated_c_string(py, value.resolved_url, true)
-    }?)?;
+    dict.set_item("requested_url", generated_text(py, value.requested_url)?)?;
+    dict.set_item("resolved_url", generated_text(py, value.resolved_url)?)?;
     dict.set_item("kind", generated_value(py, value.kind)?)?;
     dict.set_item("loading_method", generated_value(py, value.loading_method)?)?;
     dict.set_item("priority", generated_value(py, value.priority)?)?;
@@ -1703,9 +1669,7 @@ fn generated_copy_mln_resource_request_info(
             || generated_value(py, value.prior_expires_unix_ms),
         )?,
     )?;
-    dict.set_item("prior_etag", unsafe {
-        generated_c_string(py, value.prior_etag, true)
-    }?)?;
+    dict.set_item("prior_etag", generated_text(py, value.prior_etag)?)?;
     dict.set_item("prior_data", unsafe {
         generated_bytes(py, generated_view(value.prior_data, value.prior_data_size)?)
     }?)?;
@@ -1726,7 +1690,7 @@ fn generated_copy_mln_resource_route(
 unsafe extern "C" fn generated_callback_mln_resource_transform_callback(
     user_data: *mut std::ffi::c_void,
     kind: sys::mln_resource_kind,
-    url: *const std::ffi::c_char,
+    url: sys::mln_buffer_view,
     request: sys::mln_resource_transform_request,
 ) {
     let request_adopted = std::cell::Cell::new(false);
@@ -1746,7 +1710,7 @@ unsafe extern "C" fn generated_callback_mln_resource_transform_callback(
             };
             let _result = callback.bind(py).call1((
                 generated_value(py, kind)?,
-                unsafe { generated_c_string(py, url, false) }?,
+                generated_text(py, url)?,
                 request_owner,
             ))?;
             Ok(())
@@ -1933,18 +1897,8 @@ fn generated_copy_mln_runtime_options(
     value: &sys::mln_runtime_options,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item(
-        "asset_path",
-        generated_optional(py, value.asset_path.size != 0, || {
-            generated_text(py, value.asset_path)
-        })?,
-    )?;
-    dict.set_item(
-        "cache_path",
-        generated_optional(py, value.cache_path.size != 0, || {
-            generated_text(py, value.cache_path)
-        })?,
-    )?;
+    dict.set_item("asset_path", generated_text(py, value.asset_path)?)?;
+    dict.set_item("cache_path", generated_text(py, value.cache_path)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1966,11 +1920,7 @@ fn generated_copy_mln_source_feature(
     dict.set_item("feature", unsafe { generated_bytes(py, value.feature) }?)?;
     dict.set_item(
         "source_layer_id",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_SOURCE_FEATURE_SOURCE_LAYER_ID != 0,
-            || generated_text(py, value.source_layer_id),
-        )?,
+        generated_text(py, value.source_layer_id)?,
     )?;
     Ok(dict.into_any().unbind())
 }
@@ -1996,14 +1946,7 @@ fn generated_copy_mln_source_feature_query_options(
             },
         )?,
     )?;
-    dict.set_item(
-        "filter",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER != 0,
-            || unsafe { generated_bytes(py, value.filter) },
-        )?,
-    )?;
+    dict.set_item("filter", unsafe { generated_bytes(py, value.filter) }?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2052,30 +1995,13 @@ fn generated_copy_mln_style_expression_inputs(
             || generated_value(py, value.elevation),
         )?,
     )?;
-    dict.set_item(
-        "feature",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_EXPRESSION_INPUT_FEATURE != 0,
-            || unsafe { generated_bytes(py, value.feature) },
-        )?,
-    )?;
-    dict.set_item(
-        "feature_state",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE != 0,
-            || unsafe { generated_bytes(py, value.feature_state) },
-        )?,
-    )?;
-    dict.set_item(
-        "global_state",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE != 0,
-            || unsafe { generated_bytes(py, value.global_state) },
-        )?,
-    )?;
+    dict.set_item("feature", unsafe { generated_bytes(py, value.feature) }?)?;
+    dict.set_item("feature_state", unsafe {
+        generated_bytes(py, value.feature_state)
+    }?)?;
+    dict.set_item("global_state", unsafe {
+        generated_bytes(py, value.global_state)
+    }?)?;
     dict.set_item(
         "canonical_tile_id",
         generated_optional(
@@ -2258,18 +2184,8 @@ fn generated_copy_mln_style_layer_info(
     let dict = PyDict::new(py);
     dict.set_item("id", generated_text(py, value.id)?)?;
     dict.set_item("type", generated_text(py, value.type_)?)?;
-    dict.set_item(
-        "source_id",
-        generated_optional(py, value.source_id.size != 0, || {
-            generated_text(py, value.source_id)
-        })?,
-    )?;
-    dict.set_item(
-        "source_layer",
-        generated_optional(py, value.source_layer.size != 0, || {
-            generated_text(py, value.source_layer)
-        })?,
-    )?;
+    dict.set_item("source_id", generated_text(py, value.source_id)?)?;
+    dict.set_item("source_layer", generated_text(py, value.source_layer)?)?;
     dict.set_item("min_zoom", generated_value(py, value.min_zoom)?)?;
     dict.set_item("max_zoom", generated_value(py, value.max_zoom)?)?;
     dict.set_item("visibility", generated_value(py, value.visibility)?)?;
@@ -2284,22 +2200,8 @@ fn generated_copy_mln_style_source_info(
     dict.set_item("id", generated_text(py, value.id)?)?;
     dict.set_item("type", generated_value(py, value.type_)?)?;
     dict.set_item("is_volatile", generated_value(py, value.is_volatile)?)?;
-    dict.set_item(
-        "attribution",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0,
-            || generated_text(py, value.attribution),
-        )?,
-    )?;
-    dict.set_item(
-        "url",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_SOURCE_INFO_URL != 0,
-            || generated_text(py, value.url),
-        )?,
-    )?;
+    dict.set_item("attribution", generated_text(py, value.attribution)?)?;
+    dict.set_item("url", generated_text(py, value.url)?)?;
     dict.set_item(
         "tilejson",
         generated_optional(
@@ -2995,18 +2897,12 @@ fn generated_input_mln_feature_state_selector<'py>(
     raw.size = std::mem::size_of::<sys::mln_feature_state_selector>() as _;
     raw.fields = 0;
     raw.source_id = storage.buffer(value.getattr("source_id")?, true)?;
-    if let Some(field) = generated_present(value, "source_layer_id")? {
-        raw.source_layer_id = storage.buffer(field, true)?;
-        raw.fields |= sys::MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
-    }
+    raw.source_layer_id = storage.buffer(value.getattr("source_layer_id")?, true)?;
     if let Some(field) = generated_present(value, "feature_id")? {
         raw.feature_id = storage.buffer(field, true)?;
         raw.fields |= sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
     }
-    if let Some(field) = generated_present(value, "state_key")? {
-        raw.state_key = storage.buffer(field, true)?;
-        raw.fields |= sys::MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
-    }
+    raw.state_key = storage.buffer(value.getattr("state_key")?, true)?;
     Ok(raw)
 }
 
@@ -3075,10 +2971,7 @@ fn generated_input_mln_geojson_source_options<'py>(
         raw.cluster_max_zoom = field.extract::<f64>()?;
         raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
     }
-    if let Some(field) = generated_present(value, "cluster_properties")? {
-        raw.cluster_properties = storage.buffer(field, false)?;
-        raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
-    }
+    raw.cluster_properties = storage.buffer(value.getattr("cluster_properties")?, false)?;
     if let Some(field) = generated_present(value, "buffer")? {
         raw.buffer = field.extract::<u32>()?;
         raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_BUFFER;
@@ -3742,10 +3635,7 @@ fn generated_input_mln_rendered_feature_query_options<'py>(
         };
         raw.fields |= sys::MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
     }
-    if let Some(field) = generated_present(value, "filter")? {
-        raw.filter = storage.buffer(field, false)?;
-        raw.fields |= sys::MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
-    }
+    raw.filter = storage.buffer(value.getattr("filter")?, false)?;
     Ok(raw)
 }
 
@@ -3984,10 +3874,7 @@ fn generated_input_mln_source_feature_query_options<'py>(
         };
         raw.fields |= sys::MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
     }
-    if let Some(field) = generated_present(value, "filter")? {
-        raw.filter = storage.buffer(field, false)?;
-        raw.fields |= sys::MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
-    }
+    raw.filter = storage.buffer(value.getattr("filter")?, false)?;
     Ok(raw)
 }
 
@@ -4014,18 +3901,9 @@ fn generated_input_mln_style_expression_inputs<'py>(
         raw.elevation = field.extract::<f64>()?;
         raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_ELEVATION;
     }
-    if let Some(field) = generated_present(value, "feature")? {
-        raw.feature = storage.buffer(field, false)?;
-        raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_FEATURE;
-    }
-    if let Some(field) = generated_present(value, "feature_state")? {
-        raw.feature_state = storage.buffer(field, false)?;
-        raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE;
-    }
-    if let Some(field) = generated_present(value, "global_state")? {
-        raw.global_state = storage.buffer(field, false)?;
-        raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE;
-    }
+    raw.feature = storage.buffer(value.getattr("feature")?, false)?;
+    raw.feature_state = storage.buffer(value.getattr("feature_state")?, false)?;
+    raw.global_state = storage.buffer(value.getattr("global_state")?, false)?;
     if let Some(field) = generated_present(value, "canonical_tile_id")? {
         raw.canonical_tile_id = generated_input_mln_canonical_tile_id(&field, storage)?;
         raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID;
@@ -5114,17 +4992,16 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (layer_json, before_layer_id=None))]
+    #[pyo3(signature = (layer_json, before_layer_id))]
     fn add_style_layer_json(
         &self,
         py: Python<'_>,
         layer_json: &Bound<'_, PyAny>,
-        before_layer_id: Option<Bound<'_, PyAny>>,
+        before_layer_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_json_value = storage.buffer(layer_json.clone(), false)?;
-        let before_layer_id = before_layer_id.unwrap_or_else(|| py.None().into_bound(py));
         let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
         let handle = self.input();
         unsafe {
@@ -5139,17 +5016,16 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (layer_json, before_layer_id=None))]
+    #[pyo3(signature = (layer_json, before_layer_id))]
     fn _discard_add_style_layer_json(
         &self,
         py: Python<'_>,
         layer_json: &Bound<'_, PyAny>,
-        before_layer_id: Option<Bound<'_, PyAny>>,
+        before_layer_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_json_value = storage.buffer(layer_json.clone(), false)?;
-        let before_layer_id = before_layer_id.unwrap_or_else(|| py.None().into_bound(py));
         let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
         let handle = self.input();
         unsafe {
@@ -6416,17 +6292,16 @@ impl MapHandle {
             )
         }
     }
-    #[pyo3(signature = (layer_id, before_layer_id=None))]
+    #[pyo3(signature = (layer_id, before_layer_id))]
     fn move_style_layer(
         &self,
         py: Python<'_>,
         layer_id: &Bound<'_, PyAny>,
-        before_layer_id: Option<Bound<'_, PyAny>>,
+        before_layer_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let before_layer_id = before_layer_id.unwrap_or_else(|| py.None().into_bound(py));
         let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
         let handle = self.input();
         unsafe {
@@ -6441,17 +6316,16 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (layer_id, before_layer_id=None))]
+    #[pyo3(signature = (layer_id, before_layer_id))]
     fn _discard_move_style_layer(
         &self,
         py: Python<'_>,
         layer_id: &Bound<'_, PyAny>,
-        before_layer_id: Option<Bound<'_, PyAny>>,
+        before_layer_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let before_layer_id = before_layer_id.unwrap_or_else(|| py.None().into_bound(py));
         let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
         let handle = self.input();
         unsafe {
@@ -8312,7 +8186,7 @@ impl RenderSessionHandle {
         }?;
         generated_copy_mln_render_session_snapshot(py, &out_snapshot)
     }
-    #[pyo3(signature = (source_id, feature, extension, extension_field, arguments=None))]
+    #[pyo3(signature = (source_id, feature, extension, extension_field, arguments))]
     fn query_feature_extensions(
         &self,
         py: Python<'_>,
@@ -8320,7 +8194,7 @@ impl RenderSessionHandle {
         feature: &Bound<'_, PyAny>,
         extension: &Bound<'_, PyAny>,
         extension_field: &Bound<'_, PyAny>,
-        arguments: Option<Bound<'_, PyAny>>,
+        arguments: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
@@ -8328,9 +8202,7 @@ impl RenderSessionHandle {
         let feature_value = storage.buffer(feature.clone(), false)?;
         let extension_value = storage.buffer(extension.clone(), true)?;
         let extension_field_value = storage.buffer(extension_field.clone(), true)?;
-        let arguments = arguments.unwrap_or_else(|| py.None().into_bound(py));
-        let arguments_value =
-            generated_maybe(&arguments, |arguments| storage.buffer(arguments, false))?;
+        let arguments_value = storage.buffer(arguments.clone(), false)?;
         let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_buffer_view>(result)?;
@@ -8345,7 +8217,7 @@ impl RenderSessionHandle {
                         feature_value,
                         extension_value,
                         extension_field_value,
-                        generated_pointer(&arguments_value),
+                        arguments_value,
                         completion,
                         diagnostic,
                     )

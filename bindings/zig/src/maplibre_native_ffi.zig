@@ -214,7 +214,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_add_style_layer_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn addStyleLayerJson(self: Map, layer_json: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    pub fn addStyleLayerJson(self: Map, layer_json: []const u8, before_layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_style_layer_json", .handle, self, call.command, null, diagnostic, .{ layer_json, before_layer_id });
     }
 
@@ -570,7 +570,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_move_style_layer` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn moveStyleLayer(self: Map, layer_id: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    pub fn moveStyleLayer(self: Map, layer_id: []const u8, before_layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_move_style_layer", .handle, self, call.command, null, diagnostic, .{ layer_id, before_layer_id });
     }
 
@@ -1105,7 +1105,7 @@ pub const RenderSession = struct {
     ///
     /// See `mln_render_session_query_feature_extensions` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-    pub fn queryFeatureExtensions(self: RenderSession, allocator: std.mem.Allocator, source_id: []const u8, feature: []const u8, extension: []const u8, extension_field: []const u8, arguments: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const u8)) {
+    pub fn queryFeatureExtensions(self: RenderSession, allocator: std.mem.Allocator, source_id: []const u8, feature: []const u8, extension: []const u8, extension_field: []const u8, arguments: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const u8)) {
         return call.submit("mln_render_session_query_feature_extensions", .handle, self, call.value(OwnedValue([]const u8), c.mln_buffer_view), allocator, diagnostic, .{ source_id, feature, extension, extension_field, arguments });
     }
 
@@ -2320,40 +2320,36 @@ pub const EglContextDescriptor = struct {
 pub const FeatureStateSelector = struct {
     /// Source ID. Required and borrowed for the duration of the call.
     source_id: []const u8 = &.{},
-    /// Optional source layer ID. Required for vector-source disambiguation.
-    source_layer_id: ?[]const u8 = null,
+    /// Source layer ID, or empty for none. Required for vector-source
+    /// disambiguation.
+    source_layer_id: []const u8 = &.{},
     /// Optional feature ID. Required by set and get, optional for remove. A
     /// numeric feature ID matches its decimal text, such as "7" for the GeoJSON
-    /// id 7.
+    /// id 7. Its field bit tells an absent ID from the empty ID "".
     feature_id: ?[]const u8 = null,
-    /// Optional state key. Used only by remove and requires feature_id.
-    state_key: ?[]const u8 = null,
+    /// State key, or empty to select every key. Used only by remove, and
+    /// requires feature_id.
+    state_key: []const u8 = &.{},
     pub fn toNative(self: FeatureStateSelector) status.Error!c.mln_feature_state_selector {
         var raw = std.mem.zeroes(c.mln_feature_state_selector);
         raw.fields = 0;
         raw.size = @sizeOf(c.mln_feature_state_selector);
         raw.source_id = marshal.view(self.source_id);
-        if (self.source_layer_id) |item| {
-            raw.fields |= c.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
-            raw.source_layer_id = marshal.view(item);
-        }
+        raw.source_layer_id = marshal.view(self.source_layer_id);
         if (self.feature_id) |item| {
             raw.fields |= c.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
             raw.feature_id = marshal.view(item);
         }
-        if (self.state_key) |item| {
-            raw.fields |= c.MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
-            raw.state_key = marshal.view(item);
-        }
+        raw.state_key = marshal.view(self.state_key);
         return raw;
     }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_feature_state_selector) status.Error!FeatureStateSelector {
         return .{
             .source_id = try marshal.copyView(allocator, raw.source_id),
-            .source_layer_id = if (raw.fields & c.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID != 0) try marshal.copyView(allocator, raw.source_layer_id) else null,
+            .source_layer_id = try marshal.copyView(allocator, raw.source_layer_id),
             .feature_id = if (raw.fields & c.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID != 0) try marshal.copyView(allocator, raw.feature_id) else null,
-            .state_key = if (raw.fields & c.MLN_FEATURE_STATE_SELECTOR_STATE_KEY != 0) try marshal.copyView(allocator, raw.state_key) else null,
+            .state_key = try marshal.copyView(allocator, raw.state_key),
         };
     }
 };
@@ -2450,9 +2446,9 @@ pub const GeojsonSourceOptions = struct {
     /// Highest zoom that clusters points. Defaults to 17.
     cluster_max_zoom: ?f64 = null,
     /// Cluster aggregation expressions keyed by property name, as a JSON object
-    /// whose members follow the MapLibre Style Spec clusterProperties form. The
-    /// UTF-8 bytes are borrowed for the call.
-    cluster_properties: ?[]const u8 = null,
+    /// whose members follow the MapLibre Style Spec clusterProperties form, or
+    /// empty for none. The UTF-8 bytes are borrowed for the call.
+    cluster_properties: []const u8 = &.{},
     /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
     buffer: ?u32 = null,
     /// Cluster radius in pixels within \[0, 4095\]. Defaults to 50.
@@ -2474,10 +2470,7 @@ pub const GeojsonSourceOptions = struct {
         marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, self.max_zoom);
         marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE, &raw.tolerance, self.tolerance);
         marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM, &raw.cluster_max_zoom, self.cluster_max_zoom);
-        if (self.cluster_properties) |item| {
-            raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
-            raw.cluster_properties = marshal.view(item);
-        }
+        raw.cluster_properties = marshal.view(self.cluster_properties);
         marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_BUFFER, &raw.buffer, self.buffer);
         marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS, &raw.cluster_radius, self.cluster_radius);
         marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS, &raw.cluster_min_points, self.cluster_min_points);
@@ -2493,7 +2486,7 @@ pub const GeojsonSourceOptions = struct {
             .max_zoom = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM != 0) raw.max_zoom else null,
             .tolerance = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE != 0) raw.tolerance else null,
             .cluster_max_zoom = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM != 0) raw.cluster_max_zoom else null,
-            .cluster_properties = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES != 0) try marshal.copyView(allocator, raw.cluster_properties) else null,
+            .cluster_properties = try marshal.copyView(allocator, raw.cluster_properties),
             .buffer = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_BUFFER != 0) raw.buffer else null,
             .cluster_radius = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS != 0) raw.cluster_radius else null,
             .cluster_min_points = if (raw.fields & c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS != 0) raw.cluster_min_points else null,
@@ -2596,7 +2589,7 @@ pub const HttpHeaderRule = struct {
     kinds: ResourceKindFlag,
     flags: UrlMatchFlag,
     /// The URL or glob pattern to compare.
-    url: []const u8,
+    url: []const u8 = &.{},
     /// The headers to set. Registration validates each one as
     /// `mln_http_header_transform_response_set_header()` does.
     headers: []const HttpHeader,
@@ -2668,7 +2661,7 @@ pub const HttpHeaderTransform = struct {
                 var scope: callbacks.Scope = .{};
                 scope.enter(@intFromPtr(callback_arg_3));
                 defer scope.leave();
-                host(state.value.context, ResourceKind.fromNative(callback_arg_1), std.mem.span(callback_arg_2 orelse return error.NativeError), .{ .native = @ptrCast(callback_arg_3) }) catch |err| {
+                host(state.value.context, ResourceKind.fromNative(callback_arg_1), try marshal.borrowView(callback_arg_2), .{ .native = @ptrCast(callback_arg_3) }) catch |err| {
                     if (status.rawStatus(err)) |deliberate| return deliberate;
                     callbacks.reportError("mln_http_header_transform_callback", err);
                     return c.MLN_STATUS_NATIVE_ERROR;
@@ -2860,7 +2853,7 @@ pub const LogHandler = struct {
                 const host = state.value.callback orelse {
                     return false;
                 };
-                const result = host(state.value.context, LogSeverity.fromNative(callback_arg_1), LogEvent.fromNative(callback_arg_2), callback_arg_3, std.mem.span(callback_arg_4 orelse return error.NativeError)) catch |err| {
+                const result = host(state.value.context, LogSeverity.fromNative(callback_arg_1), LogEvent.fromNative(callback_arg_2), callback_arg_3, try marshal.borrowView(callback_arg_4)) catch |err| {
                     callbacks.reportError("mln_log_callback", err);
                     return false;
                 };
@@ -3839,7 +3832,7 @@ pub const PremultipliedRgba8Image = struct {
     /// Bytes per image row. Must be at least width \* 4.
     stride: u32,
     /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
-    pixels: []const u8,
+    pixels: []const u8 = &.{},
     pub fn toNative(self: PremultipliedRgba8Image) status.Error!c.mln_premultiplied_rgba8_image {
         var raw = c.mln_premultiplied_rgba8_image_default();
         raw.size = @sizeOf(c.mln_premultiplied_rgba8_image);
@@ -4310,17 +4303,17 @@ pub const RenderSessionState = enum(u32) {
 pub const RenderedFeature = struct {
     feature: []const u8 = &.{},
     layer_id: []const u8 = &.{},
-    source_id: ?[]const u8 = null,
-    source_layer_id: ?[]const u8 = null,
-    state: ?[]const u8 = null,
+    source_id: []const u8 = &.{},
+    source_layer_id: []const u8 = &.{},
+    state: []const u8 = &.{},
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_rendered_feature) status.Error!RenderedFeature {
         return .{
             .feature = try marshal.copyView(allocator, raw.feature),
             .layer_id = try marshal.copyView(allocator, raw.layer_id),
-            .source_id = if (raw.fields & c.MLN_RENDERED_FEATURE_SOURCE_ID != 0) try marshal.copyView(allocator, raw.source_id) else null,
-            .source_layer_id = if (raw.fields & c.MLN_RENDERED_FEATURE_SOURCE_LAYER_ID != 0) try marshal.copyView(allocator, raw.source_layer_id) else null,
-            .state = if (raw.fields & c.MLN_RENDERED_FEATURE_STATE != 0) try marshal.copyView(allocator, raw.state) else null,
+            .source_id = try marshal.copyView(allocator, raw.source_id),
+            .source_layer_id = try marshal.copyView(allocator, raw.source_layer_id),
+            .state = try marshal.copyView(allocator, raw.state),
         };
     }
 };
@@ -4332,8 +4325,8 @@ pub const RenderedFeature = struct {
 pub const RenderedFeatureQueryOptions = struct {
     /// Optional style layer IDs. When absent, all rendered layers are queried.
     layer_ids: ?[]const []const u8 = null,
-    /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-    filter: ?[]const u8 = null,
+    /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
+    filter: []const u8 = &.{},
     pub fn toNative(self: RenderedFeatureQueryOptions, allocator: std.mem.Allocator) status.Error!c.mln_rendered_feature_query_options {
         var raw = c.mln_rendered_feature_query_options_default();
         raw.fields = 0;
@@ -4347,10 +4340,7 @@ pub const RenderedFeatureQueryOptions = struct {
             };
         }
         raw.layer_id_count = std.math.cast(@TypeOf(raw.layer_id_count), if (self.layer_ids) |items| items.len else 0) orelse return error.InvalidArgument;
-        if (self.filter) |item| {
-            raw.fields |= c.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
-            raw.filter = marshal.view(item);
-        }
+        raw.filter = marshal.view(self.filter);
         return raw;
     }
 
@@ -4361,7 +4351,7 @@ pub const RenderedFeatureQueryOptions = struct {
                 for (try marshal.nativeSlice(c.mln_buffer_view, raw.layer_ids, raw.layer_id_count), 0..) |item, index| copied[index] = try marshal.copyView(allocator, item);
                 break :blk copied;
             } else null,
-            .filter = if (raw.fields & c.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER != 0) try marshal.copyView(allocator, raw.filter) else null,
+            .filter = try marshal.copyView(allocator, raw.filter),
         };
     }
 };
@@ -4659,10 +4649,10 @@ pub const ResourceRequestCancelHandler = struct {
 
 pub const ResourceRequestInfo = struct {
     /// URL entering the network layer, before tile server normalization.
-    requested_url: ?[]const u8 = null,
+    requested_url: []const u8 = &.{},
     /// URL to fetch, after resource-kind normalization against the runtime's
     /// tile server options and API key.
-    resolved_url: ?[]const u8 = null,
+    resolved_url: []const u8 = &.{},
     kind: ResourceKind = .unknown,
     loading_method: ResourceLoadingMethod = .all,
     priority: ResourcePriority = .regular,
@@ -4671,13 +4661,14 @@ pub const ResourceRequestInfo = struct {
     range: ?ResourceRange = null,
     prior_modified_unix_ms: ?i64 = null,
     prior_expires_unix_ms: ?i64 = null,
-    prior_etag: ?[]const u8 = null,
+    /// Entity tag of the cached copy, or empty when there is none.
+    prior_etag: []const u8 = &.{},
     prior_data: []const u8 = &.{},
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_request_info) status.Error!ResourceRequestInfo {
         return .{
-            .requested_url = if (raw.requested_url == null) null else try allocator.dupe(u8, std.mem.span(raw.requested_url orelse return error.NativeError)),
-            .resolved_url = if (raw.resolved_url == null) null else try allocator.dupe(u8, std.mem.span(raw.resolved_url orelse return error.NativeError)),
+            .requested_url = try marshal.copyView(allocator, raw.requested_url),
+            .resolved_url = try marshal.copyView(allocator, raw.resolved_url),
             .kind = ResourceKind.fromNative(raw.kind),
             .loading_method = ResourceLoadingMethod.fromNative(raw.loading_method),
             .priority = ResourcePriority.fromNative(raw.priority),
@@ -4686,7 +4677,7 @@ pub const ResourceRequestInfo = struct {
             .range = if (raw.fields & c.MLN_RESOURCE_REQUEST_RANGE != 0) ResourceRange.fromNative(raw.range) else null,
             .prior_modified_unix_ms = if (raw.fields & c.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0) raw.prior_modified_unix_ms else null,
             .prior_expires_unix_ms = if (raw.fields & c.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0) raw.prior_expires_unix_ms else null,
-            .prior_etag = if (raw.prior_etag == null) null else try allocator.dupe(u8, std.mem.span(raw.prior_etag orelse return error.NativeError)),
+            .prior_etag = try marshal.copyView(allocator, raw.prior_etag),
             .prior_data = try marshal.copyView(allocator, .{ .data = raw.prior_data, .size = raw.prior_data_size }),
         };
     }
@@ -4701,11 +4692,11 @@ pub const ResourceResponse = struct {
     error_reason: ResourceErrorReason = .none,
     /// Response bytes. May be null only when byte_count is 0.
     bytes: []const u8 = &.{},
-    error_message: ?[]const u8 = null,
+    error_message: []const u8 = &.{},
     must_revalidate: bool = false,
     modified_unix_ms: ?i64 = null,
     expires_unix_ms: ?i64 = null,
-    etag: ?[]const u8 = null,
+    etag: []const u8 = &.{},
     retry_after_unix_ms: ?i64 = null,
     pub fn toNative(self: ResourceResponse) status.Error!c.mln_resource_response {
         var raw = std.mem.zeroes(c.mln_resource_response);
@@ -4715,11 +4706,11 @@ pub const ResourceResponse = struct {
         raw.error_reason = self.error_reason.toNative();
         raw.bytes = @ptrCast(self.bytes.ptr);
         raw.byte_count = std.math.cast(@TypeOf(raw.byte_count), self.bytes.len) orelse return error.InvalidArgument;
-        raw.error_message = if (self.error_message) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
+        raw.error_message = marshal.view(self.error_message);
         raw.must_revalidate = self.must_revalidate;
         marshal.present(&raw.fields, c.MLN_RESOURCE_RESPONSE_MODIFIED, &raw.modified_unix_ms, self.modified_unix_ms);
         marshal.present(&raw.fields, c.MLN_RESOURCE_RESPONSE_EXPIRES, &raw.expires_unix_ms, self.expires_unix_ms);
-        raw.etag = if (self.etag) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
+        raw.etag = marshal.view(self.etag);
         marshal.present(&raw.fields, c.MLN_RESOURCE_RESPONSE_RETRY_AFTER, &raw.retry_after_unix_ms, self.retry_after_unix_ms);
         return raw;
     }
@@ -4729,11 +4720,11 @@ pub const ResourceResponse = struct {
             .status = ResourceResponseStatus.fromNative(raw.status),
             .error_reason = ResourceErrorReason.fromNative(raw.error_reason),
             .bytes = try marshal.copyView(allocator, .{ .data = raw.bytes, .size = raw.byte_count }),
-            .error_message = if (raw.error_message.size == 0) null else try marshal.copyView(allocator, raw.error_message),
+            .error_message = try marshal.copyView(allocator, raw.error_message),
             .must_revalidate = raw.must_revalidate,
             .modified_unix_ms = if (raw.fields & c.MLN_RESOURCE_RESPONSE_MODIFIED != 0) raw.modified_unix_ms else null,
             .expires_unix_ms = if (raw.fields & c.MLN_RESOURCE_RESPONSE_EXPIRES != 0) raw.expires_unix_ms else null,
-            .etag = if (raw.etag.size == 0) null else try marshal.copyView(allocator, raw.etag),
+            .etag = try marshal.copyView(allocator, raw.etag),
             .retry_after_unix_ms = if (raw.fields & c.MLN_RESOURCE_RESPONSE_RETRY_AFTER != 0) raw.retry_after_unix_ms else null,
         };
     }
@@ -4762,7 +4753,7 @@ pub const ResourceRoute = struct {
     kinds: ResourceKindFlag,
     flags: UrlMatchFlag,
     /// The URL or glob pattern to compare.
-    url: []const u8,
+    url: []const u8 = &.{},
     pub fn toNative(self: ResourceRoute) status.Error!c.mln_resource_route {
         var raw = c.mln_resource_route_default();
         raw.kinds = self.kinds.toNative();
@@ -4819,7 +4810,7 @@ pub const ResourceTransform = struct {
                 defer if (!ownership_transferred) {
                     owned_request.release();
                 };
-                try host(state.value.context, ResourceKind.fromNative(callback_arg_1), std.mem.span(callback_arg_2 orelse return error.NativeError), owned_request);
+                try host(state.value.context, ResourceKind.fromNative(callback_arg_1), try marshal.borrowView(callback_arg_2), owned_request);
                 ownership_transferred = true;
             }
         }.invoke(native_arg_0, native_arg_1, native_arg_2, native_arg_3) catch |err| {
@@ -5163,21 +5154,22 @@ pub const RuntimeEventType = enum(u32) {
 pub const RuntimeOptions = struct {
     /// Directory root for asset:// URLs. Copied during runtime creation. Empty
     /// selects `/android_asset` on Android and `.` elsewhere.
-    asset_path: ?[]const u8 = null,
-    /// Cache database path. Copied during runtime creation.
-    cache_path: ?[]const u8 = null,
+    asset_path: []const u8 = &.{},
+    /// Cache database path. Copied during runtime creation. Empty selects an
+    /// in-memory cache.
+    cache_path: []const u8 = &.{},
     pub fn toNative(self: RuntimeOptions) status.Error!c.mln_runtime_options {
         var raw = c.mln_runtime_options_default();
         raw.size = @sizeOf(c.mln_runtime_options);
-        raw.asset_path = if (self.asset_path) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
-        raw.cache_path = if (self.cache_path) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
+        raw.asset_path = marshal.view(self.asset_path);
+        raw.cache_path = marshal.view(self.cache_path);
         return raw;
     }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_runtime_options) status.Error!RuntimeOptions {
         return .{
-            .asset_path = if (raw.asset_path.size == 0) null else try marshal.copyView(allocator, raw.asset_path),
-            .cache_path = if (raw.cache_path.size == 0) null else try marshal.copyView(allocator, raw.cache_path),
+            .asset_path = try marshal.copyView(allocator, raw.asset_path),
+            .cache_path = try marshal.copyView(allocator, raw.cache_path),
         };
     }
 };
@@ -5260,12 +5252,12 @@ pub const ScreenPoint = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub const SourceFeature = struct {
     feature: []const u8 = &.{},
-    source_layer_id: ?[]const u8 = null,
+    source_layer_id: []const u8 = &.{},
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_source_feature) status.Error!SourceFeature {
         return .{
             .feature = try marshal.copyView(allocator, raw.feature),
-            .source_layer_id = if (raw.fields & c.MLN_SOURCE_FEATURE_SOURCE_LAYER_ID != 0) try marshal.copyView(allocator, raw.source_layer_id) else null,
+            .source_layer_id = try marshal.copyView(allocator, raw.source_layer_id),
         };
     }
 };
@@ -5278,8 +5270,8 @@ pub const SourceFeatureQueryOptions = struct {
     /// Optional source-layer IDs. Required by vector sources; ignored by
     /// GeoJSON.
     source_layer_ids: ?[]const []const u8 = null,
-    /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-    filter: ?[]const u8 = null,
+    /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
+    filter: []const u8 = &.{},
     pub fn toNative(self: SourceFeatureQueryOptions, allocator: std.mem.Allocator) status.Error!c.mln_source_feature_query_options {
         var raw = c.mln_source_feature_query_options_default();
         raw.fields = 0;
@@ -5293,10 +5285,7 @@ pub const SourceFeatureQueryOptions = struct {
             };
         }
         raw.source_layer_id_count = std.math.cast(@TypeOf(raw.source_layer_id_count), if (self.source_layer_ids) |items| items.len else 0) orelse return error.InvalidArgument;
-        if (self.filter) |item| {
-            raw.fields |= c.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
-            raw.filter = marshal.view(item);
-        }
+        raw.filter = marshal.view(self.filter);
         return raw;
     }
 
@@ -5307,7 +5296,7 @@ pub const SourceFeatureQueryOptions = struct {
                 for (try marshal.nativeSlice(c.mln_buffer_view, raw.source_layer_ids, raw.source_layer_id_count), 0..) |item, index| copied[index] = try marshal.copyView(allocator, item);
                 break :blk copied;
             } else null,
-            .filter = if (raw.fields & c.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER != 0) try marshal.copyView(allocator, raw.filter) else null,
+            .filter = try marshal.copyView(allocator, raw.filter),
         };
     }
 };
@@ -5373,11 +5362,11 @@ pub const StyleExpressionInputs = struct {
     /// The value of the elevation expression outside a color-relief layer.
     elevation: ?f64 = null,
     /// One UTF-8 GeoJSON Feature that feature data expressions read.
-    feature: ?[]const u8 = null,
+    feature: []const u8 = &.{},
     /// A UTF-8 JSON object that the feature-state expression reads.
-    feature_state: ?[]const u8 = null,
+    feature_state: []const u8 = &.{},
     /// A UTF-8 JSON object that the global-state expression reads.
-    global_state: ?[]const u8 = null,
+    global_state: []const u8 = &.{},
     /// The tile that holds the feature, which the within and distance
     /// expressions need to place its geometry.
     canonical_tile_id: ?CanonicalTileId = null,
@@ -5391,18 +5380,9 @@ pub const StyleExpressionInputs = struct {
         marshal.present(&raw.fields, c.MLN_STYLE_EXPRESSION_INPUT_ZOOM, &raw.zoom, self.zoom);
         marshal.present(&raw.fields, c.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER, &raw.color_ramp_parameter, self.color_ramp_parameter);
         marshal.present(&raw.fields, c.MLN_STYLE_EXPRESSION_INPUT_ELEVATION, &raw.elevation, self.elevation);
-        if (self.feature) |item| {
-            raw.fields |= c.MLN_STYLE_EXPRESSION_INPUT_FEATURE;
-            raw.feature = marshal.view(item);
-        }
-        if (self.feature_state) |item| {
-            raw.fields |= c.MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE;
-            raw.feature_state = marshal.view(item);
-        }
-        if (self.global_state) |item| {
-            raw.fields |= c.MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE;
-            raw.global_state = marshal.view(item);
-        }
+        raw.feature = marshal.view(self.feature);
+        raw.feature_state = marshal.view(self.feature_state);
+        raw.global_state = marshal.view(self.global_state);
         marshal.present(&raw.fields, c.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID, &raw.canonical_tile_id, self.canonical_tile_id);
         raw.available_images = blk: {
             const items = try allocator.alloc(c.mln_buffer_view, self.available_images.len);
@@ -5418,9 +5398,9 @@ pub const StyleExpressionInputs = struct {
             .zoom = if (raw.fields & c.MLN_STYLE_EXPRESSION_INPUT_ZOOM != 0) raw.zoom else null,
             .color_ramp_parameter = if (raw.fields & c.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER != 0) raw.color_ramp_parameter else null,
             .elevation = if (raw.fields & c.MLN_STYLE_EXPRESSION_INPUT_ELEVATION != 0) raw.elevation else null,
-            .feature = if (raw.fields & c.MLN_STYLE_EXPRESSION_INPUT_FEATURE != 0) try marshal.copyView(allocator, raw.feature) else null,
-            .feature_state = if (raw.fields & c.MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE != 0) try marshal.copyView(allocator, raw.feature_state) else null,
-            .global_state = if (raw.fields & c.MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE != 0) try marshal.copyView(allocator, raw.global_state) else null,
+            .feature = try marshal.copyView(allocator, raw.feature),
+            .feature_state = try marshal.copyView(allocator, raw.feature_state),
+            .global_state = try marshal.copyView(allocator, raw.global_state),
             .canonical_tile_id = if (raw.fields & c.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID != 0) CanonicalTileId.fromNative(raw.canonical_tile_id) else null,
             .available_images = blk: {
                 const copied = try allocator.alloc([]const u8, raw.available_image_count);
@@ -5649,9 +5629,9 @@ pub const StyleLayerInfo = struct {
     /// The style-spec layer type string.
     type: []const u8 = &.{},
     /// Source ID. Empty for a layer type that takes no source.
-    source_id: ?[]const u8 = null,
+    source_id: []const u8 = &.{},
     /// Source-layer ID. Empty when the layer sets none.
-    source_layer: ?[]const u8 = null,
+    source_layer: []const u8 = &.{},
     /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
     min_zoom: f64 = 0,
     /// Highest zoom at which the layer draws; INFINITY with no upper bound.
@@ -5662,8 +5642,8 @@ pub const StyleLayerInfo = struct {
         return .{
             .id = try marshal.copyView(allocator, raw.id),
             .type = try marshal.copyView(allocator, raw.type),
-            .source_id = if (raw.source_id.size == 0) null else try marshal.copyView(allocator, raw.source_id),
-            .source_layer = if (raw.source_layer.size == 0) null else try marshal.copyView(allocator, raw.source_layer),
+            .source_id = try marshal.copyView(allocator, raw.source_id),
+            .source_layer = try marshal.copyView(allocator, raw.source_layer),
             .min_zoom = raw.min_zoom,
             .max_zoom = raw.max_zoom,
             .visibility = StyleLayerVisibility.fromNative(raw.visibility),
@@ -5705,10 +5685,10 @@ pub const StyleSourceInfo = struct {
     type: StyleSourceType = .unknown,
     /// Whether the source is marked volatile.
     is_volatile: bool = false,
-    /// Attribution string, when the source sets one. It may be empty.
-    attribution: ?[]const u8 = null,
-    /// URL that the source loads from, when it has one.
-    url: ?[]const u8 = null,
+    /// Attribution string, or empty when the source sets none.
+    attribution: []const u8 = &.{},
+    /// URL that the source loads from, or empty when it has none.
+    url: []const u8 = &.{},
     /// Inline TileJSON metadata, when the source was defined with it.
     tilejson: ?StyleSourceTileInfo = null,
     /// Geographic bounds, when inline TileJSON sets them.
@@ -5725,8 +5705,8 @@ pub const StyleSourceInfo = struct {
             .id = try marshal.copyView(allocator, raw.id),
             .type = StyleSourceType.fromNative(raw.type),
             .is_volatile = raw.is_volatile,
-            .attribution = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0) try marshal.copyView(allocator, raw.attribution) else null,
-            .url = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_URL != 0) try marshal.copyView(allocator, raw.url) else null,
+            .attribution = try marshal.copyView(allocator, raw.attribution),
+            .url = try marshal.copyView(allocator, raw.url),
             .tilejson = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_TILEJSON != 0) try StyleSourceTileInfo.fromNative(allocator, raw.tilejson) else null,
             .bounds = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_BOUNDS != 0) LatLngBounds.fromNative(raw.bounds) else null,
             .tile_size = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0) raw.tile_size else null,
@@ -6883,7 +6863,7 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_add_image_source_url", .handle, map, allocator, diagnostic, .{ source_id, coordinates, coordinates.len, url });
     }
 
-    pub fn addStyleLayerJson(self: MapDiscarding, layer_json: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn addStyleLayerJson(self: MapDiscarding, layer_json: []const u8, before_layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_add_style_layer_json", .handle, map, null, diagnostic, .{ layer_json, before_layer_id });
     }
@@ -6938,7 +6918,7 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_invalidate_custom_mvt_vector_source_tile", .handle, map, null, diagnostic, .{ source_id, tile_id });
     }
 
-    pub fn moveStyleLayer(self: MapDiscarding, layer_id: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn moveStyleLayer(self: MapDiscarding, layer_id: []const u8, before_layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_move_style_layer", .handle, map, null, diagnostic, .{ layer_id, before_layer_id });
     }

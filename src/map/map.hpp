@@ -140,12 +140,8 @@ auto deliver_style_result(
                          ) -> mln_style_source_info {
       auto info = source.info;
       info.id = view(source.id);
-      if ((info.fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0) {
-        info.attribution = view(source.attribution);
-      }
-      if ((info.fields & MLN_STYLE_SOURCE_INFO_URL) != 0) {
-        info.url = view(source.url);
-      }
+      info.attribution = view(source.attribution);
+      info.url = view(source.url);
       if ((info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
         info.tilejson.tile_urls = tile_urls.data();
         info.tilejson.tile_url_count = tile_urls.size();

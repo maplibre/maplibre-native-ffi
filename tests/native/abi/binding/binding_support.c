@@ -140,15 +140,17 @@ typedef struct finalization_failure_probe {
 } finalization_failure_probe;
 
 static bool record_finalization_failure(
-  void* user_data, uint32_t severity, uint32_t event, int64_t code,
-  const char* message
+  void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
+  mln_buffer_view message
 ) {
   (void)code;
   finalization_failure_probe* probe = user_data;
-  if (message != NULL && strstr(message, "owner finalization failed") != NULL) {
+  // Lent text is NUL-terminated after its bytes.
+  const char* text = message.data;
+  if (strstr(text, "owner finalization failed") != NULL) {
     probe->severity = severity;
     probe->event = event;
-    snprintf(probe->message, sizeof(probe->message), "%s", message);
+    snprintf(probe->message, sizeof(probe->message), "%s", text);
     atomic_fetch_add(&probe->errors, 1);
   }
   return true;

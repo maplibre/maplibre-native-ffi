@@ -16,7 +16,7 @@ let redStyle = Data(##"""
 /// request as not found, so no test reaches the network.
 func denyingProvider(routes: [String: Data] = [:]) -> ResourceProvider {
   ResourceProvider { request, handle in
-    let url = request.requestedUrl ?? ""
+    let url = request.requestedUrl
     let response = routes[url].map { ResourceResponse(status: .ok, bytes: $0) }
       ?? ResourceResponse(
         status: .error,

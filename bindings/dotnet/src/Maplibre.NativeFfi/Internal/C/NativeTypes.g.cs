@@ -291,7 +291,7 @@ internal unsafe struct mln_http_header_transform
     public delegate* unmanaged[Cdecl]<
         void*,
         mln_resource_kind,
-        sbyte*,
+        mln_buffer_view,
         mln_http_header_transform_response*,
         mln_status> callback;
     public void* user_data;
@@ -340,7 +340,7 @@ internal unsafe struct mln_log_handler
         mln_log_severity,
         mln_log_event,
         long,
-        sbyte*,
+        mln_buffer_view,
         byte> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
@@ -690,7 +690,6 @@ internal unsafe struct mln_render_session_snapshot
 
 internal unsafe struct mln_rendered_feature
 {
-    public mln_rendered_feature_field fields;
     public mln_buffer_view feature;
     public mln_buffer_view layer_id;
     public mln_buffer_view source_id;
@@ -770,8 +769,8 @@ internal unsafe struct mln_resource_request_info
 {
     public uint size;
     public mln_resource_request_field fields;
-    public sbyte* requested_url;
-    public sbyte* resolved_url;
+    public mln_buffer_view requested_url;
+    public mln_buffer_view resolved_url;
     public mln_resource_kind kind;
     public mln_resource_loading_method loading_method;
     public mln_resource_priority priority;
@@ -780,7 +779,7 @@ internal unsafe struct mln_resource_request_info
     public mln_resource_range range;
     public long prior_modified_unix_ms;
     public long prior_expires_unix_ms;
-    public sbyte* prior_etag;
+    public mln_buffer_view prior_etag;
     public byte* prior_data;
     public nuint prior_data_size;
 }
@@ -814,7 +813,7 @@ internal unsafe struct mln_resource_transform
     public delegate* unmanaged[Cdecl]<
         void*,
         mln_resource_kind,
-        sbyte*,
+        mln_buffer_view,
         MlnResourceTransformRequest,
         void> callback;
     public void* user_data;
@@ -929,7 +928,6 @@ internal unsafe struct mln_screen_point
 
 internal unsafe struct mln_source_feature
 {
-    public mln_source_feature_field fields;
     public mln_buffer_view feature;
     public mln_buffer_view source_layer_id;
 }
@@ -1342,9 +1340,7 @@ internal enum mln_custom_mvt_vector_source_option_field : uint
 
 internal enum mln_feature_state_selector_field : uint
 {
-    MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID = 1,
-    MLN_FEATURE_STATE_SELECTOR_FEATURE_ID = 2,
-    MLN_FEATURE_STATE_SELECTOR_STATE_KEY = 4,
+    MLN_FEATURE_STATE_SELECTOR_FEATURE_ID = 1,
 }
 
 internal enum mln_frame_demand_flag : uint
@@ -1366,13 +1362,12 @@ internal enum mln_geojson_source_option_field : uint
     MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM = 2,
     MLN_GEOJSON_SOURCE_OPTION_TOLERANCE = 4,
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM = 8,
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES = 16,
-    MLN_GEOJSON_SOURCE_OPTION_BUFFER = 32,
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 64,
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 128,
-    MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 256,
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 512,
-    MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 1024,
+    MLN_GEOJSON_SOURCE_OPTION_BUFFER = 16,
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 32,
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 64,
+    MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 128,
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 256,
+    MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 512,
 }
 
 internal enum mln_gesture_phase : uint
@@ -1576,17 +1571,9 @@ internal enum mln_render_session_state : uint
     MLN_RENDER_SESSION_STATE_ABANDONED = 6,
 }
 
-internal enum mln_rendered_feature_field : uint
-{
-    MLN_RENDERED_FEATURE_SOURCE_ID = 1,
-    MLN_RENDERED_FEATURE_SOURCE_LAYER_ID = 2,
-    MLN_RENDERED_FEATURE_STATE = 4,
-}
-
 internal enum mln_rendered_feature_query_option_field : uint
 {
     MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS = 1,
-    MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER = 2,
 }
 
 internal enum mln_rendered_query_geometry_type : uint
@@ -1745,15 +1732,9 @@ internal enum mln_runtime_event_type : uint
     MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19,
 }
 
-internal enum mln_source_feature_field : uint
-{
-    MLN_SOURCE_FEATURE_SOURCE_LAYER_ID = 1,
-}
-
 internal enum mln_source_feature_query_option_field : uint
 {
     MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS = 1,
-    MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER = 2,
 }
 
 internal enum mln_status : int
@@ -1776,10 +1757,7 @@ internal enum mln_style_expression_input_field : uint
     MLN_STYLE_EXPRESSION_INPUT_ZOOM = 1,
     MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER = 2,
     MLN_STYLE_EXPRESSION_INPUT_ELEVATION = 4,
-    MLN_STYLE_EXPRESSION_INPUT_FEATURE = 8,
-    MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE = 16,
-    MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE = 32,
-    MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID = 64,
+    MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID = 8,
 }
 
 internal enum mln_style_expression_option_field : uint
@@ -1841,13 +1819,11 @@ internal enum mln_style_raster_dem_encoding : uint
 
 internal enum mln_style_source_info_field : uint
 {
-    MLN_STYLE_SOURCE_INFO_URL = 1,
-    MLN_STYLE_SOURCE_INFO_TILEJSON = 2,
-    MLN_STYLE_SOURCE_INFO_BOUNDS = 4,
-    MLN_STYLE_SOURCE_INFO_TILE_SIZE = 8,
-    MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 16,
-    MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 32,
-    MLN_STYLE_SOURCE_INFO_ATTRIBUTION = 64,
+    MLN_STYLE_SOURCE_INFO_TILEJSON = 1,
+    MLN_STYLE_SOURCE_INFO_BOUNDS = 2,
+    MLN_STYLE_SOURCE_INFO_TILE_SIZE = 4,
+    MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 8,
+    MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 16,
 }
 
 internal enum mln_style_source_type : uint

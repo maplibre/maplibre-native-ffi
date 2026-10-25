@@ -93,7 +93,7 @@ test "replacing the process-global log callback releases the previous one" {
 const failing_style_url = "custom://failing-provider.json";
 
 fn completeThenFail(_: ?*anyopaque, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!void {
-    if (std.mem.eql(u8, request.requested_url orelse "", failing_style_url)) {
+    if (std.mem.eql(u8, request.requested_url, failing_style_url)) {
         var owned = handle;
         try owned.complete(.{ .bytes = support.style_json }, null);
     }
@@ -125,7 +125,7 @@ const DeferringProvider = struct {
     handles: [4]maplibre.ResourceRequest = undefined,
 
     fn provide(self: *DeferringProvider, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!void {
-        if (!std.mem.eql(u8, request.requested_url orelse "", self.url)) {
+        if (!std.mem.eql(u8, request.requested_url, self.url)) {
             var owned = handle;
             return owned.complete(.{ .status = .@"error", .error_reason = .not_found }, null);
         }
@@ -356,7 +356,7 @@ const RoutedProvider = struct {
     others: support.Counter = .{},
 
     fn provide(self: *RoutedProvider, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!void {
-        const url = request.requested_url orelse "";
+        const url = request.requested_url;
         const is_style = request.kind == .style and std.mem.eql(u8, url, routed_style_url);
         const is_source = request.kind == .source and std.mem.eql(u8, url, routed_source_url);
         var owned = handle;

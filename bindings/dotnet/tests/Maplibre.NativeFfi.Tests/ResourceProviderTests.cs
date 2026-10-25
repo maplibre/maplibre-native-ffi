@@ -14,7 +14,13 @@ public sealed class ResourceProviderTests
     private const string StyleUrl = "provider-test://é/style.json";
 
     private static ResourceResponse StyleResponse() =>
-        new() { Status = ResourceResponseStatus.Ok, Bytes = [.. NativeFixture.EmptyStyle] };
+        new()
+        {
+            Status = ResourceResponseStatus.Ok,
+            Bytes = [.. NativeFixture.EmptyStyle],
+            ErrorMessage = "",
+            Etag = "",
+        };
 
     [Fact]
     public async Task AProviderCanAnswerLaterThroughItsHandle()
@@ -29,7 +35,12 @@ public sealed class ResourceProviderTests
         // Native rejects a malformed etag while the request stays open for another answer.
         Assert.Throws<MaplibreException>(() =>
             handle.Complete(
-                new ResourceResponse { Status = ResourceResponseStatus.Ok, Etag = "invalid\0etag" }
+                new ResourceResponse
+                {
+                    Status = ResourceResponseStatus.Ok,
+                    ErrorMessage = "",
+                    Etag = "invalid\0etag",
+                }
             )
         );
         Assert.False(handle.IsClosed);
@@ -50,7 +61,7 @@ public sealed class ResourceProviderTests
         const string routedSource = "routed-test://maps/source.json";
         var style =
             """{"version":8,"sources":{"s":{"type":"vector","url":"routed-test://maps/source.json"}},"layers":[]}"""u8.ToArray();
-        var seen = new ConcurrentQueue<(ResourceKind, string?)>();
+        var seen = new ConcurrentQueue<(ResourceKind, string)>();
         var sourceRequested = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
@@ -72,11 +83,15 @@ public sealed class ResourceProviderTests
                             {
                                 Status = ResourceResponseStatus.Ok,
                                 Bytes = [.. style],
+                                ErrorMessage = "",
+                                Etag = "",
                             }
                             : new ResourceResponse
                             {
                                 Status = ResourceResponseStatus.Error,
                                 ErrorReason = ResourceErrorReason.NotFound,
+                                ErrorMessage = "",
+                                Etag = "",
                             }
                     );
                     if (request.Kind == ResourceKind.Source)
@@ -137,8 +152,8 @@ public sealed class ResourceProviderTests
         {
             size = (uint)sizeof(mln_resource_request_info),
             fields = mln_resource_request_field.MLN_RESOURCE_REQUEST_RANGE,
-            requested_url = scope.CString(StyleUrl),
-            resolved_url = scope.CString("provider-test://resolved/é"),
+            requested_url = scope.Utf8(StyleUrl),
+            resolved_url = scope.Utf8("provider-test://resolved/é"),
             range = new mln_resource_range { start = 0, end = 7 },
             prior_data = (byte*)bytes.data,
             prior_data_size = bytes.size,

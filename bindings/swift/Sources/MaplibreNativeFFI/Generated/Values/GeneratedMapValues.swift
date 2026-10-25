@@ -678,23 +678,25 @@ public struct EdgeInsets: Equatable, Hashable, Sendable {
 public struct FeatureStateSelector: Equatable, Hashable, Sendable {
   /// Source ID. Required and borrowed for the duration of the call.
   public var sourceId: String
-  /// Optional source layer ID. Required for vector-source disambiguation.
-  public var sourceLayerId: String?
+  /// Source layer ID, or empty for none. Required for vector-source
+  /// disambiguation.
+  public var sourceLayerId: String
   /// Optional feature ID. Required by set and get, optional for remove. A
   /// numeric feature ID matches its decimal text, such as "7" for the GeoJSON
-  /// id 7.
+  /// id 7. Its field bit tells an absent ID from the empty ID "".
   public var featureId: String?
-  /// Optional state key. Used only by remove and requires feature_id.
-  public var stateKey: String?
+  /// State key, or empty to select every key. Used only by remove, and requires
+  /// feature_id.
+  public var stateKey: String
   public static var `default`: Self {
     Self()
   }
 
   public init(
     sourceId: String = "",
-    sourceLayerId: String? = nil,
+    sourceLayerId: String = "",
     featureId: String? = nil,
-    stateKey: String? = nil
+    stateKey: String = ""
   ) {
     self.sourceId = sourceId
     self.sourceLayerId = sourceLayerId
@@ -710,21 +712,19 @@ public struct FeatureStateSelector: Equatable, Hashable, Sendable {
       data: raw.source_id.data,
       size: raw.source_id.size
     )
-    sourceLayerId = raw.fields & MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
-      .rawValue != 0 ? try NativeString.copyUTF8(
-        data: raw.source_layer_id.data,
-        size: raw.source_layer_id.size
-      ) : nil
+    sourceLayerId = try NativeString.copyUTF8(
+      data: raw.source_layer_id.data,
+      size: raw.source_layer_id.size
+    )
     featureId = raw.fields & MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
       .rawValue != 0 ? try NativeString.copyUTF8(
         data: raw.feature_id.data,
         size: raw.feature_id.size
       ) : nil
-    stateKey = raw.fields & MLN_FEATURE_STATE_SELECTOR_STATE_KEY
-      .rawValue != 0 ? try NativeString.copyUTF8(
-        data: raw.state_key.data,
-        size: raw.state_key.size
-      ) : nil
+    stateKey = try NativeString.copyUTF8(
+      data: raw.state_key.data,
+      size: raw.state_key.size
+    )
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -734,18 +734,12 @@ public struct FeatureStateSelector: Equatable, Hashable, Sendable {
     raw.fields = 0
     raw.size = UInt32(MemoryLayout<mln_feature_state_selector>.size)
     raw.source_id = arena.view(sourceId)
-    if let item = sourceLayerId {
-      raw.fields |= MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID.rawValue; raw
-        .source_layer_id = arena.view(item)
-    }
+    raw.source_layer_id = arena.view(sourceLayerId)
     if let item = featureId {
       raw.fields |= MLN_FEATURE_STATE_SELECTOR_FEATURE_ID.rawValue; raw
         .feature_id = arena.view(item)
     }
-    if let item = stateKey {
-      raw.fields |= MLN_FEATURE_STATE_SELECTOR_STATE_KEY.rawValue; raw
-        .state_key = arena.view(item)
-    }
+    raw.state_key = arena.view(stateKey)
     return raw
   }
 }

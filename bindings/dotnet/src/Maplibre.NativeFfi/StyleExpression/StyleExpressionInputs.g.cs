@@ -30,32 +30,32 @@ public sealed record StyleExpressionInputs
     /// <summary>
     /// One UTF-8 GeoJSON Feature that feature data expressions read.
     /// </summary>
-    public ImmutableArray<byte>? Feature
+    public ImmutableArray<byte> Feature
     {
-        get => FeatureStorage?.AsImmutable();
-        init => FeatureStorage = ValueArray.FromOptional(value);
+        get => FeatureStorage.AsImmutable();
+        init => FeatureStorage = ValueArray.From(value);
     }
-    internal ValueArray<byte>? FeatureStorage { get; init; }
+    internal ValueArray<byte> FeatureStorage { get; init; }
 
     /// <summary>
     /// A UTF-8 JSON object that the feature-state expression reads.
     /// </summary>
-    public ImmutableArray<byte>? FeatureState
+    public ImmutableArray<byte> FeatureState
     {
-        get => FeatureStateStorage?.AsImmutable();
-        init => FeatureStateStorage = ValueArray.FromOptional(value);
+        get => FeatureStateStorage.AsImmutable();
+        init => FeatureStateStorage = ValueArray.From(value);
     }
-    internal ValueArray<byte>? FeatureStateStorage { get; init; }
+    internal ValueArray<byte> FeatureStateStorage { get; init; }
 
     /// <summary>
     /// A UTF-8 JSON object that the global-state expression reads.
     /// </summary>
-    public ImmutableArray<byte>? GlobalState
+    public ImmutableArray<byte> GlobalState
     {
-        get => GlobalStateStorage?.AsImmutable();
-        init => GlobalStateStorage = ValueArray.FromOptional(value);
+        get => GlobalStateStorage.AsImmutable();
+        init => GlobalStateStorage = ValueArray.From(value);
     }
-    internal ValueArray<byte>? GlobalStateStorage { get; init; }
+    internal ValueArray<byte> GlobalStateStorage { get; init; }
 
     /// <summary>
     /// The tile that holds the feature, which the within and distance

@@ -547,6 +547,20 @@ mln_status mln_test_drain_events(
   }
   if (status != MLN_STATUS_OK) return status;
   drained_batch = batch;
+  // Every queued event's message is lent text, so every drain checks it. Wait
+  // predicates drain, so this reports a failure rather than asserting.
+  for (size_t index = 0; index < out_batch->event_count; index += 1) {
+    const mln_runtime_event* event = MLN_STRIDED_AT(
+      mln_runtime_event, out_batch->events, out_batch->event_size, index
+    );
+    if (!mln_test_lent_text_is_terminated(event->message)) {
+      (void)snprintf(
+        mln_test_diagnostic()->message, MLN_DIAGNOSTIC_MESSAGE_CAPACITY,
+        "a queued event message lacks its NUL terminator"
+      );
+      return MLN_STATUS_NATIVE_ERROR;
+    }
+  }
   return MLN_STATUS_OK;
 }
 

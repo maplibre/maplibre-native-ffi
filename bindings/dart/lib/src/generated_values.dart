@@ -2480,9 +2480,9 @@ final class GeojsonSourceOptions extends _Value {
     this.lineMetrics,
     this.cluster,
     this.synchronousTiling,
-  }) : clusterProperties = clusterProperties == null
-           ? null
-           : Uint8List.fromList(clusterProperties).asUnmodifiableView();
+  }) : clusterProperties = Uint8List.fromList(
+         clusterProperties ?? geojsonSourceOptionsDefault().clusterProperties,
+       ).asUnmodifiableView();
 
   /// Minimum tiling zoom. Defaults to 0.
   final double? minZoom;
@@ -2497,9 +2497,9 @@ final class GeojsonSourceOptions extends _Value {
   final double? clusterMaxZoom;
 
   /// Cluster aggregation expressions keyed by property name, as a JSON object
-  /// whose members follow the MapLibre Style Spec clusterProperties form. The
-  /// UTF-8 bytes are borrowed for the call.
-  final Uint8List? clusterProperties;
+  /// whose members follow the MapLibre Style Spec clusterProperties form, or
+  /// empty for none. The UTF-8 bytes are borrowed for the call.
+  final Uint8List clusterProperties;
 
   /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
   final int? buffer;
@@ -2582,7 +2582,7 @@ final class GeojsonSourceOptions extends _Value {
 /// See `mln_http_header` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class HttpHeader extends _Value {
-  const HttpHeader({required this.name, required this.value});
+  const HttpHeader({this.name = '', this.value = ''});
   final String name;
   final String value;
 
@@ -3214,7 +3214,7 @@ final class WebglContextDescriptor extends _Value {
   const WebglContextDescriptor({
     this.kind = const WebglContextKind.fromRawValue(0),
     this.context = 0,
-    required this.canvasSelector,
+    this.canvasSelector = '',
   });
   final WebglContextKind kind;
 
@@ -3795,25 +3795,27 @@ final class CameraQueryResult extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class FeatureStateSelector extends _Value {
   const FeatureStateSelector({
-    required this.sourceId,
-    this.sourceLayerId,
+    this.sourceId = '',
+    this.sourceLayerId = '',
     this.featureId,
-    this.stateKey,
+    this.stateKey = '',
   });
 
   /// Source ID. Required and borrowed for the duration of the call.
   final String sourceId;
 
-  /// Optional source layer ID. Required for vector-source disambiguation.
-  final String? sourceLayerId;
+  /// Source layer ID, or empty for none. Required for vector-source
+  /// disambiguation.
+  final String sourceLayerId;
 
   /// Optional feature ID. Required by set and get, optional for remove. A
   /// numeric feature ID matches its decimal text, such as "7" for the GeoJSON
-  /// id 7.
+  /// id 7. Its field bit tells an absent ID from the empty ID "".
   final String? featureId;
 
-  /// Optional state key. Used only by remove and requires feature_id.
-  final String? stateKey;
+  /// State key, or empty to select every key. Used only by remove, and requires
+  /// feature_id.
+  final String stateKey;
 
   /// A copy of this value with the given members replaced.
   FeatureStateSelector copyWith({
@@ -4119,10 +4121,10 @@ final class StyleImageInfo extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class StyleLayerInfo extends _Value {
   const StyleLayerInfo({
-    required this.id,
-    required this.type,
-    this.sourceId,
-    this.sourceLayer,
+    this.id = '',
+    this.type = '',
+    this.sourceId = '',
+    this.sourceLayer = '',
     this.minZoom = 0,
     this.maxZoom = 0,
     this.visibility = const StyleLayerVisibility.fromRawValue(0),
@@ -4135,10 +4137,10 @@ final class StyleLayerInfo extends _Value {
   final String type;
 
   /// Source ID. Empty for a layer type that takes no source.
-  final String? sourceId;
+  final String sourceId;
 
   /// Source-layer ID. Empty when the layer sets none.
-  final String? sourceLayer;
+  final String sourceLayer;
 
   /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
   final double minZoom;
@@ -4208,11 +4210,11 @@ final class StyleSourceTileInfo extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class StyleSourceInfo extends _Value {
   const StyleSourceInfo({
-    required this.id,
+    this.id = '',
     this.type = const StyleSourceType.fromRawValue(0),
     this.isVolatile = false,
-    this.attribution,
-    this.url,
+    this.attribution = '',
+    this.url = '',
     this.tilejson,
     this.bounds,
     this.tileSize,
@@ -4227,11 +4229,11 @@ final class StyleSourceInfo extends _Value {
   /// Whether the source is marked volatile.
   final bool isVolatile;
 
-  /// Attribution string, when the source sets one. It may be empty.
-  final String? attribution;
+  /// Attribution string, or empty when the source sets none.
+  final String attribution;
 
-  /// URL that the source loads from, when it has one.
-  final String? url;
+  /// URL that the source loads from, or empty when it has none.
+  final String url;
 
   /// Inline TileJSON metadata, when the source was defined with it.
   final StyleSourceTileInfo? tilejson;
@@ -4668,15 +4670,15 @@ final class RenderedQueryGeometryLineString extends RenderedQueryGeometry {
 final class RenderedFeatureQueryOptions extends _Value {
   RenderedFeatureQueryOptions({List<String>? layerIds, Uint8List? filter})
     : layerIds = layerIds == null ? null : List.unmodifiable(layerIds),
-      filter = filter == null
-          ? null
-          : Uint8List.fromList(filter).asUnmodifiableView();
+      filter = Uint8List.fromList(
+        filter ?? renderedFeatureQueryOptionsDefault().filter,
+      ).asUnmodifiableView();
 
   /// Optional style layer IDs. When absent, all rendered layers are queried.
   final List<String>? layerIds;
 
-  /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-  final Uint8List? filter;
+  /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
+  final Uint8List filter;
 
   /// A copy of this value with the given members replaced.
   RenderedFeatureQueryOptions copyWith({
@@ -4701,21 +4703,19 @@ final class RenderedFeatureQueryOptions extends _Value {
 final class RenderedFeature extends _Value {
   RenderedFeature({
     Uint8List? feature,
-    required this.layerId,
-    this.sourceId,
-    this.sourceLayerId,
+    this.layerId = '',
+    this.sourceId = '',
+    this.sourceLayerId = '',
     Uint8List? state,
   }) : feature = Uint8List.fromList(
          feature ?? const <int>[],
        ).asUnmodifiableView(),
-       state = state == null
-           ? null
-           : Uint8List.fromList(state).asUnmodifiableView();
+       state = Uint8List.fromList(state ?? const <int>[]).asUnmodifiableView();
   final Uint8List feature;
   final String layerId;
-  final String? sourceId;
-  final String? sourceLayerId;
-  final Uint8List? state;
+  final String sourceId;
+  final String sourceLayerId;
+  final Uint8List state;
 
   @override
   List<Object?> get _members => [
@@ -4744,15 +4744,15 @@ final class SourceFeatureQueryOptions extends _Value {
     : sourceLayerIds = sourceLayerIds == null
           ? null
           : List.unmodifiable(sourceLayerIds),
-      filter = filter == null
-          ? null
-          : Uint8List.fromList(filter).asUnmodifiableView();
+      filter = Uint8List.fromList(
+        filter ?? sourceFeatureQueryOptionsDefault().filter,
+      ).asUnmodifiableView();
 
   /// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
   final List<String>? sourceLayerIds;
 
-  /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-  final Uint8List? filter;
+  /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
+  final Uint8List filter;
 
   /// A copy of this value with the given members replaced.
   SourceFeatureQueryOptions copyWith({
@@ -4777,12 +4777,12 @@ final class SourceFeatureQueryOptions extends _Value {
 /// See `mln_source_feature` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 final class SourceFeature extends _Value {
-  SourceFeature({Uint8List? feature, this.sourceLayerId})
+  SourceFeature({Uint8List? feature, this.sourceLayerId = ''})
     : feature = Uint8List.fromList(
         feature ?? const <int>[],
       ).asUnmodifiableView();
   final Uint8List feature;
-  final String? sourceLayerId;
+  final String sourceLayerId;
 
   @override
   List<Object?> get _members => [feature, sourceLayerId];
@@ -4854,11 +4854,11 @@ final class ResourceResponse extends _Value {
     this.status = const ResourceResponseStatus.fromRawValue(0),
     this.errorReason = const ResourceErrorReason.fromRawValue(0),
     Uint8List? bytes,
-    this.errorMessage,
+    this.errorMessage = '',
     this.mustRevalidate = false,
     this.modifiedUnixMs,
     this.expiresUnixMs,
-    this.etag,
+    this.etag = '',
     this.retryAfterUnixMs,
   }) : bytes = Uint8List.fromList(bytes ?? const <int>[]).asUnmodifiableView();
   final ResourceResponseStatus status;
@@ -4866,11 +4866,11 @@ final class ResourceResponse extends _Value {
 
   /// Response bytes. May be null only when byte_count is 0.
   final Uint8List bytes;
-  final String? errorMessage;
+  final String errorMessage;
   final bool mustRevalidate;
   final int? modifiedUnixMs;
   final int? expiresUnixMs;
-  final String? etag;
+  final String etag;
   final int? retryAfterUnixMs;
 
   /// A copy of this value with the given members replaced.
@@ -4979,14 +4979,17 @@ final class ResourceRoute extends _Value {
 /// See `mln_runtime_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class RuntimeOptions extends _Value {
-  RuntimeOptions({this.assetPath, this.cachePath});
+  RuntimeOptions({String? assetPath, String? cachePath})
+    : assetPath = assetPath ?? runtimeOptionsDefault().assetPath,
+      cachePath = cachePath ?? runtimeOptionsDefault().cachePath;
 
   /// Directory root for asset:// URLs. Copied during runtime creation. Empty
   /// selects `/android_asset` on Android and `.` elsewhere.
-  final String? assetPath;
+  final String assetPath;
 
-  /// Cache database path. Copied during runtime creation.
-  final String? cachePath;
+  /// Cache database path. Copied during runtime creation. Empty selects an
+  /// in-memory cache.
+  final String cachePath;
 
   /// A copy of this value with the given members replaced.
   RuntimeOptions copyWith({String? assetPath, String? cachePath}) =>
@@ -5008,7 +5011,7 @@ final class RuntimeOptions extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class OfflineTilePyramidRegionDefinition extends _Value {
   const OfflineTilePyramidRegionDefinition({
-    required this.styleUrl,
+    this.styleUrl = '',
     this.bounds = const LatLngBounds(),
     this.minZoom = 0,
     this.maxZoom = 0,
@@ -5070,7 +5073,7 @@ final class OfflineTilePyramidRegionDefinition extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class OfflineGeometryRegionDefinition extends _Value {
   OfflineGeometryRegionDefinition({
-    required this.styleUrl,
+    this.styleUrl = '',
     Uint8List? geometry,
     this.minZoom = 0,
     this.maxZoom = 0,
@@ -5461,7 +5464,7 @@ final class RuntimeEvent {
     this.source = 0,
     this.generation = 0,
     this.code = 0,
-    required this.message,
+    this.message = '',
     required this.payload,
   });
   final RuntimeEventType type;
@@ -5579,8 +5582,8 @@ final class ResourceRange extends _Value {
 
 final class ResourceRequestInfo extends _Value {
   ResourceRequestInfo({
-    this.requestedUrl,
-    this.resolvedUrl,
+    this.requestedUrl = '',
+    this.resolvedUrl = '',
     this.kind = const ResourceKind.fromRawValue(0),
     this.loadingMethod = const ResourceLoadingMethod.fromRawValue(0),
     this.priority = const ResourcePriority.fromRawValue(0),
@@ -5589,18 +5592,18 @@ final class ResourceRequestInfo extends _Value {
     this.range,
     this.priorModifiedUnixMs,
     this.priorExpiresUnixMs,
-    this.priorEtag,
+    this.priorEtag = '',
     Uint8List? priorData,
   }) : priorData = Uint8List.fromList(
          priorData ?? const <int>[],
        ).asUnmodifiableView();
 
   /// URL entering the network layer, before tile server normalization.
-  final String? requestedUrl;
+  final String requestedUrl;
 
   /// URL to fetch, after resource-kind normalization against the runtime's tile
   /// server options and API key.
-  final String? resolvedUrl;
+  final String resolvedUrl;
   final ResourceKind kind;
   final ResourceLoadingMethod loadingMethod;
   final ResourcePriority priority;
@@ -5609,7 +5612,9 @@ final class ResourceRequestInfo extends _Value {
   final ResourceRange? range;
   final int? priorModifiedUnixMs;
   final int? priorExpiresUnixMs;
-  final String? priorEtag;
+
+  /// Entity tag of the cached copy, or empty when there is none.
+  final String priorEtag;
   final Uint8List priorData;
 
   @override
@@ -5763,15 +5768,15 @@ final class StyleExpressionInputs extends _Value {
     Uint8List? globalState,
     this.canonicalTileId,
     List<String>? availableImages,
-  }) : feature = feature == null
-           ? null
-           : Uint8List.fromList(feature).asUnmodifiableView(),
-       featureState = featureState == null
-           ? null
-           : Uint8List.fromList(featureState).asUnmodifiableView(),
-       globalState = globalState == null
-           ? null
-           : Uint8List.fromList(globalState).asUnmodifiableView(),
+  }) : feature = Uint8List.fromList(
+         feature ?? styleExpressionInputsDefault().feature,
+       ).asUnmodifiableView(),
+       featureState = Uint8List.fromList(
+         featureState ?? styleExpressionInputsDefault().featureState,
+       ).asUnmodifiableView(),
+       globalState = Uint8List.fromList(
+         globalState ?? styleExpressionInputsDefault().globalState,
+       ).asUnmodifiableView(),
        availableImages = List.unmodifiable(
          availableImages ?? styleExpressionInputsDefault().availableImages,
        );
@@ -5787,13 +5792,13 @@ final class StyleExpressionInputs extends _Value {
   final double? elevation;
 
   /// One UTF-8 GeoJSON Feature that feature data expressions read.
-  final Uint8List? feature;
+  final Uint8List feature;
 
   /// A UTF-8 JSON object that the feature-state expression reads.
-  final Uint8List? featureState;
+  final Uint8List featureState;
 
   /// A UTF-8 JSON object that the global-state expression reads.
-  final Uint8List? globalState;
+  final Uint8List globalState;
 
   /// The tile that holds the feature, which the within and distance expressions
   /// need to place its geometry.

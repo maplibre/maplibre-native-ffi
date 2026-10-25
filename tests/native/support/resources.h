@@ -68,6 +68,8 @@ typedef struct mln_test_provider_request {
   int64_t prior_expires_unix_ms;
   bool has_prior_etag;
   char prior_etag[64];
+  // Whether every URL and the entity tag were NUL-terminated lent text.
+  bool text_terminated;
   size_t prior_data_size;
   // Set for a held resource; the case completes and releases it.
   mln_resource_request handle;

@@ -80,9 +80,9 @@ bool mln_test_style_render_until(
 );
 
 // Copies of the features a query returned, each string null-terminated. A
-// query that returns more than MLN_TEST_FEATURE_CAPACITY features, or a string
-// longer than its buffer, fails the test. A source query fills only feature
-// and source_layer_id.
+// query that returns more than MLN_TEST_FEATURE_CAPACITY features, a string
+// longer than its buffer, or lent text without its NUL terminator fails the
+// test. A source query fills only feature and source_layer_id.
 #define MLN_TEST_FEATURE_CAPACITY 8
 
 typedef struct mln_test_feature {
@@ -167,6 +167,8 @@ typedef struct mln_test_style_list {
   mln_test_style_entry entries[MLN_TEST_STYLE_LIST_CAPACITY];
 } mln_test_style_list;
 
+// Lists the map's style layers. Lent text without its NUL terminator fails the
+// test.
 mln_test_style_list mln_test_style_list_layers(mln_map map);
 
 // Finishes a completion from mln_test_completion_buffer_view(), copies the

@@ -62,10 +62,13 @@ pub fn stridedAt(comptime T: type, pointer: ?[*]const T, count: usize, stride: u
     return @as(*align(1) const T, @ptrCast(bytes + index * stride)).*;
 }
 
+/// The bytes of a view that native lends, valid only as long as the view.
+pub fn borrowView(raw: c.mln_buffer_view) status.Error![]const u8 {
+    return nativeSlice(u8, @ptrCast(raw.data), raw.size);
+}
+
 pub fn copyView(allocator: std.mem.Allocator, raw: c.mln_buffer_view) status.Error![]const u8 {
-    if (raw.size == 0) return &.{};
-    if (raw.size > std.math.maxInt(isize)) return error.NativeError;
-    return allocator.dupe(u8, @as([*]const u8, @ptrCast(raw.data orelse return error.NativeError))[0..raw.size]);
+    return allocator.dupe(u8, try borrowView(raw));
 }
 
 pub fn nativeOf(comptime Target: type, value: anytype) Target {

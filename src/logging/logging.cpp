@@ -57,7 +57,8 @@ class CallbackLogObserver final : public mln::Log::Observer {
     const auto forbid = mln::core::ForbidReentry{log_reentry_diagnostic};
     return callback_(
       user_data_, static_cast<mln_log_severity>(severity),
-      static_cast<mln_log_event>(event), code, message.c_str()
+      static_cast<mln_log_event>(event), code,
+      mln_buffer_view{.data = message.data(), .size = message.size()}
     );
   }
 
@@ -71,7 +72,7 @@ class CallbackLogObserver final : public mln::Log::Observer {
 // refuses to the platform logger.
 auto queue_log_record(
   void* registration, mln_log_severity severity, mln_log_event event,
-  std::int64_t code, const char* message
+  std::int64_t code, mln_buffer_view message
 ) noexcept -> bool {
   const auto record = mln_log_delivery{
     .severity = severity,

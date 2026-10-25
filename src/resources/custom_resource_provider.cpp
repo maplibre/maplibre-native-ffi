@@ -458,6 +458,10 @@ auto bytes_from_string(const std::string& value) -> const std::uint8_t* {
   return reinterpret_cast<const std::uint8_t*>(value.data());
 }
 
+auto text_view(const std::string& value) -> mln_buffer_view {
+  return {.data = value.data(), .size = value.size()};
+}
+
 auto make_request_view(
   const mln::Resource& resource, const std::string& resolved_url
 ) -> mln_resource_request_info {
@@ -471,8 +475,8 @@ auto make_request_view(
   auto request = mln_resource_request_info{
     .size = sizeof(mln_resource_request_info),
     .fields = fields,
-    .requested_url = resource.url.c_str(),
-    .resolved_url = resolved_url.c_str(),
+    .requested_url = text_view(resource.url),
+    .resolved_url = text_view(resolved_url),
     .kind = kind_to_abi(resource.kind),
     .loading_method = loading_method_to_abi(resource.loadingMethod),
     .priority = resource.priority == mln::Resource::Priority::Low
@@ -494,7 +498,8 @@ auto make_request_view(
       resource.priorModified ? to_unix_ms(*resource.priorModified) : 0,
     .prior_expires_unix_ms =
       resource.priorExpires ? to_unix_ms(*resource.priorExpires) : 0,
-    .prior_etag = resource.priorEtag ? resource.priorEtag->c_str() : nullptr,
+    .prior_etag = resource.priorEtag ? text_view(*resource.priorEtag)
+                                     : mln_buffer_view{.data = "", .size = 0},
     .prior_data = prior_data,
     .prior_data_size =
       resource.priorData == nullptr ? 0 : resource.priorData->size(),

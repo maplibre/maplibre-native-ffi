@@ -74,9 +74,7 @@ pub const MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM: mln_custom_mvt_vector_so
 pub const MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM: mln_custom_mvt_vector_source_option_field =
     2;
 pub type mln_feature_state_selector_field = u32;
-pub const MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID: mln_feature_state_selector_field = 1;
-pub const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID: mln_feature_state_selector_field = 2;
-pub const MLN_FEATURE_STATE_SELECTOR_STATE_KEY: mln_feature_state_selector_field = 4;
+pub const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID: mln_feature_state_selector_field = 1;
 pub type mln_frame_demand_flag = u32;
 pub const MLN_FRAME_DEMAND_IF_NEEDED: mln_frame_demand_flag = 1;
 pub const MLN_FRAME_DEMAND_PRESENT: mln_frame_demand_flag = 2;
@@ -89,13 +87,12 @@ pub const MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM: mln_geojson_source_option_field = 
 pub const MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM: mln_geojson_source_option_field = 2;
 pub const MLN_GEOJSON_SOURCE_OPTION_TOLERANCE: mln_geojson_source_option_field = 4;
 pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM: mln_geojson_source_option_field = 8;
-pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES: mln_geojson_source_option_field = 16;
-pub const MLN_GEOJSON_SOURCE_OPTION_BUFFER: mln_geojson_source_option_field = 32;
-pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS: mln_geojson_source_option_field = 64;
-pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS: mln_geojson_source_option_field = 128;
-pub const MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS: mln_geojson_source_option_field = 256;
-pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER: mln_geojson_source_option_field = 512;
-pub const MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING: mln_geojson_source_option_field = 1024;
+pub const MLN_GEOJSON_SOURCE_OPTION_BUFFER: mln_geojson_source_option_field = 16;
+pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS: mln_geojson_source_option_field = 32;
+pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS: mln_geojson_source_option_field = 64;
+pub const MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS: mln_geojson_source_option_field = 128;
+pub const MLN_GEOJSON_SOURCE_OPTION_CLUSTER: mln_geojson_source_option_field = 256;
+pub const MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING: mln_geojson_source_option_field = 512;
 pub type mln_gesture_phase = u32;
 pub const MLN_GESTURE_PHASE_NONE: mln_gesture_phase = 0;
 pub const MLN_GESTURE_PHASE_BEGIN: mln_gesture_phase = 1;
@@ -222,13 +219,8 @@ pub const MLN_RENDER_SESSION_STATE_DETACHING: mln_render_session_state = 3;
 pub const MLN_RENDER_SESSION_STATE_DETACHED: mln_render_session_state = 4;
 pub const MLN_RENDER_SESSION_STATE_TARGET_LOST: mln_render_session_state = 5;
 pub const MLN_RENDER_SESSION_STATE_ABANDONED: mln_render_session_state = 6;
-pub type mln_rendered_feature_field = u32;
-pub const MLN_RENDERED_FEATURE_SOURCE_ID: mln_rendered_feature_field = 1;
-pub const MLN_RENDERED_FEATURE_SOURCE_LAYER_ID: mln_rendered_feature_field = 2;
-pub const MLN_RENDERED_FEATURE_STATE: mln_rendered_feature_field = 4;
 pub type mln_rendered_feature_query_option_field = u32;
 pub const MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS: mln_rendered_feature_query_option_field = 1;
-pub const MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER: mln_rendered_feature_query_option_field = 2;
 pub type mln_rendered_query_geometry_type = u32;
 pub const MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT: mln_rendered_query_geometry_type = 1;
 pub const MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX: mln_rendered_query_geometry_type = 2;
@@ -343,12 +335,9 @@ pub const MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED: mln_runtime_event_type = 16;
 pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED: mln_runtime_event_type = 17;
 pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR: mln_runtime_event_type = 18;
 pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: mln_runtime_event_type = 19;
-pub type mln_source_feature_field = u32;
-pub const MLN_SOURCE_FEATURE_SOURCE_LAYER_ID: mln_source_feature_field = 1;
 pub type mln_source_feature_query_option_field = u32;
 pub const MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS: mln_source_feature_query_option_field =
     1;
-pub const MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER: mln_source_feature_query_option_field = 2;
 pub type mln_status = i32;
 pub const MLN_STATUS_OK: mln_status = 0;
 pub const MLN_STATUS_INVALID_ARGUMENT: mln_status = -1;
@@ -365,10 +354,7 @@ pub type mln_style_expression_input_field = u32;
 pub const MLN_STYLE_EXPRESSION_INPUT_ZOOM: mln_style_expression_input_field = 1;
 pub const MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER: mln_style_expression_input_field = 2;
 pub const MLN_STYLE_EXPRESSION_INPUT_ELEVATION: mln_style_expression_input_field = 4;
-pub const MLN_STYLE_EXPRESSION_INPUT_FEATURE: mln_style_expression_input_field = 8;
-pub const MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE: mln_style_expression_input_field = 16;
-pub const MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE: mln_style_expression_input_field = 32;
-pub const MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID: mln_style_expression_input_field = 64;
+pub const MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID: mln_style_expression_input_field = 8;
 pub type mln_style_expression_option_field = u32;
 pub const MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE: mln_style_expression_option_field = 1;
 pub type mln_style_expression_type_kind = u32;
@@ -407,13 +393,11 @@ pub type mln_style_raster_dem_encoding = u32;
 pub const MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX: mln_style_raster_dem_encoding = 0;
 pub const MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM: mln_style_raster_dem_encoding = 1;
 pub type mln_style_source_info_field = u32;
-pub const MLN_STYLE_SOURCE_INFO_URL: mln_style_source_info_field = 1;
-pub const MLN_STYLE_SOURCE_INFO_TILEJSON: mln_style_source_info_field = 2;
-pub const MLN_STYLE_SOURCE_INFO_BOUNDS: mln_style_source_info_field = 4;
-pub const MLN_STYLE_SOURCE_INFO_TILE_SIZE: mln_style_source_info_field = 8;
-pub const MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING: mln_style_source_info_field = 16;
-pub const MLN_STYLE_SOURCE_INFO_RASTER_ENCODING: mln_style_source_info_field = 32;
-pub const MLN_STYLE_SOURCE_INFO_ATTRIBUTION: mln_style_source_info_field = 64;
+pub const MLN_STYLE_SOURCE_INFO_TILEJSON: mln_style_source_info_field = 1;
+pub const MLN_STYLE_SOURCE_INFO_BOUNDS: mln_style_source_info_field = 2;
+pub const MLN_STYLE_SOURCE_INFO_TILE_SIZE: mln_style_source_info_field = 4;
+pub const MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING: mln_style_source_info_field = 8;
+pub const MLN_STYLE_SOURCE_INFO_RASTER_ENCODING: mln_style_source_info_field = 16;
 pub type mln_style_source_type = u32;
 pub const MLN_STYLE_SOURCE_TYPE_UNKNOWN: mln_style_source_type = 0;
 pub const MLN_STYLE_SOURCE_TYPE_VECTOR: mln_style_source_type = 1;
@@ -1095,7 +1079,6 @@ pub struct mln_render_session_snapshot {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_rendered_feature {
-    pub fields: mln_rendered_feature_fields,
     pub feature: mln_buffer_view,
     pub layer_id: mln_buffer_view,
     pub source_id: mln_buffer_view,
@@ -1165,8 +1148,8 @@ pub struct mln_resource_request_cancel_handler {
 pub struct mln_resource_request_info {
     pub size: u32,
     pub fields: mln_resource_request_fields,
-    pub requested_url: *const std::ffi::c_char,
-    pub resolved_url: *const std::ffi::c_char,
+    pub requested_url: mln_buffer_view,
+    pub resolved_url: mln_buffer_view,
     pub kind: mln_resource_kind,
     pub loading_method: mln_resource_loading_method,
     pub priority: mln_resource_priority,
@@ -1175,7 +1158,7 @@ pub struct mln_resource_request_info {
     pub range: mln_resource_range,
     pub prior_modified_unix_ms: i64,
     pub prior_expires_unix_ms: i64,
-    pub prior_etag: *const std::ffi::c_char,
+    pub prior_etag: mln_buffer_view,
     pub prior_data: *const u8,
     pub prior_data_size: usize,
 }
@@ -1307,7 +1290,6 @@ pub struct mln_screen_point {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_source_feature {
-    pub fields: mln_source_feature_fields,
     pub feature: mln_buffer_view,
     pub source_layer_id: mln_buffer_view,
 }
@@ -1643,7 +1625,7 @@ pub type mln_http_header_transform_callback = Option<
     unsafe extern "C" fn(
         user_data: *mut std::ffi::c_void,
         kind: mln_resource_kind,
-        url: *const std::ffi::c_char,
+        url: mln_buffer_view,
         out_response: *mut mln_http_header_transform_response,
     ) -> mln_status,
 >;
@@ -1653,7 +1635,7 @@ pub type mln_log_callback = Option<
         severity: mln_log_severity,
         event: mln_log_event,
         code: i64,
-        message: *const std::ffi::c_char,
+        message: mln_buffer_view,
     ) -> bool,
 >;
 pub type mln_log_severity_flags = u32;
@@ -1678,7 +1660,6 @@ pub struct mln_render_frame_batch(pub u64);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_render_session(pub u64);
 pub type mln_render_session_capability_flags = u32;
-pub type mln_rendered_feature_fields = u32;
 pub type mln_rendered_feature_query_option_fields = u32;
 pub type mln_resource_kind_flags = u32;
 pub type mln_resource_provider_callback = Option<
@@ -1699,7 +1680,7 @@ pub type mln_resource_transform_callback = Option<
     unsafe extern "C" fn(
         user_data: *mut std::ffi::c_void,
         kind: mln_resource_kind,
-        url: *const std::ffi::c_char,
+        url: mln_buffer_view,
         request: mln_resource_transform_request,
     ),
 >;
@@ -1713,7 +1694,6 @@ pub type mln_runtime_event_callback = Option<
     unsafe extern "C" fn(user_data: *mut std::ffi::c_void, events: *const mln_event_batch_view),
 >;
 pub type mln_runtime_event_flags = u64;
-pub type mln_source_feature_fields = u32;
 pub type mln_source_feature_query_option_fields = u32;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -2570,7 +2550,7 @@ unsafe extern "C" {
         feature: mln_buffer_view,
         extension: mln_buffer_view,
         extension_field: mln_buffer_view,
-        arguments: *const mln_buffer_view,
+        arguments: mln_buffer_view,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

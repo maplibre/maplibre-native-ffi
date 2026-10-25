@@ -1016,16 +1016,14 @@ napi_value mln_ts_read_geojson_source_options(
         ))
       return NULL;
   }
-  if ((source->fields & MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES) != 0) {
-    if (!mln_ts_set(
-          env, result, "clusterProperties",
-          mln_ts_text(
-            env, (source->cluster_properties).data,
-            (source->cluster_properties).size
-          )
-        ))
-      return NULL;
-  }
+  if (!mln_ts_set(
+        env, result, "clusterProperties",
+        mln_ts_text(
+          env, (source->cluster_properties).data,
+          (source->cluster_properties).size
+        )
+      ))
+    return NULL;
   if ((source->fields & MLN_GEOJSON_SOURCE_OPTION_BUFFER) != 0) {
     if (!mln_ts_set(
           env, result, "buffer", mln_ts_number(env, (double)(source->buffer))
@@ -1279,9 +1277,7 @@ napi_value mln_ts_read_log_delivery(
     return NULL;
   if (!mln_ts_set(
         env, result, "message",
-        ((source->message) == NULL
-           ? mln_ts_undefined(env)
-           : mln_ts_text(env, source->message, strlen(source->message)))
+        mln_ts_text(env, (source->message).data, (source->message).size)
       ))
     return NULL;
   return result;
@@ -2477,29 +2473,23 @@ napi_value mln_ts_read_rendered_feature(
         mln_ts_text(env, (source->layer_id).data, (source->layer_id).size)
       ))
     return NULL;
-  if ((source->fields & MLN_RENDERED_FEATURE_SOURCE_ID) != 0) {
-    if (!mln_ts_set(
-          env, result, "sourceId",
-          mln_ts_text(env, (source->source_id).data, (source->source_id).size)
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_RENDERED_FEATURE_SOURCE_LAYER_ID) != 0) {
-    if (!mln_ts_set(
-          env, result, "sourceLayerId",
-          mln_ts_text(
-            env, (source->source_layer_id).data, (source->source_layer_id).size
-          )
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_RENDERED_FEATURE_STATE) != 0) {
-    if (!mln_ts_set(
-          env, result, "state",
-          mln_ts_text(env, (source->state).data, (source->state).size)
-        ))
-      return NULL;
-  }
+  if (!mln_ts_set(
+        env, result, "sourceId",
+        mln_ts_text(env, (source->source_id).data, (source->source_id).size)
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "sourceLayerId",
+        mln_ts_text(
+          env, (source->source_layer_id).data, (source->source_layer_id).size
+        )
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "state",
+        mln_ts_text(env, (source->state).data, (source->state).size)
+      ))
+    return NULL;
   return result;
 }
 
@@ -2516,13 +2506,11 @@ napi_value mln_ts_read_rendered_feature_query_options(
         ))
       return NULL;
   }
-  if ((source->fields & MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER) != 0) {
-    if (!mln_ts_set(
-          env, result, "filter",
-          mln_ts_text(env, (source->filter).data, (source->filter).size)
-        ))
-      return NULL;
-  }
+  if (!mln_ts_set(
+        env, result, "filter",
+        mln_ts_text(env, (source->filter).data, (source->filter).size)
+      ))
+    return NULL;
   return result;
 }
 
@@ -2639,20 +2627,16 @@ napi_value mln_ts_read_resource_request_info(
   if (result == NULL) return NULL;
   if (!mln_ts_set(
         env, result, "requestedUrl",
-        ((source->requested_url) == NULL
-           ? mln_ts_undefined(env)
-           : mln_ts_text(
-               env, source->requested_url, strlen(source->requested_url)
-             ))
+        mln_ts_text(
+          env, (source->requested_url).data, (source->requested_url).size
+        )
       ))
     return NULL;
   if (!mln_ts_set(
         env, result, "resolvedUrl",
-        ((source->resolved_url) == NULL
-           ? mln_ts_undefined(env)
-           : mln_ts_text(
-               env, source->resolved_url, strlen(source->resolved_url)
-             ))
+        mln_ts_text(
+          env, (source->resolved_url).data, (source->resolved_url).size
+        )
       ))
     return NULL;
   if (!mln_ts_set(
@@ -2702,9 +2686,7 @@ napi_value mln_ts_read_resource_request_info(
   }
   if (!mln_ts_set(
         env, result, "priorEtag",
-        ((source->prior_etag) == NULL
-           ? mln_ts_undefined(env)
-           : mln_ts_text(env, source->prior_etag, strlen(source->prior_etag)))
+        mln_ts_text(env, (source->prior_etag).data, (source->prior_etag).size)
       ))
     return NULL;
   if (!mln_ts_set(
@@ -2749,9 +2731,7 @@ napi_value mln_ts_read_resource_transform_delivery(
     return NULL;
   if (!mln_ts_set(
         env, result, "url",
-        ((source->url) == NULL
-           ? mln_ts_undefined(env)
-           : mln_ts_text(env, source->url, strlen(source->url)))
+        mln_ts_text(env, (source->url).data, (source->url).size)
       ))
     return NULL;
   if (!mln_ts_set(
@@ -3050,20 +3030,12 @@ napi_value mln_ts_read_runtime_options(
   if (result == NULL) return NULL;
   if (!mln_ts_set(
         env, result, "assetPath",
-        ((source->asset_path).size == 0
-           ? mln_ts_undefined(env)
-           : mln_ts_text(
-               env, (source->asset_path).data, (source->asset_path).size
-             ))
+        mln_ts_text(env, (source->asset_path).data, (source->asset_path).size)
       ))
     return NULL;
   if (!mln_ts_set(
         env, result, "cachePath",
-        ((source->cache_path).size == 0
-           ? mln_ts_undefined(env)
-           : mln_ts_text(
-               env, (source->cache_path).data, (source->cache_path).size
-             ))
+        mln_ts_text(env, (source->cache_path).data, (source->cache_path).size)
       ))
     return NULL;
   return result;
@@ -3093,15 +3065,13 @@ napi_value mln_ts_read_source_feature(
         mln_ts_text(env, (source->feature).data, (source->feature).size)
       ))
     return NULL;
-  if ((source->fields & MLN_SOURCE_FEATURE_SOURCE_LAYER_ID) != 0) {
-    if (!mln_ts_set(
-          env, result, "sourceLayerId",
-          mln_ts_text(
-            env, (source->source_layer_id).data, (source->source_layer_id).size
-          )
-        ))
-      return NULL;
-  }
+  if (!mln_ts_set(
+        env, result, "sourceLayerId",
+        mln_ts_text(
+          env, (source->source_layer_id).data, (source->source_layer_id).size
+        )
+      ))
+    return NULL;
   return result;
 }
 
@@ -3120,13 +3090,11 @@ napi_value mln_ts_read_source_feature_query_options(
         ))
       return NULL;
   }
-  if ((source->fields & MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER) != 0) {
-    if (!mln_ts_set(
-          env, result, "filter",
-          mln_ts_text(env, (source->filter).data, (source->filter).size)
-        ))
-      return NULL;
-  }
+  if (!mln_ts_set(
+        env, result, "filter",
+        mln_ts_text(env, (source->filter).data, (source->filter).size)
+      ))
+    return NULL;
   return result;
 }
 
@@ -3197,31 +3165,25 @@ napi_value mln_ts_read_style_expression_inputs(
         ))
       return NULL;
   }
-  if ((source->fields & MLN_STYLE_EXPRESSION_INPUT_FEATURE) != 0) {
-    if (!mln_ts_set(
-          env, result, "feature",
-          mln_ts_text(env, (source->feature).data, (source->feature).size)
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE) != 0) {
-    if (!mln_ts_set(
-          env, result, "featureState",
-          mln_ts_text(
-            env, (source->feature_state).data, (source->feature_state).size
-          )
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE) != 0) {
-    if (!mln_ts_set(
-          env, result, "globalState",
-          mln_ts_text(
-            env, (source->global_state).data, (source->global_state).size
-          )
-        ))
-      return NULL;
-  }
+  if (!mln_ts_set(
+        env, result, "feature",
+        mln_ts_text(env, (source->feature).data, (source->feature).size)
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "featureState",
+        mln_ts_text(
+          env, (source->feature_state).data, (source->feature_state).size
+        )
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "globalState",
+        mln_ts_text(
+          env, (source->global_state).data, (source->global_state).size
+        )
+      ))
+    return NULL;
   if ((source->fields & MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID) != 0) {
     if (!mln_ts_set(
           env, result, "canonicalTileId",
@@ -3526,20 +3488,14 @@ napi_value mln_ts_read_style_layer_info(
     return NULL;
   if (!mln_ts_set(
         env, result, "sourceId",
-        ((source->source_id).size == 0
-           ? mln_ts_undefined(env)
-           : mln_ts_text(
-               env, (source->source_id).data, (source->source_id).size
-             ))
+        mln_ts_text(env, (source->source_id).data, (source->source_id).size)
       ))
     return NULL;
   if (!mln_ts_set(
         env, result, "sourceLayer",
-        ((source->source_layer).size == 0
-           ? mln_ts_undefined(env)
-           : mln_ts_text(
-               env, (source->source_layer).data, (source->source_layer).size
-             ))
+        mln_ts_text(
+          env, (source->source_layer).data, (source->source_layer).size
+        )
       ))
     return NULL;
   if (!mln_ts_set(
@@ -3577,22 +3533,16 @@ napi_value mln_ts_read_style_source_info(
         env, result, "isVolatile", mln_ts_bool(env, source->is_volatile)
       ))
     return NULL;
-  if ((source->fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0) {
-    if (!mln_ts_set(
-          env, result, "attribution",
-          mln_ts_text(
-            env, (source->attribution).data, (source->attribution).size
-          )
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_STYLE_SOURCE_INFO_URL) != 0) {
-    if (!mln_ts_set(
-          env, result, "url",
-          mln_ts_text(env, (source->url).data, (source->url).size)
-        ))
-      return NULL;
-  }
+  if (!mln_ts_set(
+        env, result, "attribution",
+        mln_ts_text(env, (source->attribution).data, (source->attribution).size)
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "url",
+        mln_ts_text(env, (source->url).data, (source->url).size)
+      ))
+    return NULL;
   if ((source->fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
     if (!mln_ts_set(
           env, result, "tilejson",
@@ -4799,11 +4749,8 @@ bool mln_ts_write_feature_state_selector(
     return false;
   if (!mln_ts_member(call, value, "sourceLayerId", &member)) return false;
   mln_ts_path(child, sizeof child, path, "sourceLayerId");
-  if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_text_view(call, member, &out->source_layer_id, child))
-      return false;
-    out->fields |= MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
-  }
+  if (!mln_ts_read_text_view(call, member, &out->source_layer_id, child))
+    return false;
   if (!mln_ts_member(call, value, "featureId", &member)) return false;
   mln_ts_path(child, sizeof child, path, "featureId");
   if (!mln_ts_is_absent(call, member)) {
@@ -4813,11 +4760,8 @@ bool mln_ts_write_feature_state_selector(
   }
   if (!mln_ts_member(call, value, "stateKey", &member)) return false;
   mln_ts_path(child, sizeof child, path, "stateKey");
-  if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_text_view(call, member, &out->state_key, child))
-      return false;
-    out->fields |= MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
-  }
+  if (!mln_ts_read_text_view(call, member, &out->state_key, child))
+    return false;
   return true;
 }
 
@@ -4926,7 +4870,6 @@ bool mln_ts_write_geojson_source_options(
   if (!mln_ts_is_absent(call, member)) {
     if (!mln_ts_read_text_view(call, member, &out->cluster_properties, child))
       return false;
-    out->fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
   }
   if (!mln_ts_member(call, value, "buffer", &member)) return false;
   mln_ts_path(child, sizeof child, path, "buffer");
@@ -6552,7 +6495,6 @@ bool mln_ts_write_rendered_feature_query_options(
   mln_ts_path(child, sizeof child, path, "filter");
   if (!mln_ts_is_absent(call, member)) {
     if (!mln_ts_read_text_view(call, member, &out->filter, child)) return false;
-    out->fields |= MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
   }
   return true;
 }
@@ -6682,10 +6624,8 @@ bool mln_ts_write_resource_response(
   }
   if (!mln_ts_member(call, value, "errorMessage", &member)) return false;
   mln_ts_path(child, sizeof child, path, "errorMessage");
-  if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_text_view(call, member, &out->error_message, child))
-      return false;
-  }
+  if (!mln_ts_read_text_view(call, member, &out->error_message, child))
+    return false;
   if (!mln_ts_member(call, value, "mustRevalidate", &member)) return false;
   mln_ts_path(child, sizeof child, path, "mustRevalidate");
   if (!mln_ts_is_absent(call, member)) {
@@ -6717,9 +6657,7 @@ bool mln_ts_write_resource_response(
   }
   if (!mln_ts_member(call, value, "etag", &member)) return false;
   mln_ts_path(child, sizeof child, path, "etag");
-  if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_text_view(call, member, &out->etag, child)) return false;
-  }
+  if (!mln_ts_read_text_view(call, member, &out->etag, child)) return false;
   if (!mln_ts_member(call, value, "retryAfterUnixMs", &member)) return false;
   mln_ts_path(child, sizeof child, path, "retryAfterUnixMs");
   if (!mln_ts_is_absent(call, member)) {
@@ -6889,7 +6827,6 @@ bool mln_ts_write_source_feature_query_options(
   mln_ts_path(child, sizeof child, path, "filter");
   if (!mln_ts_is_absent(call, member)) {
     if (!mln_ts_read_text_view(call, member, &out->filter, child)) return false;
-    out->fields |= MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
   }
   return true;
 }
@@ -6936,21 +6873,18 @@ bool mln_ts_write_style_expression_inputs(
   if (!mln_ts_is_absent(call, member)) {
     if (!mln_ts_read_text_view(call, member, &out->feature, child))
       return false;
-    out->fields |= MLN_STYLE_EXPRESSION_INPUT_FEATURE;
   }
   if (!mln_ts_member(call, value, "featureState", &member)) return false;
   mln_ts_path(child, sizeof child, path, "featureState");
   if (!mln_ts_is_absent(call, member)) {
     if (!mln_ts_read_text_view(call, member, &out->feature_state, child))
       return false;
-    out->fields |= MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE;
   }
   if (!mln_ts_member(call, value, "globalState", &member)) return false;
   mln_ts_path(child, sizeof child, path, "globalState");
   if (!mln_ts_is_absent(call, member)) {
     if (!mln_ts_read_text_view(call, member, &out->global_state, child))
       return false;
-    out->fields |= MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE;
   }
   if (!mln_ts_member(call, value, "canonicalTileId", &member)) return false;
   mln_ts_path(child, sizeof child, path, "canonicalTileId");

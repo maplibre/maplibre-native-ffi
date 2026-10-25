@@ -10,9 +10,9 @@ import Foundation
 public struct RenderedFeature: Equatable, Hashable, Sendable {
   public var feature: Data
   public var layerId: String
-  public var sourceId: String?
-  public var sourceLayerId: String?
-  public var state: Data?
+  public var sourceId: String
+  public var sourceLayerId: String
+  public var state: Data
   public static var `default`: Self {
     Self()
   }
@@ -20,9 +20,9 @@ public struct RenderedFeature: Equatable, Hashable, Sendable {
   public init(
     feature: Data = Data(),
     layerId: String = "",
-    sourceId: String? = nil,
-    sourceLayerId: String? = nil,
-    state: Data? = nil
+    sourceId: String = "",
+    sourceLayerId: String = "",
+    state: Data = Data()
   ) {
     self.feature = feature
     self.layerId = layerId
@@ -43,21 +43,18 @@ public struct RenderedFeature: Equatable, Hashable, Sendable {
       data: raw.layer_id.data,
       size: raw.layer_id.size
     )
-    sourceId = raw.fields & MLN_RENDERED_FEATURE_SOURCE_ID
-      .rawValue != 0 ? try NativeString.copyUTF8(
-        data: raw.source_id.data,
-        size: raw.source_id.size
-      ) : nil
-    sourceLayerId = raw.fields & MLN_RENDERED_FEATURE_SOURCE_LAYER_ID
-      .rawValue != 0 ? try NativeString.copyUTF8(
-        data: raw.source_layer_id.data,
-        size: raw.source_layer_id.size
-      ) : nil
-    state = raw.fields & MLN_RENDERED_FEATURE_STATE
-      .rawValue != 0 ? try NativeString.copyData(
-        data: raw.state.data,
-        size: raw.state.size
-      ) : nil
+    sourceId = try NativeString.copyUTF8(
+      data: raw.source_id.data,
+      size: raw.source_id.size
+    )
+    sourceLayerId = try NativeString.copyUTF8(
+      data: raw.source_layer_id.data,
+      size: raw.source_layer_id.size
+    )
+    state = try NativeString.copyData(
+      data: raw.state.data,
+      size: raw.state.size
+    )
   }
 }
 
@@ -68,15 +65,15 @@ public struct RenderedFeature: Equatable, Hashable, Sendable {
 public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
   /// Optional style layer IDs. When absent, all rendered layers are queried.
   public var layerIds: [String]?
-  /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-  public var filter: Data?
+  /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
+  public var filter: Data
   public static var `default`: Self {
     try! Self(raw: nativeDefault(mln_rendered_feature_query_options_default))
   }
 
   public init(
     layerIds: [String]? = RenderedFeatureQueryOptions.default.layerIds,
-    filter: Data? = RenderedFeatureQueryOptions.default.filter
+    filter: Data = RenderedFeatureQueryOptions.default.filter
   ) {
     self.layerIds = layerIds
     self.filter = filter
@@ -91,11 +88,10 @@ public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
         raw.layer_ids,
         count: Int(raw.layer_id_count)
       ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) } : nil
-    filter = raw.fields & MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER
-      .rawValue != 0 ? try NativeString.copyData(
-        data: raw.filter.data,
-        size: raw.filter.size
-      ) : nil
+    filter = try NativeString.copyData(
+      data: raw.filter.data,
+      size: raw.filter.size
+    )
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -109,10 +105,7 @@ public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
         .layer_ids = arena.array(item.map { arena.view($0) })
     }
     raw.layer_id_count = try NativeInputArena.count(layerIds?.count ?? 0)
-    if let item = filter {
-      raw.fields |= MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER.rawValue; raw
-        .filter = arena.view(item)
-    }
+    raw.filter = arena.view(filter)
     return raw
   }
 }
@@ -282,12 +275,12 @@ public struct ScreenLineString: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct SourceFeature: Equatable, Hashable, Sendable {
   public var feature: Data
-  public var sourceLayerId: String?
+  public var sourceLayerId: String
   public static var `default`: Self {
     Self()
   }
 
-  public init(feature: Data = Data(), sourceLayerId: String? = nil) {
+  public init(feature: Data = Data(), sourceLayerId: String = "") {
     self.feature = feature
     self.sourceLayerId = sourceLayerId
   }
@@ -300,11 +293,10 @@ public struct SourceFeature: Equatable, Hashable, Sendable {
       data: raw.feature.data,
       size: raw.feature.size
     )
-    sourceLayerId = raw.fields & MLN_SOURCE_FEATURE_SOURCE_LAYER_ID
-      .rawValue != 0 ? try NativeString.copyUTF8(
-        data: raw.source_layer_id.data,
-        size: raw.source_layer_id.size
-      ) : nil
+    sourceLayerId = try NativeString.copyUTF8(
+      data: raw.source_layer_id.data,
+      size: raw.source_layer_id.size
+    )
   }
 }
 
@@ -315,8 +307,8 @@ public struct SourceFeature: Equatable, Hashable, Sendable {
 public struct SourceFeatureQueryOptions: Equatable, Hashable, Sendable {
   /// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
   public var sourceLayerIds: [String]?
-  /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-  public var filter: Data?
+  /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
+  public var filter: Data
   public static var `default`: Self {
     try! Self(raw: nativeDefault(mln_source_feature_query_options_default))
   }
@@ -324,7 +316,7 @@ public struct SourceFeatureQueryOptions: Equatable, Hashable, Sendable {
   public init(
     sourceLayerIds: [String]? = SourceFeatureQueryOptions.default
       .sourceLayerIds,
-    filter: Data? = SourceFeatureQueryOptions.default.filter
+    filter: Data = SourceFeatureQueryOptions.default.filter
   ) {
     self.sourceLayerIds = sourceLayerIds
     self.filter = filter
@@ -340,11 +332,10 @@ public struct SourceFeatureQueryOptions: Equatable, Hashable, Sendable {
         raw.source_layer_ids,
         count: Int(raw.source_layer_id_count)
       ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) } : nil
-    filter = raw.fields & MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER
-      .rawValue != 0 ? try NativeString.copyData(
-        data: raw.filter.data,
-        size: raw.filter.size
-      ) : nil
+    filter = try NativeString.copyData(
+      data: raw.filter.data,
+      size: raw.filter.size
+    )
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -360,10 +351,7 @@ public struct SourceFeatureQueryOptions: Equatable, Hashable, Sendable {
     }
     raw.source_layer_id_count = try NativeInputArena
       .count(sourceLayerIds?.count ?? 0)
-    if let item = filter {
-      raw.fields |= MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER.rawValue; raw
-        .filter = arena.view(item)
-    }
+    raw.filter = arena.view(filter)
     return raw
   }
 }

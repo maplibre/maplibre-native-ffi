@@ -273,7 +273,7 @@ def operation(
             arguments[parameter.name] = local
         else:
             rust = "&Bound<'_, PyAny>"
-            if value.nullable or value.optional == "empty" or has_default:
+            if value.nullable or has_default:
                 rust = "Option<Bound<'_, PyAny>>"
                 setup.append(
                     f"        let {local} = {local}.unwrap_or_else(|| py.None().into_bound(py));"
@@ -321,7 +321,7 @@ def operation(
                 setup.append(f"        let {local}_value = {converted};")
                 arguments[parameter.name] = f"{local}_value"
         rust_parameters.append(f"{local}: {rust}")
-        absent = value.nullable or value.optional == "empty" or has_default
+        absent = value.nullable or has_default
         if has_default and "None" not in public:
             public += " | None"
         py_parameters.append(f"{local}: {public}" + (" = None" if absent else ""))

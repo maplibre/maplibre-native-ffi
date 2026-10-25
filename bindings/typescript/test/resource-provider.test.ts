@@ -75,7 +75,7 @@ test(
         // The pattern alone names no kinds, so it matches every one.
         routes: [{ url: "custom://**", flags: UrlMatchFlag.glob }],
         callback(request, handle) {
-          requests.push(request.requestedUrl ?? "");
+          requests.push(request.requestedUrl);
           assert.equal(request.kind, ResourceKind.style);
           hand(handle);
         },
@@ -106,6 +106,7 @@ test(
         handle.complete({
           status: ResourceResponseStatus.error,
           errorMessage: "bad\u0000message",
+          etag: "",
         }),
       isStatus(Status.invalidArgument),
     );
@@ -117,7 +118,12 @@ test(
     assert.equal(handle.isClosed, true);
     handle.close();
     assert.throws(
-      () => handle.complete({ status: ResourceResponseStatus.noContent }),
+      () =>
+        handle.complete({
+          status: ResourceResponseStatus.noContent,
+          errorMessage: "",
+          etag: "",
+        }),
       isStatus(Status.invalidState),
     );
     assert.throws(() => handle.passThrough(), isStatus(Status.invalidState));

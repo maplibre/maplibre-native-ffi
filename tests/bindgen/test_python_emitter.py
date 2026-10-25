@@ -71,11 +71,11 @@ class PythonEmitterTests(unittest.TestCase):
                 setattr(generated, name, loaded)
         return generated
 
-    def test_nested_copied_values_keep_absence_and_escape_keyword_fields(self):
+    def test_nested_copied_values_are_deep_and_escape_keyword_fields(self):
         api = self.parse("""
 typedef struct mln_position { double latitude; double longitude; } mln_position;
 typedef struct mln_new_entry {
-  mln_buffer_view title BIND("optional=empty");
+  mln_buffer_view title;
   mln_position position;
   double class;
 } mln_new_entry;
@@ -85,14 +85,14 @@ mln_status mln_map_new_entries(mln_map map, const mln_completion *completion, ml
         self.assertEqual(python.coverage(api)["generated"], ["mln_map_new_entries"])
         values = self.materialize(api).values
         raw = {
-            "title": None,
+            "title": "Harbor",
             "position": {"latitude": 3.25, "longitude": -8.5},
             "class_": 2.0,
         }
         copied = values.NewEntry._from_native(raw)
         raw["position"]["latitude"] = 0
         self.assertEqual(copied.position, values.Position(3.25, -8.5))
-        self.assertIsNone(copied.title)
+        self.assertEqual(copied.title, "Harbor")
         self.assertEqual(copied.class_, 2.0)
 
     def test_a_nested_registration_defaults_to_a_disabled_one(self):

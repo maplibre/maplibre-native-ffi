@@ -22,8 +22,4 @@ internal static unsafe class ValueStructs
 
     internal static string CopyUtf8View(mln_buffer_view view) =>
         RuntimeStructs.CopyUtf8(view.data, view.size);
-
-    /// <summary>Copies a UTF-8 view whose empty value means that no string is present.</summary>
-    internal static string? CopyOptionalUtf8View(mln_buffer_view view) =>
-        view.size == 0 ? null : CopyUtf8View(view);
 }

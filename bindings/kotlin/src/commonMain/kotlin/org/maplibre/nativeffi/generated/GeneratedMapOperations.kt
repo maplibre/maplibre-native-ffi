@@ -163,7 +163,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    */
   public fun addStyleLayerJson(
     layerJson: ByteArray,
-    beforeLayerId: String? = null,
+    beforeLayerId: String,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
@@ -825,10 +825,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_move_style_layer` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun moveStyleLayer(
-    layerId: String,
-    beforeLayerId: String? = null,
-  ): Deferred<CommandCompletion> =
+  public fun moveStyleLayer(layerId: String, beforeLayerId: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_move_style_layer(
@@ -1569,7 +1566,7 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
     }
 
   /** [MapHandle.addStyleLayerJson] without its completion. */
-  public fun addStyleLayerJson(layerJson: ByteArray, beforeLayerId: String? = null): Unit =
+  public fun addStyleLayerJson(layerJson: ByteArray, beforeLayerId: String): Unit =
     nativeDiscard(owner, binding) {
       check(
         C.mln_map_add_style_layer_json(
@@ -1677,7 +1674,7 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
     }
 
   /** [MapHandle.moveStyleLayer] without its completion. */
-  public fun moveStyleLayer(layerId: String, beforeLayerId: String? = null): Unit =
+  public fun moveStyleLayer(layerId: String, beforeLayerId: String): Unit =
     nativeDiscard(owner, binding) {
       check(
         C.mln_map_move_style_layer(

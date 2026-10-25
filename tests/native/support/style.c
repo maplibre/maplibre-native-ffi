@@ -30,6 +30,8 @@ static bool copy_text(mln_buffer_view view, char* out, size_t capacity) {
 
 static const char overflow_message[] =
   "a copied result is larger than its test buffer; raise the capacity";
+static const char unterminated_message[] =
+  "native lent text without a NUL after its bytes";
 
 typedef struct frame_wait {
   mln_render_session session;
@@ -102,6 +104,7 @@ bool mln_test_style_render_until(
 typedef struct feature_probe {
   atomic_bool done;
   bool overflowed;
+  bool unterminated;
   mln_test_feature_list list;
 } feature_probe;
 
@@ -114,29 +117,30 @@ static void copy_rendered_features(
   probe->overflowed = result->value_count > MLN_TEST_FEATURE_CAPACITY;
   const mln_rendered_feature* features = result->value;
   bool fits = true;
+  bool terminated = true;
   for (size_t index = 0;
        index < result->value_count && index < MLN_TEST_FEATURE_CAPACITY;
        index += 1) {
     const mln_rendered_feature* source = &features[index];
     mln_test_feature* copy = &probe->list.features[index];
+    terminated &= mln_test_lent_text_is_terminated(source->feature) &&
+                  mln_test_lent_text_is_terminated(source->layer_id) &&
+                  mln_test_lent_text_is_terminated(source->source_id) &&
+                  mln_test_lent_text_is_terminated(source->source_layer_id) &&
+                  mln_test_lent_text_is_terminated(source->state);
     fits &= copy_text(source->feature, copy->feature, sizeof(copy->feature));
     fits &= copy_text(source->layer_id, copy->layer_id, sizeof(copy->layer_id));
-    if ((source->fields & MLN_RENDERED_FEATURE_SOURCE_ID) != 0) {
-      fits &=
-        copy_text(source->source_id, copy->source_id, sizeof(copy->source_id));
-    }
-    if ((source->fields & MLN_RENDERED_FEATURE_SOURCE_LAYER_ID) != 0) {
-      fits &= copy_text(
-        source->source_layer_id, copy->source_layer_id,
-        sizeof(copy->source_layer_id)
-      );
-    }
-    copy->has_state = (source->fields & MLN_RENDERED_FEATURE_STATE) != 0;
-    if (copy->has_state) {
-      fits &= copy_text(source->state, copy->state, sizeof(copy->state));
-    }
+    fits &=
+      copy_text(source->source_id, copy->source_id, sizeof(copy->source_id));
+    fits &= copy_text(
+      source->source_layer_id, copy->source_layer_id,
+      sizeof(copy->source_layer_id)
+    );
+    copy->has_state = source->state.size != 0;
+    fits &= copy_text(source->state, copy->state, sizeof(copy->state));
   }
   probe->overflowed |= !fits;
+  probe->unterminated = !terminated;
   mln_test_flag_set(&probe->done);
 }
 
@@ -149,20 +153,22 @@ static void copy_source_features(
   probe->overflowed = result->value_count > MLN_TEST_FEATURE_CAPACITY;
   const mln_source_feature* features = result->value;
   bool fits = true;
+  bool terminated = true;
   for (size_t index = 0;
        index < result->value_count && index < MLN_TEST_FEATURE_CAPACITY;
        index += 1) {
     const mln_source_feature* source = &features[index];
     mln_test_feature* copy = &probe->list.features[index];
+    terminated &= mln_test_lent_text_is_terminated(source->feature) &&
+                  mln_test_lent_text_is_terminated(source->source_layer_id);
     fits &= copy_text(source->feature, copy->feature, sizeof(copy->feature));
-    if ((source->fields & MLN_SOURCE_FEATURE_SOURCE_LAYER_ID) != 0) {
-      fits &= copy_text(
-        source->source_layer_id, copy->source_layer_id,
-        sizeof(copy->source_layer_id)
-      );
-    }
+    fits &= copy_text(
+      source->source_layer_id, copy->source_layer_id,
+      sizeof(copy->source_layer_id)
+    );
   }
   probe->overflowed |= !fits;
+  probe->unterminated = !terminated;
   mln_test_flag_set(&probe->done);
 }
 
@@ -196,8 +202,10 @@ static mln_test_feature_list finish_feature_probe(
   );
   const mln_test_feature_list list = probe->list;
   const bool overflowed = probe->overflowed;
+  const bool unterminated = probe->unterminated;
   free(probe);
   TEST_ASSERT_FALSE_MESSAGE(overflowed, overflow_message);
+  TEST_ASSERT_FALSE_MESSAGE(unterminated, unterminated_message);
   return list;
 }
 
@@ -289,7 +297,7 @@ static void serve_route(
 ) {
   const served_routes* served = user_data;
   mln_test_style_route* route =
-    find_route(served->routes, served->count, request->requested_url);
+    find_route(served->routes, served->count, request->requested_url.data);
   mln_resource_response response = {
     .size = sizeof(mln_resource_response),
     .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
@@ -348,6 +356,7 @@ void mln_test_style_serve(
 typedef struct list_probe {
   atomic_bool done;
   bool overflowed;
+  bool unterminated;
   mln_test_style_list list;
 } list_probe;
 
@@ -357,6 +366,7 @@ static void copy_list(void* user_data, const mln_completion_result* result) {
   probe->list.count = result->value_count;
   probe->list.value_size = result->value_size;
   bool fits = result->value_count <= MLN_TEST_STYLE_LIST_CAPACITY;
+  bool terminated = true;
   for (size_t index = 0;
        index < result->value_count && index < MLN_TEST_STYLE_LIST_CAPACITY;
        index += 1) {
@@ -365,6 +375,10 @@ static void copy_list(void* user_data, const mln_completion_result* result) {
     // older header steps through them.
     const mln_style_layer_info* entry =
       MLN_STRIDED_AT(void, result->value, result->value_size, index);
+    terminated &= mln_test_lent_text_is_terminated(entry->id) &&
+                  mln_test_lent_text_is_terminated(entry->type) &&
+                  mln_test_lent_text_is_terminated(entry->source_id) &&
+                  mln_test_lent_text_is_terminated(entry->source_layer);
     fits &= copy_text(entry->id, copy->id, sizeof(copy->id));
     fits &= copy_text(entry->type, copy->type, sizeof(copy->type));
     fits &=
@@ -377,6 +391,7 @@ static void copy_list(void* user_data, const mln_completion_result* result) {
     copy->visibility = entry->visibility;
   }
   probe->overflowed = !fits;
+  probe->unterminated = !terminated;
   mln_test_flag_set(&probe->done);
 }
 
@@ -396,8 +411,10 @@ mln_test_style_list mln_test_style_list_layers(mln_map map) {
   );
   const mln_test_style_list list = probe->list;
   const bool overflowed = probe->overflowed;
+  const bool unterminated = probe->unterminated;
   free(probe);
   TEST_ASSERT_FALSE_MESSAGE(overflowed, overflow_message);
+  TEST_ASSERT_FALSE_MESSAGE(unterminated, unterminated_message);
   return list;
 }
 

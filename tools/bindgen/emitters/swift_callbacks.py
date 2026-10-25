@@ -109,9 +109,7 @@ def descriptor(values, plan):
             )
             source = identifier(camel(array.name))
             length = (
-                f"{source}?.count ?? 0"
-                if array.value.nullable or array.value.optional
-                else f"{source}.count"
+                f"{source}?.count ?? 0" if array.value.nullable else f"{source}.count"
             )
             materialize.append(
                 f"    raw.{identifier(field.name)} = try NativeInputArena.count({length})"

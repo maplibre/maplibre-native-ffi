@@ -12,11 +12,12 @@ const support = @import("fixture.zig");
 test "host strings use views and native-lent strings decode" {
     const RawRequest = @typeInfo(@TypeOf(maplibre.ResourceRequestInfo.fromNative)).@"fn".param_types[1].?;
     var raw_request = std.mem.zeroes(RawRequest);
-    raw_request.resolved_url = "custom://native-lent/é";
+    const lent_url = "custom://native-lent/é";
+    raw_request.resolved_url = .{ .data = lent_url, .size = lent_url.len };
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const request = try maplibre.ResourceRequestInfo.fromNative(arena.allocator(), raw_request);
-    try testing.expectEqualStrings("custom://native-lent/é", request.resolved_url.?);
+    try testing.expectEqualStrings("custom://native-lent/é", request.resolved_url);
 
     var options = try maplibre.runtimeOptionsDefault(testing.allocator);
     defer options.deinit();

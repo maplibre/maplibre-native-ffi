@@ -324,7 +324,6 @@ static void check_event_against_row(
   }
   if (row->message == MESSAGE_NONE) {
     TEST_ASSERT_EQUAL_UINT32(0, event->message.size);
-    TEST_ASSERT_NULL(event->message.data);
   } else {
     TEST_ASSERT_GREATER_THAN_UINT32(0, event->message.size);
     if (row->expected_message != NULL) {

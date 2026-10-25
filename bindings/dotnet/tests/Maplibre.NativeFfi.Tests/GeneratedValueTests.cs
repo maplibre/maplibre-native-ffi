@@ -58,16 +58,9 @@ public sealed class GeneratedValueTests
     private static byte[] EmptyGeoJsonSource =>
         """{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}"""u8.ToArray();
 
-    private static unsafe void AssertNativeLentStringDecodes()
-    {
-        using var scope = new NativeCallScope();
-        Assert.Equal("native-lent é", NativeCallScope.CopyCString(scope.CString("native-lent é")));
-    }
-
     [Fact]
     public async Task HostStringsUseViewsAndNativeLentStringsDecode()
     {
-        AssertNativeLentStringDecodes();
         await using var fixture = await NativeFixture.WithEmptyStyleAsync();
 
         // A source ID crosses as an explicit-length view, so an embedded NUL is part of the ID.
@@ -75,10 +68,12 @@ public sealed class GeneratedValueTests
         Assert.NotNull(await fixture.Map.GetStyleSourceAsync("before\0after"));
         Assert.Null(await fixture.Map.GetStyleSourceAsync("before"));
 
-        // An omitted optional ID crosses as the empty view, which appends the layer.
+        // The layer ID comes back as text that native lends for the completion.
         await fixture.Map.AddStyleLayerJsonAsync(
-            """{"id":"last","type":"background"}"""u8.ToArray()
+            """{"id":"café-层","type":"background"}"""u8.ToArray(),
+            ""
         );
+        Assert.Equal(["café-层"], (await fixture.Map.ListStyleLayersAsync()).Select(l => l.Id));
 
         // Native rejects a NUL in a URL view before a C-string consumer reads it.
         var error = Assert.Throws<MaplibreException>(() =>

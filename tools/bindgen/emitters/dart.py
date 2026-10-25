@@ -283,7 +283,7 @@ def lower_function(
             optional.append(f"{typ} {local}")
         else:
             signature.append(f"{typ} {local}")
-        bare = replace(value, nullable=False, optional=None)
+        bare = replace(value, nullable=False)
         if (
             value.kind == "buffer"
             and value.buffer_form != "view"
@@ -448,8 +448,6 @@ def lower_function(
         values.check(result)
         public = values.public(result)
         element = result.element if result.kind == "array" else result
-        if result.kind == "array" and result.optional:
-            raise Unsupported("empty optional array needs cardinality interpretation")
         bare = replace(element, nullable=False)
         if result.kind != "array" and bare.kind == "buffer":
             bare = replace(bare, nullable=result.nullable)

@@ -80,9 +80,10 @@ struct BlockingTransform {
 };
 
 void blocking_transform(
-  void* user_data, mln_resource_kind kind, const char* url,
+  void* user_data, mln_resource_kind kind, mln_buffer_view url_view,
   mln_resource_transform_request request
 ) {
+  const char* url = static_cast<const char*>(url_view.data);
   static_cast<void>(kind);
   auto& transform = *static_cast<BlockingTransform*>(user_data);
   if (
@@ -156,8 +157,11 @@ auto lookup_provider(
 ) -> void {
   auto& provider = *static_cast<LookupProvider*>(user_data);
   if (
-    request == nullptr || request->requested_url == nullptr ||
-    std::strstr(request->requested_url, lookup_probe_style_url) == nullptr
+    request == nullptr ||
+    std::strstr(
+      static_cast<const char*>(request->requested_url.data),
+      lookup_probe_style_url
+    ) == nullptr
   ) {
     mln_test_request_pass_through(handle);
     return;

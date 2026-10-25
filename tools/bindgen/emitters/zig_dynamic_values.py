@@ -29,19 +29,19 @@ def public(values, value):
         typ = values.public(value.element)
     else:
         return None
-    return "?" + typ if value.nullable or value.optional == "empty" else typ
+    return "?" + typ if value.nullable else typ
 
 
 def encode(values, value, source, depth=0):
     item = f"array_item_{depth}"
-    optional = value.nullable or value.optional == "empty"
+    optional = value.nullable
     if value.kind in {"buffer", "array", "reference"} and optional:
         fallback = (
             "std.mem.zeroes(c.mln_buffer_view)"
             if value.buffer_form == "view"
             else "null"
         )
-        return f"if ({source}) |{item}| {encode(values, replace(value, nullable=False, optional=None), item, depth + 1)} else {fallback}"
+        return f"if ({source}) |{item}| {encode(values, replace(value, nullable=False), item, depth + 1)} else {fallback}"
     if value.kind == "buffer":
         if value.length == "nul":
             return f"try marshal.cString(allocator, {source})"
@@ -124,14 +124,14 @@ def decode(values, value, source, context="raw"):
         return "null" if value.nullable else ".{}"
     if array := slice_of(values, value):
         return decode(values, array.value, f"{source}.{identifier(array.name)}", source)
-    optional = value.nullable or value.optional == "empty"
+    optional = value.nullable
     if value.kind in {"buffer", "array", "reference"} and optional:
         absent = (
             (f"{source}.data == null" if value.nullable else f"{source}.size == 0")
             if value.buffer_form == "view"
             else f"{source} == null"
         )
-        return f"if ({absent}) null else {decode(values, replace(value, nullable=False, optional=None), source, context)}"
+        return f"if ({absent}) null else {decode(values, replace(value, nullable=False), source, context)}"
     if value.kind == "buffer":
         if value.length == "nul":
             return f"try allocator.dupe(u8, std.mem.span({source} orelse return error.NativeError))"
@@ -224,9 +224,7 @@ def declaration(values, value):
             expression = f"self.{identifier(array.name)}"
             length = (
                 f"if ({expression}) |items| items.len else 0"
-                if array.presence
-                or array.value.nullable
-                or array.value.optional == "empty"
+                if array.presence or array.value.nullable
                 else f"{expression}.len"
             )
             writes.append(
@@ -259,13 +257,21 @@ def declaration(values, value):
             if public_type.startswith("[]")
             else field_default(values, field)
         )
+        # A native default leaves every buffer empty, and empty text means
+        # absent, so a buffer defaults to empty even in a natively defaulted
+        # record.
         fields.append(
             doc(values.bound, f"{value.native}.{field.name}", "    ")
             + f"    {local}: {'?' if optional else ''}{public_type}"
             + (
                 f" = {default}"
                 if default is not None
-                and (not value.default or optional or public_type.startswith("?"))
+                and (
+                    not value.default
+                    or optional
+                    or public_type.startswith("?")
+                    or field.value.kind == "buffer"
+                )
                 else ""
             )
             + ","

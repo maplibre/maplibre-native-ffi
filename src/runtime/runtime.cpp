@@ -1019,7 +1019,7 @@ auto delete_header_rules(void* table) noexcept -> void {
 // Queues a copy of the URL with its request handle. A request the queue
 // refuses keeps its URL.
 auto queue_resource_transform(
-  void* registration, mln_resource_kind kind, const char* url,
+  void* registration, mln_resource_kind kind, mln_buffer_view url,
   mln_resource_transform_request request
 ) noexcept -> void {
   const auto arguments = mln_resource_transform_delivery{
@@ -2431,8 +2431,9 @@ auto RuntimeEventRegistration::push(
   } else {
     if (process_exiting()) return;
     const auto text = delivery::event_message(message);
+    // message is a std::string, so its view is NUL-terminated.
     event.message = mln_buffer_view{
-      .data = text.empty() ? nullptr : text.data(), .size = text.size()
+      .data = text.empty() ? "" : text.data(), .size = text.size()
     };
     // The callback borrows this span; bindings copy it before returning.
     const mln_event_batch_view events = {
@@ -2641,7 +2642,7 @@ auto invoke_http_header_transform(
   void* platform_context, mln_resource_kind kind, const char* url
 ) noexcept -> HttpHeaders {
   const auto state = lease_http_header_transform_state(platform_context);
-  if (state == nullptr) {
+  if (state == nullptr || url == nullptr) {
     return {};
   }
 
@@ -2659,7 +2660,8 @@ auto invoke_http_header_transform(
   try {
     if (
       registration->callback(
-        registration->context->user_data(), kind, url, &response
+        registration->context->user_data(), kind,
+        mln_buffer_view{.data = url, .size = std::strlen(url)}, &response
       ) != MLN_STATUS_OK
     ) {
       return {};

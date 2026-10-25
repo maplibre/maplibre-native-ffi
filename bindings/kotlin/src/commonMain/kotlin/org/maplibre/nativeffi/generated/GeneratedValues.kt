@@ -2475,9 +2475,10 @@ public data class GeojsonSourceOptions(
   public val clusterMaxZoom: Double? = null,
   /**
    * Cluster aggregation expressions keyed by property name, as a JSON object whose members follow
-   * the MapLibre Style Spec clusterProperties form. The UTF-8 bytes are borrowed for the call.
+   * the MapLibre Style Spec clusterProperties form, or empty for none. The UTF-8 bytes are borrowed
+   * for the call.
    */
-  public val clusterProperties: ByteArray? = null,
+  public val clusterProperties: ByteArray = GeojsonSourceOptions.default.clusterProperties,
   /** Tile buffer in pixels within &#91;0, 512&#93;. Defaults to 128. */
   public val buffer: UInt? = null,
   /** Cluster radius in pixels within &#91;0, 4095&#93;. Defaults to 50. */
@@ -3006,8 +3007,8 @@ public data class RenderSessionAttachOptions(
 public data class RenderedFeatureQueryOptions(
   /** Optional style layer IDs. When absent, all rendered layers are queried. */
   public val layerIds: List<String>? = null,
-  /** Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter. */
-  public val filter: ByteArray? = null,
+  /** UTF-8 MapLibre style-spec filter JSON, or empty for no filter. */
+  public val filter: ByteArray = RenderedFeatureQueryOptions.default.filter,
 ) {
   private fun contentFields(): Array<Any?> = arrayOf(layerIds, filter)
 
@@ -3054,9 +3055,9 @@ public data class RuntimeOptions(
    * Directory root for asset:// URLs. Copied during runtime creation. Empty selects
    * `/android_asset` on Android and `.` elsewhere.
    */
-  public val assetPath: String? = null,
-  /** Cache database path. Copied during runtime creation. */
-  public val cachePath: String? = null,
+  public val assetPath: String = RuntimeOptions.default.assetPath,
+  /** Cache database path. Copied during runtime creation. Empty selects an in-memory cache. */
+  public val cachePath: String = RuntimeOptions.default.cachePath,
 ) {
   public companion object {
     internal val default: RuntimeOptions by lazy { GeneratedApi.runtimeOptionsDefault() }
@@ -3072,8 +3073,8 @@ public data class RuntimeOptions(
 public data class SourceFeatureQueryOptions(
   /** Optional source-layer IDs. Required by vector sources; ignored by GeoJSON. */
   public val sourceLayerIds: List<String>? = null,
-  /** Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter. */
-  public val filter: ByteArray? = null,
+  /** UTF-8 MapLibre style-spec filter JSON, or empty for no filter. */
+  public val filter: ByteArray = SourceFeatureQueryOptions.default.filter,
 ) {
   private fun contentFields(): Array<Any?> = arrayOf(sourceLayerIds, filter)
 
@@ -3142,11 +3143,11 @@ public data class StyleExpressionInputs(
   /** The value of the elevation expression outside a color-relief layer. */
   public val elevation: Double? = null,
   /** One UTF-8 GeoJSON Feature that feature data expressions read. */
-  public val feature: ByteArray? = null,
+  public val feature: ByteArray = StyleExpressionInputs.default.feature,
   /** A UTF-8 JSON object that the feature-state expression reads. */
-  public val featureState: ByteArray? = null,
+  public val featureState: ByteArray = StyleExpressionInputs.default.featureState,
   /** A UTF-8 JSON object that the global-state expression reads. */
-  public val globalState: ByteArray? = null,
+  public val globalState: ByteArray = StyleExpressionInputs.default.globalState,
   /**
    * The tile that holds the feature, which the within and distance expressions need to place its
    * geometry.
@@ -3539,15 +3540,16 @@ public data class CameraQueryResult(
 public data class FeatureStateSelector(
   /** Source ID. Required and borrowed for the duration of the call. */
   public val sourceId: String = "",
-  /** Optional source layer ID. Required for vector-source disambiguation. */
-  public val sourceLayerId: String? = null,
+  /** Source layer ID, or empty for none. Required for vector-source disambiguation. */
+  public val sourceLayerId: String = "",
   /**
    * Optional feature ID. Required by set and get, optional for remove. A numeric feature ID matches
-   * its decimal text, such as "7" for the GeoJSON id 7.
+   * its decimal text, such as "7" for the GeoJSON id
+   * 7. Its field bit tells an absent ID from the empty ID "".
    */
   public val featureId: String? = null,
-  /** Optional state key. Used only by remove and requires feature_id. */
-  public val stateKey: String? = null,
+  /** State key, or empty to select every key. Used only by remove, and requires feature_id. */
+  public val stateKey: String = "",
 )
 
 /**
@@ -3645,9 +3647,9 @@ public data class StyleLayerInfo(
   /** The style-spec layer type string. */
   public val type: String,
   /** Source ID. Empty for a layer type that takes no source. */
-  public val sourceId: String?,
+  public val sourceId: String,
   /** Source-layer ID. Empty when the layer sets none. */
-  public val sourceLayer: String?,
+  public val sourceLayer: String,
   /** Lowest zoom at which the layer draws; -INFINITY with no lower bound. */
   public val minZoom: Double,
   /** Highest zoom at which the layer draws; INFINITY with no upper bound. */
@@ -3683,10 +3685,10 @@ public data class StyleSourceInfo(
   public val type: StyleSourceType,
   /** Whether the source is marked volatile. */
   public val isVolatile: Boolean,
-  /** Attribution string, when the source sets one. It may be empty. */
-  public val attribution: String?,
-  /** URL that the source loads from, when it has one. */
-  public val url: String?,
+  /** Attribution string, or empty when the source sets none. */
+  public val attribution: String,
+  /** URL that the source loads from, or empty when it has none. */
+  public val url: String,
   /** Inline TileJSON metadata, when the source was defined with it. */
   public val tilejson: StyleSourceTileInfo?,
   /** Geographic bounds, when inline TileJSON sets them. */
@@ -3816,9 +3818,9 @@ public data class RenderedQueryGeometry(
 public data class RenderedFeature(
   public val feature: ByteArray,
   public val layerId: String,
-  public val sourceId: String?,
-  public val sourceLayerId: String?,
-  public val state: ByteArray?,
+  public val sourceId: String,
+  public val sourceLayerId: String,
+  public val state: ByteArray,
 ) {
   private fun contentFields(): Array<Any?> =
     arrayOf(feature, layerId, sourceId, sourceLayerId, state)
@@ -3838,7 +3840,7 @@ public data class RenderedFeature(
  */
 public data class SourceFeature(
   public val feature: ByteArray,
-  public val sourceLayerId: String?,
+  public val sourceLayerId: String,
 ) {
   private fun contentFields(): Array<Any?> = arrayOf(feature, sourceLayerId)
 
@@ -3897,11 +3899,11 @@ public data class ResourceResponse(
   public val errorReason: ResourceErrorReason = ResourceErrorReason.NONE,
   /** Response bytes. May be null only when byte_count is 0. */
   public val bytes: ByteArray = byteArrayOf(),
-  public val errorMessage: String? = null,
+  public val errorMessage: String = "",
   public val mustRevalidate: Boolean = false,
   public val modifiedUnixMs: Long? = null,
   public val expiresUnixMs: Long? = null,
-  public val etag: String? = null,
+  public val etag: String = "",
   public val retryAfterUnixMs: Long? = null,
 ) {
   private fun contentFields(): Array<Any?> =
@@ -4220,12 +4222,12 @@ public data class ResourceRange(
 
 public data class ResourceRequestInfo(
   /** URL entering the network layer, before tile server normalization. */
-  public val requestedUrl: String?,
+  public val requestedUrl: String,
   /**
    * URL to fetch, after resource-kind normalization against the runtime's tile server options and
    * API key.
    */
-  public val resolvedUrl: String?,
+  public val resolvedUrl: String,
   public val kind: ResourceKind,
   public val loadingMethod: ResourceLoadingMethod,
   public val priority: ResourcePriority,
@@ -4234,7 +4236,8 @@ public data class ResourceRequestInfo(
   public val range: ResourceRange?,
   public val priorModifiedUnixMs: Long?,
   public val priorExpiresUnixMs: Long?,
-  public val priorEtag: String?,
+  /** Entity tag of the cached copy, or empty when there is none. */
+  public val priorEtag: String,
   public val priorData: ByteArray,
 ) {
   private fun contentFields(): Array<Any?> =

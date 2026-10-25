@@ -5,8 +5,7 @@
 static mln_feature_state_selector select_poi(const char* feature_id) {
   // #region select
   mln_feature_state_selector selector = {.size = sizeof(selector)};
-  selector.fields = MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID |
-                    MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
+  selector.fields = MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
   selector.source_id = mln_buffer_view_from_cstr("places");
   selector.source_layer_id = mln_buffer_view_from_cstr("poi");
   selector.feature_id = mln_buffer_view_from_cstr(feature_id);
@@ -37,7 +36,6 @@ mln_status clear_selected(
 ) {
   // #region remove
   mln_feature_state_selector selector = select_poi(feature_id);
-  selector.fields |= MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
   selector.state_key = mln_buffer_view_from_cstr("selected");
 
   return mln_map_remove_feature_state(map, &selector, completion, NULL);

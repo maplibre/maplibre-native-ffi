@@ -21,7 +21,7 @@ def test_host_strings_use_views_and_native_lent_strings_decode(
     harness: Harness,
     map_handle: mln.MapHandle,
 ) -> None:
-    seen: list[str | None] = []
+    seen: list[str] = []
 
     def serve(
         request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
@@ -39,7 +39,7 @@ def test_host_strings_use_views_and_native_lent_strings_decode(
 
     # The layer JSON crosses as sized UTF-8 bytes, and the ID comes back
     # through a lookup that also takes an explicit-length view.
-    result(map_handle.add_style_layer_json(layer.encode()))
+    result(map_handle.add_style_layer_json(layer.encode(), ""))
     assert [entry.id for entry in result(map_handle.list_style_layers())] == [layer_id]
     stored = result(map_handle.get_style_layer_json(layer_id))
     assert stored is not None
@@ -50,7 +50,7 @@ def test_host_strings_use_views_and_native_lent_strings_decode(
     assert raised.value.status == mln.Status.INVALID_ARGUMENT
     assert "embedded NUL" in raised.value.diagnostic
     with pytest.raises(TypeError, match="bytes-like object"):
-        map_handle.add_style_layer_json(typing.cast(typing.Any, layer))
+        map_handle.add_style_layer_json(typing.cast(typing.Any, layer), "")
 
 
 def test_absent_fields_stay_distinct_from_present_values(

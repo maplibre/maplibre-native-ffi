@@ -215,14 +215,15 @@ auto copy_header_rules(
 }
 
 auto header_rules_callback(
-  void* user_data, mln_resource_kind kind, const char* url,
+  void* user_data, mln_resource_kind kind, mln_buffer_view url,
   mln_http_header_transform_response* out_response
 ) -> mln_status {
-  if (user_data == nullptr || url == nullptr || out_response == nullptr) {
+  if (user_data == nullptr || out_response == nullptr) {
     return MLN_STATUS_OK;
   }
   const auto& table = *static_cast<const HeaderRuleTable*>(user_data);
-  const auto candidate = std::string_view{url};
+  const auto candidate =
+    std::string_view{static_cast<const char*>(url.data), url.size};
   for (const auto& rule : table.rules) {
     if (!rule.pattern.matches(kind, candidate)) continue;
     for (const auto& [name, value] : rule.headers) {

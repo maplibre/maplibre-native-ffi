@@ -184,9 +184,7 @@ def check(value, values):
 def public(value, values):
     if not check(value, values):
         return None
-    return public_name(value, values) + (
-        "?" if value.nullable or value.optional else ""
-    )
+    return public_name(value, values) + ("?" if value.nullable else "")
 
 
 def split_note(value, values):
@@ -632,7 +630,10 @@ def callback_argument(parameter, values):
         return (
             f"readCStringOrNull({local})" if value.nullable else f"readCString({local})"
         )
-    if value.kind == "record":
+    if value.kind == "record" or (
+        value.kind == "buffer" and value.buffer_form == "view"
+    ):
+        # Every upcall path hands a by-value record over as its address.
         return values.decode(value, local)
     if value.kind == "enum":
         _suffix, typ = values.accessor(value)

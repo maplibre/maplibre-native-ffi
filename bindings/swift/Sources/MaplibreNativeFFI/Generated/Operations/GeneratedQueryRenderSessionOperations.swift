@@ -15,7 +15,7 @@ public extension RenderSessionHandle {
     feature bindingArg1: Data,
     extension bindingArg2: String,
     extensionField bindingArg3: String,
-    arguments bindingArg4: Data? = nil
+    arguments bindingArg4: Data
   ) async throws -> Data {
     try await nativeStart(convert: { result in
       try NativeCompletion.data(result)
@@ -26,7 +26,7 @@ public extension RenderSessionHandle {
         arena.view(bindingArg1),
         arena.view(bindingArg2),
         arena.view(bindingArg3),
-        bindingArg4.map { arena.store(arena.view($0)) },
+        arena.view(bindingArg4),
         completion,
         diagnostic
       )

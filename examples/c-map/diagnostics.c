@@ -48,8 +48,11 @@ mln_completion diagnostics_completion(const char* message) {
 bool diagnostics_log_record(
   [[maybe_unused]] void* user_data, uint32_t severity,
   [[maybe_unused]] uint32_t event, [[maybe_unused]] int64_t code,
-  const char* message
+  mln_buffer_view message
 ) {
-  printf("[%s] %s\n", severity_label(severity), message);
+  printf(
+    "[%s] %.*s\n", severity_label(severity), (int)message.size,
+    (const char*)message.data
+  );
   return true;
 }

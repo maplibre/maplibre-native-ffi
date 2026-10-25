@@ -190,21 +190,9 @@ auto capture_element(
   auto result = source;
   result.feature = buffer(arena, source.feature);
   result.layer_id = buffer(arena, source.layer_id);
-  if ((source.fields & MLN_RENDERED_FEATURE_SOURCE_ID) != 0) {
-    result.source_id = buffer(arena, source.source_id);
-  } else {
-    result.source_id = {};
-  }
-  if ((source.fields & MLN_RENDERED_FEATURE_SOURCE_LAYER_ID) != 0) {
-    result.source_layer_id = buffer(arena, source.source_layer_id);
-  } else {
-    result.source_layer_id = {};
-  }
-  if ((source.fields & MLN_RENDERED_FEATURE_STATE) != 0) {
-    result.state = buffer(arena, source.state);
-  } else {
-    result.state = {};
-  }
+  result.source_id = buffer(arena, source.source_id);
+  result.source_layer_id = buffer(arena, source.source_layer_id);
+  result.state = buffer(arena, source.state);
   return result;
 }
 inline auto discard_element(
@@ -220,11 +208,7 @@ auto capture_element(
 ) -> mln_source_feature {
   auto result = source;
   result.feature = buffer(arena, source.feature);
-  if ((source.fields & MLN_SOURCE_FEATURE_SOURCE_LAYER_ID) != 0) {
-    result.source_layer_id = buffer(arena, source.source_layer_id);
-  } else {
-    result.source_layer_id = {};
-  }
+  result.source_layer_id = buffer(arena, source.source_layer_id);
   return result;
 }
 inline auto discard_element(
@@ -299,16 +283,8 @@ auto capture_element(
 ) -> mln_style_source_info {
   auto result = source;
   result.id = buffer(arena, source.id);
-  if ((source.fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0) {
-    result.attribution = buffer(arena, source.attribution);
-  } else {
-    result.attribution = {};
-  }
-  if ((source.fields & MLN_STYLE_SOURCE_INFO_URL) != 0) {
-    result.url = buffer(arena, source.url);
-  } else {
-    result.url = {};
-  }
+  result.attribution = buffer(arena, source.attribution);
+  result.url = buffer(arena, source.url);
   if ((source.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
     result.tilejson.tile_urls = span(
       arena, source.tilejson.tile_urls, source.tilejson.tile_url_count,
@@ -453,7 +429,7 @@ auto capture_element(
   [[maybe_unused]] Arena<Writing>& arena, const mln_log_delivery& source
 ) -> mln_log_delivery {
   auto result = source;
-  result.message = string(arena, source.message);
+  result.message = buffer(arena, source.message);
   return result;
 }
 inline auto discard_element(
@@ -498,8 +474,8 @@ auto capture_element(
     arena, source.request, 1,
     [&]([[maybe_unused]] auto& arena, auto element_1) {
       auto copied_1 = element_1;
-      copied_1.requested_url = string(arena, element_1.requested_url);
-      copied_1.resolved_url = string(arena, element_1.resolved_url);
+      copied_1.requested_url = buffer(arena, element_1.requested_url);
+      copied_1.resolved_url = buffer(arena, element_1.resolved_url);
       if ((element_1.fields & MLN_RESOURCE_REQUEST_RANGE) != 0) {
       } else {
         copied_1.range = {};
@@ -512,7 +488,7 @@ auto capture_element(
       } else {
         copied_1.prior_expires_unix_ms = {};
       }
-      copied_1.prior_etag = string(arena, element_1.prior_etag);
+      copied_1.prior_etag = buffer(arena, element_1.prior_etag);
       copied_1.prior_data =
         bytes(arena, element_1.prior_data, element_1.prior_data_size);
       return copied_1;
@@ -543,7 +519,7 @@ auto capture_element(
   const mln_resource_transform_delivery& source
 ) -> mln_resource_transform_delivery {
   auto result = source;
-  result.url = string(arena, source.url);
+  result.url = buffer(arena, source.url);
   return result;
 }
 inline auto discard_element(

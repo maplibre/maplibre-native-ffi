@@ -170,8 +170,8 @@ void mln_test_request_pass_through(mln_resource_request handle) {
   }
 }
 
-static void copy_text(const char* text, char* out, size_t capacity) {
-  (void)snprintf(out, capacity, "%s", text == NULL ? "" : text);
+static void copy_text(mln_buffer_view text, char* out, size_t capacity) {
+  (void)snprintf(out, capacity, "%.*s", (int)text.size, (const char*)text.data);
 }
 
 static void scripted_provider(
@@ -182,9 +182,10 @@ static void scripted_provider(
   const mln_test_provided_resource* match = NULL;
   bool repeat = false;
   for (size_t index = 0; index < provider->resource_count; index += 1) {
+    const char* url = provider->resources[index].url;
     if (
-      request->requested_url != NULL &&
-      strcmp(provider->resources[index].url, request->requested_url) == 0
+      strlen(url) == request->requested_url.size &&
+      memcmp(url, request->requested_url.data, request->requested_url.size) == 0
     ) {
       match = &provider->resources[index];
       repeat = atomic_fetch_add(&provider->matches[index], 1) > 0;
@@ -209,7 +210,11 @@ static void scripted_provider(
     record->range = request->range;
     record->prior_modified_unix_ms = request->prior_modified_unix_ms;
     record->prior_expires_unix_ms = request->prior_expires_unix_ms;
-    record->has_prior_etag = request->prior_etag != NULL;
+    record->has_prior_etag = request->prior_etag.size != 0;
+    record->text_terminated =
+      mln_test_lent_text_is_terminated(request->requested_url) &&
+      mln_test_lent_text_is_terminated(request->resolved_url) &&
+      mln_test_lent_text_is_terminated(request->prior_etag);
     copy_text(
       request->prior_etag, record->prior_etag, sizeof(record->prior_etag)
     );

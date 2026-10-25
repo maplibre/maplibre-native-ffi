@@ -331,13 +331,10 @@ public sealed unsafe partial class RenderSessionHandle
         byte[] feature,
         string extension,
         string extensionField,
-        byte[]? arguments = null
+        byte[] arguments
     )
     {
         using var scope = new NativeCallScope(this);
-        var nativeArguments = arguments is null
-            ? default(mln_buffer_view)
-            : scope.Buffer(arguments);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_query_feature_extensions(
             Handle,
@@ -345,7 +342,7 @@ public sealed unsafe partial class RenderSessionHandle
             scope.Buffer(feature),
             scope.Utf8(extension),
             scope.Utf8(extensionField),
-            arguments is null ? null : &nativeArguments,
+            scope.Buffer(arguments),
             NativeCompletion.Start<byte[]>(
                 &nativeCompletion,
                 static nativeResult =>

@@ -176,9 +176,7 @@ auto to_native_inputs(
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_STYLE_EXPRESSION_INPUT_ZOOM) |
     MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER |
-    MLN_STYLE_EXPRESSION_INPUT_ELEVATION | MLN_STYLE_EXPRESSION_INPUT_FEATURE |
-    MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE |
-    MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE |
+    MLN_STYLE_EXPRESSION_INPUT_ELEVATION |
     MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID;
   if ((inputs.fields & ~known_fields) != 0U) {
     mln::core::set_thread_error(
@@ -205,13 +203,13 @@ auto to_native_inputs(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  if (has_input(inputs, MLN_STYLE_EXPRESSION_INPUT_FEATURE)) {
+  if (inputs.feature.size != 0) {
     out_inputs.feature = mln::core::to_native_feature(inputs.feature);
     if (!out_inputs.feature) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
   }
-  if (has_input(inputs, MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE)) {
+  if (inputs.feature_state.size != 0) {
     out_inputs.feature_state =
       json_object_input(inputs.feature_state, "feature_state");
     if (!out_inputs.feature_state) {
@@ -219,7 +217,7 @@ auto to_native_inputs(
     }
     out_context.withFeatureState(&*out_inputs.feature_state);
   }
-  if (has_input(inputs, MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE)) {
+  if (inputs.global_state.size != 0) {
     out_inputs.global_state =
       json_object_input(inputs.global_state, "global_state");
     if (!out_inputs.global_state) {

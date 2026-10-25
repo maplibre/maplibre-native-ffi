@@ -1850,7 +1850,7 @@ static jint mln_render_session_query_feature_extensions_jni(
     MLN_JNI_RECORD(mln_buffer_view, feature),
     MLN_JNI_RECORD(mln_buffer_view, extension),
     MLN_JNI_RECORD(mln_buffer_view, extension_field),
-    MLN_JNI_POINTER(const mln_buffer_view*, arguments),
+    MLN_JNI_RECORD(mln_buffer_view, arguments),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -3527,14 +3527,14 @@ static void mln_jni_releaseRoot(void* userData) {
 
 static bool mln_jni_logHandlerCallback(
   void* userData, mln_log_severity severity, mln_log_event event, int64_t code,
-  const char* message
+  mln_buffer_view message
 ) {
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)},
     {.i = (jint)severity},
     {.i = (jint)event},
     {.j = (jlong)code},
-    {.j = MLN_JNI_ADDRESS(message)}
+    {.j = MLN_JNI_ADDRESS(&message)}
   };
   jboolean result = false;
   mln_jni_upcall_boolean(
@@ -3544,13 +3544,13 @@ static bool mln_jni_logHandlerCallback(
 }
 
 static mln_status mln_jni_httpHeaderTransformCallback(
-  void* userData, mln_resource_kind kind, const char* url,
+  void* userData, mln_resource_kind kind, mln_buffer_view url,
   mln_http_header_transform_response* outResponse
 ) {
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)},
     {.i = (jint)kind},
-    {.j = MLN_JNI_ADDRESS(url)},
+    {.j = MLN_JNI_ADDRESS(&url)},
     {.j = MLN_JNI_ADDRESS(outResponse)}
   };
   jint result = -5;
@@ -3639,13 +3639,13 @@ static void mln_jni_resourceProviderCallback(
 }
 
 static void mln_jni_resourceTransformCallback(
-  void* userData, mln_resource_kind kind, const char* url,
+  void* userData, mln_resource_kind kind, mln_buffer_view url,
   mln_resource_transform_request request
 ) {
   jvalue arguments[] = {
     {.j = MLN_JNI_ADDRESS(userData)},
     {.i = (jint)kind},
-    {.j = MLN_JNI_ADDRESS(url)},
+    {.j = MLN_JNI_ADDRESS(&url)},
     {.j = (jlong)request}
   };
   if (!mln_jni_upcall_void(

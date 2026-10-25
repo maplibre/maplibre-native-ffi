@@ -37,7 +37,7 @@ export async function routeRequests(
     provider: {
       routes: [{ flags: UrlMatchFlag.glob, url: `${scheme}://**` }],
       callback(request, handle) {
-        requests.push(request.requestedUrl ?? "");
+        requests.push(request.requestedUrl);
         handle.complete(styleResponse());
       },
     },
@@ -55,6 +55,7 @@ export async function routeRequests(
   await bounded(
     map.addStyleLayerJson(
       JSON.stringify({ id: "fill", type: "fill", source: "custom" }),
+      "",
     ),
     "a command",
   );

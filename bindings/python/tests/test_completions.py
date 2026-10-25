@@ -45,7 +45,9 @@ def test_a_rejected_submission_frees_its_future(
     monkeypatch.setattr(_future, "NativeFuture", TrackedFuture)
     with pytest.raises(mln.MaplibreError) as raised:
         map_handle.get_feature_state(
-            mln.FeatureStateSelector(source_id="source", state_key="hover")
+            mln.FeatureStateSelector(
+                source_id="source", source_layer_id="", state_key="hover"
+            )
         )
     # Native rejected the submission, after the binding made its future.
     assert raised.value.status == mln.Status.INVALID_ARGUMENT

@@ -103,7 +103,7 @@ class Values:
         if plan.response:
             self.plans[plan.native] = plan
             return
-        if plan.kind in {"scalar", "enum"} and (plan.nullable or plan.optional):
+        if plan.kind in {"scalar", "enum"} and plan.nullable:
             raise Unsupported(
                 f"{plan.native}: scalar absence requires a value representation"
             )
@@ -147,11 +147,6 @@ class Values:
             self.native_type(plan)
             return
         if plan.kind == "buffer" and plan.encoding in {"utf8", "bytes", "json"}:
-            if plan.optional not in (
-                None,
-                "empty",
-            ):
-                raise Unsupported("buffer presence needs a supported representation")
             return
         if plan.kind in {"array", "reference"} and plan.element:
             self.supported(plan.element)
@@ -233,7 +228,7 @@ class Values:
             return base if not plan.nullable or base.endswith("?") else base + "?"
         if plan.kind == "buffer":
             base = "string" if plan.encoding == "utf8" else "byte[]"
-            return base + ("?" if plan.nullable or plan.optional else "")
+            return base + ("?" if plan.nullable else "")
         if plan.kind == "array" and plan.element:
             return self.public_type(plan.element) + "[]"
         if plan.native in self.bound.slices:
@@ -336,9 +331,7 @@ class Values:
                     else f"NativeCallScope.CopyArray<byte>((byte*){expression}, (nuint)({length}))"
                 )
                 return (
-                    f"{length} == 0 ? null : {copied}"
-                    if plan.optional == "empty"
-                    else f"{expression} == null ? null : {copied}"
+                    f"{expression} == null ? null : {copied}"
                     if plan.nullable
                     else copied
                 )
@@ -348,11 +341,7 @@ class Values:
                 else f"ValueStructs.CopyBufferView({expression})"
             )
             return (
-                f"{expression}.size == 0 ? null : {copy}"
-                if plan.optional == "empty"
-                else f"{expression}.data == null ? null : {copy}"
-                if plan.nullable
-                else copy
+                f"{expression}.data == null ? null : {copy}" if plan.nullable else copy
             )
         return f"Copy{public_name(plan.native)}({expression})"
 
@@ -388,16 +377,10 @@ class Values:
                     else f"scope.CString({expression})"
                 )
             method = "Utf8" if plan.encoding == "utf8" else "Buffer"
-            default = '""' if plan.encoding == "utf8" else "[]"
-            value = (
-                f"{expression} ?? {default}"
-                if plan.optional or plan.nullable
-                else expression
-            )
             return (
                 f"{expression} is null ? default : scope.{method}({expression})"
                 if plan.nullable
-                else f"scope.{method}({value})"
+                else f"scope.{method}({expression})"
             )
         if plan.kind == "array" and plan.element:
             if plan.element.kind == "scalar" and self.raw_type(

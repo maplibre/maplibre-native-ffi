@@ -189,8 +189,9 @@ typedef uint64_t mln_delivery_batch MLN_BINDING(
  * Borrowed data. The data pointer may be null only when size is zero.
  *
  * Each parameter documents whether its view contains UTF-8 text, serialized
- * data, or arbitrary bytes. The view carries no ownership and requires no
- * trailing null byte.
+ * data, or arbitrary bytes. The view carries no ownership. A view that the
+ * host passes in needs no trailing NUL byte, and text that native lends to the
+ * host has one after its bytes.
  */
 typedef struct mln_buffer_view {
   const void* data;

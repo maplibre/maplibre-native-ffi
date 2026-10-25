@@ -43,11 +43,11 @@ public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
   /// The value of the elevation expression outside a color-relief layer.
   public var elevation: Double?
   /// One UTF-8 GeoJSON Feature that feature data expressions read.
-  public var feature: Data?
+  public var feature: Data
   /// A UTF-8 JSON object that the feature-state expression reads.
-  public var featureState: Data?
+  public var featureState: Data
   /// A UTF-8 JSON object that the global-state expression reads.
-  public var globalState: Data?
+  public var globalState: Data
   /// The tile that holds the feature, which the within and distance expressions
   /// need to place its geometry.
   public var canonicalTileId: CanonicalTileId?
@@ -63,9 +63,9 @@ public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
     colorRampParameter: Double? = StyleExpressionInputs.default
       .colorRampParameter,
     elevation: Double? = StyleExpressionInputs.default.elevation,
-    feature: Data? = StyleExpressionInputs.default.feature,
-    featureState: Data? = StyleExpressionInputs.default.featureState,
-    globalState: Data? = StyleExpressionInputs.default.globalState,
+    feature: Data = StyleExpressionInputs.default.feature,
+    featureState: Data = StyleExpressionInputs.default.featureState,
+    globalState: Data = StyleExpressionInputs.default.globalState,
     canonicalTileId: CanonicalTileId? = StyleExpressionInputs.default
       .canonicalTileId,
     availableImages: [String] = StyleExpressionInputs.default.availableImages
@@ -91,21 +91,18 @@ public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
       .rawValue != 0 ? raw.color_ramp_parameter : nil
     elevation = raw.fields & MLN_STYLE_EXPRESSION_INPUT_ELEVATION
       .rawValue != 0 ? raw.elevation : nil
-    feature = raw.fields & MLN_STYLE_EXPRESSION_INPUT_FEATURE
-      .rawValue != 0 ? try NativeString.copyData(
-        data: raw.feature.data,
-        size: raw.feature.size
-      ) : nil
-    featureState = raw.fields & MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE
-      .rawValue != 0 ? try NativeString.copyData(
-        data: raw.feature_state.data,
-        size: raw.feature_state.size
-      ) : nil
-    globalState = raw.fields & MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE
-      .rawValue != 0 ? try NativeString.copyData(
-        data: raw.global_state.data,
-        size: raw.global_state.size
-      ) : nil
+    feature = try NativeString.copyData(
+      data: raw.feature.data,
+      size: raw.feature.size
+    )
+    featureState = try NativeString.copyData(
+      data: raw.feature_state.data,
+      size: raw.feature_state.size
+    )
+    globalState = try NativeString.copyData(
+      data: raw.global_state.data,
+      size: raw.global_state.size
+    )
     canonicalTileId = raw.fields & MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID
       .rawValue != 0 ? CanonicalTileId(raw: raw.canonical_tile_id) : nil
     availableImages = try NativeInputArena.copyArray(
@@ -131,18 +128,9 @@ public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
       raw.fields |= MLN_STYLE_EXPRESSION_INPUT_ELEVATION.rawValue; raw
         .elevation = item
     }
-    if let item = feature {
-      raw.fields |= MLN_STYLE_EXPRESSION_INPUT_FEATURE.rawValue; raw
-        .feature = arena.view(item)
-    }
-    if let item = featureState {
-      raw.fields |= MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE.rawValue; raw
-        .feature_state = arena.view(item)
-    }
-    if let item = globalState {
-      raw.fields |= MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE.rawValue; raw
-        .global_state = arena.view(item)
-    }
+    raw.feature = arena.view(feature)
+    raw.feature_state = arena.view(featureState)
+    raw.global_state = arena.view(globalState)
     if let item = canonicalTileId {
       raw.fields |= MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID.rawValue; raw
         .canonical_tile_id = item.nativeValue()

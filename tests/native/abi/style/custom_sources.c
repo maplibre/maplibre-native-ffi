@@ -560,8 +560,9 @@ static char tile_error_fragment[64];
 
 static bool record_tile_error(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
-  const char* message
+  mln_buffer_view message_view
 ) {
+  const char* message = message_view.data;
   (void)user_data;
   (void)event;
   (void)code;

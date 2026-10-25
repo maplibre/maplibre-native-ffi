@@ -29,7 +29,7 @@ mln_status list_cluster_leaves(
   return mln_render_session_query_feature_extensions(
     session, mln_buffer_view_from_cstr("places"), cluster,
     mln_buffer_view_from_cstr("supercluster"),
-    mln_buffer_view_from_cstr("leaves"), &arguments, &completion, NULL
+    mln_buffer_view_from_cstr("leaves"), arguments, &completion, NULL
   );
   // #endregion query
 }

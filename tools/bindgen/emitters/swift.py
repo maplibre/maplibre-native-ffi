@@ -151,7 +151,7 @@ def operation(
     lengths = {
         value.length: (
             f"(bindingArg{index}?.count ?? 0)"
-            if value.nullable or value.optional == "empty"
+            if value.nullable
             else f"bindingArg{index}.count"
         )
         for index, param in enumerate(params)
@@ -237,11 +237,7 @@ def operation(
             value_types.add(value_plan)
             declarations.append(
                 f"{label}: {value_types.public(value_plan)}"
-                + (
-                    " = nil"
-                    if value_plan.nullable or value_plan.optional == "empty"
-                    else ""
-                )
+                + (" = nil" if value_plan.nullable else "")
             )
             arguments.append(encode(value_types, value_plan, local))
         else:
@@ -322,7 +318,6 @@ def operation(
         )
         result_type = returned.native if returned else "void"
         nullable = bool(returned and returned.nullable)
-        empty_optional = bool(returned and returned.optional == "empty")
         encoding = (
             (returned.element.encoding if shape == "array" else returned.encoding)
             if returned
@@ -384,21 +379,12 @@ def operation(
                 raise unsupported(
                     function, "result needs a supported payload/ownership rule"
                 )
-            if empty_optional:
-                if shape != "value" or not (
-                    plan.result is not None and plan.result.buffer_form == "view"
-                ):
-                    raise unsupported(
-                        function, "empty optional requires a view payload"
-                    )
-                result += "?"
-                conversion = f"try NativeCompletion.value(result, as: mln_buffer_view.self).size == 0 ? nil : {conversion}"
-            elif nullable:
+            if nullable:
                 result += "?"
                 conversion = f"if {'result.pointee.value == nil' if shape == 'array' else 'result.pointee.value_count == 0'} {{ return nil }}; return {conversion}"
             conversion = (
                 f"copying: {copying}"
-                if copying and not (empty_optional or nullable)
+                if copying and not nullable
                 else f"convert: {{ result in {conversion} }}"
             )
         attribute = "@discardableResult\n" if execution == "command" else ""

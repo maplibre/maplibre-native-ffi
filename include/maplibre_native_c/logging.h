@@ -59,9 +59,9 @@ typedef enum mln_log_event : uint32_t {
 /**
  * Receives a MapLibre Native log record.
  *
- * The message pointer is borrowed for the callback duration. Returning true
- * consumes the record. Returning false lets MapLibre Native's platform logger
- * handle it.
+ * message is borrowed for the callback duration and is NUL-terminated after
+ * its bytes. Returning true consumes the record. Returning false lets MapLibre
+ * Native's platform logger handle it.
  *
  * A handler in queue mode consumes each record without a callback and queues
  * a copy as an mln_log_delivery.
@@ -71,7 +71,7 @@ MLN_BINDING(
 )
 typedef bool (*mln_log_callback)(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
-  const char* message
+  mln_buffer_view message
 );
 
 /**

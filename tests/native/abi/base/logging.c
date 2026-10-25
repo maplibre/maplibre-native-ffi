@@ -26,7 +26,7 @@ static void restoring_log_state(void (*body)(void)) {
 
 static bool ignore_log_record(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
-  const char* message
+  mln_buffer_view message
 ) {
   (void)user_data;
   (void)severity;
@@ -131,8 +131,9 @@ typedef struct discarded_failure_probe {
 
 static bool record_discarded_failure(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
-  const char* message
+  mln_buffer_view message_view
 ) {
+  const char* message = message_view.data;
   (void)code;
   discarded_failure_probe* probe = user_data;
   if (message != NULL && strstr(message, "discarded command failed") != NULL) {
@@ -178,8 +179,9 @@ typedef struct reentry_probe {
 
 static bool clear_from_log_callback(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
-  const char* message
+  mln_buffer_view message_view
 ) {
+  const char* message = message_view.data;
   (void)severity;
   (void)event;
   (void)code;
@@ -281,8 +283,9 @@ static bool is_dump_record(const char* message) {
 // Consumes every other record, so the verdict can only matter per record.
 static bool record_dump(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
-  const char* message
+  mln_buffer_view message_view
 ) {
+  const char* message = message_view.data;
   dump_probe* probe = user_data;
   if (message == NULL || !is_dump_record(message)) {
     return false;

@@ -115,27 +115,9 @@ void a_copy_clears_the_fields_its_presence_bits_mark_absent() {
     sizeof(mln_camera_options) - offsetof(mln_camera_options, center)
   ));
 
-  auto feature = mln_rendered_feature{};
-  feature.feature = mln_buffer_view{"{}", 2};
-  feature.layer_id = mln_buffer_view{"layer", 5};
-  feature.source_id = stale;
-  feature.source_layer_id = stale;
-  feature.state = stale;
-  auto feature_copy = Copy{};
-  copy_one(feature, feature_copy);
-  const auto* copied_feature =
-    static_cast<const mln_rendered_feature*>(feature_copy.value);
-  TEST_ASSERT_EQUAL_size_t(2, copied_feature->feature.size);
-  TEST_ASSERT_EQUAL_size_t(5, copied_feature->layer_id.size);
-  TEST_ASSERT_EQUAL_size_t(0, copied_feature->source_id.size);
-  TEST_ASSERT_EQUAL_size_t(0, copied_feature->source_layer_id.size);
-  TEST_ASSERT_EQUAL_size_t(0, copied_feature->state.size);
-
   // A clear TILEJSON bit leaves the embedded record unread, so its tile URL
   // pointer and count are never followed.
   auto source = mln_style_source_info{};
-  source.attribution = stale;
-  source.url = stale;
   source.tilejson.tile_urls = &stale;
   source.tilejson.tile_url_count = SIZE_MAX;
   source.tilejson.min_zoom = 1.0;
@@ -144,11 +126,90 @@ void a_copy_clears_the_fields_its_presence_bits_mark_absent() {
   copy_one(source, source_copy);
   const auto* copied_source =
     static_cast<const mln_style_source_info*>(source_copy.value);
-  TEST_ASSERT_TRUE(mln_test_all_zero(
-    &copied_source->attribution, sizeof(copied_source->attribution)
-  ));
   TEST_ASSERT_TRUE(mln_test_tile_info_is_zero(&copied_source->tilejson));
   TEST_ASSERT_EQUAL_UINT32(0, copied_source->tile_size);
+}
+
+// Text that native lends is NUL-terminated, and a copy cannot tell text from
+// bytes, so every copied view gets a terminator, even an empty one whose
+// source had no data.
+void a_copy_terminates_every_view() {
+  // Each view stops short of its source's last byte, so a copy that kept the
+  // source's bytes and nothing more would end in a letter.
+  static const char text[] = "lent textX";
+  const auto lent = mln_buffer_view{text, sizeof(text) - 2};
+  const auto empty = mln_buffer_view{nullptr, 0};
+
+  auto buffer_copy = Copy{};
+  copy_one(lent, buffer_copy);
+  const auto* copied_buffer =
+    static_cast<const mln_buffer_view*>(buffer_copy.value);
+  TEST_ASSERT_EQUAL_size_t(lent.size, copied_buffer->size);
+  TEST_ASSERT_TRUE(mln_test_lent_text_is_terminated(*copied_buffer));
+
+  const auto feature = mln_rendered_feature{
+    .feature = lent,
+    .layer_id = lent,
+    .source_id = empty,
+    .source_layer_id = lent,
+    .state = empty,
+  };
+  auto feature_copy = Copy{};
+  copy_one(feature, feature_copy);
+  const auto* copied_feature =
+    static_cast<const mln_rendered_feature*>(feature_copy.value);
+  for (const auto& view :
+       {copied_feature->feature, copied_feature->layer_id,
+        copied_feature->source_id, copied_feature->source_layer_id,
+        copied_feature->state}) {
+    TEST_ASSERT_TRUE(mln_test_lent_text_is_terminated(view));
+  }
+  TEST_ASSERT_EQUAL_size_t(0, copied_feature->source_id.size);
+
+  const auto source_feature =
+    mln_source_feature{.feature = lent, .source_layer_id = empty};
+  auto source_feature_copy = Copy{};
+  copy_one(source_feature, source_feature_copy);
+  const auto* copied_source_feature =
+    static_cast<const mln_source_feature*>(source_feature_copy.value);
+  TEST_ASSERT_TRUE(
+    mln_test_lent_text_is_terminated(copied_source_feature->feature)
+  );
+  TEST_ASSERT_TRUE(
+    mln_test_lent_text_is_terminated(copied_source_feature->source_layer_id)
+  );
+
+  auto source = mln_style_source_info{};
+  source.id = lent;
+  source.attribution = empty;
+  source.url = lent;
+  source.fields = MLN_STYLE_SOURCE_INFO_TILEJSON;
+  source.tilejson.tile_urls = &lent;
+  source.tilejson.tile_url_count = 1;
+  auto source_copy = Copy{};
+  copy_one(source, source_copy);
+  const auto* copied_source =
+    static_cast<const mln_style_source_info*>(source_copy.value);
+  for (const auto& view :
+       {copied_source->id, copied_source->attribution, copied_source->url,
+        copied_source->tilejson.tile_urls[0]}) {
+    TEST_ASSERT_TRUE(mln_test_lent_text_is_terminated(view));
+  }
+
+  auto layer = mln_style_layer_info{};
+  layer.id = lent;
+  layer.type = lent;
+  layer.source_id = empty;
+  layer.source_layer = empty;
+  auto layer_copy = Copy{};
+  copy_one(layer, layer_copy);
+  const auto* copied_layer =
+    static_cast<const mln_style_layer_info*>(layer_copy.value);
+  for (const auto& view :
+       {copied_layer->id, copied_layer->type, copied_layer->source_id,
+        copied_layer->source_layer}) {
+    TEST_ASSERT_TRUE(mln_test_lent_text_is_terminated(view));
+  }
 }
 
 }  // namespace
@@ -157,4 +218,5 @@ MLN_TEST_GROUP {
   RUN_TEST(a_copy_owns_arrays_and_their_nested_buffers);
   RUN_TEST(a_copy_preserves_the_selected_union_variant);
   RUN_TEST(a_copy_clears_the_fields_its_presence_bits_mark_absent);
+  RUN_TEST(a_copy_terminates_every_view);
 }

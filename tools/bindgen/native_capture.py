@@ -156,7 +156,7 @@ def _capture(plan, source: str, target: str, parent: str, depth: int) -> list[st
         if plan.buffer_form == "view":
             return [f"{indent}{target} = buffer(arena, {source});"]
         if plan.length == "nul":
-            return [f"{indent}{target} = string(arena, {source});"]
+            raise ModelError([f"{plan.native}: copied text must be a buffer view"])
         if plan.length:
             pointer = (
                 f"static_cast<const std::byte*>({source})"

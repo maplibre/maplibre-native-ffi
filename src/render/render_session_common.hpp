@@ -1133,7 +1133,6 @@ struct RenderedFeatureRecord {
   std::string source_id;
   std::string source_layer_id;
   std::string state;
-  uint32_t fields = 0;
 };
 
 struct RenderedFeatureList {
@@ -1143,7 +1142,6 @@ struct RenderedFeatureList {
 struct SourceFeatureRecord {
   std::string feature;
   std::string source_layer_id;
-  uint32_t fields = 0;
 };
 
 struct SourceFeatureList {
@@ -1163,12 +1161,12 @@ auto render_session_query_source_features(
 auto render_session_query_feature_extensions(
   mln_render_session session, mln_buffer_view source_id,
   mln_buffer_view feature, mln_buffer_view extension,
-  mln_buffer_view extension_field, const mln_buffer_view* arguments,
+  mln_buffer_view extension_field, mln_buffer_view arguments,
   std::string& out_result
 ) -> mln_status;
 auto validate_feature_extension_query(
   mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension,
-  mln_buffer_view extension_field, const mln_buffer_view* arguments
+  mln_buffer_view extension_field, mln_buffer_view arguments
 ) -> mln_status;
 
 auto render_session_query_rendered_features_start(
@@ -1184,7 +1182,7 @@ auto render_session_query_source_features_start(
 auto render_session_query_feature_extensions_start(
   mln_render_session session, mln_buffer_view source_id,
   mln_buffer_view feature, mln_buffer_view extension,
-  mln_buffer_view extension_field, const mln_buffer_view* arguments,
+  mln_buffer_view extension_field, mln_buffer_view arguments,
   const mln_completion* completion
 ) -> mln_status;
 

@@ -165,7 +165,7 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
         fixture
             .runtime()
             .set_resource_provider(ResourceProvider::new(move |request, handle| {
-                if request.requested_url.as_deref() == Some("custom://transformed.json") {
+                if request.requested_url == "custom://transformed.json" {
                     return handle.pass_through().unwrap();
                 }
                 deny(request, handle)
@@ -250,7 +250,7 @@ fn a_provider_hands_its_request_to_another_thread_and_answers_later() {
         fixture
             .runtime()
             .set_resource_provider(ResourceProvider::new(move |request, handle| {
-                if request.requested_url.as_deref() != Some("custom://style.json") {
+                if request.requested_url != "custom://style.json" {
                     return deny(request, handle);
                 }
                 sender.lock().unwrap().send(handle).unwrap();
@@ -344,7 +344,7 @@ fn a_provider_receives_only_the_requests_its_routes_match() {
             },
         ],
         ..ResourceProvider::new(move |request, handle| {
-            let url = request.requested_url.unwrap_or_default();
+            let url = request.requested_url;
             let body = match url.as_str() {
                 "custom://routed/style.json" => ROUTED_STYLE_JSON,
                 _ => r#"{"type":"FeatureCollection","features":[]}"#,
@@ -424,7 +424,7 @@ fn registering_for_an_already_cancelled_request_reports_it_and_roots_nothing() {
         fixture
             .runtime()
             .set_resource_provider(ResourceProvider::new(move |request, handle| {
-                if request.requested_url.as_deref() != Some("custom://style.json") {
+                if request.requested_url != "custom://style.json" {
                     return deny(request, handle);
                 }
                 sender.lock().unwrap().send(handle).unwrap();

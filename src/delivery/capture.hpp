@@ -78,19 +78,26 @@ auto bytes(Arena<Writing>& arena, const T* source, std::size_t count) -> T* {
   return destination;
 }
 
+// Text that native lends is NUL-terminated after its bytes, even when empty,
+// and nothing tells a text view from a byte view here, so every copy gets the
+// terminator.
 template <bool Writing>
 auto buffer(Arena<Writing>& arena, mln_buffer_view value) -> mln_buffer_view {
-  value.data =
-    bytes(arena, static_cast<const std::byte*>(value.data), value.size);
+  if (value.size == 0) {
+    value.data = "";
+    return value;
+  }
+  if (value.data == nullptr) throw std::invalid_argument{"null bytes"};
+  if (value.size == std::numeric_limits<std::size_t>::max()) {
+    throw std::bad_alloc{};
+  }
+  auto* destination = arena.template allocate<char>(value.size + 1);
+  if constexpr (Writing) {
+    std::memcpy(destination, value.data, value.size);
+    destination[value.size] = '\0';
+  }
+  value.data = destination;
   return value;
-}
-
-template <bool Writing>
-auto string(Arena<Writing>& arena, const char* value) -> const char* {
-  if (value == nullptr) return nullptr;
-  const auto length = std::strlen(value);
-  if (length == std::numeric_limits<std::size_t>::max()) throw std::bad_alloc{};
-  return bytes(arena, value, length + 1);
 }
 
 // The record that each delivery type copies from a delivered callback's

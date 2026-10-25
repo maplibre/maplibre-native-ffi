@@ -16,6 +16,8 @@ typedef struct source_copy {
   char attribution[64];
   char url[64];
   char tile_urls[2][64];
+  // Whether every view was NUL-terminated, as native lends text.
+  bool terminated;
 } source_copy;
 
 #define SOURCE_PROBE_CAPACITY 4
@@ -44,11 +46,16 @@ static void copy_sources(void* user_data, const mln_completion_result* result) {
     source_copy* copy = &probe->sources[index];
     copy->found = true;
     copy->info = *info;
+    copy->terminated = mln_test_lent_text_is_terminated(info->id) &&
+                       mln_test_lent_text_is_terminated(info->attribution) &&
+                       mln_test_lent_text_is_terminated(info->url);
     copy_text(info->id, copy->id, sizeof(copy->id));
     copy_text(info->attribution, copy->attribution, sizeof(copy->attribution));
     copy_text(info->url, copy->url, sizeof(copy->url));
     for (size_t url = 0; url < info->tilejson.tile_url_count && url < 2;
          url += 1) {
+      copy->terminated &=
+        mln_test_lent_text_is_terminated(info->tilejson.tile_urls[url]);
       copy_text(
         info->tilejson.tile_urls[url], copy->tile_urls[url],
         sizeof(copy->tile_urls[url])
@@ -84,6 +91,7 @@ static source_copy read_source(mln_map map, const char* id) {
   ));
   finish_source_probe(&probe);
   TEST_ASSERT_LESS_OR_EQUAL_size_t(1, probe.count);
+  if (probe.count == 1) TEST_ASSERT_TRUE(probe.sources[0].terminated);
   return probe.sources[0];
 }
 
@@ -92,6 +100,9 @@ static void list_sources(mln_map map, source_probe* probe) {
   const mln_completion completion = source_completion(probe);
   MLN_TEST_OK(mln_map_list_style_sources(map, &completion, NULL));
   finish_source_probe(probe);
+  for (size_t index = 0; index < probe->count; index += 1) {
+    TEST_ASSERT_TRUE(probe->sources[index].terminated);
+  }
 }
 
 static bool source_exists(mln_map map, const char* id) {
@@ -106,8 +117,8 @@ static void add_source_json(mln_map map, const char* id, const char* json) {
 }
 
 // A URL source reports the URL it was added with, or last set to. An inline
-// tile source reports its attribution and tile URLs. A source reports only the
-// members it has. A missing source completes with no value.
+// tile source reports its attribution and tile URLs. A source without a URL or
+// an attribution reports it empty. A missing source completes with no value.
 static void a_source_reports_its_url_attribution_and_tilejson(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -139,12 +150,10 @@ static void a_source_reports_its_url_attribution_and_tilejson(void) {
   source_copy probe = read_source(map, "remote");
   TEST_ASSERT_TRUE(probe.found);
   TEST_ASSERT_EQUAL_HEX32(
-    MLN_STYLE_SOURCE_INFO_URL,
-    probe.info.fields &
-      (MLN_STYLE_SOURCE_INFO_URL | MLN_STYLE_SOURCE_INFO_ATTRIBUTION |
-       MLN_STYLE_SOURCE_INFO_TILEJSON)
+    0, probe.info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON
   );
   TEST_ASSERT_EQUAL_STRING("fixture://tiles.json", probe.url);
+  TEST_ASSERT_EQUAL_size_t(0, probe.info.attribution.size);
 
   probe = read_source(map, "geojson");
   TEST_ASSERT_TRUE(probe.found);
@@ -153,11 +162,10 @@ static void a_source_reports_its_url_attribution_and_tilejson(void) {
   probe = read_source(map, "inline");
   TEST_ASSERT_TRUE(probe.found);
   TEST_ASSERT_EQUAL_HEX32(
-    MLN_STYLE_SOURCE_INFO_ATTRIBUTION | MLN_STYLE_SOURCE_INFO_TILEJSON,
-    probe.info.fields &
-      (MLN_STYLE_SOURCE_INFO_URL | MLN_STYLE_SOURCE_INFO_ATTRIBUTION |
-       MLN_STYLE_SOURCE_INFO_TILEJSON)
+    MLN_STYLE_SOURCE_INFO_TILEJSON,
+    probe.info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON
   );
+  TEST_ASSERT_EQUAL_size_t(0, probe.info.url.size);
   TEST_ASSERT_EQUAL_STRING("Fixture tiles", probe.attribution);
   TEST_ASSERT_EQUAL_size_t(2, probe.info.tilejson.tile_url_count);
   TEST_ASSERT_EQUAL_STRING("fixture://a/{z}/{x}/{y}.mvt", probe.tile_urls[0]);
@@ -165,8 +173,7 @@ static void a_source_reports_its_url_attribution_and_tilejson(void) {
 
   probe = read_source(map, "unattributed");
   TEST_ASSERT_TRUE(probe.found);
-  TEST_ASSERT_TRUE(probe.info.fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION);
-  TEST_ASSERT_EQUAL_STRING("", probe.attribution);
+  TEST_ASSERT_EQUAL_size_t(0, probe.info.attribution.size);
 
   TEST_ASSERT_FALSE(read_source(map, "missing").found);
 
@@ -227,15 +234,14 @@ static void sources_list_in_style_order_with_their_info(void) {
   TEST_ASSERT_EQUAL_STRING("second", second->id);
   TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_SOURCE_TYPE_GEOJSON, second->info.type);
   TEST_ASSERT_EQUAL_HEX32(
-    0, second->info.fields &
-         (MLN_STYLE_SOURCE_INFO_ATTRIBUTION | MLN_STYLE_SOURCE_INFO_TILEJSON)
+    0, second->info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON
   );
+  TEST_ASSERT_EQUAL_STRING("", second->attribution);
   TEST_ASSERT_EQUAL_STRING("third", third->id);
   TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_SOURCE_TYPE_VECTOR, third->info.type);
   TEST_ASSERT_EQUAL_HEX32(
-    MLN_STYLE_SOURCE_INFO_ATTRIBUTION | MLN_STYLE_SOURCE_INFO_TILEJSON,
-    third->info.fields &
-      (MLN_STYLE_SOURCE_INFO_ATTRIBUTION | MLN_STYLE_SOURCE_INFO_TILEJSON)
+    MLN_STYLE_SOURCE_INFO_TILEJSON,
+    third->info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON
   );
   TEST_ASSERT_EQUAL_STRING("Third tiles", third->attribution);
   TEST_ASSERT_EQUAL_size_t(1, third->info.tilejson.tile_url_count);

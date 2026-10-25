@@ -299,7 +299,7 @@ func installProvider(
       $0.type == .mapLoadingFailed && $0.message.contains("elsewhere")
     } != nil)
     #expect(seen.value.allSatisfy {
-      $0.requestedUrl?.hasPrefix("custom://routed/") == true
+      $0.requestedUrl.hasPrefix("custom://routed/")
     })
   }
 }

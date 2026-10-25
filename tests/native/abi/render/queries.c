@@ -133,6 +133,15 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
      1,
      WEST,
      CIRCLES},
+    {"an empty filter is no filter",
+     {.size = sizeof(mln_rendered_query_geometry),
+      .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
+      .data = {.box = {.min = {.x = 0, .y = 0}, .max = {.x = 64, .y = 64}}}},
+     "circles",
+     "",
+     2,
+     WEST | EAST,
+     CIRCLES},
     {"a box past every edge is clipped to the viewport",
      {.size = sizeof(mln_rendered_query_geometry),
       .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
@@ -185,7 +194,6 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
       options.layer_id_count = 1;
     }
     if (row->filter != NULL) {
-      options.fields |= MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
       options.filter = mln_buffer_view_from_cstr(row->filter);
     }
     const mln_test_feature_list list =
@@ -323,7 +331,6 @@ static void layer_id_without_bytes(void* call) {
 }
 static void unparsable_rendered_filter(void* call) {
   query_call* query = call;
-  query->rendered.fields = MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
   query->rendered.filter = unparsable_filter;
 }
 static void source_query(void* call) {
@@ -477,6 +484,7 @@ static void source_queries_read_the_named_source_layers(void) {
      "[\"==\",[\"id\"],1]",
      1,
      "\"id\":1"},
+    {"an empty filter is no filter", {"points", "labels"}, 2, "", 2, NULL},
   };
   for (size_t index = 0; index < sizeof(rows) / sizeof(rows[0]); index += 1) {
     const source_row* row = &rows[index];
@@ -492,7 +500,6 @@ static void source_queries_read_the_named_source_layers(void) {
       query.source_layer_id_count = row->layer_count;
     }
     if (row->filter != NULL) {
-      query.fields |= MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
       query.filter = mln_buffer_view_from_cstr(row->filter);
     }
     const mln_test_feature_list list =
@@ -539,6 +546,7 @@ static mln_status query_extension(
   const mln_test_render_fixture* fixture, const char* feature,
   const char* field, const char* arguments, char* out, size_t capacity
 ) {
+  // Null arguments pass an empty view, which is none.
   const mln_buffer_view argument_view =
     arguments == NULL ? (mln_buffer_view){0}
                       : mln_buffer_view_from_cstr(arguments);
@@ -546,8 +554,8 @@ static mln_status query_extension(
   MLN_TEST_OK(mln_render_session_query_feature_extensions(
     fixture->session, MLN_BUFFER_LITERAL("clustered"),
     mln_buffer_view_from_cstr(feature), MLN_BUFFER_LITERAL("supercluster"),
-    mln_buffer_view_from_cstr(field), arguments == NULL ? NULL : &argument_view,
-    &completion.descriptor, MLN_TEST_DIAGNOSTIC
+    mln_buffer_view_from_cstr(field), argument_view, &completion.descriptor,
+    MLN_TEST_DIAGNOSTIC
   ));
   (void)mln_test_render_fixture_finish_operation(fixture, &completion);
   bool found = false;
@@ -604,6 +612,7 @@ static void cluster_extensions_resolve_an_unsigned_cluster_id(void) {
   static char result[4096];
   const extension_row rows[] = {
     {"leaves default to every leaf", "leaves", NULL, 3},
+    {"empty arguments are none", "leaves", "", 3},
     {"a leaf limit bounds the leaves", "leaves", "{\"limit\":2}", 2},
     {"the expansion zoom is a number", "expansion-zoom", NULL, SIZE_MAX},
   };
@@ -665,7 +674,6 @@ typedef struct extension_call {
   mln_buffer_view extension;
   mln_buffer_view field;
   mln_buffer_view arguments;
-  bool has_arguments;
 } extension_call;
 
 static void empty_extension_source(void* call) {
@@ -684,7 +692,6 @@ static void geometry_instead_of_feature(void* call) {
 static void array_arguments(void* call) {
   extension_call* extension = call;
   extension->arguments = MLN_BUFFER_LITERAL("[1]");
-  extension->has_arguments = true;
 }
 
 static mln_status submit_extension(
@@ -695,7 +702,7 @@ static mln_status submit_extension(
   mln_completion completion = mln_test_discard_completion();
   return mln_render_session_query_feature_extensions(
     session, call->source_id, call->feature, call->extension, call->field,
-    call->has_arguments ? &call->arguments : NULL, &completion, diagnostic
+    call->arguments, &completion, diagnostic
   );
 }
 

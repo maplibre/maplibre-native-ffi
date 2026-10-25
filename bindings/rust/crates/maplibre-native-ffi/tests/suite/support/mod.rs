@@ -196,10 +196,7 @@ pub fn denying_provider() -> ResourceProvider {
         let response = ResourceResponse {
             status: ResourceResponseStatus::Error,
             error_reason: ResourceErrorReason::NotFound,
-            error_message: Some(format!(
-                "the test fixture denies {}",
-                request.requested_url.unwrap_or_default()
-            )),
+            error_message: format!("the test fixture denies {}", request.requested_url),
             ..Default::default()
         };
         handle
@@ -212,7 +209,7 @@ pub fn denying_provider() -> ResourceProvider {
 pub fn serving_provider(url: &'static str, body: &'static str) -> ResourceProvider {
     let deny = denying_provider().callback.unwrap();
     ResourceProvider::new(move |request, handle| {
-        if request.requested_url.as_deref() != Some(url) {
+        if request.requested_url != url {
             return deny(request, handle);
         }
         handle

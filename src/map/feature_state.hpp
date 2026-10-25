@@ -78,6 +78,7 @@ auto optional_selector_string(
   const mln_feature_state_selector& selector, uint32_t field,
   mln_buffer_view value
 ) -> std::optional<std::string>;
+auto optional_text(mln_buffer_view value) -> std::optional<std::string>;
 auto feature_state_source_layer(const mln_feature_state_selector& selector)
   -> FeatureStateLayerId;
 

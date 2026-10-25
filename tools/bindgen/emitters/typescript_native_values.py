@@ -426,10 +426,6 @@ class NativeValues:
             if value.buffer_form == "view":
                 convert = "mln_ts_bytes" if value.encoding == "bytes" else "mln_ts_text"
                 expression = f"{convert}(env, ({source}).data, ({source}).size)"
-                if value.optional == "empty":
-                    return (
-                        f"(({source}).size == 0 ? mln_ts_undefined(env) : {expression})"
-                    )
                 if value.nullable:
                     return f"(({source}).data == NULL ? mln_ts_undefined(env) : {expression})"
                 return expression
@@ -510,7 +506,7 @@ class NativeValues:
                     "mln_ts_bytes" if field.value.encoding == "bytes" else "mln_ts_text"
                 )
                 expression = f"{convert}(env, source->{field.name}, (size_t)source->{field.value.length})"
-                if field.value.nullable or field.value.optional:
+                if field.value.nullable:
                     guard = f"source->{field.name} != NULL"
             else:
                 expression = self.to_js(field.value, f"source->{field.name}")
@@ -615,7 +611,7 @@ class NativeValues:
         name = f"mln_ts_decode_{stem(element.native)}" + (
             "_list" if result.kind == "array" else ""
         )
-        if result.nullable or result.optional:
+        if result.nullable:
             name += "_optional"
         self.decoders.add(name)
         if name in self.functions:
@@ -648,7 +644,7 @@ class NativeValues:
         else:
             absent = (
                 "mln_ts_undefined(env)"
-                if result.nullable or result.optional
+                if result.nullable
                 else "mln_ts_missing_value(env)"
             )
             lines = [

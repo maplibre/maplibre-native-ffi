@@ -23,14 +23,14 @@ public sealed record StyleSourceInfo
     public bool IsVolatile { get; init; }
 
     /// <summary>
-    /// Attribution string, when the source sets one. It may be empty.
+    /// Attribution string, or empty when the source sets none.
     /// </summary>
-    public string? Attribution { get; init; }
+    public required string Attribution { get; init; }
 
     /// <summary>
-    /// URL that the source loads from, when it has one.
+    /// URL that the source loads from, or empty when it has none.
     /// </summary>
-    public string? Url { get; init; }
+    public required string Url { get; init; }
 
     /// <summary>
     /// Inline TileJSON metadata, when the source was defined with it.

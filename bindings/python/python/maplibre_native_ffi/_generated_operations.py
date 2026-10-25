@@ -335,7 +335,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.add_image_source_url(source_id, coordinates, url)
 
     def add_style_layer_json(
-        self, layer_json: bytes, before_layer_id: str | None = None
+        self, layer_json: bytes, before_layer_id: str
     ) -> Future[CommandCompletion]:
         """Adds one style layer from a full style-spec layer JSON object.
 
@@ -805,7 +805,7 @@ class _MapHandleOperations(GeneratedOperations):
         )
 
     def move_style_layer(
-        self, layer_id: str, before_layer_id: str | None = None
+        self, layer_id: str, before_layer_id: str
     ) -> Future[CommandCompletion]:
         """Moves one style layer before another layer or to the top.
 
@@ -1377,7 +1377,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         feature: bytes,
         extension: str,
         extension_field: str,
-        arguments: bytes | None = None,
+        arguments: bytes,
     ) -> Future[bytes]:
         """Starts a feature-extension query against the latest driver state. The
         completion borrows one `mln_buffer_view` holding UTF-8 JSON
@@ -2134,9 +2134,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_add_image_source_url(source_id, coordinates, url)
 
-    def add_style_layer_json(
-        self, layer_json: bytes, before_layer_id: str | None = None
-    ) -> None:
+    def add_style_layer_json(self, layer_json: bytes, before_layer_id: str) -> None:
         """Adds one style layer from a full style-spec layer JSON object.
 
         See `mln_map_add_style_layer_json` in the
@@ -2239,9 +2237,7 @@ class MapHandleDiscarding:
             source_id, tile_id
         )
 
-    def move_style_layer(
-        self, layer_id: str, before_layer_id: str | None = None
-    ) -> None:
+    def move_style_layer(self, layer_id: str, before_layer_id: str) -> None:
         """Moves one style layer before another layer or to the top.
 
         See `mln_map_move_style_layer` in the

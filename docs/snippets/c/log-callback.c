@@ -26,12 +26,13 @@ static const char* category_name(uint32_t event) {
 // #region callback
 static bool forward_to_host(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
-  const char* message
+  mln_buffer_view message
 ) {
   (void)user_data;
   (void)code;
 
-  host_log((int)severity, category_name(event), message);
+  // Native ends the message with a NUL, so it also reads as a C string.
+  host_log((int)severity, category_name(event), message.data);
 
   // True consumes the record. Return false instead to let MapLibre's own
   // platform logger print it as well.

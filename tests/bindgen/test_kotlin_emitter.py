@@ -371,7 +371,7 @@ class KotlinLayoutTests(unittest.TestCase):
         wasm = outputs[
             "src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/WasmUpcalls.kt"
         ]
-        self.assertIn("readCString(message)); true }; true }", wasm)
+        self.assertIn("readViewString(message)); true }; true }", wasm)
 
     def test_native_registrations_mirror_their_c_records(self):
         _functions, _unsupported, _bodies, _split, values, _native = kotlin.lowered(
@@ -441,9 +441,13 @@ UPCALL_TEST = r"""
 static bool upcall_succeeds;
 static unsigned calls;
 static mln_resource_transform_request released;
+static const char url[] = "custom://style.json";
 
 bool mln_jni_upcall_void(mln_jni_upcall* upcall, const jvalue* arguments) {
   (void)upcall;
+  // A by-value view reaches Kotlin as its address.
+  const mln_buffer_view* view = (const mln_buffer_view*)(intptr_t)arguments[2].j;
+  assert(view->data == url && view->size == sizeof url - 1);
   assert(arguments[3].j == 41);
   ++calls;
   return upcall_succeeds;
@@ -455,11 +459,12 @@ void mln_resource_transform_request_release(mln_resource_transform_request reque
 }
 
 int main(void) {
-  mln_jni_resourceTransformCallback(NULL, MLN_RESOURCE_KIND_STYLE, "custom://style.json", 41);
+  const mln_buffer_view view = {url, sizeof url - 1};
+  mln_jni_resourceTransformCallback(NULL, MLN_RESOURCE_KIND_STYLE, view, 41);
   assert(calls == 1 && released == 41);
   upcall_succeeds = true;
   released = 0;
-  mln_jni_resourceTransformCallback(NULL, MLN_RESOURCE_KIND_STYLE, "custom://style.json", 41);
+  mln_jni_resourceTransformCallback(NULL, MLN_RESOURCE_KIND_STYLE, view, 41);
   assert(calls == 2 && released == 0);
 }
 """

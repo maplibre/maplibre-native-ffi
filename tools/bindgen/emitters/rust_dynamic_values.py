@@ -38,18 +38,12 @@ def public(values, value):
         result = values.public(value.element)
     else:
         return None
-    return (
-        f"Option<{result}>" if value.nullable or value.optional == "empty" else result
-    )
-
-
-def optional(value):
-    return value.nullable or value.optional == "empty"
+    return f"Option<{result}>" if value.nullable else result
 
 
 def encode(values, value, source):
     """Converts the place `source` for one native call, with `arena` in scope."""
-    if value.kind in {"buffer", "array", "reference"} and optional(value):
+    if value.kind in {"buffer", "array", "reference"} and value.nullable:
         if value.kind == "buffer" and (
             value.buffer_form == "view" or value.length == "nul"
         ):
@@ -88,12 +82,10 @@ def count(value, context):
 
 def decode(values, value, source, context="raw"):
     """Copies the C place `source`, whose sibling fields `context` holds."""
-    if value.kind in {"buffer", "array", "reference"} and optional(value):
-        if value.kind == "buffer" and value.buffer_form == "view":
-            if value.nullable:
-                return TRAIT_COPY.format(source)
-            return f"unsafe {{ convert::nonempty({source}) }}?"
-        if value.kind == "buffer" and value.length == "nul":
+    if value.kind in {"buffer", "array", "reference"} and value.nullable:
+        if value.kind == "buffer" and (
+            value.buffer_form == "view" or value.length == "nul"
+        ):
             return TRAIT_COPY.format(source)
         if value.kind == "reference":
             # An optional record member takes a presence bit, so only a
@@ -101,9 +93,7 @@ def decode(values, value, source, context="raw"):
             raise Unsupported(f"{source}: a copied record holds a nullable reference")
         if value.kind == "array" and value.ctype.kind != "array" and not value.stride:
             return f"unsafe {{ convert::copy_optional_array({source}, {count(value, context)}) }}?"
-        copied = decode(
-            values, replace(value, nullable=False, optional=None), source, context
-        )
+        copied = decode(values, replace(value, nullable=False), source, context)
         return f"if {source}.is_null() {{ None }} else {{ Some({copied}) }}"
     if value.kind == "buffer":
         if value.buffer_form != "view" and value.length != "nul":
@@ -229,7 +219,7 @@ def declaration(values, value):
             source = f"self.{identifier(array.name)}"
             length = (
                 f"{source}.as_ref().map_or(0, |items| items.len())"
-                if optional(array.value) or array.presence
+                if array.value.nullable or array.presence
                 else f"{source}.len()"
             )
             writes.append(f"{place} = convert::count({length})?;")

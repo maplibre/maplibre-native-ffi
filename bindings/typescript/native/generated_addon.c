@@ -884,12 +884,10 @@ static napi_value mln_ts_export_mln_map_add_style_layer_json(
   }
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_layer_json, "layerJson"))
     goto done;
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    if (!mln_ts_read_text_view(
-          call, call->argv[2], &arg_before_layer_id, "beforeLayerId"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_text_view(
+        call, call->argv[2], &arg_before_layer_id, "beforeLayerId"
+      ))
+    goto done;
   if (!mln_ts_read_completion(
         call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
         &present_completion
@@ -2495,12 +2493,10 @@ static napi_value mln_ts_export_mln_map_move_style_layer(
   }
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_layer_id, "layerId"))
     goto done;
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    if (!mln_ts_read_text_view(
-          call, call->argv[2], &arg_before_layer_id, "beforeLayerId"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_text_view(
+        call, call->argv[2], &arg_before_layer_id, "beforeLayerId"
+      ))
+    goto done;
   if (!mln_ts_read_completion(
         call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
         &present_completion
@@ -4877,8 +4873,7 @@ static napi_value mln_ts_export_mln_render_session_query_feature_extensions(
   mln_buffer_view arg_feature = {0};
   mln_buffer_view arg_extension = {0};
   mln_buffer_view arg_extension_field = {0};
-  mln_buffer_view arg_arguments;
-  const void* present_arguments = NULL;
+  mln_buffer_view arg_arguments = {0};
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
@@ -4899,14 +4894,10 @@ static napi_value mln_ts_export_mln_render_session_query_feature_extensions(
         call, call->argv[4], &arg_extension_field, "extensionField"
       ))
     goto done;
-  if (!mln_ts_is_absent(call, call->argv[5])) {
-    memset(&arg_arguments, 0, sizeof arg_arguments);
-    if (!mln_ts_read_text_view(
-          call, call->argv[5], &arg_arguments, "argumentsValue"
-        ))
-      goto done;
-    present_arguments = &arg_arguments;
-  }
+  if (!mln_ts_read_text_view(
+        call, call->argv[5], &arg_arguments, "argumentsValue"
+      ))
+    goto done;
   if (!mln_ts_read_completion(
         call, call->argv[6], false, MLN_TS_DECODE_BUFFER_VIEW, &arg_completion,
         &present_completion
@@ -4916,7 +4907,7 @@ static napi_value mln_ts_export_mln_render_session_query_feature_extensions(
   diagnostic.message[0] = '\0';
   status = mln_render_session_query_feature_extensions(
     arg_session, arg_source_id, arg_feature, arg_extension, arg_extension_field,
-    present_arguments, present_completion, &diagnostic
+    arg_arguments, present_completion, &diagnostic
   );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:

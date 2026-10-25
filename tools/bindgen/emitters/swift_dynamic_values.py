@@ -26,7 +26,7 @@ def public(values, value):
         typ = values.public(value.element)
     else:
         return None
-    return typ + "?" if value.nullable or value.optional == "empty" else typ
+    return typ + "?" if value.nullable else typ
 
 
 def encode_throws(value):
@@ -52,10 +52,8 @@ def encode(values, value, source):
         if value.ctype.pointee and value.ctype.pointee.kind == "function":
             return f"unsafeBitCast({source}.addressBitPattern, to: {value.native}.self)"
         return f"{source}.{'unsafeRawPointer' if value.ctype.pointee and value.ctype.pointee.const else 'unsafeMutableRawPointer'}"
-    if value.kind in {"buffer", "array", "reference"} and (
-        value.nullable or value.optional == "empty"
-    ):
-        converted = encode(values, replace(value, nullable=False, optional=None), "$0")
+    if value.kind in {"buffer", "array", "reference"} and value.nullable:
+        converted = encode(values, replace(value, nullable=False), "$0")
         fallback = " ?? mln_buffer_view()" if value.buffer_form == "view" else ""
         method = (
             "flatMap"
@@ -139,18 +137,10 @@ def decode(values, value, source, context="raw"):
         return f"{values.public(value)}(rawValue: {source}{'.rawValue' if value.ctype.canonical.startswith('enum ') else ''})"
     if value.kind == "native_pointer":
         return f"NativePointer(bitPattern: unsafeBitCast({source}, to: UInt.self))"
-    if value.kind in {"buffer", "array", "reference"} and (
-        value.nullable or value.optional == "empty"
-    ):
-        converted = decode(
-            values, replace(value, nullable=False, optional=None), source, context
-        )
+    if value.kind in {"buffer", "array", "reference"} and value.nullable:
+        converted = decode(values, replace(value, nullable=False), source, context)
         absent = (
-            (
-                f"{source}.size == 0"
-                if value.optional == "empty"
-                else f"{source}.data == nil"
-            )
+            f"{source}.data == nil"
             if value.buffer_form == "view"
             else f"{source} == nil"
         )
@@ -249,11 +239,7 @@ def declaration(values, value):
             array = next(
                 member for member in value.fields if member.value.length == f.name
             )
-            optional = (
-                array.presence
-                or array.value.nullable
-                or array.value.optional == "empty"
-            )
+            optional = array.presence or array.value.nullable
             source = "self." + identifier(camel(array.name))
             encode_lines.append(
                 f"    {raw} = try NativeInputArena.count({source}{'?.count ?? 0' if optional else '.count'})"

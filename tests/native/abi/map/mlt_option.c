@@ -50,8 +50,9 @@ static atomic_bool mlt_parse_warning_logged;
 
 static bool record_mlt_parse_warning(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
-  const char* message
+  mln_buffer_view message_view
 ) {
+  const char* message = message_view.data;
   (void)user_data;
   (void)code;
   if (

@@ -238,13 +238,7 @@ auto effective_geojson_source_options(const mln_geojson_source_options* options)
   ) {
     result.cluster_max_zoom = options->cluster_max_zoom;
   }
-  if (
-    has_geojson_source_option(
-      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
-    )
-  ) {
-    result.cluster_properties = options->cluster_properties;
-  }
+  result.cluster_properties = options->cluster_properties;
   if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_BUFFER)) {
     result.buffer = options->buffer;
   }
@@ -298,7 +292,6 @@ auto validate_and_resolve_geojson_source_options(
     static_cast<uint32_t>(MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM) |
     MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM | MLN_GEOJSON_SOURCE_OPTION_TOLERANCE |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES |
     MLN_GEOJSON_SOURCE_OPTION_BUFFER |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
@@ -346,17 +339,6 @@ auto validate_and_resolve_geojson_source_options(
   }
   if (effective.cluster_radius > 4095U) {
     set_thread_error("cluster_radius must be at most 4095");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (
-    has_geojson_source_option(
-      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
-    ) &&
-    effective.cluster_properties.size == 0
-  ) {
-    set_thread_error(
-      "cluster_properties must not be empty when its field is present"
-    );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   return MLN_STATUS_OK;

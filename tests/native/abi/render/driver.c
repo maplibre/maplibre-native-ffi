@@ -1021,7 +1021,7 @@ static atomic_bool render_warning_logged;
 
 static bool record_render_warning(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
-  const char* message
+  mln_buffer_view message
 ) {
   (void)user_data;
   (void)code;

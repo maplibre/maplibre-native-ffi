@@ -19,7 +19,7 @@ mln_completion diagnostics_completion(const char* message);
 /// The mln_log_callback this example installs at startup.
 bool diagnostics_log_record(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
-  const char* message
+  mln_buffer_view message
 );
 
 #endif  // C_MAP_DIAGNOSTICS_H

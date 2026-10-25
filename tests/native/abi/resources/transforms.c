@@ -21,7 +21,7 @@ static const char empty_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
 static void keep_url(
-  void* user_data, uint32_t kind, const char* url,
+  void* user_data, uint32_t kind, mln_buffer_view url,
   mln_resource_transform_request request
 ) {
   (void)user_data;
@@ -31,7 +31,7 @@ static void keep_url(
 }
 
 static mln_status add_no_headers(
-  void* user_data, uint32_t kind, const char* url,
+  void* user_data, uint32_t kind, mln_buffer_view url,
   mln_http_header_transform_response* out_response
 ) {
   (void)user_data;
@@ -211,9 +211,10 @@ typedef struct rewriting_transform {
 } rewriting_transform;
 
 static void rewrite_a_to_b(
-  void* user_data, uint32_t kind, const char* url,
+  void* user_data, uint32_t kind, mln_buffer_view url_view,
   mln_resource_transform_request request
 ) {
+  const char* url = url_view.data;
   (void)kind;
   rewriting_transform* transform = user_data;
   atomic_fetch_add(&transform->calls, 1);
@@ -303,23 +304,31 @@ static void a_resource_transform_rewrites_until_cleared(void) {
   mln_test_http_server_stop(server);
 }
 
-// Records the kind each transform reports for the image source's URL.
+// Records the kind each transform reports for the image source's URL, and
+// whether the URL arrived NUL-terminated, as native lends text.
 typedef struct image_kind_probe {
   atomic_uint resource_kind;
   atomic_bool resource_seen;
+  atomic_bool resource_url_terminated;
   atomic_uint header_kind;
   atomic_bool header_seen;
+  atomic_bool header_url_terminated;
 } image_kind_probe;
 
 static const char overlay_path[] = "/overlay.png";
 
 static void record_image_resource_kind(
-  void* user_data, uint32_t kind, const char* url,
+  void* user_data, uint32_t kind, mln_buffer_view url_view,
   mln_resource_transform_request request
 ) {
+  const char* url = url_view.data;
   image_kind_probe* probe = user_data;
   if (strstr(url, overlay_path) != NULL) {
     atomic_store(&probe->resource_kind, kind);
+    atomic_store(
+      &probe->resource_url_terminated,
+      mln_test_lent_text_is_terminated(url_view)
+    );
     mln_test_flag_set(&probe->resource_seen);
   }
   mln_resource_transform_request_release(request);
@@ -327,13 +336,17 @@ static void record_image_resource_kind(
 
 #if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
 static mln_status record_image_header_kind(
-  void* user_data, uint32_t kind, const char* url,
+  void* user_data, uint32_t kind, mln_buffer_view url_view,
   mln_http_header_transform_response* out_response
 ) {
+  const char* url = url_view.data;
   (void)out_response;
   image_kind_probe* probe = user_data;
   if (strstr(url, overlay_path) != NULL) {
     atomic_store(&probe->header_kind, kind);
+    atomic_store(
+      &probe->header_url_terminated, mln_test_lent_text_is_terminated(url_view)
+    );
     mln_test_flag_set(&probe->header_seen);
   }
   return MLN_STATUS_OK;
@@ -347,8 +360,10 @@ static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
   image_kind_probe probe;
   atomic_init(&probe.resource_kind, MLN_RESOURCE_KIND_UNKNOWN);
   atomic_init(&probe.resource_seen, false);
+  atomic_init(&probe.resource_url_terminated, false);
   atomic_init(&probe.header_kind, MLN_RESOURCE_KIND_UNKNOWN);
   atomic_init(&probe.header_seen, false);
+  atomic_init(&probe.header_url_terminated, false);
   mln_runtime runtime = mln_test_create_runtime();
   const mln_resource_transform transform = {
     .size = sizeof(mln_resource_transform),
@@ -388,6 +403,7 @@ static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RESOURCE_KIND_IMAGE, atomic_load(&probe.resource_kind)
   );
+  TEST_ASSERT_TRUE(atomic_load(&probe.resource_url_terminated));
 #if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_wait_for_flag(&probe.header_seen),
@@ -396,6 +412,7 @@ static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RESOURCE_KIND_IMAGE, atomic_load(&probe.header_kind)
   );
+  TEST_ASSERT_TRUE(atomic_load(&probe.header_url_terminated));
 #endif
   TEST_ASSERT_TRUE(
     mln_test_http_server_wait_for_requests(server, overlay_path, 1)
@@ -420,7 +437,7 @@ typedef struct token_transform {
 } token_transform;
 
 static mln_status add_token(
-  void* user_data, uint32_t kind, const char* url,
+  void* user_data, uint32_t kind, mln_buffer_view url,
   mln_http_header_transform_response* out_response
 ) {
   (void)url;

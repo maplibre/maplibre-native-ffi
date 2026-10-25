@@ -1479,8 +1479,8 @@ int32_t mln_kw_mln_render_session_query_feature_extensions(
     *(const mln_buffer_view*)(uintptr_t)feature,
     *(const mln_buffer_view*)(uintptr_t)extension,
     *(const mln_buffer_view*)(uintptr_t)extension_field,
-    (const mln_buffer_view*)arguments, (const mln_completion*)completion,
-    (mln_diagnostic*)out_diagnostic
+    *(const mln_buffer_view*)(uintptr_t)arguments,
+    (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
 

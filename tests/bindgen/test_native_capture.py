@@ -139,26 +139,26 @@ auto copy(const T& source, Capture capture) -> T {
 int main() {
   char message[] = "borrowed";
   const mln_log_delivery log{
-    MLN_LOG_SEVERITY_INFO, MLN_LOG_EVENT_SHADER, 3, message
+    MLN_LOG_SEVERITY_INFO, MLN_LOG_EVENT_SHADER, 3, {message, sizeof(message) - 1}
   };
   const auto copied = copy(log, [](auto& arena, const mln_log_delivery& value) {
     return mln::delivery::capture_element(arena, value);
   });
   std::memset(message, 0, sizeof(message));
-  assert(copied.code == 3 && std::strcmp(copied.message, "borrowed") == 0);
+  assert(copied.code == 3 && std::strcmp(static_cast<const char*>(copied.message.data), "borrowed") == 0);
   mln::delivery::discard_element(copied);
   assert(releases == 0);
 
   char url[] = "custom://style.json";
   mln_resource_request_info request{};
-  request.requested_url = url;
+  request.requested_url = {url, sizeof(url) - 1};
   const mln_resource_request_delivery provided{&request, 9};
   const auto arguments = copy(provided, [](auto& arena, const mln_resource_request_delivery& value) {
     return mln::delivery::capture_element(arena, value);
   });
   std::memset(url, 0, sizeof(url));
   assert(arguments.handle == 9 && arguments.request != &request);
-  assert(std::strcmp(arguments.request->requested_url, "custom://style.json") == 0);
+  assert(std::strcmp(static_cast<const char*>(arguments.request->requested_url.data), "custom://style.json") == 0);
   // An untaken request only releases its handle; native fails the request.
   mln::delivery::discard_element(arguments);
   assert(releases == 1);
@@ -168,12 +168,14 @@ int main() {
 
   // An owned handle field of a delivered record is released with it.
   char transformed[] = "custom://tile.pbf";
-  const mln_resource_transform_delivery transform{MLN_RESOURCE_KIND_TILE, transformed, 11};
+  const mln_resource_transform_delivery transform{
+    MLN_RESOURCE_KIND_TILE, {transformed, sizeof(transformed) - 1}, 11
+  };
   const auto transform_copy = copy(transform, [](auto& arena, const mln_resource_transform_delivery& value) {
     return mln::delivery::capture_element(arena, value);
   });
   std::memset(transformed, 0, sizeof(transformed));
-  assert(std::strcmp(transform_copy.url, "custom://tile.pbf") == 0);
+  assert(std::strcmp(static_cast<const char*>(transform_copy.url.data), "custom://tile.pbf") == 0);
   mln::delivery::discard_element(transform_copy);
   assert(transform_releases == 1);
 
@@ -214,7 +216,7 @@ int main() {
   mln_buffer_view views[] = {{url, sizeof(url) - 1}, {url, 3}};
   mln_style_source_info source{};
   source.id = {url, 8};
-  source.fields = MLN_STYLE_SOURCE_INFO_TILEJSON | MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
+  source.fields = MLN_STYLE_SOURCE_INFO_TILEJSON;
   source.tilejson.tile_urls = views;
   source.tilejson.tile_url_count = 2;
   source.attribution = {url, 5};
@@ -256,7 +258,7 @@ typedef struct mln_capture_fixture {
   const mln_buffer_view* extra MLN_BINDING("length=count;nullable=true");
   size_t count;
   uint32_t fields;
-  const char* name MLN_BINDING("mask=fields;bit=MLN_CAPTURE_FIXTURE_NAME");
+  mln_buffer_view name MLN_BINDING("mask=fields;bit=MLN_CAPTURE_FIXTURE_NAME");
 } mln_capture_fixture;
 MLN_BINDING("execution=query;result=mln_capture_fixture")
 MLN_API mln_status mln_map_capture_fixture(mln_map map, const mln_completion* completion, mln_diagnostic *out_diagnostic) MLN_NOEXCEPT;
@@ -285,12 +287,12 @@ int main() {
   input.extra = &view;
   input.count = 1;
   input.fields = 0;
-  input.name = reinterpret_cast<const char*>(1);
+  input.name = {reinterpret_cast<const char*>(1), 5};
   auto* copied = copy(input);
   std::memset(bytes, 0, sizeof(bytes));
   assert(std::memcmp(copied->nested.tilejson.tile_urls[0].data, "nested", 6) == 0);
   assert(std::memcmp(copied->extra[0].data, "nested", 6) == 0);
-  assert(copied->name == nullptr);
+  assert(copied->name.data == nullptr && copied->name.size == 0);
 
   input.count = 0;
   input.extra = &view;
@@ -301,10 +303,12 @@ int main() {
   assert(copied->nested.tilejson.tile_urls[0].data != nullptr);
   assert(copied->nested.tilejson.tile_urls[0].size == 0);
 
+  // A copied view is NUL-terminated, even an empty one whose source has no data.
   input.extra = nullptr;
   view.data = nullptr;
   copied = copy(input);
   assert(copied->extra == nullptr);
-  assert(copied->nested.tilejson.tile_urls[0].data == nullptr);
+  assert(copied->nested.tilejson.tile_urls[0].size == 0);
+  assert(*static_cast<const char*>(copied->nested.tilejson.tile_urls[0].data) == '\0');
 }
 """

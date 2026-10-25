@@ -72,9 +72,7 @@ def copier(plan, values):
     if result is None:
         return "call.unit", "void"
     values.add(result)
-    if result.nullable and result.optional == "empty":
-        raise failure(plan.function, "result is both nullable and optional")
-    content = replace(result, nullable=False, optional=None)
+    content = replace(result, nullable=False)
     if result.kind == "array":
         item = result.element
         values.add(item)
@@ -85,8 +83,6 @@ def copier(plan, values):
         copy = f"call.value({public}, {values.native_type(content)})"
     if result.nullable:
         return f"call.orNull({copy})", "?" + public
-    if result.optional == "empty":
-        raise failure(plan.function, "empty completion requires a copier")
     return copy, public
 
 
@@ -182,7 +178,7 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
         if name in length_sources:
             source = names[length_sources[name]]
             counted = next(v for v in inputs.values() if v.length == name)
-            optional = counted.nullable or counted.optional == "empty"
+            optional = counted.nullable
             arguments.append(f"call.len({source})" if optional else f"{source}.len")
             continue
         if name in outputs and not (name == plan.receiver and plan.consumes):
@@ -236,7 +232,7 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
         if value.kind == "buffer" and value.length == "nul":
             arguments.append(
                 f"if ({local}) |text| call.cString(text) else null"
-                if value.nullable or value.optional == "empty"
+                if value.nullable
                 else f"call.cString({local})"
             )
             continue

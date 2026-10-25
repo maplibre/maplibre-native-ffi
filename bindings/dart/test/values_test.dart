@@ -224,7 +224,7 @@ void main() {
         pixelRatio: 1,
       ).hashCode,
     );
-    expect(() => options.clusterProperties![0] = 9, throwsUnsupportedError);
+    expect(() => options.clusterProperties[0] = 9, throwsUnsupportedError);
     expect(() => definition.geometry[0] = 9, throwsUnsupportedError);
   });
 

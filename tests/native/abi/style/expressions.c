@@ -65,7 +65,6 @@ static mln_status evaluate_status(
 
 static mln_style_expression_inputs feature_inputs(const char* feature) {
   mln_style_expression_inputs inputs = mln_style_expression_inputs_default();
-  inputs.fields = MLN_STYLE_EXPRESSION_INPUT_FEATURE;
   inputs.feature = mln_buffer_view_from_cstr(feature);
   return inputs;
 }
@@ -129,13 +128,11 @@ static void each_input_reaches_the_expression_that_reads_it(void) {
 
   static const char state[] = "{\"hover\":true}";
   inputs = mln_style_expression_inputs_default();
-  inputs.fields = MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE;
   inputs.feature_state = MLN_BUFFER_LITERAL(state);
   expect_evaluates("[\"feature-state\", \"hover\"]", &inputs, "true");
 
   static const char global[] = "{\"theme\":\"dark\"}";
   inputs = mln_style_expression_inputs_default();
-  inputs.fields = MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE;
   inputs.global_state = MLN_BUFFER_LITERAL(global);
   expect_evaluates("[\"global-state\", \"theme\"]", &inputs, "\"dark\"");
 
@@ -353,26 +350,35 @@ static void a_short_buffer_reports_the_length_it_needs(void) {
   mln_style_expression_release(expression);
 }
 
+// An input is absent when its field bit is clear or, for JSON, when it is
+// empty, whether the inputs are null or name an empty view.
 static void absent_inputs_fail_the_expressions_that_need_them(void) {
+  mln_style_expression_inputs empty = mln_style_expression_inputs_default();
+  empty.feature = (mln_buffer_view){.data = "{}", .size = 0};
+  empty.feature_state = (mln_buffer_view){.data = "{}", .size = 0};
+  empty.global_state = (mln_buffer_view){.data = NULL, .size = 0};
+  const mln_style_expression_inputs* const absent[] = {NULL, &empty};
   const char* readers[] = {
     "[\"step\", [\"zoom\"], 0, 1, 1]",
     "[\"heatmap-density\"]",
     "[\"get\", \"x\"]",
   };
-  for (size_t index = 0; index < sizeof(readers) / sizeof(readers[0]);
-       ++index) {
-    const mln_style_expression expression = create(readers[index]);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_INVALID_ARGUMENT, evaluate_status(expression, NULL),
-      readers[index]
-    );
-    TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "unavailable"));
-    mln_style_expression_release(expression);
-  }
+  for (size_t input = 0; input < sizeof(absent) / sizeof(absent[0]); ++input) {
+    for (size_t index = 0; index < sizeof(readers) / sizeof(readers[0]);
+         ++index) {
+      const mln_style_expression expression = create(readers[index]);
+      TEST_ASSERT_EQUAL_INT_MESSAGE(
+        MLN_STATUS_INVALID_ARGUMENT, evaluate_status(expression, absent[input]),
+        readers[index]
+      );
+      TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "unavailable"));
+      mln_style_expression_release(expression);
+    }
 
-  // Absent state reads as null.
-  expect_evaluates("[\"feature-state\", \"x\"]", NULL, "null");
-  expect_evaluates("[\"global-state\", \"x\"]", NULL, "null");
+    // Absent state reads as null.
+    expect_evaluates("[\"feature-state\", \"x\"]", absent[input], "null");
+    expect_evaluates("[\"global-state\", \"x\"]", absent[input], "null");
+  }
 }
 
 static void evaluation_rejects_invalid_inputs(void) {
@@ -408,16 +414,16 @@ static void evaluation_rejects_invalid_inputs(void) {
 
   static const char array[] = "[1]";
   inputs = mln_style_expression_inputs_default();
-  inputs.fields = MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE;
   inputs.feature_state = MLN_BUFFER_LITERAL(array);
   MLN_TEST_INVALID(evaluate_status(expression, &inputs));
   TEST_ASSERT_NOT_NULL(
     strstr(mln_test_last_error(), "feature_state must contain a JSON object")
   );
-  inputs.fields = MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE;
+  inputs = mln_style_expression_inputs_default();
   inputs.global_state = MLN_BUFFER_LITERAL(array);
   MLN_TEST_INVALID(evaluate_status(expression, &inputs));
-  inputs.global_state = (mln_buffer_view){.data = NULL, .size = 0};
+  inputs = mln_style_expression_inputs_default();
+  inputs.global_state = (mln_buffer_view){.data = NULL, .size = 2};
   MLN_TEST_INVALID(evaluate_status(expression, &inputs));
 
   inputs = mln_style_expression_inputs_default();

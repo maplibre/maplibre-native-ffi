@@ -217,14 +217,14 @@ impl RenderSessionHandle {
         feature: &[u8],
         extension: &str,
         extension_field: &str,
-        arguments: Option<&[u8]>,
+        arguments: &[u8],
     ) -> Result<NativeFuture<Vec<u8>>> {
         let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let feature = call.input(&feature)?;
         let extension = call.input(&extension)?;
         let extension_field = call.input(&extension_field)?;
-        let arguments = call.optional_reference(arguments)?;
+        let arguments = call.input(&arguments)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_query_feature_extensions(

@@ -1121,11 +1121,9 @@ auto style_source_record(const mln::style::Source& source)
   info.type = to_c_source_type(source.getType());
   info.is_volatile = source.isVolatile();
   if (auto attribution = source.getAttribution()) {
-    info.fields |= MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
     record.attribution = std::move(*attribution);
   }
   if (auto url = source_url(source)) {
-    info.fields |= MLN_STYLE_SOURCE_INFO_URL;
     record.url = std::move(*url);
   }
 

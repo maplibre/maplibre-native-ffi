@@ -31,6 +31,7 @@ internal sealed class NativeFixture : IAsyncDisposable
                         Status = ResourceResponseStatus.Error,
                         ErrorReason = ResourceErrorReason.NotFound,
                         ErrorMessage = "The test fixture serves no resources.",
+                        Etag = "",
                     }
                 ),
         };

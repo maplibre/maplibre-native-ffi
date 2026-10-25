@@ -71,12 +71,10 @@ def operation_contract(plan: OperationPlan) -> str | None:
     if (
         result
         and result.kind == "array"
-        and (result.nullable or value.optional)
+        and result.nullable
         and value.buffer_form == "view"
     ):
         return "optional array result needs a presence rule"
-    if value and value.optional == "empty" and value.encoding != "utf8":
-        return "optional binary result needs an empty-value conversion"
     method = pascal(plan.member)
     if (
         not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", method)
@@ -279,12 +277,7 @@ def completion_query(
     if value.buffer_form == "view" and value.encoding in {"utf8", "json", "bytes"}:
         encoding = value.encoding
         public = "string" if encoding == "utf8" else "byte[]"
-        optional = value.optional == "empty"
-        copy = (
-            ("CopyOptionalUtf8View" if optional else "CopyUtf8View")
-            if encoding == "utf8"
-            else "CopyBufferView"
-        )
+        copy = "CopyUtf8View" if encoding == "utf8" else "CopyBufferView"
         copy = f"ValueStructs.{copy}"
         if shape == "array":
             return (
@@ -292,7 +285,7 @@ def completion_query(
                 f"static nativeResult => NativeCompletion.Array<mln_buffer_view, {public}>(nativeResult, {copy})",
             )
         if shape == "value":
-            if nullable or optional:
+            if nullable:
                 return (
                     f"{public}?",
                     f"static nativeResult => NativeCompletion.Optional<mln_buffer_view, {public}>(nativeResult, {copy})",
@@ -678,11 +671,7 @@ def emit_operation(
             and value_plan.buffer_form == "view"
             and value_plan.encoding in {"bytes", "json", "utf8"}
         ):
-            if (
-                value_plan.encoding == "bytes"
-                and not value_plan.optional
-                and not value_plan.nullable
-            ):
+            if value_plan.encoding == "bytes" and not value_plan.nullable:
                 parameters.append(f"ReadOnlySpan<byte> {name}")
                 pins.append((f"pinned{pascal(name)}", name))
                 args.append(
@@ -690,7 +679,7 @@ def emit_operation(
                 )
                 continue
             parameters.append(f"{values.public_type(value_plan)} {name}")
-            if value_plan.optional or value_plan.nullable:
+            if value_plan.nullable:
                 omittable.add(name)
             scoped = True
             args.append(values.encode(value_plan, name))

@@ -26,7 +26,7 @@ internal object ThreadedUpcalls {
         LogSeverity(severity.toUInt()),
         LogEvent(event.toUInt()),
         code,
-        readCString(message),
+        readViewString(message),
       )
     }
 
@@ -37,7 +37,7 @@ internal object ThreadedUpcalls {
       withCallbackScope { scope ->
         invoke(
           ResourceKind(kind.toUInt()),
-          readCString(url),
+          readViewString(url),
           HttpHeaderTransformResponse(outResponse, scope),
         )
       }

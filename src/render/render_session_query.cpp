@@ -44,37 +44,21 @@ auto string_view_of(const std::string& string) -> mln_buffer_view {
 
 auto rendered_feature_view(const RenderedFeatureRecord& record)
   -> mln_rendered_feature {
-  auto feature = mln_rendered_feature{
-    .fields = record.fields,
+  return mln_rendered_feature{
     .feature = string_view_of(record.feature),
     .layer_id = string_view_of(record.layer_id),
-    .source_id = {},
-    .source_layer_id = {},
-    .state = {}
+    .source_id = string_view_of(record.source_id),
+    .source_layer_id = string_view_of(record.source_layer_id),
+    .state = string_view_of(record.state)
   };
-  if ((record.fields & MLN_RENDERED_FEATURE_SOURCE_ID) != 0) {
-    feature.source_id = string_view_of(record.source_id);
-  }
-  if ((record.fields & MLN_RENDERED_FEATURE_SOURCE_LAYER_ID) != 0) {
-    feature.source_layer_id = string_view_of(record.source_layer_id);
-  }
-  if ((record.fields & MLN_RENDERED_FEATURE_STATE) != 0) {
-    feature.state = string_view_of(record.state);
-  }
-  return feature;
 }
 
 auto source_feature_view(const SourceFeatureRecord& record)
   -> mln_source_feature {
-  auto feature = mln_source_feature{
-    .fields = record.fields,
+  return mln_source_feature{
     .feature = string_view_of(record.feature),
-    .source_layer_id = {}
+    .source_layer_id = string_view_of(record.source_layer_id)
   };
-  if ((record.fields & MLN_SOURCE_FEATURE_SOURCE_LAYER_ID) != 0) {
-    feature.source_layer_id = string_view_of(record.source_layer_id);
-  }
-  return feature;
 }
 
 template <auto Function, class List, auto View>
@@ -127,11 +111,12 @@ auto complete_query_buffer(
 }
 
 // Copies a query filter once it parses, so the submission rejects a filter
-// that the driver could not apply.
+// that the driver could not apply. An empty filter is no filter.
 auto copy_filter(const mln_buffer_view& filter, std::string& out)
   -> mln_status {
   const auto status = copy_view(filter, out);
   if (status != MLN_STATUS_OK) return status;
+  if (filter.size == 0) return MLN_STATUS_OK;
   if (!to_native_style_filter(&filter)) return MLN_STATUS_INVALID_ARGUMENT;
   return MLN_STATUS_OK;
 }
@@ -153,8 +138,7 @@ auto copy_rendered_options(
     set_thread_error("rendered feature query options size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  constexpr auto known_fields = MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS |
-                                MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
+  constexpr auto known_fields = MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
   if ((input->fields & ~known_fields) != 0) {
     set_thread_error("rendered feature query options have unknown fields");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -177,9 +161,6 @@ auto copy_rendered_options(
       if (status != MLN_STATUS_OK) return status;
     }
   }
-  if ((input->fields & MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER) == 0) {
-    return MLN_STATUS_OK;
-  }
   return copy_filter(input->filter, out->filter);
 }
 
@@ -199,8 +180,7 @@ auto copy_source_options(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   constexpr auto known_fields =
-    MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS |
-    MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
+    MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
   if ((input->fields & ~known_fields) != 0) {
     set_thread_error("source feature query options have unknown fields");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -223,9 +203,6 @@ auto copy_source_options(
         copy_view(input->source_layer_ids[i], out->layer_ids[i]);
       if (status != MLN_STATUS_OK) return status;
     }
-  }
-  if ((input->fields & MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER) == 0) {
-    return MLN_STATUS_OK;
   }
   return copy_filter(input->filter, out->filter);
 }
@@ -378,7 +355,7 @@ auto render_session_query_source_features_start(
 auto render_session_query_feature_extensions_start(
   mln_render_session session, mln_buffer_view source_id,
   mln_buffer_view feature, mln_buffer_view extension,
-  mln_buffer_view extension_field, const mln_buffer_view* arguments,
+  mln_buffer_view extension_field, mln_buffer_view arguments,
   const mln_completion* completion
 ) -> mln_status {
   const auto input_status = validate_feature_extension_query(
@@ -387,26 +364,22 @@ auto render_session_query_feature_extensions_start(
   if (input_status != MLN_STATUS_OK) return input_status;
   auto copied = std::vector<std::string>(5);
   const mln_buffer_view inputs[] = {
-    source_id, feature, extension, extension_field,
-    arguments == nullptr ? mln_buffer_view{} : *arguments
+    source_id, feature, extension, extension_field, arguments
   };
   for (std::size_t i = 0; i < copied.size(); ++i) {
     const auto status = copy_view(inputs[i], copied[i]);
     if (status != MLN_STATUS_OK) return status;
   }
-  const bool has_arguments = arguments != nullptr;
   return enqueue_driver_result_operation(
     session,
-    [copied = std::move(copied),
-     has_arguments](mln_render_session_object& target, std::any& result) {
+    [copied =
+       std::move(copied)](mln_render_session_object& target, std::any& result) {
       const auto view = [&copied](std::size_t i) {
         return mln_buffer_view{copied[i].data(), copied[i].size()};
       };
-      const auto argument_view = view(4);
       auto bytes = std::string{};
       const auto status = render_session_query_feature_extensions(
-        target.self, view(0), view(1), view(2), view(3),
-        has_arguments ? &argument_view : nullptr, bytes
+        target.self, view(0), view(1), view(2), view(3), view(4), bytes
       );
       if (status == MLN_STATUS_OK) result = std::move(bytes);
       return status;

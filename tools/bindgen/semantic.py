@@ -140,7 +140,6 @@ class ValuePlan:
     encoding: str | None = None
     lifetime: str = "call"
     nullable: bool = False
-    optional: str | None = None
     length: str | None = None
     stride: str | None = None
     fields: tuple[FieldPlan, ...] = ()
@@ -595,7 +594,6 @@ class ValueAttributes(TypedDict):
     encoding: str | None
     lifetime: str
     nullable: bool
-    optional: str | None
     length: str | None
     stride: str | None
 
@@ -709,7 +707,6 @@ class Binder:
             "encoding": metadata.get("encoding"),
             "lifetime": metadata.get("lifetime", "call"),
             "nullable": metadata.get("nullable") == "true",
-            "optional": metadata.get("optional"),
             "length": metadata.get("length"),
             "stride": metadata.get("stride"),
         }

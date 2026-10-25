@@ -18,7 +18,7 @@ internal actual object UpcallStubs {
       JAVA_INT,
       JAVA_INT,
       JAVA_LONG,
-      JAVA_LONG,
+      mln_buffer_view,
     )
   actual val httpHeaderTransformCallback: Long =
     Ffm.upcall(
@@ -27,7 +27,7 @@ internal actual object UpcallStubs {
       JAVA_INT,
       JAVA_LONG,
       JAVA_INT,
-      JAVA_LONG,
+      mln_buffer_view,
       JAVA_LONG,
     )
   actual val customGeometrySourceOptionsFetchTile: Long =
@@ -88,7 +88,7 @@ internal actual object UpcallStubs {
       null,
       JAVA_LONG,
       JAVA_INT,
-      JAVA_LONG,
+      mln_buffer_view,
       JAVA_LONG,
     )
   actual val wakeCallback: Long = Ffm.upcall(Upcalls::class.java, "wakeCallback", null, JAVA_LONG)

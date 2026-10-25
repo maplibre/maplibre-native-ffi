@@ -385,7 +385,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             source = names[parameter.name]
             lengths[value.length] = (
                 f"{source}.map_or(0, |value| value.len())"
-                if value.nullable or value.optional == "empty"
+                if value.nullable
                 else f"{source}.len()"
             )
 
@@ -456,7 +456,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             and value_plan.buffer_form != "view"
         ):
             public = "&str" if value_plan.encoding == "utf8" else "&[u8]"
-            optional = value_plan.nullable or value_plan.optional == "empty"
+            optional = value_plan.nullable
             signature.append(
                 f"{local}: {'Option<' + public + '>' if optional else public}"
             )
@@ -466,7 +466,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             encoding = value_plan.encoding
             if encoding not in {"utf8", "json", "bytes"}:
                 raise Unsupported(f"parameter {parameter.name} needs buffer encoding")
-            optional = value_plan.nullable or value_plan.optional == "empty"
+            optional = value_plan.nullable
             public = "&str" if encoding == "utf8" else "&[u8]"
             signature.append(
                 f"{local}: {'Option<' + public + '>' if optional else public}"

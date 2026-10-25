@@ -84,7 +84,7 @@ auto copy_header_rules(
 // The header transform callback that applies a table, which user_data points
 // to.
 auto header_rules_callback(
-  void* user_data, mln_resource_kind kind, const char* url,
+  void* user_data, mln_resource_kind kind, mln_buffer_view url,
   mln_http_header_transform_response* out_response
 ) -> mln_status;
 

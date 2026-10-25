@@ -168,7 +168,7 @@ func (f *fixture) serveStyle(t *testing.T, url string) {
 	t.Helper()
 	deny := denyingProvider().Callback
 	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) {
-		if request.RequestedUrl == nil || *request.RequestedUrl != url {
+		if request.RequestedUrl != url {
 			deny(request, handle)
 			return
 		}
@@ -194,7 +194,7 @@ func (f *fixture) serveLoopback(t *testing.T, bodies map[string]string) string {
 	t.Cleanup(server.Close)
 	deny := denyingProvider().Callback
 	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) {
-		if request.RequestedUrl != nil && strings.HasPrefix(*request.RequestedUrl, server.URL+"/") {
+		if strings.HasPrefix(request.RequestedUrl, server.URL+"/") {
 			_ = handle.PassThrough()
 			return
 		}

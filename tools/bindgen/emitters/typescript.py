@@ -463,13 +463,9 @@ def lower_function(
         else:
             result = plan.result
             values.check(result, "out")
-            if result.kind == "array" and result.optional:
-                raise Unsupported(
-                    "empty optional array needs cardinality interpretation"
-                )
             lowered.decoder = natives.decoder(result)
             ts = values.ts(result)
-            if result.nullable or result.optional:
+            if result.nullable:
                 ts += " | undefined"
             lowered.shape, lowered.returns = "query", f"Promise<{ts}>"
         decoder = natives.decoder_id(lowered.decoder)

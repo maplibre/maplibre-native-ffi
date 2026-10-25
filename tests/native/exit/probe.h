@@ -129,7 +129,7 @@ static const mln_completion probe_discarding_completion = {
 
 static inline bool probe_consume_log(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
-  const char* message
+  mln_buffer_view message
 ) {
   (void)user_data;
   (void)severity;
@@ -187,8 +187,7 @@ static inline void probe_provide(
   mln_resource_request handle
 ) {
   (void)user_data;
-  const char* url =
-    request->requested_url != NULL ? request->requested_url : "";
+  const char* url = request->requested_url.data;
   const char* body = NULL;
   if (strcmp(url, "custom://style.json") == 0) {
     body = probe_style_json;

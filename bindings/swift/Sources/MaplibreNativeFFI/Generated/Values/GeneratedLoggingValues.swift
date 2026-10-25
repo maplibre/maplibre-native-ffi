@@ -101,7 +101,7 @@ private func invokeLogHandlerCallback(
   severity: mln_log_severity,
   event: mln_log_event,
   code: Int64,
-  message: UnsafePointer<CChar>?
+  message: mln_buffer_view
 ) -> Bool {
   guard let user_data else { return false }
   let box = Unmanaged<GeneratedCallbackBox<LogHandler>>.fromOpaque(user_data)
@@ -110,7 +110,7 @@ private func invokeLogHandlerCallback(
     LogSeverity(rawValue: severity.rawValue),
     LogEvent(rawValue: event.rawValue),
     code,
-    NativeString.copyCString(message)
+    NativeString.copyUTF8(data: message.data, size: message.size)
   ) ?? false } catch {
     reportToStandardError(
       "mln_log_callback failed and native received its fallback: \(error)\n"

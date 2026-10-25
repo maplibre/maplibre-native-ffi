@@ -94,20 +94,16 @@ typedef enum mln_style_source_type : uint32_t {
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_style_source_info_field : uint32_t {
-  /** The source retains a URL. */
-  MLN_STYLE_SOURCE_INFO_URL = 1U << 0U,
   /** The tile source was defined with an inline TileJSON description. */
-  MLN_STYLE_SOURCE_INFO_TILEJSON = 1U << 1U,
+  MLN_STYLE_SOURCE_INFO_TILEJSON = 1U << 0U,
   /** The inline TileJSON description contains geographic bounds. */
-  MLN_STYLE_SOURCE_INFO_BOUNDS = 1U << 2U,
+  MLN_STYLE_SOURCE_INFO_BOUNDS = 1U << 1U,
   /** The source exposes a tile size. */
-  MLN_STYLE_SOURCE_INFO_TILE_SIZE = 1U << 3U,
+  MLN_STYLE_SOURCE_INFO_TILE_SIZE = 1U << 2U,
   /** The source exposes a vector tile encoding. */
-  MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 1U << 4U,
+  MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 1U << 3U,
   /** The source exposes a DEM raster encoding. */
-  MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 1U << 5U,
-  /** The source carries an attribution string, which may be empty. */
-  MLN_STYLE_SOURCE_INFO_ATTRIBUTION = 1U << 6U,
+  MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 1U << 4U,
 } mln_style_source_info_field;
 
 /** A set of mln_style_source_info_field bits. */
@@ -178,13 +174,12 @@ typedef enum MLN_BINDING(
   MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM = 1U << 1U,
   MLN_GEOJSON_SOURCE_OPTION_TOLERANCE = 1U << 2U,
   MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM = 1U << 3U,
-  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES = 1U << 4U,
-  MLN_GEOJSON_SOURCE_OPTION_BUFFER = 1U << 5U,
-  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 1U << 6U,
-  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 1U << 7U,
-  MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 1U << 8U,
-  MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 1U << 9U,
-  MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 1U << 10U,
+  MLN_GEOJSON_SOURCE_OPTION_BUFFER = 1U << 4U,
+  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 1U << 5U,
+  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 1U << 6U,
+  MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 1U << 7U,
+  MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 1U << 8U,
+  MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 1U << 9U,
 } mln_geojson_source_option_field;
 
 /** A set of mln_geojson_source_option_field bits. */
@@ -288,11 +283,10 @@ typedef struct mln_style_source_info {
   mln_style_source_info_fields fields;
   /** Whether the source is marked volatile. */
   bool is_volatile;
-  /** Attribution string, when the source sets one. It may be empty. */
-  mln_buffer_view attribution
-    MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_ATTRIBUTION");
-  /** URL that the source loads from, when it has one. */
-  mln_buffer_view url MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_URL");
+  /** Attribution string, or empty when the source sets none. */
+  mln_buffer_view attribution;
+  /** URL that the source loads from, or empty when it has none. */
+  mln_buffer_view url;
   /** Inline TileJSON metadata, when the source was defined with it. */
   mln_style_source_tile_info tilejson
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILEJSON");
@@ -321,9 +315,9 @@ typedef struct mln_style_layer_info {
   /** The style-spec layer type string. */
   mln_buffer_view type;
   /** Source ID. Empty for a layer type that takes no source. */
-  mln_buffer_view source_id MLN_BINDING("optional=empty");
+  mln_buffer_view source_id;
   /** Source-layer ID. Empty when the layer sets none. */
-  mln_buffer_view source_layer MLN_BINDING("optional=empty");
+  mln_buffer_view source_layer;
   /** Lowest zoom at which the layer draws; -INFINITY with no lower bound. */
   double min_zoom;
   /** Highest zoom at which the layer draws; INFINITY with no upper bound. */
@@ -355,12 +349,10 @@ typedef struct mln_geojson_source_options {
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM");
   /**
    * Cluster aggregation expressions keyed by property name, as a JSON object
-   * whose members follow the MapLibre Style Spec clusterProperties form. The
-   * UTF-8 bytes are borrowed for the call.
+   * whose members follow the MapLibre Style Spec clusterProperties form, or
+   * empty for none. The UTF-8 bytes are borrowed for the call.
    */
-  mln_buffer_view cluster_properties MLN_BINDING(
-    "encoding=json;mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES"
-  );
+  mln_buffer_view cluster_properties MLN_BINDING("encoding=json");
   /** Tile buffer in pixels within [0, 512]. Defaults to 128. */
   uint32_t buffer
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_BUFFER");
@@ -1528,8 +1520,8 @@ MLN_API mln_status mln_map_get_image_source_coordinates(
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_style_layer_json(
   mln_map map, mln_buffer_view layer_json MLN_BINDING("encoding=json"),
-  mln_buffer_view before_layer_id MLN_BINDING("optional=empty"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
+  mln_buffer_view before_layer_id, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1612,8 +1604,7 @@ MLN_API mln_status mln_map_list_style_layers(
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_move_style_layer(
-  mln_map map, mln_buffer_view layer_id,
-  mln_buffer_view before_layer_id MLN_BINDING("optional=empty"),
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

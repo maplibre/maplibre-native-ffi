@@ -898,13 +898,10 @@ Pointer<raw.mln_geojson_source_options> _writeGeojsonSourceOptions(
     result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
     result.ref.cluster_max_zoom = value.clusterMaxZoom!;
   }
-  if (value.clusterProperties != null) {
-    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
-    result.ref.cluster_properties = nativeBufferView(
-      value.clusterProperties!,
-      arena,
-    );
-  }
+  result.ref.cluster_properties = nativeBufferView(
+    value.clusterProperties,
+    arena,
+  );
   if (value.buffer != null) {
     result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_BUFFER;
     result.ref.buffer = _nativeInteger(value.buffer!, 0, 4294967295);
@@ -956,10 +953,7 @@ GeojsonSourceOptions _readGeojsonSourceOptions(
       (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM) != 0
       ? source.cluster_max_zoom
       : null,
-  clusterProperties:
-      (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES) != 0
-      ? _copyBufferView(source.cluster_properties)
-      : null,
+  clusterProperties: _copyBufferView(source.cluster_properties),
   buffer: (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_BUFFER) != 0
       ? source.buffer
       : null,
@@ -1061,7 +1055,7 @@ void _deliverLogCallback(
     LogSeverity.fromRawValue(payload.severity),
     LogEvent.fromRawValue(payload.event),
     payload.code,
-    payload.message.cast<Utf8>().toDartString(),
+    utf8.decode(_copyBufferView(payload.message)),
   );
 }
 
@@ -1711,21 +1705,15 @@ Pointer<raw.mln_feature_state_selector> _writeFeatureStateSelector(
   final result = into ?? arena<raw.mln_feature_state_selector>();
   result.ref.size = sizeOf<raw.mln_feature_state_selector>();
   result.ref.source_id = nativeStringView(value.sourceId, arena).value;
-  if (value.sourceLayerId != null) {
-    result.ref.fields |= raw.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
-    result.ref.source_layer_id = nativeStringView(
-      value.sourceLayerId!,
-      arena,
-    ).value;
-  }
+  result.ref.source_layer_id = nativeStringView(
+    value.sourceLayerId,
+    arena,
+  ).value;
   if (value.featureId != null) {
     result.ref.fields |= raw.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
     result.ref.feature_id = nativeStringView(value.featureId!, arena).value;
   }
-  if (value.stateKey != null) {
-    result.ref.fields |= raw.MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
-    result.ref.state_key = nativeStringView(value.stateKey!, arena).value;
-  }
+  result.ref.state_key = nativeStringView(value.stateKey, arena).value;
   return result;
 }
 
@@ -1876,12 +1864,8 @@ StyleLayerInfo _readStyleLayerInfo(raw.mln_style_layer_info source) =>
     StyleLayerInfo(
       id: utf8.decode(_copyBufferView(source.id)),
       type: utf8.decode(_copyBufferView(source.type)),
-      sourceId: source.source_id.size == 0
-          ? null
-          : utf8.decode(_copyBufferView(source.source_id)),
-      sourceLayer: source.source_layer.size == 0
-          ? null
-          : utf8.decode(_copyBufferView(source.source_layer)),
+      sourceId: utf8.decode(_copyBufferView(source.source_id)),
+      sourceLayer: utf8.decode(_copyBufferView(source.source_layer)),
       minZoom: source.min_zoom,
       maxZoom: source.max_zoom,
       visibility: StyleLayerVisibility.fromRawValue(source.visibility),
@@ -1906,12 +1890,8 @@ StyleSourceInfo _readStyleSourceInfo(raw.mln_style_source_info source) =>
       id: utf8.decode(_copyBufferView(source.id)),
       type: StyleSourceType.fromRawValue(source.type),
       isVolatile: source.is_volatile,
-      attribution: (source.fields & raw.MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0
-          ? utf8.decode(_copyBufferView(source.attribution))
-          : null,
-      url: (source.fields & raw.MLN_STYLE_SOURCE_INFO_URL) != 0
-          ? utf8.decode(_copyBufferView(source.url))
-          : null,
+      attribution: utf8.decode(_copyBufferView(source.attribution)),
+      url: utf8.decode(_copyBufferView(source.url)),
       tilejson: (source.fields & raw.MLN_STYLE_SOURCE_INFO_TILEJSON) != 0
           ? _readStyleSourceTileInfo(source.tilejson)
           : null,
@@ -2212,10 +2192,7 @@ _writeRenderedFeatureQueryOptions(
       ).value;
     }
   }
-  if (value.filter != null) {
-    result.ref.fields |= raw.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
-    result.ref.filter = nativeBufferView(value.filter!, arena);
-  }
+  result.ref.filter = nativeBufferView(value.filter, arena);
   return result;
 }
 
@@ -2231,25 +2208,16 @@ RenderedFeatureQueryOptions _readRenderedFeatureQueryOptions(
           ),
         )
       : null,
-  filter: (source.fields & raw.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER) != 0
-      ? _copyBufferView(source.filter)
-      : null,
+  filter: _copyBufferView(source.filter),
 );
 
 RenderedFeature _readRenderedFeature(raw.mln_rendered_feature source) =>
     RenderedFeature(
       feature: _copyBufferView(source.feature),
       layerId: utf8.decode(_copyBufferView(source.layer_id)),
-      sourceId: (source.fields & raw.MLN_RENDERED_FEATURE_SOURCE_ID) != 0
-          ? utf8.decode(_copyBufferView(source.source_id))
-          : null,
-      sourceLayerId:
-          (source.fields & raw.MLN_RENDERED_FEATURE_SOURCE_LAYER_ID) != 0
-          ? utf8.decode(_copyBufferView(source.source_layer_id))
-          : null,
-      state: (source.fields & raw.MLN_RENDERED_FEATURE_STATE) != 0
-          ? _copyBufferView(source.state)
-          : null,
+      sourceId: utf8.decode(_copyBufferView(source.source_id)),
+      sourceLayerId: utf8.decode(_copyBufferView(source.source_layer_id)),
+      state: _copyBufferView(source.state),
     );
 
 Pointer<raw.mln_source_feature_query_options> _writeSourceFeatureQueryOptions(
@@ -2272,10 +2240,7 @@ Pointer<raw.mln_source_feature_query_options> _writeSourceFeatureQueryOptions(
       ).value;
     }
   }
-  if (value.filter != null) {
-    result.ref.fields |= raw.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
-    result.ref.filter = nativeBufferView(value.filter!, arena);
-  }
+  result.ref.filter = nativeBufferView(value.filter, arena);
   return result;
 }
 
@@ -2293,18 +2258,13 @@ SourceFeatureQueryOptions _readSourceFeatureQueryOptions(
           ),
         )
       : null,
-  filter: (source.fields & raw.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER) != 0
-      ? _copyBufferView(source.filter)
-      : null,
+  filter: _copyBufferView(source.filter),
 );
 
 SourceFeature _readSourceFeature(raw.mln_source_feature source) =>
     SourceFeature(
       feature: _copyBufferView(source.feature),
-      sourceLayerId:
-          (source.fields & raw.MLN_SOURCE_FEATURE_SOURCE_LAYER_ID) != 0
-          ? utf8.decode(_copyBufferView(source.source_layer_id))
-          : null,
+      sourceLayerId: utf8.decode(_copyBufferView(source.source_layer_id)),
     );
 
 TextureImageInfo _readTextureImageInfo(raw.mln_texture_image_info source) =>
@@ -2334,10 +2294,7 @@ Pointer<raw.mln_resource_response> _writeResourceResponse(
   final bytesbytes = nativeBufferView(value.bytes, arena);
   result.ref.bytes = bytesbytes.data.cast();
   result.ref.byte_count = bytesbytes.size;
-  result.ref.error_message = nativeStringView(
-    (value.errorMessage ?? ''),
-    arena,
-  ).value;
+  result.ref.error_message = nativeStringView(value.errorMessage, arena).value;
   result.ref.must_revalidate = value.mustRevalidate;
   if (value.modifiedUnixMs != null) {
     result.ref.fields |= raw.MLN_RESOURCE_RESPONSE_MODIFIED;
@@ -2347,7 +2304,7 @@ Pointer<raw.mln_resource_response> _writeResourceResponse(
     result.ref.fields |= raw.MLN_RESOURCE_RESPONSE_EXPIRES;
     result.ref.expires_unix_ms = value.expiresUnixMs!;
   }
-  result.ref.etag = nativeStringView((value.etag ?? ''), arena).value;
+  result.ref.etag = nativeStringView(value.etag, arena).value;
   if (value.retryAfterUnixMs != null) {
     result.ref.fields |= raw.MLN_RESOURCE_RESPONSE_RETRY_AFTER;
     result.ref.retry_after_unix_ms = value.retryAfterUnixMs!;
@@ -2420,25 +2377,15 @@ Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
 }) {
   final result = into ?? arena<raw.mln_runtime_options>();
   result.ref = raw.mln_runtime_options_default();
-  result.ref.asset_path = nativeStringView(
-    (value.assetPath ?? ''),
-    arena,
-  ).value;
-  result.ref.cache_path = nativeStringView(
-    (value.cachePath ?? ''),
-    arena,
-  ).value;
+  result.ref.asset_path = nativeStringView(value.assetPath, arena).value;
+  result.ref.cache_path = nativeStringView(value.cachePath, arena).value;
   return result;
 }
 
 RuntimeOptions _readRuntimeOptions(raw.mln_runtime_options source) =>
     RuntimeOptions(
-      assetPath: source.asset_path.size == 0
-          ? null
-          : utf8.decode(_copyBufferView(source.asset_path)),
-      cachePath: source.cache_path.size == 0
-          ? null
-          : utf8.decode(_copyBufferView(source.cache_path)),
+      assetPath: utf8.decode(_copyBufferView(source.asset_path)),
+      cachePath: utf8.decode(_copyBufferView(source.cache_path)),
     );
 
 Pointer<raw.mln_offline_tile_pyramid_region_definition>
@@ -2752,12 +2699,8 @@ ResourceRange _readResourceRange(raw.mln_resource_range source) =>
 ResourceRequestInfo _readResourceRequestInfo(
   raw.mln_resource_request_info source,
 ) => ResourceRequestInfo(
-  requestedUrl: source.requested_url == nullptr
-      ? null
-      : source.requested_url.cast<Utf8>().toDartString(),
-  resolvedUrl: source.resolved_url == nullptr
-      ? null
-      : source.resolved_url.cast<Utf8>().toDartString(),
+  requestedUrl: utf8.decode(_copyBufferView(source.requested_url)),
+  resolvedUrl: utf8.decode(_copyBufferView(source.resolved_url)),
   kind: ResourceKind.fromRawValue(source.kind),
   loadingMethod: ResourceLoadingMethod.fromRawValue(source.loading_method),
   priority: ResourcePriority.fromRawValue(source.priority),
@@ -2774,9 +2717,7 @@ ResourceRequestInfo _readResourceRequestInfo(
       (source.fields & raw.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES) != 0
       ? source.prior_expires_unix_ms
       : null,
-  priorEtag: source.prior_etag == nullptr
-      ? null
-      : source.prior_etag.cast<Utf8>().toDartString(),
+  priorEtag: utf8.decode(_copyBufferView(source.prior_etag)),
   priorData: Uint8List.fromList(
     source.prior_data.cast<Uint8>().asTypedList(source.prior_data_size),
   ),
@@ -2856,7 +2797,7 @@ void _deliverResourceTransformCallback(
     );
     callback(
       ResourceKind.fromRawValue(payload.kind),
-      payload.url.cast<Utf8>().toDartString(),
+      utf8.decode(_copyBufferView(payload.url)),
       adopted,
     );
   } catch (_) {
@@ -2958,18 +2899,9 @@ Pointer<raw.mln_style_expression_inputs> _writeStyleExpressionInputs(
     result.ref.fields |= raw.MLN_STYLE_EXPRESSION_INPUT_ELEVATION;
     result.ref.elevation = value.elevation!;
   }
-  if (value.feature != null) {
-    result.ref.fields |= raw.MLN_STYLE_EXPRESSION_INPUT_FEATURE;
-    result.ref.feature = nativeBufferView(value.feature!, arena);
-  }
-  if (value.featureState != null) {
-    result.ref.fields |= raw.MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE;
-    result.ref.feature_state = nativeBufferView(value.featureState!, arena);
-  }
-  if (value.globalState != null) {
-    result.ref.fields |= raw.MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE;
-    result.ref.global_state = nativeBufferView(value.globalState!, arena);
-  }
+  result.ref.feature = nativeBufferView(value.feature, arena);
+  result.ref.feature_state = nativeBufferView(value.featureState, arena);
+  result.ref.global_state = nativeBufferView(value.globalState, arena);
   if (value.canonicalTileId != null) {
     result.ref.fields |= raw.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID;
     result.ref.canonical_tile_id = _writeCanonicalTileId(
@@ -3003,17 +2935,9 @@ StyleExpressionInputs _readStyleExpressionInputs(
   elevation: (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_ELEVATION) != 0
       ? source.elevation
       : null,
-  feature: (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_FEATURE) != 0
-      ? _copyBufferView(source.feature)
-      : null,
-  featureState:
-      (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE) != 0
-      ? _copyBufferView(source.feature_state)
-      : null,
-  globalState:
-      (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE) != 0
-      ? _copyBufferView(source.global_state)
-      : null,
+  feature: _copyBufferView(source.feature),
+  featureState: _copyBufferView(source.feature_state),
+  globalState: _copyBufferView(source.global_state),
   canonicalTileId:
       (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID) != 0
       ? _readCanonicalTileId(source.canonical_tile_id)
@@ -4058,16 +3982,15 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     );
   });
-  void addStyleLayerJson(Uint8List layerJson, {String? beforeLayerId}) =>
-      _discard(
-        (arena, completion) => raw.mln_map_add_style_layer_json(
-          _handle.raw,
-          nativeBufferView(layerJson, arena),
-          nativeStringView((beforeLayerId ?? ''), arena).value,
-          completion,
-          nativeDiagnostic,
-        ),
-      );
+  void addStyleLayerJson(Uint8List layerJson, String beforeLayerId) => _discard(
+    (arena, completion) => raw.mln_map_add_style_layer_json(
+      _handle.raw,
+      nativeBufferView(layerJson, arena),
+      nativeStringView(beforeLayerId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   void addStyleSourceJson(String sourceId, Uint8List sourceJson) => _discard(
     (arena, completion) => raw.mln_map_add_style_source_json(
       _handle.raw,
@@ -4157,11 +4080,11 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void moveStyleLayer(String layerId, {String? beforeLayerId}) => _discard(
+  void moveStyleLayer(String layerId, String beforeLayerId) => _discard(
     (arena, completion) => raw.mln_map_move_style_layer(
       _handle.raw,
       nativeStringView(layerId, arena).value,
-      nativeStringView((beforeLayerId ?? ''), arena).value,
+      nativeStringView(beforeLayerId, arena).value,
       completion,
       nativeDiagnostic,
     ),
@@ -4683,13 +4606,13 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// See `mln_map_add_style_layer_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addStyleLayerJson(
-    Uint8List layerJson, {
-    String? beforeLayerId,
-  }) => _command(
+    Uint8List layerJson,
+    String beforeLayerId,
+  ) => _command(
     (arena, completion) => raw.mln_map_add_style_layer_json(
       _handle.raw,
       nativeBufferView(layerJson, arena),
-      nativeStringView((beforeLayerId ?? ''), arena).value,
+      nativeStringView(beforeLayerId, arena).value,
       completion,
       nativeDiagnostic,
     ),
@@ -5472,13 +5395,13 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// See `mln_map_move_style_layer` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> moveStyleLayer(
-    String layerId, {
-    String? beforeLayerId,
-  }) => _command(
+    String layerId,
+    String beforeLayerId,
+  ) => _command(
     (arena, completion) => raw.mln_map_move_style_layer(
       _handle.raw,
       nativeStringView(layerId, arena).value,
-      nativeStringView((beforeLayerId ?? ''), arena).value,
+      nativeStringView(beforeLayerId, arena).value,
       completion,
       nativeDiagnostic,
     ),
@@ -6515,9 +6438,9 @@ final class RenderSessionHandle implements Finalizable {
     String sourceId,
     Uint8List feature,
     String extensionValue,
-    String extensionField, {
-    Uint8List? arguments,
-  }) => _query(
+    String extensionField,
+    Uint8List arguments,
+  ) => _query(
     _resultUint8List,
     (arena, completion) => raw.mln_render_session_query_feature_extensions(
       _handle.raw,
@@ -6525,13 +6448,7 @@ final class RenderSessionHandle implements Finalizable {
       nativeBufferView(feature, arena),
       nativeStringView(extensionValue, arena).value,
       nativeStringView(extensionField, arena).value,
-      arguments == null
-          ? nullptr
-          : (() {
-              final storage = arena<raw.mln_buffer_view>();
-              storage.ref = nativeBufferView(arguments, arena);
-              return storage;
-            })(),
+      nativeBufferView(arguments, arena),
       completion,
       nativeDiagnostic,
     ),

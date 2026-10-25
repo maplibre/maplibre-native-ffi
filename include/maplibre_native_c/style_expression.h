@@ -84,10 +84,7 @@ typedef enum MLN_BINDING(
   MLN_STYLE_EXPRESSION_INPUT_ZOOM = 1U << 0U,
   MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER = 1U << 1U,
   MLN_STYLE_EXPRESSION_INPUT_ELEVATION = 1U << 2U,
-  MLN_STYLE_EXPRESSION_INPUT_FEATURE = 1U << 3U,
-  MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE = 1U << 4U,
-  MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE = 1U << 5U,
-  MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID = 1U << 6U,
+  MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID = 1U << 3U,
 } mln_style_expression_input_field;
 
 /** A set of mln_style_expression_input_field bits. */
@@ -96,9 +93,9 @@ typedef uint32_t mln_style_expression_input_fields;
 /**
  * What one evaluation reads.
  *
- * An input whose field bit is clear is absent. An expression that needs the
- * zoom, feature data, or the color ramp parameter fails to evaluate without
- * it, and an absent state reads as null.
+ * An input whose field bit is clear, or a JSON input that is empty, is absent.
+ * An expression that needs the zoom, feature data, or the color ramp parameter
+ * fails to evaluate without it, and an absent state reads as null.
  */
 typedef struct mln_style_expression_inputs {
   uint32_t size;
@@ -117,17 +114,11 @@ typedef struct mln_style_expression_inputs {
   double elevation
     MLN_BINDING("mask=fields;bit=MLN_STYLE_EXPRESSION_INPUT_ELEVATION");
   /** One UTF-8 GeoJSON Feature that feature data expressions read. */
-  mln_buffer_view feature MLN_BINDING(
-    "encoding=json;mask=fields;bit=MLN_STYLE_EXPRESSION_INPUT_FEATURE"
-  );
+  mln_buffer_view feature MLN_BINDING("encoding=json");
   /** A UTF-8 JSON object that the feature-state expression reads. */
-  mln_buffer_view feature_state MLN_BINDING(
-    "encoding=json;mask=fields;bit=MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE"
-  );
+  mln_buffer_view feature_state MLN_BINDING("encoding=json");
   /** A UTF-8 JSON object that the global-state expression reads. */
-  mln_buffer_view global_state MLN_BINDING(
-    "encoding=json;mask=fields;bit=MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE"
-  );
+  mln_buffer_view global_state MLN_BINDING("encoding=json");
   /**
    * The tile that holds the feature, which the within and distance
    * expressions need to place its geometry.

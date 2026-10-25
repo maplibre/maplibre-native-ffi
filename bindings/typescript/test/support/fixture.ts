@@ -67,6 +67,7 @@ export const denyingProvider: ResourceProvider = {
     handle.complete({
       status: ResourceResponseStatus.error,
       errorMessage: "the test fixture serves no resources",
+      etag: "",
     });
   },
 };
@@ -77,7 +78,12 @@ export function styleRoute(url: string): ResourceRoute {
 }
 
 export function styleResponse(style = emptyStyle()): ResourceResponse {
-  return { status: ResourceResponseStatus.ok, bytes: utf8(style) };
+  return {
+    status: ResourceResponseStatus.ok,
+    bytes: utf8(style),
+    errorMessage: "",
+    etag: "",
+  };
 }
 
 /**

@@ -1352,17 +1352,21 @@ class FeatureStateSelector:
     source_id: str
     """Source ID. Required and borrowed for the duration of the call."""
 
-    source_layer_id: str | None = None
-    """Optional source layer ID. Required for vector-source disambiguation."""
+    source_layer_id: str
+    """Source layer ID, or empty for none. Required for vector-source
+    disambiguation.
+    """
+
+    state_key: str
+    """State key, or empty to select every key. Used only by remove, and
+    requires feature_id.
+    """
 
     feature_id: str | None = None
     """Optional feature ID. Required by set and get, optional for remove. A
     numeric feature ID matches its decimal text, such as "7" for the GeoJSON
-    id 7.
+    id 7. Its field bit tells an absent ID from the empty ID "".
     """
-
-    state_key: str | None = None
-    """Optional state key. Used only by remove and requires feature_id."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -1448,10 +1452,12 @@ class GeojsonSourceOptions:
     cluster_max_zoom: float | None = None
     """Highest zoom that clusters points. Defaults to 17."""
 
-    cluster_properties: bytes | None = None
+    cluster_properties: bytes = field(
+        default_factory=lambda: GeojsonSourceOptions.default().cluster_properties
+    )
     """Cluster aggregation expressions keyed by property name, as a JSON object
-    whose members follow the MapLibre Style Spec clusterProperties form. The
-    UTF-8 bytes are borrowed for the call.
+    whose members follow the MapLibre Style Spec clusterProperties form, or
+    empty for none. The UTF-8 bytes are borrowed for the call.
     """
 
     buffer: int | None = None
@@ -3025,11 +3031,11 @@ class RenderedFeature:
 
     layer_id: str
 
-    source_id: str | None = None
+    source_id: str
 
-    source_layer_id: str | None = None
+    source_layer_id: str
 
-    state: bytes | None = None
+    state: bytes
 
     @classmethod
     def _from_native(cls, raw):
@@ -3053,8 +3059,10 @@ class RenderedFeatureQueryOptions:
     layer_ids: Sequence[str] | None = None
     """Optional style layer IDs. When absent, all rendered layers are queried."""
 
-    filter: bytes | None = None
-    """Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter."""
+    filter: bytes = field(
+        default_factory=lambda: RenderedFeatureQueryOptions.default().filter
+    )
+    """UTF-8 MapLibre style-spec filter JSON, or empty for no filter."""
 
     def __post_init__(self):
         object.__setattr__(self, "layer_ids", _sequence(self.layer_ids))
@@ -3203,6 +3211,14 @@ class ResourceRequestCancelHandler:
 
 @dataclass(frozen=True, slots=True)
 class ResourceRequestInfo:
+    requested_url: str
+    """URL entering the network layer, before tile server normalization."""
+
+    resolved_url: str
+    """URL to fetch, after resource-kind normalization against the runtime's
+    tile server options and API key.
+    """
+
     kind: ResourceKind
 
     loading_method: ResourceLoadingMethod
@@ -3213,23 +3229,16 @@ class ResourceRequestInfo:
 
     storage_policy: ResourceStoragePolicy
 
+    prior_etag: str
+    """Entity tag of the cached copy, or empty when there is none."""
+
     prior_data: bytes
-
-    requested_url: str | None = None
-    """URL entering the network layer, before tile server normalization."""
-
-    resolved_url: str | None = None
-    """URL to fetch, after resource-kind normalization against the runtime's
-    tile server options and API key.
-    """
 
     range: ResourceRange | None = None
 
     prior_modified_unix_ms: int | None = None
 
     prior_expires_unix_ms: int | None = None
-
-    prior_etag: str | None = None
 
     @classmethod
     def _from_native(cls, raw):
@@ -3264,15 +3273,15 @@ class ResourceResponse:
     bytes: Buffer
     """Response bytes. May be null only when byte_count is 0."""
 
+    error_message: str
+
     must_revalidate: bool
 
-    error_message: str | None = None
+    etag: str
 
     modified_unix_ms: int | None = None
 
     expires_unix_ms: int | None = None
-
-    etag: str | None = None
 
     retry_after_unix_ms: int | None = None
 
@@ -3555,13 +3564,15 @@ class RuntimeOptions:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    asset_path: str | None = None
+    asset_path: str = field(default_factory=lambda: RuntimeOptions.default().asset_path)
     """Directory root for asset:// URLs. Copied during runtime creation. Empty
     selects `/android_asset` on Android and `.` elsewhere.
     """
 
-    cache_path: str | None = None
-    """Cache database path. Copied during runtime creation."""
+    cache_path: str = field(default_factory=lambda: RuntimeOptions.default().cache_path)
+    """Cache database path. Copied during runtime creation. Empty selects an
+    in-memory cache.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -3643,7 +3654,7 @@ class SourceFeature:
 
     feature: bytes
 
-    source_layer_id: str | None = None
+    source_layer_id: str
 
     @classmethod
     def _from_native(cls, raw):
@@ -3663,8 +3674,10 @@ class SourceFeatureQueryOptions:
     GeoJSON.
     """
 
-    filter: bytes | None = None
-    """Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter."""
+    filter: bytes = field(
+        default_factory=lambda: SourceFeatureQueryOptions.default().filter
+    )
+    """UTF-8 MapLibre style-spec filter JSON, or empty for no filter."""
 
     def __post_init__(self):
         object.__setattr__(self, "source_layer_ids", _sequence(self.source_layer_ids))
@@ -3726,13 +3739,19 @@ class StyleExpressionInputs:
     elevation: float | None = None
     """The value of the elevation expression outside a color-relief layer."""
 
-    feature: bytes | None = None
+    feature: bytes = field(
+        default_factory=lambda: StyleExpressionInputs.default().feature
+    )
     """One UTF-8 GeoJSON Feature that feature data expressions read."""
 
-    feature_state: bytes | None = None
+    feature_state: bytes = field(
+        default_factory=lambda: StyleExpressionInputs.default().feature_state
+    )
     """A UTF-8 JSON object that the feature-state expression reads."""
 
-    global_state: bytes | None = None
+    global_state: bytes = field(
+        default_factory=lambda: StyleExpressionInputs.default().global_state
+    )
     """A UTF-8 JSON object that the global-state expression reads."""
 
     canonical_tile_id: CanonicalTileId | None = None
@@ -3958,6 +3977,12 @@ class StyleLayerInfo:
     type: str
     """The style-spec layer type string."""
 
+    source_id: str
+    """Source ID. Empty for a layer type that takes no source."""
+
+    source_layer: str
+    """Source-layer ID. Empty when the layer sets none."""
+
     min_zoom: float
     """Lowest zoom at which the layer draws; -INFINITY with no lower bound."""
 
@@ -3965,12 +3990,6 @@ class StyleLayerInfo:
     """Highest zoom at which the layer draws; INFINITY with no upper bound."""
 
     visibility: StyleLayerVisibility
-
-    source_id: str | None = None
-    """Source ID. Empty for a layer type that takes no source."""
-
-    source_layer: str | None = None
-    """Source-layer ID. Empty when the layer sets none."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -4002,11 +4021,11 @@ class StyleSourceInfo:
     is_volatile: bool
     """Whether the source is marked volatile."""
 
-    attribution: str | None = None
-    """Attribution string, when the source sets one. It may be empty."""
+    attribution: str
+    """Attribution string, or empty when the source sets none."""
 
-    url: str | None = None
-    """URL that the source loads from, when it has one."""
+    url: str
+    """URL that the source loads from, or empty when it has none."""
 
     tilejson: StyleSourceTileInfo | None = None
     """Inline TileJSON metadata, when the source was defined with it."""

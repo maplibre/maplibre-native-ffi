@@ -26,28 +26,34 @@ internal actual object UpcallStubs {
       severity: UInt,
       event: UInt,
       code: Long,
-      message: CPointer<ByteVar>? ->
-      ThreadedUpcalls.logHandlerCallback(
-        userData.toLong(),
-        severity.toInt(),
-        event.toInt(),
-        code,
-        message.toLong(),
-      )
+      message: CValue<mln_buffer_view> ->
+      message.useContents {
+        val messageAddress = ptr.toLong()
+        ThreadedUpcalls.logHandlerCallback(
+          userData.toLong(),
+          severity.toInt(),
+          event.toInt(),
+          code,
+          messageAddress,
+        )
+      }
     }
     .toLong()
   actual val httpHeaderTransformCallback: Long =
     staticCFunction {
       userData: COpaquePointer?,
       kind: UInt,
-      url: CPointer<ByteVar>?,
+      url: CValue<mln_buffer_view>,
       outResponse: CPointer<mln_http_header_transform_response>? ->
-      ThreadedUpcalls.httpHeaderTransformCallback(
-        userData.toLong(),
-        kind.toInt(),
-        url.toLong(),
-        outResponse.toLong(),
-      )
+      url.useContents {
+        val urlAddress = ptr.toLong()
+        ThreadedUpcalls.httpHeaderTransformCallback(
+          userData.toLong(),
+          kind.toInt(),
+          urlAddress,
+          outResponse.toLong(),
+        )
+      }
     }
     .toLong()
   actual val customGeometrySourceOptionsFetchTile: Long =
@@ -101,14 +107,20 @@ internal actual object UpcallStubs {
     }
     .toLong()
   actual val resourceTransformCallback: Long =
-    staticCFunction { userData: COpaquePointer?, kind: UInt, url: CPointer<ByteVar>?, request: ULong
-      ->
-      Upcalls.resourceTransformCallback(
-        userData.toLong(),
-        kind.toInt(),
-        url.toLong(),
-        request.toLong(),
-      )
+    staticCFunction {
+      userData: COpaquePointer?,
+      kind: UInt,
+      url: CValue<mln_buffer_view>,
+      request: ULong ->
+      url.useContents {
+        val urlAddress = ptr.toLong()
+        Upcalls.resourceTransformCallback(
+          userData.toLong(),
+          kind.toInt(),
+          urlAddress,
+          request.toLong(),
+        )
+      }
     }
     .toLong()
   actual val wakeCallback: Long = staticCFunction { userData: COpaquePointer? ->

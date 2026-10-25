@@ -278,9 +278,11 @@ def failure_value(plan):
 
 def borrow(value, source):
     """Text that native lends for the callback's duration, without a copy."""
-    if value.length != "nul" or value.buffer_form == "view":
+    if value.buffer_form == "view":
+        return f"try marshal.borrowView({source})"
+    if value.length != "nul":
         raise ModelError([f"Zig: {value.native}: callback text must be NUL-terminated"])
-    if value.nullable or value.optional == "empty":
+    if value.nullable:
         return f"if ({source}) |text| std.mem.span(text) else null"
     return f"std.mem.span({source} orelse return error.NativeError)"
 

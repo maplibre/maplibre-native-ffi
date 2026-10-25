@@ -285,7 +285,7 @@ class Values:
             name = f"List<{self.public(value.element)}>"
         else:
             name = "String" if value.encoding == "utf8" else "Uint8List"
-        return name + "?" if value.nullable or value.optional else name
+        return name + "?" if value.nullable else name
 
     def ffi(self, value):
         if value.kind == "native_pointer":
@@ -366,8 +366,8 @@ class Values:
             return (
                 f"{expression} == null ? nullptr : {code}" if value.nullable else code
             )
-        if value.nullable or value.optional:
-            bare = replace(value, nullable=False, optional=None)
+        if value.nullable:
+            bare = replace(value, nullable=False)
             if (
                 value.kind == "buffer"
                 and value.buffer_form != "view"
@@ -462,9 +462,7 @@ class Values:
                 result = f"_copyBufferView({expression})"
                 if value.encoding == "utf8":
                     result = f"utf8.decode({result})"
-                if value.optional:
-                    result = f"{expression}.size == 0 ? null : {result}"
-                elif value.nullable:
+                if value.nullable:
                     result = f"{expression}.data == nullptr ? null : {result}"
             else:
                 if value.length == "nul":
@@ -473,13 +471,8 @@ class Values:
                     result = f"Uint8List.fromList({expression}.cast<Uint8>().asTypedList({count}))"
                     if value.encoding == "utf8":
                         result = f"utf8.decode({result})"
-                if value.optional or value.nullable:
-                    absent = (
-                        f"{count} == 0"
-                        if value.optional == "empty" and value.length != "nul"
-                        else f"{expression} == nullptr"
-                    )
-                    result = f"{absent} ? null : {result}"
+                if value.nullable:
+                    result = f"{expression} == nullptr ? null : {result}"
         elif value.kind == "array":
             item_expression = f"{expression}[index]"
             if value.stride:
@@ -538,12 +531,15 @@ class Values:
         return self.default_expression(field.value)
 
     def default_expression(self, value):
-        if value.nullable or value.optional:
+        if value.nullable:
             return "null"
         if value.kind == "native_pointer":
             return "NativePointer.nullPointer"
         if value.kind == "scalar":
             return {"double": "0", "int": "0", "bool": "false"}.get(self.public(value))
+        if value.kind == "buffer" and value.encoding == "utf8":
+            # Empty text means absent, as an empty byte buffer does.
+            return "''"
         if value.kind == "enum":
             return (
                 f"{public_name(value.native)}.{self.empty_member(value)}"

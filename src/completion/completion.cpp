@@ -61,7 +61,10 @@ auto CompletionSink::deliver(
     .generation = generations.snapshot,
     .render_update_generation = generations.render_update,
     .diagnostic =
-      mln_buffer_view{.data = diagnostic.data(), .size = diagnostic.size()},
+      mln_buffer_view{
+        .data = diagnostic.empty() ? "" : diagnostic.data(),
+        .size = diagnostic.size()
+      },
     .value = value,
     .value_count = value_count,
   };

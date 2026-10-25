@@ -413,19 +413,21 @@ export interface FeatureStateSelector {
    */
   sourceId: string;
   /**
-   * Optional source layer ID. Required for vector-source disambiguation.
+   * Source layer ID, or empty for none. Required for vector-source
+   * disambiguation.
    */
-  sourceLayerId?: string;
+  sourceLayerId: string;
   /**
    * Optional feature ID. Required by set and get, optional for remove. A
    * numeric feature ID matches its decimal text, such as "7" for the GeoJSON id
-   * 7.
+   * 7. Its field bit tells an absent ID from the empty ID "".
    */
   featureId?: string;
   /**
-   * Optional state key. Used only by remove and requires feature_id.
+   * State key, or empty to select every key. Used only by remove, and requires
+   * feature_id.
    */
-  stateKey?: string;
+  stateKey: string;
 }
 
 /**
@@ -519,8 +521,8 @@ export interface GeojsonSourceOptions {
   clusterMaxZoom?: number;
   /**
    * Cluster aggregation expressions keyed by property name, as a JSON object
-   * whose members follow the MapLibre Style Spec clusterProperties form. The
-   * UTF-8 bytes are borrowed for the call.
+   * whose members follow the MapLibre Style Spec clusterProperties form, or
+   * empty for none. The UTF-8 bytes are borrowed for the call.
    */
   clusterProperties?: string;
   /**
@@ -1948,9 +1950,9 @@ export type RenderSessionState =
 export interface RenderedFeature {
   readonly feature: string;
   readonly layerId: string;
-  readonly sourceId?: string;
-  readonly sourceLayerId?: string;
-  readonly state?: string;
+  readonly sourceId: string;
+  readonly sourceLayerId: string;
+  readonly state: string;
 }
 
 /**
@@ -1965,7 +1967,7 @@ export interface RenderedFeatureQueryOptions {
    */
   layerIds?: readonly string[];
   /**
-   * Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
+   * UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
    */
   filter?: string;
 }
@@ -2143,12 +2145,12 @@ export interface ResourceRequestInfo {
   /**
    * URL entering the network layer, before tile server normalization.
    */
-  readonly requestedUrl?: string;
+  readonly requestedUrl: string;
   /**
    * URL to fetch, after resource-kind normalization against the runtime's tile
    * server options and API key.
    */
-  readonly resolvedUrl?: string;
+  readonly resolvedUrl: string;
   readonly kind: ResourceKind;
   readonly loadingMethod: ResourceLoadingMethod;
   readonly priority: ResourcePriority;
@@ -2157,7 +2159,10 @@ export interface ResourceRequestInfo {
   readonly range?: ResourceRange;
   readonly priorModifiedUnixMs?: bigint;
   readonly priorExpiresUnixMs?: bigint;
-  readonly priorEtag?: string;
+  /**
+   * Entity tag of the cached copy, or empty when there is none.
+   */
+  readonly priorEtag: string;
   readonly priorData: Uint8Array;
 }
 
@@ -2174,11 +2179,11 @@ export interface ResourceResponse {
    * Response bytes. May be null only when byte_count is 0.
    */
   bytes?: Uint8Array;
-  errorMessage?: string;
+  errorMessage: string;
   mustRevalidate?: boolean;
   modifiedUnixMs?: bigint;
   expiresUnixMs?: bigint;
-  etag?: string;
+  etag: string;
   retryAfterUnixMs?: bigint;
 }
 
@@ -2496,7 +2501,8 @@ export interface RuntimeOptions {
    */
   assetPath?: string;
   /**
-   * Cache database path. Copied during runtime creation.
+   * Cache database path. Copied during runtime creation. Empty selects an
+   * in-memory cache.
    */
   cachePath?: string;
 }
@@ -2545,7 +2551,7 @@ export interface ScreenPoint {
  */
 export interface SourceFeature {
   readonly feature: string;
-  readonly sourceLayerId?: string;
+  readonly sourceLayerId: string;
 }
 
 /**
@@ -2560,7 +2566,7 @@ export interface SourceFeatureQueryOptions {
    */
   sourceLayerIds?: readonly string[];
   /**
-   * Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
+   * UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
    */
   filter?: string;
 }
@@ -2867,11 +2873,11 @@ export interface StyleLayerInfo {
   /**
    * Source ID. Empty for a layer type that takes no source.
    */
-  readonly sourceId?: string;
+  readonly sourceId: string;
   /**
    * Source-layer ID. Empty when the layer sets none.
    */
-  readonly sourceLayer?: string;
+  readonly sourceLayer: string;
   /**
    * Lowest zoom at which the layer draws; -INFINITY with no lower bound.
    */
@@ -2930,13 +2936,13 @@ export interface StyleSourceInfo {
    */
   readonly isVolatile: boolean;
   /**
-   * Attribution string, when the source sets one. It may be empty.
+   * Attribution string, or empty when the source sets none.
    */
-  readonly attribution?: string;
+  readonly attribution: string;
   /**
-   * URL that the source loads from, when it has one.
+   * URL that the source loads from, or empty when it has none.
    */
-  readonly url?: string;
+  readonly url: string;
   /**
    * Inline TileJSON metadata, when the source was defined with it.
    */

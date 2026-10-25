@@ -6,7 +6,7 @@
 void binding_release(void*);
 bool binding_mln_log_handler_callback(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
-  const char* message
+  mln_buffer_view message
 );
 void binding_mln_custom_geometry_source_options_fetch_tile(
   void* user_data, mln_canonical_tile_id tile_id
@@ -33,7 +33,7 @@ void binding_mln_runtime_event_handler_callback(
   void* user_data, const mln_event_batch_view* events
 );
 mln_status binding_mln_http_header_transform_callback(
-  void* user_data, mln_resource_kind kind, const char* url,
+  void* user_data, mln_resource_kind kind, mln_buffer_view url,
   mln_http_header_transform_response* out_response
 );
 void binding_mln_resource_provider_callback(
@@ -41,7 +41,7 @@ void binding_mln_resource_provider_callback(
   mln_resource_request handle
 );
 void binding_mln_resource_transform_callback(
-  void* user_data, mln_resource_kind kind, const char* url,
+  void* user_data, mln_resource_kind kind, mln_buffer_view url,
   mln_resource_transform_request request
 );
 

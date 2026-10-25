@@ -202,21 +202,6 @@ impl FromNative<*const c_char> for Option<String> {
     }
 }
 
-/// Copies a view whose empty value means absent.
-///
-/// # Safety
-///
-/// The view must be readable.
-pub(crate) unsafe fn nonempty<T: FromNative<sys::mln_buffer_view>>(
-    native: sys::mln_buffer_view,
-) -> Result<Option<T>> {
-    if native.size == 0 {
-        return Ok(None);
-    }
-    // SAFETY: the caller guarantees the view is readable.
-    unsafe { T::from_native(native) }.map(Some)
-}
-
 /// Copies `count` units that a pointer and a separate length field describe.
 ///
 /// # Safety

@@ -74,10 +74,10 @@ class _MapHandle:
         self, source_id: str, coordinates: Sequence[LatLng], url: str
     ) -> None: ...
     def add_style_layer_json(
-        self, layer_json: bytes, before_layer_id: str | None = None
+        self, layer_json: bytes, before_layer_id: str
     ) -> Future[CommandCompletion]: ...
     def _discard_add_style_layer_json(
-        self, layer_json: bytes, before_layer_id: str | None = None
+        self, layer_json: bytes, before_layer_id: str
     ) -> None: ...
     def add_style_source_json(
         self, source_id: str, source_json: bytes
@@ -197,10 +197,10 @@ class _MapHandle:
     def list_style_layers(self) -> Future[Any]: ...
     def list_style_sources(self) -> Future[Any]: ...
     def move_style_layer(
-        self, layer_id: str, before_layer_id: str | None = None
+        self, layer_id: str, before_layer_id: str
     ) -> Future[CommandCompletion]: ...
     def _discard_move_style_layer(
-        self, layer_id: str, before_layer_id: str | None = None
+        self, layer_id: str, before_layer_id: str
     ) -> None: ...
     def close(self) -> Future[None]: ...
     def remove_feature_state(
@@ -400,7 +400,7 @@ class _RenderSessionHandle:
         feature: bytes,
         extension: str,
         extension_field: str,
-        arguments: bytes | None = None,
+        arguments: bytes,
     ) -> Future[Any]: ...
     def query_rendered_features(
         self,

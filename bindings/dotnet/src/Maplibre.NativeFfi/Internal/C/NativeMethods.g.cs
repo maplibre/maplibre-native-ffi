@@ -1122,7 +1122,7 @@ internal static unsafe partial class NativeMethods
         mln_buffer_view feature,
         mln_buffer_view extension,
         mln_buffer_view extension_field,
-        mln_buffer_view* arguments,
+        mln_buffer_view arguments,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

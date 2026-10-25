@@ -83,7 +83,7 @@ def rust_field(name: str) -> str:
 
 
 def optional(plan: ValuePlan) -> bool:
-    return plan.nullable or plan.optional == "empty"
+    return plan.nullable
 
 
 def ok(copy: str) -> str:
@@ -118,7 +118,7 @@ class Values:
             return
         if plan.ownership == "owned":
             self.fail(plan, "owned values require a handle adoption transaction")
-        if plan.kind in {"scalar", "enum"} and (plan.nullable or plan.optional):
+        if plan.kind in {"scalar", "enum"} and plan.nullable:
             self.fail(plan, "scalar absence requires a C presence representation")
         if plan.kind == "native_pointer":
             return
@@ -297,12 +297,7 @@ class Values:
                 else f"unsafe {{ generated_bytes(py, {argument}) }}?"
             )
             if optional(plan):
-                present = (
-                    f"{expr}.size != 0"
-                    if plan.optional == "empty"
-                    else f"!{expr}.data.is_null()"
-                )
-                return optional_copy(present, body)
+                return optional_copy(f"!{expr}.data.is_null()", body)
             return body
         if plan.native in self.api.slices:
             array = self.api.slices[plan.native]
@@ -346,7 +341,7 @@ class Values:
         self.fail(plan, "missing output copy")
 
     def facade_copy(self, plan: ValuePlan, expr: str) -> str:
-        bare = replace(plan, nullable=False, optional=None)
+        bare = replace(plan, nullable=False)
         if optional(plan):
             copied = self.facade_copy(bare, expr)
             if copied == expr:

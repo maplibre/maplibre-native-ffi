@@ -962,7 +962,7 @@ internal actual object C {
       mln_buffer_view,
       mln_buffer_view,
       mln_buffer_view,
-      JAVA_LONG,
+      mln_buffer_view,
       JAVA_LONG,
       JAVA_LONG,
     )
@@ -2867,7 +2867,7 @@ internal actual object C {
       Ffm.value(feature, mln_buffer_view),
       Ffm.value(extension, mln_buffer_view),
       Ffm.value(extensionField, mln_buffer_view),
-      arguments,
+      Ffm.value(arguments, mln_buffer_view),
       completion,
       outDiagnostic,
     ) as Int

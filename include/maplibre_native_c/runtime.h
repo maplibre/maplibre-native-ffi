@@ -357,9 +357,12 @@ typedef struct mln_runtime_options {
    * directory after mln_android_init. Other paths read the filesystem.
    * Explicit file:// URLs use their own paths, independently of this root.
    */
-  mln_buffer_view asset_path MLN_BINDING("optional=empty");
-  /** Cache database path. Copied during runtime creation. */
-  mln_buffer_view cache_path MLN_BINDING("optional=empty");
+  mln_buffer_view asset_path;
+  /**
+   * Cache database path. Copied during runtime creation. Empty selects an
+   * in-memory cache.
+   */
+  mln_buffer_view cache_path;
 } mln_runtime_options;
 
 /**
@@ -692,15 +695,15 @@ MLN_API mln_http_header_rule mln_http_header_rule_default(void) MLN_NOEXCEPT;
  *
  * The callback runs on a MapLibre network thread. It must be thread-safe and
  * return promptly, and must not wait for runtime work. url is borrowed for the
- * callback. The C API invokes release_user_data after the final callback
- * returns.
+ * callback and is NUL-terminated after its bytes. The C API invokes
+ * release_user_data after the final callback returns.
  *
  * A transform in queue mode queues a copy as an
  * mln_resource_transform_delivery instead.
  */
 MLN_BINDING("delivery=MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM")
 typedef void (*mln_resource_transform_callback)(
-  void* user_data, mln_resource_kind kind, const char* url,
+  void* user_data, mln_resource_kind kind, mln_buffer_view url,
   mln_resource_transform_request request MLN_BINDING("ownership=owned")
 );
 
@@ -779,14 +782,14 @@ MLN_API mln_status mln_http_header_transform_response_set_header(
  *
  * The callback and user_data must be thread-safe. The C API invokes
  * release_user_data after the final callback returns. url and out_response are
- * borrowed for the callback duration. Callbacks return promptly and must not
- * wait for work that only their own thread can advance. A non-OK
- * result discards every header collected during the invocation and lets the
- * request proceed unchanged.
+ * borrowed for the callback duration, and url is NUL-terminated after its
+ * bytes. Callbacks return promptly and must not wait for work that only their
+ * own thread can advance. A non-OK result discards every header collected
+ * during the invocation and lets the request proceed unchanged.
  */
 MLN_BINDING("failure=MLN_STATUS_NATIVE_ERROR")
 typedef mln_status (*mln_http_header_transform_callback)(
-  void* user_data, mln_resource_kind kind, const char* url,
+  void* user_data, mln_resource_kind kind, mln_buffer_view url,
   mln_http_header_transform_response* out_response MLN_BINDING("direction=out")
 );
 
@@ -853,7 +856,7 @@ typedef struct mln_resource_request_info {
    * Tile coordinates, glyph ranges, and sprite suffixes are already
    * substituted.
    */
-  const char* requested_url MLN_BINDING("nullable=true");
+  mln_buffer_view requested_url;
   /**
    * URL to fetch, after resource-kind normalization against the runtime's
    * tile server options and API key.
@@ -866,7 +869,7 @@ typedef struct mln_resource_request_info {
    * fails such a request, so a provider that only fetches over HTTP checks the
    * scheme before serving it.
    */
-  const char* resolved_url MLN_BINDING("nullable=true");
+  mln_buffer_view resolved_url;
   mln_resource_kind kind;
   mln_resource_loading_method loading_method;
   mln_resource_priority priority;
@@ -878,7 +881,8 @@ typedef struct mln_resource_request_info {
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_REQUEST_PRIOR_MODIFIED");
   int64_t prior_expires_unix_ms
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_REQUEST_PRIOR_EXPIRES");
-  const char* prior_etag MLN_BINDING("nullable=true");
+  /** Entity tag of the cached copy, or empty when there is none. */
+  mln_buffer_view prior_etag;
   const uint8_t* prior_data
     MLN_BINDING("length=prior_data_size;encoding=bytes");
   size_t prior_data_size;
@@ -913,13 +917,13 @@ typedef struct mln_resource_response {
   /** Response bytes. May be null only when byte_count is 0. */
   const uint8_t* bytes MLN_BINDING("length=byte_count;encoding=bytes");
   size_t byte_count;
-  mln_buffer_view error_message MLN_BINDING("optional=empty");
+  mln_buffer_view error_message;
   bool must_revalidate;
   int64_t modified_unix_ms
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_MODIFIED");
   int64_t expires_unix_ms
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_EXPIRES");
-  mln_buffer_view etag MLN_BINDING("optional=empty");
+  mln_buffer_view etag;
   int64_t retry_after_unix_ms
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_RETRY_AFTER");
 } mln_resource_response;

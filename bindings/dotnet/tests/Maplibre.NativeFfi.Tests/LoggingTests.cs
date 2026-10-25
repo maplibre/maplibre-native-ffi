@@ -68,7 +68,7 @@ public sealed class LoggingTests
                 (mln_log_severity)999,
                 (mln_log_event)998,
                 42,
-                scope.CString("é")
+                scope.Utf8("é")
             )
         );
         Assert.Equal((999u, 998u, 42L, "é"), copied);

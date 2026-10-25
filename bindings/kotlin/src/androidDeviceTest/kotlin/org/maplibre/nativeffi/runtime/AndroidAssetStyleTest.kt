@@ -20,9 +20,8 @@ import org.maplibre.nativeffi.withMap
 class AndroidAssetStyleTest {
   @Test
   fun styleLoadsFromAssetScheme(): Unit = runSuspendTest {
-    // A null or empty asset path both select the APK's asset root.
+    // An empty asset path selects the APK's asset root.
     loadStyle("asset://style.json")
-    loadStyle("asset://style.json", assetPath = "")
   }
 
   @Test
@@ -101,7 +100,7 @@ class AndroidAssetStyleTest {
   /** Loads [styleUrl] under [assetPath], and asserts that the style holds [expectedLayer] only. */
   private suspend fun loadStyle(
     styleUrl: String,
-    assetPath: String? = null,
+    assetPath: String = "",
     expectedLayer: String? = null,
   ) {
     withMap(
@@ -125,7 +124,7 @@ class AndroidAssetStyleTest {
     }
   }
 
-  private fun runtimeOptions(assetPath: String?): RuntimeOptions =
+  private fun runtimeOptions(assetPath: String): RuntimeOptions =
     GeneratedApi.runtimeOptionsDefault().copy(assetPath = assetPath)
 }
 

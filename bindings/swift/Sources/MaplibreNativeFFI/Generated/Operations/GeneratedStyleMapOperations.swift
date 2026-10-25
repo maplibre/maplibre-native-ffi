@@ -139,13 +139,13 @@ public extension MapHandle {
   @discardableResult
   func addStyleLayerJson(
     _ bindingArg0: Data,
-    beforeLayerId bindingArg1: String? = nil
+    beforeLayerId bindingArg1: String
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_add_style_layer_json(
         raw,
         arena.view(bindingArg0),
-        bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
+        arena.view(bindingArg1),
         completion,
         diagnostic
       )
@@ -460,13 +460,13 @@ public extension MapHandle {
   @discardableResult
   func moveStyleLayer(
     _ bindingArg0: String,
-    beforeLayerId bindingArg1: String? = nil
+    beforeLayerId bindingArg1: String
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_move_style_layer(
         raw,
         arena.view(bindingArg0),
-        bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
+        arena.view(bindingArg1),
         completion,
         diagnostic
       )
@@ -985,13 +985,13 @@ public extension MapHandleDiscarding {
 
   func addStyleLayerJson(
     _ bindingArg0: Data,
-    beforeLayerId bindingArg1: String? = nil
+    beforeLayerId bindingArg1: String
   ) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in mln_map_add_style_layer_json(
         raw,
         arena.view(bindingArg0),
-        bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
+        arena.view(bindingArg1),
         nil,
         diagnostic
       ) }
@@ -1061,12 +1061,12 @@ public extension MapHandleDiscarding {
 
   func moveStyleLayer(
     _ bindingArg0: String,
-    beforeLayerId bindingArg1: String? = nil
+    beforeLayerId bindingArg1: String
   ) throws {
     try owner.nativeInvoke { raw, arena, diagnostic in mln_map_move_style_layer(
       raw,
       arena.view(bindingArg0),
-      bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
+      arena.view(bindingArg1),
       nil,
       diagnostic
     ) }

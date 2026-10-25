@@ -68,7 +68,7 @@ def releases(bound, native, plans):
 
 def defaulted(parameter):
     value = parameter.value.unwrapped
-    return bool(parameter.value.nullable or parameter.value.optional or value.default)
+    return bool(parameter.value.nullable or value.default)
 
 
 def generate_owners(bound, plans):

@@ -23,14 +23,14 @@ public sealed record SourceFeatureQueryOptions
     internal ValueArray<string>? SourceLayerIdsStorage { get; init; }
 
     /// <summary>
-    /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
+    /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
     /// </summary>
-    public ImmutableArray<byte>? Filter
+    public ImmutableArray<byte> Filter
     {
-        get => FilterStorage?.AsImmutable();
-        init => FilterStorage = ValueArray.FromOptional(value);
+        get => FilterStorage.AsImmutable();
+        init => FilterStorage = ValueArray.From(value);
     }
-    internal ValueArray<byte>? FilterStorage { get; init; }
+    internal ValueArray<byte> FilterStorage { get; init; }
     public static SourceFeatureQueryOptions Default
     {
         get

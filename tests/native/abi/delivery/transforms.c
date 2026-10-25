@@ -178,7 +178,8 @@ static void the_host_answers_a_drained_transform(void) {
   const mln_delivery_batch batch =
     await_transform(queue.handle, &tag, &delivered);
   TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_STYLE, delivered->kind);
-  TEST_ASSERT_EQUAL_STRING(original, delivered->url);
+  TEST_ASSERT_TRUE(mln_test_lent_text_is_terminated(delivered->url));
+  TEST_ASSERT_EQUAL_STRING(original, delivered->url.data);
   const mln_resource_transform_request request = delivered->request;
   MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
   mln_delivery_batch_release(batch);

@@ -431,7 +431,7 @@ def test_a_registration_reported_as_rejected_is_not_rooted(harness: Harness) -> 
 def test_a_providers_routes_decide_which_requests_reach_it(
     harness: Harness, map_handle: mln.MapHandle
 ) -> None:
-    seen: list[tuple[mln.ResourceKind, str | None]] = []
+    seen: list[tuple[mln.ResourceKind, str]] = []
     sprites = {mln.ResourceKind.SPRITE_JSON, mln.ResourceKind.SPRITE_IMAGE}
     sprites_seen = threading.Event()
     routed_style = (
@@ -485,6 +485,4 @@ def test_a_providers_routes_decide_which_requests_reach_it(
     harness.wait_event(mln.RuntimeEventType.MAP_STYLE_LOADED)
     assert sprites_seen.wait(TIMEOUT)
     assert seen[0] == (mln.ResourceKind.STYLE, "custom://routed/style.json")
-    assert all(
-        url is not None and url.startswith("custom://routed/") for _, url in seen
-    )
+    assert all(url.startswith("custom://routed/") for _, url in seen)

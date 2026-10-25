@@ -55,7 +55,7 @@ auto mln_render_session_query_source_features(
 auto mln_render_session_query_feature_extensions(
   mln_render_session session, mln_buffer_view source_id,
   mln_buffer_view feature, mln_buffer_view extension,
-  mln_buffer_view extension_field, const mln_buffer_view* arguments,
+  mln_buffer_view extension_field, mln_buffer_view arguments,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {

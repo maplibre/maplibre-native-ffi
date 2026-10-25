@@ -12,7 +12,6 @@ static mln_feature_state_selector selector_for(
     .source_id = mln_buffer_view_from_cstr(source_id),
   };
   if (source_layer_id != NULL) {
-    selector.fields |= MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
     selector.source_layer_id = mln_buffer_view_from_cstr(source_layer_id);
   }
   if (feature_id != NULL) {
@@ -77,7 +76,6 @@ static void state_merges_on_set_and_prunes_on_remove(void) {
   TEST_ASSERT_NULL(strstr(merged, "\"count\":3"));
 
   mln_feature_state_selector hover = feature;
-  hover.fields |= MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
   hover.state_key = MLN_BUFFER_LITERAL("hover");
   remove_state(map, hover);
   EXPECT_STATE("{\"count\":4}", map, feature);
@@ -89,6 +87,23 @@ static void state_merges_on_set_and_prunes_on_remove(void) {
   set_state(map, feature, "{\"label\":\"a\"}");
   EXPECT_STATE("{\"label\":\"a\"}", map, feature);
   remove_state(map, feature);
+  EXPECT_STATE("{}", map, feature);
+  // An empty state key selects every key, as no key does.
+  set_state(map, feature, "{\"label\":\"b\",\"n\":1}");
+  mln_feature_state_selector every_key = feature;
+  every_key.state_key = (mln_buffer_view){.data = "label", .size = 0};
+  remove_state(map, every_key);
+  EXPECT_STATE("{}", map, feature);
+
+  // The empty feature ID is an ID of its own, which its field bit tells from
+  // no ID.
+  const mln_feature_state_selector empty_id = selector_for("points", NULL, "");
+  set_state(map, empty_id, "{\"empty\":true}");
+  set_state(map, feature, "{\"named\":true}");
+  EXPECT_STATE("{\"empty\":true}", map, empty_id);
+  EXPECT_STATE("{\"named\":true}", map, feature);
+  remove_state(map, selector_for("points", NULL, NULL));
+  EXPECT_STATE("{}", map, empty_id);
   EXPECT_STATE("{}", map, feature);
 
   // A source layer is its own namespace, and a remove without a feature clears
@@ -106,6 +121,8 @@ static void state_merges_on_set_and_prunes_on_remove(void) {
   set_state(map, water_one, "{\"n\":3}");
   set_state(map, bare_one, "{\"n\":4}");
   set_state(map, other_one, "{\"n\":5}");
+  // An empty source layer ID is no source layer.
+  EXPECT_STATE("{\"n\":4}", map, selector_for("tiles", "", "1"));
 
   remove_state(map, selector_for("tiles", "roads", NULL));
   EXPECT_STATE("{}", map, roads_one);
@@ -189,8 +206,22 @@ static void remove_key_without_feature_id(void* descriptor) {
   feature_state_call* call = descriptor;
   no_feature_id(descriptor);
   call->kind = FEATURE_STATE_REMOVE;
-  call->selector.fields |= MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
   call->selector.state_key = MLN_BUFFER_LITERAL("hover");
+}
+static void remove_empty_key_without_feature_id(void* descriptor) {
+  feature_state_call* call = descriptor;
+  no_feature_id(descriptor);
+  call->kind = FEATURE_STATE_REMOVE;
+  call->selector.state_key = (mln_buffer_view){.data = "hover", .size = 0};
+}
+static void null_source_layer_id_bytes(void* descriptor) {
+  ((feature_state_call*)descriptor)->selector.source_layer_id =
+    (mln_buffer_view){.data = NULL, .size = 4};
+}
+static void null_state_key_bytes(void* descriptor) {
+  feature_state_call* call = descriptor;
+  call->kind = FEATURE_STATE_REMOVE;
+  call->selector.state_key = (mln_buffer_view){.data = NULL, .size = 4};
 }
 static void remove_everything_under_a_source(void* descriptor) {
   no_feature_id(descriptor);
@@ -229,6 +260,12 @@ static void malformed_selectors_are_rejected_at_submission(void) {
      "requires feature_id"},
     {"remove state_key without feature_id", remove_key_without_feature_id,
      MLN_STATUS_INVALID_ARGUMENT, "state_key requires feature_id"},
+    {"remove empty state_key without feature_id",
+     remove_empty_key_without_feature_id, MLN_STATUS_OK, NULL},
+    {"null source_layer_id bytes", null_source_layer_id_bytes,
+     MLN_STATUS_INVALID_ARGUMENT, "must not be null"},
+    {"null state_key bytes", null_state_key_bytes, MLN_STATUS_INVALID_ARGUMENT,
+     "must not be null"},
     {"empty state", empty_state, MLN_STATUS_INVALID_ARGUMENT,
      "must not be empty"},
     {"unparsable state", unparsable_state, MLN_STATUS_INVALID_ARGUMENT, NULL},

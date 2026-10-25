@@ -171,7 +171,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     feature: ByteArray,
     extension: String,
     extensionField: String,
-    arguments: ByteArray? = null,
+    arguments: ByteArray,
   ): Deferred<ByteArray> =
     nativeSubmit(this, binding, { result -> readView(CompletionBridge.value(result)) }) {
       check(
@@ -181,7 +181,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           view(feature),
           view(extension),
           view(extensionField),
-          arguments?.let { view(it) } ?: 0L,
+          view(arguments),
           completion,
           diagnostic,
         ),
@@ -206,7 +206,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
           CompletionBridge.valueSize(result),
-          w(44, 88),
+          w(40, 80),
         ) {
           readRenderedFeature(it)
         }
@@ -241,7 +241,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
           CompletionBridge.valueSize(result),
-          w(20, 40),
+          w(16, 32),
         ) {
           readSourceFeature(it)
         }

@@ -224,7 +224,7 @@ def encodings(plan):
     statements = []
     for parameter in encoded_text(plan):
         local = parameter_name(parameter.name)
-        nullable = "?" if parameter.value.nullable or parameter.value.optional else ""
+        nullable = "?" if parameter.value.nullable else ""
         statements.append(f"val {local}Utf8 = {local}{nullable}.encodeToByteArray(); ")
     return "".join(statements)
 
@@ -345,7 +345,7 @@ PUBLIC_FROM_CARRIER = {
 
 def completion_decode(value, values):
     """The decode lambda body for a completion result at `result`."""
-    bare = replace(value, nullable=False, optional=None)
+    bare = replace(value, nullable=False)
     if value.kind == "array":
         element = value.element
         item = values.decode_item(element, "it")
@@ -354,14 +354,10 @@ def completion_decode(value, values):
             f"CompletionBridge.valueSize(result), {values.element_size(element)}) {{ {item} }}"
         )
     elif value.kind in {"buffer", "record", "scalar", "enum"}:
-        expression = values.decode(
-            replace(bare, optional=None), "CompletionBridge.value(result)"
-        )
+        expression = values.decode(bare, "CompletionBridge.value(result)")
     else:
         raise Unsupported("completion result requires a copied value")
-    if value.optional == "empty":
-        expression += ".takeIf { it.isNotEmpty() }"
-    elif value.nullable:
+    if value.nullable:
         absent = (
             "CompletionBridge.valuePointer(result) == 0L"
             if value.kind == "array"

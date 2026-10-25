@@ -23,10 +23,10 @@ public sealed record ResourceResponse
         init => BytesStorage = ValueArray.From(value);
     }
     internal ValueArray<byte> BytesStorage { get; init; }
-    public string? ErrorMessage { get; init; }
+    public required string ErrorMessage { get; init; }
     public bool MustRevalidate { get; init; }
     public long? ModifiedUnixMs { get; init; }
     public long? ExpiresUnixMs { get; init; }
-    public string? Etag { get; init; }
+    public required string Etag { get; init; }
     public long? RetryAfterUnixMs { get; init; }
 }

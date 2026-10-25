@@ -292,7 +292,7 @@ class Values:
             result = "String" if value.encoding == "utf8" else "ByteArray"
         else:
             result = self.scalar(value)[0]
-        return result + ("?" if value.nullable or value.optional else "")
+        return result + ("?" if value.nullable else "")
 
     def members(self, value):
         """The public members of a record: (name, type, field)."""
@@ -324,7 +324,7 @@ class Values:
 
     def default(self, value):
         """A field's default, or None when a caller must give it."""
-        if value.nullable or value.optional:
+        if value.nullable:
             return "null"
         if value.kind == "scalar":
             return literal(0, self.public(value))
@@ -604,7 +604,7 @@ class Values:
             return f"{self.write(value)}({expression})"
         if value.kind == "array":
             element = value.element
-            nullable = value.nullable or value.optional
+            nullable = value.nullable
             items = "it" if nullable else expression
             written = (
                 f"array({items}, {self.element_size(element)}, {self.element_align(element)}) "
@@ -614,7 +614,7 @@ class Values:
         if value.kind == "buffer" and value.buffer_form == "view":
             return f"view({expression})"
         if value.kind == "buffer" and value.length == "nul":
-            if value.nullable or value.optional:
+            if value.nullable:
                 return f"{expression}?.let {{ cString(it) }} ?: 0L"
             return f"cString({expression})"
         if value.kind == "buffer":
@@ -623,7 +623,7 @@ class Values:
                 if value.encoding == "utf8"
                 else expression
             )
-            if value.nullable or value.optional:
+            if value.nullable:
                 data = data.replace(expression, "it", 1)
                 return f"{expression}?.let {{ bytes({data}) }} ?: 0L"
             return f"bytes({data})"
@@ -633,7 +633,7 @@ class Values:
         """The element or byte count of an input array or buffer, as a carrier."""
         if value.kind == "buffer" and value.encoding == "utf8":
             expression += ".encodeToByteArray()"
-        if value.nullable or value.optional:
+        if value.nullable:
             return f"({expression}?.size ?: 0).toLong()"
         return f"{expression}.size.toLong()"
 
@@ -728,7 +728,7 @@ class Values:
         count = self.field_plan(record, value.length)
         typ = self.scalar(count.value)[0]
         size = f"{expression}.size"
-        if value.nullable or value.optional:
+        if value.nullable:
             size = size.replace(f"{expression}.", f"{expression}?.", 1) + " ?: 0"
             size = f"({size})"
         converted = {
@@ -831,8 +831,7 @@ class Values:
             text = value.encoding == "utf8"
             if value.nullable:
                 return f"readView{'String' if text else ''}OrNull({address})"
-            result = f"readView{'String' if text else ''}({address})"
-            return result + (".takeIf { it.isNotEmpty() }" if value.optional else "")
+            return f"readView{'String' if text else ''}({address})"
         raise Unsupported("output storage requires another Kotlin rule")
 
     def read_function(self, value):
@@ -896,8 +895,6 @@ class Values:
                 result = f"readBytes({pointer}, {count})"
                 if value.encoding == "utf8":
                     result += ".decodeToString()"
-                if value.optional:
-                    result += ".takeIf { it.isNotEmpty() }"
                 return result
             element = value.element
             if value.stride:

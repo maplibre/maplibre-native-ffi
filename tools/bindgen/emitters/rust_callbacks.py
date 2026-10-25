@@ -1,7 +1,7 @@
 """Retained callback descriptors and scoped responses."""
 
 from .rust import Unsupported, doc, identifier, native_call, native_identifier
-from .rust_dynamic_values import decode, encode, optional
+from .rust_dynamic_values import decode, encode
 
 
 def native_type(values, ctype):
@@ -246,7 +246,7 @@ def declaration(values, value):
             source = f"self.{identifier(array.name)}"
             length = (
                 f"{source}.as_ref().map_or(0, |items| items.len())"
-                if optional(array.value) or array.presence
+                if array.value.nullable or array.presence
                 else f"{source}.len()"
             )
             writes.append(f"{place} = convert::count({length})?;")
@@ -335,7 +335,7 @@ def lent_text(value):
     return (
         value.kind == "buffer"
         and value.encoding == "utf8"
-        and not optional(value)
+        and not value.nullable
         and (value.length == "nul" or value.buffer_form == "view")
     )
 

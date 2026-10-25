@@ -54,7 +54,6 @@ import Testing
   #expect(copied.tileSize == 0)
   #expect(copied.bounds == nil)
   #expect(copied.tilejson == nil)
-  #expect(copied.url == nil)
 }
 
 /// A count that does not fit the native type is rejected rather than

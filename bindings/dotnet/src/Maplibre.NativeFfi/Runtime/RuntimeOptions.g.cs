@@ -14,9 +14,10 @@ namespace Maplibre.NativeFfi;
 /// selects <c>/android_asset</c> on Android and <c>.</c> elsewhere.
 /// </param>
 /// <param name="CachePath">
-/// Cache database path. Copied during runtime creation.
+/// Cache database path. Copied during runtime creation. Empty selects an
+/// in-memory cache.
 /// </param>
-public readonly partial record struct RuntimeOptions(string? AssetPath, string? CachePath)
+public readonly partial record struct RuntimeOptions(string AssetPath, string CachePath)
 {
     public RuntimeOptions()
         : this(default!, default!)

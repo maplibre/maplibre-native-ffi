@@ -40,6 +40,12 @@ static inline mln_buffer_view mln_test_buffer_view(
   return (mln_buffer_view){.data = data, .size = size};
 }
 
+// Whether `text`, which native lent, keeps the C API's promise for lent text:
+// its data is not null and a NUL follows its bytes, even when it is empty.
+static inline bool mln_test_lent_text_is_terminated(mln_buffer_view text) {
+  return text.data != NULL && ((const char*)text.data)[text.size] == '\0';
+}
+
 // Whether the `size` bytes at `bytes` are all zero. Only for a value without
 // padding, since the C API promises nothing about padding bytes.
 static inline bool mln_test_all_zero(const void* bytes, size_t size) {
@@ -144,8 +150,9 @@ mln_status mln_test_drain_event_delivery(
   mln_diagnostic* diagnostic
 );
 // Drains runtime event deliveries; an empty queue returns MLN_STATUS_OK with
-// no events. The view stays alive until the next drain or destroy helper on
-// this thread releases its batch.
+// no events, and a message without its NUL terminator returns
+// MLN_STATUS_NATIVE_ERROR. The view stays alive until the next drain or destroy
+// helper on this thread releases its batch.
 mln_status mln_test_drain_events(
   mln_runtime runtime, mln_event_batch_view* out_batch
 );

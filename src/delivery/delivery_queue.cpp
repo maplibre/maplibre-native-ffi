@@ -71,7 +71,10 @@ struct EventDeliveryItem final : DeliveryItem {
   auto finalize() noexcept -> void {
     auto offset = std::size_t{0};
     for (auto& event : events) {
-      if (event.message.size == 0) continue;
+      if (event.message.size == 0) {
+        event.message.data = "";
+        continue;
+      }
       event.message.data = messages.data() + offset;
       offset += event.message.size + 1;
     }

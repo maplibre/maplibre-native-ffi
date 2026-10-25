@@ -86,8 +86,8 @@ typedef struct mln_log_delivery {
   mln_log_severity severity;
   mln_log_event event;
   int64_t code;
-  /** Null-terminated UTF-8 message, owned by the batch. */
-  const char* message MLN_BINDING("lifetime=owner");
+  /** UTF-8 message, owned by the batch and NUL-terminated after its bytes. */
+  mln_buffer_view message MLN_BINDING("lifetime=owner");
 } mln_log_delivery;
 
 /** Copied mln_resource_provider_callback arguments. */
@@ -113,8 +113,8 @@ typedef struct mln_resource_request_cancel_delivery {
 /** Copied mln_resource_transform_callback arguments. */
 typedef struct mln_resource_transform_delivery {
   mln_resource_kind kind;
-  /** The URL to transform, owned by the batch. */
-  const char* url MLN_BINDING("lifetime=owner");
+  /** The URL to transform, owned by the batch and NUL-terminated. */
+  mln_buffer_view url MLN_BINDING("lifetime=owner");
   /**
    * Owned by the batch until mln_delivery_batch_take(); releasing the batch
    * without taking it releases the request, which keeps its URL.

@@ -170,7 +170,7 @@ fn denyResource(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, request: maplib
 pub const denying_provider = maplibre.ResourceProvider{ .callback = denyResource };
 
 pub const FixtureOptions = struct {
-    asset_path: ?[]const u8 = null,
+    asset_path: []const u8 = &.{},
     extent: maplibre.LogicalExtent = .{ .width = 32, .height = 32, .scale_factor = 1.0 },
     map_mode: maplibre.MapMode = .continuous,
 };

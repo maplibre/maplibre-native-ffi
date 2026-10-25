@@ -159,7 +159,7 @@ export interface NativeOperations {
   mln_map_add_style_layer_json(
     map: bigint,
     layerJson: string,
-    beforeLayerId: string | undefined,
+    beforeLayerId: string,
     completion: number | undefined,
   ): void;
   mln_map_add_style_source_json(
@@ -338,7 +338,7 @@ export interface NativeOperations {
   mln_map_move_style_layer(
     map: bigint,
     layerId: string,
-    beforeLayerId: string | undefined,
+    beforeLayerId: string,
     completion: number | undefined,
   ): void;
   mln_map_options_default(): MapOptions;
@@ -621,7 +621,7 @@ export interface NativeOperations {
     feature: string,
     extension: string,
     extensionField: string,
-    argumentsValue: string | undefined,
+    argumentsValue: string,
     completion: number,
   ): void;
   mln_render_session_query_rendered_features(
@@ -685,7 +685,7 @@ export interface NativeOperations {
   mln_resource_request_complete(
     handle: bigint,
     token: object | undefined,
-    response: ResourceResponse | undefined,
+    response: ResourceResponse,
   ): void;
   mln_resource_request_is_cancelled(handle: bigint): boolean;
   mln_resource_request_pass_through(

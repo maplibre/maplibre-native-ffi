@@ -34,15 +34,15 @@ public sealed record GeojsonSourceOptions
 
     /// <summary>
     /// Cluster aggregation expressions keyed by property name, as a JSON object
-    /// whose members follow the MapLibre Style Spec clusterProperties form. The
-    /// UTF-8 bytes are borrowed for the call.
+    /// whose members follow the MapLibre Style Spec clusterProperties form, or
+    /// empty for none. The UTF-8 bytes are borrowed for the call.
     /// </summary>
-    public ImmutableArray<byte>? ClusterProperties
+    public ImmutableArray<byte> ClusterProperties
     {
-        get => ClusterPropertiesStorage?.AsImmutable();
-        init => ClusterPropertiesStorage = ValueArray.FromOptional(value);
+        get => ClusterPropertiesStorage.AsImmutable();
+        init => ClusterPropertiesStorage = ValueArray.From(value);
     }
-    internal ValueArray<byte>? ClusterPropertiesStorage { get; init; }
+    internal ValueArray<byte> ClusterPropertiesStorage { get; init; }
 
     /// <summary>
     /// Tile buffer in pixels within [0, 512]. Defaults to 128.

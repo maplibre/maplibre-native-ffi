@@ -64,7 +64,10 @@ auto request_resource_transform(
     release_resource_transform_request(request);
     return;
   }
-  callback(user_data, kind, url.c_str(), request);
+  callback(
+    user_data, kind, mln_buffer_view{.data = url.data(), .size = url.size()},
+    request
+  );
 }
 
 auto complete_resource_transform_request(

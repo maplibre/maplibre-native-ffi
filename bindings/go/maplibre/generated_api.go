@@ -2178,13 +2178,16 @@ func nativeEglContextDescriptor(input EglContextDescriptor, arena *bindingArena)
 type FeatureStateSelector struct {
 	// Source ID. Required and borrowed for the duration of the call.
 	SourceId string
-	// Optional source layer ID. Required for vector-source disambiguation.
-	SourceLayerId *string
+	// Source layer ID, or empty for none. Required for vector-source
+	// disambiguation.
+	SourceLayerId string
 	// Optional feature ID. Required by set and get, optional for remove. A numeric
-	// feature ID matches its decimal text, such as "7" for the GeoJSON id 7.
+	// feature ID matches its decimal text, such as "7" for the GeoJSON id 7. Its
+	// field bit tells an absent ID from the empty ID "".
 	FeatureId *string
-	// Optional state key. Used only by remove and requires feature_id.
-	StateKey *string
+	// State key, or empty to select every key. Used only by remove, and requires
+	// feature_id.
+	StateKey string
 }
 
 func nativeFeatureStateSelector(input FeatureStateSelector, arena *bindingArena) C.mln_feature_state_selector {
@@ -2192,18 +2195,12 @@ func nativeFeatureStateSelector(input FeatureStateSelector, arena *bindingArena)
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	raw.source_id = C.mln_buffer_view{data: arena.bytes([]byte(input.SourceId)), size: C.size_t(len(input.SourceId))}
-	if input.SourceLayerId != nil {
-		raw.source_layer_id = C.mln_buffer_view{data: arena.bytes([]byte((*input.SourceLayerId))), size: C.size_t(len((*input.SourceLayerId)))}
-		raw.fields |= C.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
-	}
+	raw.source_layer_id = C.mln_buffer_view{data: arena.bytes([]byte(input.SourceLayerId)), size: C.size_t(len(input.SourceLayerId))}
 	if input.FeatureId != nil {
 		raw.feature_id = C.mln_buffer_view{data: arena.bytes([]byte((*input.FeatureId))), size: C.size_t(len((*input.FeatureId)))}
 		raw.fields |= C.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
 	}
-	if input.StateKey != nil {
-		raw.state_key = C.mln_buffer_view{data: arena.bytes([]byte((*input.StateKey))), size: C.size_t(len((*input.StateKey)))}
-		raw.fields |= C.MLN_FEATURE_STATE_SELECTOR_STATE_KEY
-	}
+	raw.state_key = C.mln_buffer_view{data: arena.bytes([]byte(input.StateKey)), size: C.size_t(len(input.StateKey))}
 	return raw
 }
 
@@ -2282,9 +2279,9 @@ type GeojsonSourceOptions struct {
 	// Highest zoom that clusters points. Defaults to 17.
 	ClusterMaxZoom *float64
 	// Cluster aggregation expressions keyed by property name, as a JSON object
-	// whose members follow the MapLibre Style Spec clusterProperties form. The
-	// UTF-8 bytes are borrowed for the call.
-	ClusterProperties *[]byte
+	// whose members follow the MapLibre Style Spec clusterProperties form, or empty
+	// for none. The UTF-8 bytes are borrowed for the call.
+	ClusterProperties []byte
 	// Tile buffer in pixels within [0, 512]. Defaults to 128.
 	Buffer *uint32
 	// Cluster radius in pixels within [0, 4095]. Defaults to 50.
@@ -2306,7 +2303,7 @@ func copyGeojsonSourceOptions(raw C.mln_geojson_source_options) GeojsonSourceOpt
 	result.MaxZoom = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM != 0, func() float64 { return float64(raw.max_zoom) })
 	result.Tolerance = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE != 0, func() float64 { return float64(raw.tolerance) })
 	result.ClusterMaxZoom = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM != 0, func() float64 { return float64(raw.cluster_max_zoom) })
-	result.ClusterProperties = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES != 0, func() []byte { return bindingBytes(raw.cluster_properties.data, uint64(raw.cluster_properties.size)) })
+	result.ClusterProperties = bindingBytes(raw.cluster_properties.data, uint64(raw.cluster_properties.size))
 	result.Buffer = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_BUFFER != 0, func() uint32 { return uint32(raw.buffer) })
 	result.ClusterRadius = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS != 0, func() uint32 { return uint32(raw.cluster_radius) })
 	result.ClusterMinPoints = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS != 0, func() uint32 { return uint32(raw.cluster_min_points) })
@@ -2324,10 +2321,7 @@ func nativeGeojsonSourceOptions(input GeojsonSourceOptions, arena *bindingArena)
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, input.MaxZoom, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE, &raw.tolerance, input.Tolerance, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM, &raw.cluster_max_zoom, input.ClusterMaxZoom, arena, bindingNumber[float64, C.double])
-	if input.ClusterProperties != nil {
-		raw.cluster_properties = C.mln_buffer_view{data: arena.bytes((*input.ClusterProperties)), size: C.size_t(len((*input.ClusterProperties)))}
-		raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
-	}
+	raw.cluster_properties = C.mln_buffer_view{data: arena.bytes(input.ClusterProperties), size: C.size_t(len(input.ClusterProperties))}
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_BUFFER, &raw.buffer, input.Buffer, arena, bindingNumber[uint32, C.uint32_t])
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS, &raw.cluster_radius, input.ClusterRadius, arena, bindingNumber[uint32, C.uint32_t])
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS, &raw.cluster_min_points, input.ClusterMinPoints, arena, bindingNumber[uint32, C.uint32_t])
@@ -3858,18 +3852,18 @@ func copyRenderSessionSnapshot(raw C.mln_render_session_snapshot) RenderSessionS
 type RenderedFeature struct {
 	Feature       []byte
 	LayerId       string
-	SourceId      *string
-	SourceLayerId *string
-	State         *[]byte
+	SourceId      string
+	SourceLayerId string
+	State         []byte
 }
 
 func copyRenderedFeature(raw C.mln_rendered_feature) RenderedFeature {
 	var result RenderedFeature
 	result.Feature = bindingBytes(raw.feature.data, uint64(raw.feature.size))
 	result.LayerId = bindingString(raw.layer_id.data, uint64(raw.layer_id.size))
-	result.SourceId = bindingPresent(raw.fields&C.MLN_RENDERED_FEATURE_SOURCE_ID != 0, func() string { return bindingString(raw.source_id.data, uint64(raw.source_id.size)) })
-	result.SourceLayerId = bindingPresent(raw.fields&C.MLN_RENDERED_FEATURE_SOURCE_LAYER_ID != 0, func() string { return bindingString(raw.source_layer_id.data, uint64(raw.source_layer_id.size)) })
-	result.State = bindingPresent(raw.fields&C.MLN_RENDERED_FEATURE_STATE != 0, func() []byte { return bindingBytes(raw.state.data, uint64(raw.state.size)) })
+	result.SourceId = bindingString(raw.source_id.data, uint64(raw.source_id.size))
+	result.SourceLayerId = bindingString(raw.source_layer_id.data, uint64(raw.source_layer_id.size))
+	result.State = bindingBytes(raw.state.data, uint64(raw.state.size))
 	return result
 }
 
@@ -3881,8 +3875,8 @@ func copyRenderedFeature(raw C.mln_rendered_feature) RenderedFeature {
 type RenderedFeatureQueryOptions struct {
 	// Optional style layer IDs. When absent, all rendered layers are queried.
 	LayerIds []string
-	// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-	Filter *[]byte
+	// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
+	Filter []byte
 }
 
 func copyRenderedFeatureQueryOptions(raw C.mln_rendered_feature_query_options) RenderedFeatureQueryOptions {
@@ -3898,7 +3892,7 @@ func copyRenderedFeatureQueryOptions(raw C.mln_rendered_feature_query_options) R
 			return result
 		}()
 	}
-	result.Filter = bindingPresent(raw.fields&C.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER != 0, func() []byte { return bindingBytes(raw.filter.data, uint64(raw.filter.size)) })
+	result.Filter = bindingBytes(raw.filter.data, uint64(raw.filter.size))
 	return result
 }
 
@@ -3917,10 +3911,7 @@ func nativeRenderedFeatureQueryOptions(input RenderedFeatureQueryOptions, arena 
 		}
 		raw.fields |= C.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
 	}
-	if input.Filter != nil {
-		raw.filter = C.mln_buffer_view{data: arena.bytes((*input.Filter)), size: C.size_t(len((*input.Filter)))}
-		raw.fields |= C.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER
-	}
+	raw.filter = C.mln_buffer_view{data: arena.bytes(input.Filter), size: C.size_t(len(input.Filter))}
 	return raw
 }
 
@@ -4061,10 +4052,10 @@ func nativeResourceRequestCancelHandler(input ResourceRequestCancelHandler, aren
 
 type ResourceRequestInfo struct {
 	// URL entering the network layer, before tile server normalization.
-	RequestedUrl *string
+	RequestedUrl string
 	// URL to fetch, after resource-kind normalization against the runtime's tile
 	// server options and API key.
-	ResolvedUrl         *string
+	ResolvedUrl         string
 	Kind                ResourceKind
 	LoadingMethod       ResourceLoadingMethod
 	Priority            ResourcePriority
@@ -4073,26 +4064,15 @@ type ResourceRequestInfo struct {
 	Range               *ResourceRange
 	PriorModifiedUnixMs *int64
 	PriorExpiresUnixMs  *int64
-	PriorEtag           *string
-	PriorData           []byte
+	// Entity tag of the cached copy, or empty when there is none.
+	PriorEtag string
+	PriorData []byte
 }
 
 func copyResourceRequestInfo(raw C.mln_resource_request_info) ResourceRequestInfo {
 	var result ResourceRequestInfo
-	result.RequestedUrl = func() *string {
-		if raw.requested_url == nil {
-			return nil
-		}
-		value := C.GoString(raw.requested_url)
-		return &value
-	}()
-	result.ResolvedUrl = func() *string {
-		if raw.resolved_url == nil {
-			return nil
-		}
-		value := C.GoString(raw.resolved_url)
-		return &value
-	}()
+	result.RequestedUrl = bindingString(raw.requested_url.data, uint64(raw.requested_url.size))
+	result.ResolvedUrl = bindingString(raw.resolved_url.data, uint64(raw.resolved_url.size))
 	result.Kind = ResourceKind(raw.kind)
 	result.LoadingMethod = ResourceLoadingMethod(raw.loading_method)
 	result.Priority = ResourcePriority(raw.priority)
@@ -4101,13 +4081,7 @@ func copyResourceRequestInfo(raw C.mln_resource_request_info) ResourceRequestInf
 	result.Range = bindingPresent(raw.fields&C.MLN_RESOURCE_REQUEST_RANGE != 0, func() ResourceRange { return copyResourceRange(raw._range) })
 	result.PriorModifiedUnixMs = bindingPresent(raw.fields&C.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0, func() int64 { return int64(raw.prior_modified_unix_ms) })
 	result.PriorExpiresUnixMs = bindingPresent(raw.fields&C.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0, func() int64 { return int64(raw.prior_expires_unix_ms) })
-	result.PriorEtag = func() *string {
-		if raw.prior_etag == nil {
-			return nil
-		}
-		value := C.GoString(raw.prior_etag)
-		return &value
-	}()
+	result.PriorEtag = bindingString(raw.prior_etag.data, uint64(raw.prior_etag.size))
 	result.PriorData = bindingBytes(unsafe.Pointer(raw.prior_data), uint64(raw.prior_data_size))
 	return result
 }
@@ -4388,7 +4362,8 @@ type RuntimeOptions struct {
 	// Directory root for asset:// URLs. Copied during runtime creation. Empty
 	// selects /android_asset on Android and . elsewhere.
 	AssetPath string
-	// Cache database path. Copied during runtime creation.
+	// Cache database path. Copied during runtime creation. Empty selects an
+	// in-memory cache.
 	CachePath string
 }
 
@@ -4482,13 +4457,13 @@ func nativeScreenPoint(input ScreenPoint, arena *bindingArena) C.mln_screen_poin
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
 type SourceFeature struct {
 	Feature       []byte
-	SourceLayerId *string
+	SourceLayerId string
 }
 
 func copySourceFeature(raw C.mln_source_feature) SourceFeature {
 	var result SourceFeature
 	result.Feature = bindingBytes(raw.feature.data, uint64(raw.feature.size))
-	result.SourceLayerId = bindingPresent(raw.fields&C.MLN_SOURCE_FEATURE_SOURCE_LAYER_ID != 0, func() string { return bindingString(raw.source_layer_id.data, uint64(raw.source_layer_id.size)) })
+	result.SourceLayerId = bindingString(raw.source_layer_id.data, uint64(raw.source_layer_id.size))
 	return result
 }
 
@@ -4500,8 +4475,8 @@ func copySourceFeature(raw C.mln_source_feature) SourceFeature {
 type SourceFeatureQueryOptions struct {
 	// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
 	SourceLayerIds []string
-	// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
-	Filter *[]byte
+	// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
+	Filter []byte
 }
 
 func copySourceFeatureQueryOptions(raw C.mln_source_feature_query_options) SourceFeatureQueryOptions {
@@ -4517,7 +4492,7 @@ func copySourceFeatureQueryOptions(raw C.mln_source_feature_query_options) Sourc
 			return result
 		}()
 	}
-	result.Filter = bindingPresent(raw.fields&C.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER != 0, func() []byte { return bindingBytes(raw.filter.data, uint64(raw.filter.size)) })
+	result.Filter = bindingBytes(raw.filter.data, uint64(raw.filter.size))
 	return result
 }
 
@@ -4536,10 +4511,7 @@ func nativeSourceFeatureQueryOptions(input SourceFeatureQueryOptions, arena *bin
 		}
 		raw.fields |= C.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
 	}
-	if input.Filter != nil {
-		raw.filter = C.mln_buffer_view{data: arena.bytes((*input.Filter)), size: C.size_t(len((*input.Filter)))}
-		raw.fields |= C.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER
-	}
+	raw.filter = C.mln_buffer_view{data: arena.bytes(input.Filter), size: C.size_t(len(input.Filter))}
 	return raw
 }
 
@@ -4580,11 +4552,11 @@ type StyleExpressionInputs struct {
 	// The value of the elevation expression outside a color-relief layer.
 	Elevation *float64
 	// One UTF-8 GeoJSON Feature that feature data expressions read.
-	Feature *[]byte
+	Feature []byte
 	// A UTF-8 JSON object that the feature-state expression reads.
-	FeatureState *[]byte
+	FeatureState []byte
 	// A UTF-8 JSON object that the global-state expression reads.
-	GlobalState *[]byte
+	GlobalState []byte
 	// The tile that holds the feature, which the within and distance expressions
 	// need to place its geometry.
 	CanonicalTileId *CanonicalTileId
@@ -4598,9 +4570,9 @@ func copyStyleExpressionInputs(raw C.mln_style_expression_inputs) StyleExpressio
 	result.Zoom = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_ZOOM != 0, func() float64 { return float64(raw.zoom) })
 	result.ColorRampParameter = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER != 0, func() float64 { return float64(raw.color_ramp_parameter) })
 	result.Elevation = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_ELEVATION != 0, func() float64 { return float64(raw.elevation) })
-	result.Feature = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_FEATURE != 0, func() []byte { return bindingBytes(raw.feature.data, uint64(raw.feature.size)) })
-	result.FeatureState = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE != 0, func() []byte { return bindingBytes(raw.feature_state.data, uint64(raw.feature_state.size)) })
-	result.GlobalState = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE != 0, func() []byte { return bindingBytes(raw.global_state.data, uint64(raw.global_state.size)) })
+	result.Feature = bindingBytes(raw.feature.data, uint64(raw.feature.size))
+	result.FeatureState = bindingBytes(raw.feature_state.data, uint64(raw.feature_state.size))
+	result.GlobalState = bindingBytes(raw.global_state.data, uint64(raw.global_state.size))
 	result.CanonicalTileId = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID != 0, func() CanonicalTileId { return copyCanonicalTileId(raw.canonical_tile_id) })
 	result.AvailableImages = func() []string {
 		length := bindingLength(uint64(raw.available_image_count))
@@ -4621,18 +4593,9 @@ func nativeStyleExpressionInputs(input StyleExpressionInputs, arena *bindingAren
 	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_INPUT_ZOOM, &raw.zoom, input.Zoom, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER, &raw.color_ramp_parameter, input.ColorRampParameter, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_INPUT_ELEVATION, &raw.elevation, input.Elevation, arena, bindingNumber[float64, C.double])
-	if input.Feature != nil {
-		raw.feature = C.mln_buffer_view{data: arena.bytes((*input.Feature)), size: C.size_t(len((*input.Feature)))}
-		raw.fields |= C.MLN_STYLE_EXPRESSION_INPUT_FEATURE
-	}
-	if input.FeatureState != nil {
-		raw.feature_state = C.mln_buffer_view{data: arena.bytes((*input.FeatureState)), size: C.size_t(len((*input.FeatureState)))}
-		raw.fields |= C.MLN_STYLE_EXPRESSION_INPUT_FEATURE_STATE
-	}
-	if input.GlobalState != nil {
-		raw.global_state = C.mln_buffer_view{data: arena.bytes((*input.GlobalState)), size: C.size_t(len((*input.GlobalState)))}
-		raw.fields |= C.MLN_STYLE_EXPRESSION_INPUT_GLOBAL_STATE
-	}
+	raw.feature = C.mln_buffer_view{data: arena.bytes(input.Feature), size: C.size_t(len(input.Feature))}
+	raw.feature_state = C.mln_buffer_view{data: arena.bytes(input.FeatureState), size: C.size_t(len(input.FeatureState))}
+	raw.global_state = C.mln_buffer_view{data: arena.bytes(input.GlobalState), size: C.size_t(len(input.GlobalState))}
 	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID, &raw.canonical_tile_id, input.CanonicalTileId, arena, nativeCanonicalTileId)
 	{
 		raw.available_images = (*C.mln_buffer_view)(arena.array(len(input.AvailableImages), unsafe.Sizeof(*raw.available_images)))
@@ -4906,10 +4869,10 @@ type StyleSourceInfo struct {
 	Type StyleSourceType
 	// Whether the source is marked volatile.
 	IsVolatile bool
-	// Attribution string, when the source sets one. It may be empty.
-	Attribution *string
-	// URL that the source loads from, when it has one.
-	Url *string
+	// Attribution string, or empty when the source sets none.
+	Attribution string
+	// URL that the source loads from, or empty when it has none.
+	Url string
 	// Inline TileJSON metadata, when the source was defined with it.
 	Tilejson *StyleSourceTileInfo
 	// Geographic bounds, when inline TileJSON sets them.
@@ -4927,8 +4890,8 @@ func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 	result.Id = bindingString(raw.id.data, uint64(raw.id.size))
 	result.Type = StyleSourceType(raw._type)
 	result.IsVolatile = bool(raw.is_volatile)
-	result.Attribution = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0, func() string { return bindingString(raw.attribution.data, uint64(raw.attribution.size)) })
-	result.Url = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0, func() string { return bindingString(raw.url.data, uint64(raw.url.size)) })
+	result.Attribution = bindingString(raw.attribution.data, uint64(raw.attribution.size))
+	result.Url = bindingString(raw.url.data, uint64(raw.url.size))
 	result.Tilejson = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0, func() StyleSourceTileInfo { return copyStyleSourceTileInfo(raw.tilejson) })
 	result.Bounds = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_BOUNDS != 0, func() LatLngBounds { return copyLatLngBounds(raw.bounds) })
 	result.TileSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0, func() uint32 { return uint32(raw.tile_size) })
@@ -7619,9 +7582,9 @@ func (receiver *RenderSessionHandle) Snapshot() (RenderSessionSnapshot, error) {
 //
 // See mln_render_session_query_feature_extensions in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-func (receiver *RenderSessionHandle) QueryFeatureExtensions(sourceId string, feature []byte, extension string, extensionField string, arguments *[]byte) (*Future[[]byte], error) {
+func (receiver *RenderSessionHandle) QueryFeatureExtensions(sourceId string, feature []byte, extension string, extensionField string, arguments []byte) (*Future[[]byte], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_query_feature_extensions(C.mln_render_session(raw), bindingView(sourceId, arena), bindingView(feature, arena), bindingView(extension, arena), bindingView(extensionField, arena), bindingStoreOptional(arguments, arena, bindingView[[]byte]), completion, diagnostic))
+		return int32(C.mln_render_session_query_feature_extensions(C.mln_render_session(raw), bindingView(sourceId, arena), bindingView(feature, arena), bindingView(extension, arena), bindingView(extensionField, arena), bindingView(arguments, arena), completion, diagnostic))
 	}, completionOf(copyViewBytes))
 }
 
@@ -8650,7 +8613,7 @@ func (view RuntimeHandleDiscarding) SetResourceTransform(transform ResourceTrans
 }
 
 //export mlnGo_mln_log_handler_callback
-func mlnGo_mln_log_handler_callback(native_user_data unsafe.Pointer, native_severity C.mln_log_severity, native_event C.mln_log_event, native_code C.int64_t, native_message *C.char) (result C.bool) {
+func mlnGo_mln_log_handler_callback(native_user_data unsafe.Pointer, native_severity C.mln_log_severity, native_event C.mln_log_event, native_code C.int64_t, native_message C.mln_buffer_view) (result C.bool) {
 	result = false
 	defer func() {
 		if failure := recover(); failure != nil {
@@ -8662,7 +8625,7 @@ func mlnGo_mln_log_handler_callback(native_user_data unsafe.Pointer, native_seve
 	if !ok || callbacks.Callback == nil {
 		return
 	}
-	result = C.bool(callbacks.Callback(LogSeverity(native_severity), LogEvent(native_event), int64(native_code), C.GoString(native_message)))
+	result = C.bool(callbacks.Callback(LogSeverity(native_severity), LogEvent(native_event), int64(native_code), bindingString(native_message.data, uint64(native_message.size))))
 	return
 }
 
@@ -8825,7 +8788,7 @@ func mlnGo_mln_runtime_event_handler_callback(native_user_data unsafe.Pointer, n
 }
 
 //export mlnGo_mln_http_header_transform_callback
-func mlnGo_mln_http_header_transform_callback(native_user_data unsafe.Pointer, native_kind C.mln_resource_kind, native_url *C.char, native_out_response *C.mln_http_header_transform_response) (result C.mln_status) {
+func mlnGo_mln_http_header_transform_callback(native_user_data unsafe.Pointer, native_kind C.mln_resource_kind, native_url C.mln_buffer_view, native_out_response *C.mln_http_header_transform_response) (result C.mln_status) {
 	result = C.MLN_STATUS_NATIVE_ERROR
 	defer func() {
 		if failure := recover(); failure != nil {
@@ -8839,7 +8802,7 @@ func mlnGo_mln_http_header_transform_callback(native_user_data unsafe.Pointer, n
 	if !ok || callbacks.Callback == nil {
 		return
 	}
-	result = C.mln_status(bindingCallbackStatus("mln_http_header_transform_callback", callbacks.Callback(ResourceKind(native_kind), C.GoString(native_url), &HttpHeaderTransformResponseScope{native: native_out_response, scope: scope}), C.MLN_STATUS_NATIVE_ERROR))
+	result = C.mln_status(bindingCallbackStatus("mln_http_header_transform_callback", callbacks.Callback(ResourceKind(native_kind), bindingString(native_url.data, uint64(native_url.size)), &HttpHeaderTransformResponseScope{native: native_out_response, scope: scope}), C.MLN_STATUS_NATIVE_ERROR))
 	return
 }
 
@@ -8862,7 +8825,7 @@ func mlnGo_mln_resource_provider_callback(native_user_data unsafe.Pointer, nativ
 }
 
 //export mlnGo_mln_resource_transform_callback
-func mlnGo_mln_resource_transform_callback(native_user_data unsafe.Pointer, native_kind C.mln_resource_kind, native_url *C.char, native_request C.mln_resource_transform_request) {
+func mlnGo_mln_resource_transform_callback(native_user_data unsafe.Pointer, native_kind C.mln_resource_kind, native_url C.mln_buffer_view, native_request C.mln_resource_transform_request) {
 	owned_request := adoptResourceTransformRequestHandle(uint64(native_request), nil)
 	defer func() {
 		if failure := recover(); failure != nil {
@@ -8875,6 +8838,6 @@ func mlnGo_mln_resource_transform_callback(native_user_data unsafe.Pointer, nati
 		owned_request.Close()
 		return
 	}
-	callbacks.Callback(ResourceKind(native_kind), C.GoString(native_url), owned_request)
+	callbacks.Callback(ResourceKind(native_kind), bindingString(native_url.data, uint64(native_url.size)), owned_request)
 	return
 }

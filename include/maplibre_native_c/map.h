@@ -566,9 +566,7 @@ typedef struct mln_free_camera_options {
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_feature_state_selector_field : uint32_t {
-  MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID = 1U << 0U,
-  MLN_FEATURE_STATE_SELECTOR_FEATURE_ID = 1U << 1U,
-  MLN_FEATURE_STATE_SELECTOR_STATE_KEY = 1U << 2U,
+  MLN_FEATURE_STATE_SELECTOR_FEATURE_ID = 1U << 0U,
 } mln_feature_state_selector_field;
 
 /** A set of mln_feature_state_selector_field bits. */
@@ -580,19 +578,23 @@ typedef struct mln_feature_state_selector {
   mln_feature_state_selector_fields fields;
   /** Source ID. Required and borrowed for the duration of the call. */
   mln_buffer_view source_id;
-  /** Optional source layer ID. Required for vector-source disambiguation. */
-  mln_buffer_view source_layer_id
-    MLN_BINDING("mask=fields;bit=MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID");
+  /**
+   * Source layer ID, or empty for none. Required for vector-source
+   * disambiguation.
+   */
+  mln_buffer_view source_layer_id;
   /**
    * Optional feature ID. Required by set and get, optional for remove. A
    * numeric feature ID matches its decimal text, such as "7" for the GeoJSON
-   * id 7.
+   * id 7. Its field bit tells an absent ID from the empty ID "".
    */
   mln_buffer_view feature_id
     MLN_BINDING("mask=fields;bit=MLN_FEATURE_STATE_SELECTOR_FEATURE_ID");
-  /** Optional state key. Used only by remove and requires feature_id. */
-  mln_buffer_view state_key
-    MLN_BINDING("mask=fields;bit=MLN_FEATURE_STATE_SELECTOR_STATE_KEY");
+  /**
+   * State key, or empty to select every key. Used only by remove, and requires
+   * feature_id.
+   */
+  mln_buffer_view state_key;
 } mln_feature_state_selector;
 
 /** Geographic bounds in degrees. */

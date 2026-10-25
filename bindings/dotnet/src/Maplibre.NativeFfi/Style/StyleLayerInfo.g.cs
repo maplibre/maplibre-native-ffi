@@ -30,8 +30,8 @@ namespace Maplibre.NativeFfi;
 public readonly partial record struct StyleLayerInfo(
     string Id,
     string Type,
-    string? SourceId,
-    string? SourceLayer,
+    string SourceId,
+    string SourceLayer,
     double MinZoom,
     double MaxZoom,
     StyleLayerVisibility Visibility

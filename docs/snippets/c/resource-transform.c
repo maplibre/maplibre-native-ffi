@@ -11,14 +11,15 @@ bool build_keyed_url(
 );
 
 static void add_api_key(
-  void* user_data, uint32_t kind, const char* url,
+  void* user_data, uint32_t kind, mln_buffer_view url,
   mln_resource_transform_request request
 ) {
   // #region match
   const char* api_key = user_data;
   (void)kind;
 
-  if (strncmp(url, trusted_prefix, sizeof(trusted_prefix) - 1) != 0) {
+  // Native ends the URL with a NUL, so it also reads as a C string.
+  if (strncmp(url.data, trusted_prefix, sizeof(trusted_prefix) - 1) != 0) {
     // Releasing the request without an answer keeps the original URL.
     mln_resource_transform_request_release(request);
     return;
@@ -30,7 +31,7 @@ static void add_api_key(
   // The call copies the URL before rewritten leaves scope, and an accepted
   // answer consumes the request. Otherwise releasing it keeps the URL.
   if (
-    !build_keyed_url(url, api_key, rewritten, sizeof(rewritten)) ||
+    !build_keyed_url(url.data, api_key, rewritten, sizeof(rewritten)) ||
     mln_resource_transform_request_complete(
       request, mln_buffer_view_from_cstr(rewritten), NULL
     ) != MLN_STATUS_OK
