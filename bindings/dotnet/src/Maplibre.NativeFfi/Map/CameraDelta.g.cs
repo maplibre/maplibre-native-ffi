@@ -36,14 +36,6 @@ public sealed record CameraDelta
     /// fixed.
     /// </summary>
     public ScreenPoint? Anchor { get; init; }
-    public required AnimationOptions Animation { get; init; }
+    public AnimationOptions Animation { get; init; } = new();
     public GesturePhase GesturePhase { get; init; }
-    public static CameraDelta Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyCameraDelta(NativeMethods.mln_camera_delta_default());
-        }
-    }
 }

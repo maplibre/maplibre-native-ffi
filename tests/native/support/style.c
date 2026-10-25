@@ -68,7 +68,7 @@ uint32_t mln_test_style_render_frame(const mln_test_render_fixture* fixture) {
     .session = fixture->session,
     .token = atomic_fetch_add(&next_token, 1),
   };
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_FORCE;
   demand.token = wait.token;
   MLN_TEST_OK(mln_render_session_request_frame(
@@ -212,7 +212,7 @@ static mln_test_feature_list finish_feature_probe(
 mln_test_feature_list mln_test_style_query_rendered(
   const mln_test_render_fixture* fixture
 ) {
-  const mln_rendered_query_geometry geometry = (mln_rendered_query_geometry){
+  const mln_rendered_query_geometry geometry = {
     .size = sizeof(mln_rendered_query_geometry),
     .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
     .data = {
@@ -246,8 +246,9 @@ mln_test_feature_list mln_test_style_query_source(
   const mln_test_render_fixture* fixture, const char* source_id,
   const char* source_layer
 ) {
-  mln_source_feature_query_options options =
-    mln_source_feature_query_options_default();
+  mln_source_feature_query_options options = {
+    .size = sizeof(mln_source_feature_query_options)
+  };
   mln_buffer_view layer = {0};
   if (source_layer != NULL) {
     layer = mln_buffer_view_from_cstr(source_layer);

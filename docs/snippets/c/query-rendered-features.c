@@ -36,8 +36,9 @@ mln_status features_at_screen_point(
     mln_buffer_view_from_cstr("poi-labels"),
     mln_buffer_view_from_cstr("building-fill")
   };
-  mln_rendered_feature_query_options options =
-    mln_rendered_feature_query_options_default();
+  mln_rendered_feature_query_options options = {
+    .size = sizeof(mln_rendered_feature_query_options)
+  };
   options.fields = MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
   options.layer_ids = layer_ids;
   options.layer_id_count = sizeof(layer_ids) / sizeof(layer_ids[0]);

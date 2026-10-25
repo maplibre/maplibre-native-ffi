@@ -6,6 +6,9 @@ import org.maplibre.nativeffi.internal.c.C
 
 @OptIn(ExperimentalAtomicApi::class) private val abiChecked = AtomicInt(0)
 
+/** The host binary links the library, so there is nothing to load. */
+internal actual fun loadNativeLibraryUnchecked() {}
+
 /** The host binary links the library, so only its C ABI version needs checking. */
 @OptIn(ExperimentalAtomicApi::class)
 internal actual fun ensureNativeLibrary() {

@@ -15,7 +15,7 @@ public sealed class GeneratedValueTests
         using var zoom = StyleExpressionHandle.Create(
             """["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"""
         );
-        Assert.Equal("50.0", zoom.Evaluate(StyleExpressionInputs.Default with { Zoom = 5 }));
+        Assert.Equal("50.0", zoom.Evaluate(new StyleExpressionInputs { Zoom = 5 }));
 
         // The result outgrows the call's first storage, so the call runs again, and its
         // multibyte characters decode whole.
@@ -96,17 +96,14 @@ public sealed class GeneratedValueTests
         await using var fixture = await NativeFixture.CreateAsync();
 
         await fixture.Map.UpdateCameraAsync(
-            CameraUpdate.Default with
+            new CameraUpdate
             {
                 Camera = new CameraOptions { Center = new LatLng(10, 20), Zoom = 3 },
             }
         );
         // Only the bearing is present, so the center and zoom stay as they were.
         await fixture.Map.UpdateCameraAsync(
-            CameraUpdate.Default with
-            {
-                Camera = new CameraOptions { Bearing = 30 },
-            }
+            new CameraUpdate { Camera = new CameraOptions { Bearing = 30 } }
         );
         var camera = (await fixture.Map.GetCameraAsync()).Camera;
 
@@ -116,20 +113,14 @@ public sealed class GeneratedValueTests
         Assert.Equal(30, camera.Bearing, 6);
     }
 
+    // A record struct's own default leaves a string or a nested record null, so its parameterless
+    // constructor sets them to their zero values.
     [Fact]
-    public void ARecordBuiltFromItsParameterlessConstructorEqualsTheNativeDefault()
+    public void AParameterlessConstructorSetsEachMemberToItsZeroValue()
     {
-        Assert.Equal(MapOptions.Default, new MapOptions());
-        Assert.Equal(LogicalExtent.Default, new LogicalExtent());
-        Assert.Equal(HttpHeaderRule.Default, new HttpHeaderRule());
-        Assert.Equal(PremultipliedRgba8Image.Default, new PremultipliedRgba8Image());
-        Assert.Equal(
-            HttpHeaderRule.Default with
-            {
-                Url = "/headers",
-            },
-            new HttpHeaderRule { Url = "/headers" }
-        );
+        Assert.Equal(new HttpHeaderRule(default, default, "", []), new HttpHeaderRule());
+        Assert.Equal(new CameraOptions(), new CameraUpdate().Camera);
+        Assert.Equal("", new HttpHeader { Name = "Accept" }.Value);
     }
 
     [Fact]

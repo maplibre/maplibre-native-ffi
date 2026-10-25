@@ -20,4 +20,8 @@ public readonly partial record struct WebglContextDescriptor(
     WebglContextKind Kind,
     int Context,
     string CanvasSelector
-);
+)
+{
+    public WebglContextDescriptor()
+        : this(default, default, "") { }
+}

@@ -668,7 +668,7 @@ static void remove_database(const char* path) {
 static mln_offline_region_id write_side_database(
   const char* path, const uint8_t* metadata, size_t metadata_size
 ) {
-  mln_runtime_options options = mln_runtime_options_default();
+  mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   options.cache_path = mln_buffer_view_from_cstr(path);
   mln_runtime side = mln_test_create_runtime_with_options(options);
   const mln_offline_region_definition definition = tile_definition();
@@ -948,7 +948,7 @@ static void an_offline_operation_accepted_before_release_still_completes(void) {
   remove_database(cache_path);
   // The case releases the runtime itself, so it creates it untracked.
   mln_runtime runtime = MLN_HANDLE_NULL;
-  mln_runtime_options options = mln_runtime_options_default();
+  mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   options.cache_path = mln_buffer_view_from_cstr(cache_path);
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, MLN_TEST_DIAGNOSTIC));
   // A resource configuration completion runs on the runtime worker, so the
@@ -982,7 +982,7 @@ static void an_offline_operation_accepted_before_release_still_completes(void) {
   MLN_TEST_OK(mln_test_completion_finish(&release));
   mln_test_completion_destroy(&release);
 
-  mln_runtime_options reopen = mln_runtime_options_default();
+  mln_runtime_options reopen = {.size = sizeof(mln_runtime_options)};
   reopen.cache_path = mln_buffer_view_from_cstr(cache_path);
   mln_runtime reopened = mln_test_create_runtime_with_options(reopen);
   region_probe* listed = list_regions(reopened);

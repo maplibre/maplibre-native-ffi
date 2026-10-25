@@ -6,7 +6,7 @@
 static void an_accepted_cache_operation_completes_after_the_runtime_releases(
   void
 ) {
-  mln_runtime_options options = mln_runtime_options_default();
+  mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   options.cache_path = MLN_BUFFER_LITERAL(":memory:");
   mln_runtime runtime = mln_test_create_runtime_with_options(options);
   // Nothing has opened the database yet, so the operation opens it on the

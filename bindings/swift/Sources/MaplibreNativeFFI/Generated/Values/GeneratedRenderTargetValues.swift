@@ -28,16 +28,12 @@ public struct EglContextDescriptor: Equatable, Hashable, Sendable {
   public var clientApi: OpenglClientApi
   /// Optional eglGetProcAddress-compatible function for the host loader.
   public var getProcAddress: NativePointer
-  public static var `default`: Self {
-    Self(raw: mln_egl_context_descriptor())
-  }
-
   public init(
-    display: NativePointer = EglContextDescriptor.default.display,
-    config: NativePointer = EglContextDescriptor.default.config,
-    shareContext: NativePointer = EglContextDescriptor.default.shareContext,
-    clientApi: OpenglClientApi = EglContextDescriptor.default.clientApi,
-    getProcAddress: NativePointer = EglContextDescriptor.default.getProcAddress
+    display: NativePointer,
+    config: NativePointer,
+    shareContext: NativePointer = .null,
+    clientApi: OpenglClientApi = .init(rawValue: 0),
+    getProcAddress: NativePointer = .null
   ) {
     self.display = display
     self.config = config
@@ -82,14 +78,7 @@ public struct GpuSync: Equatable, Hashable, Sendable {
   public var kind: GpuSyncKind
   /// Bit pattern of the GLsync pointer.
   public var handle: UInt64
-  public static var `default`: Self {
-    Self(raw: nativeDefault(mln_gpu_sync_default))
-  }
-
-  public init(
-    kind: GpuSyncKind = GpuSync.default.kind,
-    handle: UInt64 = GpuSync.default.handle
-  ) {
+  public init(kind: GpuSyncKind = .init(rawValue: 0), handle: UInt64 = 0) {
     self.kind = kind
     self.handle = handle
   }
@@ -100,7 +89,8 @@ public struct GpuSync: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_gpu_sync {
-    var raw = mln_gpu_sync_default()
+    var raw = mln_gpu_sync()
+    raw.size = UInt32(MemoryLayout<mln_gpu_sync>.size)
     raw.kind = mln_gpu_sync_kind(rawValue: kind.rawValue)
     raw.handle = handle
     return raw
@@ -142,11 +132,7 @@ public struct GpuSyncKind: RawRepresentable, CustomStringConvertible,
 public struct MetalContextDescriptor: Equatable, Hashable, Sendable {
   /// `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it.
   public var device: NativePointer
-  public static var `default`: Self {
-    Self(raw: mln_metal_context_descriptor())
-  }
-
-  public init(device: NativePointer = MetalContextDescriptor.default.device) {
+  public init(device: NativePointer = .null) {
     self.device = device
   }
 
@@ -199,13 +185,9 @@ public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
   /// are dedicated to their core worker.
   public var ownership: OpenglContextOwnership
   public var data: OpenglContextDescriptorData
-  public static var `default`: Self {
-    Self()
-  }
-
   public init(
     ownership: OpenglContextOwnership = .init(rawValue: 0),
-    data: OpenglContextDescriptorData = .default
+    data: OpenglContextDescriptorData
   ) {
     self.ownership = ownership
     self.data = data
@@ -213,7 +195,7 @@ public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
 
   init(
     raw: mln_opengl_context_descriptor,
-    recordBytes: UnsafeRawBufferPointer? = nil
+    recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
     ownership = OpenglContextOwnership(rawValue: raw.ownership.rawValue)
     data = try { () throws -> OpenglContextDescriptorData in
@@ -227,15 +209,8 @@ public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
             .egl)) case MLN_OPENGL_CONTEXT_PLATFORM_WEBGL
                   .rawValue: return try .webgl(WebglContextDescriptor(raw: raw
             .data
-            .webgl)) default: return .unknown(
-          raw.platform.rawValue,
-          recordBytes
-            .map {
-              Data($0
-                .dropFirst(MemoryLayout<mln_opengl_context_descriptor>
-                  .offset(of: \.data)!))
-            } ?? withUnsafeBytes(of: raw.data) { Data($0) }
-        )
+            .webgl)) default: throw MaplibreError
+        .invalidState("native union contains an unsupported variant")
       }
     }()
   }
@@ -252,8 +227,6 @@ public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
       .data.egl = item.nativeValue()
     case let .webgl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL; raw
       .data.webgl = try item.nativeValue(arena: arena)
-    case .unknown: throw MaplibreError
-      .invalidArgument("unknown union variant cannot be submitted")
     }
     return raw
   }
@@ -267,10 +240,6 @@ public enum OpenglContextDescriptorData: Equatable, Hashable, Sendable {
   case wgl(WglContextDescriptor)
   case egl(EglContextDescriptor)
   case webgl(WebglContextDescriptor)
-  case unknown(UInt32, Data)
-  public static var `default`: Self {
-    .unknown(0, Data())
-  }
 }
 
 /// How a session's OpenGL context relates to its driver thread and host
@@ -330,10 +299,6 @@ public struct QueueLock: Sendable {
   {
     self.lock = lock
     self.unlock = unlock
-  }
-
-  public static var `default`: Self {
-    Self()
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_queue_lock {
@@ -423,19 +388,13 @@ public struct RenderSessionAttachOptions: Sendable {
   /// accept an enabled lock; other backends fail the attach with
   /// `MLN_STATUS_UNSUPPORTED`.
   public var queueLock: QueueLock
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_render_session_attach_options_default))
-  }
-
   public init(
-    driver: RenderDriverKind = RenderSessionAttachOptions.default.driver,
-    requestedTextureRingDepth: UInt32 = RenderSessionAttachOptions.default
-      .requestedTextureRingDepth,
-    producerSyncKind: GpuSyncKind = RenderSessionAttachOptions.default
-      .producerSyncKind,
-    frameWake: Wake = RenderSessionAttachOptions.default.frameWake,
-    driverWorkWake: Wake = RenderSessionAttachOptions.default.driverWorkWake,
-    queueLock: QueueLock = RenderSessionAttachOptions.default.queueLock
+    driver: RenderDriverKind,
+    requestedTextureRingDepth: UInt32 = 0,
+    producerSyncKind: GpuSyncKind = .init(rawValue: 0),
+    frameWake: Wake = .init(),
+    driverWorkWake: Wake = .init(),
+    queueLock: QueueLock = .init()
   ) {
     self.driver = driver
     self.requestedTextureRingDepth = requestedTextureRingDepth
@@ -460,7 +419,7 @@ public struct RenderSessionAttachOptions: Sendable {
   func nativeValue(arena: NativeInputArena) throws
     -> mln_render_session_attach_options
   {
-    var raw = mln_render_session_attach_options_default()
+    var raw = mln_render_session_attach_options()
     raw.size = UInt32(MemoryLayout<mln_render_session_attach_options>.size)
     raw.driver = mln_render_driver_kind(rawValue: driver.rawValue)
     raw.requested_texture_ring_depth = requestedTextureRingDepth
@@ -484,15 +443,10 @@ public struct RenderSessionCapabilities: Equatable, Hashable, Sendable {
   /// texture count of a borrowed one. Zero for a surface.
   public var textureRingDepth: UInt32
   public var flags: RenderSessionCapabilityFlag
-  public static var `default`: Self {
-    Self(raw: mln_render_session_capabilities())
-  }
-
   public init(
-    driver: RenderDriverKind = RenderSessionCapabilities.default.driver,
-    textureRingDepth: UInt32 = RenderSessionCapabilities.default
-      .textureRingDepth,
-    flags: RenderSessionCapabilityFlag = RenderSessionCapabilities.default.flags
+    driver: RenderDriverKind = .init(rawValue: 0),
+    textureRingDepth: UInt32 = 0,
+    flags: RenderSessionCapabilityFlag = .init(rawValue: 0)
   ) {
     self.driver = driver
     self.textureRingDepth = textureRingDepth
@@ -549,23 +503,14 @@ public struct VulkanContextDescriptor: Equatable, Hashable, Sendable {
   public var getInstanceProcAddr: NativePointer
   /// PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device.
   public var getDeviceProcAddr: NativePointer
-  public static var `default`: Self {
-    Self(raw: mln_vulkan_context_descriptor())
-  }
-
   public init(
-    instance: NativePointer = VulkanContextDescriptor.default.instance,
-    physicalDevice: NativePointer = VulkanContextDescriptor.default
-      .physicalDevice,
-    device: NativePointer = VulkanContextDescriptor.default.device,
-    graphicsQueue: NativePointer = VulkanContextDescriptor.default
-      .graphicsQueue,
-    graphicsQueueFamilyIndex: UInt32 = VulkanContextDescriptor.default
-      .graphicsQueueFamilyIndex,
-    getInstanceProcAddr: NativePointer = VulkanContextDescriptor.default
-      .getInstanceProcAddr,
-    getDeviceProcAddr: NativePointer = VulkanContextDescriptor.default
-      .getDeviceProcAddr
+    instance: NativePointer,
+    physicalDevice: NativePointer,
+    device: NativePointer,
+    graphicsQueue: NativePointer,
+    graphicsQueueFamilyIndex: UInt32 = 0,
+    getInstanceProcAddr: NativePointer = .null,
+    getDeviceProcAddr: NativePointer = .null
   ) {
     self.instance = instance
     self.physicalDevice = physicalDevice
@@ -625,10 +570,6 @@ public struct WebglContextDescriptor: Equatable, Hashable, Sendable {
   /// Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
   /// canvas must still be transferable when attachment starts.
   public var canvasSelector: String
-  public static var `default`: Self {
-    Self()
-  }
-
   public init(
     kind: WebglContextKind = .init(rawValue: 0),
     context: Int32 = 0,
@@ -702,14 +643,10 @@ public struct WglContextDescriptor: Equatable, Hashable, Sendable {
   public var shareContext: NativePointer
   /// Optional wglGetProcAddress-compatible function for the host loader.
   public var getProcAddress: NativePointer
-  public static var `default`: Self {
-    Self(raw: mln_wgl_context_descriptor())
-  }
-
   public init(
-    deviceContext: NativePointer = WglContextDescriptor.default.deviceContext,
-    shareContext: NativePointer = WglContextDescriptor.default.shareContext,
-    getProcAddress: NativePointer = WglContextDescriptor.default.getProcAddress
+    deviceContext: NativePointer,
+    shareContext: NativePointer = .null,
+    getProcAddress: NativePointer = .null
   ) {
     self.deviceContext = deviceContext
     self.shareContext = shareContext

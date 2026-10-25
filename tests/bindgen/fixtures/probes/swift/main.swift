@@ -12,9 +12,9 @@ func check(
 }
 
 // A library that reports another C ABI version fails the program's first call
-// before it reaches C. The call takes only scalars, so no value's default reads
-// a native struct first.
+// before it reaches C, except the version query, which the check itself makes.
 if ProcessInfo.processInfo.environment["MLN_PROBE_C_VERSION"] != nil {
+  check(Maplibre.cVersion() != expectedCAbiVersion, "the version query checked")
   do {
     _ = try Maplibre.keywordCombine(defer: 1, self: 1, raw: 1, bindingArg0: 1)
     check(false, "a mismatched C ABI version was not reported")
@@ -27,7 +27,7 @@ if ProcessInfo.processInfo.environment["MLN_PROBE_C_VERSION"] != nil {
   exit(0)
 }
 
-// A record built from its initializer defaults equals the native default,
+// A record built from its initializer defaults is zeroed with its size set,
 // including its nested record.
 try Maplibre.probeSettingsCheck(ProbeSettings())
 
@@ -58,12 +58,6 @@ let entry = try Maplibre.keywordCombine(
 check(
   entry == KeywordEntry(type: 3, defer: 7, raw: 11),
   "keyword parameters: \(entry)"
-)
-/// A copy of a native default keeps its values and leaves a registration unset.
-let hooks = ProbeHooks.default
-check(
-  hooks.limit == 4 && hooks.signal.callback == nil,
-  "hooks default: \(hooks)"
 )
 do {
   _ = try Maplibre.probeRoundtrip(input: ProbeOptions(right: Array(

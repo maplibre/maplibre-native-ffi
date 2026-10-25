@@ -222,7 +222,7 @@ static void runtime_release_completes_through_the_queue(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   // Created outside the fixtures, which would release it again.
-  const mln_runtime_options options = mln_runtime_options_default();
+  const mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   mln_runtime runtime = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, NULL));
   int tag = 0;
@@ -268,7 +268,7 @@ static void a_completion_for_a_released_queue_is_discarded(void) {
 static void runtime_release_can_finish_before_queued_results_are_drained(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
-  const mln_runtime_options options = mln_runtime_options_default();
+  const mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   mln_runtime runtime = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, NULL));
   const mln_completion queued = mln_test_queue_completion(queue.handle, NULL);

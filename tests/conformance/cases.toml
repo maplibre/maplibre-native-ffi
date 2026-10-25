@@ -6,7 +6,7 @@
 [cases]
 # Status and diagnostics
 "ERR-01" = "A failed call maps its status to the language's error, keeps an unknown status code, and carries the call's diagnostic message"
-"ERR-02" = "The binding checks the C ABI version on its own before any other call reaches the library, a value's native defaults included, and a library with a different version fails with status unsupported"
+"ERR-02" = "The binding checks the C ABI version on its own before any other call reaches the library, and a library with a different version fails with status unsupported"
 "ERR-03" = "A status that the C API declares as absence returns the language's empty form instead of an error"
 
 # Handle lifecycle
@@ -43,7 +43,6 @@
 "VAL-03" = "A strided batch and a union with an unknown arm decode without losing data"
 "VAL-04" = "Integer narrowing is checked, open enums keep unknown values, and 64-bit carriers round-trip"
 "VAL-05" = "An array input is copied at submission, so changing it afterwards has no effect"
-"VAL-06" = "A record built from its constructor defaults equals the native default"
 "VAL-07" = "An array completion is read at the result's value_size stride, and a stride narrower than the element is rejected"
 "VAL-08" = "A synchronous call fills a caller-sized output array in input order"
 "VAL-09" = "A synchronous call returns caller-sized text longer than the binding's first storage for it"

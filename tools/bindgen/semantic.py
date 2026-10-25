@@ -150,7 +150,6 @@ class ValuePlan:
     enum_underlying: CType | None = None
     scalar_carrier: str | None = None
     enum_values: tuple[tuple[str, int], ...] = ()
-    default: str | None = None
     tag: str | None = None
     empty_variant: tuple[str, int] | None = None
     mask_flags: tuple[MaskFlag, ...] = ()
@@ -186,10 +185,8 @@ def plain_value(value: ValuePlan) -> bool:
     """Whether a value is fixed-size data that zeroed storage represents."""
     if value.kind in {"scalar", "enum"}:
         return True
-    return (
-        value.kind == "record"
-        and value.default is None
-        and all(plain_value(field.value) for field in value.fields)
+    return value.kind == "record" and all(
+        plain_value(field.value) for field in value.fields
     )
 
 
@@ -237,13 +234,33 @@ class FieldPlan:
         return self.value.lifetime == "owner"
 
 
+def required_member(field: FieldPlan) -> bool:
+    """Whether a public member has no zero value that a binding may default it
+    to, so that a host must always supply it.
+
+    That is a member C marks required, a callback C does not mark nullable, a
+    union with no empty variant, and a record or registration that holds such a
+    member. A masked member is absent at zero, so it is never required.
+    """
+    if field.required:
+        return True
+    if field.presence and field.presence.mask:
+        return False
+    value = field.value
+    if value.kind == "callback":
+        return not value.nullable
+    if value.kind == "union":
+        return value.empty_variant is None
+    if value.kind == "record":
+        return any(required_member(f) for f in value.fields if f.public)
+    return False
+
+
 def required_callbacks(value: ValuePlan) -> tuple[FieldPlan, ...]:
     """The callbacks that a registration requires of its host.
 
     A callback that C does not mark nullable is required whenever the host
-    leaves the delivery queue unset, which every binding's public shape does. A
-    copy from native, such as a record default, holds none of them, so a
-    binding takes them from the caller of the record's default.
+    leaves the delivery queue unset, which every binding's public shape does.
     """
     if not value.registration:
         return ()
@@ -342,13 +359,6 @@ class BorrowedViewPlan:
 
 
 @dataclass(frozen=True)
-class DefaultSupport:
-    """The operation returns the default value of this record."""
-
-    value: str
-
-
-@dataclass(frozen=True)
 class DisposeSupport:
     """The operation disposes this handle when its owner is abandoned."""
 
@@ -417,11 +427,9 @@ class OperationPlan:
     # consumes its receiver, such as an answer, keeps its own name, and a
     # second call on the consumed receiver fails as on any released handle.
     release: bool = False
-    # The record default, handle disposal, borrowed view scope, or delivery
-    # protocol that the operation backs.
-    support: DefaultSupport | DisposeSupport | ViewSupport | DeliverySupport | None = (
-        None
-    )
+    # The handle disposal, borrowed view scope, or delivery protocol that the
+    # operation backs.
+    support: DisposeSupport | ViewSupport | DeliverySupport | None = None
     completion: CompletionPlan | None = None
     owned_outputs: tuple[OwnedOutputPlan, ...] = ()
     view: BorrowedViewPlan | None = None
@@ -466,8 +474,7 @@ class BoundApi:
     unsupported: dict[str, tuple[str, ...]] = field(default_factory=dict)
     runtime_operations: tuple[OperationPlan, ...] = ()
     # The records and unions that a binding copies from native: those that an
-    # operation's output or result, a callback's argument, or a record default
-    # reaches. A copy leaves a callback registration field unset.
+    # operation's output or result or a callback's argument reaches.
     returned: frozenset[str] = frozenset()
     # The returned records and unions that only a callback's arguments reach,
     # which native lends for the callback's duration.
@@ -577,15 +584,6 @@ class BoundApi:
     @property
     def operations_by_name(self) -> dict[str, OperationPlan]:
         return {operation.name: operation for operation in self.operations}
-
-    @property
-    def defaults(self) -> dict[str, OperationPlan]:
-        """The operation that returns each record's default value."""
-        return {
-            plan.support.value: plan
-            for plan in (*self.operations, *self.runtime_operations)
-            if isinstance(plan.support, DefaultSupport)
-        }
 
 
 def output_member(name: str) -> str:
@@ -834,15 +832,15 @@ class Binder:
                         pointee, child_metadata, context + " output element"
                     )
                     # Each emitter decodes the elements after the call from
-                    # zeroed storage, so an element must own nothing, borrow
-                    # nothing, and need no native default.
+                    # zeroed storage, so an element must own nothing and borrow
+                    # nothing.
                     if not plain_value(element):
                         raise ModelError(
                             [
                                 (
                                     f"{context}: a caller-sized output element "
                                     "must be a scalar, an enum, or a record of "
-                                    "them without a native default"
+                                    "them"
                                 )
                             ]
                         )
@@ -854,6 +852,10 @@ class Binder:
             if metadata.get("length") == "1":
                 element = self.value(pointee, child_metadata, context + " pointee")
                 return ValuePlan(kind="reference", element=element, **common)
+            if metadata.get("length") == "nul":
+                if pointee.kind not in {"char_s", "char_u", "schar", "uchar"}:
+                    raise ModelError([f"{context}: nul length requires character data"])
+                return ValuePlan(kind="buffer", buffer_form="pointer", **common)
             if "length" in metadata:
                 if metadata.get("encoding") in {"utf8", "json", "bytes"} and (
                     pointee.kind in {"char_s", "char_u", "schar", "uchar"}
@@ -948,7 +950,6 @@ class Binder:
                 value = ValuePlan(
                     kind="union" if record.kind == "union" else "record",
                     fields=tuple(fields),
-                    default=record_metadata.get("default_function"),
                     tag=record_metadata.get("tag"),
                     empty_variant=next(
                         (
@@ -1185,17 +1186,11 @@ class Binder:
                 function.return_type
             ):
                 result = self.value(function.return_type, metadata, context + " return")
-        support: (
-            DefaultSupport | DisposeSupport | ViewSupport | DeliverySupport | None
-        ) = None
+        support: DisposeSupport | ViewSupport | DeliverySupport | None = None
         for parameter in function.parameters:
             delivery_handle = type_name(parameter.type.pointee or parameter.type)
             if delivery_handle in {DELIVERY_QUEUE, DELIVERY_BATCH}:
                 support = DeliverySupport(delivery_handle)
-                break
-        for name, typedef in self.typedefs.items():
-            if typedef.metadata.get("default_function") == function.name:
-                support = DefaultSupport(name)
                 break
         completion_parameter = next(
             (
@@ -1342,17 +1337,11 @@ class Binder:
                 next(f for f in record.fields if f.value.kind == "array"),
             )
         # A runtime export's caller reads its outputs itself, so only a
-        # generated operation and a default copy what native writes.
-        if (
-            function.name not in self.api.runtime_exports
-            and not isinstance(support, DeliverySupport)
-        ) or isinstance(support, DefaultSupport):
-            kept = self.copied(
-                outputs,
-                result,
-                context,
-                isinstance(support, DefaultSupport),
-            )
+        # generated operation copies what native writes.
+        if function.name not in self.api.runtime_exports and not isinstance(
+            support, DeliverySupport
+        ):
+            kept = self.copied(outputs, result, context)
             self.returned |= kept
             self.kept |= kept
         return OperationPlan(
@@ -1377,38 +1366,18 @@ class Binder:
             blocks=metadata.get("blocks"),
         )
 
-    def copied(
-        self,
-        parameters,
-        result: ValuePlan | None,
-        context: str,
-        default: bool = False,
-    ) -> set[str]:
+    def copied(self, parameters, result: ValuePlan | None, context: str) -> set[str]:
         """The records and unions that a binding copies from these values.
 
         A binding builds a callback registration from host callbacks and never
-        adopts one from native. Only a record default holds one, with null
-        callbacks, in a record field without presence. A copy of the default
-        leaves a registration field unset, and the copy of a registration's own
-        default copies only its other fields. A registration that is optional,
-        referenced, or a union variant would need a copy of its presence, so
-        the plan rejects one.
+        adopts one from native, so the plan rejects a copy that holds one.
         """
         found: set[str] = set()
 
-        def visit(
-            value: ValuePlan, path: str, root: bool = False, field: bool = False
-        ) -> None:
-            if value.registration and not (default and root):
-                if default and field:
-                    return
+        def visit(value: ValuePlan, path: str) -> None:
+            if value.registration:
                 raise ModelError(
-                    [
-                        f"{path}: a record default holds a callback registration "
-                        "only in a field without presence"
-                        if default
-                        else f"{path}: native cannot return a callback registration"
-                    ]
+                    [f"{path}: native cannot return a callback registration"]
                 )
             if value.response:
                 return
@@ -1418,16 +1387,12 @@ class Binder:
                 return
             found.add(value.native)
             for member in value.fields:
-                visit(
-                    member.value,
-                    f"{path}.{member.name}",
-                    field=value.kind == "record" and member.presence is None,
-                )
+                visit(member.value, f"{path}.{member.name}")
 
         for parameter in parameters:
             visit(parameter.value, f"{context} parameter {parameter.name}")
         if result is not None:
-            visit(result, f"{context} result", root=True)
+            visit(result, f"{context} result")
         return found
 
     def member(self, function: Function, receiver: str | None) -> str:

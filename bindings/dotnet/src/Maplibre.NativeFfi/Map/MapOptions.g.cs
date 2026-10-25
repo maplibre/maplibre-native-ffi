@@ -16,7 +16,7 @@ public sealed record MapOptions
     /// scale_factor must be finite and positive. scale_factor is fixed for the
     /// map's lifetime.
     /// </summary>
-    public LogicalExtent InitialExtent { get; init; }
+    public required LogicalExtent InitialExtent { get; init; }
     public MapMode MapMode { get; init; }
 
     /// <summary>
@@ -30,12 +30,4 @@ public sealed record MapOptions
     /// <c>mln_runtime_event_flag</c> values.
     /// </summary>
     public RuntimeEventFlag? EventMask { get; init; }
-    public static MapOptions Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyMapOptions(NativeMethods.mln_map_options_default());
-        }
-    }
 }

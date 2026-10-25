@@ -13,14 +13,4 @@ public sealed record FreeCameraOptions
 {
     public Vec3? Position { get; init; }
     public Quaternion? Orientation { get; init; }
-    public static FreeCameraOptions Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyFreeCameraOptions(
-                NativeMethods.mln_free_camera_options_default()
-            );
-        }
-    }
 }

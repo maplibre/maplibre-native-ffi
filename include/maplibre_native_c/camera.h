@@ -17,43 +17,6 @@
 extern "C" {
 #endif
 
-/** Returns zeroed camera options with size set for this C API version. */
-MLN_API mln_camera_options mln_camera_options_default(void) MLN_NOEXCEPT;
-
-/** Returns zeroed animation options. */
-MLN_API mln_animation_options mln_animation_options_default(void) MLN_NOEXCEPT;
-/** Returns a zeroed relative camera update with size set for this version. */
-MLN_API mln_camera_delta mln_camera_delta_default(void) MLN_NOEXCEPT;
-/**
- * Returns a zeroed atomic camera update, with its size and its camera's size
- * set for this C API version.
- */
-MLN_API mln_camera_update mln_camera_update_default(void) MLN_NOEXCEPT;
-
-/** Returns zeroed camera fitting options with size set for this version. */
-MLN_API mln_camera_fit_options
-mln_camera_fit_options_default(void) MLN_NOEXCEPT;
-
-/** Returns zeroed map bound options with size set for this C API version. */
-MLN_API mln_bound_options mln_bound_options_default(void) MLN_NOEXCEPT;
-
-/** Returns zeroed free camera options with size set for this C API version. */
-MLN_API mln_free_camera_options
-mln_free_camera_options_default(void) MLN_NOEXCEPT;
-
-/**
- * Returns zeroed axonometric rendering options with size set for this C API
- * version.
- */
-MLN_API mln_projection_mode mln_projection_mode_default(void) MLN_NOEXCEPT;
-
-/** Returns zeroed viewport options with size set for this C API version. */
-MLN_API mln_map_viewport_options
-mln_map_viewport_options_default(void) MLN_NOEXCEPT;
-
-/** Returns zeroed tile tuning options with size set for this C API version. */
-MLN_API mln_map_tile_options mln_map_tile_options_default(void) MLN_NOEXCEPT;
-
 /**
  * Submits a debug-overlay command.
  *

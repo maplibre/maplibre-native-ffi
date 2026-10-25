@@ -5,7 +5,8 @@ use crate::error::{Error, Result};
 pub const EXPECTED_C_ABI_VERSION: u32 = sys::MLN_C_VERSION;
 
 /// Fails when the linked library has another C ABI version. Every entry point
-/// that takes no handle calls this, or [`require_abi_version`], first.
+/// that takes no handle, except the version query this reads, calls this or
+/// [`require_abi_version`] first.
 pub fn validate_abi_version() -> Result<()> {
     // SAFETY: mln_c_version takes no arguments and returns the process-global C
     // ABI version for the linked native library.
@@ -13,7 +14,7 @@ pub fn validate_abi_version() -> Result<()> {
 }
 
 /// Panics when the linked library has another C ABI version, for an entry
-/// point with no error channel, such as a value's native default.
+/// point with no error channel, such as a call that can't fail.
 pub fn require_abi_version() {
     if let Err(error) = validate_abi_version() {
         panic!("{error}");

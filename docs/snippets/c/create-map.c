@@ -5,7 +5,7 @@
 
 mln_status open_runtime(const char* cache_path, mln_runtime* out_runtime) {
   // #region runtime
-  mln_runtime_options options = mln_runtime_options_default();
+  mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   options.cache_path = mln_buffer_view_from_cstr(cache_path);
   return mln_runtime_create(&options, out_runtime, NULL);
   // #endregion runtime
@@ -23,7 +23,7 @@ mln_status open_map(
   uint32_t map_mode, mln_map* out_map
 ) {
   // #region map
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = {.size = sizeof(mln_map_options)};
   options.initial_extent = (mln_logical_extent){
     .width = width, .height = height, .scale_factor = scale_factor
   };

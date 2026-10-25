@@ -242,7 +242,7 @@ const PlatformOpenGLRenderTarget = union(types.RenderTargetMode) {
     /// services a caller driver.
     pub fn attach(self: *PlatformOpenGLRenderTarget, map: *maplibre.Map, viewport: types.Viewport) !void {
         switch (self.*) {
-            inline else => |*backend| try backend.attach(map, viewport, try render_target.attachOptions(self.*, .caller_graphics_thread)),
+            inline else => |*backend| try backend.attach(map, viewport, render_target.attachOptions(self.*, .caller_graphics_thread)),
         }
     }
 

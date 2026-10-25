@@ -106,8 +106,9 @@ static uint32_t selected_names(
   // The still image waits for the source to load.
   MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
 
-  mln_source_feature_query_options query =
-    mln_source_feature_query_options_default();
+  mln_source_feature_query_options query = {
+    .size = sizeof(mln_source_feature_query_options)
+  };
   query.filter = mln_buffer_view_from_cstr(filter);
   const mln_test_feature_list list =
     mln_test_style_query_source_with(&fixture, "point", &query);

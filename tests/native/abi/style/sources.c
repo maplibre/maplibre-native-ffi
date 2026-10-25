@@ -341,7 +341,9 @@ static void image_sources_hold_corners_and_pixels(void) {
   const uint8_t pixels[16] = {
     255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
   };
-  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
+  mln_premultiplied_rgba8_image image = {
+    .size = sizeof(mln_premultiplied_rgba8_image)
+  };
   image.width = 2;
   image.height = 2;
   image.stride = 8;

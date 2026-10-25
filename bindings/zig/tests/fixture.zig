@@ -172,9 +172,7 @@ pub const denying_provider = maplibre.ResourceProvider{ .callback = denyResource
 /// Map options with every required member set: a 256 by 256 initial extent
 /// at scale factor 1.
 pub fn mapOptions() maplibre.MapOptions {
-    var options = maplibre.mapOptionsDefault();
-    options.initial_extent = .{ .width = 256, .height = 256, .scale_factor = 1.0 };
-    return options;
+    return .{ .initial_extent = .{ .width = 256, .height = 256, .scale_factor = 1.0 } };
 }
 
 pub const FixtureOptions = struct {
@@ -196,10 +194,7 @@ pub const Fixture = struct {
         const self = try testing.allocator.create(Fixture);
         errdefer testing.allocator.destroy(self);
         self.* = .{ .runtime = undefined, .map = undefined };
-        var runtime_options = try maplibre.runtimeOptionsDefault(testing.allocator);
-        defer runtime_options.deinit();
-        runtime_options.value.asset_path = options.asset_path;
-        self.runtime = try maplibre.runtimeCreate(runtime_options.value, null);
+        self.runtime = try maplibre.runtimeCreate(.{ .asset_path = options.asset_path }, null);
         errdefer closeRuntimeHandle(&self.runtime) catch self.runtime.deinit();
         // A handler accepted before createMap receives the map's first events.
         try self.runtime.discarding().setEventHandler(.init(self, receiveEvents, null), null);
@@ -421,13 +416,12 @@ pub const OwnedTexture = struct {
         self.* = .{ .graphics = try Graphics.create(), .session = undefined, .caller_driven = driver == .caller_graphics_thread };
         errdefer self.graphics.destroy();
         if (build_options.supports_opengl and self.caller_driven) try self.graphics.makeCurrent();
-        var defaults = try maplibre.renderSessionAttachOptionsDefault(testing.allocator);
-        defer defaults.deinit();
-        var options = defaults.value;
-        options.driver = driver;
-        options.requested_texture_ring_depth = 2;
-        options.frame_wake = self.wakes.wake();
-        options.driver_work_wake = self.wakes.wake();
+        const options: maplibre.RenderSessionAttachOptions = .{
+            .driver = driver,
+            .requested_texture_ring_depth = 2,
+            .frame_wake = self.wakes.wake(),
+            .driver_work_wake = self.wakes.wake(),
+        };
         const attachment = if (build_options.supports_metal)
             try map.attachMetalOwnedTexture(.{
                 .extent = extent,
@@ -437,13 +431,8 @@ pub const OwnedTexture = struct {
             }, options, null)
         else if (build_options.supports_vulkan)
             try map.attachVulkanOwnedTexture(.{ .extent = extent, .context = self.graphics.vulkanContext() }, options, null)
-        else attachment: {
-            var descriptor = try maplibre.openglOwnedTextureDescriptorDefault(testing.allocator);
-            defer descriptor.deinit();
-            descriptor.value.extent = extent;
-            descriptor.value.context = self.graphics.openglContext();
-            break :attachment try map.attachOpenglOwnedTexture(descriptor.value, options, null);
-        };
+        else
+            try map.attachOpenglOwnedTexture(.{ .extent = extent, .context = self.graphics.openglContext() }, options, null);
         self.session = attachment.session;
         errdefer self.release();
         try self.resolve(attachment.ready);

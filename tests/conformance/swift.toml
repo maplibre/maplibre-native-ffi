@@ -38,7 +38,6 @@
 "VAL-03" = "bindings/swift/Tests/MaplibreNativeFFITests/EventDecodeTests.swift::unknownEventSourceAndPayloadKindsSurviveAsRawValues"
 "VAL-04" = "bindings/swift/Tests/MaplibreNativeFFITests/ValueTests.swift::valuesCheckNarrowingKeepUnknownEnumsAndCarryFullWidthHandles"
 "VAL-05" = "bindings/swift/Tests/MaplibreNativeFFITests/ValueTests.swift::inputsAreCopiedAtSubmission"
-"VAL-06" = "bindings/swift/Tests/MaplibreNativeFFITests/ValueTests.swift::aRecordBuiltFromItsInitializerDefaultsEqualsTheNativeDefault"
 "VAL-07" = "bindings/swift/Tests/MaplibreNativeFFITests/CompletionTests.swift::anArrayResultIsReadAtItsValueSize"
 "VAL-08" = "bindings/swift/Tests/MaplibreNativeFFITests/ValueTests.swift::synchronousCallsFillCallerSizedOutputsInInputOrder"
 "VAL-09" = "bindings/swift/Tests/MaplibreNativeFFITests/ValueTests.swift::callerSizedTextReturnsResultsLongerThanItsFirstStorage"

@@ -45,12 +45,6 @@ pub fn run() {
     let entry = keyword_combine(5.0, 2.0, 7.0, 11.0).unwrap();
     assert_eq!((entry.r#type, entry.defer, entry.raw), (3.0, 7.0, 11.0));
 
-    // A copy of a native default keeps its values and leaves a registration
-    // unset.
-    let hooks = probe_hooks_default();
-    assert_eq!(hooks.limit, 4);
-    assert!(hooks.signal.callback.is_none());
-
     // A status that the C API declares as absence returns no value, and any
     // other failure still reports its diagnostic.
     assert!(probe_take_parcel().unwrap().is_none());

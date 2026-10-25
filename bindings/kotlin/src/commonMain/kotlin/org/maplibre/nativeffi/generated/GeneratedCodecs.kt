@@ -1100,51 +1100,11 @@ internal fun readWebgpuTextureFrame(source: Long, scope: ViewScope? = null): Web
     )
     .also { it.bindingScope = scope }
 
-internal fun readAnimationOptions(source: Long): AnimationOptions {
-  val fields = readU32(source)
-  return AnimationOptions(
-    durationMs = if ((fields and 1u) != 0u) readF64(source + 8) else null,
-    velocity = if ((fields and 2u) != 0u) readF64(source + 16) else null,
-    minZoom = if ((fields and 4u) != 0u) readF64(source + 24) else null,
-    easing = if ((fields and 8u) != 0u) readUnitBezier(source + 32) else null,
-    transitionId = if ((fields and 16u) != 0u) readU64(source + 64) else null,
-    endHandler = CameraTransitionHandler(),
-  )
-}
+internal fun readLatLng(source: Long): LatLng =
+  LatLng(latitude = readF64(source), longitude = readF64(source + 8))
 
-internal fun readBoundOptions(source: Long): BoundOptions {
-  val fields = readU32(source + 4)
-  return BoundOptions(
-    unbounded = (fields and 32u) != 0u,
-    bounds = if ((fields and 1u) != 0u) readLatLngBounds(source + 8) else null,
-    minZoom = if ((fields and 2u) != 0u) readF64(source + 40) else null,
-    maxZoom = if ((fields and 4u) != 0u) readF64(source + 48) else null,
-    minPitch = if ((fields and 8u) != 0u) readF64(source + 56) else null,
-    maxPitch = if ((fields and 16u) != 0u) readF64(source + 64) else null,
-  )
-}
-
-internal fun readCameraDelta(source: Long): CameraDelta {
-  val fields = readU32(source + 4)
-  return CameraDelta(
-    offset = if ((fields and 1u) != 0u) readScreenPoint(source + 8) else null,
-    scale = if ((fields and 2u) != 0u) readF64(source + 24) else null,
-    bearing = if ((fields and 4u) != 0u) readF64(source + 32) else null,
-    pitch = if ((fields and 8u) != 0u) readF64(source + 40) else null,
-    anchor = if ((fields and 16u) != 0u) readScreenPoint(source + 48) else null,
-    animation = readAnimationOptions(source + 64),
-    gesturePhase = GesturePhase(readU32(source + w(160, 168))),
-  )
-}
-
-internal fun readCameraFitOptions(source: Long): CameraFitOptions {
-  val fields = readU32(source + 4)
-  return CameraFitOptions(
-    padding = if ((fields and 1u) != 0u) readEdgeInsets(source + 8) else null,
-    bearing = if ((fields and 2u) != 0u) readF64(source + 40) else null,
-    pitch = if ((fields and 4u) != 0u) readF64(source + 48) else null,
-  )
-}
+internal fun readProjectedMeters(source: Long): ProjectedMeters =
+  ProjectedMeters(northing = readF64(source), easting = readF64(source + 8))
 
 internal fun readCameraOptions(source: Long): CameraOptions {
   val fields = readU32(source + 4)
@@ -1160,378 +1120,6 @@ internal fun readCameraOptions(source: Long): CameraOptions {
     fieldOfView = if ((fields and 256u) != 0u) readF64(source + 112) else null,
   )
 }
-
-internal fun readCameraUpdate(source: Long): CameraUpdate =
-  CameraUpdate(
-    mode = CameraUpdateMode(readU32(source + 4)),
-    camera = readCameraOptions(source + 8),
-    animation = readAnimationOptions(source + 128),
-    gesturePhase = GesturePhase(readU32(source + w(224, 232))),
-  )
-
-internal fun readCustomGeometrySourceOptions(
-  source: Long,
-  fetchTile: CustomSourceFetchTileCallback,
-): CustomGeometrySourceOptions {
-  val fields = readU32(source + 4)
-  return CustomGeometrySourceOptions(
-    fetchTile = fetchTile,
-    cancelTile = null,
-    minZoom = if ((fields and 1u) != 0u) readF64(source + w(24, 32)) else null,
-    maxZoom = if ((fields and 2u) != 0u) readF64(source + w(32, 40)) else null,
-    tolerance = if ((fields and 4u) != 0u) readF64(source + w(40, 48)) else null,
-    tileSize = if ((fields and 8u) != 0u) readU32(source + w(48, 56)) else null,
-    buffer = if ((fields and 16u) != 0u) readU32(source + w(52, 60)) else null,
-    clip = if ((fields and 32u) != 0u) readBool(source + w(56, 64)) else null,
-    wrap = if ((fields and 64u) != 0u) readBool(source + w(57, 65)) else null,
-  )
-}
-
-internal fun readCustomMvtVectorSourceOptions(
-  source: Long,
-  fetchTile: CustomSourceFetchTileCallback,
-): CustomMvtVectorSourceOptions {
-  val fields = readU32(source + 4)
-  return CustomMvtVectorSourceOptions(
-    fetchTile = fetchTile,
-    cancelTile = null,
-    minZoom = if ((fields and 1u) != 0u) readF64(source + w(24, 32)) else null,
-    maxZoom = if ((fields and 2u) != 0u) readF64(source + w(32, 40)) else null,
-  )
-}
-
-internal fun readFrameDemand(source: Long): FrameDemand =
-  FrameDemand(flags = FrameDemandFlag(readU32(source + 4)), token = readU64(source + 8))
-
-internal fun readFreeCameraOptions(source: Long): FreeCameraOptions {
-  val fields = readU32(source + 4)
-  return FreeCameraOptions(
-    position = if ((fields and 1u) != 0u) readVec3(source + 8) else null,
-    orientation = if ((fields and 2u) != 0u) readQuaternion(source + 32) else null,
-  )
-}
-
-internal fun readGeojsonSourceOptions(source: Long): GeojsonSourceOptions {
-  val fields = readU32(source + 4)
-  return GeojsonSourceOptions(
-    minZoom = if ((fields and 1u) != 0u) readF64(source + 8) else null,
-    maxZoom = if ((fields and 2u) != 0u) readF64(source + 16) else null,
-    tolerance = if ((fields and 4u) != 0u) readF64(source + 24) else null,
-    clusterMaxZoom = if ((fields and 8u) != 0u) readF64(source + 32) else null,
-    clusterProperties = readViewString(source + 40),
-    buffer = if ((fields and 16u) != 0u) readU32(source + w(48, 56)) else null,
-    clusterRadius = if ((fields and 32u) != 0u) readU32(source + w(52, 60)) else null,
-    clusterMinPoints = if ((fields and 64u) != 0u) readU32(source + w(56, 64)) else null,
-    lineMetrics = if ((fields and 128u) != 0u) readBool(source + w(60, 68)) else null,
-    cluster = if ((fields and 256u) != 0u) readBool(source + w(61, 69)) else null,
-    synchronousTiling = if ((fields and 512u) != 0u) readBool(source + w(62, 70)) else null,
-  )
-}
-
-internal fun readHttpHeaderRule(source: Long): HttpHeaderRule =
-  HttpHeaderRule(
-    kinds = ResourceKindFlag(readU32(source + 4)),
-    flags = UrlMatchFlag(readU32(source + 8)),
-    url = readViewString(source + w(12, 16)),
-    headers =
-      readArray(
-        readAddress(source + w(20, 32)),
-        readSize(source + w(24, 40)),
-        w(16, 32).toLong(),
-      ) { item ->
-        readHttpHeader(item)
-      },
-  )
-
-internal fun readLatLng(source: Long): LatLng =
-  LatLng(latitude = readF64(source), longitude = readF64(source + 8))
-
-internal fun readLogicalExtent(source: Long): LogicalExtent =
-  LogicalExtent(
-    width = readU32(source),
-    height = readU32(source + 4),
-    scaleFactor = readF64(source + 8),
-  )
-
-internal fun readMapOptions(source: Long): MapOptions {
-  val fields = readU32(source + 4)
-  return MapOptions(
-    initialExtent = readLogicalExtent(source + 8),
-    mapMode = MapMode(readU32(source + 24)),
-    fastPforEnabled = readBool(source + 28),
-    eventMask = if ((fields and 1u) != 0u) RuntimeEventFlag(readU64(source + 32)) else null,
-  )
-}
-
-internal fun readMapTileOptions(source: Long): MapTileOptions {
-  val fields = readU32(source + 4)
-  return MapTileOptions(
-    prefetchZoomDelta = if ((fields and 1u) != 0u) readU32(source + 8) else null,
-    lodMinRadius = if ((fields and 2u) != 0u) readF64(source + 16) else null,
-    lodScale = if ((fields and 4u) != 0u) readF64(source + 24) else null,
-    lodPitchThreshold = if ((fields and 8u) != 0u) readF64(source + 32) else null,
-    lodZoomShift = if ((fields and 16u) != 0u) readF64(source + 40) else null,
-    lodMode = if ((fields and 32u) != 0u) TileLodMode(readU32(source + 48)) else null,
-  )
-}
-
-internal fun readMapViewportOptions(source: Long): MapViewportOptions {
-  val fields = readU32(source + 4)
-  return MapViewportOptions(
-    northOrientation = if ((fields and 1u) != 0u) NorthOrientation(readU32(source + 8)) else null,
-    constrainMode = if ((fields and 2u) != 0u) ConstrainMode(readU32(source + 12)) else null,
-    viewportMode = if ((fields and 4u) != 0u) ViewportMode(readU32(source + 16)) else null,
-    frustumOffset = if ((fields and 8u) != 0u) readEdgeInsets(source + 24) else null,
-  )
-}
-
-internal fun readMetalBorrowedTextureDescriptor(source: Long): MetalBorrowedTextureDescriptor =
-  MetalBorrowedTextureDescriptor(
-    extent = readLogicalExtent(source + 8),
-    physicalWidth = readU32(source + 24),
-    physicalHeight = readU32(source + 28),
-    textures =
-      readArray(readAddress(source + 32), readSize(source + w(36, 40)), w(4, 8).toLong()) { item ->
-        readMetalBorrowedTexture(item)
-      },
-  )
-
-internal fun readMetalOwnedTextureDescriptor(source: Long): MetalOwnedTextureDescriptor =
-  MetalOwnedTextureDescriptor(
-    extent = readLogicalExtent(source + 8),
-    context = readMetalContextDescriptor(source + 24),
-    pixelFormat = readU64(source + 32),
-  )
-
-internal fun readMetalSurfaceDescriptor(source: Long): MetalSurfaceDescriptor =
-  MetalSurfaceDescriptor(
-    extent = readLogicalExtent(source + 8),
-    context = readMetalContextDescriptor(source + 24),
-    layer = NativePointer.ofAddress(readAddress(source + w(28, 32))),
-  )
-
-internal fun readOpenglBorrowedTextureDescriptor(source: Long): OpenglBorrowedTextureDescriptor =
-  OpenglBorrowedTextureDescriptor(
-    extent = readLogicalExtent(source + 8),
-    physicalWidth = readU32(source + 24),
-    physicalHeight = readU32(source + 28),
-    context = readOpenglContextDescriptor(source + 32),
-    textures =
-      readArray(readAddress(source + w(60, 80)), readSize(source + w(64, 88)), 4.toLong()) { item ->
-        readOpenglBorrowedTexture(item)
-      },
-    target = readU32(source + w(68, 96)),
-  )
-
-internal fun readOpenglOwnedTextureDescriptor(source: Long): OpenglOwnedTextureDescriptor =
-  OpenglOwnedTextureDescriptor(
-    extent = readLogicalExtent(source + 8),
-    context = readOpenglContextDescriptor(source + 24),
-  )
-
-internal fun readOpenglSurfaceDescriptor(source: Long): OpenglSurfaceDescriptor =
-  OpenglSurfaceDescriptor(
-    extent = readLogicalExtent(source + 8),
-    context = readOpenglContextDescriptor(source + 24),
-    surface = NativePointer.ofAddress(readAddress(source + w(52, 72))),
-  )
-
-internal fun readPremultipliedRgba8Image(source: Long): PremultipliedRgba8Image =
-  PremultipliedRgba8Image(
-    width = readU32(source + 4),
-    height = readU32(source + 8),
-    stride = readU32(source + 12),
-    pixels = readBytes(readAddress(source + 16), readSize(source + w(20, 24))),
-  )
-
-internal fun readProjectedMeters(source: Long): ProjectedMeters =
-  ProjectedMeters(northing = readF64(source), easting = readF64(source + 8))
-
-internal fun readProjectionMode(source: Long): ProjectionMode {
-  val fields = readU32(source + 4)
-  return ProjectionMode(
-    axonometric = if ((fields and 1u) != 0u) readBool(source + 8) else null,
-    xSkew = if ((fields and 2u) != 0u) readF64(source + 16) else null,
-    ySkew = if ((fields and 4u) != 0u) readF64(source + 24) else null,
-  )
-}
-
-internal fun readRenderSessionAttachOptions(source: Long): RenderSessionAttachOptions =
-  RenderSessionAttachOptions(
-    driver = RenderDriverKind(readU32(source + 4)),
-    requestedTextureRingDepth = readU32(source + 8),
-    producerSyncKind = GpuSyncKind(readU32(source + 12)),
-    frameWake = Wake(),
-    driverWorkWake = Wake(),
-    queueLock = QueueLock(),
-  )
-
-internal fun readRenderedFeatureQueryOptions(source: Long): RenderedFeatureQueryOptions {
-  val fields = readU32(source + 4)
-  return RenderedFeatureQueryOptions(
-    layerIds =
-      if ((fields and 1u) != 0u)
-        readArray(
-          readAddress(source + 8),
-          readSize(source + w(12, 16)),
-          2 * NativeMemory.addressSize.toLong(),
-        ) { item ->
-          readViewString(item)
-        }
-      else null,
-    filter = readViewString(source + w(16, 24)),
-  )
-}
-
-internal fun readResourceRoute(source: Long): ResourceRoute =
-  ResourceRoute(
-    kinds = ResourceKindFlag(readU32(source + 4)),
-    flags = UrlMatchFlag(readU32(source + 8)),
-    url = readViewString(source + w(12, 16)),
-  )
-
-internal fun readRuntimeOptions(source: Long): RuntimeOptions =
-  RuntimeOptions(
-    assetPath = readViewString(source + w(4, 8)),
-    cachePath = readViewString(source + w(12, 24)),
-  )
-
-internal fun readSourceFeatureQueryOptions(source: Long): SourceFeatureQueryOptions {
-  val fields = readU32(source + 4)
-  return SourceFeatureQueryOptions(
-    sourceLayerIds =
-      if ((fields and 1u) != 0u)
-        readArray(
-          readAddress(source + 8),
-          readSize(source + w(12, 16)),
-          2 * NativeMemory.addressSize.toLong(),
-        ) { item ->
-          readViewString(item)
-        }
-      else null,
-    filter = readViewString(source + w(16, 24)),
-  )
-}
-
-internal fun readStyleExpressionInputs(source: Long): StyleExpressionInputs {
-  val fields = readU32(source + 4)
-  return StyleExpressionInputs(
-    zoom = if ((fields and 1u) != 0u) readF64(source + 8) else null,
-    colorRampParameter = if ((fields and 2u) != 0u) readF64(source + 16) else null,
-    elevation = if ((fields and 4u) != 0u) readF64(source + 24) else null,
-    feature = readViewString(source + 32),
-    featureState = readViewString(source + w(40, 48)),
-    globalState = readViewString(source + w(48, 64)),
-    canonicalTileId = if ((fields and 8u) != 0u) readCanonicalTileId(source + w(56, 80)) else null,
-    availableImages =
-      readArray(
-        readAddress(source + w(68, 96)),
-        readSize(source + w(72, 104)),
-        2 * NativeMemory.addressSize.toLong(),
-      ) { item ->
-        readViewString(item)
-      },
-  )
-}
-
-internal fun readStyleExpressionOptions(source: Long): StyleExpressionOptions {
-  val fields = readU32(source + 4)
-  return StyleExpressionOptions(
-    expectedType = if ((fields and 1u) != 0u) readStyleExpressionType(source + 8) else null,
-  )
-}
-
-internal fun readStyleImageOptions(source: Long): StyleImageOptions {
-  val fields = readU32(source + 4)
-  return StyleImageOptions(
-    stretchX =
-      if ((fields and 4u) != 0u)
-        readArray(readAddress(source + 8), readSize(source + w(12, 16)), 8.toLong()) { item ->
-          readImageStretch(item)
-        }
-      else null,
-    stretchY =
-      if ((fields and 8u) != 0u)
-        readArray(readAddress(source + w(16, 24)), readSize(source + w(20, 32)), 8.toLong()) { item
-          ->
-          readImageStretch(item)
-        }
-      else null,
-    content = if ((fields and 16u) != 0u) readImageContent(source + w(24, 40)) else null,
-    textFitWidth =
-      if ((fields and 32u) != 0u) StyleImageTextFit(readU32(source + w(40, 56))) else null,
-    textFitHeight =
-      if ((fields and 64u) != 0u) StyleImageTextFit(readU32(source + w(44, 60))) else null,
-    pixelRatio = if ((fields and 1u) != 0u) readF32(source + w(48, 64)) else null,
-    sdf = if ((fields and 2u) != 0u) readBool(source + w(52, 68)) else null,
-  )
-}
-
-internal fun readStyleTransitionOptions(source: Long): StyleTransitionOptions {
-  val fields = readU32(source + 4)
-  return StyleTransitionOptions(
-    durationMs = if ((fields and 1u) != 0u) readF64(source + 8) else null,
-    delayMs = if ((fields and 2u) != 0u) readF64(source + 16) else null,
-    enablePlacementTransitions = if ((fields and 4u) != 0u) readBool(source + 24) else null,
-  )
-}
-
-internal fun readVulkanBorrowedTextureDescriptor(source: Long): VulkanBorrowedTextureDescriptor =
-  VulkanBorrowedTextureDescriptor(
-    extent = readLogicalExtent(source + 8),
-    physicalWidth = readU32(source + 24),
-    physicalHeight = readU32(source + 28),
-    context = readVulkanContextDescriptor(source + 32),
-    textures =
-      readArray(readAddress(source + w(60, 88)), readSize(source + w(64, 96)), 16.toLong()) { item
-        ->
-        readVulkanBorrowedTexture(item)
-      },
-    format = readU32(source + w(68, 104)),
-    initialLayout = readU32(source + w(72, 108)),
-    finalLayout = readU32(source + w(76, 112)),
-  )
-
-internal fun readVulkanOwnedTextureDescriptor(source: Long): VulkanOwnedTextureDescriptor =
-  VulkanOwnedTextureDescriptor(
-    extent = readLogicalExtent(source + 8),
-    context = readVulkanContextDescriptor(source + 24),
-  )
-
-internal fun readVulkanSurfaceDescriptor(source: Long): VulkanSurfaceDescriptor =
-  VulkanSurfaceDescriptor(
-    extent = readLogicalExtent(source + 8),
-    context = readVulkanContextDescriptor(source + 24),
-    surface = readU64(source + w(56, 80)),
-  )
-
-internal fun readWebgpuBorrowedTextureDescriptor(source: Long): WebgpuBorrowedTextureDescriptor =
-  WebgpuBorrowedTextureDescriptor(
-    extent = readLogicalExtent(source + 8),
-    physicalWidth = readU32(source + 24),
-    physicalHeight = readU32(source + 28),
-    context = readWebgpuContextDescriptor(source + 32),
-    textures =
-      readArray(readAddress(source + w(44, 56)), readSize(source + w(48, 64)), w(8, 16).toLong()) {
-        item ->
-        readWebgpuBorrowedTexture(item)
-      },
-    format = readU32(source + w(52, 72)),
-  )
-
-internal fun readWebgpuOwnedTextureDescriptor(source: Long): WebgpuOwnedTextureDescriptor =
-  WebgpuOwnedTextureDescriptor(
-    extent = readLogicalExtent(source + 8),
-    context = readWebgpuContextDescriptor(source + 24),
-  )
-
-internal fun readWebgpuSurfaceDescriptor(source: Long): WebgpuSurfaceDescriptor =
-  WebgpuSurfaceDescriptor(
-    extent = readLogicalExtent(source + 8),
-    context = readWebgpuContextDescriptor(source + 24),
-    surface = NativePointer.ofAddress(readAddress(source + w(36, 48))),
-    format = readU32(source + w(40, 56)),
-  )
 
 internal fun readCameraQueryResult(source: Long): CameraQueryResult =
   CameraQueryResult(generation = readU64(source), camera = readCamera(source + 8))
@@ -1602,6 +1190,15 @@ internal fun readStyleSourceInfo(source: Long): StyleSourceInfo {
       if ((fields and 8u) != 0u) StyleVectorTileEncoding(readU32(source + w(108, 140))) else null,
     rasterEncoding =
       if ((fields and 16u) != 0u) StyleRasterDemEncoding(readU32(source + w(112, 144))) else null,
+  )
+}
+
+internal fun readStyleTransitionOptions(source: Long): StyleTransitionOptions {
+  val fields = readU32(source + 4)
+  return StyleTransitionOptions(
+    durationMs = if ((fields and 1u) != 0u) readF64(source + 8) else null,
+    delayMs = if ((fields and 2u) != 0u) readF64(source + 16) else null,
+    enablePlacementTransitions = if ((fields and 4u) != 0u) readBool(source + 24) else null,
   )
 }
 
@@ -1806,8 +1403,6 @@ internal fun NativeArena.putOpenglContextDescriptor(target: Long, value: OpenglC
       writeU32(target, 3u)
       putWebglContextDescriptor(target + 8, variant.value)
     }
-    is OpenglContextDescriptorData.Unknown ->
-      throw IllegalArgumentException("unknown native union variants cannot be submitted")
   }
 }
 
@@ -2010,103 +1605,12 @@ internal fun readMapView(source: Long): MapView =
     viewport = readMapViewportOptions(source + 152),
   )
 
-internal fun readUnitBezier(source: Long): UnitBezier =
-  UnitBezier(
-    x1 = readF64(source),
-    y1 = readF64(source + 8),
-    x2 = readF64(source + 16),
-    y2 = readF64(source + 24),
-  )
-
 internal fun readEdgeInsets(source: Long): EdgeInsets =
   EdgeInsets(
     top = readF64(source),
     left = readF64(source + 8),
     bottom = readF64(source + 16),
     right = readF64(source + 24),
-  )
-
-internal fun readVec3(source: Long): Vec3 =
-  Vec3(x = readF64(source), y = readF64(source + 8), z = readF64(source + 16))
-
-internal fun readQuaternion(source: Long): Quaternion =
-  Quaternion(
-    x = readF64(source),
-    y = readF64(source + 8),
-    z = readF64(source + 16),
-    w = readF64(source + 24),
-  )
-
-internal fun readHttpHeader(source: Long): HttpHeader =
-  HttpHeader(name = readViewString(source), value = readViewString(source + w(8, 16)))
-
-internal fun readMetalBorrowedTexture(source: Long): MetalBorrowedTexture =
-  MetalBorrowedTexture(texture = NativePointer.ofAddress(readAddress(source)))
-
-internal fun readMetalContextDescriptor(source: Long): MetalContextDescriptor =
-  MetalContextDescriptor(device = NativePointer.ofAddress(readAddress(source)))
-
-internal fun readOpenglContextDescriptor(source: Long): OpenglContextDescriptor =
-  OpenglContextDescriptor(
-    ownership = OpenglContextOwnership(readU32(source + 4)),
-    data =
-      readU32(source).let { tag ->
-        when (tag) {
-          1u -> OpenglContextDescriptorData.Wgl(readWglContextDescriptor(source + 8))
-          2u -> OpenglContextDescriptorData.Egl(readEglContextDescriptor(source + 8))
-          3u -> OpenglContextDescriptorData.Webgl(readWebglContextDescriptor(source + 8))
-          else ->
-            OpenglContextDescriptorData.Unknown(tag, NativeMemory.getBytes(source + 8, w(20, 40)))
-        }
-      },
-  )
-
-internal fun readOpenglBorrowedTexture(source: Long): OpenglBorrowedTexture =
-  OpenglBorrowedTexture(texture = readU32(source))
-
-internal fun readStyleExpressionType(source: Long): StyleExpressionType =
-  StyleExpressionType(
-    kind = StyleExpressionTypeKind(readU32(source)),
-    itemKind = StyleExpressionTypeKind(readU32(source + 4)),
-    itemCount = readU32(source + 8),
-  )
-
-internal fun readImageStretch(source: Long): ImageStretch =
-  ImageStretch(from = readF32(source), to = readF32(source + 4))
-
-internal fun readImageContent(source: Long): ImageContent =
-  ImageContent(
-    left = readF32(source),
-    top = readF32(source + 4),
-    right = readF32(source + 8),
-    bottom = readF32(source + 12),
-  )
-
-internal fun readVulkanContextDescriptor(source: Long): VulkanContextDescriptor =
-  VulkanContextDescriptor(
-    instance = NativePointer.ofAddress(readAddress(source)),
-    physicalDevice = NativePointer.ofAddress(readAddress(source + w(4, 8))),
-    device = NativePointer.ofAddress(readAddress(source + w(8, 16))),
-    graphicsQueue = NativePointer.ofAddress(readAddress(source + w(12, 24))),
-    graphicsQueueFamilyIndex = readU32(source + w(16, 32)),
-    getInstanceProcAddr = NativePointer.ofAddress(readAddress(source + w(20, 40))),
-    getDeviceProcAddr = NativePointer.ofAddress(readAddress(source + w(24, 48))),
-  )
-
-internal fun readVulkanBorrowedTexture(source: Long): VulkanBorrowedTexture =
-  VulkanBorrowedTexture(image = readU64(source), imageView = readU64(source + 8))
-
-internal fun readWebgpuContextDescriptor(source: Long): WebgpuContextDescriptor =
-  WebgpuContextDescriptor(
-    instance = NativePointer.ofAddress(readAddress(source)),
-    device = NativePointer.ofAddress(readAddress(source + w(4, 8))),
-    queue = NativePointer.ofAddress(readAddress(source + w(8, 16))),
-  )
-
-internal fun readWebgpuBorrowedTexture(source: Long): WebgpuBorrowedTexture =
-  WebgpuBorrowedTexture(
-    texture = NativePointer.ofAddress(readAddress(source)),
-    textureView = NativePointer.ofAddress(readAddress(source + w(4, 8))),
   )
 
 internal fun readCamera(source: Long): Camera =
@@ -2119,6 +1623,49 @@ internal fun readCamera(source: Long): Camera =
     pitch = readF64(source + 72),
     roll = readF64(source + 80),
     fieldOfView = readF64(source + 88),
+  )
+
+internal fun readMapTileOptions(source: Long): MapTileOptions {
+  val fields = readU32(source + 4)
+  return MapTileOptions(
+    prefetchZoomDelta = if ((fields and 1u) != 0u) readU32(source + 8) else null,
+    lodMinRadius = if ((fields and 2u) != 0u) readF64(source + 16) else null,
+    lodScale = if ((fields and 4u) != 0u) readF64(source + 24) else null,
+    lodPitchThreshold = if ((fields and 8u) != 0u) readF64(source + 32) else null,
+    lodZoomShift = if ((fields and 16u) != 0u) readF64(source + 40) else null,
+    lodMode = if ((fields and 32u) != 0u) TileLodMode(readU32(source + 48)) else null,
+  )
+}
+
+internal fun readBoundOptions(source: Long): BoundOptions {
+  val fields = readU32(source + 4)
+  return BoundOptions(
+    unbounded = (fields and 32u) != 0u,
+    bounds = if ((fields and 1u) != 0u) readLatLngBounds(source + 8) else null,
+    minZoom = if ((fields and 2u) != 0u) readF64(source + 40) else null,
+    maxZoom = if ((fields and 4u) != 0u) readF64(source + 48) else null,
+    minPitch = if ((fields and 8u) != 0u) readF64(source + 56) else null,
+    maxPitch = if ((fields and 16u) != 0u) readF64(source + 64) else null,
+  )
+}
+
+internal fun readFreeCameraOptions(source: Long): FreeCameraOptions {
+  val fields = readU32(source + 4)
+  return FreeCameraOptions(
+    position = if ((fields and 1u) != 0u) readVec3(source + 8) else null,
+    orientation = if ((fields and 2u) != 0u) readQuaternion(source + 32) else null,
+  )
+}
+
+internal fun readImageStretch(source: Long): ImageStretch =
+  ImageStretch(from = readF32(source), to = readF32(source + 4))
+
+internal fun readImageContent(source: Long): ImageContent =
+  ImageContent(
+    left = readF32(source),
+    top = readF32(source + 4),
+    right = readF32(source + 8),
+    bottom = readF32(source + 12),
   )
 
 internal fun readStyleSourceTileInfo(source: Long): StyleSourceTileInfo =
@@ -2134,6 +1681,13 @@ internal fun readStyleSourceTileInfo(source: Long): StyleSourceTileInfo =
     minZoom = readF64(source + w(8, 16)),
     maxZoom = readF64(source + w(16, 24)),
     scheme = StyleTileScheme(readU32(source + w(24, 32))),
+  )
+
+internal fun readLogicalExtent(source: Long): LogicalExtent =
+  LogicalExtent(
+    width = readU32(source),
+    height = readU32(source + 4),
+    scaleFactor = readF64(source + 8),
   )
 
 internal fun readTextureImageInfo(source: Long): TextureImageInfo =
@@ -2241,27 +1795,34 @@ internal fun readRuntimeEvent(source: Long): RuntimeEvent =
 internal fun readResourceRange(source: Long): ResourceRange =
   ResourceRange(start = readU64(source), end = readU64(source + 8))
 
-internal fun readWglContextDescriptor(source: Long): WglContextDescriptor =
-  WglContextDescriptor(
-    deviceContext = NativePointer.ofAddress(readAddress(source)),
-    shareContext = NativePointer.ofAddress(readAddress(source + w(4, 8))),
-    getProcAddress = NativePointer.ofAddress(readAddress(source + w(8, 16))),
+internal fun readProjectionMode(source: Long): ProjectionMode {
+  val fields = readU32(source + 4)
+  return ProjectionMode(
+    axonometric = if ((fields and 1u) != 0u) readBool(source + 8) else null,
+    xSkew = if ((fields and 2u) != 0u) readF64(source + 16) else null,
+    ySkew = if ((fields and 4u) != 0u) readF64(source + 24) else null,
   )
+}
 
-internal fun readEglContextDescriptor(source: Long): EglContextDescriptor =
-  EglContextDescriptor(
-    display = NativePointer.ofAddress(readAddress(source)),
-    config = NativePointer.ofAddress(readAddress(source + w(4, 8))),
-    shareContext = NativePointer.ofAddress(readAddress(source + w(8, 16))),
-    clientApi = OpenglClientApi(readU32(source + w(12, 24))),
-    getProcAddress = NativePointer.ofAddress(readAddress(source + w(16, 32))),
+internal fun readMapViewportOptions(source: Long): MapViewportOptions {
+  val fields = readU32(source + 4)
+  return MapViewportOptions(
+    northOrientation = if ((fields and 1u) != 0u) NorthOrientation(readU32(source + 8)) else null,
+    constrainMode = if ((fields and 2u) != 0u) ConstrainMode(readU32(source + 12)) else null,
+    viewportMode = if ((fields and 4u) != 0u) ViewportMode(readU32(source + 16)) else null,
+    frustumOffset = if ((fields and 8u) != 0u) readEdgeInsets(source + 24) else null,
   )
+}
 
-internal fun readWebglContextDescriptor(source: Long): WebglContextDescriptor =
-  WebglContextDescriptor(
-    kind = WebglContextKind(readU32(source)),
-    context = readI32(source + 4),
-    canvasSelector = readViewString(source + 8),
+internal fun readVec3(source: Long): Vec3 =
+  Vec3(x = readF64(source), y = readF64(source + 8), z = readF64(source + 16))
+
+internal fun readQuaternion(source: Long): Quaternion =
+  Quaternion(
+    x = readF64(source),
+    y = readF64(source + 8),
+    z = readF64(source + 16),
+    w = readF64(source + 24),
   )
 
 internal fun readOfflineTilePyramidRegionDefinition(

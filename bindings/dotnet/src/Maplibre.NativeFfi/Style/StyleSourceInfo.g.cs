@@ -14,7 +14,7 @@ public sealed record StyleSourceInfo
     /// <summary>
     /// Source ID.
     /// </summary>
-    public required string Id { get; init; }
+    public string Id { get; init; } = "";
     public StyleSourceType Type { get; init; }
 
     /// <summary>
@@ -25,12 +25,12 @@ public sealed record StyleSourceInfo
     /// <summary>
     /// Attribution string, or empty when the source sets none.
     /// </summary>
-    public required string Attribution { get; init; }
+    public string Attribution { get; init; } = "";
 
     /// <summary>
     /// URL that the source loads from, or empty when it has none.
     /// </summary>
-    public required string Url { get; init; }
+    public string Url { get; init; } = "";
 
     /// <summary>
     /// Inline TileJSON metadata, when the source was defined with it.

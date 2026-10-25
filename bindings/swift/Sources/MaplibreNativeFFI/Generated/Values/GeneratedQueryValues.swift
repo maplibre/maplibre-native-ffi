@@ -13,10 +13,6 @@ public struct RenderedFeature: Equatable, Hashable, Sendable {
   public var sourceId: String
   public var sourceLayerId: String
   public var state: String
-  public static var `default`: Self {
-    Self()
-  }
-
   public init(
     feature: String = "",
     layerId: String = "",
@@ -67,14 +63,7 @@ public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
   public var layerIds: [String]?
   /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
   public var filter: String
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_rendered_feature_query_options_default))
-  }
-
-  public init(
-    layerIds: [String]? = RenderedFeatureQueryOptions.default.layerIds,
-    filter: String = RenderedFeatureQueryOptions.default.filter
-  ) {
+  public init(layerIds: [String]? = nil, filter: String = "") {
     self.layerIds = layerIds
     self.filter = filter
   }
@@ -97,7 +86,7 @@ public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
   func nativeValue(arena: NativeInputArena) throws
     -> mln_rendered_feature_query_options
   {
-    var raw = mln_rendered_feature_query_options_default()
+    var raw = mln_rendered_feature_query_options()
     raw.fields = 0
     raw.size = UInt32(MemoryLayout<mln_rendered_feature_query_options>.size)
     if let item = layerIds {
@@ -144,14 +133,7 @@ public enum RenderedQueryGeometry: Equatable, Hashable, Sendable {
 public struct ScreenBox: Equatable, Hashable, Sendable {
   public var min: ScreenPoint
   public var max: ScreenPoint
-  public static var `default`: Self {
-    Self(raw: mln_screen_box())
-  }
-
-  public init(
-    min: ScreenPoint = ScreenBox.default.min,
-    max: ScreenPoint = ScreenBox.default.max
-  ) {
+  public init(min: ScreenPoint = .init(), max: ScreenPoint = .init()) {
     self.min = min
     self.max = max
   }
@@ -176,10 +158,6 @@ public struct ScreenBox: Equatable, Hashable, Sendable {
 public struct ScreenLineString: Equatable, Hashable, Sendable {
   /// Points. Null only when point_count is 0.
   public var points: [ScreenPoint]
-  public static var `default`: Self {
-    Self()
-  }
-
   public init(points: [ScreenPoint] = []) {
     self.points = points
   }
@@ -209,10 +187,6 @@ public struct ScreenLineString: Equatable, Hashable, Sendable {
 public struct SourceFeature: Equatable, Hashable, Sendable {
   public var feature: String
   public var sourceLayerId: String
-  public static var `default`: Self {
-    Self()
-  }
-
   public init(feature: String = "", sourceLayerId: String = "") {
     self.feature = feature
     self.sourceLayerId = sourceLayerId
@@ -242,15 +216,7 @@ public struct SourceFeatureQueryOptions: Equatable, Hashable, Sendable {
   public var sourceLayerIds: [String]?
   /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
   public var filter: String
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_source_feature_query_options_default))
-  }
-
-  public init(
-    sourceLayerIds: [String]? = SourceFeatureQueryOptions.default
-      .sourceLayerIds,
-    filter: String = SourceFeatureQueryOptions.default.filter
-  ) {
+  public init(sourceLayerIds: [String]? = nil, filter: String = "") {
     self.sourceLayerIds = sourceLayerIds
     self.filter = filter
   }
@@ -274,7 +240,7 @@ public struct SourceFeatureQueryOptions: Equatable, Hashable, Sendable {
   func nativeValue(arena: NativeInputArena) throws
     -> mln_source_feature_query_options
   {
-    var raw = mln_source_feature_query_options_default()
+    var raw = mln_source_feature_query_options()
     raw.fields = 0
     raw.size = UInt32(MemoryLayout<mln_source_feature_query_options>.size)
     if let item = sourceLayerIds {

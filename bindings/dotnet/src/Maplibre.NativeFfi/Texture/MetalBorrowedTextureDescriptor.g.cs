@@ -9,13 +9,9 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_metal_borrowed_texture_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
-public readonly record struct MetalBorrowedTextureDescriptor
+public readonly partial record struct MetalBorrowedTextureDescriptor
 {
-    public MetalBorrowedTextureDescriptor()
-    {
-        this = Default;
-    }
-
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public MetalBorrowedTextureDescriptor(
         LogicalExtent Extent,
         uint PhysicalWidth,
@@ -34,35 +30,25 @@ public readonly record struct MetalBorrowedTextureDescriptor
     /// give the texture's size. A scale_factor that differs from the map's is
     /// accepted and logged as a warning.
     /// </summary>
-    public LogicalExtent Extent { get; init; }
+    public required LogicalExtent Extent { get; init; }
 
     /// <summary>
     /// Physical texture width in device pixels. Required.
     /// </summary>
-    public uint PhysicalWidth { get; init; }
+    public required uint PhysicalWidth { get; init; }
 
     /// <summary>
     /// Physical texture height in device pixels. Required.
     /// </summary>
-    public uint PhysicalHeight { get; init; }
+    public required uint PhysicalHeight { get; init; }
 
     /// <summary>
     /// The ring's textures, one per slot, in slot order. Required.
     /// </summary>
-    public ImmutableArray<MetalBorrowedTexture> Textures
+    public required ImmutableArray<MetalBorrowedTexture> Textures
     {
         get => TexturesStorage.AsImmutable();
         init => TexturesStorage = ValueArray.From(value);
     }
     internal ValueArray<MetalBorrowedTexture> TexturesStorage { get; init; }
-    public static MetalBorrowedTextureDescriptor Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyMetalBorrowedTextureDescriptor(
-                NativeMethods.mln_metal_borrowed_texture_descriptor_default()
-            );
-        }
-    }
 }

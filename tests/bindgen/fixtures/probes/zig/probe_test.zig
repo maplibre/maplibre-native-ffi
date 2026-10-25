@@ -37,15 +37,8 @@ test "generated calls report native failures through the diagnostic" {
     try std.testing.expectEqualStrings("right holds more than 8 points", diagnostic.message());
 }
 
-test "generated record defaults equal the native default" {
-    try api.probeSettingsCheck(api.probeSettingsDefault(), null);
-}
-
-test "generated default copies keep values and leave registrations unset" {
-    var hooks = try api.probeHooksDefault(std.testing.allocator);
-    defer hooks.deinit();
-    try std.testing.expectEqual(@as(u32, 4), hooks.value.limit);
-    try std.testing.expect(hooks.value.signal.callback == null);
+test "generated record defaults are zeroed with their size set" {
+    try api.probeSettingsCheck(.{}, null);
 }
 
 test "generated absence returns null and other failures still report" {
@@ -87,17 +80,17 @@ test "generated owned callback arguments are released on conversion and host err
     const handler = api.QueryHandler{ .callback = QueryProbe.receive, .context = &probe };
     const raw = try handler.toNative(&roots);
     released_query = 0;
-    raw.callback.?(raw.context, .{ .data = null, .size = 1 }, 41);
+    raw.callback.?(raw.context, null, 41);
     try std.testing.expectEqual(@as(u64, 41), released_query);
     try std.testing.expectEqual(@as(usize, 0), probe.calls);
 
     probe.fail = true;
-    raw.callback.?(raw.context, .{ .data = "query", .size = 5 }, 42);
+    raw.callback.?(raw.context, "query", 42);
     try std.testing.expectEqual(@as(u64, 42), released_query);
     try std.testing.expectEqual(@as(usize, 1), probe.calls);
 
     probe.fail = false;
-    raw.callback.?(raw.context, .{ .data = "query", .size = 5 }, 43);
+    raw.callback.?(raw.context, "query", 43);
     try std.testing.expectEqual(@as(usize, 2), probe.calls);
     try std.testing.expectEqual(@as(u64, 42), released_query);
     var saved = probe.saved.?;

@@ -122,7 +122,7 @@ Future<RuntimeFixture> openRuntime({
   RuntimeOptions? options,
   ResourceProvider? provider,
 }) async {
-  final defaults = options ?? runtimeOptionsDefault();
+  final defaults = options ?? RuntimeOptions();
   final events = Signal();
   final runtime = runtimeCreate(
     RuntimeOptions(

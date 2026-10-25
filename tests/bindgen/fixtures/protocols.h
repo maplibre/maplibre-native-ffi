@@ -20,7 +20,7 @@
   defined(MLN_PROTOCOL_PRESENCE_MASK) ||                                 \
   defined(MLN_PROTOCOL_COMPLETION_RUNTIME) ||                            \
   defined(MLN_PROTOCOL_ABI_VERSION) || defined(MLN_PROTOCOL_DEFAULTS) || \
-  defined(MLN_PROTOCOL_DEFAULT_REGISTRATION) ||                          \
+  defined(MLN_PROTOCOL_NESTED_REGISTRATION) ||                           \
   defined(MLN_PROTOCOL_STRIDED_RECORDS) || defined(MLN_PROTOCOL_VERSIONING)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
@@ -193,10 +193,10 @@ mln_status mln_probe_roundtrip(
 #endif
 
 #ifdef MLN_PROTOCOL_DEFAULTS
-// A record whose native default holds nonzero values: a scalar of each kind,
-// an enumerator, a bitmask with one flag and with several, and a nested record
-// with defaults of its own. Bindings copy the native default.
+// A record whose default is zero with its size set: a scalar of each kind, an
+// enumerator, a bitmask, and a nested record. Bindings build it without native.
 typedef enum mln_probe_mode : uint32_t {
+  MLN_PROBE_MODE_DEFAULT = 0,
   MLN_PROBE_MODE_FIRST = 1,
   MLN_PROBE_MODE_SECOND = 2,
 } mln_probe_mode;
@@ -223,17 +223,15 @@ typedef struct mln_probe_settings {
   bool enabled;
   int32_t count;
 } mln_probe_settings;
-mln_probe_settings mln_probe_settings_default(void);
-// Succeeds when every field of `settings` equals the native default, and
-// otherwise names the first field that differs.
+// Succeeds when `settings` is zeroed with its size set, and otherwise names the
+// first field that differs.
 mln_status mln_probe_settings_check(
   mln_probe_settings settings, mln_diagnostic* out_diagnostic
 );
 #endif
 
-#ifdef MLN_PROTOCOL_DEFAULT_REGISTRATION
-// A record default that holds a callback registration with its callback null.
-// A copy of the default keeps the limit and leaves the registration unset.
+#ifdef MLN_PROTOCOL_NESTED_REGISTRATION
+// A record that embeds a callback registration whose callback is nullable.
 typedef void (*mln_probe_notify)(void* user_data);
 typedef void (*mln_probe_notify_release)(void* user_data);
 typedef struct mln_probe_signal {
@@ -246,7 +244,6 @@ typedef struct mln_probe_hooks {
   uint32_t limit;
   mln_probe_signal signal;
 } mln_probe_hooks;
-mln_probe_hooks mln_probe_hooks_default(void);
 #endif
 
 #ifdef MLN_PROTOCOL_KEYWORDS
@@ -300,9 +297,8 @@ mln_status mln_probe_zeros_json(
 #endif
 
 #ifdef MLN_PROTOCOL_PRESENCE_MASK
-// A bitmask presence mask whose bit guards an embedded record, in a record with
-// a default constructor that a caller passes by pointer. A snapshot nests it
-// beside a borrowed array.
+// A bitmask presence mask whose bit guards an embedded record, in a record that
+// a caller passes by pointer. A snapshot nests it beside a borrowed array.
 typedef enum BIND("kind=bitmask") mln_camera_field : uint64_t {
   MLN_CAMERA_CENTER = 1ULL << 40,
   MLN_CAMERA_ZOOM = 2
@@ -324,7 +320,6 @@ typedef struct mln_snapshot {
   const mln_lat_lng* coordinates BIND("length=coordinate_count");
   size_t coordinate_count;
 } mln_snapshot;
-mln_camera mln_camera_default(void);
 mln_status mln_map_jump(
   mln_map map, const mln_camera* camera, mln_diagnostic* out_diagnostic
 );
@@ -384,7 +379,6 @@ typedef struct mln_label {
   double text_size BIND("mask=fields;bit=MLN_LABEL_FIELD_TEXT_SIZE");
   uint32_t reserved BIND("kind=reserved");
 } mln_label;
-mln_label mln_label_default(void);
 BIND("execution=command")
 mln_status mln_map_set_label(
   mln_map map, const mln_label* label, const mln_completion* completion,
@@ -534,7 +528,7 @@ typedef struct mln_sample_delivery {
 typedef unsigned long long mln_query
   BIND("kind=handle;release=mln_query_release;dispose=mln_query_release");
 typedef void (*mln_query_callback)(
-  void* context, mln_buffer_view text, mln_query query BIND("ownership=owned")
+  void* context, const char* text, mln_query query BIND("ownership=owned")
 ) BIND("delivery=MLN_DELIVERY_TYPE_QUERY");
 typedef void (*mln_query_release_context)(void* context);
 typedef struct mln_query_handler {
@@ -554,7 +548,7 @@ mln_status mln_query_answer(
 );
 void mln_query_release(mln_query query);
 typedef struct mln_query_delivery {
-  mln_buffer_view text BIND("lifetime=owner");
+  const char* text BIND("lifetime=owner");
   mln_query query BIND("ownership=owned");
 } mln_query_delivery;
 #endif
@@ -624,7 +618,7 @@ typedef struct mln_ticket_cancel_delivery {
 // that native code supplies in queue mode.
 typedef void (*mln_notice_release)(void* context);
 typedef unsigned (*mln_notice_callback)(
-  void* context, int code, mln_buffer_view text
+  void* context, int code, const char* text
 ) BIND("failure=0;delivery=MLN_DELIVERY_TYPE_NOTICE;queue_result=1");
 // Its release must not call back into the API.
 typedef struct mln_notice_handler {
@@ -639,7 +633,7 @@ mln_status mln_notice_set_callback(
 );
 typedef struct mln_notice_delivery {
   int code;
-  mln_buffer_view text BIND("lifetime=owner");
+  const char* text BIND("lifetime=owner");
 } mln_notice_delivery;
 #endif
 

@@ -32,10 +32,11 @@ impl OpenGLPlatformContext {
         };
         Ok(OpenglContextDescriptor {
             data: maplibre_native_ffi::OpenglContextDescriptorData::Egl(EglContextDescriptor {
-                display: raw_display.cast_mut().cast::<std::ffi::c_void>(),
-                config: raw_config.cast_mut().cast::<std::ffi::c_void>(),
                 share_context: raw_context.cast_mut().cast::<std::ffi::c_void>(),
-                ..Default::default()
+                ..EglContextDescriptor::new(
+                    raw_display.cast_mut().cast::<std::ffi::c_void>(),
+                    raw_config.cast_mut().cast::<std::ffi::c_void>(),
+                )
             }),
             ownership: maplibre_native_ffi::OpenglContextOwnership::Shared,
         })

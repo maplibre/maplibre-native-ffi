@@ -9,38 +9,35 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_vulkan_surface_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Extent">
-/// Logical surface extent. Required. A scale_factor that differs from the map's
-/// is accepted and logged as a warning.
-/// </param>
-/// <param name="Context">
-/// Borrowed Vulkan context. All handles are required. The device must support
-/// VK_KHR_swapchain, and the queue family must support graphics and
-/// presentation to this descriptor's surface.
-/// </param>
-/// <param name="Surface">
-/// Borrowed VkSurfaceKHR bit pattern. Required.
-/// </param>
-public readonly partial record struct VulkanSurfaceDescriptor(
-    LogicalExtent Extent,
-    VulkanContextDescriptor Context,
-    ulong Surface
-)
+public readonly partial record struct VulkanSurfaceDescriptor
 {
-    public VulkanSurfaceDescriptor()
-        : this(default!, default!, default!)
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public VulkanSurfaceDescriptor(
+        LogicalExtent Extent,
+        VulkanContextDescriptor Context,
+        ulong Surface
+    )
     {
-        this = Default;
+        this.Extent = Extent;
+        this.Context = Context;
+        this.Surface = Surface;
     }
 
-    public static VulkanSurfaceDescriptor Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyVulkanSurfaceDescriptor(
-                NativeMethods.mln_vulkan_surface_descriptor_default()
-            );
-        }
-    }
+    /// <summary>
+    /// Logical surface extent. Required. A scale_factor that differs from the
+    /// map's is accepted and logged as a warning.
+    /// </summary>
+    public required LogicalExtent Extent { get; init; }
+
+    /// <summary>
+    /// Borrowed Vulkan context. All handles are required. The device must
+    /// support VK_KHR_swapchain, and the queue family must support graphics and
+    /// presentation to this descriptor's surface.
+    /// </summary>
+    public required VulkanContextDescriptor Context { get; init; }
+
+    /// <summary>
+    /// Borrowed VkSurfaceKHR bit pattern. Required.
+    /// </summary>
+    public required ulong Surface { get; init; }
 }

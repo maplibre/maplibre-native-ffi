@@ -93,7 +93,7 @@ pub fn main(init_args: std.process.Init) !void {
     // on the window-owning thread.
     app.target = try RenderTarget.init(allocator, window, app.viewport, target_mode);
     defer app.target.deinit();
-    app.map = try map_state.MapState.init(allocator, app.viewport, smoke);
+    app.map = try map_state.MapState.init(app.viewport, smoke);
     defer app.map.deinit();
     try app.target.attach(&app.map.map, app.viewport);
     // The session detaches before its map and runtime close, and the graphics

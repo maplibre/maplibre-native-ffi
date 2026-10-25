@@ -16,7 +16,8 @@ void rejected_provider_registration_queues_no_retirement() {
   auto unexpected_retirements = std::size_t{};
   for (auto budget = std::size_t{}; budget < 24; ++budget) {
     auto runtime = mln_runtime{MLN_HANDLE_NULL};
-    auto options = mln_runtime_options_default();
+    auto options = mln_runtime_options{};
+    options.size = sizeof(mln_runtime_options);
     MLN_TEST_OK(mln_runtime_create(&options, &runtime, nullptr));
     auto queue = mln_delivery_queue{MLN_HANDLE_NULL};
     const auto queue_options = mln_delivery_queue_options{
@@ -85,7 +86,8 @@ void rejected_callback_registrations_never_release_caller_data() {
   for (auto mode = 0; mode < 3; ++mode) {
     for (auto budget = std::size_t{0}; budget < 24; ++budget) {
       auto runtime = mln_runtime{MLN_HANDLE_NULL};
-      auto options = mln_runtime_options_default();
+      auto options = mln_runtime_options{};
+      options.size = sizeof(mln_runtime_options);
       MLN_TEST_OK(mln_runtime_create(&options, &runtime, nullptr));
       auto releases = 0;
       const auto provider = mln_resource_provider{

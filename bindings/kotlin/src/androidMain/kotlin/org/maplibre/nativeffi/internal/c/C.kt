@@ -72,29 +72,7 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int
 
-  @CriticalNative @JvmStatic actual external fun mln_animation_options_default(returned: Long): Unit
-
-  @CriticalNative @JvmStatic actual external fun mln_bound_options_default(returned: Long): Unit
-
   @JvmStatic actual external fun mln_c_version(): Int
-
-  @CriticalNative @JvmStatic actual external fun mln_camera_delta_default(returned: Long): Unit
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_camera_fit_options_default(returned: Long): Unit
-
-  @CriticalNative @JvmStatic actual external fun mln_camera_options_default(returned: Long): Unit
-
-  @CriticalNative @JvmStatic actual external fun mln_camera_update_default(returned: Long): Unit
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_custom_geometry_source_options_default(returned: Long): Unit
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_custom_mvt_vector_source_options_default(returned: Long): Unit
 
   @JvmStatic actual external fun mln_delivery_batch_release(batch: Long): Unit
 
@@ -118,12 +96,6 @@ internal actual object C {
 
   @JvmStatic actual external fun mln_delivery_queue_release(queue: Long): Unit
 
-  @CriticalNative @JvmStatic actual external fun mln_frame_demand_default(returned: Long): Unit
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_free_camera_options_default(returned: Long): Unit
-
   @JvmStatic
   actual external fun mln_geojson_source_data_create(
     data: Long,
@@ -133,14 +105,6 @@ internal actual object C {
   ): Int
 
   @JvmStatic actual external fun mln_geojson_source_data_release(data: Long): Unit
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_geojson_source_options_default(returned: Long): Unit
-
-  @CriticalNative @JvmStatic actual external fun mln_gpu_sync_default(returned: Long): Unit
-
-  @CriticalNative @JvmStatic actual external fun mln_http_header_rule_default(returned: Long): Unit
 
   @JvmStatic
   actual external fun mln_http_header_transform_response_set_header(
@@ -163,8 +127,6 @@ internal actual object C {
   actual external fun mln_log_set_async_severity_mask(mask: Int, outDiagnostic: Long): Int
 
   @JvmStatic actual external fun mln_log_set_callback(handler: Long, outDiagnostic: Long): Int
-
-  @CriticalNative @JvmStatic actual external fun mln_logical_extent_default(returned: Long): Unit
 
   @JvmStatic
   actual external fun mln_logical_extent_physical_size(
@@ -603,8 +565,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int
 
-  @CriticalNative @JvmStatic actual external fun mln_map_options_default(returned: Long): Unit
-
   @JvmStatic
   actual external fun mln_map_projection_create(
     view: Long,
@@ -987,8 +947,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int
 
-  @CriticalNative @JvmStatic actual external fun mln_map_tile_options_default(returned: Long): Unit
-
   @JvmStatic
   actual external fun mln_map_update_camera(
     map: Long,
@@ -997,45 +955,13 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int
 
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_map_viewport_options_default(returned: Long): Unit
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_metal_borrowed_texture_descriptor_default(returned: Long): Unit
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_metal_owned_texture_descriptor_default(returned: Long): Unit
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_metal_surface_descriptor_default(returned: Long): Unit
-
   @JvmStatic actual external fun mln_network_get_status(outStatus: Long, outDiagnostic: Long): Int
 
   @JvmStatic actual external fun mln_network_set_status(status: Int, outDiagnostic: Long): Int
 
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_opengl_borrowed_texture_descriptor_default(returned: Long): Unit
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_opengl_owned_texture_descriptor_default(returned: Long): Unit
-
   @JvmStatic actual external fun mln_opengl_supported_context_provider_mask(): Int
 
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_opengl_surface_descriptor_default(returned: Long): Unit
-
   @JvmStatic actual external fun mln_plugin_get_register_function_v1(): Long
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_premultiplied_rgba8_image_default(returned: Long): Unit
 
   @JvmStatic
   actual external fun mln_projected_meters_for_lat_lng(
@@ -1043,8 +969,6 @@ internal actual object C {
     outMeters: Long,
     outDiagnostic: Long,
   ): Int
-
-  @CriticalNative @JvmStatic actual external fun mln_projection_mode_default(returned: Long): Unit
 
   @JvmStatic actual external fun mln_render_frame_batch_release(batch: Long): Unit
 
@@ -1061,10 +985,6 @@ internal actual object C {
     outFrame: Long,
     outDiagnostic: Long,
   ): Int
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_render_session_attach_options_default(returned: Long): Unit
 
   @JvmStatic
   actual external fun mln_render_session_barrier(
@@ -1254,10 +1174,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int
 
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_rendered_feature_query_options_default(returned: Long): Unit
-
   @JvmStatic
   actual external fun mln_resource_request_complete(
     handle: Long,
@@ -1284,8 +1200,6 @@ internal actual object C {
     outCancelled: Long,
     outDiagnostic: Long,
   ): Int
-
-  @CriticalNative @JvmStatic actual external fun mln_resource_route_default(returned: Long): Unit
 
   @JvmStatic
   actual external fun mln_resource_transform_request_complete(
@@ -1402,8 +1316,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int
 
-  @CriticalNative @JvmStatic actual external fun mln_runtime_options_default(returned: Long): Unit
-
   @JvmStatic
   actual external fun mln_runtime_release(runtime: Long, completion: Long, outDiagnostic: Long): Int
 
@@ -1490,10 +1402,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int
 
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_source_feature_query_options_default(returned: Long): Unit
-
   @JvmStatic
   actual external fun mln_style_expression_create(
     expression: Long,
@@ -1519,47 +1427,7 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int
 
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_style_expression_inputs_default(returned: Long): Unit
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_style_expression_options_default(returned: Long): Unit
-
   @JvmStatic actual external fun mln_style_expression_release(expression: Long): Unit
 
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_style_image_options_default(returned: Long): Unit
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_style_transition_options_default(returned: Long): Unit
-
   @JvmStatic actual external fun mln_supported_render_backend_mask(): Int
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_vulkan_borrowed_texture_descriptor_default(returned: Long): Unit
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_vulkan_owned_texture_descriptor_default(returned: Long): Unit
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_vulkan_surface_descriptor_default(returned: Long): Unit
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_webgpu_borrowed_texture_descriptor_default(returned: Long): Unit
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_webgpu_owned_texture_descriptor_default(returned: Long): Unit
-
-  @CriticalNative
-  @JvmStatic
-  actual external fun mln_webgpu_surface_descriptor_default(returned: Long): Unit
 }

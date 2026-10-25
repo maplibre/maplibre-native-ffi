@@ -29,12 +29,4 @@ public sealed record BoundOptions
     /// <c>mln_bound_options.bounds</c> unread.
     /// </summary>
     public bool Unbounded { get; init; }
-    public static BoundOptions Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyBoundOptions(NativeMethods.mln_bound_options_default());
-        }
-    }
 }

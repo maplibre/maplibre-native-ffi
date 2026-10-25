@@ -22,8 +22,9 @@ const char* render_driver_label(mln_render_driver_kind driver) {
 mln_render_session_attach_options render_session_attach_options(
   render_target_mode mode, mln_render_driver_kind driver
 ) {
-  mln_render_session_attach_options options =
-    mln_render_session_attach_options_default();
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
   options.driver = driver;
   if (mode == RENDER_TARGET_MODE_OWNED_TEXTURE) {
     options.requested_texture_ring_depth = RING_DEPTH;
@@ -155,7 +156,7 @@ void render_session_close(render_session* session) {
 }
 
 app_error render_session_request_frame(render_session* session, bool force) {
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags =
     (force ? MLN_FRAME_DEMAND_FORCE : MLN_FRAME_DEMAND_WAIT_FOR_UPDATE) |
     (session->presents ? MLN_FRAME_DEMAND_PRESENT : 0);
@@ -249,7 +250,7 @@ app_error render_session_acquire_newest(
 
 void render_session_release_frame(mln_acquired_frame* frame) {
   if (*frame == MLN_HANDLE_NULL) return;
-  mln_gpu_sync sync = mln_gpu_sync_default();
+  mln_gpu_sync sync = {.size = sizeof(mln_gpu_sync)};
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status =
     mln_acquired_frame_release(*frame, &sync, &diagnostic);
@@ -263,7 +264,7 @@ void render_session_release_frame(mln_acquired_frame* frame) {
 app_error render_session_require_cpu_complete_producer(
   mln_acquired_frame frame, const char* message
 ) {
-  mln_gpu_sync sync = mln_gpu_sync_default();
+  mln_gpu_sync sync = {.size = sizeof(mln_gpu_sync)};
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status =
     mln_acquired_frame_get_producer_sync(frame, &sync, &diagnostic);

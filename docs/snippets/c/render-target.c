@@ -4,8 +4,9 @@
 #include <maplibre_native_c.h>
 
 static mln_render_session_attach_options caller_driver(void) {
-  mln_render_session_attach_options options =
-    mln_render_session_attach_options_default();
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
   options.driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
   return options;
 }
@@ -16,8 +17,9 @@ mln_status attach_to_window(
   mln_render_session* out_session, const mln_completion* completion
 ) {
   // #region surface
-  mln_opengl_surface_descriptor descriptor =
-    mln_opengl_surface_descriptor_default();
+  mln_opengl_surface_descriptor descriptor = {
+    .size = sizeof(mln_opengl_surface_descriptor)
+  };
   descriptor.extent.width = width;
   descriptor.extent.height = height;
   descriptor.extent.scale_factor = scale_factor;
@@ -36,8 +38,9 @@ mln_status attach_to_own_texture(
   const mln_completion* completion
 ) {
   // #region owned
-  mln_opengl_owned_texture_descriptor descriptor =
-    mln_opengl_owned_texture_descriptor_default();
+  mln_opengl_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_opengl_owned_texture_descriptor)
+  };
   descriptor.extent.width = width;
   descriptor.extent.height = height;
   descriptor.extent.scale_factor = scale_factor;
@@ -62,8 +65,9 @@ mln_status attach_to_host_textures(
     {.texture = textures[0]},
     {.texture = textures[1]},
   };
-  mln_opengl_borrowed_texture_descriptor descriptor =
-    mln_opengl_borrowed_texture_descriptor_default();
+  mln_opengl_borrowed_texture_descriptor descriptor = {
+    .size = sizeof(mln_opengl_borrowed_texture_descriptor)
+  };
   descriptor.extent.width = logical_width;
   descriptor.extent.height = logical_height;
   descriptor.extent.scale_factor = scale_factor;
@@ -98,8 +102,9 @@ mln_status resize_window_target(
   const mln_completion* completion
 ) {
   // #region set-target
-  mln_opengl_surface_descriptor descriptor =
-    mln_opengl_surface_descriptor_default();
+  mln_opengl_surface_descriptor descriptor = {
+    .size = sizeof(mln_opengl_surface_descriptor)
+  };
   descriptor.extent.width = width;
   descriptor.extent.height = height;
   descriptor.extent.scale_factor = scale_factor;

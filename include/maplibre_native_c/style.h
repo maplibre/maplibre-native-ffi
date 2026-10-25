@@ -673,33 +673,6 @@ typedef struct mln_style_transition_options {
   );
 } mln_style_transition_options;
 
-/** Returns zeroed GeoJSON source options with size set. */
-MLN_API mln_geojson_source_options
-mln_geojson_source_options_default(void) MLN_NOEXCEPT;
-
-/** Returns zeroed custom geometry source options with size set. */
-MLN_API mln_custom_geometry_source_options
-mln_custom_geometry_source_options_default(void) MLN_NOEXCEPT;
-
-/** Returns zeroed custom MVT vector source options with size set. */
-MLN_API mln_custom_mvt_vector_source_options
-mln_custom_mvt_vector_source_options_default(void) MLN_NOEXCEPT;
-
-/**
- * Returns a zeroed premultiplied RGBA8 image descriptor with size set. The
- * caller still sets every required member.
- */
-MLN_API mln_premultiplied_rgba8_image
-mln_premultiplied_rgba8_image_default(void) MLN_NOEXCEPT;
-
-/** Returns zeroed runtime style image options with size set. */
-MLN_API mln_style_image_options
-mln_style_image_options_default(void) MLN_NOEXCEPT;
-
-/** Returns zeroed global style transition options with size set. */
-MLN_API mln_style_transition_options
-mln_style_transition_options_default(void) MLN_NOEXCEPT;
-
 /**
  * Adds one style source from a style-spec source JSON object.
  *

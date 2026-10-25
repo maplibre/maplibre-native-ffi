@@ -9,12 +9,9 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_http_header_rule</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
-public readonly record struct HttpHeaderRule
+public readonly partial record struct HttpHeaderRule
 {
-    public HttpHeaderRule()
-    {
-        this = Default;
-    }
+    public HttpHeaderRule() { }
 
     public HttpHeaderRule(
         ResourceKindFlag Kinds,
@@ -38,7 +35,7 @@ public readonly record struct HttpHeaderRule
     /// <summary>
     /// The URL or glob pattern to compare.
     /// </summary>
-    public string Url { get; init; }
+    public string Url { get; init; } = "";
 
     /// <summary>
     /// The headers to set. Registration validates each one as
@@ -50,12 +47,4 @@ public readonly record struct HttpHeaderRule
         init => HeadersStorage = ValueArray.From(value);
     }
     internal ValueArray<HttpHeader> HeadersStorage { get; init; }
-    public static HttpHeaderRule Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyHttpHeaderRule(NativeMethods.mln_http_header_rule_default());
-        }
-    }
 }

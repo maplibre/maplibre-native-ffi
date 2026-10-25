@@ -60,7 +60,6 @@
 "VAL-03" = "tests/bindgen/test_typescript_emitter.py::test_generated_decoders_keep_unknown_arms_and_read_at_the_reported_stride"
 "VAL-04" = "bindings/typescript/test/values.test.ts::integer narrowing is checked and 64-bit carriers round-trip"
 "VAL-05" = "bindings/typescript/test/values.test.ts::an array input is copied when the call submits it"
-"VAL-06" = "bindings/typescript/test/values.test.ts::a record with omitted members equals the native default"
 "VAL-07" = "tests/bindgen/test_typescript_emitter.py::test_generated_decoders_keep_unknown_arms_and_read_at_the_reported_stride"
 "VAL-08" = "bindings/typescript/test/values.test.ts::a synchronous call fills a caller-sized output array in input order"
 "VAL-09" = "bindings/typescript/test/values.test.ts::caller-sized text returns a result longer than its first storage"

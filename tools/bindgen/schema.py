@@ -41,8 +41,7 @@ COMPLETION_EXECUTIONS = frozenset({"command", "query", "operation", "lifecycle"}
 ENCODINGS = frozenset({"utf8", "json", "bytes"})
 # The operating systems that a native build targets, as the presets name them.
 # A `platforms=` annotation lists, in this order and without repeats, the ones
-# where a function can do its work; a function without one serves them all. A
-# record default is never annotated: it serves wherever its record does.
+# where a function can do its work; a function without one serves them all.
 PLATFORMS = ("android", "ios", "linux", "macos", "ohos", "tvos", "web", "windows")
 # The values that a header annotation may write for each key. Conventions fill
 # in most of the rest of a key's vocabulary, such as direction=in, shape=none,
@@ -132,7 +131,6 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "discard",
         "view_begin",
         "view_end",
-        "default_function",
         "user_data",
         "failure",
         "borrowed_owner",
@@ -188,7 +186,7 @@ def platforms(function: Function) -> frozenset[str]:
     return frozenset(value.split(",")) if value else frozenset(PLATFORMS)
 
 
-def platform_errors(function: Function, defaults: set[str], context: str) -> list[str]:
+def platform_errors(function: Function, context: str) -> list[str]:
     value = function.metadata.get("platforms")
     if value is None:
         return []
@@ -200,8 +198,6 @@ def platform_errors(function: Function, defaults: set[str], context: str) -> lis
         return [f"{context}: platforms must list each platform once, in order"]
     if len(names) == len(PLATFORMS):
         return [f"{context}: platforms={value} restates the default"]
-    if function.name in defaults:
-        return [f"{context}: a record default serves wherever its record does"]
     return []
 
 
@@ -259,7 +255,8 @@ class Conventions:
         declares it, and elsewhere a native pointer that bindings pass through.
         A context outlives the call that passes it; every other value lasts for
         the call. A buffer view or character pointer holds UTF-8 text. A pointer
-        borrows its target, and a pointer to a record addresses one record.
+        borrows its target. A character pointer is NUL-terminated, and a pointer
+        to a record addresses one record.
         """
         defaults = {}
         resolved = self.resolve(type_)
@@ -282,7 +279,7 @@ class Conventions:
         if kind in OPAQUE_POINTER_KINDS:
             return defaults
         if pointee.kind in TEXT_POINTEE_KINDS:
-            defaults["encoding"] = "utf8"
+            defaults.update(length="nul", encoding="utf8")
         elif self.is_record(pointee):
             defaults["length"] = "1"
             if is_buffer_view(resolved.pointee) or is_buffer_view(pointee):
@@ -366,9 +363,8 @@ class Conventions:
 
     def typedef(self, typedef) -> dict[str, str]:
         """A callback contains a failure it cannot report; a
-        handle has no parent, and its operations begin with its own name; a
-        registration's user data is its context field; and a record's default
-        value comes from the one function that takes nothing and returns it."""
+        handle has no parent, and its operations begin with its own name; and a
+        registration's user data is its context field."""
         explicit = typedef.metadata
         defaults = {}
         signature = typedef.type.pointee if typedef.type.kind == "pointer" else None
@@ -390,15 +386,6 @@ class Conventions:
             ]
             if len(contexts) == 1:
                 defaults["user_data"] = contexts[0]
-        if self.is_record(typedef.type):
-            constructors = [
-                function.name
-                for function in self.api.functions
-                if not function.parameters
-                and function.return_type.declaration == typedef.name
-            ]
-            if len(constructors) == 1:
-                defaults["default_function"] = constructors[0]
         return defaults
 
 
@@ -521,15 +508,6 @@ def value_metadata_errors(
         )
     if "length" in metadata and type_.kind not in {"pointer", "array"}:
         errors.append(f"{context}: length requires a pointer or array")
-    # Text crosses the API as an mln_buffer_view, so a character pointer is
-    # caller-sized storage that names its capacity.
-    if (
-        is_text_pointer
-        and is_pointer
-        and "length" not in metadata
-        and metadata.get("kind") not in OPAQUE_POINTER_KINDS
-    ):
-        errors.append(f"{context}: text requires an mln_buffer_view")
     return errors
 
 
@@ -680,11 +658,6 @@ def validate(api: Api) -> None:
         "intptr_t",
         "uintptr_t",
     }
-    record_defaults = {
-        typedef.metadata["default_function"]
-        for typedef in api.typedefs
-        if "default_function" in typedef.metadata
-    }
     # The records that an owner lends. A record that no function reaches, such
     # as one that only another platform's view reads, is not checked.
     payload = api.records_by_name.get(DELIVERY_PAYLOAD)
@@ -700,7 +673,7 @@ def validate(api: Api) -> None:
         errors.extend(
             metadata_errors(metadata, FUNCTION_KEYS, context, KINDS["function"])
         )
-        errors.extend(platform_errors(function, record_defaults, context))
+        errors.extend(platform_errors(function, context))
         if "view_owner" in metadata:
             owner = next(
                 (
@@ -853,6 +826,7 @@ def validate(api: Api) -> None:
             if (
                 "length" in parameter.metadata
                 and parameter.metadata["length"] not in parameters
+                and parameter.metadata["length"] != "nul"
                 and parameter.metadata["length"] != "1"
             ):
                 errors.append(f"{pcontext}: length names an absent parameter")
@@ -1040,7 +1014,7 @@ def validate(api: Api) -> None:
                 if (
                     key in field.metadata
                     and field_path(record.name, field.metadata[key]) is None
-                    and not (key == "length" and field.metadata[key] == "1")
+                    and not (key == "length" and field.metadata[key] in {"nul", "1"})
                 ):
                     errors.append(f"{fcontext}: {key} names an absent field")
     for typedef in api.typedefs:
@@ -1228,11 +1202,6 @@ def record_reaches(api: Api) -> tuple[dict[str, set[str]], set[str]]:
     reaches: dict[str, set[str]] = {}
     inputs: set[str] = set()
     internal = set(api.runtime_types)
-    defaults = {
-        typedef.metadata["default_function"]
-        for typedef in api.typedefs
-        if "default_function" in typedef.metadata
-    }
 
     def record_of(type_: CType) -> str | None:
         name = conventions.resolve(type_).declaration
@@ -1275,7 +1244,7 @@ def record_reaches(api: Api) -> tuple[dict[str, set[str]], set[str]]:
                 parameter.metadata,
                 parameter.metadata.get("direction", "in") != "out",
             )
-        if function.name not in defaults and function.return_type.kind != "void":
+        if function.return_type.kind != "void":
             reach(function.return_type, BY_POINTER, {}, False)
         result = function.metadata.get("result")
         if result and result != "void" and result in api.records_by_name:
@@ -1321,11 +1290,10 @@ def versioning_errors(api: Api) -> list[str]:
     callback by pointer, carries its own size. A struct that the interface only
     embeds by value is versioned by its container, and a completion value or a
     strided element by the stride that native delivers with it, so neither
-    carries a size. A record default initializes a record that native reads, so
-    an output-only record has none. Every binding steps through an array result
+    carries a size. Every binding steps through an array result
     by the stride that the completion result reports beside its count.
     """
-    reaches, inputs = record_reaches(api)
+    reaches, _ = record_reaches(api)
     errors = []
     for record in api.records:
         how = reaches.get(record.name)
@@ -1337,17 +1305,6 @@ def versioning_errors(api: Api) -> list[str]:
             errors.append(
                 f"{record.location}: {record.name}: struct versioned by its "
                 "container or stride must not carry size"
-            )
-    for typedef in api.typedefs:
-        if (
-            "default_function" in typedef.metadata
-            and typedef.name in api.records_by_name
-            and typedef.name in reaches
-            and typedef.name not in inputs
-        ):
-            errors.append(
-                f"{typedef.location}: {typedef.name}: default requires a record "
-                "that native reads"
             )
     return errors
 
@@ -1361,7 +1318,6 @@ FUNCTION_REFERENCES = {
         "abandon",
         "view_begin",
         "view_end",
-        "default_function",
     ),
 }
 PARAMETER_REFERENCES = {

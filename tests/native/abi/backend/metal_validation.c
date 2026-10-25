@@ -111,8 +111,9 @@ MLN_TEST_SET_TARGET_SUBMITTER(
 )
 
 static mln_metal_surface_descriptor surface_descriptor(void) {
-  mln_metal_surface_descriptor descriptor =
-    mln_metal_surface_descriptor_default();
+  mln_metal_surface_descriptor descriptor = {
+    .size = sizeof(mln_metal_surface_descriptor)
+  };
   descriptor.extent = mln_test_target_extent();
   descriptor.layer = MLN_TEST_FAKE_HANDLE;
   return descriptor;
@@ -125,7 +126,9 @@ static void describe_borrowed(mln_test_target_call* call, void* texture) {
   call->textures.metal[0] = (mln_metal_borrowed_texture){.texture = texture};
   mln_metal_borrowed_texture_descriptor* descriptor =
     &call->descriptor.metal_borrowed;
-  *descriptor = mln_metal_borrowed_texture_descriptor_default();
+  *descriptor = (mln_metal_borrowed_texture_descriptor){
+    .size = sizeof(mln_metal_borrowed_texture_descriptor)
+  };
   descriptor->extent = mln_test_target_extent();
   descriptor->textures = call->textures.metal;
   descriptor->texture_count = 1;
@@ -169,7 +172,9 @@ static void metal_attach_rejects_malformed_calls(void) {
     sizeof(surface_rows) / sizeof(surface_rows[0])
   );
 
-  call.descriptor.metal_owned = mln_metal_owned_texture_descriptor_default();
+  call.descriptor.metal_owned = (mln_metal_owned_texture_descriptor){
+    .size = sizeof(mln_metal_owned_texture_descriptor)
+  };
   call.descriptor.metal_owned.extent = mln_test_target_extent();
   call.descriptor.metal_owned.context.device = MLN_TEST_FAKE_HANDLE;
   // MTLPixelFormatRGBA8Unorm.

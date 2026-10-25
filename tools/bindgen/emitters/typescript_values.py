@@ -21,7 +21,13 @@ from dataclasses import dataclass
 
 from .. import async_hosts, docs
 from ..names import camel, pascal
-from ..semantic import BoundApi, FieldPlan, ValuePlan, enum_member_prefix
+from ..semantic import (
+    BoundApi,
+    FieldPlan,
+    ValuePlan,
+    enum_member_prefix,
+    required_member,
+)
 
 
 class Unsupported(ValueError):
@@ -232,7 +238,7 @@ def is_counted(value: ValuePlan) -> bool:
     return (
         value.kind == "buffer"
         and value.buffer_form != "view"
-        and value.length not in {None, "1"}
+        and value.length not in {None, "1", "nul"}
     )
 
 
@@ -346,7 +352,10 @@ class Values:
                 raise Unsupported(f"{value.native}: unsupported buffer encoding")
             if value.encoding == "json" and value.buffer_form != "view":
                 raise Unsupported(f"{value.native}: JSON outside a view")
-            if value.buffer_form != "view" and not is_counted(value):
+            if value.buffer_form != "view" and value.length == "nul":
+                if value.encoding == "bytes":
+                    raise Unsupported(f"{value.native}: NUL-terminated bytes")
+            elif value.buffer_form != "view" and not is_counted(value):
                 raise Unsupported(f"{value.native}: buffer without a length")
             return
         if value.kind == "reference":
@@ -492,25 +501,12 @@ class Values:
         return bool(value.nullable)
 
     def omittable(self, record: ValuePlan, field: FieldPlan) -> bool:
-        """Whether an input may leave a member out and keep its default."""
+        """Whether an input may leave a member out and keep its zero default."""
         if field.presence and field.presence.mask:
             return True
         if self.absent(field.value):
             return True
-        if record.default:
-            return True
-        return self.zero_valid(field.value)
-
-    def zero_valid(self, value: ValuePlan) -> bool:
-        # An empty counted buffer is no bytes, which native code validates.
-        if value.kind in {"scalar", "enum", "native_pointer"} or is_counted(value):
-            return True
-        if value.kind == "record" and not value.registration:
-            return value.default is not None or all(
-                self.zero_valid(f.value) or self.absent(f.value)
-                for f in self.fields(value)
-            )
-        return False
+        return not required_member(field)
 
     def all_omittable(self, value: ValuePlan) -> bool:
         return value.kind == "record" and all(

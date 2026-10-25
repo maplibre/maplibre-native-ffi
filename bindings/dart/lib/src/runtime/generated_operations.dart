@@ -36,7 +36,7 @@ Pointer<raw.mln_gpu_sync> _writeGpuSync(
   Pointer<raw.mln_gpu_sync>? into,
 }) {
   final result = into ?? arena<raw.mln_gpu_sync>();
-  result.ref = raw.mln_gpu_sync_default();
+  result.ref.size = sizeOf<raw.mln_gpu_sync>();
   result.ref.kind = value.kind.rawValue;
   result.ref.handle = value.handle;
   return result;
@@ -113,7 +113,6 @@ Pointer<raw.mln_logical_extent> _writeLogicalExtent(
   Pointer<raw.mln_logical_extent>? into,
 }) {
   final result = into ?? arena<raw.mln_logical_extent>();
-  result.ref = raw.mln_logical_extent_default();
   result.ref.width = _nativeInteger(value.width, 0, 4294967295);
   result.ref.height = _nativeInteger(value.height, 0, 4294967295);
   result.ref.scale_factor = value.scaleFactor;
@@ -133,7 +132,7 @@ Pointer<raw.mln_projection_mode> _writeProjectionMode(
   Pointer<raw.mln_projection_mode>? into,
 }) {
   final result = into ?? arena<raw.mln_projection_mode>();
-  result.ref = raw.mln_projection_mode_default();
+  result.ref.size = sizeOf<raw.mln_projection_mode>();
   if (value.axonometric != null) {
     result.ref.fields |= raw.MLN_PROJECTION_MODE_AXONOMETRIC;
     result.ref.axonometric = value.axonometric!;
@@ -168,7 +167,7 @@ Pointer<raw.mln_map_viewport_options> _writeMapViewportOptions(
   Pointer<raw.mln_map_viewport_options>? into,
 }) {
   final result = into ?? arena<raw.mln_map_viewport_options>();
-  result.ref = raw.mln_map_viewport_options_default();
+  result.ref.size = sizeOf<raw.mln_map_viewport_options>();
   if (value.northOrientation != null) {
     result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
     result.ref.north_orientation = value.northOrientation!.rawValue;
@@ -262,6 +261,296 @@ VulkanTextureFrame _readVulkanTextureFrame(
   layout: source.layout,
 );
 
+Pointer<raw.mln_geojson_source_options> _writeGeojsonSourceOptions(
+  GeojsonSourceOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_geojson_source_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_geojson_source_options>();
+  result.ref.size = sizeOf<raw.mln_geojson_source_options>();
+  if (value.minZoom != null) {
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM;
+    result.ref.min_zoom = value.minZoom!;
+  }
+  if (value.maxZoom != null) {
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM;
+    result.ref.max_zoom = value.maxZoom!;
+  }
+  if (value.tolerance != null) {
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE;
+    result.ref.tolerance = value.tolerance!;
+  }
+  if (value.clusterMaxZoom != null) {
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
+    result.ref.cluster_max_zoom = value.clusterMaxZoom!;
+  }
+  result.ref.cluster_properties = _nativeJsonView(
+    value.clusterProperties,
+    arena,
+    member: true,
+  );
+  if (value.buffer != null) {
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_BUFFER;
+    result.ref.buffer = _nativeInteger(value.buffer!, 0, 4294967295);
+  }
+  if (value.clusterRadius != null) {
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
+    result.ref.cluster_radius = _nativeInteger(
+      value.clusterRadius!,
+      0,
+      4294967295,
+    );
+  }
+  if (value.clusterMinPoints != null) {
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
+    result.ref.cluster_min_points = _nativeInteger(
+      value.clusterMinPoints!,
+      0,
+      4294967295,
+    );
+  }
+  if (value.lineMetrics != null) {
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS;
+    result.ref.line_metrics = value.lineMetrics!;
+  }
+  if (value.cluster != null) {
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+    result.ref.cluster = value.cluster!;
+  }
+  if (value.synchronousTiling != null) {
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
+    result.ref.synchronous_tiling = value.synchronousTiling!;
+  }
+  return result;
+}
+
+Pointer<raw.mln_projected_meters> _writeProjectedMeters(
+  ProjectedMeters value,
+  Allocator arena, {
+  Pointer<raw.mln_projected_meters>? into,
+}) {
+  final result = into ?? arena<raw.mln_projected_meters>();
+  result.ref.northing = value.northing;
+  result.ref.easting = value.easting;
+  return result;
+}
+
+ProjectedMeters _readProjectedMeters(raw.mln_projected_meters source) =>
+    ProjectedMeters(northing: source.northing, easting: source.easting);
+
+void _deliverLogCallback(
+  LogCallback callback,
+  int batch,
+  int index,
+  Pointer<raw.mln_delivery> delivery,
+) {
+  final payload = delivery.ref.payload.log_record;
+  callback(
+    LogSeverity.fromRawValue(payload.severity),
+    LogEvent.fromRawValue(payload.event),
+    payload.code,
+    utf8.decode(_copyBufferView(payload.message)),
+  );
+}
+
+_NativeRegistration<raw.mln_log_handler> _prepareLogHandler(
+  LogCallback value,
+  _CallbackRoots roots,
+) {
+  final arena = Arena();
+  DeliveryRegistration? registration;
+  try {
+    final result = arena<raw.mln_log_handler>();
+    result.ref.size = sizeOf<raw.mln_log_handler>();
+    final registered = registration = roots.registerQueued({
+      raw.MLN_DELIVERY_TYPE_LOG_RECORD: (batch, index, delivery) =>
+          _deliverLogCallback(value, batch, index, delivery),
+    });
+    result.ref.queue = isolateDeliveryQueue.handle;
+    result.ref.user_data = Pointer.fromAddress(registered.token);
+    return _NativeRegistration(result, registered.reject, arena.releaseAll);
+  } catch (_) {
+    registration?.reject();
+    arena.releaseAll();
+    rethrow;
+  }
+}
+
+Pointer<raw.mln_canonical_tile_id> _writeCanonicalTileId(
+  CanonicalTileId value,
+  Allocator arena, {
+  Pointer<raw.mln_canonical_tile_id>? into,
+}) {
+  final result = into ?? arena<raw.mln_canonical_tile_id>();
+  result.ref.z = _nativeInteger(value.z, 0, 4294967295);
+  result.ref.x = _nativeInteger(value.x, 0, 4294967295);
+  result.ref.y = _nativeInteger(value.y, 0, 4294967295);
+  return result;
+}
+
+CanonicalTileId _readCanonicalTileId(raw.mln_canonical_tile_id source) =>
+    CanonicalTileId(z: source.z, x: source.x, y: source.y);
+
+void _deliverCustomSourceFetchTileCallback(
+  CustomSourceFetchTileCallback callback,
+  int batch,
+  int index,
+  Pointer<raw.mln_delivery> delivery,
+) {
+  final payload = delivery.ref.payload.custom_source_fetch_tile;
+  callback(_readCanonicalTileId(payload.tile_id));
+}
+
+void _deliverCustomSourceCancelTileCallback(
+  CustomSourceCancelTileCallback callback,
+  int batch,
+  int index,
+  Pointer<raw.mln_delivery> delivery,
+) {
+  final payload = delivery.ref.payload.custom_source_cancel_tile;
+  callback(_readCanonicalTileId(payload.tile_id));
+}
+
+_NativeRegistration<raw.mln_custom_geometry_source_options>
+_prepareCustomGeometrySourceOptions(
+  CustomGeometrySourceOptions value,
+  _CallbackRoots roots,
+) {
+  final arena = Arena();
+  DeliveryRegistration? registration;
+  try {
+    final result = arena<raw.mln_custom_geometry_source_options>();
+    result.ref.size = sizeOf<raw.mln_custom_geometry_source_options>();
+    if (value.minZoom != null) {
+      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
+      result.ref.min_zoom = value.minZoom!;
+    }
+    if (value.maxZoom != null) {
+      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM;
+      result.ref.max_zoom = value.maxZoom!;
+    }
+    if (value.tolerance != null) {
+      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE;
+      result.ref.tolerance = value.tolerance!;
+    }
+    if (value.tileSize != null) {
+      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE;
+      result.ref.tile_size = _nativeInteger(value.tileSize!, 0, 4294967295);
+    }
+    if (value.buffer != null) {
+      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER;
+      result.ref.buffer = _nativeInteger(value.buffer!, 0, 4294967295);
+    }
+    if (value.clip != null) {
+      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP;
+      result.ref.clip = value.clip!;
+    }
+    if (value.wrap != null) {
+      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
+      result.ref.wrap = value.wrap!;
+    }
+    final registered = registration = roots.registerQueued({
+      raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE:
+          (batch, index, delivery) => _deliverCustomSourceFetchTileCallback(
+            value.fetchTile,
+            batch,
+            index,
+            delivery,
+          ),
+      if (value.cancelTile != null)
+        raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE:
+            (batch, index, delivery) => _deliverCustomSourceCancelTileCallback(
+              value.cancelTile!,
+              batch,
+              index,
+              delivery,
+            ),
+    });
+    result.ref.queue = isolateDeliveryQueue.handle;
+    result.ref.user_data = Pointer.fromAddress(registered.token);
+    return _NativeRegistration(result, registered.reject, arena.releaseAll);
+  } catch (_) {
+    registration?.reject();
+    arena.releaseAll();
+    rethrow;
+  }
+}
+
+_NativeRegistration<raw.mln_custom_mvt_vector_source_options>
+_prepareCustomMvtVectorSourceOptions(
+  CustomMvtVectorSourceOptions value,
+  _CallbackRoots roots,
+) {
+  final arena = Arena();
+  DeliveryRegistration? registration;
+  try {
+    final result = arena<raw.mln_custom_mvt_vector_source_options>();
+    result.ref.size = sizeOf<raw.mln_custom_mvt_vector_source_options>();
+    if (value.minZoom != null) {
+      result.ref.fields |= raw.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM;
+      result.ref.min_zoom = value.minZoom!;
+    }
+    if (value.maxZoom != null) {
+      result.ref.fields |= raw.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
+      result.ref.max_zoom = value.maxZoom!;
+    }
+    final registered = registration = roots.registerQueued({
+      raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE:
+          (batch, index, delivery) => _deliverCustomSourceFetchTileCallback(
+            value.fetchTile,
+            batch,
+            index,
+            delivery,
+          ),
+      if (value.cancelTile != null)
+        raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE:
+            (batch, index, delivery) => _deliverCustomSourceCancelTileCallback(
+              value.cancelTile!,
+              batch,
+              index,
+              delivery,
+            ),
+    });
+    result.ref.queue = isolateDeliveryQueue.handle;
+    result.ref.user_data = Pointer.fromAddress(registered.token);
+    return _NativeRegistration(result, registered.reject, arena.releaseAll);
+  } catch (_) {
+    registration?.reject();
+    arena.releaseAll();
+    rethrow;
+  }
+}
+
+Pointer<raw.mln_premultiplied_rgba8_image> _writePremultipliedRgba8Image(
+  PremultipliedRgba8Image value,
+  Allocator arena, {
+  Pointer<raw.mln_premultiplied_rgba8_image>? into,
+}) {
+  final result = into ?? arena<raw.mln_premultiplied_rgba8_image>();
+  result.ref.size = sizeOf<raw.mln_premultiplied_rgba8_image>();
+  result.ref.width = _nativeInteger(value.width, 0, 4294967295);
+  result.ref.height = _nativeInteger(value.height, 0, 4294967295);
+  result.ref.stride = _nativeInteger(value.stride, 0, 4294967295);
+  final bytespixels = nativeBufferView(value.pixels, arena);
+  result.ref.pixels = bytespixels.data.cast();
+  result.ref.byte_length = bytespixels.size;
+  return result;
+}
+
+Pointer<raw.mln_screen_point> _writeScreenPoint(
+  ScreenPoint value,
+  Allocator arena, {
+  Pointer<raw.mln_screen_point>? into,
+}) {
+  final result = into ?? arena<raw.mln_screen_point>();
+  result.ref.x = value.x;
+  result.ref.y = value.y;
+  return result;
+}
+
+ScreenPoint _readScreenPoint(raw.mln_screen_point source) =>
+    ScreenPoint(x: source.x, y: source.y);
+
 Pointer<raw.mln_unit_bezier> _writeUnitBezier(
   UnitBezier value,
   Allocator arena, {
@@ -274,9 +563,6 @@ Pointer<raw.mln_unit_bezier> _writeUnitBezier(
   result.ref.y2 = value.y2;
   return result;
 }
-
-UnitBezier _readUnitBezier(raw.mln_unit_bezier source) =>
-    UnitBezier(x1: source.x1, y1: source.y1, x2: source.x2, y2: source.y2);
 
 CameraTransitionEnd _readCameraTransitionEnd(
   raw.mln_camera_transition_end source,
@@ -328,7 +614,6 @@ Pointer<raw.mln_animation_options> _writeAnimationOptions(
   Pointer<raw.mln_animation_options>? into,
 }) {
   final result = into ?? arena<raw.mln_animation_options>();
-  result.ref = raw.mln_animation_options_default();
   if (value.durationMs != null) {
     result.ref.fields |= raw.MLN_ANIMATION_OPTION_DURATION;
     result.ref.duration_ms = value.durationMs!;
@@ -362,109 +647,6 @@ Pointer<raw.mln_animation_options> _writeAnimationOptions(
   return result;
 }
 
-AnimationOptions _readAnimationOptions(raw.mln_animation_options source) =>
-    AnimationOptions(
-      durationMs: (source.fields & raw.MLN_ANIMATION_OPTION_DURATION) != 0
-          ? source.duration_ms
-          : null,
-      velocity: (source.fields & raw.MLN_ANIMATION_OPTION_VELOCITY) != 0
-          ? source.velocity
-          : null,
-      minZoom: (source.fields & raw.MLN_ANIMATION_OPTION_MIN_ZOOM) != 0
-          ? source.min_zoom
-          : null,
-      easing: (source.fields & raw.MLN_ANIMATION_OPTION_EASING) != 0
-          ? _readUnitBezier(source.easing)
-          : null,
-      transitionId:
-          (source.fields & raw.MLN_ANIMATION_OPTION_TRANSITION_ID) != 0
-          ? source.transition_id
-          : null,
-      endHandler: null,
-    );
-
-Pointer<raw.mln_lat_lng_bounds> _writeLatLngBounds(
-  LatLngBounds value,
-  Allocator arena, {
-  Pointer<raw.mln_lat_lng_bounds>? into,
-}) {
-  final result = into ?? arena<raw.mln_lat_lng_bounds>();
-  result.ref.southwest = _writeLatLng(value.southwest, arena).ref;
-  result.ref.northeast = _writeLatLng(value.northeast, arena).ref;
-  return result;
-}
-
-LatLngBounds _readLatLngBounds(raw.mln_lat_lng_bounds source) => LatLngBounds(
-  southwest: _readLatLng(source.southwest),
-  northeast: _readLatLng(source.northeast),
-);
-
-Pointer<raw.mln_bound_options> _writeBoundOptions(
-  BoundOptions value,
-  Allocator arena, {
-  Pointer<raw.mln_bound_options>? into,
-}) {
-  final result = into ?? arena<raw.mln_bound_options>();
-  result.ref = raw.mln_bound_options_default();
-  if (value.unbounded) {
-    result.ref.fields |= raw.MLN_BOUND_OPTION_UNBOUNDED;
-  }
-  if (value.bounds != null) {
-    result.ref.fields |= raw.MLN_BOUND_OPTION_BOUNDS;
-    result.ref.bounds = _writeLatLngBounds(value.bounds!, arena).ref;
-  }
-  if (value.minZoom != null) {
-    result.ref.fields |= raw.MLN_BOUND_OPTION_MIN_ZOOM;
-    result.ref.min_zoom = value.minZoom!;
-  }
-  if (value.maxZoom != null) {
-    result.ref.fields |= raw.MLN_BOUND_OPTION_MAX_ZOOM;
-    result.ref.max_zoom = value.maxZoom!;
-  }
-  if (value.minPitch != null) {
-    result.ref.fields |= raw.MLN_BOUND_OPTION_MIN_PITCH;
-    result.ref.min_pitch = value.minPitch!;
-  }
-  if (value.maxPitch != null) {
-    result.ref.fields |= raw.MLN_BOUND_OPTION_MAX_PITCH;
-    result.ref.max_pitch = value.maxPitch!;
-  }
-  return result;
-}
-
-BoundOptions _readBoundOptions(raw.mln_bound_options source) => BoundOptions(
-  unbounded: (source.fields & raw.MLN_BOUND_OPTION_UNBOUNDED) != 0,
-  bounds: (source.fields & raw.MLN_BOUND_OPTION_BOUNDS) != 0
-      ? _readLatLngBounds(source.bounds)
-      : null,
-  minZoom: (source.fields & raw.MLN_BOUND_OPTION_MIN_ZOOM) != 0
-      ? source.min_zoom
-      : null,
-  maxZoom: (source.fields & raw.MLN_BOUND_OPTION_MAX_ZOOM) != 0
-      ? source.max_zoom
-      : null,
-  minPitch: (source.fields & raw.MLN_BOUND_OPTION_MIN_PITCH) != 0
-      ? source.min_pitch
-      : null,
-  maxPitch: (source.fields & raw.MLN_BOUND_OPTION_MAX_PITCH) != 0
-      ? source.max_pitch
-      : null,
-);
-
-Pointer<raw.mln_screen_point> _writeScreenPoint(
-  ScreenPoint value,
-  Allocator arena, {
-  Pointer<raw.mln_screen_point>? into,
-}) {
-  final result = into ?? arena<raw.mln_screen_point>();
-  result.ref.x = value.x;
-  result.ref.y = value.y;
-  return result;
-}
-
-ScreenPoint _readScreenPoint(raw.mln_screen_point source) =>
-    ScreenPoint(x: source.x, y: source.y);
-
 Pointer<raw.mln_camera_delta> _writeCameraDelta(
   CameraDelta value,
   Allocator arena,
@@ -472,7 +654,7 @@ Pointer<raw.mln_camera_delta> _writeCameraDelta(
   Pointer<raw.mln_camera_delta>? into,
 }) {
   final result = into ?? arena<raw.mln_camera_delta>();
-  result.ref = raw.mln_camera_delta_default();
+  result.ref.size = sizeOf<raw.mln_camera_delta>();
   if (value.offset != null) {
     result.ref.fields |= raw.MLN_CAMERA_DELTA_OFFSET;
     result.ref.offset = _writeScreenPoint(value.offset!, arena).ref;
@@ -502,25 +684,395 @@ Pointer<raw.mln_camera_delta> _writeCameraDelta(
   return result;
 }
 
-CameraDelta _readCameraDelta(raw.mln_camera_delta source) => CameraDelta(
-  offset: (source.fields & raw.MLN_CAMERA_DELTA_OFFSET) != 0
-      ? _readScreenPoint(source.offset)
-      : null,
-  scale: (source.fields & raw.MLN_CAMERA_DELTA_SCALE) != 0
-      ? source.scale
-      : null,
-  bearing: (source.fields & raw.MLN_CAMERA_DELTA_BEARING) != 0
-      ? source.bearing
-      : null,
-  pitch: (source.fields & raw.MLN_CAMERA_DELTA_PITCH) != 0
-      ? source.pitch
-      : null,
-  anchor: (source.fields & raw.MLN_CAMERA_DELTA_ANCHOR) != 0
-      ? _readScreenPoint(source.anchor)
-      : null,
-  animation: _readAnimationOptions(source.animation),
-  gesturePhase: GesturePhase.fromRawValue(source.gesture_phase),
-);
+Pointer<raw.mln_metal_borrowed_texture> _writeMetalBorrowedTexture(
+  MetalBorrowedTexture value,
+  Allocator arena, {
+  Pointer<raw.mln_metal_borrowed_texture>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_borrowed_texture>();
+  result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
+  return result;
+}
+
+Pointer<raw.mln_metal_borrowed_texture_descriptor>
+_writeMetalBorrowedTextureDescriptor(
+  MetalBorrowedTextureDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_metal_borrowed_texture_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_borrowed_texture_descriptor>();
+  result.ref.size = sizeOf<raw.mln_metal_borrowed_texture_descriptor>();
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.physical_width = _nativeInteger(
+    value.physicalWidth,
+    0,
+    4294967295,
+  );
+  result.ref.physical_height = _nativeInteger(
+    value.physicalHeight,
+    0,
+    4294967295,
+  );
+  result.ref.textures = arena<raw.mln_metal_borrowed_texture>(
+    value.textures.isEmpty ? 1 : value.textures.length,
+  );
+  result.ref.texture_count = value.textures.length;
+  for (var index = 0; index < value.textures.length; index++) {
+    _writeMetalBorrowedTexture(
+      value.textures[index],
+      arena,
+      into: result.ref.textures + index,
+    );
+  }
+  return result;
+}
+
+_NativeRegistration<raw.mln_wake> _prepareWake(
+  Wake value,
+  _CallbackRoots roots,
+) {
+  final native = _takeNativeRegistration(value);
+  if (native == null) return roots.wake(value.callback);
+  final arena = Arena();
+  final result = arena<raw.mln_wake>();
+  result.ref.callback = Pointer.fromAddress(native.callbacks[0].address);
+  result.ref.user_data = Pointer.fromAddress(native.userData.address);
+  result.ref.release_user_data = Pointer.fromAddress(
+    native.releaseUserData.address,
+  );
+  return _NativeRegistration(result, native.release, arena.releaseAll);
+}
+
+_NativeRegistration<raw.mln_queue_lock> _prepareQueueLock(QueueLock value) {
+  final native = _takeNativeRegistration(value)!;
+  final arena = Arena();
+  final result = arena<raw.mln_queue_lock>();
+  result.ref.lock = Pointer.fromAddress(native.callbacks[0].address);
+  result.ref.unlock = Pointer.fromAddress(native.callbacks[1].address);
+  result.ref.user_data = Pointer.fromAddress(native.userData.address);
+  result.ref.release_user_data = Pointer.fromAddress(
+    native.releaseUserData.address,
+  );
+  return _NativeRegistration(result, native.release, arena.releaseAll);
+}
+
+Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
+  RenderSessionAttachOptions value,
+  Allocator arena,
+  _NativeRegistrations registrations, {
+  Pointer<raw.mln_render_session_attach_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_render_session_attach_options>();
+  result.ref.size = sizeOf<raw.mln_render_session_attach_options>();
+  result.ref.driver = value.driver.rawValue;
+  result.ref.requested_texture_ring_depth = _nativeInteger(
+    value.requestedTextureRingDepth,
+    0,
+    4294967295,
+  );
+  result.ref.producer_sync_kind = value.producerSyncKind.rawValue;
+  result.ref.frame_wake = registrations
+      .add(_prepareWake(value.frameWake, registrations.roots))
+      .ref;
+  result.ref.driver_work_wake = registrations
+      .add(_prepareWake(value.driverWorkWake, registrations.roots))
+      .ref;
+  if (value.queueLock != null) {
+    result.ref.queue_lock = registrations
+        .add(_prepareQueueLock(value.queueLock!))
+        .ref;
+  }
+  return result;
+}
+
+Pointer<raw.mln_metal_context_descriptor> _writeMetalContextDescriptor(
+  MetalContextDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_metal_context_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_context_descriptor>();
+  result.ref.device = Pointer<Void>.fromAddress(value.device.address).cast();
+  return result;
+}
+
+Pointer<raw.mln_metal_owned_texture_descriptor>
+_writeMetalOwnedTextureDescriptor(
+  MetalOwnedTextureDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_metal_owned_texture_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_owned_texture_descriptor>();
+  result.ref.size = sizeOf<raw.mln_metal_owned_texture_descriptor>();
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.context = _writeMetalContextDescriptor(value.context, arena).ref;
+  result.ref.pixel_format = value.pixelFormat;
+  return result;
+}
+
+Pointer<raw.mln_metal_surface_descriptor> _writeMetalSurfaceDescriptor(
+  MetalSurfaceDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_metal_surface_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_surface_descriptor>();
+  result.ref.size = sizeOf<raw.mln_metal_surface_descriptor>();
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.context = _writeMetalContextDescriptor(value.context, arena).ref;
+  result.ref.layer = Pointer<Void>.fromAddress(value.layer.address).cast();
+  return result;
+}
+
+Pointer<raw.mln_wgl_context_descriptor> _writeWglContextDescriptor(
+  WglContextDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_wgl_context_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_wgl_context_descriptor>();
+  result.ref.device_context = Pointer<Void>.fromAddress(
+    value.deviceContext.address,
+  ).cast();
+  result.ref.share_context = Pointer<Void>.fromAddress(
+    value.shareContext.address,
+  ).cast();
+  result.ref.get_proc_address = Pointer<Void>.fromAddress(
+    value.getProcAddress.address,
+  ).cast();
+  return result;
+}
+
+Pointer<raw.mln_egl_context_descriptor> _writeEglContextDescriptor(
+  EglContextDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_egl_context_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_egl_context_descriptor>();
+  result.ref.display = Pointer<Void>.fromAddress(value.display.address).cast();
+  result.ref.config = Pointer<Void>.fromAddress(value.config.address).cast();
+  result.ref.share_context = Pointer<Void>.fromAddress(
+    value.shareContext.address,
+  ).cast();
+  result.ref.client_api = value.clientApi.rawValue;
+  result.ref.get_proc_address = Pointer<Void>.fromAddress(
+    value.getProcAddress.address,
+  ).cast();
+  return result;
+}
+
+Pointer<raw.mln_webgl_context_descriptor> _writeWebglContextDescriptor(
+  WebglContextDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_webgl_context_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_webgl_context_descriptor>();
+  result.ref.kind = value.kind.rawValue;
+  result.ref.context = _nativeInteger(value.context, -2147483648, 2147483647);
+  result.ref.canvas_selector = nativeStringView(
+    value.canvasSelector,
+    arena,
+  ).value;
+  return result;
+}
+
+Pointer<raw.mln_opengl_context_descriptor> _writeOpenglContextDescriptor(
+  OpenglContextDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_opengl_context_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_opengl_context_descriptor>();
+
+  result.ref.ownership = value.ownership.rawValue;
+  switch (value.data) {
+    case OpenglContextDescriptorDataWgl(:final value):
+      result.ref.platform = 1;
+      result.ref.data.wgl = _writeWglContextDescriptor(value, arena).ref;
+    case OpenglContextDescriptorDataEgl(:final value):
+      result.ref.platform = 2;
+      result.ref.data.egl = _writeEglContextDescriptor(value, arena).ref;
+    case OpenglContextDescriptorDataWebgl(:final value):
+      result.ref.platform = 3;
+      result.ref.data.webgl = _writeWebglContextDescriptor(value, arena).ref;
+  }
+  return result;
+}
+
+Pointer<raw.mln_opengl_borrowed_texture> _writeOpenglBorrowedTexture(
+  OpenglBorrowedTexture value,
+  Allocator arena, {
+  Pointer<raw.mln_opengl_borrowed_texture>? into,
+}) {
+  final result = into ?? arena<raw.mln_opengl_borrowed_texture>();
+  result.ref.texture = _nativeInteger(value.texture, 0, 4294967295);
+  return result;
+}
+
+Pointer<raw.mln_opengl_borrowed_texture_descriptor>
+_writeOpenglBorrowedTextureDescriptor(
+  OpenglBorrowedTextureDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_opengl_borrowed_texture_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_opengl_borrowed_texture_descriptor>();
+  result.ref.size = sizeOf<raw.mln_opengl_borrowed_texture_descriptor>();
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.physical_width = _nativeInteger(
+    value.physicalWidth,
+    0,
+    4294967295,
+  );
+  result.ref.physical_height = _nativeInteger(
+    value.physicalHeight,
+    0,
+    4294967295,
+  );
+  result.ref.context = _writeOpenglContextDescriptor(value.context, arena).ref;
+  result.ref.textures = arena<raw.mln_opengl_borrowed_texture>(
+    value.textures.isEmpty ? 1 : value.textures.length,
+  );
+  result.ref.texture_count = value.textures.length;
+  for (var index = 0; index < value.textures.length; index++) {
+    _writeOpenglBorrowedTexture(
+      value.textures[index],
+      arena,
+      into: result.ref.textures + index,
+    );
+  }
+  result.ref.target = _nativeInteger(value.target, 0, 4294967295);
+  return result;
+}
+
+Pointer<raw.mln_opengl_owned_texture_descriptor>
+_writeOpenglOwnedTextureDescriptor(
+  OpenglOwnedTextureDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_opengl_owned_texture_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_opengl_owned_texture_descriptor>();
+  result.ref.size = sizeOf<raw.mln_opengl_owned_texture_descriptor>();
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.context = _writeOpenglContextDescriptor(value.context, arena).ref;
+  return result;
+}
+
+Pointer<raw.mln_opengl_surface_descriptor> _writeOpenglSurfaceDescriptor(
+  OpenglSurfaceDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_opengl_surface_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_opengl_surface_descriptor>();
+  result.ref.size = sizeOf<raw.mln_opengl_surface_descriptor>();
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.context = _writeOpenglContextDescriptor(value.context, arena).ref;
+  result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
+  return result;
+}
+
+Pointer<raw.mln_vulkan_context_descriptor> _writeVulkanContextDescriptor(
+  VulkanContextDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_vulkan_context_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_vulkan_context_descriptor>();
+  result.ref.instance = Pointer<Void>.fromAddress(
+    value.instance.address,
+  ).cast();
+  result.ref.physical_device = Pointer<Void>.fromAddress(
+    value.physicalDevice.address,
+  ).cast();
+  result.ref.device = Pointer<Void>.fromAddress(value.device.address).cast();
+  result.ref.graphics_queue = Pointer<Void>.fromAddress(
+    value.graphicsQueue.address,
+  ).cast();
+  result.ref.graphics_queue_family_index = _nativeInteger(
+    value.graphicsQueueFamilyIndex,
+    0,
+    4294967295,
+  );
+  result.ref.get_instance_proc_addr = Pointer<Void>.fromAddress(
+    value.getInstanceProcAddr.address,
+  ).cast();
+  result.ref.get_device_proc_addr = Pointer<Void>.fromAddress(
+    value.getDeviceProcAddr.address,
+  ).cast();
+  return result;
+}
+
+Pointer<raw.mln_vulkan_borrowed_texture> _writeVulkanBorrowedTexture(
+  VulkanBorrowedTexture value,
+  Allocator arena, {
+  Pointer<raw.mln_vulkan_borrowed_texture>? into,
+}) {
+  final result = into ?? arena<raw.mln_vulkan_borrowed_texture>();
+  result.ref.image = value.image;
+  result.ref.image_view = value.imageView;
+  return result;
+}
+
+Pointer<raw.mln_vulkan_borrowed_texture_descriptor>
+_writeVulkanBorrowedTextureDescriptor(
+  VulkanBorrowedTextureDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_vulkan_borrowed_texture_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_vulkan_borrowed_texture_descriptor>();
+  result.ref.size = sizeOf<raw.mln_vulkan_borrowed_texture_descriptor>();
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.physical_width = _nativeInteger(
+    value.physicalWidth,
+    0,
+    4294967295,
+  );
+  result.ref.physical_height = _nativeInteger(
+    value.physicalHeight,
+    0,
+    4294967295,
+  );
+  result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
+  result.ref.textures = arena<raw.mln_vulkan_borrowed_texture>(
+    value.textures.isEmpty ? 1 : value.textures.length,
+  );
+  result.ref.texture_count = value.textures.length;
+  for (var index = 0; index < value.textures.length; index++) {
+    _writeVulkanBorrowedTexture(
+      value.textures[index],
+      arena,
+      into: result.ref.textures + index,
+    );
+  }
+  result.ref.format = _nativeInteger(value.format, 0, 4294967295);
+  result.ref.initial_layout = _nativeInteger(
+    value.initialLayout,
+    0,
+    4294967295,
+  );
+  result.ref.final_layout = _nativeInteger(value.finalLayout, 0, 4294967295);
+  return result;
+}
+
+Pointer<raw.mln_vulkan_owned_texture_descriptor>
+_writeVulkanOwnedTextureDescriptor(
+  VulkanOwnedTextureDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_vulkan_owned_texture_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_vulkan_owned_texture_descriptor>();
+  result.ref.size = sizeOf<raw.mln_vulkan_owned_texture_descriptor>();
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
+  return result;
+}
+
+Pointer<raw.mln_vulkan_surface_descriptor> _writeVulkanSurfaceDescriptor(
+  VulkanSurfaceDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_vulkan_surface_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_vulkan_surface_descriptor>();
+  result.ref.size = sizeOf<raw.mln_vulkan_surface_descriptor>();
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
+  result.ref.surface = value.surface;
+  return result;
+}
 
 Pointer<raw.mln_camera_fit_options> _writeCameraFitOptions(
   CameraFitOptions value,
@@ -528,7 +1080,7 @@ Pointer<raw.mln_camera_fit_options> _writeCameraFitOptions(
   Pointer<raw.mln_camera_fit_options>? into,
 }) {
   final result = into ?? arena<raw.mln_camera_fit_options>();
-  result.ref = raw.mln_camera_fit_options_default();
+  result.ref.size = sizeOf<raw.mln_camera_fit_options>();
   if (value.padding != null) {
     result.ref.fields |= raw.MLN_CAMERA_FIT_OPTION_PADDING;
     result.ref.padding = _writeEdgeInsets(value.padding!, arena).ref;
@@ -544,26 +1096,13 @@ Pointer<raw.mln_camera_fit_options> _writeCameraFitOptions(
   return result;
 }
 
-CameraFitOptions _readCameraFitOptions(raw.mln_camera_fit_options source) =>
-    CameraFitOptions(
-      padding: (source.fields & raw.MLN_CAMERA_FIT_OPTION_PADDING) != 0
-          ? _readEdgeInsets(source.padding)
-          : null,
-      bearing: (source.fields & raw.MLN_CAMERA_FIT_OPTION_BEARING) != 0
-          ? source.bearing
-          : null,
-      pitch: (source.fields & raw.MLN_CAMERA_FIT_OPTION_PITCH) != 0
-          ? source.pitch
-          : null,
-    );
-
 Pointer<raw.mln_camera_options> _writeCameraOptions(
   CameraOptions value,
   Allocator arena, {
   Pointer<raw.mln_camera_options>? into,
 }) {
   final result = into ?? arena<raw.mln_camera_options>();
-  result.ref = raw.mln_camera_options_default();
+  result.ref.size = sizeOf<raw.mln_camera_options>();
   if (value.center != null) {
     result.ref.fields |= raw.MLN_CAMERA_OPTION_CENTER;
     result.ref.center = _writeLatLng(value.center!, arena).ref;
@@ -631,1091 +1170,20 @@ CameraOptions _readCameraOptions(
       : null,
 );
 
-Pointer<raw.mln_camera_update> _writeCameraUpdate(
-  CameraUpdate value,
-  Allocator arena,
-  _NativeRegistrations registrations, {
-  Pointer<raw.mln_camera_update>? into,
-}) {
-  final result = into ?? arena<raw.mln_camera_update>();
-  result.ref = raw.mln_camera_update_default();
-  result.ref.mode = value.mode.rawValue;
-  result.ref.camera = _writeCameraOptions(value.camera, arena).ref;
-  result.ref.animation = _writeAnimationOptions(
-    value.animation,
-    arena,
-    registrations,
-  ).ref;
-  result.ref.gesture_phase = value.gesturePhase.rawValue;
-  return result;
-}
-
-CameraUpdate _readCameraUpdate(raw.mln_camera_update source) => CameraUpdate(
-  mode: CameraUpdateMode.fromRawValue(source.mode),
-  camera: _readCameraOptions(source.camera),
-  animation: _readAnimationOptions(source.animation),
-  gesturePhase: GesturePhase.fromRawValue(source.gesture_phase),
-);
-
-Pointer<raw.mln_canonical_tile_id> _writeCanonicalTileId(
-  CanonicalTileId value,
+Pointer<raw.mln_lat_lng_bounds> _writeLatLngBounds(
+  LatLngBounds value,
   Allocator arena, {
-  Pointer<raw.mln_canonical_tile_id>? into,
+  Pointer<raw.mln_lat_lng_bounds>? into,
 }) {
-  final result = into ?? arena<raw.mln_canonical_tile_id>();
-  result.ref.z = _nativeInteger(value.z, 0, 4294967295);
-  result.ref.x = _nativeInteger(value.x, 0, 4294967295);
-  result.ref.y = _nativeInteger(value.y, 0, 4294967295);
+  final result = into ?? arena<raw.mln_lat_lng_bounds>();
+  result.ref.southwest = _writeLatLng(value.southwest, arena).ref;
+  result.ref.northeast = _writeLatLng(value.northeast, arena).ref;
   return result;
 }
 
-CanonicalTileId _readCanonicalTileId(raw.mln_canonical_tile_id source) =>
-    CanonicalTileId(z: source.z, x: source.x, y: source.y);
-
-void _deliverCustomSourceFetchTileCallback(
-  CustomSourceFetchTileCallback callback,
-  int batch,
-  int index,
-  Pointer<raw.mln_delivery> delivery,
-) {
-  final payload = delivery.ref.payload.custom_source_fetch_tile;
-  callback(_readCanonicalTileId(payload.tile_id));
-}
-
-void _deliverCustomSourceCancelTileCallback(
-  CustomSourceCancelTileCallback callback,
-  int batch,
-  int index,
-  Pointer<raw.mln_delivery> delivery,
-) {
-  final payload = delivery.ref.payload.custom_source_cancel_tile;
-  callback(_readCanonicalTileId(payload.tile_id));
-}
-
-_NativeRegistration<raw.mln_custom_geometry_source_options>
-_prepareCustomGeometrySourceOptions(
-  CustomGeometrySourceOptions value,
-  _CallbackRoots roots,
-) {
-  final arena = Arena();
-  DeliveryRegistration? registration;
-  try {
-    final result = arena<raw.mln_custom_geometry_source_options>();
-    result.ref = raw.mln_custom_geometry_source_options_default();
-    if (value.minZoom != null) {
-      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
-      result.ref.min_zoom = value.minZoom!;
-    }
-    if (value.maxZoom != null) {
-      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM;
-      result.ref.max_zoom = value.maxZoom!;
-    }
-    if (value.tolerance != null) {
-      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE;
-      result.ref.tolerance = value.tolerance!;
-    }
-    if (value.tileSize != null) {
-      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE;
-      result.ref.tile_size = _nativeInteger(value.tileSize!, 0, 4294967295);
-    }
-    if (value.buffer != null) {
-      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER;
-      result.ref.buffer = _nativeInteger(value.buffer!, 0, 4294967295);
-    }
-    if (value.clip != null) {
-      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP;
-      result.ref.clip = value.clip!;
-    }
-    if (value.wrap != null) {
-      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
-      result.ref.wrap = value.wrap!;
-    }
-    final registered = registration = roots.registerQueued({
-      raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE:
-          (batch, index, delivery) => _deliverCustomSourceFetchTileCallback(
-            value.fetchTile,
-            batch,
-            index,
-            delivery,
-          ),
-      if (value.cancelTile != null)
-        raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE:
-            (batch, index, delivery) => _deliverCustomSourceCancelTileCallback(
-              value.cancelTile!,
-              batch,
-              index,
-              delivery,
-            ),
-    });
-    result.ref.queue = isolateDeliveryQueue.handle;
-    result.ref.user_data = Pointer.fromAddress(registered.token);
-    return _NativeRegistration(result, registered.reject, arena.releaseAll);
-  } catch (_) {
-    registration?.reject();
-    arena.releaseAll();
-    rethrow;
-  }
-}
-
-CustomGeometrySourceOptions _readCustomGeometrySourceOptions(
-  raw.mln_custom_geometry_source_options source,
-  CustomSourceFetchTileCallback fetchTile,
-) => CustomGeometrySourceOptions(
-  fetchTile: fetchTile,
-  minZoom: source.min_zoom,
-  maxZoom: source.max_zoom,
-  tolerance: source.tolerance,
-  tileSize: source.tile_size,
-  buffer: source.buffer,
-  clip: source.clip,
-  wrap: source.wrap,
-);
-
-_NativeRegistration<raw.mln_custom_mvt_vector_source_options>
-_prepareCustomMvtVectorSourceOptions(
-  CustomMvtVectorSourceOptions value,
-  _CallbackRoots roots,
-) {
-  final arena = Arena();
-  DeliveryRegistration? registration;
-  try {
-    final result = arena<raw.mln_custom_mvt_vector_source_options>();
-    result.ref = raw.mln_custom_mvt_vector_source_options_default();
-    if (value.minZoom != null) {
-      result.ref.fields |= raw.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM;
-      result.ref.min_zoom = value.minZoom!;
-    }
-    if (value.maxZoom != null) {
-      result.ref.fields |= raw.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
-      result.ref.max_zoom = value.maxZoom!;
-    }
-    final registered = registration = roots.registerQueued({
-      raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_FETCH_TILE:
-          (batch, index, delivery) => _deliverCustomSourceFetchTileCallback(
-            value.fetchTile,
-            batch,
-            index,
-            delivery,
-          ),
-      if (value.cancelTile != null)
-        raw.MLN_DELIVERY_TYPE_CUSTOM_SOURCE_CANCEL_TILE:
-            (batch, index, delivery) => _deliverCustomSourceCancelTileCallback(
-              value.cancelTile!,
-              batch,
-              index,
-              delivery,
-            ),
-    });
-    result.ref.queue = isolateDeliveryQueue.handle;
-    result.ref.user_data = Pointer.fromAddress(registered.token);
-    return _NativeRegistration(result, registered.reject, arena.releaseAll);
-  } catch (_) {
-    registration?.reject();
-    arena.releaseAll();
-    rethrow;
-  }
-}
-
-CustomMvtVectorSourceOptions _readCustomMvtVectorSourceOptions(
-  raw.mln_custom_mvt_vector_source_options source,
-  CustomSourceFetchTileCallback fetchTile,
-) => CustomMvtVectorSourceOptions(
-  fetchTile: fetchTile,
-  minZoom: source.min_zoom,
-  maxZoom: source.max_zoom,
-);
-
-Pointer<raw.mln_frame_demand> _writeFrameDemand(
-  FrameDemand value,
-  Allocator arena, {
-  Pointer<raw.mln_frame_demand>? into,
-}) {
-  final result = into ?? arena<raw.mln_frame_demand>();
-  result.ref = raw.mln_frame_demand_default();
-  result.ref.flags = value.flags.rawValue;
-  result.ref.token = value.token;
-  return result;
-}
-
-FrameDemand _readFrameDemand(raw.mln_frame_demand source) => FrameDemand(
-  flags: FrameDemandFlag.fromRawValue(source.flags),
-  token: source.token,
-);
-
-Pointer<raw.mln_vec3> _writeVec3(
-  Vec3 value,
-  Allocator arena, {
-  Pointer<raw.mln_vec3>? into,
-}) {
-  final result = into ?? arena<raw.mln_vec3>();
-  result.ref.x = value.x;
-  result.ref.y = value.y;
-  result.ref.z = value.z;
-  return result;
-}
-
-Vec3 _readVec3(raw.mln_vec3 source) =>
-    Vec3(x: source.x, y: source.y, z: source.z);
-
-Pointer<raw.mln_quaternion> _writeQuaternion(
-  Quaternion value,
-  Allocator arena, {
-  Pointer<raw.mln_quaternion>? into,
-}) {
-  final result = into ?? arena<raw.mln_quaternion>();
-  result.ref.x = value.x;
-  result.ref.y = value.y;
-  result.ref.z = value.z;
-  result.ref.w = value.w;
-  return result;
-}
-
-Quaternion _readQuaternion(raw.mln_quaternion source) =>
-    Quaternion(x: source.x, y: source.y, z: source.z, w: source.w);
-
-Pointer<raw.mln_free_camera_options> _writeFreeCameraOptions(
-  FreeCameraOptions value,
-  Allocator arena, {
-  Pointer<raw.mln_free_camera_options>? into,
-}) {
-  final result = into ?? arena<raw.mln_free_camera_options>();
-  result.ref = raw.mln_free_camera_options_default();
-  if (value.position != null) {
-    result.ref.fields |= raw.MLN_FREE_CAMERA_OPTION_POSITION;
-    result.ref.position = _writeVec3(value.position!, arena).ref;
-  }
-  if (value.orientation != null) {
-    result.ref.fields |= raw.MLN_FREE_CAMERA_OPTION_ORIENTATION;
-    result.ref.orientation = _writeQuaternion(value.orientation!, arena).ref;
-  }
-  return result;
-}
-
-FreeCameraOptions _readFreeCameraOptions(raw.mln_free_camera_options source) =>
-    FreeCameraOptions(
-      position: (source.fields & raw.MLN_FREE_CAMERA_OPTION_POSITION) != 0
-          ? _readVec3(source.position)
-          : null,
-      orientation: (source.fields & raw.MLN_FREE_CAMERA_OPTION_ORIENTATION) != 0
-          ? _readQuaternion(source.orientation)
-          : null,
-    );
-
-Pointer<raw.mln_geojson_source_options> _writeGeojsonSourceOptions(
-  GeojsonSourceOptions value,
-  Allocator arena, {
-  Pointer<raw.mln_geojson_source_options>? into,
-}) {
-  final result = into ?? arena<raw.mln_geojson_source_options>();
-  result.ref = raw.mln_geojson_source_options_default();
-  if (value.minZoom != null) {
-    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM;
-    result.ref.min_zoom = value.minZoom!;
-  }
-  if (value.maxZoom != null) {
-    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM;
-    result.ref.max_zoom = value.maxZoom!;
-  }
-  if (value.tolerance != null) {
-    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE;
-    result.ref.tolerance = value.tolerance!;
-  }
-  if (value.clusterMaxZoom != null) {
-    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
-    result.ref.cluster_max_zoom = value.clusterMaxZoom!;
-  }
-  result.ref.cluster_properties = _nativeJsonView(
-    value.clusterProperties,
-    arena,
-    member: true,
-  );
-  if (value.buffer != null) {
-    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_BUFFER;
-    result.ref.buffer = _nativeInteger(value.buffer!, 0, 4294967295);
-  }
-  if (value.clusterRadius != null) {
-    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
-    result.ref.cluster_radius = _nativeInteger(
-      value.clusterRadius!,
-      0,
-      4294967295,
-    );
-  }
-  if (value.clusterMinPoints != null) {
-    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
-    result.ref.cluster_min_points = _nativeInteger(
-      value.clusterMinPoints!,
-      0,
-      4294967295,
-    );
-  }
-  if (value.lineMetrics != null) {
-    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS;
-    result.ref.line_metrics = value.lineMetrics!;
-  }
-  if (value.cluster != null) {
-    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
-    result.ref.cluster = value.cluster!;
-  }
-  if (value.synchronousTiling != null) {
-    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
-    result.ref.synchronous_tiling = value.synchronousTiling!;
-  }
-  return result;
-}
-
-GeojsonSourceOptions _readGeojsonSourceOptions(
-  raw.mln_geojson_source_options source,
-) => GeojsonSourceOptions(
-  minZoom: (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM) != 0
-      ? source.min_zoom
-      : null,
-  maxZoom: (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM) != 0
-      ? source.max_zoom
-      : null,
-  tolerance: (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE) != 0
-      ? source.tolerance
-      : null,
-  clusterMaxZoom:
-      (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM) != 0
-      ? source.cluster_max_zoom
-      : null,
-  clusterProperties: _decodeJsonView(source.cluster_properties),
-  buffer: (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_BUFFER) != 0
-      ? source.buffer
-      : null,
-  clusterRadius:
-      (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS) != 0
-      ? source.cluster_radius
-      : null,
-  clusterMinPoints:
-      (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS) != 0
-      ? source.cluster_min_points
-      : null,
-  lineMetrics: (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS) != 0
-      ? source.line_metrics
-      : null,
-  cluster: (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER) != 0
-      ? source.cluster
-      : null,
-  synchronousTiling:
-      (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING) != 0
-      ? source.synchronous_tiling
-      : null,
-);
-
-Pointer<raw.mln_http_header> _writeHttpHeader(
-  HttpHeader value,
-  Allocator arena, {
-  Pointer<raw.mln_http_header>? into,
-}) {
-  final result = into ?? arena<raw.mln_http_header>();
-  result.ref.name = nativeStringView(value.name, arena).value;
-  result.ref.value = nativeStringView(value.value, arena).value;
-  return result;
-}
-
-HttpHeader _readHttpHeader(raw.mln_http_header source) => HttpHeader(
-  name: utf8.decode(_copyBufferView(source.name)),
-  value: utf8.decode(_copyBufferView(source.value)),
-);
-
-Pointer<raw.mln_http_header_rule> _writeHttpHeaderRule(
-  HttpHeaderRule value,
-  Allocator arena, {
-  Pointer<raw.mln_http_header_rule>? into,
-}) {
-  final result = into ?? arena<raw.mln_http_header_rule>();
-  result.ref = raw.mln_http_header_rule_default();
-  result.ref.kinds = value.kinds.rawValue;
-  result.ref.flags = value.flags.rawValue;
-  result.ref.url = nativeStringView(value.url, arena).value;
-  result.ref.headers = arena<raw.mln_http_header>(
-    value.headers.isEmpty ? 1 : value.headers.length,
-  );
-  result.ref.header_count = value.headers.length;
-  for (var index = 0; index < value.headers.length; index++) {
-    _writeHttpHeader(
-      value.headers[index],
-      arena,
-      into: result.ref.headers + index,
-    );
-  }
-  return result;
-}
-
-HttpHeaderRule _readHttpHeaderRule(raw.mln_http_header_rule source) =>
-    HttpHeaderRule(
-      kinds: ResourceKindFlag.fromRawValue(source.kinds),
-      flags: UrlMatchFlag.fromRawValue(source.flags),
-      url: utf8.decode(_copyBufferView(source.url)),
-      headers: List<HttpHeader>.unmodifiable(
-        List.generate(
-          source.header_count,
-          (index) => _readHttpHeader(source.headers[index]),
-        ),
-      ),
-    );
-
-Pointer<raw.mln_projected_meters> _writeProjectedMeters(
-  ProjectedMeters value,
-  Allocator arena, {
-  Pointer<raw.mln_projected_meters>? into,
-}) {
-  final result = into ?? arena<raw.mln_projected_meters>();
-  result.ref.northing = value.northing;
-  result.ref.easting = value.easting;
-  return result;
-}
-
-ProjectedMeters _readProjectedMeters(raw.mln_projected_meters source) =>
-    ProjectedMeters(northing: source.northing, easting: source.easting);
-
-void _deliverLogCallback(
-  LogCallback callback,
-  int batch,
-  int index,
-  Pointer<raw.mln_delivery> delivery,
-) {
-  final payload = delivery.ref.payload.log_record;
-  callback(
-    LogSeverity.fromRawValue(payload.severity),
-    LogEvent.fromRawValue(payload.event),
-    payload.code,
-    utf8.decode(_copyBufferView(payload.message)),
-  );
-}
-
-_NativeRegistration<raw.mln_log_handler> _prepareLogHandler(
-  LogCallback value,
-  _CallbackRoots roots,
-) {
-  final arena = Arena();
-  DeliveryRegistration? registration;
-  try {
-    final result = arena<raw.mln_log_handler>();
-    result.ref.size = sizeOf<raw.mln_log_handler>();
-    final registered = registration = roots.registerQueued({
-      raw.MLN_DELIVERY_TYPE_LOG_RECORD: (batch, index, delivery) =>
-          _deliverLogCallback(value, batch, index, delivery),
-    });
-    result.ref.queue = isolateDeliveryQueue.handle;
-    result.ref.user_data = Pointer.fromAddress(registered.token);
-    return _NativeRegistration(result, registered.reject, arena.releaseAll);
-  } catch (_) {
-    registration?.reject();
-    arena.releaseAll();
-    rethrow;
-  }
-}
-
-Pointer<raw.mln_premultiplied_rgba8_image> _writePremultipliedRgba8Image(
-  PremultipliedRgba8Image value,
-  Allocator arena, {
-  Pointer<raw.mln_premultiplied_rgba8_image>? into,
-}) {
-  final result = into ?? arena<raw.mln_premultiplied_rgba8_image>();
-  result.ref = raw.mln_premultiplied_rgba8_image_default();
-  result.ref.width = _nativeInteger(value.width, 0, 4294967295);
-  result.ref.height = _nativeInteger(value.height, 0, 4294967295);
-  result.ref.stride = _nativeInteger(value.stride, 0, 4294967295);
-  final bytespixels = nativeBufferView(value.pixels, arena);
-  result.ref.pixels = bytespixels.data.cast();
-  result.ref.byte_length = bytespixels.size;
-  return result;
-}
-
-PremultipliedRgba8Image _readPremultipliedRgba8Image(
-  raw.mln_premultiplied_rgba8_image source,
-) => PremultipliedRgba8Image(
-  width: source.width,
-  height: source.height,
-  stride: source.stride,
-  pixels: Uint8List.fromList(
-    source.pixels.cast<Uint8>().asTypedList(source.byte_length),
-  ),
-);
-
-Pointer<raw.mln_metal_borrowed_texture> _writeMetalBorrowedTexture(
-  MetalBorrowedTexture value,
-  Allocator arena, {
-  Pointer<raw.mln_metal_borrowed_texture>? into,
-}) {
-  final result = into ?? arena<raw.mln_metal_borrowed_texture>();
-  result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
-  return result;
-}
-
-MetalBorrowedTexture _readMetalBorrowedTexture(
-  raw.mln_metal_borrowed_texture source,
-) => MetalBorrowedTexture(texture: NativePointer(source.texture.address));
-
-Pointer<raw.mln_metal_borrowed_texture_descriptor>
-_writeMetalBorrowedTextureDescriptor(
-  MetalBorrowedTextureDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_metal_borrowed_texture_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_metal_borrowed_texture_descriptor>();
-  result.ref = raw.mln_metal_borrowed_texture_descriptor_default();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.physical_width = _nativeInteger(
-    value.physicalWidth,
-    0,
-    4294967295,
-  );
-  result.ref.physical_height = _nativeInteger(
-    value.physicalHeight,
-    0,
-    4294967295,
-  );
-  result.ref.textures = arena<raw.mln_metal_borrowed_texture>(
-    value.textures.isEmpty ? 1 : value.textures.length,
-  );
-  result.ref.texture_count = value.textures.length;
-  for (var index = 0; index < value.textures.length; index++) {
-    _writeMetalBorrowedTexture(
-      value.textures[index],
-      arena,
-      into: result.ref.textures + index,
-    );
-  }
-  return result;
-}
-
-MetalBorrowedTextureDescriptor _readMetalBorrowedTextureDescriptor(
-  raw.mln_metal_borrowed_texture_descriptor source,
-) => MetalBorrowedTextureDescriptor(
-  extent: _readLogicalExtent(source.extent),
-  physicalWidth: source.physical_width,
-  physicalHeight: source.physical_height,
-  textures: List<MetalBorrowedTexture>.unmodifiable(
-    List.generate(
-      source.texture_count,
-      (index) => _readMetalBorrowedTexture(source.textures[index]),
-    ),
-  ),
-);
-
-_NativeRegistration<raw.mln_wake> _prepareWake(
-  Wake value,
-  _CallbackRoots roots,
-) {
-  final native = _takeNativeRegistration(value);
-  if (native == null) return roots.wake(value.callback);
-  final arena = Arena();
-  final result = arena<raw.mln_wake>();
-  result.ref.callback = Pointer.fromAddress(native.callbacks[0].address);
-  result.ref.user_data = Pointer.fromAddress(native.userData.address);
-  result.ref.release_user_data = Pointer.fromAddress(
-    native.releaseUserData.address,
-  );
-  return _NativeRegistration(result, native.release, arena.releaseAll);
-}
-
-_NativeRegistration<raw.mln_queue_lock> _prepareQueueLock(QueueLock value) {
-  final native = _takeNativeRegistration(value)!;
-  final arena = Arena();
-  final result = arena<raw.mln_queue_lock>();
-  result.ref.lock = Pointer.fromAddress(native.callbacks[0].address);
-  result.ref.unlock = Pointer.fromAddress(native.callbacks[1].address);
-  result.ref.user_data = Pointer.fromAddress(native.userData.address);
-  result.ref.release_user_data = Pointer.fromAddress(
-    native.releaseUserData.address,
-  );
-  return _NativeRegistration(result, native.release, arena.releaseAll);
-}
-
-Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
-  RenderSessionAttachOptions value,
-  Allocator arena,
-  _NativeRegistrations registrations, {
-  Pointer<raw.mln_render_session_attach_options>? into,
-}) {
-  final result = into ?? arena<raw.mln_render_session_attach_options>();
-  result.ref = raw.mln_render_session_attach_options_default();
-  result.ref.driver = value.driver.rawValue;
-  result.ref.requested_texture_ring_depth = _nativeInteger(
-    value.requestedTextureRingDepth,
-    0,
-    4294967295,
-  );
-  result.ref.producer_sync_kind = value.producerSyncKind.rawValue;
-  result.ref.frame_wake = registrations
-      .add(_prepareWake(value.frameWake, registrations.roots))
-      .ref;
-  result.ref.driver_work_wake = registrations
-      .add(_prepareWake(value.driverWorkWake, registrations.roots))
-      .ref;
-  if (value.queueLock != null) {
-    result.ref.queue_lock = registrations
-        .add(_prepareQueueLock(value.queueLock!))
-        .ref;
-  }
-  return result;
-}
-
-RenderSessionAttachOptions _readRenderSessionAttachOptions(
-  raw.mln_render_session_attach_options source,
-) => RenderSessionAttachOptions(
-  driver: RenderDriverKind.fromRawValue(source.driver),
-  requestedTextureRingDepth: source.requested_texture_ring_depth,
-  producerSyncKind: GpuSyncKind.fromRawValue(source.producer_sync_kind),
-  frameWake: const Wake(),
-  driverWorkWake: const Wake(),
-  queueLock: null,
-);
-
-Pointer<raw.mln_metal_context_descriptor> _writeMetalContextDescriptor(
-  MetalContextDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_metal_context_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_metal_context_descriptor>();
-  result.ref.device = Pointer<Void>.fromAddress(value.device.address).cast();
-  return result;
-}
-
-MetalContextDescriptor _readMetalContextDescriptor(
-  raw.mln_metal_context_descriptor source,
-) => MetalContextDescriptor(device: NativePointer(source.device.address));
-
-Pointer<raw.mln_metal_owned_texture_descriptor>
-_writeMetalOwnedTextureDescriptor(
-  MetalOwnedTextureDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_metal_owned_texture_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_metal_owned_texture_descriptor>();
-  result.ref = raw.mln_metal_owned_texture_descriptor_default();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.context = _writeMetalContextDescriptor(value.context, arena).ref;
-  result.ref.pixel_format = value.pixelFormat;
-  return result;
-}
-
-MetalOwnedTextureDescriptor _readMetalOwnedTextureDescriptor(
-  raw.mln_metal_owned_texture_descriptor source,
-) => MetalOwnedTextureDescriptor(
-  extent: _readLogicalExtent(source.extent),
-  context: _readMetalContextDescriptor(source.context),
-  pixelFormat: source.pixel_format,
-);
-
-Pointer<raw.mln_metal_surface_descriptor> _writeMetalSurfaceDescriptor(
-  MetalSurfaceDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_metal_surface_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_metal_surface_descriptor>();
-  result.ref = raw.mln_metal_surface_descriptor_default();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.context = _writeMetalContextDescriptor(value.context, arena).ref;
-  result.ref.layer = Pointer<Void>.fromAddress(value.layer.address).cast();
-  return result;
-}
-
-MetalSurfaceDescriptor _readMetalSurfaceDescriptor(
-  raw.mln_metal_surface_descriptor source,
-) => MetalSurfaceDescriptor(
-  extent: _readLogicalExtent(source.extent),
-  context: _readMetalContextDescriptor(source.context),
-  layer: NativePointer(source.layer.address),
-);
-
-Pointer<raw.mln_wgl_context_descriptor> _writeWglContextDescriptor(
-  WglContextDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_wgl_context_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_wgl_context_descriptor>();
-  result.ref.device_context = Pointer<Void>.fromAddress(
-    value.deviceContext.address,
-  ).cast();
-  result.ref.share_context = Pointer<Void>.fromAddress(
-    value.shareContext.address,
-  ).cast();
-  result.ref.get_proc_address = Pointer<Void>.fromAddress(
-    value.getProcAddress.address,
-  ).cast();
-  return result;
-}
-
-WglContextDescriptor _readWglContextDescriptor(
-  raw.mln_wgl_context_descriptor source,
-) => WglContextDescriptor(
-  deviceContext: NativePointer(source.device_context.address),
-  shareContext: NativePointer(source.share_context.address),
-  getProcAddress: NativePointer(source.get_proc_address.address),
-);
-
-Pointer<raw.mln_egl_context_descriptor> _writeEglContextDescriptor(
-  EglContextDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_egl_context_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_egl_context_descriptor>();
-  result.ref.display = Pointer<Void>.fromAddress(value.display.address).cast();
-  result.ref.config = Pointer<Void>.fromAddress(value.config.address).cast();
-  result.ref.share_context = Pointer<Void>.fromAddress(
-    value.shareContext.address,
-  ).cast();
-  result.ref.client_api = value.clientApi.rawValue;
-  result.ref.get_proc_address = Pointer<Void>.fromAddress(
-    value.getProcAddress.address,
-  ).cast();
-  return result;
-}
-
-EglContextDescriptor _readEglContextDescriptor(
-  raw.mln_egl_context_descriptor source,
-) => EglContextDescriptor(
-  display: NativePointer(source.display.address),
-  config: NativePointer(source.config.address),
-  shareContext: NativePointer(source.share_context.address),
-  clientApi: OpenglClientApi.fromRawValue(source.client_api),
-  getProcAddress: NativePointer(source.get_proc_address.address),
-);
-
-Pointer<raw.mln_webgl_context_descriptor> _writeWebglContextDescriptor(
-  WebglContextDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_webgl_context_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_webgl_context_descriptor>();
-  result.ref.kind = value.kind.rawValue;
-  result.ref.context = _nativeInteger(value.context, -2147483648, 2147483647);
-  result.ref.canvas_selector = nativeStringView(
-    value.canvasSelector,
-    arena,
-  ).value;
-  return result;
-}
-
-WebglContextDescriptor _readWebglContextDescriptor(
-  raw.mln_webgl_context_descriptor source,
-) => WebglContextDescriptor(
-  kind: WebglContextKind.fromRawValue(source.kind),
-  context: source.context,
-  canvasSelector: utf8.decode(_copyBufferView(source.canvas_selector)),
-);
-
-Pointer<raw.mln_opengl_context_descriptor> _writeOpenglContextDescriptor(
-  OpenglContextDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_opengl_context_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_opengl_context_descriptor>();
-
-  result.ref.ownership = value.ownership.rawValue;
-  switch (value.data) {
-    case OpenglContextDescriptorDataWgl(:final value):
-      result.ref.platform = 1;
-      result.ref.data.wgl = _writeWglContextDescriptor(value, arena).ref;
-    case OpenglContextDescriptorDataEgl(:final value):
-      result.ref.platform = 2;
-      result.ref.data.egl = _writeEglContextDescriptor(value, arena).ref;
-    case OpenglContextDescriptorDataWebgl(:final value):
-      result.ref.platform = 3;
-      result.ref.data.webgl = _writeWebglContextDescriptor(value, arena).ref;
-    case OpenglContextDescriptorDataUnknown():
-      throwInvalidArgument('unknown native union variant cannot be submitted');
-  }
-  return result;
-}
-
-OpenglContextDescriptor _readOpenglContextDescriptor(
-  raw.mln_opengl_context_descriptor source, {
-  Uint8List Function()? rawRecord,
-}) => OpenglContextDescriptor(
-  ownership: OpenglContextOwnership.fromRawValue(source.ownership),
-  data: switch (source.platform) {
-    1 => OpenglContextDescriptorDataWgl(
-      _readWglContextDescriptor(source.data.wgl),
-    ),
-    2 => OpenglContextDescriptorDataEgl(
-      _readEglContextDescriptor(source.data.egl),
-    ),
-    3 => OpenglContextDescriptorDataWebgl(
-      _readWebglContextDescriptor(source.data.webgl),
-    ),
-    final tag => OpenglContextDescriptorDataUnknown(
-      tag,
-      rawRecord?.call() ??
-          withNativeArena((arena) {
-            final copy = arena<raw.mln_opengl_context_descriptor>()
-              ..ref = source;
-            return Uint8List.fromList(
-              copy.cast<Uint8>().asTypedList(
-                sizeOf<raw.mln_opengl_context_descriptor>(),
-              ),
-            );
-          }),
-    ),
-  },
-);
-
-Pointer<raw.mln_opengl_borrowed_texture> _writeOpenglBorrowedTexture(
-  OpenglBorrowedTexture value,
-  Allocator arena, {
-  Pointer<raw.mln_opengl_borrowed_texture>? into,
-}) {
-  final result = into ?? arena<raw.mln_opengl_borrowed_texture>();
-  result.ref.texture = _nativeInteger(value.texture, 0, 4294967295);
-  return result;
-}
-
-OpenglBorrowedTexture _readOpenglBorrowedTexture(
-  raw.mln_opengl_borrowed_texture source,
-) => OpenglBorrowedTexture(texture: source.texture);
-
-Pointer<raw.mln_opengl_borrowed_texture_descriptor>
-_writeOpenglBorrowedTextureDescriptor(
-  OpenglBorrowedTextureDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_opengl_borrowed_texture_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_opengl_borrowed_texture_descriptor>();
-  result.ref = raw.mln_opengl_borrowed_texture_descriptor_default();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.physical_width = _nativeInteger(
-    value.physicalWidth,
-    0,
-    4294967295,
-  );
-  result.ref.physical_height = _nativeInteger(
-    value.physicalHeight,
-    0,
-    4294967295,
-  );
-  result.ref.context = _writeOpenglContextDescriptor(value.context, arena).ref;
-  result.ref.textures = arena<raw.mln_opengl_borrowed_texture>(
-    value.textures.isEmpty ? 1 : value.textures.length,
-  );
-  result.ref.texture_count = value.textures.length;
-  for (var index = 0; index < value.textures.length; index++) {
-    _writeOpenglBorrowedTexture(
-      value.textures[index],
-      arena,
-      into: result.ref.textures + index,
-    );
-  }
-  result.ref.target = _nativeInteger(value.target, 0, 4294967295);
-  return result;
-}
-
-OpenglBorrowedTextureDescriptor _readOpenglBorrowedTextureDescriptor(
-  raw.mln_opengl_borrowed_texture_descriptor source,
-) => OpenglBorrowedTextureDescriptor(
-  extent: _readLogicalExtent(source.extent),
-  physicalWidth: source.physical_width,
-  physicalHeight: source.physical_height,
-  context: _readOpenglContextDescriptor(source.context),
-  textures: List<OpenglBorrowedTexture>.unmodifiable(
-    List.generate(
-      source.texture_count,
-      (index) => _readOpenglBorrowedTexture(source.textures[index]),
-    ),
-  ),
-  target: source.target,
-);
-
-Pointer<raw.mln_opengl_owned_texture_descriptor>
-_writeOpenglOwnedTextureDescriptor(
-  OpenglOwnedTextureDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_opengl_owned_texture_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_opengl_owned_texture_descriptor>();
-  result.ref = raw.mln_opengl_owned_texture_descriptor_default();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.context = _writeOpenglContextDescriptor(value.context, arena).ref;
-  return result;
-}
-
-OpenglOwnedTextureDescriptor _readOpenglOwnedTextureDescriptor(
-  raw.mln_opengl_owned_texture_descriptor source,
-) => OpenglOwnedTextureDescriptor(
-  extent: _readLogicalExtent(source.extent),
-  context: _readOpenglContextDescriptor(source.context),
-);
-
-Pointer<raw.mln_opengl_surface_descriptor> _writeOpenglSurfaceDescriptor(
-  OpenglSurfaceDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_opengl_surface_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_opengl_surface_descriptor>();
-  result.ref = raw.mln_opengl_surface_descriptor_default();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.context = _writeOpenglContextDescriptor(value.context, arena).ref;
-  result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
-  return result;
-}
-
-OpenglSurfaceDescriptor _readOpenglSurfaceDescriptor(
-  raw.mln_opengl_surface_descriptor source,
-) => OpenglSurfaceDescriptor(
-  extent: _readLogicalExtent(source.extent),
-  context: _readOpenglContextDescriptor(source.context),
-  surface: NativePointer(source.surface.address),
-);
-
-Pointer<raw.mln_vulkan_context_descriptor> _writeVulkanContextDescriptor(
-  VulkanContextDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_vulkan_context_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_vulkan_context_descriptor>();
-  result.ref.instance = Pointer<Void>.fromAddress(
-    value.instance.address,
-  ).cast();
-  result.ref.physical_device = Pointer<Void>.fromAddress(
-    value.physicalDevice.address,
-  ).cast();
-  result.ref.device = Pointer<Void>.fromAddress(value.device.address).cast();
-  result.ref.graphics_queue = Pointer<Void>.fromAddress(
-    value.graphicsQueue.address,
-  ).cast();
-  result.ref.graphics_queue_family_index = _nativeInteger(
-    value.graphicsQueueFamilyIndex,
-    0,
-    4294967295,
-  );
-  result.ref.get_instance_proc_addr = Pointer<Void>.fromAddress(
-    value.getInstanceProcAddr.address,
-  ).cast();
-  result.ref.get_device_proc_addr = Pointer<Void>.fromAddress(
-    value.getDeviceProcAddr.address,
-  ).cast();
-  return result;
-}
-
-VulkanContextDescriptor _readVulkanContextDescriptor(
-  raw.mln_vulkan_context_descriptor source,
-) => VulkanContextDescriptor(
-  instance: NativePointer(source.instance.address),
-  physicalDevice: NativePointer(source.physical_device.address),
-  device: NativePointer(source.device.address),
-  graphicsQueue: NativePointer(source.graphics_queue.address),
-  graphicsQueueFamilyIndex: source.graphics_queue_family_index,
-  getInstanceProcAddr: NativePointer(source.get_instance_proc_addr.address),
-  getDeviceProcAddr: NativePointer(source.get_device_proc_addr.address),
-);
-
-Pointer<raw.mln_vulkan_borrowed_texture> _writeVulkanBorrowedTexture(
-  VulkanBorrowedTexture value,
-  Allocator arena, {
-  Pointer<raw.mln_vulkan_borrowed_texture>? into,
-}) {
-  final result = into ?? arena<raw.mln_vulkan_borrowed_texture>();
-  result.ref.image = value.image;
-  result.ref.image_view = value.imageView;
-  return result;
-}
-
-VulkanBorrowedTexture _readVulkanBorrowedTexture(
-  raw.mln_vulkan_borrowed_texture source,
-) => VulkanBorrowedTexture(image: source.image, imageView: source.image_view);
-
-Pointer<raw.mln_vulkan_borrowed_texture_descriptor>
-_writeVulkanBorrowedTextureDescriptor(
-  VulkanBorrowedTextureDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_vulkan_borrowed_texture_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_vulkan_borrowed_texture_descriptor>();
-  result.ref = raw.mln_vulkan_borrowed_texture_descriptor_default();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.physical_width = _nativeInteger(
-    value.physicalWidth,
-    0,
-    4294967295,
-  );
-  result.ref.physical_height = _nativeInteger(
-    value.physicalHeight,
-    0,
-    4294967295,
-  );
-  result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
-  result.ref.textures = arena<raw.mln_vulkan_borrowed_texture>(
-    value.textures.isEmpty ? 1 : value.textures.length,
-  );
-  result.ref.texture_count = value.textures.length;
-  for (var index = 0; index < value.textures.length; index++) {
-    _writeVulkanBorrowedTexture(
-      value.textures[index],
-      arena,
-      into: result.ref.textures + index,
-    );
-  }
-  result.ref.format = _nativeInteger(value.format, 0, 4294967295);
-  result.ref.initial_layout = _nativeInteger(
-    value.initialLayout,
-    0,
-    4294967295,
-  );
-  result.ref.final_layout = _nativeInteger(value.finalLayout, 0, 4294967295);
-  return result;
-}
-
-VulkanBorrowedTextureDescriptor _readVulkanBorrowedTextureDescriptor(
-  raw.mln_vulkan_borrowed_texture_descriptor source,
-) => VulkanBorrowedTextureDescriptor(
-  extent: _readLogicalExtent(source.extent),
-  physicalWidth: source.physical_width,
-  physicalHeight: source.physical_height,
-  context: _readVulkanContextDescriptor(source.context),
-  textures: List<VulkanBorrowedTexture>.unmodifiable(
-    List.generate(
-      source.texture_count,
-      (index) => _readVulkanBorrowedTexture(source.textures[index]),
-    ),
-  ),
-  format: source.format,
-  initialLayout: source.initial_layout,
-  finalLayout: source.final_layout,
-);
-
-Pointer<raw.mln_vulkan_owned_texture_descriptor>
-_writeVulkanOwnedTextureDescriptor(
-  VulkanOwnedTextureDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_vulkan_owned_texture_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_vulkan_owned_texture_descriptor>();
-  result.ref = raw.mln_vulkan_owned_texture_descriptor_default();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
-  return result;
-}
-
-VulkanOwnedTextureDescriptor _readVulkanOwnedTextureDescriptor(
-  raw.mln_vulkan_owned_texture_descriptor source,
-) => VulkanOwnedTextureDescriptor(
-  extent: _readLogicalExtent(source.extent),
-  context: _readVulkanContextDescriptor(source.context),
-);
-
-Pointer<raw.mln_vulkan_surface_descriptor> _writeVulkanSurfaceDescriptor(
-  VulkanSurfaceDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_vulkan_surface_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_vulkan_surface_descriptor>();
-  result.ref = raw.mln_vulkan_surface_descriptor_default();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
-  result.ref.surface = value.surface;
-  return result;
-}
-
-VulkanSurfaceDescriptor _readVulkanSurfaceDescriptor(
-  raw.mln_vulkan_surface_descriptor source,
-) => VulkanSurfaceDescriptor(
-  extent: _readLogicalExtent(source.extent),
-  context: _readVulkanContextDescriptor(source.context),
-  surface: source.surface,
+LatLngBounds _readLatLngBounds(raw.mln_lat_lng_bounds source) => LatLngBounds(
+  southwest: _readLatLng(source.southwest),
+  northeast: _readLatLng(source.northeast),
 );
 
 CameraQueryResult _readCameraQueryResult(raw.mln_camera_query_result source) =>
@@ -1750,7 +1218,7 @@ Pointer<raw.mln_map_tile_options> _writeMapTileOptions(
   Pointer<raw.mln_map_tile_options>? into,
 }) {
   final result = into ?? arena<raw.mln_map_tile_options>();
-  result.ref = raw.mln_map_tile_options_default();
+  result.ref.size = sizeOf<raw.mln_map_tile_options>();
   if (value.prefetchZoomDelta != null) {
     result.ref.fields |= raw.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
     result.ref.prefetch_zoom_delta = _nativeInteger(
@@ -1806,6 +1274,117 @@ MapTileOptions _readMapTileOptions(
       ? TileLodMode.fromRawValue(source.lod_mode)
       : null,
 );
+
+Pointer<raw.mln_bound_options> _writeBoundOptions(
+  BoundOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_bound_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_bound_options>();
+  result.ref.size = sizeOf<raw.mln_bound_options>();
+  if (value.unbounded) {
+    result.ref.fields |= raw.MLN_BOUND_OPTION_UNBOUNDED;
+  }
+  if (value.bounds != null) {
+    result.ref.fields |= raw.MLN_BOUND_OPTION_BOUNDS;
+    result.ref.bounds = _writeLatLngBounds(value.bounds!, arena).ref;
+  }
+  if (value.minZoom != null) {
+    result.ref.fields |= raw.MLN_BOUND_OPTION_MIN_ZOOM;
+    result.ref.min_zoom = value.minZoom!;
+  }
+  if (value.maxZoom != null) {
+    result.ref.fields |= raw.MLN_BOUND_OPTION_MAX_ZOOM;
+    result.ref.max_zoom = value.maxZoom!;
+  }
+  if (value.minPitch != null) {
+    result.ref.fields |= raw.MLN_BOUND_OPTION_MIN_PITCH;
+    result.ref.min_pitch = value.minPitch!;
+  }
+  if (value.maxPitch != null) {
+    result.ref.fields |= raw.MLN_BOUND_OPTION_MAX_PITCH;
+    result.ref.max_pitch = value.maxPitch!;
+  }
+  return result;
+}
+
+BoundOptions _readBoundOptions(raw.mln_bound_options source) => BoundOptions(
+  unbounded: (source.fields & raw.MLN_BOUND_OPTION_UNBOUNDED) != 0,
+  bounds: (source.fields & raw.MLN_BOUND_OPTION_BOUNDS) != 0
+      ? _readLatLngBounds(source.bounds)
+      : null,
+  minZoom: (source.fields & raw.MLN_BOUND_OPTION_MIN_ZOOM) != 0
+      ? source.min_zoom
+      : null,
+  maxZoom: (source.fields & raw.MLN_BOUND_OPTION_MAX_ZOOM) != 0
+      ? source.max_zoom
+      : null,
+  minPitch: (source.fields & raw.MLN_BOUND_OPTION_MIN_PITCH) != 0
+      ? source.min_pitch
+      : null,
+  maxPitch: (source.fields & raw.MLN_BOUND_OPTION_MAX_PITCH) != 0
+      ? source.max_pitch
+      : null,
+);
+
+Pointer<raw.mln_vec3> _writeVec3(
+  Vec3 value,
+  Allocator arena, {
+  Pointer<raw.mln_vec3>? into,
+}) {
+  final result = into ?? arena<raw.mln_vec3>();
+  result.ref.x = value.x;
+  result.ref.y = value.y;
+  result.ref.z = value.z;
+  return result;
+}
+
+Vec3 _readVec3(raw.mln_vec3 source) =>
+    Vec3(x: source.x, y: source.y, z: source.z);
+
+Pointer<raw.mln_quaternion> _writeQuaternion(
+  Quaternion value,
+  Allocator arena, {
+  Pointer<raw.mln_quaternion>? into,
+}) {
+  final result = into ?? arena<raw.mln_quaternion>();
+  result.ref.x = value.x;
+  result.ref.y = value.y;
+  result.ref.z = value.z;
+  result.ref.w = value.w;
+  return result;
+}
+
+Quaternion _readQuaternion(raw.mln_quaternion source) =>
+    Quaternion(x: source.x, y: source.y, z: source.z, w: source.w);
+
+Pointer<raw.mln_free_camera_options> _writeFreeCameraOptions(
+  FreeCameraOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_free_camera_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_free_camera_options>();
+  result.ref.size = sizeOf<raw.mln_free_camera_options>();
+  if (value.position != null) {
+    result.ref.fields |= raw.MLN_FREE_CAMERA_OPTION_POSITION;
+    result.ref.position = _writeVec3(value.position!, arena).ref;
+  }
+  if (value.orientation != null) {
+    result.ref.fields |= raw.MLN_FREE_CAMERA_OPTION_ORIENTATION;
+    result.ref.orientation = _writeQuaternion(value.orientation!, arena).ref;
+  }
+  return result;
+}
+
+FreeCameraOptions _readFreeCameraOptions(raw.mln_free_camera_options source) =>
+    FreeCameraOptions(
+      position: (source.fields & raw.MLN_FREE_CAMERA_OPTION_POSITION) != 0
+          ? _readVec3(source.position)
+          : null,
+      orientation: (source.fields & raw.MLN_FREE_CAMERA_OPTION_ORIENTATION) != 0
+          ? _readQuaternion(source.orientation)
+          : null,
+    );
 
 MapSnapshot _readMapSnapshot(raw.mln_map_snapshot source) => MapSnapshot(
   debugOptions: MapDebugFlag.fromRawValue(source.debug_options),
@@ -1944,7 +1523,7 @@ Pointer<raw.mln_style_transition_options> _writeStyleTransitionOptions(
   Pointer<raw.mln_style_transition_options>? into,
 }) {
   final result = into ?? arena<raw.mln_style_transition_options>();
-  result.ref = raw.mln_style_transition_options_default();
+  result.ref.size = sizeOf<raw.mln_style_transition_options>();
   if (value.durationMs != null) {
     result.ref.fields |= raw.MLN_STYLE_TRANSITION_OPTION_DURATION;
     result.ref.duration_ms = value.durationMs!;
@@ -1978,42 +1557,13 @@ StyleTransitionOptions _readStyleTransitionOptions(
       : null,
 );
 
-Pointer<raw.mln_map_options> _writeMapOptions(
-  MapOptions value,
-  Allocator arena, {
-  Pointer<raw.mln_map_options>? into,
-}) {
-  final result = into ?? arena<raw.mln_map_options>();
-  result.ref = raw.mln_map_options_default();
-  result.ref.initial_extent = _writeLogicalExtent(
-    value.initialExtent,
-    arena,
-  ).ref;
-  result.ref.map_mode = value.mapMode.rawValue;
-  result.ref.fast_pfor_enabled = value.fastPforEnabled;
-  if (value.eventMask != null) {
-    result.ref.fields |= raw.MLN_MAP_OPTION_EVENT_MASK;
-    result.ref.event_mask = value.eventMask!.rawValue;
-  }
-  return result;
-}
-
-MapOptions _readMapOptions(raw.mln_map_options source) => MapOptions(
-  initialExtent: _readLogicalExtent(source.initial_extent),
-  mapMode: MapMode.fromRawValue(source.map_mode),
-  fastPforEnabled: source.fast_pfor_enabled,
-  eventMask: (source.fields & raw.MLN_MAP_OPTION_EVENT_MASK) != 0
-      ? RuntimeEventFlag.fromRawValue(source.event_mask)
-      : null,
-);
-
 Pointer<raw.mln_style_image_options> _writeStyleImageOptions(
   StyleImageOptions value,
   Allocator arena, {
   Pointer<raw.mln_style_image_options>? into,
 }) {
   final result = into ?? arena<raw.mln_style_image_options>();
-  result.ref = raw.mln_style_image_options_default();
+  result.ref.size = sizeOf<raw.mln_style_image_options>();
   if (value.stretchX != null) {
     result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_STRETCH_X;
     result.ref.stretch_x = arena<raw.mln_image_stretch>(
@@ -2065,42 +1615,24 @@ Pointer<raw.mln_style_image_options> _writeStyleImageOptions(
   return result;
 }
 
-StyleImageOptions _readStyleImageOptions(raw.mln_style_image_options source) =>
-    StyleImageOptions(
-      stretchX: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_STRETCH_X) != 0
-          ? List<ImageStretch>.unmodifiable(
-              List.generate(
-                source.stretch_x_count,
-                (index) => _readImageStretch(source.stretch_x[index]),
-              ),
-            )
-          : null,
-      stretchY: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_STRETCH_Y) != 0
-          ? List<ImageStretch>.unmodifiable(
-              List.generate(
-                source.stretch_y_count,
-                (index) => _readImageStretch(source.stretch_y[index]),
-              ),
-            )
-          : null,
-      content: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_CONTENT) != 0
-          ? _readImageContent(source.content)
-          : null,
-      textFitWidth:
-          (source.fields & raw.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH) != 0
-          ? StyleImageTextFit.fromRawValue(source.text_fit_width)
-          : null,
-      textFitHeight:
-          (source.fields & raw.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT) != 0
-          ? StyleImageTextFit.fromRawValue(source.text_fit_height)
-          : null,
-      pixelRatio: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO) != 0
-          ? source.pixel_ratio
-          : null,
-      sdf: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_SDF) != 0
-          ? source.sdf
-          : null,
-    );
+Pointer<raw.mln_camera_update> _writeCameraUpdate(
+  CameraUpdate value,
+  Allocator arena,
+  _NativeRegistrations registrations, {
+  Pointer<raw.mln_camera_update>? into,
+}) {
+  final result = into ?? arena<raw.mln_camera_update>();
+  result.ref.size = sizeOf<raw.mln_camera_update>();
+  result.ref.mode = value.mode.rawValue;
+  result.ref.camera = _writeCameraOptions(value.camera, arena).ref;
+  result.ref.animation = _writeAnimationOptions(
+    value.animation,
+    arena,
+    registrations,
+  ).ref;
+  result.ref.gesture_phase = value.gesturePhase.rawValue;
+  return result;
+}
 
 RenderAbandonResult _readRenderAbandonResult(
   raw.mln_render_abandon_result source,
@@ -2210,7 +1742,7 @@ _writeRenderedFeatureQueryOptions(
   Pointer<raw.mln_rendered_feature_query_options>? into,
 }) {
   final result = into ?? arena<raw.mln_rendered_feature_query_options>();
-  result.ref = raw.mln_rendered_feature_query_options_default();
+  result.ref.size = sizeOf<raw.mln_rendered_feature_query_options>();
   if (value.layerIds != null) {
     result.ref.fields |= raw.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
     result.ref.layer_ids = arena<raw.mln_buffer_view>(
@@ -2228,21 +1760,6 @@ _writeRenderedFeatureQueryOptions(
   return result;
 }
 
-RenderedFeatureQueryOptions _readRenderedFeatureQueryOptions(
-  raw.mln_rendered_feature_query_options source,
-) => RenderedFeatureQueryOptions(
-  layerIds:
-      (source.fields & raw.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS) != 0
-      ? List<String>.unmodifiable(
-          List.generate(
-            source.layer_id_count,
-            (index) => utf8.decode(_copyBufferView(source.layer_ids[index])),
-          ),
-        )
-      : null,
-  filter: _decodeJsonView(source.filter),
-);
-
 RenderedFeature _readRenderedFeature(raw.mln_rendered_feature source) =>
     RenderedFeature(
       feature: _decodeJsonView(source.feature),
@@ -2258,7 +1775,7 @@ Pointer<raw.mln_source_feature_query_options> _writeSourceFeatureQueryOptions(
   Pointer<raw.mln_source_feature_query_options>? into,
 }) {
   final result = into ?? arena<raw.mln_source_feature_query_options>();
-  result.ref = raw.mln_source_feature_query_options_default();
+  result.ref.size = sizeOf<raw.mln_source_feature_query_options>();
   if (value.sourceLayerIds != null) {
     result.ref.fields |= raw.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
     result.ref.source_layer_ids = arena<raw.mln_buffer_view>(
@@ -2275,23 +1792,6 @@ Pointer<raw.mln_source_feature_query_options> _writeSourceFeatureQueryOptions(
   result.ref.filter = _nativeJsonView(value.filter, arena, member: true);
   return result;
 }
-
-SourceFeatureQueryOptions _readSourceFeatureQueryOptions(
-  raw.mln_source_feature_query_options source,
-) => SourceFeatureQueryOptions(
-  sourceLayerIds:
-      (source.fields & raw.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS) !=
-          0
-      ? List<String>.unmodifiable(
-          List.generate(
-            source.source_layer_id_count,
-            (index) =>
-                utf8.decode(_copyBufferView(source.source_layer_ids[index])),
-          ),
-        )
-      : null,
-  filter: _decodeJsonView(source.filter),
-);
 
 SourceFeature _readSourceFeature(raw.mln_source_feature source) =>
     SourceFeature(
@@ -2313,6 +1813,18 @@ TextureReadbackResult _readTextureReadbackResult(
   data: _copyBufferView(source.data),
   info: _readTextureImageInfo(source.info),
 );
+
+Pointer<raw.mln_frame_demand> _writeFrameDemand(
+  FrameDemand value,
+  Allocator arena, {
+  Pointer<raw.mln_frame_demand>? into,
+}) {
+  final result = into ?? arena<raw.mln_frame_demand>();
+  result.ref.size = sizeOf<raw.mln_frame_demand>();
+  result.ref.flags = value.flags.rawValue;
+  result.ref.token = value.token;
+  return result;
+}
 
 Pointer<raw.mln_resource_response> _writeResourceResponse(
   ResourceResponse value,
@@ -2377,43 +1889,37 @@ _prepareResourceRequestCancelHandler(
   }
 }
 
-Pointer<raw.mln_resource_route> _writeResourceRoute(
-  ResourceRoute value,
-  Allocator arena, {
-  Pointer<raw.mln_resource_route>? into,
-}) {
-  final result = into ?? arena<raw.mln_resource_route>();
-  result.ref = raw.mln_resource_route_default();
-  result.ref.kinds = value.kinds.rawValue;
-  result.ref.flags = value.flags.rawValue;
-  result.ref.url = nativeStringView(value.url, arena).value;
-  return result;
-}
-
-ResourceRoute _readResourceRoute(raw.mln_resource_route source) =>
-    ResourceRoute(
-      kinds: ResourceKindFlag.fromRawValue(source.kinds),
-      flags: UrlMatchFlag.fromRawValue(source.flags),
-      url: utf8.decode(_copyBufferView(source.url)),
-    );
-
 Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
   RuntimeOptions value,
   Allocator arena, {
   Pointer<raw.mln_runtime_options>? into,
 }) {
   final result = into ?? arena<raw.mln_runtime_options>();
-  result.ref = raw.mln_runtime_options_default();
+  result.ref.size = sizeOf<raw.mln_runtime_options>();
   result.ref.asset_path = nativeStringView(value.assetPath, arena).value;
   result.ref.cache_path = nativeStringView(value.cachePath, arena).value;
   return result;
 }
 
-RuntimeOptions _readRuntimeOptions(raw.mln_runtime_options source) =>
-    RuntimeOptions(
-      assetPath: utf8.decode(_copyBufferView(source.asset_path)),
-      cachePath: utf8.decode(_copyBufferView(source.cache_path)),
-    );
+Pointer<raw.mln_map_options> _writeMapOptions(
+  MapOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_map_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_map_options>();
+  result.ref.size = sizeOf<raw.mln_map_options>();
+  result.ref.initial_extent = _writeLogicalExtent(
+    value.initialExtent,
+    arena,
+  ).ref;
+  result.ref.map_mode = value.mapMode.rawValue;
+  result.ref.fast_pfor_enabled = value.fastPforEnabled;
+  if (value.eventMask != null) {
+    result.ref.fields |= raw.MLN_MAP_OPTION_EVENT_MASK;
+    result.ref.event_mask = value.eventMask!.rawValue;
+  }
+  return result;
+}
 
 Pointer<raw.mln_offline_tile_pyramid_region_definition>
 _writeOfflineTilePyramidRegionDefinition(
@@ -2706,6 +2212,41 @@ _NativeRegistration<raw.mln_runtime_event_handler> _prepareRuntimeEventHandler(
   }
 }
 
+Pointer<raw.mln_http_header> _writeHttpHeader(
+  HttpHeader value,
+  Allocator arena, {
+  Pointer<raw.mln_http_header>? into,
+}) {
+  final result = into ?? arena<raw.mln_http_header>();
+  result.ref.name = nativeStringView(value.name, arena).value;
+  result.ref.value = nativeStringView(value.value, arena).value;
+  return result;
+}
+
+Pointer<raw.mln_http_header_rule> _writeHttpHeaderRule(
+  HttpHeaderRule value,
+  Allocator arena, {
+  Pointer<raw.mln_http_header_rule>? into,
+}) {
+  final result = into ?? arena<raw.mln_http_header_rule>();
+  result.ref.size = sizeOf<raw.mln_http_header_rule>();
+  result.ref.kinds = value.kinds.rawValue;
+  result.ref.flags = value.flags.rawValue;
+  result.ref.url = nativeStringView(value.url, arena).value;
+  result.ref.headers = arena<raw.mln_http_header>(
+    value.headers.isEmpty ? 1 : value.headers.length,
+  );
+  result.ref.header_count = value.headers.length;
+  for (var index = 0; index < value.headers.length; index++) {
+    _writeHttpHeader(
+      value.headers[index],
+      arena,
+      into: result.ref.headers + index,
+    );
+  }
+  return result;
+}
+
 _NativeRegistration<raw.mln_http_header_transform> _prepareHttpHeaderTransform(
   HttpHeaderTransform value,
 ) {
@@ -2779,6 +2320,19 @@ void _deliverResourceProviderCallback(
     owner?.close();
     rethrow;
   }
+}
+
+Pointer<raw.mln_resource_route> _writeResourceRoute(
+  ResourceRoute value,
+  Allocator arena, {
+  Pointer<raw.mln_resource_route>? into,
+}) {
+  final result = into ?? arena<raw.mln_resource_route>();
+  result.ref.size = sizeOf<raw.mln_resource_route>();
+  result.ref.kinds = value.kinds.rawValue;
+  result.ref.flags = value.flags.rawValue;
+  result.ref.url = nativeStringView(value.url, arena).value;
+  return result;
 }
 
 _NativeRegistration<raw.mln_resource_provider> _prepareResourceProvider(
@@ -2879,21 +2433,13 @@ Pointer<raw.mln_style_expression_type> _writeStyleExpressionType(
   return result;
 }
 
-StyleExpressionType _readStyleExpressionType(
-  raw.mln_style_expression_type source,
-) => StyleExpressionType(
-  kind: StyleExpressionTypeKind.fromRawValue(source.kind),
-  itemKind: StyleExpressionTypeKind.fromRawValue(source.item_kind),
-  itemCount: source.item_count,
-);
-
 Pointer<raw.mln_style_expression_options> _writeStyleExpressionOptions(
   StyleExpressionOptions value,
   Allocator arena, {
   Pointer<raw.mln_style_expression_options>? into,
 }) {
   final result = into ?? arena<raw.mln_style_expression_options>();
-  result.ref = raw.mln_style_expression_options_default();
+  result.ref.size = sizeOf<raw.mln_style_expression_options>();
   if (value.expectedType != null) {
     result.ref.fields |= raw.MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE;
     result.ref.expected_type = _writeStyleExpressionType(
@@ -2904,22 +2450,13 @@ Pointer<raw.mln_style_expression_options> _writeStyleExpressionOptions(
   return result;
 }
 
-StyleExpressionOptions _readStyleExpressionOptions(
-  raw.mln_style_expression_options source,
-) => StyleExpressionOptions(
-  expectedType:
-      (source.fields & raw.MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE) != 0
-      ? _readStyleExpressionType(source.expected_type)
-      : null,
-);
-
 Pointer<raw.mln_style_expression_inputs> _writeStyleExpressionInputs(
   StyleExpressionInputs value,
   Allocator arena, {
   Pointer<raw.mln_style_expression_inputs>? into,
 }) {
   final result = into ?? arena<raw.mln_style_expression_inputs>();
-  result.ref = raw.mln_style_expression_inputs_default();
+  result.ref.size = sizeOf<raw.mln_style_expression_inputs>();
   if (value.zoom != null) {
     result.ref.fields |= raw.MLN_STYLE_EXPRESSION_INPUT_ZOOM;
     result.ref.zoom = value.zoom!;
@@ -2962,34 +2499,6 @@ Pointer<raw.mln_style_expression_inputs> _writeStyleExpressionInputs(
   }
   return result;
 }
-
-StyleExpressionInputs _readStyleExpressionInputs(
-  raw.mln_style_expression_inputs source,
-) => StyleExpressionInputs(
-  zoom: (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_ZOOM) != 0
-      ? source.zoom
-      : null,
-  colorRampParameter:
-      (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER) != 0
-      ? source.color_ramp_parameter
-      : null,
-  elevation: (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_ELEVATION) != 0
-      ? source.elevation
-      : null,
-  feature: _decodeJsonView(source.feature),
-  featureState: _decodeJsonView(source.feature_state),
-  globalState: _decodeJsonView(source.global_state),
-  canonicalTileId:
-      (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID) != 0
-      ? _readCanonicalTileId(source.canonical_tile_id)
-      : null,
-  availableImages: List<String>.unmodifiable(
-    List.generate(
-      source.available_image_count,
-      (index) => utf8.decode(_copyBufferView(source.available_images[index])),
-    ),
-  ),
-);
 
 StyleExpressionInfo _readStyleExpressionInfo(
   raw.mln_style_expression_info source,
@@ -3072,121 +2581,14 @@ final _resultTextureReadbackResult = _CompletionValue(
   ),
 );
 
-/// Returns zeroed animation options.
-///
-/// See `mln_animation_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-AnimationOptions animationOptionsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_animation_options_default();
-  return _readAnimationOptions(nativeResult);
-}
-
-/// Returns zeroed map bound options with size set for this C API version.
-///
-/// See `mln_bound_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-BoundOptions boundOptionsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_bound_options_default();
-  return _readBoundOptions(nativeResult);
-}
-
 /// Reports the C ABI contract version. The value is 0 while the ABI is
 /// unstable, and will increment on each SemVer major release.
 ///
 /// See `mln_c_version` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 int cVersion() {
-  ensureAbiVersion();
   final nativeResult = raw.mln_c_version();
   return nativeResult;
-}
-
-/// Returns a zeroed relative camera update with size set for this version.
-///
-/// See `mln_camera_delta_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-CameraDelta cameraDeltaDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_camera_delta_default();
-  return _readCameraDelta(nativeResult);
-}
-
-/// Returns zeroed camera fitting options with size set for this version.
-///
-/// See `mln_camera_fit_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-CameraFitOptions cameraFitOptionsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_camera_fit_options_default();
-  return _readCameraFitOptions(nativeResult);
-}
-
-/// Returns zeroed camera options with size set for this C API version.
-///
-/// See `mln_camera_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-CameraOptions cameraOptionsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_camera_options_default();
-  return _readCameraOptions(nativeResult);
-}
-
-/// Returns a zeroed atomic camera update, with its size and its camera's size
-/// set for this C API version.
-///
-/// See `mln_camera_update_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-CameraUpdate cameraUpdateDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_camera_update_default();
-  return _readCameraUpdate(nativeResult);
-}
-
-/// Returns zeroed custom geometry source options with size set.
-///
-/// See `mln_custom_geometry_source_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-CustomGeometrySourceOptions customGeometrySourceOptionsDefault(
-  CustomSourceFetchTileCallback fetchTile,
-) {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_custom_geometry_source_options_default();
-  return _readCustomGeometrySourceOptions(nativeResult, fetchTile);
-}
-
-/// Returns zeroed custom MVT vector source options with size set.
-///
-/// See `mln_custom_mvt_vector_source_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-CustomMvtVectorSourceOptions customMvtVectorSourceOptionsDefault(
-  CustomSourceFetchTileCallback fetchTile,
-) {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_custom_mvt_vector_source_options_default();
-  return _readCustomMvtVectorSourceOptions(nativeResult, fetchTile);
-}
-
-/// Returns a zeroed frame demand with size set for this C API version: a
-/// zero-token, render-if-needed, nonpresenting demand.
-///
-/// See `mln_frame_demand_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-FrameDemand frameDemandDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_frame_demand_default();
-  return _readFrameDemand(nativeResult);
-}
-
-/// Returns zeroed free camera options with size set for this C API version.
-///
-/// See `mln_free_camera_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-FreeCameraOptions freeCameraOptionsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_free_camera_options_default();
-  return _readFreeCameraOptions(nativeResult);
 }
 
 /// Prepares GeoJSON source data for installation on a map.
@@ -3215,38 +2617,6 @@ GeojsonSourceDataHandle geojsonSourceDataCreate(
     },
   );
 });
-
-/// Returns zeroed GeoJSON source options with size set.
-///
-/// See `mln_geojson_source_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-GeojsonSourceOptions geojsonSourceOptionsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_geojson_source_options_default();
-  return _readGeojsonSourceOptions(nativeResult);
-}
-
-/// Returns zeroed synchronization with size set for this C API version, which
-/// is CPU completion.
-///
-/// See `mln_gpu_sync_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-GpuSync gpuSyncDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_gpu_sync_default();
-  return _readGpuSync(nativeResult);
-}
-
-/// Returns a zeroed header rule with size set for this C API version: an
-/// exact match of the empty URL for every resource kind, with no headers.
-///
-/// See `mln_http_header_rule_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-HttpHeaderRule httpHeaderRuleDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_http_header_rule_default();
-  return _readHttpHeaderRule(nativeResult);
-}
 
 /// Converts spherical Mercator projected meters to a geographic coordinate.
 ///
@@ -3303,17 +2673,6 @@ void logSetCallback(LogCallback handler) {
   );
 }
 
-/// Returns a zeroed logical extent, which every function that takes an extent
-/// rejects.
-///
-/// See `mln_logical_extent_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-LogicalExtent logicalExtentDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_logical_extent_default();
-  return _readLogicalExtent(nativeResult);
-}
-
 /// Computes the physical device-pixel size of a logical extent.
 ///
 /// See `mln_logical_extent_physical_size` in the
@@ -3333,16 +2692,6 @@ LogicalExtent logicalExtentDefault() {
       );
       return (outWidth.value, outHeight.value);
     });
-
-/// Returns zeroed map options with size set for this C API version.
-///
-/// See `mln_map_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-MapOptions mapOptionsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_map_options_default();
-  return _readMapOptions(nativeResult);
-}
 
 /// Creates a standalone projection of a view, such as the view of a rendered
 /// frame or of a map snapshot.
@@ -3369,59 +2718,6 @@ MapProjectionHandle mapProjectionCreate(MapView view) =>
       );
     });
 
-/// Returns zeroed tile tuning options with size set for this C API version.
-///
-/// See `mln_map_tile_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-MapTileOptions mapTileOptionsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_map_tile_options_default();
-  return _readMapTileOptions(nativeResult);
-}
-
-/// Returns zeroed viewport options with size set for this C API version.
-///
-/// See `mln_map_viewport_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-MapViewportOptions mapViewportOptionsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_map_viewport_options_default();
-  return _readMapViewportOptions(nativeResult);
-}
-
-/// Returns a zeroed Metal borrowed-texture descriptor with size set for this
-/// C API version. The caller still sets every required member.
-///
-/// See `mln_metal_borrowed_texture_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-MetalBorrowedTextureDescriptor metalBorrowedTextureDescriptorDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_metal_borrowed_texture_descriptor_default();
-  return _readMetalBorrowedTextureDescriptor(nativeResult);
-}
-
-/// Returns a zeroed Metal owned-texture descriptor with size set for this C
-/// API version. The caller still sets every required member.
-///
-/// See `mln_metal_owned_texture_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-MetalOwnedTextureDescriptor metalOwnedTextureDescriptorDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_metal_owned_texture_descriptor_default();
-  return _readMetalOwnedTextureDescriptor(nativeResult);
-}
-
-/// Returns a zeroed Metal surface descriptor with size set for this C API
-/// version. The caller still sets every required member.
-///
-/// See `mln_metal_surface_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-MetalSurfaceDescriptor metalSurfaceDescriptorDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_metal_surface_descriptor_default();
-  return _readMetalSurfaceDescriptor(nativeResult);
-}
-
 /// Reads MapLibre Native's process-global network status.
 ///
 /// See `mln_network_get_status` in the
@@ -3442,28 +2738,6 @@ void networkSetStatus(NetworkStatus status) {
   return _check(raw.mln_network_set_status(status.rawValue, nativeDiagnostic));
 }
 
-/// Returns a zeroed OpenGL borrowed-texture descriptor with size set for this
-/// C API version. The caller still sets every required member.
-///
-/// See `mln_opengl_borrowed_texture_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-OpenglBorrowedTextureDescriptor openglBorrowedTextureDescriptorDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_opengl_borrowed_texture_descriptor_default();
-  return _readOpenglBorrowedTextureDescriptor(nativeResult);
-}
-
-/// Returns a zeroed OpenGL owned-texture descriptor with size set for this C
-/// API version. The caller still sets every required member.
-///
-/// See `mln_opengl_owned_texture_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-OpenglOwnedTextureDescriptor openglOwnedTextureDescriptorDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_opengl_owned_texture_descriptor_default();
-  return _readOpenglOwnedTextureDescriptor(nativeResult);
-}
-
 /// Returns OpenGL context providers supported by this build.
 ///
 /// See `mln_opengl_supported_context_provider_mask` in the
@@ -3474,17 +2748,6 @@ OpenglContextProviderFlag openglSupportedContextProviderMask() {
   return OpenglContextProviderFlag.fromRawValue(nativeResult);
 }
 
-/// Returns a zeroed OpenGL surface descriptor with size set for this C API
-/// version. The caller still sets every required member.
-///
-/// See `mln_opengl_surface_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-OpenglSurfaceDescriptor openglSurfaceDescriptorDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_opengl_surface_descriptor_default();
-  return _readOpenglSurfaceDescriptor(nativeResult);
-}
-
 /// Returns the process-wide `mln_plugin_register_v1` entry point; never null.
 ///
 /// See `mln_plugin_get_register_function_v1` in the
@@ -3493,17 +2756,6 @@ NativePointer pluginGetRegisterFunctionV1() {
   ensureAbiVersion();
   final nativeResult = raw.mln_plugin_get_register_function_v1();
   return NativePointer(nativeResult.address);
-}
-
-/// Returns a zeroed premultiplied RGBA8 image descriptor with size set. The
-/// caller still sets every required member.
-///
-/// See `mln_premultiplied_rgba8_image_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-PremultipliedRgba8Image premultipliedRgba8ImageDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_premultiplied_rgba8_image_default();
-  return _readPremultipliedRgba8Image(nativeResult);
 }
 
 /// Converts a geographic coordinate to spherical Mercator projected meters.
@@ -3523,48 +2775,6 @@ ProjectedMeters projectedMetersForLatLng(LatLng coordinate) =>
       );
       return _readProjectedMeters(outMeters.ref);
     });
-
-/// Returns zeroed axonometric rendering options with size set for this C API
-/// version.
-///
-/// See `mln_projection_mode_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-ProjectionMode projectionModeDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_projection_mode_default();
-  return _readProjectionMode(nativeResult);
-}
-
-/// Returns zeroed attachment options with size set for this C API version.
-///
-/// See `mln_render_session_attach_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-RenderSessionAttachOptions renderSessionAttachOptionsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_render_session_attach_options_default();
-  return _readRenderSessionAttachOptions(nativeResult);
-}
-
-/// Returns zeroed rendered feature query options with size set.
-///
-/// See `mln_rendered_feature_query_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-RenderedFeatureQueryOptions renderedFeatureQueryOptionsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_rendered_feature_query_options_default();
-  return _readRenderedFeatureQueryOptions(nativeResult);
-}
-
-/// Returns a zeroed route with size set for this C API version: an exact
-/// match of the empty URL for every resource kind.
-///
-/// See `mln_resource_route_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-ResourceRoute resourceRouteDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_resource_route_default();
-  return _readResourceRoute(nativeResult);
-}
 
 /// Creates a runtime.
 ///
@@ -3588,26 +2798,6 @@ RuntimeHandle runtimeCreate(RuntimeOptions options) => withNativeArena((arena) {
     },
   );
 });
-
-/// Returns zeroed runtime options with size set for this C API version.
-///
-/// See `mln_runtime_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-RuntimeOptions runtimeOptionsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_runtime_options_default();
-  return _readRuntimeOptions(nativeResult);
-}
-
-/// Returns zeroed source feature query options with size set.
-///
-/// See `mln_source_feature_query_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-SourceFeatureQueryOptions sourceFeatureQueryOptionsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_source_feature_query_options_default();
-  return _readSourceFeatureQueryOptions(nativeResult);
-}
 
 /// Parses a style expression.
 ///
@@ -3636,46 +2826,6 @@ StyleExpressionHandle styleExpressionCreate(
   );
 });
 
-/// Returns zeroed style expression inputs with size set, which set no input.
-///
-/// See `mln_style_expression_inputs_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-StyleExpressionInputs styleExpressionInputsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_style_expression_inputs_default();
-  return _readStyleExpressionInputs(nativeResult);
-}
-
-/// Returns zeroed style expression options with size set.
-///
-/// See `mln_style_expression_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-StyleExpressionOptions styleExpressionOptionsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_style_expression_options_default();
-  return _readStyleExpressionOptions(nativeResult);
-}
-
-/// Returns zeroed runtime style image options with size set.
-///
-/// See `mln_style_image_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-StyleImageOptions styleImageOptionsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_style_image_options_default();
-  return _readStyleImageOptions(nativeResult);
-}
-
-/// Returns zeroed global style transition options with size set.
-///
-/// See `mln_style_transition_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-StyleTransitionOptions styleTransitionOptionsDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_style_transition_options_default();
-  return _readStyleTransitionOptions(nativeResult);
-}
-
 /// Reports the render backends available in this native library build.
 ///
 /// See `mln_supported_render_backend_mask` in the
@@ -3684,39 +2834,6 @@ RenderBackendFlag supportedRenderBackendMask() {
   ensureAbiVersion();
   final nativeResult = raw.mln_supported_render_backend_mask();
   return RenderBackendFlag.fromRawValue(nativeResult);
-}
-
-/// Returns a zeroed Vulkan borrowed-texture descriptor with size set for this
-/// C API version. The caller still sets every required member.
-///
-/// See `mln_vulkan_borrowed_texture_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-VulkanBorrowedTextureDescriptor vulkanBorrowedTextureDescriptorDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_vulkan_borrowed_texture_descriptor_default();
-  return _readVulkanBorrowedTextureDescriptor(nativeResult);
-}
-
-/// Returns a zeroed Vulkan owned-texture descriptor with size set for this C
-/// API version. The caller still sets every required member.
-///
-/// See `mln_vulkan_owned_texture_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-VulkanOwnedTextureDescriptor vulkanOwnedTextureDescriptorDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_vulkan_owned_texture_descriptor_default();
-  return _readVulkanOwnedTextureDescriptor(nativeResult);
-}
-
-/// Returns a zeroed Vulkan surface descriptor with size set for this C API
-/// version. The caller still sets every required member.
-///
-/// See `mln_vulkan_surface_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-VulkanSurfaceDescriptor vulkanSurfaceDescriptorDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_vulkan_surface_descriptor_default();
-  return _readVulkanSurfaceDescriptor(nativeResult);
 }
 
 /// Issued `mln_acquired_frame` handle id.
@@ -3821,7 +2938,7 @@ final class AcquiredFrameHandle implements Finalizable {
 
   GpuSync _getProducerSync() => withNativeArena((arena) {
     final outSync = arena<raw.mln_gpu_sync>();
-    outSync.ref = raw.mln_gpu_sync_default();
+    outSync.ref.size = sizeOf<raw.mln_gpu_sync>();
     _check(
       raw.mln_acquired_frame_get_producer_sync(
         _handle.raw,
@@ -6056,7 +5173,7 @@ final class MapProjectionHandle implements Finalizable {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   CameraOptions getCamera() => withNativeArena((arena) {
     final outCamera = arena<raw.mln_camera_options>();
-    outCamera.ref = raw.mln_camera_options_default();
+    outCamera.ref.size = sizeOf<raw.mln_camera_options>();
     _check(
       raw.mln_map_projection_get_camera(
         _handle.raw,

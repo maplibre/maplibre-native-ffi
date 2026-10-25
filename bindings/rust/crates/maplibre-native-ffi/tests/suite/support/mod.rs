@@ -359,10 +359,7 @@ pub struct Fixture {
 impl Fixture {
     /// A 64 by 64 map on a runtime that denies every resource request.
     pub fn new() -> Self {
-        Self::with_map_options(MapOptions {
-            initial_extent: LogicalExtent::new(64, 64, 1.0),
-            ..Default::default()
-        })
+        Self::with_map_options(MapOptions::new(LogicalExtent::new(64, 64, 1.0)))
     }
 
     pub fn with_map_options(map_options: MapOptions) -> Self {
@@ -514,11 +511,10 @@ impl Session {
             })
         };
         let options = RenderSessionAttachOptions {
-            driver,
             requested_texture_ring_depth: 2,
             frame_wake: wake(),
             driver_work_wake: wake(),
-            ..RenderSessionAttachOptions::default()
+            ..RenderSessionAttachOptions::new(driver)
         };
         (options, SessionWakes { signal, released })
     }

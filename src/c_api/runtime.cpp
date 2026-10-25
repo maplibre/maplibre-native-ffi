@@ -10,18 +10,6 @@
 #include "resources/custom_resource_provider.hpp"
 #include "resources/resource_transform.hpp"
 
-auto mln_resource_route_default(void) noexcept -> mln_resource_route {
-  return mln::c_api::sized<mln_resource_route>();
-}
-
-auto mln_http_header_rule_default(void) noexcept -> mln_http_header_rule {
-  return mln::c_api::sized<mln_http_header_rule>();
-}
-
-auto mln_runtime_options_default(void) noexcept -> mln_runtime_options {
-  return mln::c_api::sized<mln_runtime_options>();
-}
-
 auto mln_runtime_create(
   const mln_runtime_options* options, mln_runtime* out_runtime,
   mln_diagnostic* out_diagnostic

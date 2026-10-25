@@ -8,12 +8,10 @@ import {
   keywordCombine,
   probeBatchPoints,
   probeBatchScores,
-  probeHooksDefault,
   probeZerosJson,
   probeReadLevel,
   probeRoundtrip,
   probeSettingsCheck,
-  probeSettingsDefault,
   probeTakeParcel,
 } from "./index.ts";
 
@@ -63,13 +61,8 @@ assert.deepEqual(probeBatchScores([]), []);
 // Parameters that are TypeScript keywords keep their order.
 assert.deepEqual(keywordCombine(5, 2, 7, 11), { type: 3, defer: 7, raw: 11 });
 
-// An empty record keeps the native default, and a copy of the default holds
-// every value the default sets.
+// An empty record is zeroed with its size set.
 probeSettingsCheck({});
-probeSettingsCheck(probeSettingsDefault());
-
-// A copy of a native default keeps its values and leaves a registration unset.
-assert.deepEqual(probeHooksDefault(), { limit: 4 });
 
 // A status that the C API declares as absence returns undefined, and any other
 // failure still reports its own diagnostic.

@@ -34,9 +34,8 @@ impl OpenGLPlatformContext {
         };
         Ok(OpenglContextDescriptor {
             data: maplibre_native_ffi::OpenglContextDescriptorData::Wgl(WglContextDescriptor {
-                device_context: self.hdc.cast::<std::ffi::c_void>(),
                 share_context: raw_context.cast_mut().cast::<std::ffi::c_void>(),
-                ..Default::default()
+                ..WglContextDescriptor::new(self.hdc.cast::<std::ffi::c_void>())
             }),
             ownership: maplibre_native_ffi::OpenglContextOwnership::Shared,
         })

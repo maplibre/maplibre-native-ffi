@@ -17,6 +17,12 @@ internal static unsafe class NativeCall
         return new Entry(owner);
     }
 
+    /// <summary>
+    /// Loads the native library without checking its C ABI version, for the call that reports
+    /// that version.
+    /// </summary>
+    internal static void EnterUnchecked() => NativeLibraryLoader.EnsureResolved();
+
     internal static mln_diagnostic* Diagnostic => NativeDiagnostic.Current;
 
     internal static void Check(mln_status status)

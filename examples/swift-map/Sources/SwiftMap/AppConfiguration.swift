@@ -15,7 +15,7 @@ struct AppConfiguration {
       exit(0)
     }
 
-    let backends = (try! Maplibre.supportedRenderBackendMask())
+    let backends = Maplibre.supportedRenderBackendMask()
     print("native render backends: \(renderBackendLabel(backends))")
     guard backends.contains(.metal) else {
       printError("the loaded MapLibre native library does not support Metal")

@@ -121,7 +121,7 @@ func TestCameraEndHandlerIsRootedUntilItRuns(t *testing.T) {
 	zoom := 4.0
 	duration := 60000.0
 	identity := uint64(1<<64 - 1)
-	update := DefaultCameraUpdate()
+	update := CameraUpdate{}
 	update.Mode = CameraUpdateModeEase
 	update.Camera.Zoom = &zoom
 	update.Animation.DurationMs = &duration
@@ -145,7 +145,7 @@ func TestCameraEndHandlerIsRootedUntilItRuns(t *testing.T) {
 	}
 
 	scale := -1.0
-	delta := DefaultCameraDelta()
+	delta := CameraDelta{}
 	delta.Scale = &scale
 	delta.Animation.EndHandler = update.Animation.EndHandler
 	if _, err := f.m.ApplyCameraDelta(delta); !errors.Is(err, StatusInvalidArgument) {
@@ -163,7 +163,7 @@ func TestCameraEndHandlerIsRootedUntilItRuns(t *testing.T) {
 // runtime, and drops every other reference to both.
 func discardProviderCycle(t *testing.T) weak.Pointer[bindingOwner] {
 	t.Helper()
-	host, err := RuntimeCreate(DefaultRuntimeOptions())
+	host, err := RuntimeCreate(RuntimeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -382,13 +382,10 @@ func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {
 	}
 	requests := make(chan routed, 8)
 	deny := denyingProvider().Callback
-	allKindsRoute := DefaultResourceRoute()
-	allKindsRoute.Flags = UrlMatchFlagGlob
-	allKindsRoute.Url = "custom://any/**"
 	routes := []ResourceRoute{
 		{Kinds: ResourceKindFlagTile, Flags: UrlMatchFlagGlob, Url: "**"},
 		{Kinds: ResourceKindFlagStyle, Url: "custom://routed/style.json"},
-		allKindsRoute,
+		{Flags: UrlMatchFlagGlob, Url: "custom://any/**"},
 	}
 	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Routes: routes, Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) {
 		offer(requests, routed{request.RequestedUrl, request.Kind})

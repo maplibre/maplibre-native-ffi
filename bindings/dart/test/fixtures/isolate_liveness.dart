@@ -15,7 +15,7 @@ const _style = {
 /// completion is what keeps the isolate alive until it resolves.
 Future<(RuntimeHandle, MapHandle)> _register() async {
   logSetCallback((_, _, _, _) {});
-  final runtime = runtimeCreate(runtimeOptionsDefault());
+  final runtime = runtimeCreate(RuntimeOptions());
   await runtime.setResourceTransform((_, _, request) => request.close());
   await runtime.setResourceProvider(
     ResourceProvider(

@@ -105,7 +105,7 @@ static void rule_registrations_reject_an_invalid_rule(void) {
   );
 
   // A rule smaller than this header's struct has no size to step by.
-  mln_http_header_rule undersized_rule = mln_http_header_rule_default();
+  mln_http_header_rule undersized_rule = {.size = sizeof(mln_http_header_rule)};
   undersized_rule.size = sizeof(undersized_rule) - sizeof(uint64_t);
   undersized_rule.url = (mln_buffer_view)MLN_BUFFER_LITERAL("custom://headers");
   const mln_http_header_transform undersized_transform = {

@@ -34,7 +34,7 @@ pub const VulkanRenderTarget = union(types.RenderTargetMode) {
     /// Attaches the render session. Its core worker submits to the host's
     /// queue, so it takes the host's queue lock around each call on it.
     pub fn attach(self: *VulkanRenderTarget, map: *maplibre.Map, viewport: types.Viewport) !void {
-        var options = try render_target.attachOptions(self.*, .core_worker);
+        var options = render_target.attachOptions(self.*, .core_worker);
         options.queue_lock = switch (self.*) {
             .native_surface => |*backend| backend.context.queueLock(),
             inline else => |*backend| backend.compositor.context.queueLock(),

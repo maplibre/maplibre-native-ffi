@@ -273,15 +273,15 @@ fn borrowed_descriptor(
 }
 
 fn context_descriptor(vk: &VulkanContext) -> VulkanContextDescriptor {
-    let mut descriptor = VulkanContextDescriptor {
-        instance: vk.instance_pointer(),
-        physical_device: vk.physical_device_pointer(),
-        device: vk.device_pointer(),
-        graphics_queue: vk.graphics_queue_pointer(),
+    VulkanContextDescriptor {
         graphics_queue_family_index: vk.graphics_queue_family_index(),
-        ..Default::default()
-    };
-    descriptor.get_instance_proc_addr = vk.get_instance_proc_addr_pointer();
-    descriptor.get_device_proc_addr = vk.get_device_proc_addr_pointer();
-    descriptor
+        get_instance_proc_addr: vk.get_instance_proc_addr_pointer(),
+        get_device_proc_addr: vk.get_device_proc_addr_pointer(),
+        ..VulkanContextDescriptor::new(
+            vk.instance_pointer(),
+            vk.physical_device_pointer(),
+            vk.device_pointer(),
+            vk.graphics_queue_pointer(),
+        )
+    }
 }

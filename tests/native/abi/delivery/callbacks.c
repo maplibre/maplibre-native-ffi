@@ -80,7 +80,10 @@ static void unused_cancel(void* user_data, mln_resource_request handle) {
 }
 
 static mln_camera_update queued_ease(mln_delivery_queue queue, void* token) {
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.mode = MLN_CAMERA_UPDATE_MODE_EASE;
   update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   update.camera.zoom = 6;
@@ -168,8 +171,9 @@ static void a_custom_source_delivers_its_fetches_and_cancels_then_retires(
   int token = 0;
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
 
-  mln_custom_geometry_source_options options =
-    mln_custom_geometry_source_options_default();
+  mln_custom_geometry_source_options options = {
+    .size = sizeof(mln_custom_geometry_source_options)
+  };
   options.user_data = &token;
   options.queue = queue.handle;
   MLN_TEST_AWAIT_OK(mln_map_add_custom_geometry_source(
@@ -227,8 +231,9 @@ static void a_custom_source_delivers_its_fetches_and_cancels_then_retires(
     map, MLN_BUFFER_LITERAL("refused"), &options, NULL, NULL
   ));
 
-  mln_custom_mvt_vector_source_options mvt =
-    mln_custom_mvt_vector_source_options_default();
+  mln_custom_mvt_vector_source_options mvt = {
+    .size = sizeof(mln_custom_mvt_vector_source_options)
+  };
   mvt.queue = queue.handle;
   mvt.cancel_tile = unused_tile;
   MLN_TEST_INVALID(mln_map_add_custom_mvt_vector_source(

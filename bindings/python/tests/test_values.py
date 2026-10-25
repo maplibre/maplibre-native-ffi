@@ -1,7 +1,6 @@
 """The generated value shapes, one representative each against native."""
 
 import typing
-from dataclasses import replace
 
 import maplibre_native_ffi as mln
 import pytest
@@ -10,9 +9,7 @@ from support import EMPTY_STYLE, Harness, ok_response, result
 
 
 def _jump(map_handle: mln.MapHandle, camera: mln.CameraOptions) -> None:
-    update = replace(
-        mln.CameraUpdate.default(), mode=mln.CameraUpdateMode.JUMP, camera=camera
-    )
+    update = mln.CameraUpdate(mode=mln.CameraUpdateMode.JUMP, camera=camera)
     result(map_handle.update_camera(update))
 
 
@@ -111,8 +108,7 @@ def test_integers_are_range_checked_enums_stay_open_and_64_bit_values_round_trip
     # identity crossed whole both times.
     largest = 2**64 - 1
     ends: list[mln.CameraTransitionEnd] = []
-    ease = replace(
-        mln.CameraUpdate.default(),
+    ease = mln.CameraUpdate(
         mode=mln.CameraUpdateMode.EASE,
         camera=mln.CameraOptions(zoom=2.0),
         animation=mln.AnimationOptions(

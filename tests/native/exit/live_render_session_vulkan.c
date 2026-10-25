@@ -65,8 +65,9 @@ static mln_status attach(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) {
-  mln_vulkan_owned_texture_descriptor descriptor =
-    mln_vulkan_owned_texture_descriptor_default();
+  mln_vulkan_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_vulkan_owned_texture_descriptor)
+  };
   descriptor.extent = probe_extent;
   descriptor.context.instance = context->vulkan_instance;
   descriptor.context.physical_device = context->vulkan_physical_device;

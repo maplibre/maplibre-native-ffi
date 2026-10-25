@@ -10,7 +10,7 @@ MaplibreNative.LogSetCallback(new LogHandler((_, _, _, _) => false));
 var held = new TaskCompletionSource<ResourceRequestHandle>(
     TaskCreationOptions.RunContinuationsAsynchronously
 );
-var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+var runtime = RuntimeHandle.Create(new RuntimeOptions());
 await runtime.SetResourceProviderAsync(
     new ResourceProvider
     {

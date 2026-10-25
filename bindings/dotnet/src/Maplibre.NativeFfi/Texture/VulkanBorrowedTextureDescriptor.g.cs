@@ -9,13 +9,9 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_vulkan_borrowed_texture_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
-public readonly record struct VulkanBorrowedTextureDescriptor
+public readonly partial record struct VulkanBorrowedTextureDescriptor
 {
-    public VulkanBorrowedTextureDescriptor()
-    {
-        this = Default;
-    }
-
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public VulkanBorrowedTextureDescriptor(
         LogicalExtent Extent,
         uint PhysicalWidth,
@@ -42,27 +38,27 @@ public readonly record struct VulkanBorrowedTextureDescriptor
     /// give the texture's size. A scale_factor that differs from the map's is
     /// accepted and logged as a warning.
     /// </summary>
-    public LogicalExtent Extent { get; init; }
+    public required LogicalExtent Extent { get; init; }
 
     /// <summary>
     /// Physical image width in device pixels. Required.
     /// </summary>
-    public uint PhysicalWidth { get; init; }
+    public required uint PhysicalWidth { get; init; }
 
     /// <summary>
     /// Physical image height in device pixels. Required.
     /// </summary>
-    public uint PhysicalHeight { get; init; }
+    public required uint PhysicalHeight { get; init; }
 
     /// <summary>
     /// Borrowed Vulkan context. All handles are required.
     /// </summary>
-    public VulkanContextDescriptor Context { get; init; }
+    public required VulkanContextDescriptor Context { get; init; }
 
     /// <summary>
     /// The ring's images, one per slot, in slot order. Required.
     /// </summary>
-    public ImmutableArray<VulkanBorrowedTexture> Textures
+    public required ImmutableArray<VulkanBorrowedTexture> Textures
     {
         get => TexturesStorage.AsImmutable();
         init => TexturesStorage = ValueArray.From(value);
@@ -73,7 +69,7 @@ public readonly record struct VulkanBorrowedTextureDescriptor
     /// Backend-native VkFormat value of every image. Required, so
     /// VK_FORMAT_UNDEFINED is invalid.
     /// </summary>
-    public uint Format { get; init; }
+    public required uint Format { get; init; }
 
     /// <summary>
     /// Backend-native VkImageLayout value expected at render-pass begin.
@@ -85,15 +81,5 @@ public readonly record struct VulkanBorrowedTextureDescriptor
     /// as VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
     /// VK_IMAGE_LAYOUT_UNDEFINED is invalid.
     /// </summary>
-    public uint FinalLayout { get; init; }
-    public static VulkanBorrowedTextureDescriptor Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyVulkanBorrowedTextureDescriptor(
-                NativeMethods.mln_vulkan_borrowed_texture_descriptor_default()
-            );
-        }
-    }
+    public required uint FinalLayout { get; init; }
 }

@@ -59,11 +59,7 @@ public struct HttpHeader: Equatable, Hashable, Sendable {
   /// Header field name. Required.
   public var name: String
   public var value: String
-  public static var `default`: Self {
-    Self()
-  }
-
-  public init(name: String = "", value: String = "") {
+  public init(name: String, value: String = "") {
     self.name = name
     self.value = value
   }
@@ -100,15 +96,11 @@ public struct HttpHeaderRule: Equatable, Hashable, Sendable {
   /// The headers to set. Registration validates each one as
   /// `mln_http_header_transform_response_set_header()` does.
   public var headers: [HttpHeader]
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_http_header_rule_default))
-  }
-
   public init(
-    kinds: ResourceKindFlag = HttpHeaderRule.default.kinds,
-    flags: UrlMatchFlag = HttpHeaderRule.default.flags,
-    url: String = HttpHeaderRule.default.url,
-    headers: [HttpHeader] = HttpHeaderRule.default.headers
+    kinds: ResourceKindFlag = .init(rawValue: 0),
+    flags: UrlMatchFlag = .init(rawValue: 0),
+    url: String = "",
+    headers: [HttpHeader] = []
   ) {
     self.kinds = kinds
     self.flags = flags
@@ -130,7 +122,7 @@ public struct HttpHeaderRule: Equatable, Hashable, Sendable {
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_http_header_rule {
-    var raw = mln_http_header_rule_default()
+    var raw = mln_http_header_rule()
     raw.size = UInt32(MemoryLayout<mln_http_header_rule>.size)
     raw.kinds = kinds.rawValue
     raw.flags = flags.rawValue
@@ -157,10 +149,6 @@ public struct HttpHeaderTransform: Sendable {
   ) {
     self.callback = callback
     self.rules = rules
-  }
-
-  public static var `default`: Self {
-    Self()
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -288,25 +276,16 @@ public struct OfflineRegionStatus: Equatable, Hashable, Sendable {
   public var requiredResourceCount: UInt64
   public var requiredResourceCountIsPrecise: Bool
   public var complete: Bool
-  public static var `default`: Self {
-    Self(raw: mln_offline_region_status())
-  }
-
   public init(
-    downloadState: OfflineRegionDownloadState = OfflineRegionStatus.default
-      .downloadState,
-    completedResourceCount: UInt64 = OfflineRegionStatus.default
-      .completedResourceCount,
-    completedResourceSize: UInt64 = OfflineRegionStatus.default
-      .completedResourceSize,
-    completedTileCount: UInt64 = OfflineRegionStatus.default.completedTileCount,
-    requiredTileCount: UInt64 = OfflineRegionStatus.default.requiredTileCount,
-    completedTileSize: UInt64 = OfflineRegionStatus.default.completedTileSize,
-    requiredResourceCount: UInt64 = OfflineRegionStatus.default
-      .requiredResourceCount,
-    requiredResourceCountIsPrecise: Bool = OfflineRegionStatus.default
-      .requiredResourceCountIsPrecise,
-    complete: Bool = OfflineRegionStatus.default.complete
+    downloadState: OfflineRegionDownloadState = .init(rawValue: 0),
+    completedResourceCount: UInt64 = 0,
+    completedResourceSize: UInt64 = 0,
+    completedTileCount: UInt64 = 0,
+    requiredTileCount: UInt64 = 0,
+    completedTileSize: UInt64 = 0,
+    requiredResourceCount: UInt64 = 0,
+    requiredResourceCountIsPrecise: Bool = false,
+    complete: Bool = false
   ) {
     self.downloadState = downloadState
     self.completedResourceCount = completedResourceCount
@@ -371,16 +350,12 @@ public struct RenderingStats: Equatable, Hashable, Sendable {
   public var drawCallCount: Int64
   /// Total draw calls executed by the native renderer.
   public var totalDrawCallCount: Int64
-  public static var `default`: Self {
-    Self(raw: mln_rendering_stats())
-  }
-
   public init(
-    encodingTime: Double = RenderingStats.default.encodingTime,
-    renderingTime: Double = RenderingStats.default.renderingTime,
-    frameCount: Int64 = RenderingStats.default.frameCount,
-    drawCallCount: Int64 = RenderingStats.default.drawCallCount,
-    totalDrawCallCount: Int64 = RenderingStats.default.totalDrawCallCount
+    encodingTime: Double = 0,
+    renderingTime: Double = 0,
+    frameCount: Int64 = 0,
+    drawCallCount: Int64 = 0,
+    totalDrawCallCount: Int64 = 0
   ) {
     self.encodingTime = encodingTime
     self.renderingTime = renderingTime
@@ -591,14 +566,7 @@ public struct ResourceRange: Equatable, Hashable, Sendable {
   public var start: UInt64
   /// Last byte offset of the requested range, inclusive.
   public var end: UInt64
-  public static var `default`: Self {
-    Self(raw: mln_resource_range())
-  }
-
-  public init(
-    start: UInt64 = ResourceRange.default.start,
-    end: UInt64 = ResourceRange.default.end
-  ) {
+  public init(start: UInt64 = 0, end: UInt64 = 0) {
     self.start = start
     self.end = end
   }
@@ -665,10 +633,6 @@ public struct ResourceRequestInfo: Equatable, Hashable, Sendable {
   /// Entity tag of the cached copy, or empty when there is none.
   public var priorEtag: String
   public var priorData: Data
-  public static var `default`: Self {
-    Self()
-  }
-
   public init(
     requestedUrl: String = "",
     resolvedUrl: String = "",
@@ -746,10 +710,6 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
   public var expiresUnixMs: Int64?
   public var etag: String
   public var retryAfterUnixMs: Int64?
-  public static var `default`: Self {
-    Self()
-  }
-
   public init(
     status: ResourceResponseStatus = .init(rawValue: 0),
     errorReason: ResourceErrorReason = .init(rawValue: 0),
@@ -860,14 +820,10 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
   public var flags: UrlMatchFlag
   /// The URL or glob pattern to compare.
   public var url: String
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_resource_route_default))
-  }
-
   public init(
-    kinds: ResourceKindFlag = ResourceRoute.default.kinds,
-    flags: UrlMatchFlag = ResourceRoute.default.flags,
-    url: String = ResourceRoute.default.url
+    kinds: ResourceKindFlag = .init(rawValue: 0),
+    flags: UrlMatchFlag = .init(rawValue: 0),
+    url: String = ""
   ) {
     self.kinds = kinds
     self.flags = flags
@@ -884,7 +840,7 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_route {
-    var raw = mln_resource_route_default()
+    var raw = mln_resource_route()
     raw.size = UInt32(MemoryLayout<mln_resource_route>.size)
     raw.kinds = kinds.rawValue
     raw.flags = flags.rawValue
@@ -1005,10 +961,6 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
   public var message: String
   /// Typed payload selected by payload_type.
   public var payload: RuntimeEventPayload
-  public static var `default`: Self {
-    Self()
-  }
-
   public init(
     type: RuntimeEventType = .init(rawValue: 0),
     sourceType: RuntimeEventSourceType = .init(rawValue: 0),
@@ -1016,7 +968,7 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
     generation: UInt64 = 0,
     code: UInt32 = 0,
     message: String = "",
-    payload: RuntimeEventPayload = .default
+    payload: RuntimeEventPayload = .none
   ) {
     self.type = type
     self.sourceType = sourceType
@@ -1193,14 +1145,9 @@ public struct RuntimeEventOfflineRegionResponseError: Equatable, Hashable,
 {
   public var regionId: Int64
   public var reason: ResourceErrorReason
-  public static var `default`: Self {
-    Self(raw: mln_runtime_event_offline_region_response_error())
-  }
-
   public init(
-    regionId: Int64 = RuntimeEventOfflineRegionResponseError.default.regionId,
-    reason: ResourceErrorReason = RuntimeEventOfflineRegionResponseError.default
-      .reason
+    regionId: Int64 = 0,
+    reason: ResourceErrorReason = .init(rawValue: 0)
   ) {
     self.regionId = regionId
     self.reason = reason
@@ -1219,14 +1166,7 @@ public struct RuntimeEventOfflineRegionResponseError: Equatable, Hashable,
 public struct RuntimeEventOfflineRegionStatus: Equatable, Hashable, Sendable {
   public var regionId: Int64
   public var status: OfflineRegionStatus
-  public static var `default`: Self {
-    Self(raw: mln_runtime_event_offline_region_status())
-  }
-
-  public init(
-    regionId: Int64 = RuntimeEventOfflineRegionStatus.default.regionId,
-    status: OfflineRegionStatus = RuntimeEventOfflineRegionStatus.default.status
-  ) {
+  public init(regionId: Int64 = 0, status: OfflineRegionStatus = .init()) {
     self.regionId = regionId
     self.status = status
   }
@@ -1246,14 +1186,7 @@ public struct RuntimeEventOfflineRegionTileCountLimit: Equatable, Hashable,
 {
   public var regionId: Int64
   public var limit: UInt64
-  public static var `default`: Self {
-    Self(raw: mln_runtime_event_offline_region_tile_count_limit())
-  }
-
-  public init(
-    regionId: Int64 = RuntimeEventOfflineRegionTileCountLimit.default.regionId,
-    limit: UInt64 = RuntimeEventOfflineRegionTileCountLimit.default.limit
-  ) {
+  public init(regionId: Int64 = 0, limit: UInt64 = 0) {
     self.regionId = regionId
     self.limit = limit
   }
@@ -1277,9 +1210,6 @@ public enum RuntimeEventPayload: Equatable, Hashable, Sendable {
   case offlineRegionTileCountLimit(RuntimeEventOfflineRegionTileCountLimit)
   case none
   case unknown(UInt32, Data)
-  public static var `default`: Self {
-    .none
-  }
 }
 
 /// Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`.
@@ -1293,15 +1223,11 @@ public struct RuntimeEventRenderFrame: Equatable, Hashable, Sendable {
   /// Whether symbol placement changed during this frame.
   public var placementChanged: Bool
   public var stats: RenderingStats
-  public static var `default`: Self {
-    Self(raw: mln_runtime_event_render_frame())
-  }
-
   public init(
-    mode: RenderMode = RuntimeEventRenderFrame.default.mode,
-    needsRepaint: Bool = RuntimeEventRenderFrame.default.needsRepaint,
-    placementChanged: Bool = RuntimeEventRenderFrame.default.placementChanged,
-    stats: RenderingStats = RuntimeEventRenderFrame.default.stats
+    mode: RenderMode = .init(rawValue: 0),
+    needsRepaint: Bool = false,
+    placementChanged: Bool = false,
+    stats: RenderingStats = .init()
   ) {
     self.mode = mode
     self.needsRepaint = needsRepaint
@@ -1323,11 +1249,7 @@ public struct RuntimeEventRenderFrame: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventRenderMap: Equatable, Hashable, Sendable {
   public var mode: RenderMode
-  public static var `default`: Self {
-    Self(raw: mln_runtime_event_render_map())
-  }
-
-  public init(mode: RenderMode = RuntimeEventRenderMap.default.mode) {
+  public init(mode: RenderMode = .init(rawValue: 0)) {
     self.mode = mode
   }
 
@@ -1366,13 +1288,9 @@ public struct RuntimeEventSourceType: RawRepresentable, CustomStringConvertible,
 public struct RuntimeEventTileAction: Equatable, Hashable, Sendable {
   public var operation: TileOperation
   public var tileId: TileId
-  public static var `default`: Self {
-    Self(raw: mln_runtime_event_tile_action())
-  }
-
   public init(
-    operation: TileOperation = RuntimeEventTileAction.default.operation,
-    tileId: TileId = RuntimeEventTileAction.default.tileId
+    operation: TileOperation = .init(rawValue: 0),
+    tileId: TileId = .init()
   ) {
     self.operation = operation
     self.tileId = tileId
@@ -1457,14 +1375,7 @@ public struct RuntimeOptions: Equatable, Hashable, Sendable {
   /// Cache database path. Copied during runtime creation. Empty selects an
   /// in-memory cache.
   public var cachePath: String
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_runtime_options_default))
-  }
-
-  public init(
-    assetPath: String = RuntimeOptions.default.assetPath,
-    cachePath: String = RuntimeOptions.default.cachePath
-  ) {
+  public init(assetPath: String = "", cachePath: String = "") {
     self.assetPath = assetPath
     self.cachePath = cachePath
   }
@@ -1484,7 +1395,7 @@ public struct RuntimeOptions: Equatable, Hashable, Sendable {
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_runtime_options {
-    var raw = mln_runtime_options_default()
+    var raw = mln_runtime_options()
     raw.size = UInt32(MemoryLayout<mln_runtime_options>.size)
     raw.asset_path = arena.view(assetPath)
     raw.cache_path = arena.view(cachePath)
@@ -1502,16 +1413,12 @@ public struct TileId: Equatable, Hashable, Sendable {
   public var canonicalZ: UInt32
   public var canonicalX: UInt32
   public var canonicalY: UInt32
-  public static var `default`: Self {
-    Self(raw: mln_tile_id())
-  }
-
   public init(
-    overscaledZ: UInt32 = TileId.default.overscaledZ,
-    wrap: Int32 = TileId.default.wrap,
-    canonicalZ: UInt32 = TileId.default.canonicalZ,
-    canonicalX: UInt32 = TileId.default.canonicalX,
-    canonicalY: UInt32 = TileId.default.canonicalY
+    overscaledZ: UInt32 = 0,
+    wrap: Int32 = 0,
+    canonicalZ: UInt32 = 0,
+    canonicalX: UInt32 = 0,
+    canonicalY: UInt32 = 0
   ) {
     self.overscaledZ = overscaledZ
     self.wrap = wrap

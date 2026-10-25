@@ -92,7 +92,7 @@ impl AcquiredFrameHandle {
                 sys::mln_acquired_frame_view_end,
             )
         }?;
-        let mut out_sync: sys::mln_gpu_sync = unsafe { sys::mln_gpu_sync_default() };
+        let mut out_sync: sys::mln_gpu_sync = unsafe { std::mem::zeroed() };
         out_sync.size = std::mem::size_of::<sys::mln_gpu_sync>() as _;
         call.status(|frame, out_diagnostic| unsafe {
             sys::mln_acquired_frame_get_producer_sync(frame, &mut out_sync, out_diagnostic)

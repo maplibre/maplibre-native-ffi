@@ -27,8 +27,9 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
   mln_test_graphics_context context = {0};
   TEST_ASSERT_TRUE(mln_test_graphics_get_context(graphics, &context));
 
-  mln_vulkan_owned_texture_descriptor descriptor =
-    mln_vulkan_owned_texture_descriptor_default();
+  mln_vulkan_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_vulkan_owned_texture_descriptor)
+  };
   descriptor.extent = (mln_logical_extent){
     .width = 32,
     .height = 32,
@@ -45,8 +46,9 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
     .get_instance_proc_addr = context.vulkan_get_instance_proc_addr,
     .get_device_proc_addr = context.vulkan_get_device_proc_addr,
   };
-  mln_render_session_attach_options options =
-    mln_render_session_attach_options_default();
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
   options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
   options.requested_texture_ring_depth = 2;
   mln_render_session session = MLN_HANDLE_NULL;

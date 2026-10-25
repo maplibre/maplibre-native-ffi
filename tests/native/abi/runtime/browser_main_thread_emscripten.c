@@ -19,7 +19,7 @@ typedef struct main_thread_creation {
 
 static void create_runtime_here(void* context) {
   main_thread_creation* creation = context;
-  const mln_runtime_options options = mln_runtime_options_default();
+  const mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   creation->status =
     mln_runtime_create(&options, &creation->runtime, &creation->diagnostic);
 }

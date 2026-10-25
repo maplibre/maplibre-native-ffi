@@ -69,7 +69,9 @@ static const uint8_t red_swatch[16] = {
 };
 
 static void add_swatch(mln_map map) {
-  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
+  mln_premultiplied_rgba8_image image = {
+    .size = sizeof(mln_premultiplied_rgba8_image)
+  };
   image.width = 2;
   image.height = 2;
   image.stride = 8;
@@ -341,7 +343,9 @@ static void remove_geojson(mln_map map, update_state* state) {
 }
 static const uint8_t white_pixel[4] = {255, 255, 255, 255};
 static mln_premultiplied_rgba8_image white_image(void) {
-  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
+  mln_premultiplied_rgba8_image image = {
+    .size = sizeof(mln_premultiplied_rgba8_image)
+  };
   image.width = 1;
   image.height = 1;
   image.stride = 4;
@@ -382,14 +386,14 @@ static void set_tile_options(mln_map map, const mln_map_tile_options* options) {
   );
 }
 static void raise_prefetch_delta(mln_map map, update_state* state) {
-  mln_map_tile_options options = mln_map_tile_options_default();
+  mln_map_tile_options options = {.size = sizeof(mln_map_tile_options)};
   options.fields = MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
   options.prefetch_zoom_delta = state->initial_tile.prefetch_zoom_delta + 1;
   set_tile_options(map, &options);
 }
 static void use_distance_lod(mln_map map, update_state* state) {
   (void)state;
-  mln_map_tile_options options = mln_map_tile_options_default();
+  mln_map_tile_options options = {.size = sizeof(mln_map_tile_options)};
   options.fields = MLN_MAP_TILE_OPTION_LOD_MODE;
   options.lod_mode = MLN_TILE_LOD_MODE_DISTANCE;
   set_tile_options(map, &options);
@@ -400,7 +404,9 @@ static void set_layer_transition(mln_map map, update_state* state) {
 }
 static void set_style_transition(mln_map map, update_state* state) {
   (void)state;
-  mln_style_transition_options options = mln_style_transition_options_default();
+  mln_style_transition_options options = {
+    .size = sizeof(mln_style_transition_options)
+  };
   options.fields = MLN_STYLE_TRANSITION_OPTION_DURATION;
   options.duration_ms = 123.0;
   MLN_TEST_AWAIT_OK(mln_map_set_style_transition_options(
@@ -513,7 +519,7 @@ typedef struct frame_seek {
 // Demands one frame and reports whether its result matched.
 static bool frame_matches(void* context) {
   const frame_seek* seek = context;
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = seek->flags;
   MLN_TEST_OK(
     mln_render_session_request_frame(seek->fixture->session, &demand, NULL)

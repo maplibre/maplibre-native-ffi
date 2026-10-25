@@ -243,12 +243,6 @@ typedef struct mln_render_abandon_result {
 } mln_render_abandon_result;
 
 /**
- * Returns a zeroed frame demand with size set for this C API version: a
- * zero-token, render-if-needed, nonpresenting demand.
- */
-MLN_API mln_frame_demand mln_frame_demand_default(void) MLN_NOEXCEPT;
-
-/**
  * Returns the immutable capabilities fixed during attachment.
  *
  * Returns:

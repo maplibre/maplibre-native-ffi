@@ -34,7 +34,6 @@
 "VAL-03" = "bindings/python/tests/test_values.py::test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native"
 "VAL-04" = "bindings/python/tests/test_values.py::test_integers_are_range_checked_enums_stay_open_and_64_bit_values_round_trip"
 "VAL-05" = "bindings/python/tests/test_callbacks.py::test_a_providers_routes_decide_which_requests_reach_it"
-"VAL-06" = { na = "A value's constructor takes every field, and MapOptions.default() returns a copy of the native default" }
 # The extension reads every strided array, array completions included, through
 # the reader it shares with the Rust binding, so the Rust array-completion test,
 # which reads through that reader, covers it. The installed wheel offers no seam

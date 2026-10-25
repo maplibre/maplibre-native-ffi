@@ -10,8 +10,9 @@ static mln_status attach(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) {
-  mln_opengl_owned_texture_descriptor descriptor =
-    mln_opengl_owned_texture_descriptor_default();
+  mln_opengl_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_opengl_owned_texture_descriptor)
+  };
   descriptor.extent = probe_extent;
   // A core worker renders in a context of its own; a host graphics thread
   // renders in the host's context.

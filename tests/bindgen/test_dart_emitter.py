@@ -123,6 +123,23 @@ class DartEmitterTests(unittest.TestCase):
         # A registration with more than its callback stays a class.
         self.assertIn("final class ResourceProvider {", values)
 
+    def test_a_required_member_has_no_default_and_others_default_to_zero(self):
+        values = dart.generate_values(real_api())
+        self.assertIn(
+            "const MapOptions({required this.initialExtent, this.mapMode = const "
+            "MapMode.fromRawValue(0), this.fastPforEnabled = false, this.eventMask});",
+            values,
+        )
+        # A list member defaults to empty unless it is required.
+        self.assertIn("List<String> tileUrls = const []", values)
+        self.assertIn("required List<MetalBorrowedTexture> textures", values)
+        # Reading the C version skips the ABI version check, which reads it.
+        operations = dart.generate(real_api())
+        self.assertIn(
+            "int cVersion() {\n    final nativeResult = raw.mln_c_version();",
+            operations,
+        )
+
     def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
         values = dart.generate_values(real_api())
         self.assertIn("sealed class RenderedQueryGeometry {", values)
@@ -145,7 +162,6 @@ class DartEmitterTests(unittest.TestCase):
                 "values",
                 "keywords",
                 "defaults",
-                "default_registration",
                 "absent_value",
             )
         )
@@ -158,11 +174,9 @@ class DartEmitterTests(unittest.TestCase):
                 "mln_probe_batch_points",
                 "mln_probe_batch_scores",
                 "mln_probe_zeros_json",
-                "mln_probe_hooks_default",
                 "mln_probe_read_level",
                 "mln_probe_roundtrip",
                 "mln_probe_settings_check",
-                "mln_probe_settings_default",
             },
         )
         with TemporaryDirectory() as directory:

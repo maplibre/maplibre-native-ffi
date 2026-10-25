@@ -143,8 +143,8 @@ def lower(api):
         else:
             constrained.setdefault(build, []).append((plan, source))
     for value in bound.public_values.values():
-        if value.kind == "enum" or value.default:
-            values.require(value, input=value.kind == "record")
+        if value.kind == "enum":
+            values.require(value)
     owners = []
     used_support = set()
     sources = event_sources(bound.source)
@@ -196,8 +196,6 @@ def lower(api):
             go.append(a)
             header.append(b)
             c.append(d)
-        if record.default:
-            used_support.add(record.default)
     for plan in bound.operations:
         if (
             plan.name in generated

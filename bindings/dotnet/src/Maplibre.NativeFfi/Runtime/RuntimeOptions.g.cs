@@ -20,17 +20,5 @@ namespace Maplibre.NativeFfi;
 public readonly partial record struct RuntimeOptions(string AssetPath, string CachePath)
 {
     public RuntimeOptions()
-        : this(default!, default!)
-    {
-        this = Default;
-    }
-
-    public static RuntimeOptions Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyRuntimeOptions(NativeMethods.mln_runtime_options_default());
-        }
-    }
+        : this("", "") { }
 }

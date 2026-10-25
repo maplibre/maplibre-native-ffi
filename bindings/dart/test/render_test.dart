@@ -55,13 +55,13 @@ void main() {
     _expectRed(await within(worker.session.readTexture(), 'texture readback'));
   }, skip: _wglSkip);
 
-  test('an attach with default options completes on its own', () async {
+  test('an attach with a core-worker driver completes on its own', () async {
     final map = await openRenderMap(emptyStyle);
-    // Nothing services driver work, so only a core-worker default completes.
+    // Nothing services driver work, so only a core-worker driver completes.
     final attachment = TestGraphics.open().attachOwnedTexture(
       map,
       _extent,
-      RenderSessionAttachOptions(),
+      const RenderSessionAttachOptions(driver: RenderDriverKind.coreWorker),
     );
     addTearDown(() => releaseSession(attachment.session));
     await within(attachment.ready, 'attachment');
@@ -75,7 +75,7 @@ void main() {
       final attachment = graphics.attachOwnedTexture(
         map,
         _extent,
-        RenderSessionAttachOptions(),
+        const RenderSessionAttachOptions(driver: RenderDriverKind.coreWorker),
       );
       addTearDown(() => releaseSession(attachment.session));
       await within(attachment.ready, 'attachment');
@@ -99,7 +99,7 @@ void main() {
       final attachment = graphics.attachOwnedTexture(
         map,
         _extent,
-        RenderSessionAttachOptions(),
+        const RenderSessionAttachOptions(driver: RenderDriverKind.coreWorker),
       );
       addTearDown(() => releaseSession(attachment.session));
       await within(attachment.ready, 'attachment');
@@ -132,7 +132,7 @@ void main() {
         // The view borrows the frame, so neither the frame nor its session
         // can go away while it is open.
         expect(
-          () => frame.release(consumerCompletion: gpuSyncDefault()),
+          () => frame.release(consumerCompletion: GpuSync()),
           throwsA(
             isA<MaplibreException>().having(
               (error) => error.status,

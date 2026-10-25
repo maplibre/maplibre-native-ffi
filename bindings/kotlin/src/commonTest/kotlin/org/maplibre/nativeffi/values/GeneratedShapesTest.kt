@@ -22,7 +22,6 @@ import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LatLng
 import org.maplibre.nativeffi.generated.LogSeverityFlag
 import org.maplibre.nativeffi.generated.MapMode
-import org.maplibre.nativeffi.generated.MapOptions
 import org.maplibre.nativeffi.generated.OfflineRegionDefinition
 import org.maplibre.nativeffi.generated.PremultipliedRgba8Image
 import org.maplibre.nativeffi.generated.Status
@@ -83,8 +82,7 @@ class GeneratedShapesTest {
   @Test
   fun hostStringsUseViewsAndNativeLentStringsDecode() = runSuspendTest {
     NativeArena().use { arena ->
-      val lent = "native-lent é".encodeToByteArray() + 0
-      assertEquals("native-lent é", readCString(arena.bytes(lent)))
+      assertEquals("native-lent é", readCString(arena.cString("native-lent é")))
     }
     withMap {
       // Native rejects an embedded NUL in the URL view before a C-string consumer.
@@ -221,12 +219,6 @@ class GeneratedShapesTest {
         map.getStyleImage("marker").awaitWithin("the marker")?.pixels,
       )
     }
-  }
-
-  // Constructor defaults use the native default function.
-  @Test
-  fun aRecordBuiltFromItsConstructorDefaultsEqualsTheNativeDefault() {
-    assertEquals(GeneratedApi.mapOptionsDefault(), MapOptions())
   }
 
   @Test

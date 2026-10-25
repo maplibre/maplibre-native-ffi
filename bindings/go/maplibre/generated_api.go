@@ -1536,8 +1536,6 @@ type OpenglContextDescriptorData interface {
 	isOpenglContextDescriptorData()
 }
 
-func (UnknownVariant) isOpenglContextDescriptorData() {}
-
 type OpenglContextDescriptorDataWglVariant struct{ Value WglContextDescriptor }
 
 func (OpenglContextDescriptorDataWglVariant) bindingTag() uint32 {
@@ -1674,18 +1672,8 @@ type AnimationOptions struct {
 	EndHandler CameraTransitionHandler
 }
 
-func copyAnimationOptions(raw C.mln_animation_options) AnimationOptions {
-	var result AnimationOptions
-	result.DurationMs = bindingPresent(raw.fields&C.MLN_ANIMATION_OPTION_DURATION != 0, func() float64 { return float64(raw.duration_ms) })
-	result.Velocity = bindingPresent(raw.fields&C.MLN_ANIMATION_OPTION_VELOCITY != 0, func() float64 { return float64(raw.velocity) })
-	result.MinZoom = bindingPresent(raw.fields&C.MLN_ANIMATION_OPTION_MIN_ZOOM != 0, func() float64 { return float64(raw.min_zoom) })
-	result.Easing = bindingPresent(raw.fields&C.MLN_ANIMATION_OPTION_EASING != 0, func() UnitBezier { return copyUnitBezier(raw.easing) })
-	result.TransitionId = bindingPresent(raw.fields&C.MLN_ANIMATION_OPTION_TRANSITION_ID != 0, func() uint64 { return uint64(raw.transition_id) })
-	return result
-}
-
 func nativeAnimationOptions(input AnimationOptions, arena *bindingArena) C.mln_animation_options {
-	raw := C.mln_animation_options_default()
+	raw := C.mln_animation_options{}
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_DURATION, &raw.duration_ms, input.DurationMs, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_VELOCITY, &raw.velocity, input.Velocity, arena, bindingNumber[float64, C.double])
@@ -1694,10 +1682,6 @@ func nativeAnimationOptions(input AnimationOptions, arena *bindingArena) C.mln_a
 	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_TRANSITION_ID, &raw.transition_id, input.TransitionId, arena, bindingNumber[uint64, C.uint64_t])
 	raw.end_handler = nativeCameraTransitionHandler(input.EndHandler, arena)
 	return raw
-}
-
-func DefaultAnimationOptions() AnimationOptions {
-	return copyAnimationOptions(C.mln_animation_options_default())
 }
 
 // BoundOptions corresponds to mln_bound_options. Optional map camera constraint
@@ -1732,7 +1716,7 @@ func copyBoundOptions(raw C.mln_bound_options) BoundOptions {
 }
 
 func nativeBoundOptions(input BoundOptions, arena *bindingArena) C.mln_bound_options {
-	raw := C.mln_bound_options_default()
+	raw := C.mln_bound_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_BOUND_OPTION_BOUNDS, &raw.bounds, input.Bounds, arena, nativeLatLngBounds)
@@ -1745,8 +1729,6 @@ func nativeBoundOptions(input BoundOptions, arena *bindingArena) C.mln_bound_opt
 	}
 	return raw
 }
-
-func DefaultBoundOptions() BoundOptions { return copyBoundOptions(C.mln_bound_options_default()) }
 
 // Camera corresponds to mln_camera. A complete camera, as native reports it.
 //
@@ -1809,20 +1791,8 @@ type CameraDelta struct {
 	GesturePhase GesturePhase
 }
 
-func copyCameraDelta(raw C.mln_camera_delta) CameraDelta {
-	var result CameraDelta
-	result.Offset = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_OFFSET != 0, func() ScreenPoint { return copyScreenPoint(raw.offset) })
-	result.Scale = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_SCALE != 0, func() float64 { return float64(raw.scale) })
-	result.Bearing = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_BEARING != 0, func() float64 { return float64(raw.bearing) })
-	result.Pitch = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_PITCH != 0, func() float64 { return float64(raw.pitch) })
-	result.Anchor = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_ANCHOR != 0, func() ScreenPoint { return copyScreenPoint(raw.anchor) })
-	result.Animation = copyAnimationOptions(raw.animation)
-	result.GesturePhase = GesturePhase(raw.gesture_phase)
-	return result
-}
-
 func nativeCameraDelta(input CameraDelta, arena *bindingArena) C.mln_camera_delta {
-	raw := C.mln_camera_delta_default()
+	raw := C.mln_camera_delta{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_OFFSET, &raw.offset, input.Offset, arena, nativeScreenPoint)
@@ -1835,8 +1805,6 @@ func nativeCameraDelta(input CameraDelta, arena *bindingArena) C.mln_camera_delt
 	return raw
 }
 
-func DefaultCameraDelta() CameraDelta { return copyCameraDelta(C.mln_camera_delta_default()) }
-
 // CameraFitOptions corresponds to mln_camera_fit_options. Optional fitting
 // controls for camera-for-viewport queries.
 //
@@ -1848,26 +1816,14 @@ type CameraFitOptions struct {
 	Pitch   *float64
 }
 
-func copyCameraFitOptions(raw C.mln_camera_fit_options) CameraFitOptions {
-	var result CameraFitOptions
-	result.Padding = bindingPresent(raw.fields&C.MLN_CAMERA_FIT_OPTION_PADDING != 0, func() EdgeInsets { return copyEdgeInsets(raw.padding) })
-	result.Bearing = bindingPresent(raw.fields&C.MLN_CAMERA_FIT_OPTION_BEARING != 0, func() float64 { return float64(raw.bearing) })
-	result.Pitch = bindingPresent(raw.fields&C.MLN_CAMERA_FIT_OPTION_PITCH != 0, func() float64 { return float64(raw.pitch) })
-	return result
-}
-
 func nativeCameraFitOptions(input CameraFitOptions, arena *bindingArena) C.mln_camera_fit_options {
-	raw := C.mln_camera_fit_options_default()
+	raw := C.mln_camera_fit_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_CAMERA_FIT_OPTION_PADDING, &raw.padding, input.Padding, arena, nativeEdgeInsets)
 	bindingMasked(&raw.fields, C.MLN_CAMERA_FIT_OPTION_BEARING, &raw.bearing, input.Bearing, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_CAMERA_FIT_OPTION_PITCH, &raw.pitch, input.Pitch, arena, bindingNumber[float64, C.double])
 	return raw
-}
-
-func DefaultCameraFitOptions() CameraFitOptions {
-	return copyCameraFitOptions(C.mln_camera_fit_options_default())
 }
 
 // CameraOptions corresponds to mln_camera_options. Camera fields used by
@@ -1903,7 +1859,7 @@ func copyCameraOptions(raw C.mln_camera_options) CameraOptions {
 }
 
 func nativeCameraOptions(input CameraOptions, arena *bindingArena) C.mln_camera_options {
-	raw := C.mln_camera_options_default()
+	raw := C.mln_camera_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_CENTER, &raw.center, input.Center, arena, nativeLatLng)
@@ -1917,8 +1873,6 @@ func nativeCameraOptions(input CameraOptions, arena *bindingArena) C.mln_camera_
 	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_FOV, &raw.field_of_view, input.FieldOfView, arena, bindingNumber[float64, C.double])
 	return raw
 }
-
-func DefaultCameraOptions() CameraOptions { return copyCameraOptions(C.mln_camera_options_default()) }
 
 // CameraQueryResult corresponds to mln_camera_query_result. Camera result
 // borrowed for an ordered camera-query completion.
@@ -1990,17 +1944,8 @@ type CameraUpdate struct {
 	GesturePhase GesturePhase
 }
 
-func copyCameraUpdate(raw C.mln_camera_update) CameraUpdate {
-	var result CameraUpdate
-	result.Mode = CameraUpdateMode(raw.mode)
-	result.Camera = copyCameraOptions(raw.camera)
-	result.Animation = copyAnimationOptions(raw.animation)
-	result.GesturePhase = GesturePhase(raw.gesture_phase)
-	return result
-}
-
 func nativeCameraUpdate(input CameraUpdate, arena *bindingArena) C.mln_camera_update {
-	raw := C.mln_camera_update_default()
+	raw := C.mln_camera_update{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.mode = C.mln_camera_update_mode(input.Mode)
 	raw.camera = nativeCameraOptions(input.Camera, arena)
@@ -2008,8 +1953,6 @@ func nativeCameraUpdate(input CameraUpdate, arena *bindingArena) C.mln_camera_up
 	raw.gesture_phase = C.mln_gesture_phase(input.GesturePhase)
 	return raw
 }
-
-func DefaultCameraUpdate() CameraUpdate { return copyCameraUpdate(C.mln_camera_update_default()) }
 
 // CanonicalTileId corresponds to mln_canonical_tile_id. Canonical tile identity
 // used by custom geometry and custom MVT vector source callbacks.
@@ -2057,20 +2000,8 @@ type CustomGeometrySourceOptions struct {
 	CancelTile func(tileId CanonicalTileId)
 }
 
-func copyCustomGeometrySourceOptions(raw C.mln_custom_geometry_source_options) CustomGeometrySourceOptions {
-	var result CustomGeometrySourceOptions
-	result.MinZoom = bindingPresent(raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM != 0, func() float64 { return float64(raw.min_zoom) })
-	result.MaxZoom = bindingPresent(raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM != 0, func() float64 { return float64(raw.max_zoom) })
-	result.Tolerance = bindingPresent(raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE != 0, func() float64 { return float64(raw.tolerance) })
-	result.TileSize = bindingPresent(raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE != 0, func() uint32 { return uint32(raw.tile_size) })
-	result.Buffer = bindingPresent(raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER != 0, func() uint32 { return uint32(raw.buffer) })
-	result.Clip = bindingPresent(raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP != 0, func() bool { return bool(raw.clip) })
-	result.Wrap = bindingPresent(raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP != 0, func() bool { return bool(raw.wrap) })
-	return result
-}
-
 func nativeCustomGeometrySourceOptions(input CustomGeometrySourceOptions, arena *bindingArena) C.mln_custom_geometry_source_options {
-	raw := C.mln_custom_geometry_source_options_default()
+	raw := C.mln_custom_geometry_source_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, input.MinZoom, arena, bindingNumber[float64, C.double])
@@ -2093,10 +2024,6 @@ func nativeCustomGeometrySourceOptions(input CustomGeometrySourceOptions, arena 
 	return raw
 }
 
-func DefaultCustomGeometrySourceOptions() CustomGeometrySourceOptions {
-	return copyCustomGeometrySourceOptions(C.mln_custom_geometry_source_options_default())
-}
-
 // CustomMvtVectorSourceOptions corresponds to
 // mln_custom_mvt_vector_source_options. Options for custom MVT vector sources.
 //
@@ -2111,15 +2038,8 @@ type CustomMvtVectorSourceOptions struct {
 	CancelTile func(tileId CanonicalTileId)
 }
 
-func copyCustomMvtVectorSourceOptions(raw C.mln_custom_mvt_vector_source_options) CustomMvtVectorSourceOptions {
-	var result CustomMvtVectorSourceOptions
-	result.MinZoom = bindingPresent(raw.fields&C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM != 0, func() float64 { return float64(raw.min_zoom) })
-	result.MaxZoom = bindingPresent(raw.fields&C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM != 0, func() float64 { return float64(raw.max_zoom) })
-	return result
-}
-
 func nativeCustomMvtVectorSourceOptions(input CustomMvtVectorSourceOptions, arena *bindingArena) C.mln_custom_mvt_vector_source_options {
-	raw := C.mln_custom_mvt_vector_source_options_default()
+	raw := C.mln_custom_mvt_vector_source_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, input.MinZoom, arena, bindingNumber[float64, C.double])
@@ -2135,10 +2055,6 @@ func nativeCustomMvtVectorSourceOptions(input CustomMvtVectorSourceOptions, aren
 		}
 	}
 	return raw
-}
-
-func DefaultCustomMvtVectorSourceOptions() CustomMvtVectorSourceOptions {
-	return copyCustomMvtVectorSourceOptions(C.mln_custom_mvt_vector_source_options_default())
 }
 
 // EdgeInsets corresponds to mln_edge_insets. Screen-space inset in logical map
@@ -2199,16 +2115,6 @@ type EglContextDescriptor struct {
 	GetProcAddress uintptr
 }
 
-func copyEglContextDescriptor(raw C.mln_egl_context_descriptor) EglContextDescriptor {
-	var result EglContextDescriptor
-	result.Display = uintptr(unsafe.Pointer(raw.display))
-	result.Config = uintptr(unsafe.Pointer(raw.config))
-	result.ShareContext = uintptr(unsafe.Pointer(raw.share_context))
-	result.ClientApi = OpenglClientApi(raw.client_api)
-	result.GetProcAddress = uintptr(unsafe.Pointer(raw.get_proc_address))
-	return result
-}
-
 func nativeEglContextDescriptor(input EglContextDescriptor, arena *bindingArena) C.mln_egl_context_descriptor {
 	raw := C.mln_egl_context_descriptor{}
 	raw.display = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Display)))
@@ -2267,22 +2173,13 @@ type FrameDemand struct {
 	Token uint64
 }
 
-func copyFrameDemand(raw C.mln_frame_demand) FrameDemand {
-	var result FrameDemand
-	result.Flags = FrameDemandFlag(raw.flags)
-	result.Token = uint64(raw.token)
-	return result
-}
-
 func nativeFrameDemand(input FrameDemand, arena *bindingArena) C.mln_frame_demand {
-	raw := C.mln_frame_demand_default()
+	raw := C.mln_frame_demand{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.flags = C.mln_frame_demand_flags(input.Flags)
 	raw.token = C.uint64_t(input.Token)
 	return raw
 }
-
-func DefaultFrameDemand() FrameDemand { return copyFrameDemand(C.mln_frame_demand_default()) }
 
 // FreeCameraOptions corresponds to mln_free_camera_options. Free camera
 // position and orientation in MapLibre Native camera space.
@@ -2302,16 +2199,12 @@ func copyFreeCameraOptions(raw C.mln_free_camera_options) FreeCameraOptions {
 }
 
 func nativeFreeCameraOptions(input FreeCameraOptions, arena *bindingArena) C.mln_free_camera_options {
-	raw := C.mln_free_camera_options_default()
+	raw := C.mln_free_camera_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_FREE_CAMERA_OPTION_POSITION, &raw.position, input.Position, arena, nativeVec3)
 	bindingMasked(&raw.fields, C.MLN_FREE_CAMERA_OPTION_ORIENTATION, &raw.orientation, input.Orientation, arena, nativeQuaternion)
 	return raw
-}
-
-func DefaultFreeCameraOptions() FreeCameraOptions {
-	return copyFreeCameraOptions(C.mln_free_camera_options_default())
 }
 
 // GeojsonSourceOptions corresponds to mln_geojson_source_options. Options for
@@ -2347,24 +2240,8 @@ type GeojsonSourceOptions struct {
 	SynchronousTiling *bool
 }
 
-func copyGeojsonSourceOptions(raw C.mln_geojson_source_options) GeojsonSourceOptions {
-	var result GeojsonSourceOptions
-	result.MinZoom = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM != 0, func() float64 { return float64(raw.min_zoom) })
-	result.MaxZoom = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM != 0, func() float64 { return float64(raw.max_zoom) })
-	result.Tolerance = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE != 0, func() float64 { return float64(raw.tolerance) })
-	result.ClusterMaxZoom = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM != 0, func() float64 { return float64(raw.cluster_max_zoom) })
-	result.ClusterProperties = bindingString(raw.cluster_properties.data, uint64(raw.cluster_properties.size))
-	result.Buffer = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_BUFFER != 0, func() uint32 { return uint32(raw.buffer) })
-	result.ClusterRadius = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS != 0, func() uint32 { return uint32(raw.cluster_radius) })
-	result.ClusterMinPoints = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS != 0, func() uint32 { return uint32(raw.cluster_min_points) })
-	result.LineMetrics = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS != 0, func() bool { return bool(raw.line_metrics) })
-	result.Cluster = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER != 0, func() bool { return bool(raw.cluster) })
-	result.SynchronousTiling = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING != 0, func() bool { return bool(raw.synchronous_tiling) })
-	return result
-}
-
 func nativeGeojsonSourceOptions(input GeojsonSourceOptions, arena *bindingArena) C.mln_geojson_source_options {
-	raw := C.mln_geojson_source_options_default()
+	raw := C.mln_geojson_source_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, input.MinZoom, arena, bindingNumber[float64, C.double])
@@ -2379,10 +2256,6 @@ func nativeGeojsonSourceOptions(input GeojsonSourceOptions, arena *bindingArena)
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER, &raw.cluster, input.Cluster, arena, bindingBool[bool, C.bool])
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING, &raw.synchronous_tiling, input.SynchronousTiling, arena, bindingBool[bool, C.bool])
 	return raw
-}
-
-func DefaultGeojsonSourceOptions() GeojsonSourceOptions {
-	return copyGeojsonSourceOptions(C.mln_geojson_source_options_default())
 }
 
 // GpuSync corresponds to mln_gpu_sync. Backend synchronization copied by frame
@@ -2404,14 +2277,12 @@ func copyGpuSync(raw C.mln_gpu_sync) GpuSync {
 }
 
 func nativeGpuSync(input GpuSync, arena *bindingArena) C.mln_gpu_sync {
-	raw := C.mln_gpu_sync_default()
+	raw := C.mln_gpu_sync{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.kind = C.mln_gpu_sync_kind(input.Kind)
 	raw.handle = C.uint64_t(input.Handle)
 	return raw
 }
-
-func DefaultGpuSync() GpuSync { return copyGpuSync(C.mln_gpu_sync_default()) }
 
 // HttpHeader corresponds to mln_http_header. One HTTP header that a header rule
 // supplies.
@@ -2422,13 +2293,6 @@ type HttpHeader struct {
 	// Header field name. Required.
 	Name  string
 	Value string
-}
-
-func copyHttpHeader(raw C.mln_http_header) HttpHeader {
-	var result HttpHeader
-	result.Name = bindingString(raw.name.data, uint64(raw.name.size))
-	result.Value = bindingString(raw.value.data, uint64(raw.value.size))
-	return result
 }
 
 func nativeHttpHeader(input HttpHeader, arena *bindingArena) C.mln_http_header {
@@ -2454,25 +2318,8 @@ type HttpHeaderRule struct {
 	Headers []HttpHeader
 }
 
-func copyHttpHeaderRule(raw C.mln_http_header_rule) HttpHeaderRule {
-	var result HttpHeaderRule
-	result.Kinds = ResourceKindFlag(raw.kinds)
-	result.Flags = UrlMatchFlag(raw.flags)
-	result.Url = bindingString(raw.url.data, uint64(raw.url.size))
-	result.Headers = func() []HttpHeader {
-		length := bindingLength(uint64(raw.header_count))
-		result := make([]HttpHeader, length)
-		for i := range result {
-			item := *(*C.mln_http_header)(bindingElement(unsafe.Pointer(raw.headers), i, uint64(unsafe.Sizeof(C.mln_http_header{})), unsafe.Sizeof(*raw.headers), unsafe.Alignof(*raw.headers)))
-			result[i] = copyHttpHeader(item)
-		}
-		return result
-	}()
-	return result
-}
-
 func nativeHttpHeaderRule(input HttpHeaderRule, arena *bindingArena) C.mln_http_header_rule {
-	raw := C.mln_http_header_rule_default()
+	raw := C.mln_http_header_rule{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.kinds = C.mln_resource_kind_flags(input.Kinds)
 	raw.flags = C.mln_url_match_flags(input.Flags)
@@ -2486,10 +2333,6 @@ func nativeHttpHeaderRule(input HttpHeaderRule, arena *bindingArena) C.mln_http_
 		}
 	}
 	return raw
-}
-
-func DefaultHttpHeaderRule() HttpHeaderRule {
-	return copyHttpHeaderRule(C.mln_http_header_rule_default())
 }
 
 // HttpHeaderTransform corresponds to mln_http_header_transform. HTTP header
@@ -2690,14 +2533,12 @@ func copyLogicalExtent(raw C.mln_logical_extent) LogicalExtent {
 }
 
 func nativeLogicalExtent(input LogicalExtent, arena *bindingArena) C.mln_logical_extent {
-	raw := C.mln_logical_extent_default()
+	raw := C.mln_logical_extent{}
 	raw.width = C.uint32_t(input.Width)
 	raw.height = C.uint32_t(input.Height)
 	raw.scale_factor = C.double(input.ScaleFactor)
 	return raw
 }
-
-func DefaultLogicalExtent() LogicalExtent { return copyLogicalExtent(C.mln_logical_extent_default()) }
 
 // MapOptions corresponds to mln_map_options. Options used when creating a map.
 //
@@ -2717,17 +2558,8 @@ type MapOptions struct {
 	EventMask *RuntimeEventFlag
 }
 
-func copyMapOptions(raw C.mln_map_options) MapOptions {
-	var result MapOptions
-	result.InitialExtent = copyLogicalExtent(raw.initial_extent)
-	result.MapMode = MapMode(raw.map_mode)
-	result.FastPforEnabled = bool(raw.fast_pfor_enabled)
-	result.EventMask = bindingPresent(raw.fields&C.MLN_MAP_OPTION_EVENT_MASK != 0, func() RuntimeEventFlag { return RuntimeEventFlag(raw.event_mask) })
-	return result
-}
-
 func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options {
-	raw := C.mln_map_options_default()
+	raw := C.mln_map_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	raw.initial_extent = nativeLogicalExtent(input.InitialExtent, arena)
@@ -2736,8 +2568,6 @@ func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options {
 	bindingMasked(&raw.fields, C.MLN_MAP_OPTION_EVENT_MASK, &raw.event_mask, input.EventMask, arena, bindingNumber[RuntimeEventFlag, C.mln_runtime_event_flags])
 	return raw
 }
-
-func DefaultMapOptions() MapOptions { return copyMapOptions(C.mln_map_options_default()) }
 
 // MapSnapshot corresponds to mln_map_snapshot. Immutable map state copied from
 // the latest published generation.
@@ -2812,7 +2642,7 @@ func copyMapTileOptions(raw C.mln_map_tile_options) MapTileOptions {
 }
 
 func nativeMapTileOptions(input MapTileOptions, arena *bindingArena) C.mln_map_tile_options {
-	raw := C.mln_map_tile_options_default()
+	raw := C.mln_map_tile_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA, &raw.prefetch_zoom_delta, input.PrefetchZoomDelta, arena, bindingNumber[uint32, C.uint32_t])
@@ -2822,10 +2652,6 @@ func nativeMapTileOptions(input MapTileOptions, arena *bindingArena) C.mln_map_t
 	bindingMasked(&raw.fields, C.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT, &raw.lod_zoom_shift, input.LodZoomShift, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_MAP_TILE_OPTION_LOD_MODE, &raw.lod_mode, input.LodMode, arena, bindingNumber[TileLodMode, C.mln_tile_lod_mode])
 	return raw
-}
-
-func DefaultMapTileOptions() MapTileOptions {
-	return copyMapTileOptions(C.mln_map_tile_options_default())
 }
 
 // MapView corresponds to mln_map_view. Everything that a projection depends on:
@@ -2888,7 +2714,7 @@ func copyMapViewportOptions(raw C.mln_map_viewport_options) MapViewportOptions {
 }
 
 func nativeMapViewportOptions(input MapViewportOptions, arena *bindingArena) C.mln_map_viewport_options {
-	raw := C.mln_map_viewport_options_default()
+	raw := C.mln_map_viewport_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION, &raw.north_orientation, input.NorthOrientation, arena, bindingNumber[NorthOrientation, C.mln_north_orientation])
@@ -2896,10 +2722,6 @@ func nativeMapViewportOptions(input MapViewportOptions, arena *bindingArena) C.m
 	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE, &raw.viewport_mode, input.ViewportMode, arena, bindingNumber[ViewportMode, C.mln_viewport_mode])
 	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET, &raw.frustum_offset, input.FrustumOffset, arena, nativeEdgeInsets)
 	return raw
-}
-
-func DefaultMapViewportOptions() MapViewportOptions {
-	return copyMapViewportOptions(C.mln_map_viewport_options_default())
 }
 
 // MetalBorrowedTexture corresponds to mln_metal_borrowed_texture. One
@@ -2910,12 +2732,6 @@ func DefaultMapViewportOptions() MapViewportOptions {
 type MetalBorrowedTexture struct {
 	// Borrowed id<MTLTexture> / MTL::Texture*. Required.
 	Texture uintptr
-}
-
-func copyMetalBorrowedTexture(raw C.mln_metal_borrowed_texture) MetalBorrowedTexture {
-	var result MetalBorrowedTexture
-	result.Texture = uintptr(unsafe.Pointer(raw.texture))
-	return result
 }
 
 func nativeMetalBorrowedTexture(input MetalBorrowedTexture, arena *bindingArena) C.mln_metal_borrowed_texture {
@@ -2943,25 +2759,8 @@ type MetalBorrowedTextureDescriptor struct {
 	Textures []MetalBorrowedTexture
 }
 
-func copyMetalBorrowedTextureDescriptor(raw C.mln_metal_borrowed_texture_descriptor) MetalBorrowedTextureDescriptor {
-	var result MetalBorrowedTextureDescriptor
-	result.Extent = copyLogicalExtent(raw.extent)
-	result.PhysicalWidth = uint32(raw.physical_width)
-	result.PhysicalHeight = uint32(raw.physical_height)
-	result.Textures = func() []MetalBorrowedTexture {
-		length := bindingLength(uint64(raw.texture_count))
-		result := make([]MetalBorrowedTexture, length)
-		for i := range result {
-			item := *(*C.mln_metal_borrowed_texture)(bindingElement(unsafe.Pointer(raw.textures), i, uint64(unsafe.Sizeof(C.mln_metal_borrowed_texture{})), unsafe.Sizeof(*raw.textures), unsafe.Alignof(*raw.textures)))
-			result[i] = copyMetalBorrowedTexture(item)
-		}
-		return result
-	}()
-	return result
-}
-
 func nativeMetalBorrowedTextureDescriptor(input MetalBorrowedTextureDescriptor, arena *bindingArena) C.mln_metal_borrowed_texture_descriptor {
-	raw := C.mln_metal_borrowed_texture_descriptor_default()
+	raw := C.mln_metal_borrowed_texture_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.physical_width = C.uint32_t(input.PhysicalWidth)
@@ -2977,10 +2776,6 @@ func nativeMetalBorrowedTextureDescriptor(input MetalBorrowedTextureDescriptor, 
 	return raw
 }
 
-func DefaultMetalBorrowedTextureDescriptor() MetalBorrowedTextureDescriptor {
-	return copyMetalBorrowedTextureDescriptor(C.mln_metal_borrowed_texture_descriptor_default())
-}
-
 // MetalContextDescriptor corresponds to mln_metal_context_descriptor. Metal
 // backend context fields shared by Metal render targets.
 //
@@ -2989,12 +2784,6 @@ func DefaultMetalBorrowedTextureDescriptor() MetalBorrowedTextureDescriptor {
 type MetalContextDescriptor struct {
 	// id<MTLDevice> / MTL::Device*. Retained when the target requires it.
 	Device uintptr
-}
-
-func copyMetalContextDescriptor(raw C.mln_metal_context_descriptor) MetalContextDescriptor {
-	var result MetalContextDescriptor
-	result.Device = uintptr(unsafe.Pointer(raw.device))
-	return result
 }
 
 func nativeMetalContextDescriptor(input MetalContextDescriptor, arena *bindingArena) C.mln_metal_context_descriptor {
@@ -3021,25 +2810,13 @@ type MetalOwnedTextureDescriptor struct {
 	PixelFormat uint64
 }
 
-func copyMetalOwnedTextureDescriptor(raw C.mln_metal_owned_texture_descriptor) MetalOwnedTextureDescriptor {
-	var result MetalOwnedTextureDescriptor
-	result.Extent = copyLogicalExtent(raw.extent)
-	result.Context = copyMetalContextDescriptor(raw.context)
-	result.PixelFormat = uint64(raw.pixel_format)
-	return result
-}
-
 func nativeMetalOwnedTextureDescriptor(input MetalOwnedTextureDescriptor, arena *bindingArena) C.mln_metal_owned_texture_descriptor {
-	raw := C.mln_metal_owned_texture_descriptor_default()
+	raw := C.mln_metal_owned_texture_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.context = nativeMetalContextDescriptor(input.Context, arena)
 	raw.pixel_format = C.uint64_t(input.PixelFormat)
 	return raw
-}
-
-func DefaultMetalOwnedTextureDescriptor() MetalOwnedTextureDescriptor {
-	return copyMetalOwnedTextureDescriptor(C.mln_metal_owned_texture_descriptor_default())
 }
 
 // MetalSurfaceDescriptor corresponds to mln_metal_surface_descriptor. Metal
@@ -3057,25 +2834,13 @@ type MetalSurfaceDescriptor struct {
 	Layer uintptr
 }
 
-func copyMetalSurfaceDescriptor(raw C.mln_metal_surface_descriptor) MetalSurfaceDescriptor {
-	var result MetalSurfaceDescriptor
-	result.Extent = copyLogicalExtent(raw.extent)
-	result.Context = copyMetalContextDescriptor(raw.context)
-	result.Layer = uintptr(unsafe.Pointer(raw.layer))
-	return result
-}
-
 func nativeMetalSurfaceDescriptor(input MetalSurfaceDescriptor, arena *bindingArena) C.mln_metal_surface_descriptor {
-	raw := C.mln_metal_surface_descriptor_default()
+	raw := C.mln_metal_surface_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.context = nativeMetalContextDescriptor(input.Context, arena)
 	raw.layer = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Layer)))
 	return raw
-}
-
-func DefaultMetalSurfaceDescriptor() MetalSurfaceDescriptor {
-	return copyMetalSurfaceDescriptor(C.mln_metal_surface_descriptor_default())
 }
 
 // MetalTextureFrame corresponds to mln_metal_texture_frame. Metal frame
@@ -3288,12 +3053,6 @@ type OpenglBorrowedTexture struct {
 	Texture uint32
 }
 
-func copyOpenglBorrowedTexture(raw C.mln_opengl_borrowed_texture) OpenglBorrowedTexture {
-	var result OpenglBorrowedTexture
-	result.Texture = uint32(raw.texture)
-	return result
-}
-
 func nativeOpenglBorrowedTexture(input OpenglBorrowedTexture, arena *bindingArena) C.mln_opengl_borrowed_texture {
 	raw := C.mln_opengl_borrowed_texture{}
 	raw.texture = C.uint32_t(input.Texture)
@@ -3324,27 +3083,8 @@ type OpenglBorrowedTextureDescriptor struct {
 	Target uint32
 }
 
-func copyOpenglBorrowedTextureDescriptor(raw C.mln_opengl_borrowed_texture_descriptor) OpenglBorrowedTextureDescriptor {
-	var result OpenglBorrowedTextureDescriptor
-	result.Extent = copyLogicalExtent(raw.extent)
-	result.PhysicalWidth = uint32(raw.physical_width)
-	result.PhysicalHeight = uint32(raw.physical_height)
-	result.Context = copyOpenglContextDescriptor(raw.context)
-	result.Textures = func() []OpenglBorrowedTexture {
-		length := bindingLength(uint64(raw.texture_count))
-		result := make([]OpenglBorrowedTexture, length)
-		for i := range result {
-			item := *(*C.mln_opengl_borrowed_texture)(bindingElement(unsafe.Pointer(raw.textures), i, uint64(unsafe.Sizeof(C.mln_opengl_borrowed_texture{})), unsafe.Sizeof(*raw.textures), unsafe.Alignof(*raw.textures)))
-			result[i] = copyOpenglBorrowedTexture(item)
-		}
-		return result
-	}()
-	result.Target = uint32(raw.target)
-	return result
-}
-
 func nativeOpenglBorrowedTextureDescriptor(input OpenglBorrowedTextureDescriptor, arena *bindingArena) C.mln_opengl_borrowed_texture_descriptor {
-	raw := C.mln_opengl_borrowed_texture_descriptor_default()
+	raw := C.mln_opengl_borrowed_texture_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.physical_width = C.uint32_t(input.PhysicalWidth)
@@ -3362,10 +3102,6 @@ func nativeOpenglBorrowedTextureDescriptor(input OpenglBorrowedTextureDescriptor
 	return raw
 }
 
-func DefaultOpenglBorrowedTextureDescriptor() OpenglBorrowedTextureDescriptor {
-	return copyOpenglBorrowedTextureDescriptor(C.mln_opengl_borrowed_texture_descriptor_default())
-}
-
 // OpenglContextDescriptor corresponds to mln_opengl_context_descriptor. OpenGL
 // backend context fields shared by OpenGL render targets.
 //
@@ -3377,23 +3113,6 @@ type OpenglContextDescriptor struct {
 	// dedicated to their core worker.
 	Ownership OpenglContextOwnership
 	Data      OpenglContextDescriptorData
-}
-
-func copyOpenglContextDescriptor(raw C.mln_opengl_context_descriptor) OpenglContextDescriptor {
-	var result OpenglContextDescriptor
-	result.Ownership = OpenglContextOwnership(raw.ownership)
-	result.Data = func() OpenglContextDescriptorData {
-		switch raw.platform {
-		case C.MLN_OPENGL_CONTEXT_PLATFORM_WGL:
-			return OpenglContextDescriptorDataWglVariant{Value: copyWglContextDescriptor((*(*C.mln_wgl_context_descriptor)(unsafe.Pointer(&raw.data))))}
-		case C.MLN_OPENGL_CONTEXT_PLATFORM_EGL:
-			return OpenglContextDescriptorDataEglVariant{Value: copyEglContextDescriptor((*(*C.mln_egl_context_descriptor)(unsafe.Pointer(&raw.data))))}
-		case C.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL:
-			return OpenglContextDescriptorDataWebglVariant{Value: copyWebglContextDescriptor((*(*C.mln_webgl_context_descriptor)(unsafe.Pointer(&raw.data))))}
-		}
-		return UnknownVariant{Tag: uint32(raw.platform)}
-	}()
-	return result
 }
 
 func nativeOpenglContextDescriptor(input OpenglContextDescriptor, arena *bindingArena) C.mln_opengl_context_descriptor {
@@ -3432,23 +3151,12 @@ type OpenglOwnedTextureDescriptor struct {
 	Context OpenglContextDescriptor
 }
 
-func copyOpenglOwnedTextureDescriptor(raw C.mln_opengl_owned_texture_descriptor) OpenglOwnedTextureDescriptor {
-	var result OpenglOwnedTextureDescriptor
-	result.Extent = copyLogicalExtent(raw.extent)
-	result.Context = copyOpenglContextDescriptor(raw.context)
-	return result
-}
-
 func nativeOpenglOwnedTextureDescriptor(input OpenglOwnedTextureDescriptor, arena *bindingArena) C.mln_opengl_owned_texture_descriptor {
-	raw := C.mln_opengl_owned_texture_descriptor_default()
+	raw := C.mln_opengl_owned_texture_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.context = nativeOpenglContextDescriptor(input.Context, arena)
 	return raw
-}
-
-func DefaultOpenglOwnedTextureDescriptor() OpenglOwnedTextureDescriptor {
-	return copyOpenglOwnedTextureDescriptor(C.mln_opengl_owned_texture_descriptor_default())
 }
 
 // OpenglSurfaceDescriptor corresponds to mln_opengl_surface_descriptor. OpenGL
@@ -3467,25 +3175,13 @@ type OpenglSurfaceDescriptor struct {
 	Surface uintptr
 }
 
-func copyOpenglSurfaceDescriptor(raw C.mln_opengl_surface_descriptor) OpenglSurfaceDescriptor {
-	var result OpenglSurfaceDescriptor
-	result.Extent = copyLogicalExtent(raw.extent)
-	result.Context = copyOpenglContextDescriptor(raw.context)
-	result.Surface = uintptr(unsafe.Pointer(raw.surface))
-	return result
-}
-
 func nativeOpenglSurfaceDescriptor(input OpenglSurfaceDescriptor, arena *bindingArena) C.mln_opengl_surface_descriptor {
-	raw := C.mln_opengl_surface_descriptor_default()
+	raw := C.mln_opengl_surface_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.context = nativeOpenglContextDescriptor(input.Context, arena)
 	raw.surface = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Surface)))
 	return raw
-}
-
-func DefaultOpenglSurfaceDescriptor() OpenglSurfaceDescriptor {
-	return copyOpenglSurfaceDescriptor(C.mln_opengl_surface_descriptor_default())
 }
 
 // OpenglTextureFrame corresponds to mln_opengl_texture_frame. OpenGL frame
@@ -3552,17 +3248,8 @@ type PremultipliedRgba8Image struct {
 	Pixels []byte
 }
 
-func copyPremultipliedRgba8Image(raw C.mln_premultiplied_rgba8_image) PremultipliedRgba8Image {
-	var result PremultipliedRgba8Image
-	result.Width = uint32(raw.width)
-	result.Height = uint32(raw.height)
-	result.Stride = uint32(raw.stride)
-	result.Pixels = bindingBytes(unsafe.Pointer(raw.pixels), uint64(raw.byte_length))
-	return result
-}
-
 func nativePremultipliedRgba8Image(input PremultipliedRgba8Image, arena *bindingArena) C.mln_premultiplied_rgba8_image {
-	raw := C.mln_premultiplied_rgba8_image_default()
+	raw := C.mln_premultiplied_rgba8_image{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.width = C.uint32_t(input.Width)
 	raw.height = C.uint32_t(input.Height)
@@ -3570,10 +3257,6 @@ func nativePremultipliedRgba8Image(input PremultipliedRgba8Image, arena *binding
 	raw.pixels = (*C.uint8_t)(arena.bytes(input.Pixels))
 	raw.byte_length = bindingCountLike(raw.byte_length, len(input.Pixels))
 	return raw
-}
-
-func DefaultPremultipliedRgba8Image() PremultipliedRgba8Image {
-	return copyPremultipliedRgba8Image(C.mln_premultiplied_rgba8_image_default())
 }
 
 // ProjectedMeters corresponds to mln_projected_meters. Lower-level Spherical
@@ -3625,17 +3308,13 @@ func copyProjectionMode(raw C.mln_projection_mode) ProjectionMode {
 }
 
 func nativeProjectionMode(input ProjectionMode, arena *bindingArena) C.mln_projection_mode {
-	raw := C.mln_projection_mode_default()
+	raw := C.mln_projection_mode{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_PROJECTION_MODE_AXONOMETRIC, &raw.axonometric, input.Axonometric, arena, bindingBool[bool, C.bool])
 	bindingMasked(&raw.fields, C.MLN_PROJECTION_MODE_X_SKEW, &raw.x_skew, input.XSkew, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_PROJECTION_MODE_Y_SKEW, &raw.y_skew, input.YSkew, arena, bindingNumber[float64, C.double])
 	return raw
-}
-
-func DefaultProjectionMode() ProjectionMode {
-	return copyProjectionMode(C.mln_projection_mode_default())
 }
 
 // Quaternion corresponds to mln_quaternion. Quaternion stored as x, y, z, w
@@ -3803,16 +3482,8 @@ type RenderSessionAttachOptions struct {
 	QueueLock QueueLock
 }
 
-func copyRenderSessionAttachOptions(raw C.mln_render_session_attach_options) RenderSessionAttachOptions {
-	var result RenderSessionAttachOptions
-	result.Driver = RenderDriverKind(raw.driver)
-	result.RequestedTextureRingDepth = uint32(raw.requested_texture_ring_depth)
-	result.ProducerSyncKind = GpuSyncKind(raw.producer_sync_kind)
-	return result
-}
-
 func nativeRenderSessionAttachOptions(input RenderSessionAttachOptions, arena *bindingArena) C.mln_render_session_attach_options {
-	raw := C.mln_render_session_attach_options_default()
+	raw := C.mln_render_session_attach_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.driver = C.mln_render_driver_kind(input.Driver)
 	raw.requested_texture_ring_depth = C.uint32_t(input.RequestedTextureRingDepth)
@@ -3821,10 +3492,6 @@ func nativeRenderSessionAttachOptions(input RenderSessionAttachOptions, arena *b
 	raw.driver_work_wake = nativeWake(input.DriverWorkWake, arena)
 	raw.queue_lock = nativeQueueLock(input.QueueLock, arena)
 	return raw
-}
-
-func DefaultRenderSessionAttachOptions() RenderSessionAttachOptions {
-	return copyRenderSessionAttachOptions(C.mln_render_session_attach_options_default())
 }
 
 // RenderSessionCapabilities corresponds to mln_render_session_capabilities.
@@ -3922,25 +3589,8 @@ type RenderedFeatureQueryOptions struct {
 	Filter string
 }
 
-func copyRenderedFeatureQueryOptions(raw C.mln_rendered_feature_query_options) RenderedFeatureQueryOptions {
-	var result RenderedFeatureQueryOptions
-	if raw.fields&C.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS != 0 {
-		result.LayerIds = func() []string {
-			length := bindingLength(uint64(raw.layer_id_count))
-			result := make([]string, length)
-			for i := range result {
-				item := *(*C.mln_buffer_view)(bindingElement(unsafe.Pointer(raw.layer_ids), i, uint64(unsafe.Sizeof(*raw.layer_ids)), unsafe.Sizeof(*raw.layer_ids), unsafe.Alignof(*raw.layer_ids)))
-				result[i] = bindingString(item.data, uint64(item.size))
-			}
-			return result
-		}()
-	}
-	result.Filter = bindingString(raw.filter.data, uint64(raw.filter.size))
-	return result
-}
-
 func nativeRenderedFeatureQueryOptions(input RenderedFeatureQueryOptions, arena *bindingArena) C.mln_rendered_feature_query_options {
-	raw := C.mln_rendered_feature_query_options_default()
+	raw := C.mln_rendered_feature_query_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	if input.LayerIds != nil {
@@ -3956,10 +3606,6 @@ func nativeRenderedFeatureQueryOptions(input RenderedFeatureQueryOptions, arena 
 	}
 	raw.filter = C.mln_buffer_view{data: arena.bytes([]byte(input.Filter)), size: C.size_t(len(input.Filter))}
 	return raw
-}
-
-func DefaultRenderedFeatureQueryOptions() RenderedFeatureQueryOptions {
-	return copyRenderedFeatureQueryOptions(C.mln_rendered_feature_query_options_default())
 }
 
 func nativeRenderedQueryGeometry(input RenderedQueryGeometry, arena *bindingArena) C.mln_rendered_query_geometry {
@@ -4170,24 +3816,14 @@ type ResourceRoute struct {
 	Url string
 }
 
-func copyResourceRoute(raw C.mln_resource_route) ResourceRoute {
-	var result ResourceRoute
-	result.Kinds = ResourceKindFlag(raw.kinds)
-	result.Flags = UrlMatchFlag(raw.flags)
-	result.Url = bindingString(raw.url.data, uint64(raw.url.size))
-	return result
-}
-
 func nativeResourceRoute(input ResourceRoute, arena *bindingArena) C.mln_resource_route {
-	raw := C.mln_resource_route_default()
+	raw := C.mln_resource_route{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.kinds = C.mln_resource_kind_flags(input.Kinds)
 	raw.flags = C.mln_url_match_flags(input.Flags)
 	raw.url = C.mln_buffer_view{data: arena.bytes([]byte(input.Url)), size: C.size_t(len(input.Url))}
 	return raw
 }
-
-func DefaultResourceRoute() ResourceRoute { return copyResourceRoute(C.mln_resource_route_default()) }
 
 // ResourceTransform corresponds to mln_resource_transform. Resource transform
 // state.
@@ -4407,23 +4043,12 @@ type RuntimeOptions struct {
 	CachePath string
 }
 
-func copyRuntimeOptions(raw C.mln_runtime_options) RuntimeOptions {
-	var result RuntimeOptions
-	result.AssetPath = bindingString(raw.asset_path.data, uint64(raw.asset_path.size))
-	result.CachePath = bindingString(raw.cache_path.data, uint64(raw.cache_path.size))
-	return result
-}
-
 func nativeRuntimeOptions(input RuntimeOptions, arena *bindingArena) C.mln_runtime_options {
-	raw := C.mln_runtime_options_default()
+	raw := C.mln_runtime_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.asset_path = C.mln_buffer_view{data: arena.bytes([]byte(input.AssetPath)), size: C.size_t(len(input.AssetPath))}
 	raw.cache_path = C.mln_buffer_view{data: arena.bytes([]byte(input.CachePath)), size: C.size_t(len(input.CachePath))}
 	return raw
-}
-
-func DefaultRuntimeOptions() RuntimeOptions {
-	return copyRuntimeOptions(C.mln_runtime_options_default())
 }
 
 // ScreenBox corresponds to mln_screen_box. Screen-space box in logical map
@@ -4519,25 +4144,8 @@ type SourceFeatureQueryOptions struct {
 	Filter string
 }
 
-func copySourceFeatureQueryOptions(raw C.mln_source_feature_query_options) SourceFeatureQueryOptions {
-	var result SourceFeatureQueryOptions
-	if raw.fields&C.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS != 0 {
-		result.SourceLayerIds = func() []string {
-			length := bindingLength(uint64(raw.source_layer_id_count))
-			result := make([]string, length)
-			for i := range result {
-				item := *(*C.mln_buffer_view)(bindingElement(unsafe.Pointer(raw.source_layer_ids), i, uint64(unsafe.Sizeof(*raw.source_layer_ids)), unsafe.Sizeof(*raw.source_layer_ids), unsafe.Alignof(*raw.source_layer_ids)))
-				result[i] = bindingString(item.data, uint64(item.size))
-			}
-			return result
-		}()
-	}
-	result.Filter = bindingString(raw.filter.data, uint64(raw.filter.size))
-	return result
-}
-
 func nativeSourceFeatureQueryOptions(input SourceFeatureQueryOptions, arena *bindingArena) C.mln_source_feature_query_options {
-	raw := C.mln_source_feature_query_options_default()
+	raw := C.mln_source_feature_query_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	if input.SourceLayerIds != nil {
@@ -4553,10 +4161,6 @@ func nativeSourceFeatureQueryOptions(input SourceFeatureQueryOptions, arena *bin
 	}
 	raw.filter = C.mln_buffer_view{data: arena.bytes([]byte(input.Filter)), size: C.size_t(len(input.Filter))}
 	return raw
-}
-
-func DefaultSourceFeatureQueryOptions() SourceFeatureQueryOptions {
-	return copySourceFeatureQueryOptions(C.mln_source_feature_query_options_default())
 }
 
 // StyleExpressionInfo corresponds to mln_style_expression_info. What a parsed
@@ -4605,29 +4209,8 @@ type StyleExpressionInputs struct {
 	AvailableImages []string
 }
 
-func copyStyleExpressionInputs(raw C.mln_style_expression_inputs) StyleExpressionInputs {
-	var result StyleExpressionInputs
-	result.Zoom = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_ZOOM != 0, func() float64 { return float64(raw.zoom) })
-	result.ColorRampParameter = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER != 0, func() float64 { return float64(raw.color_ramp_parameter) })
-	result.Elevation = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_ELEVATION != 0, func() float64 { return float64(raw.elevation) })
-	result.Feature = bindingString(raw.feature.data, uint64(raw.feature.size))
-	result.FeatureState = bindingString(raw.feature_state.data, uint64(raw.feature_state.size))
-	result.GlobalState = bindingString(raw.global_state.data, uint64(raw.global_state.size))
-	result.CanonicalTileId = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID != 0, func() CanonicalTileId { return copyCanonicalTileId(raw.canonical_tile_id) })
-	result.AvailableImages = func() []string {
-		length := bindingLength(uint64(raw.available_image_count))
-		result := make([]string, length)
-		for i := range result {
-			item := *(*C.mln_buffer_view)(bindingElement(unsafe.Pointer(raw.available_images), i, uint64(unsafe.Sizeof(*raw.available_images)), unsafe.Sizeof(*raw.available_images), unsafe.Alignof(*raw.available_images)))
-			result[i] = bindingString(item.data, uint64(item.size))
-		}
-		return result
-	}()
-	return result
-}
-
 func nativeStyleExpressionInputs(input StyleExpressionInputs, arena *bindingArena) C.mln_style_expression_inputs {
-	raw := C.mln_style_expression_inputs_default()
+	raw := C.mln_style_expression_inputs{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_INPUT_ZOOM, &raw.zoom, input.Zoom, arena, bindingNumber[float64, C.double])
@@ -4648,10 +4231,6 @@ func nativeStyleExpressionInputs(input StyleExpressionInputs, arena *bindingAren
 	return raw
 }
 
-func DefaultStyleExpressionInputs() StyleExpressionInputs {
-	return copyStyleExpressionInputs(C.mln_style_expression_inputs_default())
-}
-
 // StyleExpressionOptions corresponds to mln_style_expression_options. Options
 // for parsing a style expression.
 //
@@ -4664,22 +4243,12 @@ type StyleExpressionOptions struct {
 	ExpectedType *StyleExpressionType
 }
 
-func copyStyleExpressionOptions(raw C.mln_style_expression_options) StyleExpressionOptions {
-	var result StyleExpressionOptions
-	result.ExpectedType = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE != 0, func() StyleExpressionType { return copyStyleExpressionType(raw.expected_type) })
-	return result
-}
-
 func nativeStyleExpressionOptions(input StyleExpressionOptions, arena *bindingArena) C.mln_style_expression_options {
-	raw := C.mln_style_expression_options_default()
+	raw := C.mln_style_expression_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE, &raw.expected_type, input.ExpectedType, arena, nativeStyleExpressionType)
 	return raw
-}
-
-func DefaultStyleExpressionOptions() StyleExpressionOptions {
-	return copyStyleExpressionOptions(C.mln_style_expression_options_default())
 }
 
 // StyleExpressionType corresponds to mln_style_expression_type. A style
@@ -4693,14 +4262,6 @@ type StyleExpressionType struct {
 	ItemKind StyleExpressionTypeKind
 	// For an array, its fixed length, or zero for any length.
 	ItemCount uint32
-}
-
-func copyStyleExpressionType(raw C.mln_style_expression_type) StyleExpressionType {
-	var result StyleExpressionType
-	result.Kind = StyleExpressionTypeKind(raw.kind)
-	result.ItemKind = StyleExpressionTypeKind(raw.item_kind)
-	result.ItemCount = uint32(raw.item_count)
-	return result
 }
 
 func nativeStyleExpressionType(input StyleExpressionType, arena *bindingArena) C.mln_style_expression_type {
@@ -4795,40 +4356,8 @@ type StyleImageOptions struct {
 	Sdf *bool
 }
 
-func copyStyleImageOptions(raw C.mln_style_image_options) StyleImageOptions {
-	var result StyleImageOptions
-	if raw.fields&C.MLN_STYLE_IMAGE_OPTION_STRETCH_X != 0 {
-		result.StretchX = func() []ImageStretch {
-			length := bindingLength(uint64(raw.stretch_x_count))
-			result := make([]ImageStretch, length)
-			for i := range result {
-				item := *(*C.mln_image_stretch)(bindingElement(unsafe.Pointer(raw.stretch_x), i, uint64(unsafe.Sizeof(C.mln_image_stretch{})), unsafe.Sizeof(*raw.stretch_x), unsafe.Alignof(*raw.stretch_x)))
-				result[i] = copyImageStretch(item)
-			}
-			return result
-		}()
-	}
-	if raw.fields&C.MLN_STYLE_IMAGE_OPTION_STRETCH_Y != 0 {
-		result.StretchY = func() []ImageStretch {
-			length := bindingLength(uint64(raw.stretch_y_count))
-			result := make([]ImageStretch, length)
-			for i := range result {
-				item := *(*C.mln_image_stretch)(bindingElement(unsafe.Pointer(raw.stretch_y), i, uint64(unsafe.Sizeof(C.mln_image_stretch{})), unsafe.Sizeof(*raw.stretch_y), unsafe.Alignof(*raw.stretch_y)))
-				result[i] = copyImageStretch(item)
-			}
-			return result
-		}()
-	}
-	result.Content = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_OPTION_CONTENT != 0, func() ImageContent { return copyImageContent(raw.content) })
-	result.TextFitWidth = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH != 0, func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_width) })
-	result.TextFitHeight = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT != 0, func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_height) })
-	result.PixelRatio = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO != 0, func() float32 { return float32(raw.pixel_ratio) })
-	result.Sdf = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_OPTION_SDF != 0, func() bool { return bool(raw.sdf) })
-	return result
-}
-
 func nativeStyleImageOptions(input StyleImageOptions, arena *bindingArena) C.mln_style_image_options {
-	raw := C.mln_style_image_options_default()
+	raw := C.mln_style_image_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	if input.StretchX != nil {
@@ -4859,10 +4388,6 @@ func nativeStyleImageOptions(input StyleImageOptions, arena *bindingArena) C.mln
 	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO, &raw.pixel_ratio, input.PixelRatio, arena, bindingNumber[float32, C.float])
 	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_SDF, &raw.sdf, input.Sdf, arena, bindingBool[bool, C.bool])
 	return raw
-}
-
-func DefaultStyleImageOptions() StyleImageOptions {
-	return copyStyleImageOptions(C.mln_style_image_options_default())
 }
 
 // StyleLayerInfo corresponds to mln_style_layer_info. One style layer, borrowed
@@ -4997,17 +4522,13 @@ func copyStyleTransitionOptions(raw C.mln_style_transition_options) StyleTransit
 }
 
 func nativeStyleTransitionOptions(input StyleTransitionOptions, arena *bindingArena) C.mln_style_transition_options {
-	raw := C.mln_style_transition_options_default()
+	raw := C.mln_style_transition_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_STYLE_TRANSITION_OPTION_DURATION, &raw.duration_ms, input.DurationMs, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_STYLE_TRANSITION_OPTION_DELAY, &raw.delay_ms, input.DelayMs, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS, &raw.enable_placement_transitions, input.EnablePlacementTransitions, arena, bindingBool[bool, C.bool])
 	return raw
-}
-
-func DefaultStyleTransitionOptions() StyleTransitionOptions {
-	return copyStyleTransitionOptions(C.mln_style_transition_options_default())
 }
 
 // TextureImageInfo corresponds to mln_texture_image_info. CPU image readback
@@ -5088,15 +4609,6 @@ type UnitBezier struct {
 	Y2 float64
 }
 
-func copyUnitBezier(raw C.mln_unit_bezier) UnitBezier {
-	var result UnitBezier
-	result.X1 = float64(raw.x1)
-	result.Y1 = float64(raw.y1)
-	result.X2 = float64(raw.x2)
-	result.Y2 = float64(raw.y2)
-	return result
-}
-
 func nativeUnitBezier(input UnitBezier, arena *bindingArena) C.mln_unit_bezier {
 	raw := C.mln_unit_bezier{}
 	raw.x1 = C.double(input.X1)
@@ -5146,13 +4658,6 @@ type VulkanBorrowedTexture struct {
 	ImageView uint64
 }
 
-func copyVulkanBorrowedTexture(raw C.mln_vulkan_borrowed_texture) VulkanBorrowedTexture {
-	var result VulkanBorrowedTexture
-	result.Image = uint64(raw.image)
-	result.ImageView = uint64(raw.image_view)
-	return result
-}
-
 func nativeVulkanBorrowedTexture(input VulkanBorrowedTexture, arena *bindingArena) C.mln_vulkan_borrowed_texture {
 	raw := C.mln_vulkan_borrowed_texture{}
 	raw.image = C.mln_vulkan_non_dispatchable_handle(input.Image)
@@ -5190,29 +4695,8 @@ type VulkanBorrowedTextureDescriptor struct {
 	FinalLayout uint32
 }
 
-func copyVulkanBorrowedTextureDescriptor(raw C.mln_vulkan_borrowed_texture_descriptor) VulkanBorrowedTextureDescriptor {
-	var result VulkanBorrowedTextureDescriptor
-	result.Extent = copyLogicalExtent(raw.extent)
-	result.PhysicalWidth = uint32(raw.physical_width)
-	result.PhysicalHeight = uint32(raw.physical_height)
-	result.Context = copyVulkanContextDescriptor(raw.context)
-	result.Textures = func() []VulkanBorrowedTexture {
-		length := bindingLength(uint64(raw.texture_count))
-		result := make([]VulkanBorrowedTexture, length)
-		for i := range result {
-			item := *(*C.mln_vulkan_borrowed_texture)(bindingElement(unsafe.Pointer(raw.textures), i, uint64(unsafe.Sizeof(C.mln_vulkan_borrowed_texture{})), unsafe.Sizeof(*raw.textures), unsafe.Alignof(*raw.textures)))
-			result[i] = copyVulkanBorrowedTexture(item)
-		}
-		return result
-	}()
-	result.Format = uint32(raw.format)
-	result.InitialLayout = uint32(raw.initial_layout)
-	result.FinalLayout = uint32(raw.final_layout)
-	return result
-}
-
 func nativeVulkanBorrowedTextureDescriptor(input VulkanBorrowedTextureDescriptor, arena *bindingArena) C.mln_vulkan_borrowed_texture_descriptor {
-	raw := C.mln_vulkan_borrowed_texture_descriptor_default()
+	raw := C.mln_vulkan_borrowed_texture_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.physical_width = C.uint32_t(input.PhysicalWidth)
@@ -5230,10 +4714,6 @@ func nativeVulkanBorrowedTextureDescriptor(input VulkanBorrowedTextureDescriptor
 	raw.initial_layout = C.uint32_t(input.InitialLayout)
 	raw.final_layout = C.uint32_t(input.FinalLayout)
 	return raw
-}
-
-func DefaultVulkanBorrowedTextureDescriptor() VulkanBorrowedTextureDescriptor {
-	return copyVulkanBorrowedTextureDescriptor(C.mln_vulkan_borrowed_texture_descriptor_default())
 }
 
 // VulkanContextDescriptor corresponds to mln_vulkan_context_descriptor. Vulkan
@@ -5258,18 +4738,6 @@ type VulkanContextDescriptor struct {
 	GetInstanceProcAddr uintptr
 	// PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device.
 	GetDeviceProcAddr uintptr
-}
-
-func copyVulkanContextDescriptor(raw C.mln_vulkan_context_descriptor) VulkanContextDescriptor {
-	var result VulkanContextDescriptor
-	result.Instance = uintptr(unsafe.Pointer(raw.instance))
-	result.PhysicalDevice = uintptr(unsafe.Pointer(raw.physical_device))
-	result.Device = uintptr(unsafe.Pointer(raw.device))
-	result.GraphicsQueue = uintptr(unsafe.Pointer(raw.graphics_queue))
-	result.GraphicsQueueFamilyIndex = uint32(raw.graphics_queue_family_index)
-	result.GetInstanceProcAddr = uintptr(unsafe.Pointer(raw.get_instance_proc_addr))
-	result.GetDeviceProcAddr = uintptr(unsafe.Pointer(raw.get_device_proc_addr))
-	return result
 }
 
 func nativeVulkanContextDescriptor(input VulkanContextDescriptor, arena *bindingArena) C.mln_vulkan_context_descriptor {
@@ -5298,23 +4766,12 @@ type VulkanOwnedTextureDescriptor struct {
 	Context VulkanContextDescriptor
 }
 
-func copyVulkanOwnedTextureDescriptor(raw C.mln_vulkan_owned_texture_descriptor) VulkanOwnedTextureDescriptor {
-	var result VulkanOwnedTextureDescriptor
-	result.Extent = copyLogicalExtent(raw.extent)
-	result.Context = copyVulkanContextDescriptor(raw.context)
-	return result
-}
-
 func nativeVulkanOwnedTextureDescriptor(input VulkanOwnedTextureDescriptor, arena *bindingArena) C.mln_vulkan_owned_texture_descriptor {
-	raw := C.mln_vulkan_owned_texture_descriptor_default()
+	raw := C.mln_vulkan_owned_texture_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.context = nativeVulkanContextDescriptor(input.Context, arena)
 	return raw
-}
-
-func DefaultVulkanOwnedTextureDescriptor() VulkanOwnedTextureDescriptor {
-	return copyVulkanOwnedTextureDescriptor(C.mln_vulkan_owned_texture_descriptor_default())
 }
 
 // VulkanSurfaceDescriptor corresponds to mln_vulkan_surface_descriptor. Vulkan
@@ -5334,25 +4791,13 @@ type VulkanSurfaceDescriptor struct {
 	Surface uint64
 }
 
-func copyVulkanSurfaceDescriptor(raw C.mln_vulkan_surface_descriptor) VulkanSurfaceDescriptor {
-	var result VulkanSurfaceDescriptor
-	result.Extent = copyLogicalExtent(raw.extent)
-	result.Context = copyVulkanContextDescriptor(raw.context)
-	result.Surface = uint64(raw.surface)
-	return result
-}
-
 func nativeVulkanSurfaceDescriptor(input VulkanSurfaceDescriptor, arena *bindingArena) C.mln_vulkan_surface_descriptor {
-	raw := C.mln_vulkan_surface_descriptor_default()
+	raw := C.mln_vulkan_surface_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.context = nativeVulkanContextDescriptor(input.Context, arena)
 	raw.surface = C.mln_vulkan_non_dispatchable_handle(input.Surface)
 	return raw
-}
-
-func DefaultVulkanSurfaceDescriptor() VulkanSurfaceDescriptor {
-	return copyVulkanSurfaceDescriptor(C.mln_vulkan_surface_descriptor_default())
 }
 
 // VulkanTextureFrame corresponds to mln_vulkan_texture_frame. Vulkan frame
@@ -5459,14 +4904,6 @@ type WebglContextDescriptor struct {
 	CanvasSelector string
 }
 
-func copyWebglContextDescriptor(raw C.mln_webgl_context_descriptor) WebglContextDescriptor {
-	var result WebglContextDescriptor
-	result.Kind = WebglContextKind(raw.kind)
-	result.Context = int32(raw.context)
-	result.CanvasSelector = bindingString(raw.canvas_selector.data, uint64(raw.canvas_selector.size))
-	return result
-}
-
 func nativeWebglContextDescriptor(input WebglContextDescriptor, arena *bindingArena) C.mln_webgl_context_descriptor {
 	raw := C.mln_webgl_context_descriptor{}
 	raw.kind = C.mln_webgl_context_kind(input.Kind)
@@ -5490,14 +4927,6 @@ type WglContextDescriptor struct {
 	ShareContext uintptr
 	// Optional wglGetProcAddress-compatible function for the host loader.
 	GetProcAddress uintptr
-}
-
-func copyWglContextDescriptor(raw C.mln_wgl_context_descriptor) WglContextDescriptor {
-	var result WglContextDescriptor
-	result.DeviceContext = uintptr(unsafe.Pointer(raw.device_context))
-	result.ShareContext = uintptr(unsafe.Pointer(raw.share_context))
-	result.GetProcAddress = uintptr(unsafe.Pointer(raw.get_proc_address))
-	return result
 }
 
 func nativeWglContextDescriptor(input WglContextDescriptor, arena *bindingArena) C.mln_wgl_context_descriptor {
@@ -5987,7 +5416,7 @@ func (receiver *AcquiredFrameHandle) WithOpenglTexture(callback func(OpenglTextu
 // See mln_acquired_frame_get_producer_sync in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *AcquiredFrameHandle) WithProducerSync(callback func(GpuSyncView) error) error {
-	outSync := C.mln_gpu_sync_default()
+	var outSync C.mln_gpu_sync
 	outSync.size = C.uint32_t(unsafe.Sizeof(outSync))
 	return bindingWithView(bindingOwned(receiver.owner()), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
@@ -6720,7 +6149,7 @@ func MapProjectionCreate(view MapView) (*MapProjectionHandle, error) {
 // See mln_map_projection_get_camera in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
 func (receiver *MapProjectionHandle) Camera() (CameraOptions, error) {
-	outCamera := C.mln_camera_options_default()
+	var outCamera C.mln_camera_options
 	outCamera.size = C.uint32_t(unsafe.Sizeof(outCamera))
 	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_projection_get_camera(C.mln_map_projection(raw), &outCamera, diagnostic))

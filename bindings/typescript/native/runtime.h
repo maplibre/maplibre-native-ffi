@@ -140,6 +140,10 @@ bool mln_ts_read_u64(
 bool mln_ts_read_i64(
   mln_ts_call* call, napi_value value, int64_t* out, const char* path
 );
+/** A NUL-terminated copy of a string, which rejects an embedded NUL. */
+bool mln_ts_read_text(
+  mln_ts_call* call, napi_value value, const char** out, const char* path
+);
 /** A sized copy of a string, which keeps an embedded NUL. */
 bool mln_ts_read_text_view(
   mln_ts_call* call, napi_value value, mln_buffer_view* out, const char* path

@@ -9,38 +9,35 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_metal_owned_texture_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Extent">
-/// Logical texture extent. Required. A scale_factor that differs from the map's
-/// is accepted and logged as a warning.
-/// </param>
-/// <param name="Context">
-/// Metal backend context. device is required.
-/// </param>
-/// <param name="PixelFormat">
-/// Backend-native MTLPixelFormat value of the ring's textures: either
-/// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
-/// returns RGBA8 for either format.
-/// </param>
-public readonly partial record struct MetalOwnedTextureDescriptor(
-    LogicalExtent Extent,
-    MetalContextDescriptor Context,
-    ulong PixelFormat
-)
+public readonly partial record struct MetalOwnedTextureDescriptor
 {
-    public MetalOwnedTextureDescriptor()
-        : this(default!, default!, default!)
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public MetalOwnedTextureDescriptor(
+        LogicalExtent Extent,
+        MetalContextDescriptor Context,
+        ulong PixelFormat
+    )
     {
-        this = Default;
+        this.Extent = Extent;
+        this.Context = Context;
+        this.PixelFormat = PixelFormat;
     }
 
-    public static MetalOwnedTextureDescriptor Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyMetalOwnedTextureDescriptor(
-                NativeMethods.mln_metal_owned_texture_descriptor_default()
-            );
-        }
-    }
+    /// <summary>
+    /// Logical texture extent. Required. A scale_factor that differs from the
+    /// map's is accepted and logged as a warning.
+    /// </summary>
+    public required LogicalExtent Extent { get; init; }
+
+    /// <summary>
+    /// Metal backend context. device is required.
+    /// </summary>
+    public MetalContextDescriptor Context { get; init; }
+
+    /// <summary>
+    /// Backend-native MTLPixelFormat value of the ring's textures: either
+    /// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
+    /// returns RGBA8 for either format.
+    /// </summary>
+    public required ulong PixelFormat { get; init; }
 }

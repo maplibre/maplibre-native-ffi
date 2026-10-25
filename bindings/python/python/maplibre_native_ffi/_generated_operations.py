@@ -272,7 +272,7 @@ class _MapHandleOperations(GeneratedOperations):
     _native: _native._MapHandle
 
     def add_custom_geometry_source(
-        self, source_id: str, options: CustomGeometrySourceOptions | None = None
+        self, source_id: str, options: CustomGeometrySourceOptions
     ) -> Future[CommandCompletion]:
         """Adds a custom geometry source.
 
@@ -282,7 +282,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.add_custom_geometry_source(source_id, options)
 
     def add_custom_mvt_vector_source(
-        self, source_id: str, options: CustomMvtVectorSourceOptions | None = None
+        self, source_id: str, options: CustomMvtVectorSourceOptions
     ) -> Future[CommandCompletion]:
         """Adds a custom MVT vector source.
 
@@ -365,7 +365,7 @@ class _MapHandleOperations(GeneratedOperations):
     def attach_metal_borrowed_texture(
         self,
         descriptor: MetalBorrowedTextureDescriptor,
-        options: RenderSessionAttachOptions | None = None,
+        options: RenderSessionAttachOptions,
     ) -> MapAttachMetalBorrowedTextureResult:
         """Starts attachment of a ring of caller-owned Metal textures.
 
@@ -381,7 +381,7 @@ class _MapHandleOperations(GeneratedOperations):
     def attach_metal_owned_texture(
         self,
         descriptor: MetalOwnedTextureDescriptor,
-        options: RenderSessionAttachOptions | None = None,
+        options: RenderSessionAttachOptions,
     ) -> MapAttachMetalOwnedTextureResult:
         """Starts attachment of a session-owned Metal texture ring.
 
@@ -395,9 +395,7 @@ class _MapHandleOperations(GeneratedOperations):
         )
 
     def attach_metal_surface(
-        self,
-        descriptor: MetalSurfaceDescriptor,
-        options: RenderSessionAttachOptions | None = None,
+        self, descriptor: MetalSurfaceDescriptor, options: RenderSessionAttachOptions
     ) -> MapAttachMetalSurfaceResult:
         """Starts attachment of a Metal surface target.
 
@@ -413,7 +411,7 @@ class _MapHandleOperations(GeneratedOperations):
     def attach_opengl_borrowed_texture(
         self,
         descriptor: OpenglBorrowedTextureDescriptor,
-        options: RenderSessionAttachOptions | None = None,
+        options: RenderSessionAttachOptions,
     ) -> MapAttachOpenglBorrowedTextureResult:
         """Starts attachment of a ring of caller-owned OpenGL textures.
 
@@ -429,7 +427,7 @@ class _MapHandleOperations(GeneratedOperations):
     def attach_opengl_owned_texture(
         self,
         descriptor: OpenglOwnedTextureDescriptor,
-        options: RenderSessionAttachOptions | None = None,
+        options: RenderSessionAttachOptions,
     ) -> MapAttachOpenglOwnedTextureResult:
         """Starts attachment of a session-owned OpenGL texture ring.
 
@@ -443,9 +441,7 @@ class _MapHandleOperations(GeneratedOperations):
         )
 
     def attach_opengl_surface(
-        self,
-        descriptor: OpenglSurfaceDescriptor,
-        options: RenderSessionAttachOptions | None = None,
+        self, descriptor: OpenglSurfaceDescriptor, options: RenderSessionAttachOptions
     ) -> MapAttachOpenglSurfaceResult:
         """Starts attachment of an OpenGL surface target.
 
@@ -461,7 +457,7 @@ class _MapHandleOperations(GeneratedOperations):
     def attach_vulkan_borrowed_texture(
         self,
         descriptor: VulkanBorrowedTextureDescriptor,
-        options: RenderSessionAttachOptions | None = None,
+        options: RenderSessionAttachOptions,
     ) -> MapAttachVulkanBorrowedTextureResult:
         """Starts attachment of a ring of caller-owned Vulkan images.
 
@@ -477,7 +473,7 @@ class _MapHandleOperations(GeneratedOperations):
     def attach_vulkan_owned_texture(
         self,
         descriptor: VulkanOwnedTextureDescriptor,
-        options: RenderSessionAttachOptions | None = None,
+        options: RenderSessionAttachOptions,
     ) -> MapAttachVulkanOwnedTextureResult:
         """Starts attachment of a session-owned Vulkan texture ring.
 
@@ -491,9 +487,7 @@ class _MapHandleOperations(GeneratedOperations):
         )
 
     def attach_vulkan_surface(
-        self,
-        descriptor: VulkanSurfaceDescriptor,
-        options: RenderSessionAttachOptions | None = None,
+        self, descriptor: VulkanSurfaceDescriptor, options: RenderSessionAttachOptions
     ) -> MapAttachVulkanSurfaceResult:
         """Starts attachment of a Vulkan surface target.
 
@@ -1656,7 +1650,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.clear_resource_transform()
 
-    def create_map(self, options: MapOptions | None = None) -> RuntimeCreateMapResult:
+    def create_map(self, options: MapOptions) -> RuntimeCreateMapResult:
         """Starts creation of a map on the runtime.
 
         See `mln_runtime_create_map` in the
@@ -2080,7 +2074,7 @@ class MapHandleDiscarding:
         self._native = owner._native
 
     def add_custom_geometry_source(
-        self, source_id: str, options: CustomGeometrySourceOptions | None = None
+        self, source_id: str, options: CustomGeometrySourceOptions
     ) -> None:
         """Adds a custom geometry source.
 
@@ -2090,7 +2084,7 @@ class MapHandleDiscarding:
         return self._native._discard_add_custom_geometry_source(source_id, options)
 
     def add_custom_mvt_vector_source(
-        self, source_id: str, options: CustomMvtVectorSourceOptions | None = None
+        self, source_id: str, options: CustomMvtVectorSourceOptions
     ) -> None:
         """Adds a custom MVT vector source.
 

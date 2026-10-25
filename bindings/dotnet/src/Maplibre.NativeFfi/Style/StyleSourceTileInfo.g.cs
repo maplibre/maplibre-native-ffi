@@ -9,7 +9,7 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_style_source_tile_info</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
 /// </remarks>
-public readonly record struct StyleSourceTileInfo
+public readonly partial record struct StyleSourceTileInfo
 {
     public StyleSourceTileInfo(
         ImmutableArray<string> TileUrls,

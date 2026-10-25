@@ -195,12 +195,6 @@ typedef struct mln_logical_extent {
   double scale_factor;
 } mln_logical_extent;
 
-/**
- * Returns a zeroed logical extent, which every function that takes an extent
- * rejects.
- */
-MLN_API mln_logical_extent mln_logical_extent_default(void) MLN_NOEXCEPT;
-
 /** Field mask values for mln_map_options. */
 typedef enum MLN_BINDING("kind=bitmask") mln_map_option_field : uint32_t {
   MLN_MAP_OPTION_EVENT_MASK = 1U << 0U,
@@ -1147,13 +1141,6 @@ typedef struct mln_camera_query_result {
   uint64_t generation;
   mln_camera camera;
 } mln_camera_query_result;
-
-/**
- * Returns zeroed map options with size set for this C API version.
- *
- * The caller still sets every required member.
- */
-MLN_API mln_map_options mln_map_options_default(void) MLN_NOEXCEPT;
 
 /**
  * Starts creation of a map on the runtime.

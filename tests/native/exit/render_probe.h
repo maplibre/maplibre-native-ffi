@@ -226,8 +226,9 @@ static inline void probe_attach_rendering(
   }
   probe_signal_init(&probe->frames);
   probe_signal_init(&probe->driver_work);
-  mln_render_session_attach_options options =
-    mln_render_session_attach_options_default();
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
   options.driver = driver;
   options.frame_wake = probe_signal_wake(&probe->frames);
   if (driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {

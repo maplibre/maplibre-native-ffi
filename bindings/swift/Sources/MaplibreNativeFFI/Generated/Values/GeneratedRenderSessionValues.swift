@@ -14,14 +14,7 @@ public struct FrameDemand: Equatable, Hashable, Sendable {
   /// Host identity returned with the terminal frame result. Any value except
   /// `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE`, the maximum uint64_t value.
   public var token: UInt64
-  public static var `default`: Self {
-    Self(raw: nativeDefault(mln_frame_demand_default))
-  }
-
-  public init(
-    flags: FrameDemandFlag = FrameDemand.default.flags,
-    token: UInt64 = FrameDemand.default.token
-  ) {
+  public init(flags: FrameDemandFlag = .init(rawValue: 0), token: UInt64 = 0) {
     self.flags = flags
     self.token = token
   }
@@ -32,7 +25,8 @@ public struct FrameDemand: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_frame_demand {
-    var raw = mln_frame_demand_default()
+    var raw = mln_frame_demand()
+    raw.size = UInt32(MemoryLayout<mln_frame_demand>.size)
     raw.flags = flags.rawValue
     raw.token = token
     return raw
@@ -101,15 +95,9 @@ public struct RenderAbandonResult: Equatable, Hashable, Sendable {
   public var disposition: RenderAbandonDisposition
   /// Backend resource groups intentionally retained until process exit.
   public var quarantinedResourceCount: UInt32
-  public static var `default`: Self {
-    Self(raw: mln_render_abandon_result())
-  }
-
   public init(
-    disposition: RenderAbandonDisposition = RenderAbandonResult.default
-      .disposition,
-    quarantinedResourceCount: UInt32 = RenderAbandonResult.default
-      .quarantinedResourceCount
+    disposition: RenderAbandonDisposition = .init(rawValue: 0),
+    quarantinedResourceCount: UInt32 = 0
   ) {
     self.disposition = disposition
     self.quarantinedResourceCount = quarantinedResourceCount
@@ -154,18 +142,14 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
   /// coordinates. Zero, with a size of zero, unless disposition is
   /// `MLN_RENDER_RESULT_RENDERED`.
   public var view: MapView
-  public static var `default`: Self {
-    Self(raw: mln_render_frame_result())
-  }
-
   public init(
-    disposition: RenderResult = RenderFrameResult.default.disposition,
-    token: UInt64 = RenderFrameResult.default.token,
-    mapUpdateGeneration: UInt64 = RenderFrameResult.default.mapUpdateGeneration,
-    generation: UInt64 = RenderFrameResult.default.generation,
-    frameGeneration: UInt64 = RenderFrameResult.default.frameGeneration,
-    needsRepaint: Bool = RenderFrameResult.default.needsRepaint,
-    view: MapView = RenderFrameResult.default.view
+    disposition: RenderResult = .init(rawValue: 0),
+    token: UInt64 = 0,
+    mapUpdateGeneration: UInt64 = 0,
+    generation: UInt64 = 0,
+    frameGeneration: UInt64 = 0,
+    needsRepaint: Bool = false,
+    view: MapView = .init()
   ) {
     self.disposition = disposition
     self.token = token
@@ -249,22 +233,15 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
   /// True when a map update or an accepted resize arrived after the latest
   /// rendered frame.
   public var pendingChanges: Bool
-  public static var `default`: Self {
-    Self(raw: mln_render_session_snapshot())
-  }
-
   public init(
-    state: RenderSessionState = RenderSessionSnapshot.default.state,
-    extent: LogicalExtent = RenderSessionSnapshot.default.extent,
-    generation: UInt64 = RenderSessionSnapshot.default.generation,
-    mapUpdateGeneration: UInt64 = RenderSessionSnapshot.default
-      .mapUpdateGeneration,
-    renderedUpdateGeneration: UInt64 = RenderSessionSnapshot.default
-      .renderedUpdateGeneration,
-    frameGeneration: UInt64 = RenderSessionSnapshot.default.frameGeneration,
-    acquiredFrameCount: UInt32 = RenderSessionSnapshot.default
-      .acquiredFrameCount,
-    pendingChanges: Bool = RenderSessionSnapshot.default.pendingChanges
+    state: RenderSessionState = .init(rawValue: 0),
+    extent: LogicalExtent = .init(),
+    generation: UInt64 = 0,
+    mapUpdateGeneration: UInt64 = 0,
+    renderedUpdateGeneration: UInt64 = 0,
+    frameGeneration: UInt64 = 0,
+    acquiredFrameCount: UInt32 = 0,
+    pendingChanges: Bool = false
   ) {
     self.state = state
     self.extent = extent

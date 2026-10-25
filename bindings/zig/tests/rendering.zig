@@ -114,7 +114,7 @@ test "a scoped frame view holds its frame until the scope returns" {
         fn inspect(self: @This(), _: maplibre.GpuSync) anyerror!void {
             // The native scope keeps the frame and its session busy.
             var diagnostic: maplibre.Diagnostic = .{};
-            try testing.expectError(error.Busy, self.frame.release(maplibre.gpuSyncDefault(), &diagnostic));
+            try testing.expectError(error.Busy, self.frame.release(.{}, &diagnostic));
             try testing.expectEqual(.busy, diagnostic.status);
             try testing.expectError(error.Busy, self.session.abandon(null));
             try self.sibling.discard(null);

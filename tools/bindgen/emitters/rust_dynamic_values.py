@@ -8,6 +8,7 @@ as an array's count or a presence mask.
 
 from dataclasses import replace
 
+from ..semantic import required_callbacks
 from .rust import Unsupported, doc, identifier, is_text, native_identifier, pascal
 
 TRAIT_COPY = "unsafe {{ from_native({}) }}?"
@@ -44,7 +45,9 @@ def public(values, value):
 def encode(values, value, source):
     """Converts the place `source` for one native call, with `arena` in scope."""
     if value.kind in {"buffer", "array", "reference"} and value.nullable:
-        if value.kind == "buffer" and value.buffer_form == "view":
+        if value.kind == "buffer" and (
+            value.buffer_form == "view" or value.length == "nul"
+        ):
             return f"to_native(&{source}, arena)?"
         if value.kind == "buffer":
             return f"{source}.as_ref().map_or(std::ptr::null(), |item| item.as_ptr().cast())"
@@ -54,7 +57,7 @@ def encode(values, value, source):
             return f"convert::optional_reference({source}.as_ref(), arena)?"
         raise Unsupported(f"{value.native}: optional fixed arrays need a presence rule")
     if value.kind == "buffer":
-        if value.buffer_form == "view":
+        if value.buffer_form == "view" or value.length == "nul":
             return f"to_native(&{source}, arena)?"
         return f"{source}.as_ptr().cast()"
     if value.kind == "reference":
@@ -81,7 +84,9 @@ def count(value, context):
 def decode(values, value, source, context="raw"):
     """Copies the C place `source`, whose sibling fields `context` holds."""
     if value.kind in {"buffer", "array", "reference"} and value.nullable:
-        if value.kind == "buffer" and value.buffer_form == "view":
+        if value.kind == "buffer" and (
+            value.buffer_form == "view" or value.length == "nul"
+        ):
             return TRAIT_COPY.format(source)
         if value.kind == "reference":
             # An optional record member takes a presence bit, so only a
@@ -92,7 +97,7 @@ def decode(values, value, source, context="raw"):
         copied = decode(values, replace(value, nullable=False), source, context)
         return f"if {source}.is_null() {{ None }} else {{ Some({copied}) }}"
     if value.kind == "buffer":
-        if value.buffer_form != "view":
+        if value.buffer_form != "view" and value.length != "nul":
             return f"unsafe {{ convert::counted({source}, {count(value, context)}) }}?"
         return TRAIT_COPY.format(source)
     if array := slice_of(values, value):
@@ -163,7 +168,8 @@ def submit(values, union, owner, source, place):
 
 def defaultable(values, value):
     """Whether the value's Rust type implements `Default`. An enum does only
-    when 0 is one of its members, and a union only when it has `Unknown`."""
+    when 0 is one of its members, a union only when it has `Unknown`, and a
+    record only when it has no required member."""
     if value.kind == "enum":
         return value.enum_kind == "bitmask" or any(
             number == 0 for _, number in value.enum_values
@@ -174,10 +180,12 @@ def defaultable(values, value):
         return defaultable(values, value.element)
     if value.kind == "union" or value.union_member:
         return value.native in values.bound.returned
-    if value.kind != "record" or value.default:
+    if value.kind != "record":
         return True
+    if required_callbacks(value):
+        return False
     return all(
-        defaultable(values, field.value)
+        not field.required and defaultable(values, field.value)
         for field in value.fields
         if field.public and not (field.presence and field.presence.mask)
     )
@@ -220,6 +228,10 @@ def declaration(values, value):
     raw = f"sys::{value.native}"
     copyable = not dynamic(value)
     fields, writes, copies, args, names = [], [], [], [], []
+    # The constructor arguments of a record without a default, which are its
+    # required members and those whose type has no default, and the
+    # initializers of all its members.
+    taken, members = [], []
     for field in value.fields:
         if field.role == "presence_mask":
             writes.append(f"raw.{native_identifier(field.name)} = 0;")
@@ -236,6 +248,7 @@ def declaration(values, value):
             f"convert::set_flag(&mut raw.{mask}, sys::{flag.name}, self.{local});"
         )
         copies.append(f"{local}: raw.{mask} & sys::{flag.name} != 0,")
+        members.append(f"{local}: false")
     for field in value.fields:
         place, local = f"raw.{native_identifier(field.name)}", identifier(field.name)
         if field.role == "count":
@@ -260,6 +273,11 @@ def declaration(values, value):
             )
             copies.append(f"{local}: {decode(values, union, place)},")
             writes.append(submit(values, union, union, f"&self.{local}", place))
+            if field.required or not defaultable(values, union):
+                taken.append(f"{local}: {values.public(union)}")
+                members.append(local)
+            else:
+                members.append(f"{local}: Default::default()")
             continue
         typ = values.public(field.value)
         masked = field.presence and field.presence.mask
@@ -272,6 +290,13 @@ def declaration(values, value):
             # unset.
             copied = "None" if masked else "Default::default()"
         if masked:
+            members.append(f"{local}: None")
+        elif field.required or not defaultable(values, field.value):
+            taken.append(f"{local}: {typ}")
+            members.append(local)
+        else:
+            members.append(f"{local}: Default::default()")
+        if masked:
             write, copy = masked_field(values, field, place, local)
             writes.append(write)
             copies.append(f"{local}: None," if field.value.registration else copy)
@@ -281,37 +306,31 @@ def declaration(values, value):
             args.append(f"{local}: {typ}")
             names.append(local)
     constructors = []
-    if numeric(value) and "in" in values.directions.get(value.native, {"in", "out"}):
+    directions = values.directions.get(value.native, {"in", "out"})
+    if numeric(value) and "in" in directions:
         # Only a small value made of numbers, such as a coordinate, takes its
-        # fields in order. Any other record is built from its default, so a
-        # field C adds doesn't break callers.
+        # fields in order. Any other record is built from its default, or from
+        # its required members, so a field C adds doesn't break callers.
         constructors.append(
             f"pub const fn new({', '.join(args)}) -> Self {{ Self {{ {', '.join(names)} }} }}"
         )
-    initial = (
-        f"unsafe {{ sys::{value.default}() }}"
-        if value.default
-        else "unsafe { std::mem::zeroed() }"
-    )
+    elif taken and "in" in directions:
+        constructors.append(
+            f"pub fn new({', '.join(taken)}) -> Self {{ Self {{ {', '.join(members)} }} }}"
+        )
     derives = ["Debug", "Clone"]
     if copyable:
         derives += ["Copy", "PartialEq"]
     elif comparable(value):
         derives.append("PartialEq")
-    if not value.default and defaultable(values, value):
+    if defaultable(values, value):
         derives.append("Default")
-    default = (
-        f"impl Default for {name} {{ fn default() -> Self {{ maplibre_core::require_abi_version(); convert::native_default(unsafe {{ sys::{value.default}() }}) }} }}\n"
-        if value.default
-        else ""
-    )
     arena = "arena" if any("arena" in line for line in writes) else "_arena"
     impl = f"impl {name} {{ {' '.join(constructors)} }}\n" if constructors else ""
-    directions = values.directions.get(value.native, {"in", "out"})
     to_native = (
         f"impl ToNative<{raw}> for {name} {{\n"
         + f"    fn to_native(&self, {arena}: &mut InputArena) -> Result<{raw}> {{\n"
-        + f"        let mut raw: {raw} = {initial};\n"
+        + f"        let mut raw: {raw} = unsafe {{ std::mem::zeroed() }};\n"
         + "".join(f"        {line}\n" for line in writes)
         + "        Ok(raw)\n    }\n}\n"
         if "in" in directions
@@ -330,7 +349,6 @@ def declaration(values, value):
         f"\n{doc(values.bound, value.native)}#[derive({', '.join(derives)})]\npub struct {name} {{\n"
         + "\n".join(fields)
         + "\n}\n"
-        + default
         + impl
         + to_native
         + from_native
@@ -379,17 +397,12 @@ def union_declaration(values, value):
         if field.role == "size"
     ]
     writes.append(submit(values, member.value, value, "self", place))
-    initial = (
-        f"unsafe {{ sys::{value.default}() }}"
-        if value.default
-        else "unsafe { std::mem::zeroed() }"
-    )
     arena = "arena" if any("arena" in line for line in writes) else "_arena"
     directions = values.directions.get(value.native, {"in", "out"})
     to_native = (
         f"impl ToNative<{raw}> for {name} {{\n"
         + f"    fn to_native(&self, {arena}: &mut InputArena) -> Result<{raw}> {{\n"
-        + f"        let mut raw: {raw} = {initial};\n"
+        + f"        let mut raw: {raw} = unsafe {{ std::mem::zeroed() }};\n"
         + "".join(f"        {line}\n" for line in writes)
         + "        Ok(raw)\n    }\n}\n"
         if "in" in directions

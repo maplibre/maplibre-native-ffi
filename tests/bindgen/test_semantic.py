@@ -8,7 +8,6 @@ from support import parse, parse_sources, protocol_header
 from tools.bindgen.emitters import dart
 from tools.bindgen.model import ModelError
 from tools.bindgen.semantic import (
-    DefaultSupport,
     DeliveryPlan,
     DisposeSupport,
     bind,
@@ -188,19 +187,6 @@ mln_status read_value(value *out BIND("direction=out"), mln_diagnostic *out_diag
                         }
                     )
                 )
-        # A default initializes a record that native reads, so a record that
-        # only a completion delivers has none.
-        with self.assertRaisesRegex(
-            ModelError, "mln_probe_survey: default requires a record that native reads"
-        ):
-            bind(
-                parse_sources(
-                    {
-                        "api.h": header
-                        + "mln_probe_survey mln_probe_survey_default(void);\n"
-                    }
-                )
-            )
 
     def test_enums_that_only_masks_and_tags_use_stay_private(self):
         source = """
@@ -613,24 +599,6 @@ mln_status install(const registration *value, mln_diagnostic *out_diagnostic);
                 require_complete=True,
             )
 
-    def test_default_support_is_derived_from_a_checked_consumer(self):
-        source = """
-typedef struct options { double zoom; } options;
-options make_options(void);
-mln_status set_options(const options *value, mln_diagnostic *out_diagnostic);
-"""
-        model = bind(self.parse(source), require_complete=True)
-        constructor = model.operations_by_name["make_options"]
-        self.assertEqual(constructor.support, DefaultSupport("options"))
-        self.assertEqual(model.defaults, {"options": constructor})
-        self.assertEqual(model.operations_by_name["set_options"].role, "public")
-        # A constructor that takes arguments is a public operation.
-        with_argument = source.replace(
-            "make_options(void)", "make_options(int ignored)"
-        )
-        model = bind(self.parse(with_argument), require_complete=True)
-        self.assertEqual(model.operations_by_name["make_options"].role, "public")
-
     def test_attachment_keeps_immediate_owner_separate_from_completion(self):
         source = """
 typedef unsigned long root BIND("kind=handle;release=close_root");
@@ -764,7 +732,7 @@ mln_status copy_values(
         self.assertEqual(output.sized_by, "values")
 
     # A binding decodes caller-sized elements after the call from zeroed
-    # storage, so an element that owns, borrows, or needs a default is refused.
+    # storage, so an element that owns or borrows is refused.
     def test_counted_output_elements_must_be_plain_values(self):
         for element, declarations in (
             (
@@ -777,13 +745,6 @@ mln_status copy_values(
             (
                 "item",
                 "typedef struct item { mln_buffer_view message; } item;",
-            ),
-            (
-                "item",
-                (
-                    "typedef struct item { double value; } item;\nitem item_default(void);\n"
-                    "mln_status use_item(item value, mln_diagnostic *out_diagnostic);"
-                ),
             ),
         ):
             source = f"""
@@ -912,8 +873,8 @@ typedef struct signals { notify signal; void *state BIND("kind=context"); releas
                 "queue_result must be an integer",
             ),
             (
-                "  int code;\n  mln_buffer_view text",
-                '  mln_buffer_view text BIND("lifetime=owner");\n  int code',
+                "  int code;\n  const char* text",
+                '  const char* text BIND("lifetime=owner");\n  int code',
                 "must mirror",
             ),
             (
@@ -950,7 +911,6 @@ typedef void (*release)(void *context);
 typedef struct gates { gate enter BIND("nullable=true"); gate leave BIND("nullable=true"); void *context BIND("kind=context"); release retire; } gates BIND("kind=callback_registration;release=retire");
 typedef struct signals { notify signal BIND("nullable=true"); void *context BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
 typedef struct settings { unsigned size; signals wake; gates guard; } settings;
-settings settings_default(void);
 mln_status attach(const settings *options, mln_diagnostic *out_diagnostic);
 """
         api = self.parse(source)

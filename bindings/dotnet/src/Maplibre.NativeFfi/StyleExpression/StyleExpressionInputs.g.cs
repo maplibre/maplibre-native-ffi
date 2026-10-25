@@ -30,17 +30,17 @@ public sealed record StyleExpressionInputs
     /// <summary>
     /// One UTF-8 GeoJSON Feature that feature data expressions read.
     /// </summary>
-    public required string Feature { get; init; }
+    public string Feature { get; init; } = "";
 
     /// <summary>
     /// A UTF-8 JSON object that the feature-state expression reads.
     /// </summary>
-    public required string FeatureState { get; init; }
+    public string FeatureState { get; init; } = "";
 
     /// <summary>
     /// A UTF-8 JSON object that the global-state expression reads.
     /// </summary>
-    public required string GlobalState { get; init; }
+    public string GlobalState { get; init; } = "";
 
     /// <summary>
     /// The tile that holds the feature, which the within and distance
@@ -58,14 +58,4 @@ public sealed record StyleExpressionInputs
         init => AvailableImagesStorage = ValueArray.From(value);
     }
     internal ValueArray<string> AvailableImagesStorage { get; init; }
-    public static StyleExpressionInputs Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyStyleExpressionInputs(
-                NativeMethods.mln_style_expression_inputs_default()
-            );
-        }
-    }
 }

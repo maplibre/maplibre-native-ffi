@@ -24,17 +24,13 @@ public struct AnimationOptions: Sendable {
   public var transitionId: UInt64?
   /// Reports the end of the command's transitions. Disabled by default.
   public var endHandler: CameraTransitionHandler
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_animation_options_default))
-  }
-
   public init(
-    durationMs: Double? = AnimationOptions.default.durationMs,
-    velocity: Double? = AnimationOptions.default.velocity,
-    minZoom: Double? = AnimationOptions.default.minZoom,
-    easing: UnitBezier? = AnimationOptions.default.easing,
-    transitionId: UInt64? = AnimationOptions.default.transitionId,
-    endHandler: CameraTransitionHandler = AnimationOptions.default.endHandler
+    durationMs: Double? = nil,
+    velocity: Double? = nil,
+    minZoom: Double? = nil,
+    easing: UnitBezier? = nil,
+    transitionId: UInt64? = nil,
+    endHandler: CameraTransitionHandler = .init()
   ) {
     self.durationMs = durationMs
     self.velocity = velocity
@@ -62,7 +58,7 @@ public struct AnimationOptions: Sendable {
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_animation_options {
-    var raw = mln_animation_options_default()
+    var raw = mln_animation_options()
     raw.fields = 0
     if let item = durationMs {
       raw.fields |= MLN_ANIMATION_OPTION_DURATION.rawValue; raw
@@ -104,17 +100,13 @@ public struct BoundOptions: Equatable, Hashable, Sendable {
   public var maxZoom: Double?
   public var minPitch: Double?
   public var maxPitch: Double?
-  public static var `default`: Self {
-    Self(raw: nativeDefault(mln_bound_options_default))
-  }
-
   public init(
-    unbounded: Bool = BoundOptions.default.unbounded,
-    bounds: LatLngBounds? = BoundOptions.default.bounds,
-    minZoom: Double? = BoundOptions.default.minZoom,
-    maxZoom: Double? = BoundOptions.default.maxZoom,
-    minPitch: Double? = BoundOptions.default.minPitch,
-    maxPitch: Double? = BoundOptions.default.maxPitch
+    unbounded: Bool = false,
+    bounds: LatLngBounds? = nil,
+    minZoom: Double? = nil,
+    maxZoom: Double? = nil,
+    minPitch: Double? = nil,
+    maxPitch: Double? = nil
   ) {
     self.unbounded = unbounded
     self.bounds = bounds
@@ -139,11 +131,12 @@ public struct BoundOptions: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_bound_options {
-    var raw = mln_bound_options_default()
+    var raw = mln_bound_options()
     raw.fields = 0
     if unbounded {
       raw.fields |= MLN_BOUND_OPTION_UNBOUNDED.rawValue
     }
+    raw.size = UInt32(MemoryLayout<mln_bound_options>.size)
     if let item = bounds {
       raw.fields |= MLN_BOUND_OPTION_BOUNDS.rawValue; raw.bounds = item
         .nativeValue()
@@ -177,19 +170,15 @@ public struct Camera: Equatable, Hashable, Sendable {
   public var pitch: Double
   public var roll: Double
   public var fieldOfView: Double
-  public static var `default`: Self {
-    Self(raw: mln_camera())
-  }
-
   public init(
-    center: LatLng = Camera.default.center,
-    centerAltitude: Double = Camera.default.centerAltitude,
-    padding: EdgeInsets = Camera.default.padding,
-    zoom: Double = Camera.default.zoom,
-    bearing: Double = Camera.default.bearing,
-    pitch: Double = Camera.default.pitch,
-    roll: Double = Camera.default.roll,
-    fieldOfView: Double = Camera.default.fieldOfView
+    center: LatLng = .init(),
+    centerAltitude: Double = 0,
+    padding: EdgeInsets = .init(),
+    zoom: Double = 0,
+    bearing: Double = 0,
+    pitch: Double = 0,
+    roll: Double = 0,
+    fieldOfView: Double = 0
   ) {
     self.center = center
     self.centerAltitude = centerAltitude
@@ -244,18 +233,14 @@ public struct CameraDelta: Sendable {
   public var anchor: ScreenPoint?
   public var animation: AnimationOptions
   public var gesturePhase: GesturePhase
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_camera_delta_default))
-  }
-
   public init(
-    offset: ScreenPoint? = CameraDelta.default.offset,
-    scale: Double? = CameraDelta.default.scale,
-    bearing: Double? = CameraDelta.default.bearing,
-    pitch: Double? = CameraDelta.default.pitch,
-    anchor: ScreenPoint? = CameraDelta.default.anchor,
-    animation: AnimationOptions = CameraDelta.default.animation,
-    gesturePhase: GesturePhase = CameraDelta.default.gesturePhase
+    offset: ScreenPoint? = nil,
+    scale: Double? = nil,
+    bearing: Double? = nil,
+    pitch: Double? = nil,
+    anchor: ScreenPoint? = nil,
+    animation: AnimationOptions = .init(),
+    gesturePhase: GesturePhase = .init(rawValue: 0)
   ) {
     self.offset = offset
     self.scale = scale
@@ -283,7 +268,7 @@ public struct CameraDelta: Sendable {
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_camera_delta {
-    var raw = mln_camera_delta_default()
+    var raw = mln_camera_delta()
     raw.fields = 0
     raw.size = UInt32(MemoryLayout<mln_camera_delta>.size)
     if let item = offset {
@@ -317,14 +302,10 @@ public struct CameraFitOptions: Equatable, Hashable, Sendable {
   public var padding: EdgeInsets?
   public var bearing: Double?
   public var pitch: Double?
-  public static var `default`: Self {
-    Self(raw: nativeDefault(mln_camera_fit_options_default))
-  }
-
   public init(
-    padding: EdgeInsets? = CameraFitOptions.default.padding,
-    bearing: Double? = CameraFitOptions.default.bearing,
-    pitch: Double? = CameraFitOptions.default.pitch
+    padding: EdgeInsets? = nil,
+    bearing: Double? = nil,
+    pitch: Double? = nil
   ) {
     self.padding = padding
     self.bearing = bearing
@@ -341,8 +322,9 @@ public struct CameraFitOptions: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_camera_fit_options {
-    var raw = mln_camera_fit_options_default()
+    var raw = mln_camera_fit_options()
     raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_camera_fit_options>.size)
     if let item = padding {
       raw.fields |= MLN_CAMERA_FIT_OPTION_PADDING.rawValue; raw.padding = item
         .nativeValue()
@@ -372,20 +354,16 @@ public struct CameraOptions: Equatable, Hashable, Sendable {
   public var pitch: Double?
   public var roll: Double?
   public var fieldOfView: Double?
-  public static var `default`: Self {
-    Self(raw: nativeDefault(mln_camera_options_default))
-  }
-
   public init(
-    center: LatLng? = CameraOptions.default.center,
-    centerAltitude: Double? = CameraOptions.default.centerAltitude,
-    padding: EdgeInsets? = CameraOptions.default.padding,
-    anchor: ScreenPoint? = CameraOptions.default.anchor,
-    zoom: Double? = CameraOptions.default.zoom,
-    bearing: Double? = CameraOptions.default.bearing,
-    pitch: Double? = CameraOptions.default.pitch,
-    roll: Double? = CameraOptions.default.roll,
-    fieldOfView: Double? = CameraOptions.default.fieldOfView
+    center: LatLng? = nil,
+    centerAltitude: Double? = nil,
+    padding: EdgeInsets? = nil,
+    anchor: ScreenPoint? = nil,
+    zoom: Double? = nil,
+    bearing: Double? = nil,
+    pitch: Double? = nil,
+    roll: Double? = nil,
+    fieldOfView: Double? = nil
   ) {
     self.center = center
     self.centerAltitude = centerAltitude
@@ -417,8 +395,9 @@ public struct CameraOptions: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_camera_options {
-    var raw = mln_camera_options_default()
+    var raw = mln_camera_options()
     raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_camera_options>.size)
     if let item = center {
       raw.fields |= MLN_CAMERA_OPTION_CENTER.rawValue; raw.center = item
         .nativeValue()
@@ -461,14 +440,7 @@ public struct CameraOptions: Equatable, Hashable, Sendable {
 public struct CameraQueryResult: Equatable, Hashable, Sendable {
   public var generation: UInt64
   public var camera: Camera
-  public static var `default`: Self {
-    Self(raw: mln_camera_query_result())
-  }
-
-  public init(
-    generation: UInt64 = CameraQueryResult.default.generation,
-    camera: Camera = CameraQueryResult.default.camera
-  ) {
+  public init(generation: UInt64 = 0, camera: Camera = .init()) {
     self.generation = generation
     self.camera = camera
   }
@@ -490,13 +462,9 @@ public struct CameraTransitionEnd: Equatable, Hashable, Sendable {
   /// this generation and are queued before the callback runs. Zero for
   /// `MLN_CAMERA_TRANSITION_OUTCOME_CLOSED`.
   public var generation: UInt64
-  public static var `default`: Self {
-    Self(raw: mln_camera_transition_end())
-  }
-
   public init(
-    outcome: CameraTransitionOutcome = CameraTransitionEnd.default.outcome,
-    generation: UInt64 = CameraTransitionEnd.default.generation
+    outcome: CameraTransitionOutcome = .init(rawValue: 0),
+    generation: UInt64 = 0
   ) {
     self.outcome = outcome
     self.generation = generation
@@ -524,10 +492,6 @@ public struct CameraTransitionHandler: Sendable {
   public var callback: CameraTransitionEndCallback?
   public init(callback: CameraTransitionEndCallback? = nil) {
     self.callback = callback
-  }
-
-  public static var `default`: Self {
-    Self()
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -602,15 +566,11 @@ public struct CameraUpdate: Sendable {
   public var camera: CameraOptions
   public var animation: AnimationOptions
   public var gesturePhase: GesturePhase
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_camera_update_default))
-  }
-
   public init(
-    mode: CameraUpdateMode = CameraUpdate.default.mode,
-    camera: CameraOptions = CameraUpdate.default.camera,
-    animation: AnimationOptions = CameraUpdate.default.animation,
-    gesturePhase: GesturePhase = CameraUpdate.default.gesturePhase
+    mode: CameraUpdateMode = .init(rawValue: 0),
+    camera: CameraOptions = .init(),
+    animation: AnimationOptions = .init(),
+    gesturePhase: GesturePhase = .init(rawValue: 0)
   ) {
     self.mode = mode
     self.camera = camera
@@ -629,7 +589,7 @@ public struct CameraUpdate: Sendable {
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_camera_update {
-    var raw = mln_camera_update_default()
+    var raw = mln_camera_update()
     raw.size = UInt32(MemoryLayout<mln_camera_update>.size)
     raw.mode = mln_camera_update_mode(rawValue: mode.rawValue)
     raw.camera = camera.nativeValue()
@@ -700,15 +660,11 @@ public struct EdgeInsets: Equatable, Hashable, Sendable {
   public var left: Double
   public var bottom: Double
   public var right: Double
-  public static var `default`: Self {
-    Self(raw: mln_edge_insets())
-  }
-
   public init(
-    top: Double = EdgeInsets.default.top,
-    left: Double = EdgeInsets.default.left,
-    bottom: Double = EdgeInsets.default.bottom,
-    right: Double = EdgeInsets.default.right
+    top: Double = 0,
+    left: Double = 0,
+    bottom: Double = 0,
+    right: Double = 0
   ) {
     self.top = top
     self.left = left
@@ -750,12 +706,8 @@ public struct FeatureStateSelector: Equatable, Hashable, Sendable {
   /// State key, or empty to select every key. Used only by remove, and requires
   /// feature_id.
   public var stateKey: String
-  public static var `default`: Self {
-    Self()
-  }
-
   public init(
-    sourceId: String = "",
+    sourceId: String,
     sourceLayerId: String = "",
     featureId: String? = nil,
     stateKey: String = ""
@@ -813,14 +765,7 @@ public struct FeatureStateSelector: Equatable, Hashable, Sendable {
 public struct FreeCameraOptions: Equatable, Hashable, Sendable {
   public var position: Vec3?
   public var orientation: Quaternion?
-  public static var `default`: Self {
-    Self(raw: nativeDefault(mln_free_camera_options_default))
-  }
-
-  public init(
-    position: Vec3? = FreeCameraOptions.default.position,
-    orientation: Quaternion? = FreeCameraOptions.default.orientation
-  ) {
+  public init(position: Vec3? = nil, orientation: Quaternion? = nil) {
     self.position = position
     self.orientation = orientation
   }
@@ -833,8 +778,9 @@ public struct FreeCameraOptions: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_free_camera_options {
-    var raw = mln_free_camera_options_default()
+    var raw = mln_free_camera_options()
     raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_free_camera_options>.size)
     if let item = position {
       raw.fields |= MLN_FREE_CAMERA_OPTION_POSITION.rawValue; raw
         .position = item.nativeValue()
@@ -892,14 +838,7 @@ public struct LatLng: Equatable, Hashable, Sendable {
   public var latitude: Double
   /// Longitude in degrees. Input longitude must be finite.
   public var longitude: Double
-  public static var `default`: Self {
-    Self(raw: mln_lat_lng())
-  }
-
-  public init(
-    latitude: Double = LatLng.default.latitude,
-    longitude: Double = LatLng.default.longitude
-  ) {
+  public init(latitude: Double = 0, longitude: Double = 0) {
     self.latitude = latitude
     self.longitude = longitude
   }
@@ -924,14 +863,7 @@ public struct LatLng: Equatable, Hashable, Sendable {
 public struct LatLngBounds: Equatable, Hashable, Sendable {
   public var southwest: LatLng
   public var northeast: LatLng
-  public static var `default`: Self {
-    Self(raw: mln_lat_lng_bounds())
-  }
-
-  public init(
-    southwest: LatLng = LatLngBounds.default.southwest,
-    northeast: LatLng = LatLngBounds.default.northeast
-  ) {
+  public init(southwest: LatLng = .init(), northeast: LatLng = .init()) {
     self.southwest = southwest
     self.northeast = northeast
   }
@@ -960,15 +892,7 @@ public struct LogicalExtent: Equatable, Hashable, Sendable {
   public var height: UInt32
   /// Device pixels per UI pixel.
   public var scaleFactor: Double
-  public static var `default`: Self {
-    Self(raw: nativeDefault(mln_logical_extent_default))
-  }
-
-  public init(
-    width: UInt32 = LogicalExtent.default.width,
-    height: UInt32 = LogicalExtent.default.height,
-    scaleFactor: Double = LogicalExtent.default.scaleFactor
-  ) {
+  public init(width: UInt32 = 0, height: UInt32 = 0, scaleFactor: Double = 0) {
     self.width = width
     self.height = height
     self.scaleFactor = scaleFactor
@@ -981,7 +905,7 @@ public struct LogicalExtent: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_logical_extent {
-    var raw = mln_logical_extent_default()
+    var raw = mln_logical_extent()
     raw.width = width
     raw.height = height
     raw.scale_factor = scaleFactor
@@ -1054,15 +978,11 @@ public struct MapOptions: Equatable, Hashable, Sendable {
   /// Map-originated event types this map queues, as a bitwise OR of
   /// `mln_runtime_event_flag` values.
   public var eventMask: RuntimeEventFlag?
-  public static var `default`: Self {
-    Self(raw: nativeDefault(mln_map_options_default))
-  }
-
   public init(
-    initialExtent: LogicalExtent = MapOptions.default.initialExtent,
-    mapMode: MapMode = MapOptions.default.mapMode,
-    fastPforEnabled: Bool = MapOptions.default.fastPforEnabled,
-    eventMask: RuntimeEventFlag? = MapOptions.default.eventMask
+    initialExtent: LogicalExtent,
+    mapMode: MapMode = .init(rawValue: 0),
+    fastPforEnabled: Bool = false,
+    eventMask: RuntimeEventFlag? = nil
   ) {
     self.initialExtent = initialExtent
     self.mapMode = mapMode
@@ -1079,8 +999,9 @@ public struct MapOptions: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_map_options {
-    var raw = mln_map_options_default()
+    var raw = mln_map_options()
     raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_map_options>.size)
     raw.initial_extent = initialExtent.nativeValue()
     raw.map_mode = mln_map_mode(rawValue: mapMode.rawValue)
     raw.fast_pfor_enabled = fastPforEnabled
@@ -1118,25 +1039,19 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   /// The map's camera, extent, projection mode, and viewport options.
   /// `mln_map_projection_create()` converts coordinates for this view.
   public var view: MapView
-  public static var `default`: Self {
-    Self(raw: mln_map_snapshot())
-  }
-
   public init(
-    debugOptions: MapDebugFlag = MapSnapshot.default.debugOptions,
-    generation: UInt64 = MapSnapshot.default.generation,
-    fullyLoaded: Bool = MapSnapshot.default.fullyLoaded,
-    renderingStatsViewEnabled: Bool = MapSnapshot.default
-      .renderingStatsViewEnabled,
-    gestureInProgress: Bool = MapSnapshot.default.gestureInProgress,
-    transitionInProgress: Bool = MapSnapshot.default.transitionInProgress,
-    eventMask: RuntimeEventFlag = MapSnapshot.default.eventMask,
-    latestRenderUpdateGeneration: UInt64 = MapSnapshot.default
-      .latestRenderUpdateGeneration,
-    tile: MapTileOptions = MapSnapshot.default.tile,
-    bounds: BoundOptions = MapSnapshot.default.bounds,
-    freeCamera: FreeCameraOptions = MapSnapshot.default.freeCamera,
-    view: MapView = MapSnapshot.default.view
+    debugOptions: MapDebugFlag = .init(rawValue: 0),
+    generation: UInt64 = 0,
+    fullyLoaded: Bool = false,
+    renderingStatsViewEnabled: Bool = false,
+    gestureInProgress: Bool = false,
+    transitionInProgress: Bool = false,
+    eventMask: RuntimeEventFlag = .init(rawValue: 0),
+    latestRenderUpdateGeneration: UInt64 = 0,
+    tile: MapTileOptions = .init(),
+    bounds: BoundOptions = .init(),
+    freeCamera: FreeCameraOptions = .init(),
+    view: MapView = .init()
   ) {
     self.debugOptions = debugOptions
     self.generation = generation
@@ -1180,17 +1095,13 @@ public struct MapTileOptions: Equatable, Hashable, Sendable {
   public var lodPitchThreshold: Double?
   public var lodZoomShift: Double?
   public var lodMode: TileLodMode?
-  public static var `default`: Self {
-    Self(raw: nativeDefault(mln_map_tile_options_default))
-  }
-
   public init(
-    prefetchZoomDelta: UInt32? = MapTileOptions.default.prefetchZoomDelta,
-    lodMinRadius: Double? = MapTileOptions.default.lodMinRadius,
-    lodScale: Double? = MapTileOptions.default.lodScale,
-    lodPitchThreshold: Double? = MapTileOptions.default.lodPitchThreshold,
-    lodZoomShift: Double? = MapTileOptions.default.lodZoomShift,
-    lodMode: TileLodMode? = MapTileOptions.default.lodMode
+    prefetchZoomDelta: UInt32? = nil,
+    lodMinRadius: Double? = nil,
+    lodScale: Double? = nil,
+    lodPitchThreshold: Double? = nil,
+    lodZoomShift: Double? = nil,
+    lodMode: TileLodMode? = nil
   ) {
     self.prefetchZoomDelta = prefetchZoomDelta
     self.lodMinRadius = lodMinRadius
@@ -1216,8 +1127,9 @@ public struct MapTileOptions: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_map_tile_options {
-    var raw = mln_map_tile_options_default()
+    var raw = mln_map_tile_options()
     raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_map_tile_options>.size)
     if let item = prefetchZoomDelta {
       raw.fields |= MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA.rawValue; raw
         .prefetch_zoom_delta = item
@@ -1263,15 +1175,11 @@ public struct MapView: Equatable, Hashable, Sendable {
   /// North orientation, constrain mode, viewport mode, and frustum offset, with
   /// every field set.
   public var viewport: MapViewportOptions
-  public static var `default`: Self {
-    Self(raw: mln_map_view())
-  }
-
   public init(
-    camera: Camera = MapView.default.camera,
-    extent: LogicalExtent = MapView.default.extent,
-    projectionMode: ProjectionMode = MapView.default.projectionMode,
-    viewport: MapViewportOptions = MapView.default.viewport
+    camera: Camera = .init(),
+    extent: LogicalExtent = .init(),
+    projectionMode: ProjectionMode = .init(),
+    viewport: MapViewportOptions = .init()
   ) {
     self.camera = camera
     self.extent = extent
@@ -1306,16 +1214,11 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
   public var constrainMode: ConstrainMode?
   public var viewportMode: ViewportMode?
   public var frustumOffset: EdgeInsets?
-  public static var `default`: Self {
-    Self(raw: nativeDefault(mln_map_viewport_options_default))
-  }
-
   public init(
-    northOrientation: NorthOrientation? = MapViewportOptions.default
-      .northOrientation,
-    constrainMode: ConstrainMode? = MapViewportOptions.default.constrainMode,
-    viewportMode: ViewportMode? = MapViewportOptions.default.viewportMode,
-    frustumOffset: EdgeInsets? = MapViewportOptions.default.frustumOffset
+    northOrientation: NorthOrientation? = nil,
+    constrainMode: ConstrainMode? = nil,
+    viewportMode: ViewportMode? = nil,
+    frustumOffset: EdgeInsets? = nil
   ) {
     self.northOrientation = northOrientation
     self.constrainMode = constrainMode
@@ -1337,8 +1240,9 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_map_viewport_options {
-    var raw = mln_map_viewport_options_default()
+    var raw = mln_map_viewport_options()
     raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_map_viewport_options>.size)
     if let item = northOrientation {
       raw.fields |= MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION.rawValue; raw
         .north_orientation = mln_north_orientation(rawValue: item.rawValue)
@@ -1401,13 +1305,9 @@ public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
   public var maxZoom: Double
   public var pixelRatio: Float
   public var includeIdeographs: Bool
-  public static var `default`: Self {
-    Self()
-  }
-
   public init(
     styleUrl: String = "",
-    geometry: String = "",
+    geometry: String,
     minZoom: Double = 0,
     maxZoom: Double = 0,
     pixelRatio: Float = 0,
@@ -1461,10 +1361,6 @@ public enum OfflineRegionDefinition: Equatable, Hashable, Sendable {
   case tilePyramid(OfflineTilePyramidRegionDefinition)
   case geometry(OfflineGeometryRegionDefinition)
   case unknown(UInt32, Data)
-  public static var `default`: Self {
-    .unknown(0, Data())
-  }
-
   init(
     raw: mln_offline_region_definition,
     recordBytes: UnsafeRawBufferPointer? = nil
@@ -1520,13 +1416,9 @@ public struct OfflineRegionInfo: Equatable, Hashable, Sendable {
   public var definition: OfflineRegionDefinition
   /// Metadata bytes.
   public var metadata: Data
-  public static var `default`: Self {
-    Self()
-  }
-
   public init(
     id: Int64 = 0,
-    definition: OfflineRegionDefinition = .default,
+    definition: OfflineRegionDefinition = .unknown(0, Data()),
     metadata: Data = Data()
   ) {
     self.id = id
@@ -1563,13 +1455,9 @@ public struct OfflineTilePyramidRegionDefinition: Equatable, Hashable,
   public var maxZoom: Double
   public var pixelRatio: Float
   public var includeIdeographs: Bool
-  public static var `default`: Self {
-    Self()
-  }
-
   public init(
     styleUrl: String = "",
-    bounds: LatLngBounds = .default,
+    bounds: LatLngBounds = .init(),
     minZoom: Double = 0,
     maxZoom: Double = 0,
     pixelRatio: Float = 0,
@@ -1621,14 +1509,7 @@ public struct ProjectedMeters: Equatable, Hashable, Sendable {
   public var northing: Double
   /// Distance measured eastward from the prime meridian, in meters.
   public var easting: Double
-  public static var `default`: Self {
-    Self(raw: mln_projected_meters())
-  }
-
-  public init(
-    northing: Double = ProjectedMeters.default.northing,
-    easting: Double = ProjectedMeters.default.easting
-  ) {
+  public init(northing: Double = 0, easting: Double = 0) {
     self.northing = northing
     self.easting = easting
   }
@@ -1657,14 +1538,10 @@ public struct ProjectionMode: Equatable, Hashable, Sendable {
   public var xSkew: Double?
   /// Y-skew factor of the axonometric transform.
   public var ySkew: Double?
-  public static var `default`: Self {
-    Self(raw: nativeDefault(mln_projection_mode_default))
-  }
-
   public init(
-    axonometric: Bool? = ProjectionMode.default.axonometric,
-    xSkew: Double? = ProjectionMode.default.xSkew,
-    ySkew: Double? = ProjectionMode.default.ySkew
+    axonometric: Bool? = nil,
+    xSkew: Double? = nil,
+    ySkew: Double? = nil
   ) {
     self.axonometric = axonometric
     self.xSkew = xSkew
@@ -1681,8 +1558,9 @@ public struct ProjectionMode: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_projection_mode {
-    var raw = mln_projection_mode_default()
+    var raw = mln_projection_mode()
     raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_projection_mode>.size)
     if let item = axonometric {
       raw.fields |= MLN_PROJECTION_MODE_AXONOMETRIC.rawValue; raw
         .axonometric = item
@@ -1706,16 +1584,7 @@ public struct Quaternion: Equatable, Hashable, Sendable {
   public var y: Double
   public var z: Double
   public var w: Double
-  public static var `default`: Self {
-    Self(raw: mln_quaternion())
-  }
-
-  public init(
-    x: Double = Quaternion.default.x,
-    y: Double = Quaternion.default.y,
-    z: Double = Quaternion.default.z,
-    w: Double = Quaternion.default.w
-  ) {
+  public init(x: Double = 0, y: Double = 0, z: Double = 0, w: Double = 0) {
     self.x = x
     self.y = y
     self.z = z
@@ -1747,14 +1616,7 @@ public struct Quaternion: Equatable, Hashable, Sendable {
 public struct ScreenPoint: Equatable, Hashable, Sendable {
   public var x: Double
   public var y: Double
-  public static var `default`: Self {
-    Self(raw: mln_screen_point())
-  }
-
-  public init(
-    x: Double = ScreenPoint.default.x,
-    y: Double = ScreenPoint.default.y
-  ) {
+  public init(x: Double = 0, y: Double = 0) {
     self.x = x
     self.y = y
   }
@@ -1804,16 +1666,7 @@ public struct UnitBezier: Equatable, Hashable, Sendable {
   public var y1: Double
   public var x2: Double
   public var y2: Double
-  public static var `default`: Self {
-    Self(raw: mln_unit_bezier())
-  }
-
-  public init(
-    x1: Double = UnitBezier.default.x1,
-    y1: Double = UnitBezier.default.y1,
-    x2: Double = UnitBezier.default.x2,
-    y2: Double = UnitBezier.default.y2
-  ) {
+  public init(x1: Double = 0, y1: Double = 0, x2: Double = 0, y2: Double = 0) {
     self.x1 = x1
     self.y1 = y1
     self.x2 = x2
@@ -1845,15 +1698,7 @@ public struct Vec3: Equatable, Hashable, Sendable {
   public var x: Double
   public var y: Double
   public var z: Double
-  public static var `default`: Self {
-    Self(raw: mln_vec3())
-  }
-
-  public init(
-    x: Double = Vec3.default.x,
-    y: Double = Vec3.default.y,
-    z: Double = Vec3.default.z
-  ) {
+  public init(x: Double = 0, y: Double = 0, z: Double = 0) {
     self.x = x
     self.y = y
     self.z = z

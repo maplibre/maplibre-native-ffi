@@ -25,6 +25,12 @@ class MemoryTest {
           text.encodeToByteArray(),
           readBytes(readAddress(view), readSize(view + NativeMemory.addressSize)),
         )
+        if ('\u0000' !in text) {
+          assertContentEquals(
+            text.encodeToByteArray(),
+            NativeMemory.getBytes(arena.cString(text), text.encodeToByteArray().size),
+          )
+        }
       }
     }
   }
@@ -50,6 +56,15 @@ class MemoryTest {
     }
     NativeArena().use { next ->
       assertEquals(0L, NativeMemory.getLong(next.allocate(32)))
+    }
+  }
+
+  @Test
+  fun nullTerminatedStringsRejectEmbeddedNul() {
+    NativeArena().use { arena ->
+      val error = assertFailsWith<IllegalArgumentException> { arena.cString("a\u0000b") }
+
+      assertEquals("text contains an embedded NUL", error.message)
     }
   }
 

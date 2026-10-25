@@ -97,8 +97,9 @@ static uint32_t feature_mask(const mln_test_feature_list* list, size_t count) {
 static uint32_t selected(
   const locale_map* map, const char* filter, size_t count
 ) {
-  mln_source_feature_query_options query =
-    mln_source_feature_query_options_default();
+  mln_source_feature_query_options query = {
+    .size = sizeof(mln_source_feature_query_options)
+  };
   query.filter = mln_buffer_view_from_cstr(filter);
   const mln_test_feature_list list =
     mln_test_style_query_source_with(&map->fixture, "point", &query);

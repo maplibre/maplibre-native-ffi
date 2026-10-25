@@ -53,7 +53,8 @@ struct OtherRuntime {
 void run_other_runtime(void* argument) {
   auto& other = *static_cast<OtherRuntime*>(argument);
   auto runtime = mln_runtime{MLN_HANDLE_NULL};
-  const auto options = mln_runtime_options_default();
+  auto options = mln_runtime_options{};
+  options.size = sizeof(mln_runtime_options);
   const auto created = mln_runtime_create(&options, &runtime, nullptr);
   if (created != MLN_STATUS_OK) {
     other.status = created;

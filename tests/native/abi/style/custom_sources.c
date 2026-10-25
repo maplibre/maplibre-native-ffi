@@ -55,8 +55,9 @@ static mln_status add_geometry_source(
   mln_map map, custom_probe* probe, enum add_variant variant,
   const mln_completion* completion
 ) {
-  mln_custom_geometry_source_options options =
-    mln_custom_geometry_source_options_default();
+  mln_custom_geometry_source_options options = {
+    .size = sizeof(mln_custom_geometry_source_options)
+  };
   options.fetch_tile = variant == ADD_WITHOUT_FETCH ? NULL : probe_fetch_tile;
   options.cancel_tile = probe_cancel_tile;
   options.user_data = probe;
@@ -77,8 +78,9 @@ static mln_status add_mvt_source(
   mln_map map, custom_probe* probe, enum add_variant variant,
   const mln_completion* completion
 ) {
-  mln_custom_mvt_vector_source_options options =
-    mln_custom_mvt_vector_source_options_default();
+  mln_custom_mvt_vector_source_options options = {
+    .size = sizeof(mln_custom_mvt_vector_source_options)
+  };
   options.fetch_tile = variant == ADD_WITHOUT_FETCH ? NULL : probe_fetch_tile;
   options.cancel_tile = probe_cancel_tile;
   options.user_data = probe;
@@ -503,7 +505,10 @@ static void a_delivered_tile_becomes_features_and_invalidation_refetches_it(
 }
 
 static void jump_to_zoom(mln_map map, double zoom) {
-  mln_camera_update camera = mln_camera_update_default();
+  mln_camera_update camera = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   camera.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   camera.camera.zoom = zoom;
   MLN_TEST_AWAIT_OK(
@@ -762,8 +767,9 @@ static void tile_operations_check_their_tile_and_source_kind(void) {
 static mln_custom_geometry_source_options every_geometry_option(
   custom_probe* probe
 ) {
-  mln_custom_geometry_source_options options =
-    mln_custom_geometry_source_options_default();
+  mln_custom_geometry_source_options options = {
+    .size = sizeof(mln_custom_geometry_source_options)
+  };
   options.fields = MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM |
                    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM |
                    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE |
@@ -857,8 +863,9 @@ static void custom_sources_take_and_validate_every_option(void) {
     mln_test_completion_destroy(&completion);
   }
 
-  mln_custom_mvt_vector_source_options mvt =
-    mln_custom_mvt_vector_source_options_default();
+  mln_custom_mvt_vector_source_options mvt = {
+    .size = sizeof(mln_custom_mvt_vector_source_options)
+  };
   mvt.fields = MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM |
                MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
   mvt.min_zoom = 2;

@@ -10,8 +10,9 @@ static mln_status attach(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) {
-  mln_metal_owned_texture_descriptor descriptor =
-    mln_metal_owned_texture_descriptor_default();
+  mln_metal_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_metal_owned_texture_descriptor)
+  };
   descriptor.extent = probe_extent;
   descriptor.context.device = context->metal_device;
   // MTLPixelFormatRGBA8Unorm.

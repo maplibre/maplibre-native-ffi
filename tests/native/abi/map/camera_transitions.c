@@ -8,7 +8,7 @@
 #include "support/test_support.h"
 
 static mln_camera_options test_camera(void) {
-  mln_camera_options camera = mln_camera_options_default();
+  mln_camera_options camera = {.size = sizeof(mln_camera_options)};
   camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM |
                   MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH;
   camera.center.latitude = 37.7749;
@@ -42,7 +42,10 @@ static uint64_t update_camera_generation(
 static mln_camera_update ease_to_zoom(
   double zoom, double duration_ms, mln_test_transition_end* probe
 ) {
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.mode = MLN_CAMERA_UPDATE_MODE_EASE;
   update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   update.camera.zoom = zoom;
@@ -172,7 +175,7 @@ static bool transition_ended(void* context) {
   if (atomic_load(&wait->probe->releases) > 0) {
     return true;
   }
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   if (
     mln_render_session_request_frame(wait->fixture->session, &demand, NULL) !=
     MLN_STATUS_OK
@@ -244,7 +247,7 @@ static void a_rendered_ease_completes_at_its_target(void) {
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 5.0, observation.snapshot_zoom);
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 5.0, query_camera(map).zoom);
 
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_FORCE;
   MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
   MLN_TEST_OK(mln_test_render_step_until(
@@ -277,7 +280,7 @@ static void an_unobserved_animation_publishes_its_final_snapshot(void) {
 
   mln_render_frame_result result;
   do {
-    mln_frame_demand demand = mln_frame_demand_default();
+    mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
     demand.flags |= MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
     MLN_TEST_OK(
       mln_render_session_request_frame(fixture.session, &demand, NULL)
@@ -342,7 +345,10 @@ static void an_immediate_command_completes_before_its_completion(void) {
     const immediate_case* row = &immediate_cases[index];
     mln_test_transition_end probe;
     mln_test_transition_end_init(&probe);
-    mln_camera_update update = mln_camera_update_default();
+    mln_camera_update update = {
+      .size = sizeof(mln_camera_update),
+      .camera = {.size = sizeof(mln_camera_options)}
+    };
     update.mode = row->mode;
     update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
     update.camera.zoom = 3.0 + (double)index;
@@ -381,7 +387,10 @@ static void the_handler_runs_whatever_the_event_mask_selects(void) {
   mln_test_transition_end_init(&probe);
   const mln_camera_update eased = ease_to_zoom(6.0, 60000.0, &probe);
   update_camera(map, &eased);
-  mln_camera_update jump = mln_camera_update_default();
+  mln_camera_update jump = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   jump.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   jump.camera.zoom = 3.0;
   const uint64_t generation = update_camera_generation(map, &jump);
@@ -397,7 +406,10 @@ static void the_handler_runs_whatever_the_event_mask_selects(void) {
 static void cancel_transitions_commits_and_leaves_the_camera(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.camera = test_camera();
   update_camera(map, &update);
 
@@ -447,7 +459,10 @@ static void cancel_transitions_commits_and_leaves_the_camera(void) {
 static void cancel_camera_transition_ends_only_its_identity(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.camera = test_camera();
   update_camera(map, &update);
 
@@ -459,7 +474,10 @@ static void cancel_camera_transition_ends_only_its_identity(void) {
   update_camera(map, &zoom_ease);
   mln_test_transition_end pitch;
   mln_test_transition_end_init(&pitch);
-  mln_camera_update pitch_ease = mln_camera_update_default();
+  mln_camera_update pitch_ease = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   pitch_ease.mode = MLN_CAMERA_UPDATE_MODE_EASE;
   pitch_ease.camera.fields = MLN_CAMERA_OPTION_PITCH;
   pitch_ease.camera.pitch = 50.0;
@@ -470,7 +488,10 @@ static void cancel_camera_transition_ends_only_its_identity(void) {
   update_camera(map, &pitch_ease);
   mln_test_transition_end bearing;
   mln_test_transition_end_init(&bearing);
-  mln_camera_update bearing_ease = mln_camera_update_default();
+  mln_camera_update bearing_ease = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   bearing_ease.mode = MLN_CAMERA_UPDATE_MODE_EASE;
   bearing_ease.camera.fields = MLN_CAMERA_OPTION_BEARING;
   bearing_ease.camera.bearing = 90.0;
@@ -506,7 +527,10 @@ static void cancel_camera_transition_ends_only_its_identity(void) {
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&bearing.calls));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&zoom.calls));
 
-  mln_camera_update jump = mln_camera_update_default();
+  mln_camera_update jump = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   jump.camera.fields = MLN_CAMERA_OPTION_BEARING;
   jump.camera.bearing = 45.0;
   update_camera(map, &jump);
@@ -532,7 +556,10 @@ static void gesture_phase_publishes_the_snapshot_flag(void) {
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_FALSE(read_settled_snapshot(runtime, map).gesture_in_progress);
 
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.camera = test_camera();
   update.gesture_phase = MLN_GESTURE_PHASE_BEGIN;
   update_camera(map, &update);
@@ -554,7 +581,10 @@ static void gesture_phase_publishes_the_snapshot_flag(void) {
   mln_test_transition_end_init(&probe);
   const mln_camera_update eased = ease_to_zoom(3.0, 60000.0, &probe);
   update_camera(map, &eased);
-  mln_camera_update gesture = mln_camera_update_default();
+  mln_camera_update gesture = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   gesture.camera.fields = MLN_CAMERA_OPTION_BEARING;
   gesture.camera.bearing = 20.0;
   gesture.gesture_phase = MLN_GESTURE_PHASE_BEGIN;
@@ -575,11 +605,11 @@ static void gesture_phase_publishes_the_snapshot_flag(void) {
 static mln_camera_delta animated_delta(
   uint32_t fields, double duration_ms, mln_test_transition_end* probe
 ) {
-  mln_animation_options animation = mln_animation_options_default();
+  mln_animation_options animation = {};
   animation.fields = MLN_ANIMATION_OPTION_DURATION;
   animation.duration_ms = duration_ms;
   animation.end_handler = mln_test_transition_end_handler(probe);
-  mln_camera_delta delta = mln_camera_delta_default();
+  mln_camera_delta delta = {.size = sizeof(mln_camera_delta)};
   delta.fields = fields;
   delta.animation = animation;
   return delta;
@@ -629,7 +659,10 @@ static void an_animated_delta_reports_its_end_once(void) {
   apply_delta(map, &delta);
   // A jump that replaces the zoom ends one of the two transitions, and the
   // pan keeps the command running.
-  mln_camera_update jump = mln_camera_update_default();
+  mln_camera_update jump = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   jump.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   jump.camera.zoom = start.zoom;
   update_camera(map, &jump);
@@ -692,11 +725,14 @@ static void an_animated_delta_replaces_the_running_one(void) {
 static void a_delta_carries_its_gesture_phase(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.camera = test_camera();
   update_camera(map, &update);
 
-  mln_camera_delta delta = mln_camera_delta_default();
+  mln_camera_delta delta = {.size = sizeof(mln_camera_delta)};
   delta.gesture_phase = MLN_GESTURE_PHASE_BEGIN;
   apply_delta(map, &delta);
   mln_map_snapshot snapshot = read_settled_snapshot(runtime, map);
@@ -713,7 +749,7 @@ static void a_delta_carries_its_gesture_phase(void) {
 
   mln_test_transition_end probe;
   mln_test_transition_end_init(&probe);
-  delta = mln_camera_delta_default();
+  delta = (mln_camera_delta){.size = sizeof(mln_camera_delta)};
   delta.animation.end_handler = mln_test_transition_end_handler(&probe);
   delta.gesture_phase = MLN_GESTURE_PHASE_END;
   apply_delta(map, &delta);
@@ -807,7 +843,10 @@ static void submit_from_end(
 ) {
   (void)end;
   submitting_end* state = probe->context;
-  mln_camera_update jump = mln_camera_update_default();
+  mln_camera_update jump = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   jump.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   jump.camera.zoom = 9.0;
   const mln_completion discard = mln_test_discard_completion();

@@ -14,7 +14,6 @@ import org.maplibre.nativeffi.WAIT_TIMEOUT
 import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.generated.FrameDemand
 import org.maplibre.nativeffi.generated.FrameDemandFlag
-import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.NewRenderSession
 import org.maplibre.nativeffi.generated.RenderDriverKind
@@ -174,7 +173,7 @@ internal suspend fun <T> withOwnedTexture(
   driver: RenderDriverKind = RenderDriverKind.CALLER_GRAPHICS_THREAD,
   textureRingDepth: UInt = 1u,
   provider: ResourceProvider = denyingProvider(),
-  runtimeOptions: RuntimeOptions = GeneratedApi.runtimeOptionsDefault(),
+  runtimeOptions: RuntimeOptions = RuntimeOptions(),
   onFrameWake: () -> Unit = {},
   block: suspend RenderSessionFixture.() -> T,
 ): T =

@@ -49,8 +49,9 @@ static void close_map(locale_map* map) {
 // Whether the feature passes `filter`, which is false when evaluating the
 // filter fails.
 static bool selects(const locale_map* map, const char* filter) {
-  mln_source_feature_query_options query =
-    mln_source_feature_query_options_default();
+  mln_source_feature_query_options query = {
+    .size = sizeof(mln_source_feature_query_options)
+  };
   query.filter = mln_buffer_view_from_cstr(filter);
   const mln_test_feature_list list =
     mln_test_style_query_source_with(&map->fixture, "point", &query);

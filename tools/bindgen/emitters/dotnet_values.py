@@ -15,6 +15,7 @@ from ..semantic import (
     ValuePlan,
     enum_member_prefix,
     required_callbacks,
+    required_member,
 )
 
 # JSON is text, so it takes and returns a string as UTF-8 text does.
@@ -325,6 +326,12 @@ class Values:
                 f"{expression}.{member(array.value.length)}",
             )
         if plan.kind == "buffer":
+            if plan.length == "nul":
+                return (
+                    f"{expression} == null ? null : NativeCallScope.CopyCString({expression})"
+                    if plan.nullable
+                    else f"NativeCallScope.CopyCString({expression})"
+                )
             if plan.ctype.pointee:
                 if length is None:
                     raise Unsupported("counted buffer requires a count expression")
@@ -373,6 +380,12 @@ class Values:
             scope = ", scope" if self.needs_scope(plan) else ""
             return f"Native{public_name(plan.native)}({expression}{scope})"
         if plan.kind == "buffer":
+            if plan.length == "nul":
+                return (
+                    f"{expression} is null ? null : scope.CString({expression})"
+                    if plan.nullable
+                    else f"scope.CString({expression})"
+                )
             method = "Utf8" if plan.encoding in TEXT_ENCODINGS else "Buffer"
             return (
                 f"{expression} is null ? default : scope.{method}({expression})"
@@ -563,7 +576,7 @@ class Values:
         )
         if plan.union_member is not None:
             copied = values[0]
-        elif masked or any(array for array, _ in arrays.values()):
+        elif masked or self.explicit(plan):
             copied = (
                 (
                     "new() { "
@@ -672,12 +685,7 @@ class Values:
             "    {",
         ]
         lines.extend(self.required_reference_checks(plan))
-        initial = (
-            f"NativeMethods.{plan.default}()"
-            if plan.default
-            else f"new {plan.native}()"
-        )
-        lines.append(f"        var native = {initial};")
+        lines.append(f"        var native = new {plan.native}();")
         for control in plan.fields:
             if control.role == "presence_mask" or any(
                 field.presence and field.presence.mask == control.name
@@ -869,7 +877,11 @@ class Values:
             )
             encoded.append(f"{indent}}}")
             return encoded
-        if field.value.kind == "buffer" and field.value.ctype.pointee:
+        if (
+            field.value.kind == "buffer"
+            and field.value.ctype.pointee
+            and field.value.length != "nul"
+        ):
             local = "buffer" + pascal(field.name)
             method = "Utf8" if field.value.encoding in TEXT_ENCODINGS else "Buffer"
             count = next(
@@ -1039,9 +1051,57 @@ class Values:
         element = type_.removesuffix("?").removesuffix("[]")
         return f"ImmutableArray<{element}>{'?' if optional else ''}"
 
-    def array_declaration(self, plan: ValuePlan) -> str:
-        """A value with array members, which keep their elements in ValueArray
-        storage so that record synthesis compares them element by element."""
+    def zero(self, plan: ValuePlan, name: str, field: FieldPlan) -> str | None:
+        """The zero default of a member a host may omit, where the default of
+        its .NET type, such as a null string, differs from zero."""
+        type_ = self.member_type(plan, name, field)
+        if (field.presence and field.presence.mask) or type_.endswith("?"):
+            return None
+        if self.array_member(plan, name, field)[0]:
+            # Array storage reads back an empty array.
+            return None
+        if type_ == "string":
+            return '""'
+        value = field.value
+        if (
+            value.kind == "record"
+            and not value.registration
+            and value.union_member is None
+            and (self.declares_class(value) or self.zero_constructor(value))
+        ):
+            return "new()"
+        return None
+
+    def zero_constructor(self, plan: ValuePlan) -> bool:
+        """Whether an input record struct declares a parameterless constructor
+        that sets a member to its zero default."""
+        return (
+            plan.native in self.bound.inputs
+            and not self.declares_class(plan)
+            and any(
+                not required_member(field) and self.zero(plan, name, field)
+                for name, field in self.members(plan)
+            )
+        )
+
+    def explicit(self, plan: ValuePlan) -> bool:
+        """Whether a value declares its properties and constructor itself:
+        one with array members, which keep their elements in ValueArray
+        storage, or a record struct with a required member."""
+        fields = self.fields(plan)
+        if any(
+            self.public_type(field.value).removesuffix("?").endswith("[]")
+            for field in fields
+        ):
+            return True
+        return not any(
+            field.presence and field.presence.mask for field in fields
+        ) and any(required_member(field) for field in fields)
+
+    def explicit_declaration(self, plan: ValuePlan) -> str:
+        """A value that declares its properties, so that a required member is
+        `required` and an array keeps its elements in ValueArray storage, which
+        record synthesis compares element by element."""
         members = self.members(plan)
         masked = any(
             field.presence and field.presence.mask for field in self.fields(plan)
@@ -1055,6 +1115,7 @@ class Values:
                 type_ += "?"
             parameters.append(f"{type_} {member}")
             assignments.append(f"        this.{member} = {member};")
+            required = "required " if required_member(field) else ""
             if array:
                 element = type_.removesuffix("?").removeprefix("ImmutableArray<")[:-1]
                 storage = f"ValueArray<{element}>{'?' if optional else ''}"
@@ -1062,29 +1123,30 @@ class Values:
                 properties.extend(
                     [
                         self.member_doc(plan, field)
-                        + f"    public {type_} {member} {{ get => {member}Storage{'?' if optional else ''}.AsImmutable(); init => {member}Storage = {adopt}(value); }}",
+                        + f"    public {required}{type_} {member} {{ get => {member}Storage{'?' if optional else ''}.AsImmutable(); init => {member}Storage = {adopt}(value); }}",
                         f"    internal {storage} {member}Storage {{ get; init; }}",
                     ]
                 )
                 continue
-            required = (
-                "required "
-                if masked
-                and not optional
-                and (type_ == "string" or self.is_reference_type(field.value))
-                else ""
-            )
+            zero = None if required else self.zero(plan, member, field)
             properties.append(
                 self.member_doc(plan, field)
                 + f"    public {required}{type_} {member} {{ get; init; }}"
+                + (f" = {zero};" if zero else "")
             )
-        declaration = f"public {'sealed record' if masked else 'readonly record struct'} {name}\n{{\n"
+        declaration = f"public {'sealed record' if masked else 'readonly partial record struct'} {name}\n{{\n"
         if not masked:
             declaration += (
                 self.parameterless(plan)
+                + (
+                    "    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]\n"
+                    if any(required_member(field) for _, field in members)
+                    else ""
+                )
                 + f"    public {name}({', '.join(parameters)})\n    {{\n"
                 + "\n".join(assignments)
                 + "\n    }\n"
+                + self.native_members(plan)
             )
         return declaration + "\n".join(properties) + "\n}\n"
 
@@ -1196,14 +1258,18 @@ class Values:
         )
 
     def parameterless(self, plan: ValuePlan, *, primary: bool = False) -> str:
-        if not plan.default:
+        """The constructor that sets each member to its zero default, where
+        the record struct's own default leaves one null."""
+        if not self.zero_constructor(plan):
             return ""
-        initializer = (
-            " : this(" + ", ".join("default!" for _ in self.members(plan)) + ")"
-            if primary
-            else ""
+        name = public_name(plan.native)
+        if not primary:
+            return f"    public {name}() {{ }}\n\n"
+        arguments = ", ".join(
+            self.zero(plan, member, field) or "default"
+            for member, field in self.members(plan)
         )
-        return f"    public {public_name(plan.native)}(){initializer} {{ this = Default; }}\n"
+        return f"    public {name}()\n        : this({arguments}) {{ }}\n"
 
     def member_doc(self, plan: ValuePlan, field: FieldPlan) -> str:
         """The XML doc comment of a member."""
@@ -1211,35 +1277,20 @@ class Values:
 
     def value_declaration(self, plan: ValuePlan) -> str:
         fields = self.fields(plan)
-        if any(
-            self.public_type(field.value).removesuffix("?").endswith("[]")
-            for field in fields
-        ):
-            return self.array_declaration(plan)
+        if self.explicit(plan):
+            return self.explicit_declaration(plan)
         if any(field.presence and field.presence.mask for field in fields):
             properties = []
             for name, field in self.members(plan):
                 type_ = self.member_type(plan, name, field)
                 if field.presence and field.presence.mask and not type_.endswith("?"):
                     type_ += "?"
-                required = (
-                    "required "
-                    if not field.presence
-                    and (
-                        type_ in {"string", "byte[]"}
-                        or (field.value.kind == "callback" and not type_.endswith("?"))
-                        or (
-                            field.value.kind == "record"
-                            and any(
-                                member.presence for member in self.fields(field.value)
-                            )
-                        )
-                    )
-                    else ""
-                )
+                required = required_member(field)
+                zero = None if required else self.zero(plan, name, field)
                 properties.append(
                     self.member_doc(plan, field)
-                    + f"    public {required}{type_} {name} {{ get; init; }}"
+                    + f"    public {'required ' if required else ''}{type_} {name} {{ get; init; }}"
+                    + (f" = {zero};" if zero else "")
                 )
             properties.extend(
                 docs.xml_comment(self.bound.doc(flag.name), "    ")

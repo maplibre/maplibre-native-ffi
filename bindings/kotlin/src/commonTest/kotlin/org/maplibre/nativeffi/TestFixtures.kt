@@ -149,7 +149,7 @@ private constructor(val runtime: RuntimeHandle, private val events: Channel<Runt
      */
     suspend fun <T> use(
       provider: ResourceProvider = denyingProvider(),
-      options: RuntimeOptions = GeneratedApi.runtimeOptionsDefault(),
+      options: RuntimeOptions = RuntimeOptions(),
       block: suspend RuntimeFixture.() -> T,
     ): T {
       val events = Channel<RuntimeEvent>(Channel.UNLIMITED)
@@ -191,7 +191,7 @@ internal suspend fun <T> withMap(
   mapMode: MapMode = MapMode.CONTINUOUS,
   provider: ResourceProvider = denyingProvider(),
   options: MapOptions = smallMapOptions(mapMode),
-  runtimeOptions: RuntimeOptions = GeneratedApi.runtimeOptionsDefault(),
+  runtimeOptions: RuntimeOptions = RuntimeOptions(),
   block: suspend MapFixture.() -> T,
 ): T =
   RuntimeFixture.use(provider, runtimeOptions) {

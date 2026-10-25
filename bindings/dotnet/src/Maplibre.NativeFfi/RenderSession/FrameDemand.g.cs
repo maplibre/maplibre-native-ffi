@@ -17,20 +17,4 @@ namespace Maplibre.NativeFfi;
 /// Host identity returned with the terminal frame result. Any value except
 /// <c>MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE</c>, the maximum uint64_t value.
 /// </param>
-public readonly partial record struct FrameDemand(FrameDemandFlag Flags, ulong Token)
-{
-    public FrameDemand()
-        : this(default!, default!)
-    {
-        this = Default;
-    }
-
-    public static FrameDemand Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyFrameDemand(NativeMethods.mln_frame_demand_default());
-        }
-    }
-}
+public readonly partial record struct FrameDemand(FrameDemandFlag Flags, ulong Token);

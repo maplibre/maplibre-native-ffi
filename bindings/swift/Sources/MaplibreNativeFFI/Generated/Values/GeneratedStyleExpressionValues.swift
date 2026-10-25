@@ -12,14 +12,7 @@ public struct StyleExpressionInfo: Equatable, Hashable, Sendable {
   public var isFeatureConstant: Bool
   /// Whether the result is the same at every zoom.
   public var isZoomConstant: Bool
-  public static var `default`: Self {
-    Self(raw: mln_style_expression_info())
-  }
-
-  public init(
-    isFeatureConstant: Bool = StyleExpressionInfo.default.isFeatureConstant,
-    isZoomConstant: Bool = StyleExpressionInfo.default.isZoomConstant
-  ) {
+  public init(isFeatureConstant: Bool = false, isZoomConstant: Bool = false) {
     self.isFeatureConstant = isFeatureConstant
     self.isZoomConstant = isZoomConstant
   }
@@ -54,21 +47,15 @@ public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
   /// The image IDs that the image expression reports as available. The
   /// expression reports any other ID as unavailable.
   public var availableImages: [String]
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_style_expression_inputs_default))
-  }
-
   public init(
-    zoom: Double? = StyleExpressionInputs.default.zoom,
-    colorRampParameter: Double? = StyleExpressionInputs.default
-      .colorRampParameter,
-    elevation: Double? = StyleExpressionInputs.default.elevation,
-    feature: String = StyleExpressionInputs.default.feature,
-    featureState: String = StyleExpressionInputs.default.featureState,
-    globalState: String = StyleExpressionInputs.default.globalState,
-    canonicalTileId: CanonicalTileId? = StyleExpressionInputs.default
-      .canonicalTileId,
-    availableImages: [String] = StyleExpressionInputs.default.availableImages
+    zoom: Double? = nil,
+    colorRampParameter: Double? = nil,
+    elevation: Double? = nil,
+    feature: String = "",
+    featureState: String = "",
+    globalState: String = "",
+    canonicalTileId: CanonicalTileId? = nil,
+    availableImages: [String] = []
   ) {
     self.zoom = zoom
     self.colorRampParameter = colorRampParameter
@@ -114,7 +101,7 @@ public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
   func nativeValue(arena: NativeInputArena) throws
     -> mln_style_expression_inputs
   {
-    var raw = mln_style_expression_inputs_default()
+    var raw = mln_style_expression_inputs()
     raw.fields = 0
     raw.size = UInt32(MemoryLayout<mln_style_expression_inputs>.size)
     if let item = zoom {
@@ -151,13 +138,7 @@ public struct StyleExpressionOptions: Equatable, Hashable, Sendable {
   /// result to a string, as a string layer property does; every other type
   /// asserts it. Without it, the expression keeps the type it infers.
   public var expectedType: StyleExpressionType?
-  public static var `default`: Self {
-    Self(raw: nativeDefault(mln_style_expression_options_default))
-  }
-
-  public init(expectedType: StyleExpressionType? = StyleExpressionOptions
-    .default.expectedType)
-  {
+  public init(expectedType: StyleExpressionType? = nil) {
     self.expectedType = expectedType
   }
 
@@ -167,8 +148,9 @@ public struct StyleExpressionOptions: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_style_expression_options {
-    var raw = mln_style_expression_options_default()
+    var raw = mln_style_expression_options()
     raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_style_expression_options>.size)
     if let item = expectedType {
       raw.fields |= MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE.rawValue; raw
         .expected_type = item.nativeValue()
@@ -187,14 +169,10 @@ public struct StyleExpressionType: Equatable, Hashable, Sendable {
   public var itemKind: StyleExpressionTypeKind
   /// For an array, its fixed length, or zero for any length.
   public var itemCount: UInt32
-  public static var `default`: Self {
-    Self(raw: mln_style_expression_type())
-  }
-
   public init(
-    kind: StyleExpressionTypeKind = StyleExpressionType.default.kind,
-    itemKind: StyleExpressionTypeKind = StyleExpressionType.default.itemKind,
-    itemCount: UInt32 = StyleExpressionType.default.itemCount
+    kind: StyleExpressionTypeKind = .init(rawValue: 0),
+    itemKind: StyleExpressionTypeKind = .init(rawValue: 0),
+    itemCount: UInt32 = 0
   ) {
     self.kind = kind
     self.itemKind = itemKind

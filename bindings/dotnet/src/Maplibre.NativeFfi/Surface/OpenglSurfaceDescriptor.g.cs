@@ -9,37 +9,35 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_opengl_surface_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Extent">
-/// Logical surface extent. Required. A scale_factor that differs from the map's
-/// is accepted and logged as a warning.
-/// </param>
-/// <param name="Context">
-/// Borrowed OpenGL context provider data.
-/// </param>
-/// <param name="Surface">
-/// Borrowed platform surface handle: an HDC for WGL and an EGLSurface for EGL,
-/// both required. Null for WebGL, whose context carries its canvas binding.
-/// </param>
-public readonly partial record struct OpenglSurfaceDescriptor(
-    LogicalExtent Extent,
-    OpenglContextDescriptor Context,
-    NativePointer Surface
-)
+public readonly partial record struct OpenglSurfaceDescriptor
 {
-    public OpenglSurfaceDescriptor()
-        : this(default!, default!, default!)
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public OpenglSurfaceDescriptor(
+        LogicalExtent Extent,
+        OpenglContextDescriptor Context,
+        NativePointer Surface
+    )
     {
-        this = Default;
+        this.Extent = Extent;
+        this.Context = Context;
+        this.Surface = Surface;
     }
 
-    public static OpenglSurfaceDescriptor Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyOpenglSurfaceDescriptor(
-                NativeMethods.mln_opengl_surface_descriptor_default()
-            );
-        }
-    }
+    /// <summary>
+    /// Logical surface extent. Required. A scale_factor that differs from the
+    /// map's is accepted and logged as a warning.
+    /// </summary>
+    public required LogicalExtent Extent { get; init; }
+
+    /// <summary>
+    /// Borrowed OpenGL context provider data.
+    /// </summary>
+    public required OpenglContextDescriptor Context { get; init; }
+
+    /// <summary>
+    /// Borrowed platform surface handle: an HDC for WGL and an EGLSurface for
+    /// EGL, both required. Null for WebGL, whose context carries its canvas
+    /// binding.
+    /// </summary>
+    public NativePointer Surface { get; init; }
 }

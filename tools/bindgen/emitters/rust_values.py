@@ -96,8 +96,6 @@ class Values:
             wanted = {"in", "out"} if direction == "both" else {direction}
             if value.native not in self.bound.inputs:
                 wanted.discard("in")
-            if value.default:
-                wanted.add("out")
             known = self.directions.setdefault(value.native, set())
             if value.native in self.used and wanted <= known:
                 return self.public(value)

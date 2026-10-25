@@ -22,13 +22,4 @@ public sealed record CustomMvtVectorSourceOptions
     public CustomSourceCancelTileCallback? CancelTile { get; init; }
     public double? MinZoom { get; init; }
     public double? MaxZoom { get; init; }
-
-    public static CustomMvtVectorSourceOptions Default(CustomSourceFetchTileCallback fetchTile)
-    {
-        using var call = NativeCall.Enter(null);
-        return GeneratedValues.CopyCustomMvtVectorSourceOptions(
-            NativeMethods.mln_custom_mvt_vector_source_options_default(),
-            fetchTile
-        );
-    }
 }

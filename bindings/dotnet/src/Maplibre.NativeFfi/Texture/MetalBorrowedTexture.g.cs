@@ -9,7 +9,16 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_metal_borrowed_texture</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Texture">
-/// Borrowed <c>id&lt;MTLTexture&gt;</c> / <c>MTL::Texture*</c>. Required.
-/// </param>
-public readonly partial record struct MetalBorrowedTexture(NativePointer Texture);
+public readonly partial record struct MetalBorrowedTexture
+{
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public MetalBorrowedTexture(NativePointer Texture)
+    {
+        this.Texture = Texture;
+    }
+
+    /// <summary>
+    /// Borrowed <c>id&lt;MTLTexture&gt;</c> / <c>MTL::Texture*</c>. Required.
+    /// </summary>
+    public required NativePointer Texture { get; init; }
+}

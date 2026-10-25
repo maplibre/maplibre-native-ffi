@@ -153,7 +153,7 @@ func TestChildKeepsItsParentAlive(t *testing.T) {
 	// No fixture: its cleanup would keep the runtime reachable. The map's
 	// cleanup closes it if the test fails, and the collector then reclaims the
 	// runtime.
-	runtime, err := RuntimeCreate(DefaultRuntimeOptions())
+	runtime, err := RuntimeCreate(RuntimeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

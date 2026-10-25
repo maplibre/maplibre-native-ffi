@@ -50,7 +50,7 @@ static mln_render_frame_result render_frame(
 static mln_render_frame_result render_update(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = token;
   MLN_TEST_OK(
@@ -131,7 +131,7 @@ typedef struct view_row {
 // Applies a row through the map's own commands, under limits raised past the
 // map's defaults of zoom 22 and pitch 60.
 static void apply(mln_map map, const view_row* row) {
-  mln_bound_options bounds = mln_bound_options_default();
+  mln_bound_options bounds = {.size = sizeof(mln_bound_options)};
   bounds.fields =
     MLN_BOUND_OPTION_MAX_ZOOM | MLN_BOUND_OPTION_MAX_PITCH |
     (row->world_copy ? MLN_BOUND_OPTION_BOUNDS : MLN_BOUND_OPTION_UNBOUNDED);
@@ -144,7 +144,9 @@ static void apply(mln_map map, const view_row* row) {
   MLN_TEST_AWAIT_OK(
     mln_map_set_bounds(map, &bounds, &completion.descriptor, NULL)
   );
-  mln_map_viewport_options viewport = mln_map_viewport_options_default();
+  mln_map_viewport_options viewport = {
+    .size = sizeof(mln_map_viewport_options)
+  };
   viewport.fields = MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION |
                     MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;
   viewport.north_orientation = row->north_orientation;
@@ -152,7 +154,7 @@ static void apply(mln_map map, const view_row* row) {
   MLN_TEST_AWAIT_OK(
     mln_map_set_viewport_options(map, &viewport, &completion.descriptor, NULL)
   );
-  mln_projection_mode mode = mln_projection_mode_default();
+  mln_projection_mode mode = {.size = sizeof(mln_projection_mode)};
   mode.fields = MLN_PROJECTION_MODE_AXONOMETRIC | MLN_PROJECTION_MODE_X_SKEW |
                 MLN_PROJECTION_MODE_Y_SKEW;
   mode.axonometric = row->axonometric;
@@ -161,7 +163,10 @@ static void apply(mln_map map, const view_row* row) {
   MLN_TEST_AWAIT_OK(
     mln_map_set_projection_mode(map, &mode, &completion.descriptor, NULL)
   );
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM |
                          MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH |
                          MLN_CAMERA_OPTION_PADDING;
@@ -311,7 +316,7 @@ static void a_frame_view_places_coordinates_where_the_frame_drew_them(void) {
   );
 
   // An unforced demand with nothing new to draw reports no view.
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(&fixture);
@@ -332,7 +337,7 @@ static void a_frame_view_places_coordinates_where_the_frame_drew_them(void) {
       fixture.session, resized, &completion.descriptor, NULL
     )
   );
-  mln_bound_options bounds = mln_bound_options_default();
+  mln_bound_options bounds = {.size = sizeof(mln_bound_options)};
   bounds.fields = MLN_BOUND_OPTION_BOUNDS | MLN_BOUND_OPTION_MAX_ZOOM;
   bounds.bounds = (mln_lat_lng_bounds){
     .southwest = {.latitude = -60.0, .longitude = -100.0},
@@ -364,7 +369,10 @@ static void each_frame_of_a_transition_reports_its_own_view(void) {
   apply(map, &rows[0]);
   mln_test_render_until_idle(runtime, map, &fixture, NULL);
 
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.mode = MLN_CAMERA_UPDATE_MODE_EASE;
   update.camera.fields = MLN_CAMERA_OPTION_CENTER;
   update.camera.center = (mln_lat_lng){
@@ -429,7 +437,10 @@ static void a_frame_at_a_commands_render_update_draws_the_command(void) {
   };
   MLN_TEST_OK(mln_render_session_get_snapshot(fixture.session, &before, NULL));
 
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
   update.camera.center.latitude = -21.0;
   update.camera.center.longitude = 43.0;

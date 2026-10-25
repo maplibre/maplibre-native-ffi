@@ -15,14 +15,4 @@ public sealed record MapViewportOptions
     public ConstrainMode? ConstrainMode { get; init; }
     public ViewportMode? ViewportMode { get; init; }
     public EdgeInsets? FrustumOffset { get; init; }
-    public static MapViewportOptions Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyMapViewportOptions(
-                NativeMethods.mln_map_viewport_options_default()
-            );
-        }
-    }
 }

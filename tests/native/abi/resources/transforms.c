@@ -114,7 +114,7 @@ static void header_transform_with_zero_size(void* descriptor) {
 #if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
 static void header_transform_with_rules(void* descriptor) {
   static mln_http_header_rule rule;
-  rule = mln_http_header_rule_default();
+  rule = (mln_http_header_rule){.size = sizeof(mln_http_header_rule)};
   rule.url = (mln_buffer_view)MLN_BUFFER_LITERAL("http://127.0.0.1/unused");
   ((mln_http_header_transform*)descriptor)->rules = &rule;
   ((mln_http_header_transform*)descriptor)->rule_count = 1;

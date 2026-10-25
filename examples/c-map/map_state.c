@@ -6,7 +6,7 @@
 #include "util.h"
 
 static app_error create_runtime(map_state* state) {
-  mln_runtime_options options = mln_runtime_options_default();
+  mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   options.cache_path = mln_buffer_view_from_cstr(":memory:");
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status =
@@ -19,7 +19,7 @@ static app_error create_runtime(map_state* state) {
 }
 
 static app_error create_map(map_state* state, viewport initial_viewport) {
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = {.size = sizeof(mln_map_options)};
   options.initial_extent = render_target_extent(initial_viewport);
   options.map_mode = MLN_MAP_MODE_CONTINUOUS;
   options.fields |= MLN_MAP_OPTION_EVENT_MASK;
@@ -78,7 +78,7 @@ static app_error configure_map(map_state* state, bool smoke) {
     return APP_ERROR_STYLE_LOAD_FAILED;
   }
 
-  mln_camera_options camera = mln_camera_options_default();
+  mln_camera_options camera = {.size = sizeof(mln_camera_options)};
   camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM |
                   MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH;
   camera.center.latitude = 37.7749;
@@ -150,7 +150,10 @@ app_error map_state_update_camera(
   map_state* state, const mln_camera_options* camera, uint32_t mode,
   const mln_animation_options* animation, uint32_t gesture_phase
 ) {
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.mode = mode;
   update.camera = *camera;
   if (animation != NULL) {

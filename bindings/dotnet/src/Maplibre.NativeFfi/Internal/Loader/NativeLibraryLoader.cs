@@ -57,6 +57,31 @@ internal static class NativeLibraryLoader
         }
     }
 
+    /// <summary>
+    /// Resolves the library through the standard lookup order without checking its ABI version,
+    /// so that the version stays readable from a library that fails the check. The next call
+    /// through <see cref="EnsureLoaded"/> checks it.
+    /// </summary>
+    internal static void EnsureResolved()
+    {
+        lock (Gate)
+        {
+            EnsureResolverInstalledLocked();
+            if (
+                resolvedHandle == 0
+                && NativeLibrary.TryLoad(
+                    NativeMethods.LibraryName,
+                    typeof(NativeMethods).Assembly,
+                    null,
+                    out var handle
+                )
+            )
+            {
+                resolvedHandle = handle;
+            }
+        }
+    }
+
     private static nint ResolveLibrary(
         string libraryName,
         Assembly assembly,

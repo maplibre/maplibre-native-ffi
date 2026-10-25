@@ -9,7 +9,8 @@ public extension MapProjectionHandle {
   /// See `mln_map_projection_get_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func getCamera() throws -> CameraOptions {
-    var value0: mln_camera_options = mln_camera_options_default()
+    var value0 = mln_camera_options()
+    value0.size = UInt32(MemoryLayout<mln_camera_options>.size)
     return try nativeInvoke { raw, _, diagnostic in
       mln_map_projection_get_camera(
         raw,

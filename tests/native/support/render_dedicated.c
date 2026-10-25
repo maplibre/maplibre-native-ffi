@@ -166,8 +166,9 @@ bool mln_test_dedicated_egl_surface_create(
   }
   mln_test_graphics_surface_info surface = {0};
   (void)mln_test_graphics_surface_get_info(state->surface, &surface);
-  mln_opengl_surface_descriptor descriptor =
-    mln_opengl_surface_descriptor_default();
+  mln_opengl_surface_descriptor descriptor = {
+    .size = sizeof(mln_opengl_surface_descriptor)
+  };
   descriptor.extent = (mln_logical_extent){
     .width = surface.width,
     .height = surface.height,
@@ -178,8 +179,9 @@ bool mln_test_dedicated_egl_surface_create(
 
   fixture->driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
   fixture->backend_state = state;
-  mln_render_session_attach_options options =
-    mln_render_session_attach_options_default();
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
   options.driver = fixture->driver;
   mln_test_completion attach = mln_test_completion_default(0);
   const mln_status attach_status = mln_map_attach_opengl_surface(
@@ -223,16 +225,18 @@ bool mln_test_dedicated_texture_create(
   if (state == NULL) {
     return false;
   }
-  mln_opengl_owned_texture_descriptor descriptor =
-    mln_opengl_owned_texture_descriptor_default();
+  mln_opengl_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_opengl_owned_texture_descriptor)
+  };
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
   descriptor.extent.scale_factor = 1.0;
   descriptor.context = dedicated_context(state);
   fixture->driver = MLN_RENDER_DRIVER_CORE_WORKER;
   fixture->backend_state = state;
-  mln_render_session_attach_options options =
-    mln_render_session_attach_options_default();
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
   options.driver = fixture->driver;
   options.requested_texture_ring_depth = 3;
   mln_test_completion attach = mln_test_completion_default(0);

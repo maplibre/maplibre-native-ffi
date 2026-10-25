@@ -9,6 +9,7 @@ const generated = @import("generated_status.zig");
 pub const NativeStatusError = generated.NativeStatusError;
 
 pub const BindingError = NativeStatusError || error{
+    InvalidString,
     AbiVersionMismatch,
     AlreadyCompleted,
 };
@@ -90,14 +91,15 @@ pub fn callUnless(
 }
 
 /// Fails when the loaded library has another C ABI version. Every entry point
-/// that takes no handle checks this, or `requireAbiVersion`, first; every other
-/// entry point needs a handle that one of those created.
+/// that takes no handle, except the version query this reads, checks this or
+/// `requireAbiVersion` first; every other entry point needs a handle that one
+/// of those created.
 pub fn validateAbiVersion(diagnostic: ?*diagnostics.Diagnostic) Error!void {
     return validateAbiVersionValue(c.mln_c_version(), expected_c_abi_version, diagnostic);
 }
 
 /// Panics when the loaded library has another C ABI version, for an entry
-/// point with no error channel, such as a value's native default.
+/// point with no error channel, such as a call that can't fail.
 pub fn requireAbiVersion() void {
     var diagnostic: diagnostics.Diagnostic = .{};
     validateAbiVersion(&diagnostic) catch @panic(diagnostic.message());
@@ -122,6 +124,7 @@ fn validateAbiVersionValue(
 
 fn bindingMessage(err: anyerror) []const u8 {
     return switch (err) {
+        error.InvalidString => "the string contains a NUL byte",
         error.AlreadyCompleted => "the operation already completed",
         error.OutOfMemory => "out of memory",
         else => @errorName(err),
@@ -183,9 +186,9 @@ test "statuses map both ways, keep an unknown code, and carry the diagnostic" {
     try std.testing.expectEqualStrings("", diagnostic.message());
     // A failure the binding detects records its own message only once, so the
     // first recorded cause wins.
+    fail(&diagnostic, error.InvalidString);
     fail(&diagnostic, error.AlreadyCompleted);
-    fail(&diagnostic, error.OutOfMemory);
-    try std.testing.expectEqualStrings("the operation already completed", diagnostic.message());
+    try std.testing.expectEqualStrings("the string contains a NUL byte", diagnostic.message());
 }
 
 test "ABI version validation reports mismatch diagnostics" {

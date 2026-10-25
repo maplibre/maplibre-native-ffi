@@ -220,10 +220,8 @@ impl Graphics {
                         context: OpenglContextDescriptor {
                             ownership: OpenglContextOwnership::Shared,
                             data: OpenglContextDescriptorData::Egl(EglContextDescriptor {
-                                display: context.egl_display,
-                                config: context.egl_config,
                                 share_context: context.egl_context,
-                                ..Default::default()
+                                ..EglContextDescriptor::new(context.egl_display, context.egl_config)
                             }),
                         },
                     },

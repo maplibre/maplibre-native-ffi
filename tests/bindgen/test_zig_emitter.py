@@ -66,6 +66,26 @@ class ZigEmitterTests(unittest.TestCase):
         self.assertNotIn("pub const ReadingBatch ", source)
         self.assertNotIn("ReadingView", source)
 
+    def test_a_required_member_has_no_default_initializer(self):
+        source = zig.generate(real_api())["maplibre_native_ffi.zig"]
+        self.assertIn(
+            '    @"initial_extent": LogicalExtent,\n'
+            '    @"map_mode": MapMode = .@"continuous",\n',
+            source,
+        )
+        # A member record with a required member has no `.{}` either.
+        self.assertIn('    @"context": VulkanContextDescriptor,\n', source)
+        self.assertNotIn("Default(", source)
+
+    def test_the_c_version_checks_no_abi_version(self):
+        source = zig.generate(real_api())["maplibre_native_ffi.zig"]
+        self.assertIn("cVersion() u32 {\n    return c.mln_c_version();\n}", source)
+        self.assertIn(
+            "supportedRenderBackendMask() RenderBackendFlag {\n"
+            "    status.requireAbiVersion();",
+            source,
+        )
+
     def test_a_callback_receives_its_slice_argument_as_a_slice(self):
         source = zig.generate(real_api())["maplibre_native_ffi.zig"]
         self.assertIn(
@@ -162,7 +182,6 @@ void mln_query_release(mln_query query);
                 "values",
                 "keywords",
                 "defaults",
-                "default_registration",
                 "absent_handle",
                 "absent_value",
                 "owned_argument",

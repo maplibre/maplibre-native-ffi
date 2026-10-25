@@ -97,9 +97,7 @@ func awaitFailure[T any](t *testing.T, future *Future[T]) *Error {
 // testMapOptions returns map options with every required member set: a 256
 // by 256 initial extent at scale factor 1.
 func testMapOptions() MapOptions {
-	options := DefaultMapOptions()
-	options.InitialExtent = LogicalExtent{Width: 256, Height: 256, ScaleFactor: 1}
-	return options
+	return MapOptions{InitialExtent: LogicalExtent{Width: 256, Height: 256, ScaleFactor: 1}}
 }
 
 type fixture struct {
@@ -134,9 +132,7 @@ func newFixtureWith(t *testing.T, options MapOptions) *fixture {
 func newRuntimeFixture(t *testing.T) *fixture {
 	t.Helper()
 	f := &fixture{pendingEvents: make(chan RuntimeEvent, 4096)}
-	options := DefaultRuntimeOptions()
-	options.CachePath = ":memory:"
-	runtime, err := RuntimeCreate(options)
+	runtime, err := RuntimeCreate(RuntimeOptions{CachePath: ":memory:"})
 	if err != nil {
 		t.Fatalf("RuntimeCreate: %v", err)
 	}

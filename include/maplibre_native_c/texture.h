@@ -450,62 +450,6 @@ typedef struct mln_texture_readback_result {
 } mln_texture_readback_result;
 
 /**
- * Returns a zeroed Metal owned-texture descriptor with size set
- * for this C API version. The caller still sets every required member.
- */
-MLN_API mln_metal_owned_texture_descriptor
-mln_metal_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
-
-/**
- * Returns a zeroed Metal borrowed-texture descriptor with size set
- * for this C API version. The caller still sets every required member.
- */
-MLN_API mln_metal_borrowed_texture_descriptor
-mln_metal_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
-
-/**
- * Returns a zeroed Vulkan owned-texture descriptor with size set
- * for this C API version. The caller still sets every required member.
- */
-MLN_API mln_vulkan_owned_texture_descriptor
-mln_vulkan_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
-
-/**
- * Returns a zeroed Vulkan borrowed-texture descriptor with size set
- * for this C API version. The caller still sets every required member.
- */
-MLN_API mln_vulkan_borrowed_texture_descriptor
-mln_vulkan_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
-
-/**
- * Returns a zeroed OpenGL owned-texture descriptor with size set
- * for this C API version. The caller still sets every required member.
- */
-MLN_API mln_opengl_owned_texture_descriptor
-mln_opengl_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
-
-/**
- * Returns a zeroed OpenGL borrowed-texture descriptor with size set
- * for this C API version. The caller still sets every required member.
- */
-MLN_API mln_opengl_borrowed_texture_descriptor
-mln_opengl_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
-
-/**
- * Returns a zeroed WebGPU owned-texture descriptor with size set
- * for this C API version. The caller still sets every required member.
- */
-MLN_API mln_webgpu_owned_texture_descriptor
-mln_webgpu_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
-
-/**
- * Returns a zeroed WebGPU borrowed-texture descriptor with size set
- * for this C API version. The caller still sets every required member.
- */
-MLN_API mln_webgpu_borrowed_texture_descriptor
-mln_webgpu_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
-
-/**
  * Starts attachment of a session-owned Metal texture ring.
  *
  * The common options select driver placement and requested ring depth. The

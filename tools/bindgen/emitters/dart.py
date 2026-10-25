@@ -13,17 +13,14 @@ from tools.bindgen.model import Api
 from tools.bindgen.names import camel, pascal, type_name
 from tools.bindgen.semantic import (
     BoundApi,
-    DefaultSupport,
     OperationPlan,
     output_member,
-    required_callbacks,
 )
 
 from .dart_values import (
     Unsupported,
     Values,
     doc,
-    identifier,
     owner_names,
 )
 
@@ -147,7 +144,7 @@ def lower_function(
         if p.value.kind == "array"
         or p.value.kind == "buffer"
         and p.value.buffer_form != "view"
-        and p.value.length not in {None, "1"}
+        and p.value.length not in {None, "1", "nul"}
     }
     # Caller-sized text passes its storage, capacity, and length to a closure
     # that the runtime calls again when the text did not fit.
@@ -218,15 +215,12 @@ def lower_function(
                 setup.append(
                     f"final {local} = arena<{values.ffi(element)}>({source}.isEmpty ? 1 : {count});"
                 )
-                if element.kind == "record":
-                    if element.default:
-                        setup.append(
-                            f"for (var index = 0; index < {count}; index++) {{ {local}[index] = raw.{element.default}(); }}"
-                        )
-                    elif any(f.role == "size" for f in element.fields):
-                        setup.append(
-                            f"for (var index = 0; index < {count}; index++) {{ {local}[index].size = sizeOf<{values.ffi(element)}>(); }}"
-                        )
+                if element.kind == "record" and any(
+                    f.role == "size" for f in element.fields
+                ):
+                    setup.append(
+                        f"for (var index = 0; index < {count}; index++) {{ {local}[index].size = sizeOf<{values.ffi(element)}>(); }}"
+                    )
                 args.append(local)
                 returns.append(
                     (values.public(output), values.copy(output, local, count))
@@ -260,11 +254,8 @@ def lower_function(
                 continue
             values.check(output)
             setup.append(f"final {local} = arena<{values.ffi(output)}>();")
-            if output.kind == "record":
-                if output.default:
-                    setup.append(f"{local}.ref = raw.{output.default}();")
-                elif any(f.role == "size" for f in output.fields):
-                    setup.append(f"{local}.ref.size = sizeOf<{values.ffi(output)}>();")
+            if output.kind == "record" and any(f.role == "size" for f in output.fields):
+                setup.append(f"{local}.ref.size = sizeOf<{values.ffi(output)}>();")
             args.append(local + ".cast()" if output.kind == "native_pointer" else local)
             expression = f"{local}." + (
                 "ref"
@@ -296,7 +287,7 @@ def lower_function(
         if (
             value.kind == "buffer"
             and value.buffer_form != "view"
-            and value.length not in {None, "1"}
+            and value.length not in {None, "1", "nul"}
         ):
             view = (
                 f"nativeStringView({local}, arena).value"
@@ -374,13 +365,6 @@ def lower_function(
     if not plan.completion:
         if not status_return and plan.result:
             values.check(plan.result)
-            if isinstance(plan.support, DefaultSupport):
-                # The native default holds no callbacks, so its caller passes
-                # the required ones, which the copy then names.
-                signature.extend(
-                    f"{values.public(f.value)} {identifier(f.name)}"
-                    for f in required_callbacks(plan.result)
-                )
             returns.insert(
                 0,
                 (values.public(plan.result), values.copy(plan.result, "nativeResult")),
@@ -571,7 +555,9 @@ def lower(api: Api | BoundApi):
             # Failed attempts cannot leave unrenderable value fragments behind.
             local_values = Values(bound)
             owner, body = lower_function(plan, local_values)
-            if owner == "Globals":
+            # The ABI version check reads the C version, so reading it skips
+            # the check.
+            if owner == "Globals" and plan.name != "mln_c_version":
                 body = abi_checked(body)
             body = doc(bound, plan.name, "  ") + body
             local_values.render()

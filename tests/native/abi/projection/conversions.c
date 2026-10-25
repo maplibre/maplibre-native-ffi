@@ -30,7 +30,10 @@ static void conversions_agree_singly_and_in_batches_and_invert(void) {
   options.initial_extent.width = 200;
   options.initial_extent.height = 100;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
   update.camera.center.latitude = 0.0;
   update.camera.center.longitude = 0.0;

@@ -2,7 +2,6 @@
 
 import type {
   AmbientCacheOperation,
-  AnimationOptions,
   BoundOptions,
   CameraDelta,
   CameraFitOptions,
@@ -16,7 +15,6 @@ import type {
   FreeCameraOptions,
   GeojsonSourceOptions,
   GpuSync,
-  HttpHeaderRule,
   HttpHeaderTransform,
   LatLng,
   LatLngBounds,
@@ -55,7 +53,6 @@ import type {
   ResourceProvider,
   ResourceRequestCancelHandler,
   ResourceResponse,
-  ResourceRoute,
   ResourceTransform,
   RuntimeEventFlag,
   RuntimeEventHandler,
@@ -86,23 +83,7 @@ export interface NativeOperations {
     token: object | undefined,
     consumerCompletion: GpuSync | undefined,
   ): void;
-  mln_animation_options_default(): AnimationOptions;
-  mln_bound_options_default(): BoundOptions;
   mln_c_version(): number;
-  mln_camera_delta_default(): CameraDelta;
-  mln_camera_fit_options_default(): CameraFitOptions;
-  mln_camera_options_default(): CameraOptions;
-  mln_camera_update_default(): CameraUpdate;
-  mln_custom_geometry_source_options_default(): Omit<
-    CustomGeometrySourceOptions,
-    "fetchTile"
-  >;
-  mln_custom_mvt_vector_source_options_default(): Omit<
-    CustomMvtVectorSourceOptions,
-    "fetchTile"
-  >;
-  mln_frame_demand_default(): FrameDemand;
-  mln_free_camera_options_default(): FreeCameraOptions;
   mln_geojson_source_data_create(
     data: unknown,
     options: GeojsonSourceOptions | undefined,
@@ -111,14 +92,10 @@ export interface NativeOperations {
     data: bigint,
     token: object | undefined,
   ): void;
-  mln_geojson_source_options_default(): GeojsonSourceOptions;
-  mln_gpu_sync_default(): GpuSync;
-  mln_http_header_rule_default(): HttpHeaderRule;
   mln_lat_lng_for_projected_meters(meters: ProjectedMeters | undefined): LatLng;
   mln_log_clear_callback(): void;
   mln_log_set_async_severity_mask(mask: LogSeverityFlag): void;
   mln_log_set_callback(handler: LogHandler): void;
-  mln_logical_extent_default(): LogicalExtent;
   mln_logical_extent_physical_size(extent: LogicalExtent | undefined): {
     readonly width: number;
     readonly height: number;
@@ -152,7 +129,7 @@ export interface NativeOperations {
     map: bigint,
     sourceId: string,
     coordinates: readonly LatLng[],
-    image: PremultipliedRgba8Image | undefined,
+    image: PremultipliedRgba8Image,
     completion: number | undefined,
   ): void;
   mln_map_add_image_source_url(
@@ -181,56 +158,56 @@ export interface NativeOperations {
   ): void;
   mln_map_attach_metal_borrowed_texture(
     map: bigint,
-    descriptor: MetalBorrowedTextureDescriptor | undefined,
-    options: RenderSessionAttachOptions | undefined,
+    descriptor: MetalBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions,
     completion: number,
   ): bigint;
   mln_map_attach_metal_owned_texture(
     map: bigint,
-    descriptor: MetalOwnedTextureDescriptor | undefined,
-    options: RenderSessionAttachOptions | undefined,
+    descriptor: MetalOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions,
     completion: number,
   ): bigint;
   mln_map_attach_metal_surface(
     map: bigint,
-    descriptor: MetalSurfaceDescriptor | undefined,
-    options: RenderSessionAttachOptions | undefined,
+    descriptor: MetalSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
     completion: number,
   ): bigint;
   mln_map_attach_opengl_borrowed_texture(
     map: bigint,
-    descriptor: OpenglBorrowedTextureDescriptor | undefined,
-    options: RenderSessionAttachOptions | undefined,
+    descriptor: OpenglBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions,
     completion: number,
   ): bigint;
   mln_map_attach_opengl_owned_texture(
     map: bigint,
-    descriptor: OpenglOwnedTextureDescriptor | undefined,
-    options: RenderSessionAttachOptions | undefined,
+    descriptor: OpenglOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions,
     completion: number,
   ): bigint;
   mln_map_attach_opengl_surface(
     map: bigint,
-    descriptor: OpenglSurfaceDescriptor | undefined,
-    options: RenderSessionAttachOptions | undefined,
+    descriptor: OpenglSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
     completion: number,
   ): bigint;
   mln_map_attach_vulkan_borrowed_texture(
     map: bigint,
-    descriptor: VulkanBorrowedTextureDescriptor | undefined,
-    options: RenderSessionAttachOptions | undefined,
+    descriptor: VulkanBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions,
     completion: number,
   ): bigint;
   mln_map_attach_vulkan_owned_texture(
     map: bigint,
-    descriptor: VulkanOwnedTextureDescriptor | undefined,
-    options: RenderSessionAttachOptions | undefined,
+    descriptor: VulkanOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions,
     completion: number,
   ): bigint;
   mln_map_attach_vulkan_surface(
     map: bigint,
-    descriptor: VulkanSurfaceDescriptor | undefined,
-    options: RenderSessionAttachOptions | undefined,
+    descriptor: VulkanSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
     completion: number,
   ): bigint;
   mln_map_begin_command_group(
@@ -347,7 +324,6 @@ export interface NativeOperations {
     beforeLayerId: string,
     completion: number | undefined,
   ): void;
-  mln_map_options_default(): MapOptions;
   mln_map_projection_create(view: MapView | undefined): bigint;
   mln_map_projection_get_camera(projection: bigint): CameraOptions;
   mln_map_projection_lat_lng_for_pixel(
@@ -505,7 +481,7 @@ export interface NativeOperations {
   mln_map_set_image_source_image(
     map: bigint,
     sourceId: string,
-    image: PremultipliedRgba8Image | undefined,
+    image: PremultipliedRgba8Image,
     completion: number | undefined,
   ): void;
   mln_map_set_image_source_url(
@@ -527,7 +503,7 @@ export interface NativeOperations {
   mln_map_set_style_image(
     map: bigint,
     imageId: string,
-    image: PremultipliedRgba8Image | undefined,
+    image: PremultipliedRgba8Image,
     options: StyleImageOptions | undefined,
     completion: number | undefined,
   ): void;
@@ -580,31 +556,20 @@ export interface NativeOperations {
     options: MapViewportOptions | undefined,
     completion: number | undefined,
   ): void;
-  mln_map_tile_options_default(): MapTileOptions;
   mln_map_update_camera(
     map: bigint,
     update: CameraUpdate | undefined,
     completion: number | undefined,
   ): void;
-  mln_map_viewport_options_default(): MapViewportOptions;
-  mln_metal_borrowed_texture_descriptor_default(): MetalBorrowedTextureDescriptor;
-  mln_metal_owned_texture_descriptor_default(): MetalOwnedTextureDescriptor;
-  mln_metal_surface_descriptor_default(): MetalSurfaceDescriptor;
   mln_network_get_status(): NetworkStatus;
   mln_network_set_status(status: NetworkStatus): void;
-  mln_opengl_borrowed_texture_descriptor_default(): OpenglBorrowedTextureDescriptor;
-  mln_opengl_owned_texture_descriptor_default(): OpenglOwnedTextureDescriptor;
   mln_opengl_supported_context_provider_mask(): OpenglContextProviderFlag;
-  mln_opengl_surface_descriptor_default(): OpenglSurfaceDescriptor;
   mln_plugin_get_register_function_v1(): bigint;
-  mln_premultiplied_rgba8_image_default(): PremultipliedRgba8Image;
   mln_projected_meters_for_lat_lng(
     coordinate: LatLng | undefined,
   ): ProjectedMeters;
-  mln_projection_mode_default(): ProjectionMode;
   mln_render_session_abandon(session: bigint): RenderAbandonResult;
   mln_render_session_acquire_frame(session: bigint): bigint | undefined;
-  mln_render_session_attach_options_default(): RenderSessionAttachOptions;
   mln_render_session_barrier(session: bigint, completion: number): void;
   mln_render_session_clear_data(session: bigint, completion: number): void;
   mln_render_session_detach(session: bigint, completion: number): void;
@@ -659,39 +624,38 @@ export interface NativeOperations {
   mln_render_session_service_driver_work(session: bigint): void;
   mln_render_session_set_metal_borrowed_texture_target(
     session: bigint,
-    descriptor: MetalBorrowedTextureDescriptor | undefined,
+    descriptor: MetalBorrowedTextureDescriptor,
     completion: number,
   ): void;
   mln_render_session_set_metal_surface_target(
     session: bigint,
-    descriptor: MetalSurfaceDescriptor | undefined,
+    descriptor: MetalSurfaceDescriptor,
     completion: number,
   ): void;
   mln_render_session_set_opengl_borrowed_texture_target(
     session: bigint,
-    descriptor: OpenglBorrowedTextureDescriptor | undefined,
+    descriptor: OpenglBorrowedTextureDescriptor,
     completion: number,
   ): void;
   mln_render_session_set_opengl_surface_target(
     session: bigint,
-    descriptor: OpenglSurfaceDescriptor | undefined,
+    descriptor: OpenglSurfaceDescriptor,
     completion: number,
   ): void;
   mln_render_session_set_vulkan_borrowed_texture_target(
     session: bigint,
-    descriptor: VulkanBorrowedTextureDescriptor | undefined,
+    descriptor: VulkanBorrowedTextureDescriptor,
     completion: number,
   ): void;
   mln_render_session_set_vulkan_surface_target(
     session: bigint,
-    descriptor: VulkanSurfaceDescriptor | undefined,
+    descriptor: VulkanSurfaceDescriptor,
     completion: number,
   ): void;
-  mln_rendered_feature_query_options_default(): RenderedFeatureQueryOptions;
   mln_resource_request_complete(
     handle: bigint,
     token: object | undefined,
-    response: ResourceResponse,
+    response: ResourceResponse | undefined,
   ): void;
   mln_resource_request_is_cancelled(handle: bigint): boolean;
   mln_resource_request_pass_through(
@@ -703,7 +667,6 @@ export interface NativeOperations {
     handle: bigint,
     handler: ResourceRequestCancelHandler,
   ): boolean;
-  mln_resource_route_default(): ResourceRoute;
   mln_resource_transform_request_complete(
     request: bigint,
     token: object | undefined,
@@ -732,7 +695,7 @@ export interface NativeOperations {
   mln_runtime_create(options: RuntimeOptions | undefined): bigint;
   mln_runtime_create_map(
     runtime: bigint,
-    options: MapOptions | undefined,
+    options: MapOptions,
     completion: number,
   ): bigint;
   mln_runtime_create_offline_region(
@@ -769,7 +732,6 @@ export interface NativeOperations {
     sideDatabasePath: string,
     completion: number,
   ): void;
-  mln_runtime_options_default(): RuntimeOptions;
   mln_runtime_release(
     runtime: bigint,
     token: object | undefined,
@@ -824,7 +786,6 @@ export interface NativeOperations {
     metadata: Uint8Array,
     completion: number,
   ): void;
-  mln_source_feature_query_options_default(): SourceFeatureQueryOptions;
   mln_style_expression_create(
     expression: unknown,
     options: StyleExpressionOptions | undefined,
@@ -834,18 +795,11 @@ export interface NativeOperations {
     inputs: StyleExpressionInputs | undefined,
   ): unknown;
   mln_style_expression_get_info(expression: bigint): StyleExpressionInfo;
-  mln_style_expression_inputs_default(): StyleExpressionInputs;
-  mln_style_expression_options_default(): StyleExpressionOptions;
   mln_style_expression_release(
     expression: bigint,
     token: object | undefined,
   ): void;
-  mln_style_image_options_default(): StyleImageOptions;
-  mln_style_transition_options_default(): StyleTransitionOptions;
   mln_supported_render_backend_mask(): RenderBackendFlag;
-  mln_vulkan_borrowed_texture_descriptor_default(): VulkanBorrowedTextureDescriptor;
-  mln_vulkan_owned_texture_descriptor_default(): VulkanOwnedTextureDescriptor;
-  mln_vulkan_surface_descriptor_default(): VulkanSurfaceDescriptor;
   mln_acquired_frame_view_begin(handle: bigint): bigint;
   mln_acquired_frame_view_end(scope: bigint): void;
 }

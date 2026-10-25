@@ -9,7 +9,7 @@ from typing import NoReturn
 
 from .. import async_hosts, docs
 from ..model import ModelError
-from ..semantic import BoundApi, ValuePlan, enum_member_prefix
+from ..semantic import BoundApi, ValuePlan, enum_member_prefix, required_member
 
 SCALARS = {
     "bool": "bool",
@@ -102,7 +102,9 @@ class Values:
         self.records: dict[str, ValuePlan] = {}
         self.inputs: dict[str, ValuePlan] = {}
         self.outputs: set[str] = set()
-        self.defaults: set[str] = set()
+        # The records that an operation lets its caller omit, which convert
+        # None to their zero value.
+        self.omittable: set[str] = set()
         self.disposed: set[str] = set()
         self.enums: dict[str, ValuePlan] = {}
 
@@ -275,19 +277,23 @@ class Values:
             return f"generated_value(py, {expr})?"
         if plan.kind == "buffer":
             if plan.ctype.pointee:
-                if not plan.length:
-                    self.fail(plan, "pointer buffer needs an explicit copied length")
-                count = (
-                    plan.length
-                    if plan.length.isdigit()
-                    else f"{scope}.{rust_field(plan.length)}"
-                )
-                view = f"generated_view({expr}, {count})?"
-                return self.copy(
-                    replace(plan, ctype=replace(plan.ctype, pointee=None)),
-                    view,
-                    scope=scope,
-                )
+                if plan.length != "nul":
+                    if not plan.length:
+                        self.fail(
+                            plan, "pointer buffer needs an explicit copied length"
+                        )
+                    count = (
+                        plan.length
+                        if plan.length.isdigit()
+                        else f"{scope}.{rust_field(plan.length)}"
+                    )
+                    view = f"generated_view({expr}, {count})?"
+                    return self.copy(
+                        replace(plan, ctype=replace(plan.ctype, pointee=None)),
+                        view,
+                        scope=scope,
+                    )
+                return f"unsafe {{ generated_c_string(py, {expr}, {str(optional(plan)).lower()}) }}?"
             argument = (
                 expr[1:-1] if expr.startswith("(*") and expr.endswith(")") else expr
             )
@@ -403,6 +409,8 @@ class Values:
                 self.fail(plan, "JSON requires a view")
             return f"storage.json({expr}, {str(member).lower()})?"
         if plan.kind == "buffer":
+            if plan.length == "nul":
+                self.fail(plan, "terminated text needs a view")
             converted = (
                 f"storage.buffer({expr}, {str(plan.encoding == 'utf8').lower()})?"
             )
@@ -429,19 +437,7 @@ class Values:
 
     def input_lines(self, plan):
         name = plan.native
-        init = (
-            f"unsafe {{ sys::{plan.default}() }}"
-            if plan.default
-            else "unsafe { std::mem::zeroed() }"
-        )
-        lines = [f"let mut raw: sys::{name} = {init};"]
-        if plan.default:
-            lines.insert(
-                0,
-                "if value.is_none() { return Ok(unsafe { sys::"
-                + plan.default
-                + "() }); }",
-            )
+        lines = [f"let mut raw: sys::{name} = unsafe {{ std::mem::zeroed() }};"]
         for field in plan.fields:
             if field.role == "size":
                 lines.append(
@@ -451,6 +447,8 @@ class Values:
                 lines.append(
                     f"raw.{rust_field(field.name)} = {'false' if field.value.ctype.canonical in {'bool', '_Bool'} else '0'};"
                 )
+        if name in self.omittable:
+            lines.append("if value.is_none() { return Ok(raw); }")
         for member, value, field in self.members(plan):
             # A record of only a union is presented as the selected variant.
             lines.append(
@@ -588,6 +586,37 @@ class Values:
         )
         return rust, python
 
+    def zero(self, plan: ValuePlan, *, input: bool) -> str:
+        """The default of a member that a host may omit: its zero value."""
+        if optional(plan) or plan.kind == "buffer" and plan.encoding == "json":
+            return " = None"
+        if plan.kind == "scalar":
+            return {"bool": " = False", "float": " = 0.0"}.get(self.type(plan), " = 0")
+        if plan.kind == "native_pointer":
+            return " = 0"
+        if plan.kind == "enum":
+            zero = next((key for key, value in plan.enum_values if value == 0), None)
+            if zero is None:
+                # A set of flags with none of them set.
+                return (
+                    f" = field(default_factory=lambda: {public_name(plan.native)}(0))"
+                )
+            prefix = enum_member_prefix(
+                (key for key, _ in plan.enum_values), plan.native
+            )
+            return f" = {public_name(plan.native)}.{zero.removeprefix(prefix)}"
+        if plan.kind == "buffer":
+            return ' = b""' if plan.encoding == "bytes" else ' = ""'
+        if plan.kind == "array":
+            return " = ()"
+        if plan.kind == "union" and plan.empty_variant:
+            return " = None"
+        if plan.kind == "record":
+            # The lambda defers the name, whose class may come later in the
+            # module.
+            return f" = field(default_factory=lambda: {public_name(plan.native)}())"
+        self.fail(plan, "missing zero value")
+
     def record_sources(
         self,
         plan,
@@ -601,8 +630,8 @@ class Values:
         """The Rust copy and the Python class of one record.
 
         A record that native never returns, `copied=False`, has neither copy.
-        A copy holds no callbacks, so the copy and the default of a
-        registration take its `required` callbacks.
+        A copy holds no callbacks, so the copy of a registration takes its
+        `required` callbacks.
         """
         name = plan.native
         if plan.union_member:
@@ -626,27 +655,11 @@ class Values:
                 normalized.append((member, "_sequence"))
             elif input and value.kind == "buffer" and value.encoding == "bytes":
                 normalized.append((member, "_bytes"))
-            if (
-                plan.default
-                and not registration
-                and not optional(value)
-                and not field.presence
-            ):
-                default = f" = field(default_factory=lambda: {public_name(name)}.default().{member})"
-            elif optional(value):
-                default = " = None"
-            elif registration and value.kind == "array":
-                # A registration's routes or rules default to none.
-                default = " = ()"
-            elif value.registration:
-                # A registration without presence defaults to a disabled one,
-                # which is what the record's native default holds. The lambda
-                # defers the name, whose class may come later in the module.
-                default = (
-                    f" = field(default_factory=lambda: {public_name(value.native)}())"
-                )
-            else:
-                default = ""
+            default = (
+                self.zero(value, input=input)
+                if (input or registration) and not required_member(field)
+                else ""
+            )
             fields.append(
                 f"    {member}: {public_type}{default}\n"
                 + docs.docstring(self.api.doc(f"{name}.{field.name}"), "    ")
@@ -685,10 +698,6 @@ class Values:
                 + ")\n"
             )
         python[-1] += extra_methods
-        if name in self.defaults:
-            python[-1] += (
-                f"\n    @classmethod\n    def default(cls{taken}):\n        from . import _native\n        return cls._from_native(_native._default_{name.removeprefix('mln_')}(){taken})\n"
-            )
         if not copied or name not in self.outputs:
             return "", "\n".join(python)
         rust.append(

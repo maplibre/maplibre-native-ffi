@@ -7,7 +7,6 @@ import kotlin.test.assertEquals
 import org.maplibre.nativeffi.NETWORK_URLS
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.denyingProvider
-import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.RuntimeEventSourceType
 import org.maplibre.nativeffi.generated.RuntimeEventType
@@ -125,7 +124,7 @@ class AndroidAssetStyleTest {
   }
 
   private fun runtimeOptions(assetPath: String): RuntimeOptions =
-    GeneratedApi.runtimeOptionsDefault().copy(assetPath = assetPath)
+    RuntimeOptions(assetPath = assetPath)
 }
 
 /** Denies network requests, and leaves asset and file URLs to the platform file sources. */

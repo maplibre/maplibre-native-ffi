@@ -400,7 +400,10 @@ static void submit_camera(
   mln_map map, uint32_t mode, double zoom, uint32_t animation_fields,
   double duration_ms
 ) {
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.mode = mode;
   update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   update.camera.zoom = zoom;
@@ -474,7 +477,7 @@ static void camera_events_carry_their_change_mode(void) {
 static void render_one_frame(
   const mln_test_render_fixture* fixture, mln_runtime runtime, event_log* log
 ) {
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
   );

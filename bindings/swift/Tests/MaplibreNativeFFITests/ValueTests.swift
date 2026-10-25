@@ -3,12 +3,14 @@ import MaplibreNativeC
 @testable import MaplibreNativeFFI
 import Testing
 
-/// Host strings cross as counted views, which decode with an embedded NUL,
-/// and native validates URLs before a C-string consumer reads them.
+/// Host strings cross as counted views, and native validates URLs before a
+/// C-string consumer reads them. Native-lent strings decode as C strings.
 @Test func hostStringsUseViewsAndNativeLentStringsDecode() async throws {
   let arena = NativeInputArena()
   let view = arena.view("é\0")
   #expect(try NativeString.copyUTF8(data: view.data, size: view.size) == "é\0")
+  #expect(try NativeString
+    .copyCString(arena.cString("native-lent")) == "native-lent")
 
   try await withMapFixture { fixture in
     let error = await expectMaplibreError(.invalidArgument) {
@@ -36,7 +38,7 @@ import Testing
     MLN_CAMERA_FIT_OPTION_BEARING.rawValue)
   #expect(CameraFitOptions().nativeValue().fields == 0)
 
-  var raw = mln_camera_options_default()
+  var raw = mln_camera_options()
   raw.fields = MLN_CAMERA_OPTION_ZOOM.rawValue
   raw.zoom = 5
   raw.bearing = 90
@@ -113,12 +115,6 @@ import Testing
   #expect(empty.data != nil)
   #expect(empty.size == 0)
   withExtendedLifetime(arena) {}
-}
-
-/// Each initializer parameter defaults to the native default's field, so the
-/// record it builds matches what the native default function returns.
-@Test func aRecordBuiltFromItsInitializerDefaultsEqualsTheNativeDefault() {
-  #expect(MapOptions() == MapOptions.default)
 }
 
 @Test func synchronousCallsFillCallerSizedOutputsInInputOrder() async throws {

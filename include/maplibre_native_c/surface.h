@@ -89,34 +89,6 @@ typedef struct mln_opengl_surface_descriptor {
 } mln_opengl_surface_descriptor;
 
 /**
- * Returns a zeroed Metal surface descriptor with size set for this C
- * API version. The caller still sets every required member.
- */
-MLN_API mln_metal_surface_descriptor
-mln_metal_surface_descriptor_default(void) MLN_NOEXCEPT;
-
-/**
- * Returns a zeroed Vulkan surface descriptor with size set for this C
- * API version. The caller still sets every required member.
- */
-MLN_API mln_vulkan_surface_descriptor
-mln_vulkan_surface_descriptor_default(void) MLN_NOEXCEPT;
-
-/**
- * Returns a zeroed OpenGL surface descriptor with size set for this C
- * API version. The caller still sets every required member.
- */
-MLN_API mln_opengl_surface_descriptor
-mln_opengl_surface_descriptor_default(void) MLN_NOEXCEPT;
-
-/**
- * Returns a zeroed WebGPU surface descriptor with size set for this C
- * API version. The caller still sets every required member.
- */
-MLN_API mln_webgpu_surface_descriptor
-mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
-
-/**
  * Starts attachment of a Metal surface target.
  *
  * The descriptor and options are copied before return. An accepted attachment

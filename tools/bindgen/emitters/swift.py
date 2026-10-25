@@ -12,10 +12,8 @@ from tools.bindgen.model import Api, CType, Function, ModelError, Record
 from tools.bindgen.names import camel
 from tools.bindgen.semantic import (
     BoundApi,
-    DefaultSupport,
     OperationPlan,
     output_member,
-    required_callbacks,
 )
 
 # The condition that selects each platform the package builds for.
@@ -163,6 +161,7 @@ def operation(
         if (value := input_plans.get(param.name))
         and value.kind in {"array", "buffer"}
         and value.length
+        and value.length != "nul"
         and not value.length.isdigit()
     }
     # Caller-sized text passes its storage, capacity, and length to a closure
@@ -273,23 +272,6 @@ def operation(
     target = ""
     if plan.scoped_receiver:
         target = "owner: self"
-    required = (
-        required_callbacks(plan.result)
-        if isinstance(plan.support, DefaultSupport) and plan.result
-        else ()
-    )
-    if required:
-        from .swift_callbacks import alias
-
-        # The native default holds no callbacks, so its caller passes the
-        # required ones.
-        declarations = [
-            *declarations,
-            *(
-                f"{identifier(camel(f.name))}: @escaping {alias(value_types.bound.callbacks[f.value.native])}"
-                for f in required
-            ),
-        ]
     signature = f"{modifier}func {method}({', '.join(declarations)})"
     if discard:
         call = native_call(
@@ -427,21 +409,24 @@ def operation(
                 )
             if receiver:
                 raise unsupported(function, "a returned value needs a global call")
+            if plan.inputs or "try " in call:
+                raise unsupported(function, "a returned value takes no input")
             value_types.add(plan.result)
             result = value_types.public(plan.result)
             copied = decode(value_types, plan.result, call)
-            if required:
-                copied = (
-                    copied.removesuffix(")")
-                    + "".join(
-                        f", {identifier(camel(f.name))}: {identifier(camel(f.name))}"
-                        for f in required
-                    )
-                    + ")"
-                )
+            if "try " in copied:
+                raise unsupported(function, "a returned value needs a plain copy")
+            # A call that returns a value cannot fail, so it does not throw.
+            # The ABI version check reads the C version, so reading it skips
+            # the check.
+            body = (
+                copied
+                if function.name == "mln_c_version"
+                else f"nativeDirect {{ {copied} }}"
+            )
             return (
-                f"""{doc_comment}{signature} throws -> {result} {{
-  try nativeDirect({target}) {{ arena in {copied} }}
+                f"""{doc_comment}{signature} -> {result} {{
+  {body}
 }}
 """,
                 owner,
@@ -467,7 +452,7 @@ def operation(
                 raw = SCALARS.get(
                     native(output.type.pointee), native(output.type.pointee)
                 )
-                initial = f"{element.default}()" if element.default else f"{raw}()"
+                initial = f"{raw}()"
                 count = lengths[value.length]
                 storage.append(
                     f"  var value{index}: [{raw}] = Array(repeating: {initial}, count: {count})"
@@ -503,18 +488,17 @@ def operation(
             types.append(public)
             raw = SCALARS.get(native(output.type.pointee), native(output.type.pointee))
             if value.kind in {"record", "buffer"}:
-                initial = f"{value.default}()" if value.default else f"{raw}()"
+                initial = f"{raw}()"
             elif value.kind == "enum" and value.ctype.canonical.startswith("enum "):
                 initial = f"{raw}(rawValue: 0)"
             else:
                 initial = "false" if raw == "Bool" else "0"
             storage.append(f"  var value{index}: {raw} = {initial}")
-            if not value.default:
-                for field in value.fields:
-                    if field.role == "size":
-                        storage.append(
-                            f"  value{index}.{identifier(field.name)} = UInt32(MemoryLayout<{raw}>.size)"
-                        )
+            for field in value.fields:
+                if field.role == "size":
+                    storage.append(
+                        f"  value{index}.{identifier(field.name)} = UInt32(MemoryLayout<{raw}>.size)"
+                    )
             capture.append(value_types.copy(value, f"value{index}"))
         absent = (
             f"{', ' if target else ''}absentOn: {plan.absence.status}"

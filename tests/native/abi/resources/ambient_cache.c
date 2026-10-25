@@ -238,7 +238,7 @@ static void touch_shared_cache(void* argument) {
   shared_cache_probe* probe = thread->probe;
   (void)mln_test_wait_for_count(&probe->started, thread->index);
 
-  mln_runtime_options options = mln_runtime_options_default();
+  mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   options.cache_path = mln_buffer_view_from_cstr(probe->cache_path);
   mln_runtime runtime = MLN_HANDLE_NULL;
   thread->create_status = mln_runtime_create(&options, &runtime, NULL);

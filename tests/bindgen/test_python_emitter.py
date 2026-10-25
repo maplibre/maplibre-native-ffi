@@ -1,6 +1,7 @@
 """Exercise header-driven Python values and identifier isolation."""
 
 import enum
+import inspect
 import sys
 import types
 import typing
@@ -95,6 +96,40 @@ mln_status mln_map_new_entries(mln_map map, const mln_completion *completion, ml
         self.assertEqual(copied.title, "Harbor")
         self.assertEqual(copied.class_, 2.0)
 
+    def test_only_a_required_member_lacks_a_zero_default(self):
+        api = self.parse("""
+typedef struct mln_probe_route_options {
+  unsigned size;
+  mln_buffer_view url BIND("required=true");
+  mln_buffer_view label;
+  unsigned weight;
+} mln_probe_route_options;
+typedef struct mln_probe_label_options {
+  unsigned size;
+  mln_buffer_view label;
+} mln_probe_label_options;
+mln_status mln_probe_route_add(
+  const mln_probe_route_options* options, mln_diagnostic* out_diagnostic
+);
+mln_status mln_probe_label_set(
+  const mln_probe_label_options* options, mln_diagnostic* out_diagnostic
+);
+""")
+        generated = self.materialize(api)
+        values = generated.values
+        with self.assertRaises(TypeError):
+            values.ProbeRouteOptions()
+        self.assertEqual(
+            values.ProbeRouteOptions(url="/tiles"),
+            values.ProbeRouteOptions(url="/tiles", label="", weight=0),
+        )
+        # An options record with a required member is itself required.
+        operations = generated.operations
+        route = inspect.signature(operations.probe_route_add).parameters["options"]
+        label = inspect.signature(operations.probe_label_set).parameters["options"]
+        self.assertIs(route.default, inspect.Parameter.empty)
+        self.assertIsNone(label.default)
+
     def test_a_nested_registration_defaults_to_a_disabled_one(self):
         api = self.parse(groups=("record_notification",))
         self.assertIn("mln_map_request_reading", python.coverage(api)["generated"])
@@ -120,7 +155,7 @@ mln_status mln_probe_hooks_install(
   mln_diagnostic* out_diagnostic
 );
 """,
-            groups=("default_registration", "record_notification"),
+            groups=("nested_registration", "record_notification"),
         )
         self.assertIn("mln_probe_hooks_install", python.coverage(api)["generated"])
         native = types.SimpleNamespace(_NativeRegistration=lambda *parts: parts)

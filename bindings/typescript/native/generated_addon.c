@@ -102,7 +102,8 @@ static napi_value mln_ts_export_mln_acquired_frame_get_producer_sync(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "frame")) goto done;
     arg_frame = (mln_acquired_frame)number;
   }
-  arg_out_sync = mln_gpu_sync_default();
+  memset(&arg_out_sync, 0, sizeof arg_out_sync);
+  arg_out_sync.size = sizeof arg_out_sync;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status =
@@ -131,6 +132,10 @@ static napi_value mln_ts_export_mln_acquired_frame_get_result(
   }
   memset(&arg_out_result, 0, sizeof arg_out_result);
   arg_out_result.size = sizeof arg_out_result;
+  arg_out_result.view.size = sizeof arg_out_result.view;
+  arg_out_result.view.projection_mode.size =
+    sizeof arg_out_result.view.projection_mode;
+  arg_out_result.view.viewport.size = sizeof arg_out_result.view.viewport;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status =
@@ -191,7 +196,8 @@ static napi_value mln_ts_export_mln_acquired_frame_release(
   }
   if (!mln_ts_read_owner(call, call->argv[1])) goto done;
   if (!mln_ts_is_absent(call, call->argv[2])) {
-    arg_consumer_completion = mln_gpu_sync_default();
+    memset(&arg_consumer_completion, 0, sizeof arg_consumer_completion);
+    arg_consumer_completion.size = sizeof arg_consumer_completion;
     if (!mln_ts_read_record(call, call->argv[2], "consumerCompletion"))
       goto done;
     if (!mln_ts_write_gpu_sync(
@@ -211,30 +217,6 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_animation_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_animation_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_animation_options_default();
-  call->result = mln_ts_read_animation_options(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_bound_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_bound_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_bound_options_default();
-  call->result = mln_ts_read_bound_options(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_c_version(
   napi_env env, napi_callback_info info
 ) {
@@ -244,106 +226,6 @@ static napi_value mln_ts_export_mln_c_version(
   if (!mln_ts_begin(call, env, info, 0)) return NULL;
   result = mln_c_version();
   call->result = mln_ts_number(env, (double)(result));
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_camera_delta_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_camera_delta result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_camera_delta_default();
-  call->result = mln_ts_read_camera_delta(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_camera_fit_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_camera_fit_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_camera_fit_options_default();
-  call->result = mln_ts_read_camera_fit_options(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_camera_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_camera_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_camera_options_default();
-  call->result = mln_ts_read_camera_options(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_camera_update_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_camera_update result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_camera_update_default();
-  call->result = mln_ts_read_camera_update(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_custom_geometry_source_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_custom_geometry_source_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_custom_geometry_source_options_default();
-  call->result =
-    mln_ts_read_custom_geometry_source_options(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_custom_mvt_vector_source_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_custom_mvt_vector_source_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_custom_mvt_vector_source_options_default();
-  call->result = mln_ts_read_custom_mvt_vector_source_options(
-    env, &(result), sizeof(result)
-  );
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_frame_demand_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_frame_demand result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_frame_demand_default();
-  call->result = mln_ts_read_frame_demand(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_free_camera_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_free_camera_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_free_camera_options_default();
-  call->result =
-    mln_ts_read_free_camera_options(env, &(result), sizeof(result));
   return mln_ts_end(call);
 }
 
@@ -361,7 +243,8 @@ static napi_value mln_ts_export_mln_geojson_source_data_create(
   if (!mln_ts_begin(call, env, info, 2)) return NULL;
   if (!mln_ts_read_json_view(call, call->argv[0], &arg_data, "data")) goto done;
   if (!mln_ts_is_absent(call, call->argv[1])) {
-    arg_options = mln_geojson_source_options_default();
+    memset(&arg_options, 0, sizeof arg_options);
+    arg_options.size = sizeof arg_options;
     if (!mln_ts_read_record(call, call->argv[1], "options")) goto done;
     if (!mln_ts_write_geojson_source_options(
           call, call->argv[1], &arg_options, "options"
@@ -396,43 +279,6 @@ static napi_value mln_ts_export_mln_geojson_source_data_release(
   mln_geojson_source_data_release(arg_data);
   mln_ts_consume(call);
 done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_geojson_source_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_geojson_source_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_geojson_source_options_default();
-  call->result =
-    mln_ts_read_geojson_source_options(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_gpu_sync_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_gpu_sync result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_gpu_sync_default();
-  call->result = mln_ts_read_gpu_sync(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_http_header_rule_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_http_header_rule result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_http_header_rule_default();
-  call->result = mln_ts_read_http_header_rule(env, &(result), sizeof(result));
   return mln_ts_end(call);
 }
 
@@ -535,18 +381,6 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_logical_extent_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_logical_extent result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_logical_extent_default();
-  call->result = mln_ts_read_logical_extent(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_logical_extent_physical_size(
   napi_env env, napi_callback_info info
 ) {
@@ -558,7 +392,7 @@ static napi_value mln_ts_export_mln_logical_extent_physical_size(
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 1)) return NULL;
-  arg_extent = mln_logical_extent_default();
+  memset(&arg_extent, 0, sizeof arg_extent);
   if (!mln_ts_is_absent(call, call->argv[0])) {
     if (!mln_ts_read_record(call, call->argv[0], "extent")) goto done;
     if (!mln_ts_write_logical_extent(
@@ -608,7 +442,8 @@ static napi_value mln_ts_export_mln_map_add_custom_geometry_source(
   }
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
-  arg_options = mln_custom_geometry_source_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
   if (!mln_ts_write_custom_geometry_source_options(
         call, call->argv[2], &arg_options, "options"
@@ -650,7 +485,8 @@ static napi_value mln_ts_export_mln_map_add_custom_mvt_vector_source(
   }
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
-  arg_options = mln_custom_mvt_vector_source_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
   if (!mln_ts_write_custom_mvt_vector_source_options(
         call, call->argv[2], &arg_options, "options"
@@ -732,7 +568,8 @@ static napi_value mln_ts_export_mln_map_add_geojson_source_url(
     goto done;
   if (!mln_ts_read_text_view(call, call->argv[2], &arg_url, "url")) goto done;
   if (!mln_ts_is_absent(call, call->argv[3])) {
-    arg_options = mln_geojson_source_options_default();
+    memset(&arg_options, 0, sizeof arg_options);
+    arg_options.size = sizeof arg_options;
     if (!mln_ts_read_record(call, call->argv[3], "options")) goto done;
     if (!mln_ts_write_geojson_source_options(
           call, call->argv[3], &arg_options, "options"
@@ -788,7 +625,8 @@ static napi_value mln_ts_export_mln_map_add_image_source_image(
     arg_coordinates = items;
     count_coordinates = (size_t)count;
   }
-  arg_image = mln_premultiplied_rgba8_image_default();
+  memset(&arg_image, 0, sizeof arg_image);
+  arg_image.size = sizeof arg_image;
   if (!mln_ts_read_record(call, call->argv[3], "image")) goto done;
   if (!mln_ts_write_premultiplied_rgba8_image(
         call, call->argv[3], &arg_image, "image"
@@ -955,7 +793,8 @@ static napi_value mln_ts_export_mln_map_apply_camera_delta(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_delta = mln_camera_delta_default();
+  memset(&arg_delta, 0, sizeof arg_delta);
+  arg_delta.size = sizeof arg_delta;
   if (!mln_ts_read_record(call, call->argv[1], "delta")) goto done;
   if (!mln_ts_write_camera_delta(call, call->argv[1], &arg_delta, "delta"))
     goto done;
@@ -994,13 +833,15 @@ static napi_value mln_ts_export_mln_map_attach_metal_borrowed_texture(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_descriptor = mln_metal_borrowed_texture_descriptor_default();
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
   if (!mln_ts_write_metal_borrowed_texture_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
       ))
     goto done;
-  arg_options = mln_render_session_attach_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
   if (!mln_ts_write_render_session_attach_options(
         call, call->argv[2], &arg_options, "options"
@@ -1043,13 +884,15 @@ static napi_value mln_ts_export_mln_map_attach_metal_owned_texture(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_descriptor = mln_metal_owned_texture_descriptor_default();
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
   if (!mln_ts_write_metal_owned_texture_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
       ))
     goto done;
-  arg_options = mln_render_session_attach_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
   if (!mln_ts_write_render_session_attach_options(
         call, call->argv[2], &arg_options, "options"
@@ -1092,13 +935,15 @@ static napi_value mln_ts_export_mln_map_attach_metal_surface(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_descriptor = mln_metal_surface_descriptor_default();
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
   if (!mln_ts_write_metal_surface_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
       ))
     goto done;
-  arg_options = mln_render_session_attach_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
   if (!mln_ts_write_render_session_attach_options(
         call, call->argv[2], &arg_options, "options"
@@ -1141,13 +986,15 @@ static napi_value mln_ts_export_mln_map_attach_opengl_borrowed_texture(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_descriptor = mln_opengl_borrowed_texture_descriptor_default();
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
   if (!mln_ts_write_opengl_borrowed_texture_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
       ))
     goto done;
-  arg_options = mln_render_session_attach_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
   if (!mln_ts_write_render_session_attach_options(
         call, call->argv[2], &arg_options, "options"
@@ -1190,13 +1037,15 @@ static napi_value mln_ts_export_mln_map_attach_opengl_owned_texture(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_descriptor = mln_opengl_owned_texture_descriptor_default();
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
   if (!mln_ts_write_opengl_owned_texture_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
       ))
     goto done;
-  arg_options = mln_render_session_attach_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
   if (!mln_ts_write_render_session_attach_options(
         call, call->argv[2], &arg_options, "options"
@@ -1239,13 +1088,15 @@ static napi_value mln_ts_export_mln_map_attach_opengl_surface(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_descriptor = mln_opengl_surface_descriptor_default();
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
   if (!mln_ts_write_opengl_surface_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
       ))
     goto done;
-  arg_options = mln_render_session_attach_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
   if (!mln_ts_write_render_session_attach_options(
         call, call->argv[2], &arg_options, "options"
@@ -1288,13 +1139,15 @@ static napi_value mln_ts_export_mln_map_attach_vulkan_borrowed_texture(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_descriptor = mln_vulkan_borrowed_texture_descriptor_default();
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
   if (!mln_ts_write_vulkan_borrowed_texture_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
       ))
     goto done;
-  arg_options = mln_render_session_attach_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
   if (!mln_ts_write_render_session_attach_options(
         call, call->argv[2], &arg_options, "options"
@@ -1337,13 +1190,15 @@ static napi_value mln_ts_export_mln_map_attach_vulkan_owned_texture(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_descriptor = mln_vulkan_owned_texture_descriptor_default();
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
   if (!mln_ts_write_vulkan_owned_texture_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
       ))
     goto done;
-  arg_options = mln_render_session_attach_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
   if (!mln_ts_write_render_session_attach_options(
         call, call->argv[2], &arg_options, "options"
@@ -1386,13 +1241,15 @@ static napi_value mln_ts_export_mln_map_attach_vulkan_surface(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_descriptor = mln_vulkan_surface_descriptor_default();
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
   if (!mln_ts_write_vulkan_surface_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
       ))
     goto done;
-  arg_options = mln_render_session_attach_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
   if (!mln_ts_write_render_session_attach_options(
         call, call->argv[2], &arg_options, "options"
@@ -1468,7 +1325,8 @@ static napi_value mln_ts_export_mln_map_camera_for_geometry(
   if (!mln_ts_read_json_view(call, call->argv[1], &arg_geometry, "geometry"))
     goto done;
   if (!mln_ts_is_absent(call, call->argv[2])) {
-    arg_fit_options = mln_camera_fit_options_default();
+    memset(&arg_fit_options, 0, sizeof arg_fit_options);
+    arg_fit_options.size = sizeof arg_fit_options;
     if (!mln_ts_read_record(call, call->argv[2], "fitOptions")) goto done;
     if (!mln_ts_write_camera_fit_options(
           call, call->argv[2], &arg_fit_options, "fitOptions"
@@ -1519,7 +1377,8 @@ static napi_value mln_ts_export_mln_map_camera_for_lat_lng_bounds(
       goto done;
   }
   if (!mln_ts_is_absent(call, call->argv[2])) {
-    arg_fit_options = mln_camera_fit_options_default();
+    memset(&arg_fit_options, 0, sizeof arg_fit_options);
+    arg_fit_options.size = sizeof arg_fit_options;
     if (!mln_ts_read_record(call, call->argv[2], "fitOptions")) goto done;
     if (!mln_ts_write_camera_fit_options(
           call, call->argv[2], &arg_fit_options, "fitOptions"
@@ -1573,7 +1432,8 @@ static napi_value mln_ts_export_mln_map_camera_for_lat_lngs(
     count_coordinates = (size_t)count;
   }
   if (!mln_ts_is_absent(call, call->argv[2])) {
-    arg_fit_options = mln_camera_fit_options_default();
+    memset(&arg_fit_options, 0, sizeof arg_fit_options);
+    arg_fit_options.size = sizeof arg_fit_options;
     if (!mln_ts_read_record(call, call->argv[2], "fitOptions")) goto done;
     if (!mln_ts_write_camera_fit_options(
           call, call->argv[2], &arg_fit_options, "fitOptions"
@@ -1925,6 +1785,13 @@ static napi_value mln_ts_export_mln_map_get_snapshot(
   }
   memset(&arg_out_snapshot, 0, sizeof arg_out_snapshot);
   arg_out_snapshot.size = sizeof arg_out_snapshot;
+  arg_out_snapshot.tile.size = sizeof arg_out_snapshot.tile;
+  arg_out_snapshot.bounds.size = sizeof arg_out_snapshot.bounds;
+  arg_out_snapshot.free_camera.size = sizeof arg_out_snapshot.free_camera;
+  arg_out_snapshot.view.size = sizeof arg_out_snapshot.view;
+  arg_out_snapshot.view.projection_mode.size =
+    sizeof arg_out_snapshot.view.projection_mode;
+  arg_out_snapshot.view.viewport.size = sizeof arg_out_snapshot.view.viewport;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_map_get_snapshot(arg_map, &arg_out_snapshot, &diagnostic);
@@ -2355,7 +2222,8 @@ static napi_value mln_ts_export_mln_map_lat_lng_bounds_for_camera(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_camera = mln_camera_options_default();
+  memset(&arg_camera, 0, sizeof arg_camera);
+  arg_camera.size = sizeof arg_camera;
   if (!mln_ts_read_record(call, call->argv[1], "camera")) goto done;
   if (!mln_ts_write_camera_options(call, call->argv[1], &arg_camera, "camera"))
     goto done;
@@ -2391,7 +2259,8 @@ static napi_value mln_ts_export_mln_map_lat_lng_bounds_for_camera_unwrapped(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_camera = mln_camera_options_default();
+  memset(&arg_camera, 0, sizeof arg_camera);
+  arg_camera.size = sizeof arg_camera;
   if (!mln_ts_read_record(call, call->argv[1], "camera")) goto done;
   if (!mln_ts_write_camera_options(call, call->argv[1], &arg_camera, "camera"))
     goto done;
@@ -2507,18 +2376,6 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_map_options_default();
-  call->result = mln_ts_read_map_options(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_map_projection_create(
   napi_env env, napi_callback_info info
 ) {
@@ -2531,6 +2388,8 @@ static napi_value mln_ts_export_mln_map_projection_create(
   if (!mln_ts_begin(call, env, info, 1)) return NULL;
   memset(&arg_view, 0, sizeof arg_view);
   arg_view.size = sizeof arg_view;
+  arg_view.projection_mode.size = sizeof arg_view.projection_mode;
+  arg_view.viewport.size = sizeof arg_view.viewport;
   if (!mln_ts_read_record(call, call->argv[0], "view")) goto done;
   if (!mln_ts_write_map_view(call, call->argv[0], &arg_view, "view")) goto done;
   diagnostic.size = sizeof diagnostic;
@@ -2558,7 +2417,8 @@ static napi_value mln_ts_export_mln_map_projection_get_camera(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "projection")) goto done;
     arg_projection = (mln_map_projection)number;
   }
-  arg_out_camera = mln_camera_options_default();
+  memset(&arg_out_camera, 0, sizeof arg_out_camera);
+  arg_out_camera.size = sizeof arg_out_camera;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status =
@@ -2876,7 +2736,8 @@ static napi_value mln_ts_export_mln_map_projection_set_camera(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "projection")) goto done;
     arg_projection = (mln_map_projection)number;
   }
-  arg_camera = mln_camera_options_default();
+  memset(&arg_camera, 0, sizeof arg_camera);
+  arg_camera.size = sizeof arg_camera;
   if (!mln_ts_read_record(call, call->argv[1], "camera")) goto done;
   if (!mln_ts_write_camera_options(call, call->argv[1], &arg_camera, "camera"))
     goto done;
@@ -3137,7 +2998,7 @@ static napi_value mln_ts_export_mln_map_resize(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_extent = mln_logical_extent_default();
+  memset(&arg_extent, 0, sizeof arg_extent);
   if (!mln_ts_is_absent(call, call->argv[1])) {
     if (!mln_ts_read_record(call, call->argv[1], "extent")) goto done;
     if (!mln_ts_write_logical_extent(
@@ -3175,7 +3036,8 @@ static napi_value mln_ts_export_mln_map_set_bounds(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_options = mln_bound_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[1], "options")) goto done;
   if (!mln_ts_write_bound_options(call, call->argv[1], &arg_options, "options"))
     goto done;
@@ -3517,7 +3379,8 @@ static napi_value mln_ts_export_mln_map_set_free_camera_options(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_options = mln_free_camera_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[1], "options")) goto done;
   if (!mln_ts_write_free_camera_options(
         call, call->argv[1], &arg_options, "options"
@@ -3757,7 +3620,8 @@ static napi_value mln_ts_export_mln_map_set_image_source_image(
   }
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
-  arg_image = mln_premultiplied_rgba8_image_default();
+  memset(&arg_image, 0, sizeof arg_image);
+  arg_image.size = sizeof arg_image;
   if (!mln_ts_read_record(call, call->argv[2], "image")) goto done;
   if (!mln_ts_write_premultiplied_rgba8_image(
         call, call->argv[2], &arg_image, "image"
@@ -3831,7 +3695,8 @@ static napi_value mln_ts_export_mln_map_set_projection_mode(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_mode = mln_projection_mode_default();
+  memset(&arg_mode, 0, sizeof arg_mode);
+  arg_mode.size = sizeof arg_mode;
   if (!mln_ts_read_record(call, call->argv[1], "mode")) goto done;
   if (!mln_ts_write_projection_mode(call, call->argv[1], &arg_mode, "mode"))
     goto done;
@@ -3910,14 +3775,16 @@ static napi_value mln_ts_export_mln_map_set_style_image(
   }
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_image_id, "imageId"))
     goto done;
-  arg_image = mln_premultiplied_rgba8_image_default();
+  memset(&arg_image, 0, sizeof arg_image);
+  arg_image.size = sizeof arg_image;
   if (!mln_ts_read_record(call, call->argv[2], "image")) goto done;
   if (!mln_ts_write_premultiplied_rgba8_image(
         call, call->argv[2], &arg_image, "image"
       ))
     goto done;
   if (!mln_ts_is_absent(call, call->argv[3])) {
-    arg_options = mln_style_image_options_default();
+    memset(&arg_options, 0, sizeof arg_options);
+    arg_options.size = sizeof arg_options;
     if (!mln_ts_read_record(call, call->argv[3], "options")) goto done;
     if (!mln_ts_write_style_image_options(
           call, call->argv[3], &arg_options, "options"
@@ -4147,7 +4014,8 @@ static napi_value mln_ts_export_mln_map_set_style_transition_options(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_options = mln_style_transition_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[1], "options")) goto done;
   if (!mln_ts_write_style_transition_options(
         call, call->argv[1], &arg_options, "options"
@@ -4217,7 +4085,8 @@ static napi_value mln_ts_export_mln_map_set_tile_options(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_options = mln_map_tile_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[1], "options")) goto done;
   if (!mln_ts_write_map_tile_options(
         call, call->argv[1], &arg_options, "options"
@@ -4255,7 +4124,8 @@ static napi_value mln_ts_export_mln_map_set_viewport_options(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_options = mln_map_viewport_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[1], "options")) goto done;
   if (!mln_ts_write_map_viewport_options(
         call, call->argv[1], &arg_options, "options"
@@ -4276,18 +4146,6 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_tile_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map_tile_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_map_tile_options_default();
-  call->result = mln_ts_read_map_tile_options(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_map_update_camera(
   napi_env env, napi_callback_info info
 ) {
@@ -4305,7 +4163,9 @@ static napi_value mln_ts_export_mln_map_update_camera(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  arg_update = mln_camera_update_default();
+  memset(&arg_update, 0, sizeof arg_update);
+  arg_update.size = sizeof arg_update;
+  arg_update.camera.size = sizeof arg_update.camera;
   if (!mln_ts_read_record(call, call->argv[1], "update")) goto done;
   if (!mln_ts_write_camera_update(call, call->argv[1], &arg_update, "update"))
     goto done;
@@ -4322,59 +4182,6 @@ static napi_value mln_ts_export_mln_map_update_camera(
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_viewport_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map_viewport_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_map_viewport_options_default();
-  call->result =
-    mln_ts_read_map_viewport_options(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_metal_borrowed_texture_descriptor_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_metal_borrowed_texture_descriptor result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_metal_borrowed_texture_descriptor_default();
-  call->result = mln_ts_read_metal_borrowed_texture_descriptor(
-    env, &(result), sizeof(result)
-  );
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_metal_owned_texture_descriptor_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_metal_owned_texture_descriptor result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_metal_owned_texture_descriptor_default();
-  call->result =
-    mln_ts_read_metal_owned_texture_descriptor(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_metal_surface_descriptor_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_metal_surface_descriptor result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_metal_surface_descriptor_default();
-  call->result =
-    mln_ts_read_metal_surface_descriptor(env, &(result), sizeof(result));
   return mln_ts_end(call);
 }
 
@@ -4423,33 +4230,6 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_opengl_borrowed_texture_descriptor_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_opengl_borrowed_texture_descriptor result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_opengl_borrowed_texture_descriptor_default();
-  call->result = mln_ts_read_opengl_borrowed_texture_descriptor(
-    env, &(result), sizeof(result)
-  );
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_opengl_owned_texture_descriptor_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_opengl_owned_texture_descriptor result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_opengl_owned_texture_descriptor_default();
-  call->result =
-    mln_ts_read_opengl_owned_texture_descriptor(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_opengl_supported_context_provider_mask(
   napi_env env, napi_callback_info info
 ) {
@@ -4462,19 +4242,6 @@ static napi_value mln_ts_export_mln_opengl_supported_context_provider_mask(
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_opengl_surface_descriptor_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_opengl_surface_descriptor result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_opengl_surface_descriptor_default();
-  call->result =
-    mln_ts_read_opengl_surface_descriptor(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_plugin_get_register_function_v1(
   napi_env env, napi_callback_info info
 ) {
@@ -4484,19 +4251,6 @@ static napi_value mln_ts_export_mln_plugin_get_register_function_v1(
   if (!mln_ts_begin(call, env, info, 0)) return NULL;
   result = mln_plugin_get_register_function_v1();
   call->result = mln_ts_u64(env, (uint64_t)(uintptr_t)(result));
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_premultiplied_rgba8_image_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_premultiplied_rgba8_image result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_premultiplied_rgba8_image_default();
-  call->result =
-    mln_ts_read_premultiplied_rgba8_image(env, &(result), sizeof(result));
   return mln_ts_end(call);
 }
 
@@ -4529,18 +4283,6 @@ static napi_value mln_ts_export_mln_projected_meters_for_lat_lng(
     env, &(arg_out_meters), sizeof(arg_out_meters)
   );
 done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_projection_mode_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_projection_mode result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_projection_mode_default();
-  call->result = mln_ts_read_projection_mode(env, &(result), sizeof(result));
   return mln_ts_end(call);
 }
 
@@ -4596,19 +4338,6 @@ static napi_value mln_ts_export_mln_render_session_acquire_frame(
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
   call->result = mln_ts_u64(env, (uint64_t)arg_out_frame);
 done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_render_session_attach_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_render_session_attach_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_render_session_attach_options_default();
-  call->result =
-    mln_ts_read_render_session_attach_options(env, &(result), sizeof(result));
   return mln_ts_end(call);
 }
 
@@ -4936,7 +4665,8 @@ static napi_value mln_ts_export_mln_render_session_query_rendered_features(
       ))
     goto done;
   if (!mln_ts_is_absent(call, call->argv[2])) {
-    arg_options = mln_rendered_feature_query_options_default();
+    memset(&arg_options, 0, sizeof arg_options);
+    arg_options.size = sizeof arg_options;
     if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
     if (!mln_ts_write_rendered_feature_query_options(
           call, call->argv[2], &arg_options, "options"
@@ -4981,7 +4711,8 @@ static napi_value mln_ts_export_mln_render_session_query_source_features(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
   if (!mln_ts_is_absent(call, call->argv[2])) {
-    arg_options = mln_source_feature_query_options_default();
+    memset(&arg_options, 0, sizeof arg_options);
+    arg_options.size = sizeof arg_options;
     if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
     if (!mln_ts_write_source_feature_query_options(
           call, call->argv[2], &arg_options, "options"
@@ -5081,7 +4812,8 @@ static napi_value mln_ts_export_mln_render_session_request_frame(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
     arg_session = (mln_render_session)number;
   }
-  arg_demand = mln_frame_demand_default();
+  memset(&arg_demand, 0, sizeof arg_demand);
+  arg_demand.size = sizeof arg_demand;
   if (!mln_ts_read_record(call, call->argv[1], "demand")) goto done;
   if (!mln_ts_write_frame_demand(call, call->argv[1], &arg_demand, "demand"))
     goto done;
@@ -5111,7 +4843,7 @@ static napi_value mln_ts_export_mln_render_session_resize(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
     arg_session = (mln_render_session)number;
   }
-  arg_extent = mln_logical_extent_default();
+  memset(&arg_extent, 0, sizeof arg_extent);
   if (!mln_ts_is_absent(call, call->argv[1])) {
     if (!mln_ts_read_record(call, call->argv[1], "extent")) goto done;
     if (!mln_ts_write_logical_extent(
@@ -5174,7 +4906,8 @@ mln_ts_export_mln_render_session_set_metal_borrowed_texture_target(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
     arg_session = (mln_render_session)number;
   }
-  arg_descriptor = mln_metal_borrowed_texture_descriptor_default();
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
   if (!mln_ts_write_metal_borrowed_texture_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
@@ -5212,7 +4945,8 @@ static napi_value mln_ts_export_mln_render_session_set_metal_surface_target(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
     arg_session = (mln_render_session)number;
   }
-  arg_descriptor = mln_metal_surface_descriptor_default();
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
   if (!mln_ts_write_metal_surface_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
@@ -5251,7 +4985,8 @@ mln_ts_export_mln_render_session_set_opengl_borrowed_texture_target(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
     arg_session = (mln_render_session)number;
   }
-  arg_descriptor = mln_opengl_borrowed_texture_descriptor_default();
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
   if (!mln_ts_write_opengl_borrowed_texture_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
@@ -5289,7 +5024,8 @@ static napi_value mln_ts_export_mln_render_session_set_opengl_surface_target(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
     arg_session = (mln_render_session)number;
   }
-  arg_descriptor = mln_opengl_surface_descriptor_default();
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
   if (!mln_ts_write_opengl_surface_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
@@ -5328,7 +5064,8 @@ mln_ts_export_mln_render_session_set_vulkan_borrowed_texture_target(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
     arg_session = (mln_render_session)number;
   }
-  arg_descriptor = mln_vulkan_borrowed_texture_descriptor_default();
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
   if (!mln_ts_write_vulkan_borrowed_texture_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
@@ -5366,7 +5103,8 @@ static napi_value mln_ts_export_mln_render_session_set_vulkan_surface_target(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
     arg_session = (mln_render_session)number;
   }
-  arg_descriptor = mln_vulkan_surface_descriptor_default();
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
   if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
   if (!mln_ts_write_vulkan_surface_descriptor(
         call, call->argv[1], &arg_descriptor, "descriptor"
@@ -5384,19 +5122,6 @@ static napi_value mln_ts_export_mln_render_session_set_vulkan_surface_target(
   );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_rendered_feature_query_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_rendered_feature_query_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_rendered_feature_query_options_default();
-  call->result =
-    mln_ts_read_rendered_feature_query_options(env, &(result), sizeof(result));
   return mln_ts_end(call);
 }
 
@@ -5537,18 +5262,6 @@ static napi_value mln_ts_export_mln_resource_request_set_cancel_callback(
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
   call->result = mln_ts_bool(env, arg_out_cancelled);
 done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_resource_route_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_resource_route result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_resource_route_default();
-  call->result = mln_ts_read_resource_route(env, &(result), sizeof(result));
   return mln_ts_end(call);
 }
 
@@ -5732,7 +5445,8 @@ static napi_value mln_ts_export_mln_runtime_create(
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 1)) return NULL;
-  arg_options = mln_runtime_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[0], "options")) goto done;
   if (!mln_ts_write_runtime_options(
         call, call->argv[0], &arg_options, "options"
@@ -5765,7 +5479,8 @@ static napi_value mln_ts_export_mln_runtime_create_map(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "runtime")) goto done;
     arg_runtime = (mln_runtime)number;
   }
-  arg_options = mln_map_options_default();
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[1], "options")) goto done;
   if (!mln_ts_write_map_options(call, call->argv[1], &arg_options, "options"))
     goto done;
@@ -6102,18 +5817,6 @@ static napi_value mln_ts_export_mln_runtime_merge_offline_regions(
   );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_runtime_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_runtime_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_runtime_options_default();
-  call->result = mln_ts_read_runtime_options(env, &(result), sizeof(result));
   return mln_ts_end(call);
 }
 
@@ -6562,19 +6265,6 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_source_feature_query_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_source_feature_query_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_source_feature_query_options_default();
-  call->result =
-    mln_ts_read_source_feature_query_options(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_style_expression_create(
   napi_env env, napi_callback_info info
 ) {
@@ -6592,7 +6282,8 @@ static napi_value mln_ts_export_mln_style_expression_create(
       ))
     goto done;
   if (!mln_ts_is_absent(call, call->argv[1])) {
-    arg_options = mln_style_expression_options_default();
+    memset(&arg_options, 0, sizeof arg_options);
+    arg_options.size = sizeof arg_options;
     if (!mln_ts_read_record(call, call->argv[1], "options")) goto done;
     if (!mln_ts_write_style_expression_options(
           call, call->argv[1], &arg_options, "options"
@@ -6631,7 +6322,8 @@ static napi_value mln_ts_export_mln_style_expression_evaluate(
     arg_expression = (mln_style_expression)number;
   }
   if (!mln_ts_is_absent(call, call->argv[1])) {
-    arg_inputs = mln_style_expression_inputs_default();
+    memset(&arg_inputs, 0, sizeof arg_inputs);
+    arg_inputs.size = sizeof arg_inputs;
     if (!mln_ts_read_record(call, call->argv[1], "inputs")) goto done;
     if (!mln_ts_write_style_expression_inputs(
           call, call->argv[1], &arg_inputs, "inputs"
@@ -6689,32 +6381,6 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_style_expression_inputs_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_style_expression_inputs result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_style_expression_inputs_default();
-  call->result =
-    mln_ts_read_style_expression_inputs(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_style_expression_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_style_expression_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_style_expression_options_default();
-  call->result =
-    mln_ts_read_style_expression_options(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_style_expression_release(
   napi_env env, napi_callback_info info
 ) {
@@ -6734,32 +6400,6 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_style_image_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_style_image_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_style_image_options_default();
-  call->result =
-    mln_ts_read_style_image_options(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_style_transition_options_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_style_transition_options result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_style_transition_options_default();
-  call->result =
-    mln_ts_read_style_transition_options(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_supported_render_backend_mask(
   napi_env env, napi_callback_info info
 ) {
@@ -6769,46 +6409,6 @@ static napi_value mln_ts_export_mln_supported_render_backend_mask(
   if (!mln_ts_begin(call, env, info, 0)) return NULL;
   result = mln_supported_render_backend_mask();
   call->result = mln_ts_number(env, (double)(result));
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_vulkan_borrowed_texture_descriptor_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_vulkan_borrowed_texture_descriptor result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_vulkan_borrowed_texture_descriptor_default();
-  call->result = mln_ts_read_vulkan_borrowed_texture_descriptor(
-    env, &(result), sizeof(result)
-  );
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_vulkan_owned_texture_descriptor_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_vulkan_owned_texture_descriptor result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_vulkan_owned_texture_descriptor_default();
-  call->result =
-    mln_ts_read_vulkan_owned_texture_descriptor(env, &(result), sizeof(result));
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_vulkan_surface_descriptor_default(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_vulkan_surface_descriptor result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_vulkan_surface_descriptor_default();
-  call->result =
-    mln_ts_read_vulkan_surface_descriptor(env, &(result), sizeof(result));
   return mln_ts_end(call);
 }
 
@@ -6863,37 +6463,17 @@ static const mln_ts_export exports[] = {
   {"mln_acquired_frame_view_begin",
    mln_ts_export_mln_acquired_frame_view_begin},
   {"mln_acquired_frame_view_end", mln_ts_export_mln_acquired_frame_view_end},
-  {"mln_animation_options_default",
-   mln_ts_export_mln_animation_options_default},
-  {"mln_bound_options_default", mln_ts_export_mln_bound_options_default},
   {"mln_c_version", mln_ts_export_mln_c_version},
-  {"mln_camera_delta_default", mln_ts_export_mln_camera_delta_default},
-  {"mln_camera_fit_options_default",
-   mln_ts_export_mln_camera_fit_options_default},
-  {"mln_camera_options_default", mln_ts_export_mln_camera_options_default},
-  {"mln_camera_update_default", mln_ts_export_mln_camera_update_default},
-  {"mln_custom_geometry_source_options_default",
-   mln_ts_export_mln_custom_geometry_source_options_default},
-  {"mln_custom_mvt_vector_source_options_default",
-   mln_ts_export_mln_custom_mvt_vector_source_options_default},
-  {"mln_frame_demand_default", mln_ts_export_mln_frame_demand_default},
-  {"mln_free_camera_options_default",
-   mln_ts_export_mln_free_camera_options_default},
   {"mln_geojson_source_data_create",
    mln_ts_export_mln_geojson_source_data_create},
   {"mln_geojson_source_data_release",
    mln_ts_export_mln_geojson_source_data_release},
-  {"mln_geojson_source_options_default",
-   mln_ts_export_mln_geojson_source_options_default},
-  {"mln_gpu_sync_default", mln_ts_export_mln_gpu_sync_default},
-  {"mln_http_header_rule_default", mln_ts_export_mln_http_header_rule_default},
   {"mln_lat_lng_for_projected_meters",
    mln_ts_export_mln_lat_lng_for_projected_meters},
   {"mln_log_clear_callback", mln_ts_export_mln_log_clear_callback},
   {"mln_log_set_async_severity_mask",
    mln_ts_export_mln_log_set_async_severity_mask},
   {"mln_log_set_callback", mln_ts_export_mln_log_set_callback},
-  {"mln_logical_extent_default", mln_ts_export_mln_logical_extent_default},
   {"mln_logical_extent_physical_size",
    mln_ts_export_mln_logical_extent_physical_size},
   {"mln_map_add_custom_geometry_source",
@@ -6971,7 +6551,6 @@ static const mln_ts_export exports[] = {
   {"mln_map_list_style_layers", mln_ts_export_mln_map_list_style_layers},
   {"mln_map_list_style_sources", mln_ts_export_mln_map_list_style_sources},
   {"mln_map_move_style_layer", mln_ts_export_mln_map_move_style_layer},
-  {"mln_map_options_default", mln_ts_export_mln_map_options_default},
   {"mln_map_projection_create", mln_ts_export_mln_map_projection_create},
   {"mln_map_projection_get_camera",
    mln_ts_export_mln_map_projection_get_camera},
@@ -7044,38 +6623,18 @@ static const mln_ts_export exports[] = {
   {"mln_map_set_style_url", mln_ts_export_mln_map_set_style_url},
   {"mln_map_set_tile_options", mln_ts_export_mln_map_set_tile_options},
   {"mln_map_set_viewport_options", mln_ts_export_mln_map_set_viewport_options},
-  {"mln_map_tile_options_default", mln_ts_export_mln_map_tile_options_default},
   {"mln_map_update_camera", mln_ts_export_mln_map_update_camera},
-  {"mln_map_viewport_options_default",
-   mln_ts_export_mln_map_viewport_options_default},
-  {"mln_metal_borrowed_texture_descriptor_default",
-   mln_ts_export_mln_metal_borrowed_texture_descriptor_default},
-  {"mln_metal_owned_texture_descriptor_default",
-   mln_ts_export_mln_metal_owned_texture_descriptor_default},
-  {"mln_metal_surface_descriptor_default",
-   mln_ts_export_mln_metal_surface_descriptor_default},
   {"mln_network_get_status", mln_ts_export_mln_network_get_status},
   {"mln_network_set_status", mln_ts_export_mln_network_set_status},
-  {"mln_opengl_borrowed_texture_descriptor_default",
-   mln_ts_export_mln_opengl_borrowed_texture_descriptor_default},
-  {"mln_opengl_owned_texture_descriptor_default",
-   mln_ts_export_mln_opengl_owned_texture_descriptor_default},
   {"mln_opengl_supported_context_provider_mask",
    mln_ts_export_mln_opengl_supported_context_provider_mask},
-  {"mln_opengl_surface_descriptor_default",
-   mln_ts_export_mln_opengl_surface_descriptor_default},
   {"mln_plugin_get_register_function_v1",
    mln_ts_export_mln_plugin_get_register_function_v1},
-  {"mln_premultiplied_rgba8_image_default",
-   mln_ts_export_mln_premultiplied_rgba8_image_default},
   {"mln_projected_meters_for_lat_lng",
    mln_ts_export_mln_projected_meters_for_lat_lng},
-  {"mln_projection_mode_default", mln_ts_export_mln_projection_mode_default},
   {"mln_render_session_abandon", mln_ts_export_mln_render_session_abandon},
   {"mln_render_session_acquire_frame",
    mln_ts_export_mln_render_session_acquire_frame},
-  {"mln_render_session_attach_options_default",
-   mln_ts_export_mln_render_session_attach_options_default},
   {"mln_render_session_barrier", mln_ts_export_mln_render_session_barrier},
   {"mln_render_session_clear_data",
    mln_ts_export_mln_render_session_clear_data},
@@ -7116,8 +6675,6 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_render_session_set_vulkan_borrowed_texture_target},
   {"mln_render_session_set_vulkan_surface_target",
    mln_ts_export_mln_render_session_set_vulkan_surface_target},
-  {"mln_rendered_feature_query_options_default",
-   mln_ts_export_mln_rendered_feature_query_options_default},
   {"mln_resource_request_complete",
    mln_ts_export_mln_resource_request_complete},
   {"mln_resource_request_is_cancelled",
@@ -7127,7 +6684,6 @@ static const mln_ts_export exports[] = {
   {"mln_resource_request_release", mln_ts_export_mln_resource_request_release},
   {"mln_resource_request_set_cancel_callback",
    mln_ts_export_mln_resource_request_set_cancel_callback},
-  {"mln_resource_route_default", mln_ts_export_mln_resource_route_default},
   {"mln_resource_transform_request_complete",
    mln_ts_export_mln_resource_transform_request_complete},
   {"mln_resource_transform_request_release",
@@ -7158,7 +6714,6 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_runtime_list_offline_regions},
   {"mln_runtime_merge_offline_regions",
    mln_ts_export_mln_runtime_merge_offline_regions},
-  {"mln_runtime_options_default", mln_ts_export_mln_runtime_options_default},
   {"mln_runtime_release", mln_ts_export_mln_runtime_release},
   {"mln_runtime_run_ambient_cache_operation",
    mln_ts_export_mln_runtime_run_ambient_cache_operation},
@@ -7179,30 +6734,14 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_runtime_set_resource_transform},
   {"mln_runtime_update_offline_region_metadata",
    mln_ts_export_mln_runtime_update_offline_region_metadata},
-  {"mln_source_feature_query_options_default",
-   mln_ts_export_mln_source_feature_query_options_default},
   {"mln_style_expression_create", mln_ts_export_mln_style_expression_create},
   {"mln_style_expression_evaluate",
    mln_ts_export_mln_style_expression_evaluate},
   {"mln_style_expression_get_info",
    mln_ts_export_mln_style_expression_get_info},
-  {"mln_style_expression_inputs_default",
-   mln_ts_export_mln_style_expression_inputs_default},
-  {"mln_style_expression_options_default",
-   mln_ts_export_mln_style_expression_options_default},
   {"mln_style_expression_release", mln_ts_export_mln_style_expression_release},
-  {"mln_style_image_options_default",
-   mln_ts_export_mln_style_image_options_default},
-  {"mln_style_transition_options_default",
-   mln_ts_export_mln_style_transition_options_default},
   {"mln_supported_render_backend_mask",
    mln_ts_export_mln_supported_render_backend_mask},
-  {"mln_vulkan_borrowed_texture_descriptor_default",
-   mln_ts_export_mln_vulkan_borrowed_texture_descriptor_default},
-  {"mln_vulkan_owned_texture_descriptor_default",
-   mln_ts_export_mln_vulkan_owned_texture_descriptor_default},
-  {"mln_vulkan_surface_descriptor_default",
-   mln_ts_export_mln_vulkan_surface_descriptor_default},
 };
 
 NAPI_MODULE_EXPORT napi_value

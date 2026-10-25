@@ -115,8 +115,9 @@ static void destroy_mlt_map(mlt_map* map) {
 
 static size_t count_admin_features(const mlt_map* map) {
   const mln_buffer_view source_layers[] = {MLN_BUFFER_LITERAL("admin")};
-  mln_source_feature_query_options options =
-    mln_source_feature_query_options_default();
+  mln_source_feature_query_options options = {
+    .size = sizeof(mln_source_feature_query_options)
+  };
   options.fields |= MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
   options.source_layer_ids = source_layers;
   options.source_layer_id_count = 1;

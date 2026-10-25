@@ -17,14 +17,4 @@ public sealed record StyleExpressionOptions
     /// asserts it. Without it, the expression keeps the type it infers.
     /// </summary>
     public StyleExpressionType? ExpectedType { get; init; }
-    public static StyleExpressionOptions Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyStyleExpressionOptions(
-                NativeMethods.mln_style_expression_options_default()
-            );
-        }
-    }
 }

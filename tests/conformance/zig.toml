@@ -38,7 +38,6 @@
 "VAL-03" = "bindings/zig/tests/values.zig::a strided event batch with an unknown payload arm decodes without loss"
 "VAL-04" = "bindings/zig/tests/values.zig::open enums keep unknown values and 64-bit carriers round-trip"
 "VAL-05" = "bindings/zig/tests/values.zig::an array input is copied at submission"
-"VAL-06" = "bindings/zig/tests/values.zig::native record defaults round trip through generated conversion"
 "VAL-07" = "bindings/zig/src/call.zig::an array completion is read at its value_size"
 "VAL-08" = "bindings/zig/tests/values.zig::synchronous calls fill caller-sized outputs in input order"
 "VAL-09" = "bindings/zig/tests/values.zig::caller-sized text returns results longer than its first storage"

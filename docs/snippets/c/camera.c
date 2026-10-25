@@ -5,7 +5,7 @@
 
 static mln_camera_options downtown(void) {
   // #region camera
-  mln_camera_options camera = mln_camera_options_default();
+  mln_camera_options camera = {.size = sizeof(mln_camera_options)};
   camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM |
                   MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH;
   camera.center.latitude = 37.7749;
@@ -19,7 +19,10 @@ static mln_camera_options downtown(void) {
 
 // #region jump
 mln_status jump_downtown(mln_map map, const mln_completion* completion) {
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.mode = MLN_CAMERA_UPDATE_MODE_JUMP;
   update.camera = downtown();
   return mln_map_update_camera(map, &update, completion, NULL);
@@ -42,7 +45,10 @@ mln_status ease_downtown(
   const mln_completion* completion
 ) {
   // #region ease
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.mode = MLN_CAMERA_UPDATE_MODE_EASE;
   update.camera = downtown();
   update.animation.fields = MLN_ANIMATION_OPTION_DURATION |

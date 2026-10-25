@@ -24,12 +24,4 @@ public sealed record CameraOptions
     public double? Pitch { get; init; }
     public double? Roll { get; init; }
     public double? FieldOfView { get; init; }
-    public static CameraOptions Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyCameraOptions(NativeMethods.mln_camera_options_default());
-        }
-    }
 }

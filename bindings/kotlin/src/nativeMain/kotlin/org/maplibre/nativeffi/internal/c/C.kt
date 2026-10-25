@@ -107,55 +107,7 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_animation_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_animation_options_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_bound_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_bound_options_default()
-      .place(returned.toCPointer()!!)
-  }
-
   actual fun mln_c_version(): Int = org.maplibre.nativeffi.internal.cinterop.mln_c_version().toInt()
-
-  actual fun mln_camera_delta_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_camera_delta_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_camera_fit_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_camera_fit_options_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_camera_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_camera_options_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_camera_update_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_camera_update_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_custom_geometry_source_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_custom_geometry_source_options_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_custom_mvt_vector_source_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_custom_mvt_vector_source_options_default()
-      .place(returned.toCPointer()!!)
-  }
 
   actual fun mln_delivery_batch_release(batch: Long) {
     org.maplibre.nativeffi.internal.cinterop.mln_delivery_batch_release(batch.toULong())
@@ -192,18 +144,6 @@ internal actual object C {
     org.maplibre.nativeffi.internal.cinterop.mln_delivery_queue_release(queue.toULong())
   }
 
-  actual fun mln_frame_demand_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_frame_demand_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_free_camera_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_free_camera_options_default()
-      .place(returned.toCPointer()!!)
-  }
-
   actual fun mln_geojson_source_data_create(
     data: Long,
     options: Long,
@@ -219,22 +159,6 @@ internal actual object C {
 
   actual fun mln_geojson_source_data_release(data: Long) {
     org.maplibre.nativeffi.internal.cinterop.mln_geojson_source_data_release(data.toULong())
-  }
-
-  actual fun mln_geojson_source_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_geojson_source_options_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_gpu_sync_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop.mln_gpu_sync_default().place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_http_header_rule_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_http_header_rule_default()
-      .place(returned.toCPointer()!!)
   }
 
   actual fun mln_http_header_transform_response_set_header(
@@ -275,12 +199,6 @@ internal actual object C {
       handler.toCPointer(),
       outDiagnostic.toCPointer(),
     )
-
-  actual fun mln_logical_extent_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_logical_extent_default()
-      .place(returned.toCPointer()!!)
-  }
 
   actual fun mln_logical_extent_physical_size(
     extent: Long,
@@ -988,12 +906,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_map_options_default()
-      .place(returned.toCPointer()!!)
-  }
-
   actual fun mln_map_projection_create(view: Long, outProjection: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_projection_create(
       view.toCPointer(),
@@ -1615,12 +1527,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_tile_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_map_tile_options_default()
-      .place(returned.toCPointer()!!)
-  }
-
   actual fun mln_map_update_camera(
     map: Long,
     update: Long,
@@ -1634,30 +1540,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_viewport_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_map_viewport_options_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_metal_borrowed_texture_descriptor_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_metal_borrowed_texture_descriptor_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_metal_owned_texture_descriptor_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_metal_owned_texture_descriptor_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_metal_surface_descriptor_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_metal_surface_descriptor_default()
-      .place(returned.toCPointer()!!)
-  }
-
   actual fun mln_network_get_status(outStatus: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_network_get_status(
       outStatus.toCPointer(),
@@ -1670,35 +1552,11 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_opengl_borrowed_texture_descriptor_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_opengl_borrowed_texture_descriptor_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_opengl_owned_texture_descriptor_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_opengl_owned_texture_descriptor_default()
-      .place(returned.toCPointer()!!)
-  }
-
   actual fun mln_opengl_supported_context_provider_mask(): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_opengl_supported_context_provider_mask().toInt()
 
-  actual fun mln_opengl_surface_descriptor_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_opengl_surface_descriptor_default()
-      .place(returned.toCPointer()!!)
-  }
-
   actual fun mln_plugin_get_register_function_v1(): Long =
     org.maplibre.nativeffi.internal.cinterop.mln_plugin_get_register_function_v1().toLong()
-
-  actual fun mln_premultiplied_rgba8_image_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_premultiplied_rgba8_image_default()
-      .place(returned.toCPointer()!!)
-  }
 
   actual fun mln_projected_meters_for_lat_lng(
     coordinate: Long,
@@ -1710,12 +1568,6 @@ internal actual object C {
       outMeters.toCPointer(),
       outDiagnostic.toCPointer(),
     )
-
-  actual fun mln_projection_mode_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_projection_mode_default()
-      .place(returned.toCPointer()!!)
-  }
 
   actual fun mln_render_frame_batch_release(batch: Long) {
     org.maplibre.nativeffi.internal.cinterop.mln_render_frame_batch_release(batch.toULong())
@@ -1738,12 +1590,6 @@ internal actual object C {
       outFrame.toCPointer(),
       outDiagnostic.toCPointer(),
     )
-
-  actual fun mln_render_session_attach_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_render_session_attach_options_default()
-      .place(returned.toCPointer()!!)
-  }
 
   actual fun mln_render_session_barrier(session: Long, completion: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_barrier(
@@ -2030,12 +1876,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_rendered_feature_query_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_rendered_feature_query_options_default()
-      .place(returned.toCPointer()!!)
-  }
-
   actual fun mln_resource_request_complete(handle: Long, response: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_resource_request_complete(
       handle.toULong(),
@@ -2076,12 +1916,6 @@ internal actual object C {
       outCancelled.toCPointer(),
       outDiagnostic.toCPointer(),
     )
-
-  actual fun mln_resource_route_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_resource_route_default()
-      .place(returned.toCPointer()!!)
-  }
 
   actual fun mln_resource_transform_request_complete(
     request: Long,
@@ -2272,12 +2106,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_runtime_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_runtime_options_default()
-      .place(returned.toCPointer()!!)
-  }
-
   actual fun mln_runtime_release(runtime: Long, completion: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_runtime_release(
       runtime.toULong(),
@@ -2417,12 +2245,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_source_feature_query_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_source_feature_query_options_default()
-      .place(returned.toCPointer()!!)
-  }
-
   actual fun mln_style_expression_create(
     expression: Long,
     options: Long,
@@ -2464,70 +2286,10 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_style_expression_inputs_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_style_expression_inputs_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_style_expression_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_style_expression_options_default()
-      .place(returned.toCPointer()!!)
-  }
-
   actual fun mln_style_expression_release(expression: Long) {
     org.maplibre.nativeffi.internal.cinterop.mln_style_expression_release(expression.toULong())
   }
 
-  actual fun mln_style_image_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_style_image_options_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_style_transition_options_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_style_transition_options_default()
-      .place(returned.toCPointer()!!)
-  }
-
   actual fun mln_supported_render_backend_mask(): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_supported_render_backend_mask().toInt()
-
-  actual fun mln_vulkan_borrowed_texture_descriptor_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_vulkan_borrowed_texture_descriptor_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_vulkan_owned_texture_descriptor_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_vulkan_owned_texture_descriptor_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_vulkan_surface_descriptor_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_vulkan_surface_descriptor_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_webgpu_borrowed_texture_descriptor_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_webgpu_borrowed_texture_descriptor_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_webgpu_owned_texture_descriptor_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_webgpu_owned_texture_descriptor_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_webgpu_surface_descriptor_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_webgpu_surface_descriptor_default()
-      .place(returned.toCPointer()!!)
-  }
 }

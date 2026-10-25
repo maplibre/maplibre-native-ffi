@@ -88,6 +88,9 @@ internal actual fun ensureNativeLibrary() {
   check(ModuleLoader.loaded) { "the browser module is not loaded; call Maplibre.loadModule first" }
 }
 
+/** A loaded module has passed its C ABI version check already. */
+internal actual fun loadNativeLibraryUnchecked() = ensureNativeLibrary()
+
 // The module is an Emscripten ES module factory that the bundler must leave to the browser. Its
 // link reads the pool size as Module.mlnPoolSize, and a size of 0 selects the link's default.
 private fun instantiate(url: String, poolSize: Int): Promise<JsAny> =

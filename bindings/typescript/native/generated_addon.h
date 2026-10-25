@@ -105,20 +105,11 @@ napi_value mln_ts_decode_texture_readback_result(
   napi_env env, const mln_completion_result* result
 );
 napi_value mln_ts_delivery_payload(napi_env env, const mln_delivery* delivery);
-napi_value mln_ts_read_animation_options(
-  napi_env env, const mln_animation_options* source, size_t size
-);
 napi_value mln_ts_read_bound_options(
   napi_env env, const mln_bound_options* source, size_t size
 );
 napi_value mln_ts_read_camera(
   napi_env env, const mln_camera* source, size_t size
-);
-napi_value mln_ts_read_camera_delta(
-  napi_env env, const mln_camera_delta* source, size_t size
-);
-napi_value mln_ts_read_camera_fit_options(
-  napi_env env, const mln_camera_fit_options* source, size_t size
 );
 napi_value mln_ts_read_camera_options(
   napi_env env, const mln_camera_options* source, size_t size
@@ -132,17 +123,8 @@ napi_value mln_ts_read_camera_transition_end(
 napi_value mln_ts_read_camera_transition_end_delivery(
   napi_env env, const mln_camera_transition_end_delivery* source, size_t size
 );
-napi_value mln_ts_read_camera_update(
-  napi_env env, const mln_camera_update* source, size_t size
-);
 napi_value mln_ts_read_canonical_tile_id(
   napi_env env, const mln_canonical_tile_id* source, size_t size
-);
-napi_value mln_ts_read_custom_geometry_source_options(
-  napi_env env, const mln_custom_geometry_source_options* source, size_t size
-);
-napi_value mln_ts_read_custom_mvt_vector_source_options(
-  napi_env env, const mln_custom_mvt_vector_source_options* source, size_t size
 );
 napi_value mln_ts_read_custom_source_tile_delivery(
   napi_env env, const mln_custom_source_tile_delivery* source, size_t size
@@ -150,35 +132,17 @@ napi_value mln_ts_read_custom_source_tile_delivery(
 napi_value mln_ts_read_edge_insets(
   napi_env env, const mln_edge_insets* source, size_t size
 );
-napi_value mln_ts_read_egl_context_descriptor(
-  napi_env env, const mln_egl_context_descriptor* source, size_t size
-);
 napi_value mln_ts_read_event_batch_view(
   napi_env env, const mln_event_batch_view* source, size_t size
 );
 napi_value mln_ts_read_event_batch_view_events(
   napi_env env, const mln_event_batch_view* source
 );
-napi_value mln_ts_read_frame_demand(
-  napi_env env, const mln_frame_demand* source, size_t size
-);
 napi_value mln_ts_read_free_camera_options(
   napi_env env, const mln_free_camera_options* source, size_t size
 );
-napi_value mln_ts_read_geojson_source_options(
-  napi_env env, const mln_geojson_source_options* source, size_t size
-);
 napi_value mln_ts_read_gpu_sync(
   napi_env env, const mln_gpu_sync* source, size_t size
-);
-napi_value mln_ts_read_http_header(
-  napi_env env, const mln_http_header* source, size_t size
-);
-napi_value mln_ts_read_http_header_rule(
-  napi_env env, const mln_http_header_rule* source, size_t size
-);
-napi_value mln_ts_read_http_header_rule_headers(
-  napi_env env, const mln_http_header_rule* source
 );
 napi_value mln_ts_read_image_content(
   napi_env env, const mln_image_content* source, size_t size
@@ -204,9 +168,6 @@ napi_value mln_ts_read_log_delivery(
 napi_value mln_ts_read_logical_extent(
   napi_env env, const mln_logical_extent* source, size_t size
 );
-napi_value mln_ts_read_map_options(
-  napi_env env, const mln_map_options* source, size_t size
-);
 napi_value mln_ts_read_map_snapshot(
   napi_env env, const mln_map_snapshot* source, size_t size
 );
@@ -218,24 +179,6 @@ napi_value mln_ts_read_map_view(
 );
 napi_value mln_ts_read_map_viewport_options(
   napi_env env, const mln_map_viewport_options* source, size_t size
-);
-napi_value mln_ts_read_metal_borrowed_texture(
-  napi_env env, const mln_metal_borrowed_texture* source, size_t size
-);
-napi_value mln_ts_read_metal_borrowed_texture_descriptor(
-  napi_env env, const mln_metal_borrowed_texture_descriptor* source, size_t size
-);
-napi_value mln_ts_read_metal_borrowed_texture_descriptor_textures(
-  napi_env env, const mln_metal_borrowed_texture_descriptor* source
-);
-napi_value mln_ts_read_metal_context_descriptor(
-  napi_env env, const mln_metal_context_descriptor* source, size_t size
-);
-napi_value mln_ts_read_metal_owned_texture_descriptor(
-  napi_env env, const mln_metal_owned_texture_descriptor* source, size_t size
-);
-napi_value mln_ts_read_metal_surface_descriptor(
-  napi_env env, const mln_metal_surface_descriptor* source, size_t size
 );
 napi_value mln_ts_read_metal_texture_frame(
   napi_env env, const mln_metal_texture_frame* source, size_t size
@@ -260,33 +203,8 @@ napi_value mln_ts_read_offline_tile_pyramid_region_definition(
   napi_env env, const mln_offline_tile_pyramid_region_definition* source,
   size_t size
 );
-napi_value mln_ts_read_opengl_borrowed_texture(
-  napi_env env, const mln_opengl_borrowed_texture* source, size_t size
-);
-napi_value mln_ts_read_opengl_borrowed_texture_descriptor(
-  napi_env env, const mln_opengl_borrowed_texture_descriptor* source,
-  size_t size
-);
-napi_value mln_ts_read_opengl_borrowed_texture_descriptor_textures(
-  napi_env env, const mln_opengl_borrowed_texture_descriptor* source
-);
-napi_value mln_ts_read_opengl_context_descriptor(
-  napi_env env, const mln_opengl_context_descriptor* source, size_t size
-);
-napi_value mln_ts_read_opengl_context_descriptor_data(
-  napi_env env, const mln_opengl_context_descriptor* source, size_t size
-);
-napi_value mln_ts_read_opengl_owned_texture_descriptor(
-  napi_env env, const mln_opengl_owned_texture_descriptor* source, size_t size
-);
-napi_value mln_ts_read_opengl_surface_descriptor(
-  napi_env env, const mln_opengl_surface_descriptor* source, size_t size
-);
 napi_value mln_ts_read_opengl_texture_frame(
   napi_env env, const mln_opengl_texture_frame* source, size_t size
-);
-napi_value mln_ts_read_premultiplied_rgba8_image(
-  napi_env env, const mln_premultiplied_rgba8_image* source, size_t size
 );
 napi_value mln_ts_read_projected_meters(
   napi_env env, const mln_projected_meters* source, size_t size
@@ -309,9 +227,6 @@ napi_value mln_ts_read_render_frame_batch_view_results(
 napi_value mln_ts_read_render_frame_result(
   napi_env env, const mln_render_frame_result* source, size_t size
 );
-napi_value mln_ts_read_render_session_attach_options(
-  napi_env env, const mln_render_session_attach_options* source, size_t size
-);
 napi_value mln_ts_read_render_session_capabilities(
   napi_env env, const mln_render_session_capabilities* source, size_t size
 );
@@ -320,12 +235,6 @@ napi_value mln_ts_read_render_session_snapshot(
 );
 napi_value mln_ts_read_rendered_feature(
   napi_env env, const mln_rendered_feature* source, size_t size
-);
-napi_value mln_ts_read_rendered_feature_query_options(
-  napi_env env, const mln_rendered_feature_query_options* source, size_t size
-);
-napi_value mln_ts_read_rendered_feature_query_options_layer_ids(
-  napi_env env, const mln_rendered_feature_query_options* source
 );
 napi_value mln_ts_read_rendering_stats(
   napi_env env, const mln_rendering_stats* source, size_t size
@@ -341,9 +250,6 @@ napi_value mln_ts_read_resource_request_delivery(
 );
 napi_value mln_ts_read_resource_request_info(
   napi_env env, const mln_resource_request_info* source, size_t size
-);
-napi_value mln_ts_read_resource_route(
-  napi_env env, const mln_resource_route* source, size_t size
 );
 napi_value mln_ts_read_resource_transform_delivery(
   napi_env env, const mln_resource_transform_delivery* source, size_t size
@@ -378,35 +284,14 @@ napi_value mln_ts_read_runtime_event_render_map(
 napi_value mln_ts_read_runtime_event_tile_action(
   napi_env env, const mln_runtime_event_tile_action* source, size_t size
 );
-napi_value mln_ts_read_runtime_options(
-  napi_env env, const mln_runtime_options* source, size_t size
-);
 napi_value mln_ts_read_screen_point(
   napi_env env, const mln_screen_point* source, size_t size
 );
 napi_value mln_ts_read_source_feature(
   napi_env env, const mln_source_feature* source, size_t size
 );
-napi_value mln_ts_read_source_feature_query_options(
-  napi_env env, const mln_source_feature_query_options* source, size_t size
-);
-napi_value mln_ts_read_source_feature_query_options_source_layer_ids(
-  napi_env env, const mln_source_feature_query_options* source
-);
 napi_value mln_ts_read_style_expression_info(
   napi_env env, const mln_style_expression_info* source, size_t size
-);
-napi_value mln_ts_read_style_expression_inputs(
-  napi_env env, const mln_style_expression_inputs* source, size_t size
-);
-napi_value mln_ts_read_style_expression_inputs_available_images(
-  napi_env env, const mln_style_expression_inputs* source
-);
-napi_value mln_ts_read_style_expression_options(
-  napi_env env, const mln_style_expression_options* source, size_t size
-);
-napi_value mln_ts_read_style_expression_type(
-  napi_env env, const mln_style_expression_type* source, size_t size
 );
 napi_value mln_ts_read_style_image_info(
   napi_env env, const mln_style_image_info* source, size_t size
@@ -416,15 +301,6 @@ napi_value mln_ts_read_style_image_info_stretch_x(
 );
 napi_value mln_ts_read_style_image_info_stretch_y(
   napi_env env, const mln_style_image_info* source
-);
-napi_value mln_ts_read_style_image_options(
-  napi_env env, const mln_style_image_options* source, size_t size
-);
-napi_value mln_ts_read_style_image_options_stretch_x(
-  napi_env env, const mln_style_image_options* source
-);
-napi_value mln_ts_read_style_image_options_stretch_y(
-  napi_env env, const mln_style_image_options* source
 );
 napi_value mln_ts_read_style_layer_info(
   napi_env env, const mln_style_layer_info* source, size_t size
@@ -450,37 +326,9 @@ napi_value mln_ts_read_texture_readback_result(
 napi_value mln_ts_read_tile_id(
   napi_env env, const mln_tile_id* source, size_t size
 );
-napi_value mln_ts_read_unit_bezier(
-  napi_env env, const mln_unit_bezier* source, size_t size
-);
 napi_value mln_ts_read_vec3(napi_env env, const mln_vec3* source, size_t size);
-napi_value mln_ts_read_vulkan_borrowed_texture(
-  napi_env env, const mln_vulkan_borrowed_texture* source, size_t size
-);
-napi_value mln_ts_read_vulkan_borrowed_texture_descriptor(
-  napi_env env, const mln_vulkan_borrowed_texture_descriptor* source,
-  size_t size
-);
-napi_value mln_ts_read_vulkan_borrowed_texture_descriptor_textures(
-  napi_env env, const mln_vulkan_borrowed_texture_descriptor* source
-);
-napi_value mln_ts_read_vulkan_context_descriptor(
-  napi_env env, const mln_vulkan_context_descriptor* source, size_t size
-);
-napi_value mln_ts_read_vulkan_owned_texture_descriptor(
-  napi_env env, const mln_vulkan_owned_texture_descriptor* source, size_t size
-);
-napi_value mln_ts_read_vulkan_surface_descriptor(
-  napi_env env, const mln_vulkan_surface_descriptor* source, size_t size
-);
 napi_value mln_ts_read_vulkan_texture_frame(
   napi_env env, const mln_vulkan_texture_frame* source, size_t size
-);
-napi_value mln_ts_read_webgl_context_descriptor(
-  napi_env env, const mln_webgl_context_descriptor* source, size_t size
-);
-napi_value mln_ts_read_wgl_context_descriptor(
-  napi_env env, const mln_wgl_context_descriptor* source, size_t size
 );
 bool mln_ts_write_animation_options(
   mln_ts_call* call, napi_value value, mln_animation_options* out,

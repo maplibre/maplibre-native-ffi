@@ -41,14 +41,4 @@ public sealed record AnimationOptions
     /// Reports the end of the command's transitions. Disabled by default.
     /// </summary>
     public CameraTransitionHandler EndHandler { get; init; }
-    public static AnimationOptions Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyAnimationOptions(
-                NativeMethods.mln_animation_options_default()
-            );
-        }
-    }
 }

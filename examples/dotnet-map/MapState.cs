@@ -22,7 +22,7 @@ internal sealed class MapState : IDisposable
     /// </summary>
     public static MapState Create(Viewport viewport, string? styleJson = null)
     {
-        var runtime = RuntimeHandle.Create(RuntimeOptions.Default with { CachePath = ":memory:" });
+        var runtime = RuntimeHandle.Create(new RuntimeOptions { CachePath = ":memory:" });
         MapHandle? map = null;
         try
         {
@@ -41,7 +41,7 @@ internal sealed class MapState : IDisposable
                 : map.SetStyleJsonAsync(styleJson);
             style.ReportFailure("style load");
             map.UpdateCameraAsync(
-                    CameraUpdate.Default with
+                    new CameraUpdate
                     {
                         Mode = CameraUpdateMode.Jump,
                         Camera = new CameraOptions
@@ -72,7 +72,7 @@ internal sealed class MapState : IDisposable
     public void SetGestureInProgress(bool inProgress)
     {
         Map.UpdateCameraAsync(
-                CameraUpdate.Default with
+                new CameraUpdate
                 {
                     GesturePhase = inProgress ? GesturePhase.Begin : GesturePhase.End,
                 }
@@ -149,7 +149,7 @@ internal sealed class MapState : IDisposable
     private void Update(CameraOptions camera, AnimationOptions? animation)
     {
         Map.UpdateCameraAsync(
-                CameraUpdate.Default with
+                new CameraUpdate
                 {
                     Mode = animation is null ? CameraUpdateMode.Jump : CameraUpdateMode.Ease,
                     Camera = camera,

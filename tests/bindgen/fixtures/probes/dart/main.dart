@@ -72,16 +72,8 @@ void main() {
     'keyword parameters: ${entry.type} ${entry.defer} ${entry.raw}',
   );
 
-  // A record built from its constructor defaults equals the native default.
+  // A record built from its constructor defaults is zeroed with its size set.
   probeSettingsCheck(ProbeSettings());
-
-  // A copy of a native default keeps its values and leaves a registration
-  // unset.
-  final hooks = probeHooksDefault();
-  check(
-    hooks.limit == 4 && hooks.signal == const ProbeSignal(),
-    'hooks default: ${hooks.limit} ${hooks.signal}',
-  );
 
   // A status that the C API declares as absence returns null, and any other
   // failure still reports its diagnostic.

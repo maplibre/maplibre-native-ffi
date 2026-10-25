@@ -1,20 +1,8 @@
 #define MLN_BUILDING_C
 
-#include <cstddef>
-
 #include "c_api/boundary.hpp"
 #include "maplibre_native_c.h"
 #include "render/render_session_common.hpp"
-
-auto mln_rendered_feature_query_options_default(void) noexcept
-  -> mln_rendered_feature_query_options {
-  return mln::c_api::sized<mln_rendered_feature_query_options>();
-}
-
-auto mln_source_feature_query_options_default(void) noexcept
-  -> mln_source_feature_query_options {
-  return mln::c_api::sized<mln_source_feature_query_options>();
-}
 
 auto mln_render_session_query_rendered_features(
   mln_render_session session, const mln_rendered_query_geometry* geometry,

@@ -44,6 +44,8 @@ def encode(values, value, source, depth=0):
         )
         return f"if ({source}) |{item}| {encode(values, replace(value, nullable=False), item, depth + 1)} else {fallback}"
     if value.kind == "buffer":
+        if value.length == "nul":
+            return f"try marshal.cString(allocator, {source})"
         return (
             f"marshal.view({source})"
             if value.buffer_form == "view"
@@ -73,7 +75,7 @@ def encoding(value) -> tuple[bool, bool]:
         allocates, roots = fields_encoding(value)
         return allocates, True
     if value.kind == "buffer":
-        return False, False
+        return value.length == "nul", False
     if value.kind == "reference":
         return True, encoding(value.element)[1]
     if value.kind == "array":
@@ -165,6 +167,9 @@ def decode(values, value, source, context="raw", borrowed=False):
         )
         return f"if ({absent}) null else {decode(values, replace(value, nullable=False), source, context, borrowed)}"
     if value.kind == "buffer":
+        if value.length == "nul":
+            span = f"std.mem.span({source} orelse return error.NativeError)"
+            return span if borrowed else f"try allocator.dupe(u8, {span})"
         if value.buffer_form != "view":
             count = (
                 value.length
@@ -296,12 +301,12 @@ def declaration(values, value):
             continue
         if field.value.kind == "union":
             union = field.value
-            default = (
-                " = .{ .unknown = 0 }" if union.native in values.bound.returned else ""
-            )
+            default = field_default(values, field)
             fields.append(
                 doc(values.bound, f"{value.native}.{field.name}", "    ")
-                + f"    {local}: {values.public(union)}{default},"
+                + f"    {local}: {values.public(union)}"
+                + (f" = {default}" if default is not None else "")
+                + ","
             )
             captures.append(
                 f"            .{local} = {decode(values, union, raw, borrowed=borrowed)},"
@@ -310,30 +315,11 @@ def declaration(values, value):
             continue
         optional = field.presence and field.presence.mask
         public_type = values.public(field.value)
-        default = (
-            "null"
-            if optional or public_type.startswith("?")
-            else "&.{}"
-            if public_type.startswith("[]")
-            else field_default(values, field)
-        )
-        # A native default leaves every buffer empty, and empty text means
-        # absent, so a buffer defaults to empty even in a natively defaulted
-        # record.
+        default = "null" if optional else field_default(values, field)
         fields.append(
             doc(values.bound, f"{value.native}.{field.name}", "    ")
             + f"    {local}: {'?' if optional else ''}{public_type}"
-            + (
-                f" = {default}"
-                if default is not None
-                and (
-                    not value.default
-                    or optional
-                    or public_type.startswith("?")
-                    or field.value.kind == "buffer"
-                )
-                else ""
-            )
+            + (f" = {default}" if default is not None else "")
             + ","
         )
         copied = decode(values, field.value, raw, borrowed=borrowed)
@@ -357,9 +343,6 @@ def declaration(values, value):
             captures.append(f"            .{local} = {copied},")
     if value.registration:
         writes.extend(callback_writes)
-    initial = (
-        f"c.{value.default}()" if value.default else f"std.mem.zeroes(c.{value.native})"
-    )
     encoder_parameters = to_native_parameters(value)
     for name in ("allocator", "roots"):
         if (name in encoder_parameters) != any(name in line for line in writes):
@@ -388,7 +371,7 @@ def declaration(values, value):
         if borrowed
         else ""
     )
-    # Native returns a registration only as its own default.
+    # A registration that native returns copies with its callbacks unset.
     copy = (
         f"""{lent_doc}    pub fn fromNative({"" if borrowed else "allocator: std.mem.Allocator, "}raw: c.{value.native}) status.Error!{typ} {{
 {capture_use}        return .{{
@@ -399,31 +382,14 @@ def declaration(values, value):
         if not value.registration or value.native in values.bound.returned
         else ""
     )
-    required = required_callbacks(value)
-    if copy and required:
-        from .zig_callbacks import callback_type
-
-        if any("allocator" in line for line in captures):
-            raise ModelError(
-                [f"Zig: {value.native}: a default with required callbacks allocates"]
-            )
-        # A copy holds no callbacks, so the default's caller passes the
-        # required ones.
-        taken = "".join(
-            f", {identifier(f.name)}: {callback_type(values, f)}" for f in required
+    if copy and required_callbacks(value):
+        # A copy holds no callbacks, so it can't hold the required ones.
+        raise ModelError(
+            [f"Zig: {value.native}: a returned registration requires callbacks"]
         )
-        unused = (
-            "" if any("raw." in line for line in captures) else "        _ = raw;\n"
-        )
-        copy = f"""    fn fromDefault(raw: c.{value.native}{taken}) {typ} {{
-{unused}        return .{{
-{chr(10).join(captures)}
-        }};
-    }}
-"""
     encoder = (
         f"""    pub fn toNative(self: {typ}{signature}) status.Error!c.{value.native} {{
-        var raw = {initial};
+        var raw = std.mem.zeroes(c.{value.native});
 {chr(10).join(writes)}
         return raw;
     }}
@@ -451,9 +417,6 @@ def union_declaration(values, value):
         if field.role == "size"
     ]
     writes.append(submit(values, member.value, value, "self", raw))
-    initial = (
-        f"c.{value.default}()" if value.default else f"std.mem.zeroes(c.{value.native})"
-    )
     signature = "".join(
         {
             "allocator": ", allocator: std.mem.Allocator",
@@ -465,7 +428,7 @@ def union_declaration(values, value):
     capture_use = "" if "allocator" in copied else "        _ = allocator;\n"
     encoder = (
         f"""    pub fn toNative(self: {typ}{signature}) status.Error!c.{value.native} {{
-        var raw = {initial};
+        var raw = std.mem.zeroes(c.{value.native});
 {chr(10).join(writes)}
         return raw;
     }}

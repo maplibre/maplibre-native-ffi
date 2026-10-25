@@ -9,7 +9,16 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_opengl_borrowed_texture</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Texture">
-/// Borrowed OpenGL texture object name. Required.
-/// </param>
-public readonly partial record struct OpenglBorrowedTexture(uint Texture);
+public readonly partial record struct OpenglBorrowedTexture
+{
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public OpenglBorrowedTexture(uint Texture)
+    {
+        this.Texture = Texture;
+    }
+
+    /// <summary>
+    /// Borrowed OpenGL texture object name. Required.
+    /// </summary>
+    public required uint Texture { get; init; }
+}

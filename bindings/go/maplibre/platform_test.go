@@ -42,8 +42,7 @@ func exitWithLiveHandles(t *testing.T) {
 		t.Fatal(err)
 	}
 	f := &fixture{pendingEvents: make(chan RuntimeEvent, 4096)}
-	options := DefaultRuntimeOptions()
-	runtime, err := RuntimeCreate(options)
+	runtime, err := RuntimeCreate(RuntimeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

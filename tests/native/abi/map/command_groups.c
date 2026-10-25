@@ -93,7 +93,10 @@ static void a_camera_gesture_update_publishes_once(void) {
   const uint32_t phases[] = {MLN_GESTURE_PHASE_BEGIN, MLN_GESTURE_PHASE_END};
   for (size_t index = 0; index < sizeof(phases) / sizeof(phases[0]); ++index) {
     const uint64_t before = render_update_generation(map);
-    mln_camera_update update = mln_camera_update_default();
+    mln_camera_update update = {
+      .size = sizeof(mln_camera_update),
+      .camera = {.size = sizeof(mln_camera_options)}
+    };
     update.mode = MLN_CAMERA_UPDATE_MODE_JUMP;
     update.gesture_phase = phases[index];
     update.camera.fields = MLN_CAMERA_OPTION_ZOOM;

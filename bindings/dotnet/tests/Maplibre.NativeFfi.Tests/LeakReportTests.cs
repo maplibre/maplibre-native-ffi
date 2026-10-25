@@ -20,7 +20,7 @@ public sealed class LeakReportTests
     public void AnAbandonedHandleIsDisposedAndReportedAsALeak()
     {
         using var reports = new LeakCapture();
-        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         var (map, mapId, undisposable) = Abandon(runtime);
 
         Gc.CollectUntilReclaimed("the abandoned handles", map, undisposable);
@@ -78,7 +78,7 @@ public sealed class LeakReportTests
         ulong MapId
     ) CreateUnreachableRuntimeAndMap()
     {
-        var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        var runtime = RuntimeHandle.Create(new RuntimeOptions());
         var map = CreateMapReleased(runtime);
         return (new WeakReference(runtime), runtime.Id, new WeakReference(map), map.Id);
     }

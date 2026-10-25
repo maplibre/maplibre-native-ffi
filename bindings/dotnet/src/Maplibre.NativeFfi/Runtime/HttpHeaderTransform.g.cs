@@ -9,7 +9,7 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_http_header_transform</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
-public readonly record struct HttpHeaderTransform
+public readonly partial record struct HttpHeaderTransform
 {
     public HttpHeaderTransform(
         HttpHeaderTransformCallback? Callback,

@@ -57,14 +57,4 @@ public sealed record StyleImageOptions
     /// Whether the image is a signed distance field icon. Absent selects false.
     /// </summary>
     public bool? Sdf { get; init; }
-    public static StyleImageOptions Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyStyleImageOptions(
-                NativeMethods.mln_style_image_options_default()
-            );
-        }
-    }
 }

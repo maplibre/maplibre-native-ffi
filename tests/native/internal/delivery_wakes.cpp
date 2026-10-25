@@ -172,7 +172,9 @@ void a_camera_end_reaches_its_queue_without_allocating() {
   mln_test_delivery_queue_create(&queue);
   const auto runtime = mln_test_create_runtime();
   const auto map = mln_test_create_map(runtime);
-  auto camera = mln_camera_update_default();
+  auto camera = mln_camera_update{};
+  camera.size = sizeof(mln_camera_update);
+  camera.camera.size = sizeof(mln_camera_options);
   camera.mode = MLN_CAMERA_UPDATE_MODE_EASE;
   camera.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   camera.camera.zoom = 6;

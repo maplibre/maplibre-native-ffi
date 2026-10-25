@@ -68,6 +68,15 @@ class GoEmitterTests(unittest.TestCase):
         self.assertIn('default: arena.fail("unknown input union variant")', encode[0])
         self.assertNotIn("func (UnknownVariant) isRenderedQueryGeometry()", source)
 
+    def test_a_zero_literal_is_the_default(self):
+        source = go.generate(real_api())["generated_api.go"]
+        self.assertNotRegex(source, r"func Default[A-Z]")
+        # An input starts from a zeroed record, with its size set.
+        self.assertIn(
+            "func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options { raw := C.mln_map_options{}; raw.size = ",
+            source,
+        )
+
     def test_a_callback_receives_its_slice_argument_as_a_slice(self):
         source = go.generate(real_api())["generated_api.go"]
         self.assertIn(

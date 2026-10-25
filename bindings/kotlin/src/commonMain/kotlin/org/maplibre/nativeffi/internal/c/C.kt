@@ -29,23 +29,7 @@ internal expect object C {
 
   fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int
 
-  fun mln_animation_options_default(returned: Long): Unit
-
-  fun mln_bound_options_default(returned: Long): Unit
-
   fun mln_c_version(): Int
-
-  fun mln_camera_delta_default(returned: Long): Unit
-
-  fun mln_camera_fit_options_default(returned: Long): Unit
-
-  fun mln_camera_options_default(returned: Long): Unit
-
-  fun mln_camera_update_default(returned: Long): Unit
-
-  fun mln_custom_geometry_source_options_default(returned: Long): Unit
-
-  fun mln_custom_mvt_vector_source_options_default(returned: Long): Unit
 
   fun mln_delivery_batch_release(batch: Long): Unit
 
@@ -57,10 +41,6 @@ internal expect object C {
 
   fun mln_delivery_queue_release(queue: Long): Unit
 
-  fun mln_frame_demand_default(returned: Long): Unit
-
-  fun mln_free_camera_options_default(returned: Long): Unit
-
   fun mln_geojson_source_data_create(
     data: Long,
     options: Long,
@@ -69,12 +49,6 @@ internal expect object C {
   ): Int
 
   fun mln_geojson_source_data_release(data: Long): Unit
-
-  fun mln_geojson_source_options_default(returned: Long): Unit
-
-  fun mln_gpu_sync_default(returned: Long): Unit
-
-  fun mln_http_header_rule_default(returned: Long): Unit
 
   fun mln_http_header_transform_response_set_header(
     response: Long,
@@ -90,8 +64,6 @@ internal expect object C {
   fun mln_log_set_async_severity_mask(mask: Int, outDiagnostic: Long): Int
 
   fun mln_log_set_callback(handler: Long, outDiagnostic: Long): Int
-
-  fun mln_logical_extent_default(returned: Long): Unit
 
   fun mln_logical_extent_physical_size(
     extent: Long,
@@ -430,8 +402,6 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_options_default(returned: Long): Unit
-
   fun mln_map_projection_create(view: Long, outProjection: Long, outDiagnostic: Long): Int
 
   fun mln_map_projection_get_camera(projection: Long, outCamera: Long, outDiagnostic: Long): Int
@@ -712,45 +682,23 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_tile_options_default(returned: Long): Unit
-
   fun mln_map_update_camera(map: Long, update: Long, completion: Long, outDiagnostic: Long): Int
-
-  fun mln_map_viewport_options_default(returned: Long): Unit
-
-  fun mln_metal_borrowed_texture_descriptor_default(returned: Long): Unit
-
-  fun mln_metal_owned_texture_descriptor_default(returned: Long): Unit
-
-  fun mln_metal_surface_descriptor_default(returned: Long): Unit
 
   fun mln_network_get_status(outStatus: Long, outDiagnostic: Long): Int
 
   fun mln_network_set_status(status: Int, outDiagnostic: Long): Int
 
-  fun mln_opengl_borrowed_texture_descriptor_default(returned: Long): Unit
-
-  fun mln_opengl_owned_texture_descriptor_default(returned: Long): Unit
-
   fun mln_opengl_supported_context_provider_mask(): Int
-
-  fun mln_opengl_surface_descriptor_default(returned: Long): Unit
 
   fun mln_plugin_get_register_function_v1(): Long
 
-  fun mln_premultiplied_rgba8_image_default(returned: Long): Unit
-
   fun mln_projected_meters_for_lat_lng(coordinate: Long, outMeters: Long, outDiagnostic: Long): Int
-
-  fun mln_projection_mode_default(returned: Long): Unit
 
   fun mln_render_frame_batch_release(batch: Long): Unit
 
   fun mln_render_session_abandon(session: Long, outResult: Long, outDiagnostic: Long): Int
 
   fun mln_render_session_acquire_frame(session: Long, outFrame: Long, outDiagnostic: Long): Int
-
-  fun mln_render_session_attach_options_default(returned: Long): Unit
 
   fun mln_render_session_barrier(session: Long, completion: Long, outDiagnostic: Long): Int
 
@@ -879,8 +827,6 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_rendered_feature_query_options_default(returned: Long): Unit
-
   fun mln_resource_request_complete(handle: Long, response: Long, outDiagnostic: Long): Int
 
   fun mln_resource_request_is_cancelled(handle: Long, outCancelled: Long, outDiagnostic: Long): Int
@@ -895,8 +841,6 @@ internal expect object C {
     outCancelled: Long,
     outDiagnostic: Long,
   ): Int
-
-  fun mln_resource_route_default(returned: Long): Unit
 
   fun mln_resource_transform_request_complete(request: Long, url: Long, outDiagnostic: Long): Int
 
@@ -978,8 +922,6 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_runtime_options_default(returned: Long): Unit
-
   fun mln_runtime_release(runtime: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_runtime_run_ambient_cache_operation(
@@ -1051,8 +993,6 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_source_feature_query_options_default(returned: Long): Unit
-
   fun mln_style_expression_create(
     expression: Long,
     options: Long,
@@ -1071,27 +1011,7 @@ internal expect object C {
 
   fun mln_style_expression_get_info(expression: Long, outInfo: Long, outDiagnostic: Long): Int
 
-  fun mln_style_expression_inputs_default(returned: Long): Unit
-
-  fun mln_style_expression_options_default(returned: Long): Unit
-
   fun mln_style_expression_release(expression: Long): Unit
 
-  fun mln_style_image_options_default(returned: Long): Unit
-
-  fun mln_style_transition_options_default(returned: Long): Unit
-
   fun mln_supported_render_backend_mask(): Int
-
-  fun mln_vulkan_borrowed_texture_descriptor_default(returned: Long): Unit
-
-  fun mln_vulkan_owned_texture_descriptor_default(returned: Long): Unit
-
-  fun mln_vulkan_surface_descriptor_default(returned: Long): Unit
-
-  fun mln_webgpu_borrowed_texture_descriptor_default(returned: Long): Unit
-
-  fun mln_webgpu_owned_texture_descriptor_default(returned: Long): Unit
-
-  fun mln_webgpu_surface_descriptor_default(returned: Long): Unit
 }

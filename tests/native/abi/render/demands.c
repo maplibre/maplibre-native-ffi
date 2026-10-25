@@ -92,7 +92,7 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, empty);
   TEST_ASSERT_EQUAL_size_t(0, strlen(diagnostic.message));
   // A demand with an unknown flag is rejected and queues no result.
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = 1U << 8U;
   demand.token = 200;
   MLN_TEST_INVALID(
@@ -101,7 +101,7 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   frame_wake_wait wake = {
     .fixture = &fixture, .before = atomic_load(&fixture.frame_wakes)
   };
-  demand = mln_frame_demand_default();
+  demand = (mln_frame_demand){.size = sizeof(mln_frame_demand)};
   demand.token = 201;
   MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
   MLN_TEST_OK(mln_test_render_step_until(
@@ -132,7 +132,7 @@ static void a_barrier_ends_a_demand_while_the_ring_stays_acquired(void) {
   attach(&runtime, &map, &fixture);
   mln_acquired_frame first = mln_test_render_and_acquire(&fixture, 201);
   mln_acquired_frame second = mln_test_render_and_acquire(&fixture, 202);
-  mln_gpu_sync producer = mln_gpu_sync_default();
+  mln_gpu_sync producer = {.size = sizeof(mln_gpu_sync)};
   MLN_TEST_OK(mln_acquired_frame_get_producer_sync(first, &producer, NULL));
   TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_CPU_COMPLETE, producer.kind);
 
@@ -509,7 +509,7 @@ static bool still_completed_under_keepalive(void* context) {
   if (wait->failed || mln_test_completion_poll(wait->still)) {
     return true;
   }
-  const mln_frame_demand demand = mln_frame_demand_default();
+  const mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   wait->failed =
     mln_render_session_request_frame(wait->fixture->session, &demand, NULL) !=
     MLN_STATUS_OK;
@@ -550,7 +550,7 @@ static void still_image_completes_under_if_needed_keepalive_demands(void) {
 static void request_waiting(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = token;
   MLN_TEST_OK(
@@ -576,7 +576,10 @@ static void expect_waiting(const mln_test_render_fixture* fixture) {
 }
 
 static void move_camera(mln_map map, double zoom) {
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   update.camera.zoom = zoom;
   MLN_TEST_AWAIT_OK(
@@ -682,7 +685,7 @@ static void a_waiting_demand_ends_by_supersession_barrier_or_detach(void) {
   mln_map map;
   mln_test_render_fixture fixture = {0};
   attach(&runtime, &map, &fixture);
-  mln_frame_demand forced_wait = mln_frame_demand_default();
+  mln_frame_demand forced_wait = {.size = sizeof(mln_frame_demand)};
   forced_wait.flags = MLN_FRAME_DEMAND_FORCE | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   MLN_TEST_INVALID(
     mln_render_session_request_frame(fixture.session, &forced_wait, NULL)

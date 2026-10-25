@@ -14,14 +14,4 @@ public sealed record CameraFitOptions
     public EdgeInsets? Padding { get; init; }
     public double? Bearing { get; init; }
     public double? Pitch { get; init; }
-    public static CameraFitOptions Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyCameraFitOptions(
-                NativeMethods.mln_camera_fit_options_default()
-            );
-        }
-    }
 }

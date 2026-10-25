@@ -1,13 +1,15 @@
 """Generate allocator-free Zig values from resolved scalar and record plans."""
 
 from ..model import ModelError
-from ..semantic import ValuePlan, enum_member_prefix
+from ..semantic import ValuePlan, enum_member_prefix, required_callbacks
 from .zig import SCALARS, doc, documented, identifier, pascal
 
 
 def field_default(values, field) -> str | None:
+    """A field's initializer, or None when a literal must set it: a required
+    field, or one whose type has no zero value."""
     value = field.value
-    if value.default:
+    if field.required:
         return None
     if value.kind == "enum":
         if value.enum_kind == "bitmask":
@@ -19,26 +21,30 @@ def field_default(values, field) -> str | None:
             if zero
             else "@enumFromInt(0)"
         )
-    if value.union_member:
+    if value.kind == "union" or value.union_member:
         # Only a union that keeps unknown tags has a value to start from.
         return ".{ .unknown = 0 }" if value.native in values.bound.returned else None
+    public = values.public(value)
+    if public.startswith("?"):
+        return "null"
+    if public.startswith("[]"):
+        return "&.{}"
     if value.kind != "record":
-        public = values.public(value)
-        if public.startswith("?"):
-            return "null"
         if public == "bool":
             return "false"
         if public in SCALARS.values():
             return "0"
         return f"std.mem.zeroes({public})"
     # `.{}` builds a record only when each of its public members has a default
-    # too, which a member record with a default function lacks.
+    # too, which a required member or callback lacks.
+    if required_callbacks(value):
+        return None
     members = (
         member
         for member in value.fields
         if member.public
-        and member.value.kind == "record"
         and not (member.presence and member.presence.mask)
+        and (member.required or member.value.kind in {"record", "union"})
     )
     if any(field_default(values, member) is None for member in members):
         return None
@@ -265,8 +271,7 @@ class Values:
         for field in value.fields:
             local = identifier(field.name)
             if field.role == "size":
-                if not value.default:
-                    writes.append(f"        raw.{local} = @sizeOf(c.{value.native});")
+                writes.append(f"        raw.{local} = @sizeOf(c.{value.native});")
                 continue
             if not field.public:
                 continue
@@ -275,11 +280,7 @@ class Values:
             fields.append(
                 doc(self.bound, f"{value.native}.{field.name}", "    ")
                 + f"    {local}: {'?' if optional else ''}{self.public(field.value)}"
-                + (
-                    f" = {initial}"
-                    if initial is not None and (not value.default or optional)
-                    else ""
-                )
+                + (f" = {initial}" if initial is not None else "")
                 + ","
             )
             copy = self.capture(field.value, f"raw.{local}")
@@ -297,14 +298,9 @@ class Values:
                 writes.append(
                     f"        raw.{local} = {self.materialize(field.value, 'self.' + local)};"
                 )
-        initial = (
-            f"c.{value.default}()"
-            if value.default
-            else f"std.mem.zeroes(c.{value.native})"
-        )
         encoder = (
             f"""    pub fn toNative(self: {public}) c.{value.native} {{
-        var raw = {initial};
+        var raw = std.mem.zeroes(c.{value.native});
 {chr(10).join(writes)}
         return raw;
     }}

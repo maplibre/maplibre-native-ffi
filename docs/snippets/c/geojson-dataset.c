@@ -10,7 +10,9 @@ mln_status show_earthquakes(
 ) {
   // #region options
   // Each value applies when its field bit is set.
-  mln_geojson_source_options options = mln_geojson_source_options_default();
+  mln_geojson_source_options options = {
+    .size = sizeof(mln_geojson_source_options)
+  };
   options.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER |
                     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
   options.cluster = true;

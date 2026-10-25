@@ -59,7 +59,7 @@ internal sealed class NativeFixture : IAsyncDisposable
     )
     {
         var events = new SemaphoreSlim(0);
-        var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        var runtime = RuntimeHandle.Create(new RuntimeOptions());
         var pendingEvents = new ConcurrentQueue<RuntimeEvent>();
         try
         {

@@ -150,9 +150,18 @@ fn array_inputs_are_copied_when_they_are_submitted() {
     assert_eq!(copied.pixels, expected_pixels);
 }
 
+// A record with a required member has no default; its constructor takes the
+// required members and zeroes the others.
+static_assertions::assert_not_impl_any!(MapOptions: Default);
+
 #[test]
-fn a_record_built_from_its_default_equals_the_native_default() {
-    assert_eq!(MapOptions::default(), map_options_default());
+fn a_record_built_from_its_required_members_zeroes_the_others() {
+    let extent = LogicalExtent::new(256, 128, 2.0);
+    let options = MapOptions::new(extent);
+    assert_eq!(options.initial_extent, extent);
+    assert_eq!(options.map_mode, MapMode::default());
+    assert!(!options.fast_pfor_enabled);
+    assert_eq!(options.event_mask, None);
 }
 
 // An enum without a zero member has no default rather than an unknown 0, and

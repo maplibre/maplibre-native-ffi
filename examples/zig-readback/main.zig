@@ -107,11 +107,11 @@ pub fn main(init_args: std.process.Init) !void {
         teardown.deinit();
     } else |_| runtime.deinit();
 
-    var options = maplibre.mapOptionsDefault();
-    options.initial_extent = image_extent;
-    options.map_mode = .static;
-    options.event_mask = .{};
-    var created = try runtime.createMap(options, &diagnostic);
+    var created = try runtime.createMap(.{
+        .initial_extent = image_extent,
+        .map_mode = .static,
+        .event_mask = .{},
+    }, &diagnostic);
     // The map is ours from the call, so a failed creation still releases it.
     var map = created.map;
     defer if (map.release(null)) |future| {
@@ -122,7 +122,7 @@ pub fn main(init_args: std.process.Init) !void {
     defer created.ready.deinit();
     try created.ready.wait(&diagnostic);
 
-    try setInitialCamera(allocator, &map);
+    try setInitialCamera(&map);
     var style = if (isSmokeRun(init_args))
         try map.setStyleJson(smoke_style_json, &diagnostic)
     else
@@ -151,7 +151,7 @@ fn renderWithDriver(
     signal: *WakeSignal,
     output_path: []const u8,
 ) !void {
-    var attachment = try attachOwnedTexture(allocator, context, map, signal, image_extent);
+    var attachment = try attachOwnedTexture(context, map, signal, image_extent);
     var attachment_needs_cleanup = true;
     errdefer if (attachment_needs_cleanup) {
         _ = attachment.session.abandon(null) catch {};
@@ -237,43 +237,39 @@ const OwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachConte
 /// Supplies transferable state to a core worker or a WGL context to the caller
 /// driver.
 fn attachOwnedTexture(
-    allocator: std.mem.Allocator,
     context: *OwnedTextureContext,
     map: *maplibre.Map,
     signal: *WakeSignal,
     extent: maplibre.LogicalExtent,
 ) !maplibre.NewRenderSession {
-    var defaults = try maplibre.renderSessionAttachOptionsDefault(allocator);
-    defer defaults.deinit();
-    var wakes = defaults.value;
-    wakes.requested_texture_ring_depth = 1;
-    wakes.frame_wake = signal.wake();
-    wakes.driver_work_wake = if (uses_caller_driver) signal.wake() else .{};
     return if (build_options.supports_vulkan)
         try map.attachVulkanOwnedTexture(.{
             .extent = extent,
             .context = context.descriptor(),
-        }, withDriver(wakes, .core_worker), null)
+        }, attachOptions(signal, .core_worker), null)
     else if (build_options.supports_metal)
         try map.attachMetalOwnedTexture(.{
             .extent = extent,
             .context = context.descriptor(),
             // MTLPixelFormatBGRA8Unorm, the format Apple's drawables use.
             .pixel_format = 80,
-        }, withDriver(wakes, .core_worker), null)
+        }, attachOptions(signal, .core_worker), null)
     else if (build_options.supports_opengl)
         try map.attachOpenglOwnedTexture(.{
             .extent = extent,
             .context = context.descriptor(),
-        }, withDriver(wakes, if (supports_egl) .core_worker else .caller_graphics_thread), null)
+        }, attachOptions(signal, if (supports_egl) .core_worker else .caller_graphics_thread), null)
     else
         error.RenderBackendUnavailable;
 }
 
-fn withDriver(options: maplibre.RenderSessionAttachOptions, driver: maplibre.RenderDriverKind) maplibre.RenderSessionAttachOptions {
-    var with_driver = options;
-    with_driver.driver = driver;
-    return with_driver;
+fn attachOptions(signal: *WakeSignal, driver: maplibre.RenderDriverKind) maplibre.RenderSessionAttachOptions {
+    return .{
+        .driver = driver,
+        .requested_texture_ring_depth = 1,
+        .frame_wake = signal.wake(),
+        .driver_work_wake = if (uses_caller_driver) signal.wake() else .{},
+    };
 }
 
 const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
@@ -541,16 +537,13 @@ fn expectVk(result: if (build_options.supports_vulkan) vk.VkResult else i32) !vo
     if (build_options.supports_vulkan and result != vk.VK_SUCCESS) return error.VulkanCallFailed;
 }
 
-fn setInitialCamera(allocator: std.mem.Allocator, map: *maplibre.Map) !void {
-    var update = try maplibre.cameraUpdateDefault(allocator);
-    defer update.deinit();
-    update.value.camera = .{
+fn setInitialCamera(map: *maplibre.Map) !void {
+    var completion = try map.updateCamera(.{ .camera = .{
         .center = .{ .latitude = 37.7749, .longitude = -122.4194 },
         .zoom = 13.0,
         .bearing = 12.0,
         .pitch = 30.0,
-    };
-    var completion = try map.updateCamera(update.value, null);
+    } }, null);
     completion.deinit();
 }
 

@@ -18,11 +18,11 @@ from tools.bindgen.emitters.rust import (
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
 from tools.bindgen.semantic import (
     BoundApi,
-    DefaultSupport,
     DisposeSupport,
     HandlePlan,
     OperationPlan,
     output_member,
+    required_member,
 )
 
 from .python_values import Values, enum_type, ok, public_name, rust_field, scalar_type
@@ -251,15 +251,18 @@ def operation(
         if (receiver and parameter.name == receiver.name) or parameter.name in counts:
             continue
         value = parameter.value
-        # An options record may be omitted, as may a release's inputs, since
-        # every handle closes with no arguments. Any other record is the
-        # subject of the call, which C requires.
+        # An options record with no required member may be omitted, as may a
+        # release's inputs, since every handle closes with no arguments. Any
+        # other record is the subject of the call, which C requires.
         record = value.element if value.kind == "reference" else value
         has_default = bool(
             record
-            and record.default
+            and record.kind == "record"
+            and not any(required_member(f) for f in record.fields if f.public)
             and (release or exit or record.native.endswith("_options"))
         )
+        if has_default:
+            values.omittable.add(record.native)
         # The Python facade keeps the C name. Only the Rust glue's local is
         # renamed, when it would shadow a name the glue itself uses.
         local = parameter.name
@@ -292,7 +295,7 @@ def operation(
                 setup.append(
                     f"        let {local} = {local}.unwrap_or_else(|| py.None().into_bound(py));"
                 )
-            if value.kind == "buffer" and value.ctype.pointee:
+            if value.kind == "buffer" and value.ctype.pointee and value.length != "nul":
                 setup.append(
                     f"        let {local}_view = storage.buffer({local}.clone(), {str(value.encoding == 'utf8').lower()})?;"
                 )
@@ -425,13 +428,8 @@ def operation(
                 else "sys::" + element.native
             )
             count = arguments[value.length]
-            init = (
-                f"unsafe {{ sys::{element.default}() }}"
-                if element.default
-                else "unsafe { std::mem::zeroed() }"
-            )
             setup.append(
-                f"        let mut {output.name}: Vec<{native}> = (0..{count}).map(|_| {init}).collect();"
+                f"        let mut {output.name}: Vec<{native}> = (0..{count}).map(|_| unsafe {{ std::mem::zeroed() }}).collect();"
             )
             for field in element.fields:
                 if field.role == "size":
@@ -448,12 +446,9 @@ def operation(
             if value.kind == "enum"
             else "sys::" + value.native
         )
-        init = (
-            f"unsafe {{ sys::{value.default}() }}"
-            if value.default
-            else "unsafe { std::mem::zeroed() }"
+        setup.append(
+            f"        let mut {output.name}: {native} = unsafe {{ std::mem::zeroed() }};"
         )
-        setup.append(f"        let mut {output.name}: {native} = {init};")
         if value.kind == "record":
             for field in value.fields:
                 if field.role == "size":
@@ -931,32 +926,8 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         generated.append(function.name)
         if record:
             records.add(record)
-    default_native = []
-    default_names = []
-    for plan in bound.operations:
-        if not isinstance(plan.support, DefaultSupport) or plan.result is None:
-            continue
-        saved = (
-            dict(values.records),
-            dict(values.inputs),
-            dict(values.enums),
-            set(values.outputs),
-        )
-        try:
-            values.supported(plan.result)
-        except ModelError:
-            values.records, values.inputs, values.enums, values.outputs = saved
-            continue
-        values.defaults.add(plan.result.native)
-        errors.pop(plan.name, None)
-        name = "_default_" + plan.result.native.removeprefix("mln_")
-        default_names.append(name)
-        default_native.append(
-            f"#[pyfunction]\nfn {name}(py: Python<'_>) -> PyResult<Py<PyAny>> {{ let value = unsafe {{ sys::{plan.name}() }}; {ok(values.copy(plan.result, 'value'))} }}\n"
-        )
     files = error_sources()
     rust_values, public_values = values.sources()
-    rust_values += "\n".join(default_native)
     for handle in bound.handles.values():
         if not handle.cleanup or handle.cleanup in bound.source.runtime_exports:
             continue
@@ -995,7 +966,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         if value.response
     }
     global_native = "\n".join(rust.get("", []))
-    global_names = default_names + [
+    global_names = [
         plan.member
         for plan in bound.operations
         if plan.name in generated
@@ -1033,9 +1004,6 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
             "\nclass _NativeRegistration:\n"
             "    def __init__(self, kind: str, callbacks: tuple[int, ...], user_data: int, release: int) -> None: ...\n"
         )
-    files["python/maplibre_native_ffi/_native.pyi"] += "\n" + "\n".join(
-        f"def {name}() -> Any: ..." for name in default_names
-    )
     for owner in OWNERS.values():
         files["python/maplibre_native_ffi/_native.pyi"] = files[
             "python/maplibre_native_ffi/_native.pyi"

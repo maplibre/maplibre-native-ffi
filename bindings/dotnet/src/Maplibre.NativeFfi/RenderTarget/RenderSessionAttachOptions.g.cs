@@ -9,57 +9,64 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_render_session_attach_options</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Driver">
-/// Where the session's driver runs. Required.
-/// </param>
-/// <param name="RequestedTextureRingDepth">
-/// Requested slot count of a session-owned texture ring, up to
-/// <c>MLN_TEXTURE_RING_MAX_DEPTH</c>. Zero selects 2, so the host can retain
-/// one frame while the session renders its replacement. Private targets grant
-/// one slot regardless of this value. A borrowed texture ring's depth is its
-/// texture count, so borrowed and other targets ignore this value.
-/// </param>
-/// <param name="ProducerSyncKind">
-/// Producer synchronization for acquired texture frames.
-/// <c>MLN_GPU_SYNC_OPENGL_FENCE</c> requires a shared EGL or WGL texture target
-/// and a caller-graphics-thread driver. Other targets support only CPU
-/// completion and fail an unsupported request.
-/// </param>
-/// <param name="FrameWake">
-/// Wakes the receiver when the frame-result queue becomes nonempty.
-/// </param>
-/// <param name="DriverWorkWake">
-/// Wakes the graphics receiver when caller-driver work is available, including
-/// work that a finished driver result releases.
-/// </param>
-/// <param name="QueueLock">
-/// Host lock on the graphics queue, disabled by default. Only Vulkan targets
-/// accept an enabled lock; other backends fail the attach with
-/// <c>MLN_STATUS_UNSUPPORTED</c>.
-/// </param>
-public readonly partial record struct RenderSessionAttachOptions(
-    RenderDriverKind Driver,
-    uint RequestedTextureRingDepth,
-    GpuSyncKind ProducerSyncKind,
-    Wake FrameWake,
-    Wake DriverWorkWake,
-    QueueLock QueueLock
-)
+public readonly partial record struct RenderSessionAttachOptions
 {
-    public RenderSessionAttachOptions()
-        : this(default!, default!, default!, default!, default!, default!)
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public RenderSessionAttachOptions(
+        RenderDriverKind Driver,
+        uint RequestedTextureRingDepth,
+        GpuSyncKind ProducerSyncKind,
+        Wake FrameWake,
+        Wake DriverWorkWake,
+        QueueLock QueueLock
+    )
     {
-        this = Default;
+        this.Driver = Driver;
+        this.RequestedTextureRingDepth = RequestedTextureRingDepth;
+        this.ProducerSyncKind = ProducerSyncKind;
+        this.FrameWake = FrameWake;
+        this.DriverWorkWake = DriverWorkWake;
+        this.QueueLock = QueueLock;
     }
 
-    public static RenderSessionAttachOptions Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyRenderSessionAttachOptions(
-                NativeMethods.mln_render_session_attach_options_default()
-            );
-        }
-    }
+    /// <summary>
+    /// Where the session's driver runs. Required.
+    /// </summary>
+    public required RenderDriverKind Driver { get; init; }
+
+    /// <summary>
+    /// Requested slot count of a session-owned texture ring, up to
+    /// <c>MLN_TEXTURE_RING_MAX_DEPTH</c>. Zero selects 2, so the host can
+    /// retain one frame while the session renders its replacement. Private
+    /// targets grant one slot regardless of this value. A borrowed texture
+    /// ring's depth is its texture count, so borrowed and other targets ignore
+    /// this value.
+    /// </summary>
+    public uint RequestedTextureRingDepth { get; init; }
+
+    /// <summary>
+    /// Producer synchronization for acquired texture frames.
+    /// <c>MLN_GPU_SYNC_OPENGL_FENCE</c> requires a shared EGL or WGL texture
+    /// target and a caller-graphics-thread driver. Other targets support only
+    /// CPU completion and fail an unsupported request.
+    /// </summary>
+    public GpuSyncKind ProducerSyncKind { get; init; }
+
+    /// <summary>
+    /// Wakes the receiver when the frame-result queue becomes nonempty.
+    /// </summary>
+    public Wake FrameWake { get; init; }
+
+    /// <summary>
+    /// Wakes the graphics receiver when caller-driver work is available,
+    /// including work that a finished driver result releases.
+    /// </summary>
+    public Wake DriverWorkWake { get; init; }
+
+    /// <summary>
+    /// Host lock on the graphics queue, disabled by default. Only Vulkan
+    /// targets accept an enabled lock; other backends fail the attach with
+    /// <c>MLN_STATUS_UNSUPPORTED</c>.
+    /// </summary>
+    public QueueLock QueueLock { get; init; }
 }

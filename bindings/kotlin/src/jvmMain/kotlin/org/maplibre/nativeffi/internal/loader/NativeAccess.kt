@@ -6,6 +6,8 @@ import org.maplibre.nativeffi.internal.c.C
 
 internal actual fun ensureNativeLibrary() = NativeAccess.ensureLoaded()
 
+internal actual fun loadNativeLibraryUnchecked() = NativeLibrary.load()
+
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
 internal object NativeAccess {
   private val lock = Any()

@@ -75,6 +75,16 @@ internal open class NativeArena : AutoCloseable {
     return block(size.toLong(), false)
   }
 
+  /** Copies [value] as NUL-terminated UTF-8, refusing an embedded NUL that C would truncate at. */
+  fun cString(value: String): Long {
+    require('\u0000' !in value) { "text contains an embedded NUL" }
+    val size = value.length.toLong() * 3 + 1
+    return (if (size > BLOCK_SIZE / 4) block(size, false) else allocate(size, 1)).also {
+      val length = NativeMemory.putUtf8(it, value)
+      NativeMemory.putByte(it + length, 0)
+    }
+  }
+
   fun putView(address: Long, value: ByteArray?) {
     if (value == null) return
     writeAddress(address, bytes(value))

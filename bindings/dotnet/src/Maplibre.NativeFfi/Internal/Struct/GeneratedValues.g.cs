@@ -8,29 +8,12 @@ namespace Maplibre.NativeFfi.Internal.Struct;
 
 internal static unsafe class GeneratedValues
 {
-    internal static AnimationOptions CopyAnimationOptions(mln_animation_options value) =>
-        new()
-        {
-            DurationMs = value.fields.HasFlag(MLN_ANIMATION_OPTION_DURATION)
-                ? value.duration_ms
-                : null,
-            Velocity = value.fields.HasFlag(MLN_ANIMATION_OPTION_VELOCITY) ? value.velocity : null,
-            MinZoom = value.fields.HasFlag(MLN_ANIMATION_OPTION_MIN_ZOOM) ? value.min_zoom : null,
-            Easing = value.fields.HasFlag(MLN_ANIMATION_OPTION_EASING)
-                ? CopyUnitBezier(value.easing)
-                : null,
-            TransitionId = value.fields.HasFlag(MLN_ANIMATION_OPTION_TRANSITION_ID)
-                ? value.transition_id
-                : null,
-            EndHandler = default,
-        };
-
     internal static mln_animation_options NativeAnimationOptions(
         AnimationOptions value,
         NativeCallScope scope
     )
     {
-        var native = NativeMethods.mln_animation_options_default();
+        var native = new mln_animation_options();
         native.fields = 0;
         native.fields |= Put(
             value.DurationMs,
@@ -69,7 +52,7 @@ internal static unsafe class GeneratedValues
 
     internal static mln_bound_options NativeBoundOptions(BoundOptions value)
     {
-        var native = NativeMethods.mln_bound_options_default();
+        var native = new mln_bound_options();
         native.fields = 0;
         native.size = (uint)sizeof(mln_bound_options);
         native.fields |= Put(
@@ -113,26 +96,10 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static CameraDelta CopyCameraDelta(mln_camera_delta value) =>
-        new()
-        {
-            Offset = value.fields.HasFlag(MLN_CAMERA_DELTA_OFFSET)
-                ? CopyScreenPoint(value.offset)
-                : null,
-            Scale = value.fields.HasFlag(MLN_CAMERA_DELTA_SCALE) ? value.scale : null,
-            Bearing = value.fields.HasFlag(MLN_CAMERA_DELTA_BEARING) ? value.bearing : null,
-            Pitch = value.fields.HasFlag(MLN_CAMERA_DELTA_PITCH) ? value.pitch : null,
-            Anchor = value.fields.HasFlag(MLN_CAMERA_DELTA_ANCHOR)
-                ? CopyScreenPoint(value.anchor)
-                : null,
-            Animation = CopyAnimationOptions(value.animation),
-            GesturePhase = (GesturePhase)value.gesture_phase,
-        };
-
     internal static mln_camera_delta NativeCameraDelta(CameraDelta value, NativeCallScope scope)
     {
         Required(value.Animation, "CameraDelta.Animation must not be null.");
-        var native = NativeMethods.mln_camera_delta_default();
+        var native = new mln_camera_delta();
         native.fields = 0;
         native.size = (uint)sizeof(mln_camera_delta);
         native.fields |= Put(
@@ -155,19 +122,9 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static CameraFitOptions CopyCameraFitOptions(mln_camera_fit_options value) =>
-        new()
-        {
-            Padding = value.fields.HasFlag(MLN_CAMERA_FIT_OPTION_PADDING)
-                ? CopyEdgeInsets(value.padding)
-                : null,
-            Bearing = value.fields.HasFlag(MLN_CAMERA_FIT_OPTION_BEARING) ? value.bearing : null,
-            Pitch = value.fields.HasFlag(MLN_CAMERA_FIT_OPTION_PITCH) ? value.pitch : null,
-        };
-
     internal static mln_camera_fit_options NativeCameraFitOptions(CameraFitOptions value)
     {
-        var native = NativeMethods.mln_camera_fit_options_default();
+        var native = new mln_camera_fit_options();
         native.fields = 0;
         native.size = (uint)sizeof(mln_camera_fit_options);
         native.fields |= Put(
@@ -205,7 +162,7 @@ internal static unsafe class GeneratedValues
 
     internal static mln_camera_options NativeCameraOptions(CameraOptions value)
     {
-        var native = NativeMethods.mln_camera_options_default();
+        var native = new mln_camera_options();
         native.fields = 0;
         native.size = (uint)sizeof(mln_camera_options);
         native.fields |= Put(
@@ -280,19 +237,11 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static CameraUpdate CopyCameraUpdate(mln_camera_update value) =>
-        new(
-            (CameraUpdateMode)value.mode,
-            CopyCameraOptions(value.camera),
-            CopyAnimationOptions(value.animation),
-            (GesturePhase)value.gesture_phase
-        );
-
     internal static mln_camera_update NativeCameraUpdate(CameraUpdate value, NativeCallScope scope)
     {
         Required(value.Camera, "CameraUpdate.Camera must not be null.");
         Required(value.Animation, "CameraUpdate.Animation must not be null.");
-        var native = NativeMethods.mln_camera_update_default();
+        var native = new mln_camera_update();
         native.size = (uint)sizeof(mln_camera_update);
         native.mode = (mln_camera_update_mode)value.Mode;
         native.camera = NativeCameraOptions(value.Camera);
@@ -312,37 +261,6 @@ internal static unsafe class GeneratedValues
         native.y = value.Y;
         return native;
     }
-
-    internal static CustomGeometrySourceOptions CopyCustomGeometrySourceOptions(
-        mln_custom_geometry_source_options value,
-        CustomSourceFetchTileCallback fetchTile
-    ) =>
-        new()
-        {
-            FetchTile = fetchTile,
-            CancelTile = default,
-            MinZoom = value.fields.HasFlag(MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM)
-                ? value.min_zoom
-                : null,
-            MaxZoom = value.fields.HasFlag(MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM)
-                ? value.max_zoom
-                : null,
-            Tolerance = value.fields.HasFlag(MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE)
-                ? value.tolerance
-                : null,
-            TileSize = value.fields.HasFlag(MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE)
-                ? value.tile_size
-                : null,
-            Buffer = value.fields.HasFlag(MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER)
-                ? value.buffer
-                : null,
-            Clip = value.fields.HasFlag(MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP)
-                ? value.clip != 0
-                : null,
-            Wrap = value.fields.HasFlag(MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP)
-                ? value.wrap != 0
-                : null,
-        };
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokeCustomGeometrySourceOptionsFetchTile(
@@ -385,7 +303,7 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
-        var native = NativeMethods.mln_custom_geometry_source_options_default();
+        var native = new mln_custom_geometry_source_options();
         native.fields = 0;
         native.size = (uint)sizeof(mln_custom_geometry_source_options);
         if (value.FetchTile is not null || value.CancelTile is not null)
@@ -439,22 +357,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static CustomMvtVectorSourceOptions CopyCustomMvtVectorSourceOptions(
-        mln_custom_mvt_vector_source_options value,
-        CustomSourceFetchTileCallback fetchTile
-    ) =>
-        new()
-        {
-            FetchTile = fetchTile,
-            CancelTile = default,
-            MinZoom = value.fields.HasFlag(MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM)
-                ? value.min_zoom
-                : null,
-            MaxZoom = value.fields.HasFlag(MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM)
-                ? value.max_zoom
-                : null,
-        };
-
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokeCustomMvtVectorSourceOptionsFetchTile(
         void* user_data,
@@ -496,7 +398,7 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
-        var native = NativeMethods.mln_custom_mvt_vector_source_options_default();
+        var native = new mln_custom_mvt_vector_source_options();
         native.fields = 0;
         native.size = (uint)sizeof(mln_custom_mvt_vector_source_options);
         if (value.FetchTile is not null || value.CancelTile is not null)
@@ -535,17 +437,6 @@ internal static unsafe class GeneratedValues
         native.right = value.Right;
         return native;
     }
-
-    internal static EglContextDescriptor CopyEglContextDescriptor(
-        mln_egl_context_descriptor value
-    ) =>
-        new(
-            NativePointer.FromNativeAddress((nint)value.display),
-            NativePointer.FromNativeAddress((nint)value.config),
-            NativePointer.FromNativeAddress((nint)value.share_context),
-            (OpenglClientApi)value.client_api,
-            NativePointer.FromNativeAddress((nint)value.get_proc_address)
-        );
 
     internal static mln_egl_context_descriptor NativeEglContextDescriptor(
         EglContextDescriptor value
@@ -599,12 +490,9 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static FrameDemand CopyFrameDemand(mln_frame_demand value) =>
-        new((FrameDemandFlag)value.flags, value.token);
-
     internal static mln_frame_demand NativeFrameDemand(FrameDemand value)
     {
-        var native = NativeMethods.mln_frame_demand_default();
+        var native = new mln_frame_demand();
         native.size = (uint)sizeof(mln_frame_demand);
         native.flags = (uint)value.Flags;
         native.token = value.Token;
@@ -624,7 +512,7 @@ internal static unsafe class GeneratedValues
 
     internal static mln_free_camera_options NativeFreeCameraOptions(FreeCameraOptions value)
     {
-        var native = NativeMethods.mln_free_camera_options_default();
+        var native = new mln_free_camera_options();
         native.fields = 0;
         native.size = (uint)sizeof(mln_free_camera_options);
         native.fields |= Put(
@@ -642,45 +530,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static GeojsonSourceOptions CopyGeojsonSourceOptions(
-        mln_geojson_source_options value
-    ) =>
-        new()
-        {
-            MinZoom = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM)
-                ? value.min_zoom
-                : null,
-            MaxZoom = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM)
-                ? value.max_zoom
-                : null,
-            Tolerance = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_TOLERANCE)
-                ? value.tolerance
-                : null,
-            ClusterMaxZoom = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM)
-                ? value.cluster_max_zoom
-                : null,
-            ClusterProperties = RuntimeStructs.CopyUtf8(
-                (sbyte*)value.cluster_properties.data,
-                value.cluster_properties.size
-            ),
-            Buffer = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_BUFFER) ? value.buffer : null,
-            ClusterRadius = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS)
-                ? value.cluster_radius
-                : null,
-            ClusterMinPoints = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS)
-                ? value.cluster_min_points
-                : null,
-            LineMetrics = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS)
-                ? value.line_metrics != 0
-                : null,
-            Cluster = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_CLUSTER)
-                ? value.cluster != 0
-                : null,
-            SynchronousTiling = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING)
-                ? value.synchronous_tiling != 0
-                : null,
-        };
-
     internal static mln_geojson_source_options NativeGeojsonSourceOptions(
         GeojsonSourceOptions value,
         NativeCallScope scope
@@ -690,7 +539,7 @@ internal static unsafe class GeneratedValues
             value.ClusterProperties,
             "GeojsonSourceOptions.ClusterProperties must not be null."
         );
-        var native = NativeMethods.mln_geojson_source_options_default();
+        var native = new mln_geojson_source_options();
         native.fields = 0;
         native.size = (uint)sizeof(mln_geojson_source_options);
         native.fields |= Put(
@@ -751,18 +600,12 @@ internal static unsafe class GeneratedValues
 
     internal static mln_gpu_sync NativeGpuSync(GpuSync value)
     {
-        var native = NativeMethods.mln_gpu_sync_default();
+        var native = new mln_gpu_sync();
         native.size = (uint)sizeof(mln_gpu_sync);
         native.kind = (mln_gpu_sync_kind)value.Kind;
         native.handle = value.Handle;
         return native;
     }
-
-    internal static HttpHeader CopyHttpHeader(mln_http_header value) =>
-        new(
-            RuntimeStructs.CopyUtf8((sbyte*)value.name.data, value.name.size),
-            RuntimeStructs.CopyUtf8((sbyte*)value.value.data, value.value.size)
-        );
 
     internal static mln_http_header NativeHttpHeader(HttpHeader value, NativeCallScope scope)
     {
@@ -774,28 +617,13 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static HttpHeaderRule CopyHttpHeaderRule(mln_http_header_rule value) =>
-        default(HttpHeaderRule) with
-        {
-            Kinds = (ResourceKindFlag)value.kinds,
-            Flags = (UrlMatchFlag)value.flags,
-            Url = RuntimeStructs.CopyUtf8((sbyte*)value.url.data, value.url.size),
-            HeadersStorage = new(
-                NativeCallScope.CopyArray<mln_http_header, HttpHeader>(
-                    value.headers,
-                    (nuint)(value.header_count),
-                    static item => CopyHttpHeader(item)
-                )
-            ),
-        };
-
     internal static mln_http_header_rule NativeHttpHeaderRule(
         HttpHeaderRule value,
         NativeCallScope scope
     )
     {
         Required(value.Url, "HttpHeaderRule.Url must not be null.");
-        var native = NativeMethods.mln_http_header_rule_default();
+        var native = new mln_http_header_rule();
         native.size = (uint)sizeof(mln_http_header_rule);
         native.kinds = (uint)value.Kinds;
         native.flags = (uint)value.Flags;
@@ -960,27 +788,16 @@ internal static unsafe class GeneratedValues
 
     internal static mln_logical_extent NativeLogicalExtent(LogicalExtent value)
     {
-        var native = NativeMethods.mln_logical_extent_default();
+        var native = new mln_logical_extent();
         native.width = value.Width;
         native.height = value.Height;
         native.scale_factor = value.ScaleFactor;
         return native;
     }
 
-    internal static MapOptions CopyMapOptions(mln_map_options value) =>
-        new()
-        {
-            InitialExtent = CopyLogicalExtent(value.initial_extent),
-            MapMode = (MapMode)value.map_mode,
-            FastPforEnabled = value.fast_pfor_enabled != 0,
-            EventMask = value.fields.HasFlag(MLN_MAP_OPTION_EVENT_MASK)
-                ? (RuntimeEventFlag)value.event_mask
-                : null,
-        };
-
     internal static mln_map_options NativeMapOptions(MapOptions value)
     {
-        var native = NativeMethods.mln_map_options_default();
+        var native = new mln_map_options();
         native.fields = 0;
         native.size = (uint)sizeof(mln_map_options);
         native.initial_extent = NativeLogicalExtent(value.InitialExtent);
@@ -1034,7 +851,7 @@ internal static unsafe class GeneratedValues
 
     internal static mln_map_tile_options NativeMapTileOptions(MapTileOptions value)
     {
-        var native = NativeMethods.mln_map_tile_options_default();
+        var native = new mln_map_tile_options();
         native.fields = 0;
         native.size = (uint)sizeof(mln_map_tile_options);
         native.fields |= Put(
@@ -1107,7 +924,7 @@ internal static unsafe class GeneratedValues
 
     internal static mln_map_viewport_options NativeMapViewportOptions(MapViewportOptions value)
     {
-        var native = NativeMethods.mln_map_viewport_options_default();
+        var native = new mln_map_viewport_options();
         native.fields = 0;
         native.size = (uint)sizeof(mln_map_viewport_options);
         native.fields |= Put(
@@ -1137,10 +954,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static MetalBorrowedTexture CopyMetalBorrowedTexture(
-        mln_metal_borrowed_texture value
-    ) => new(NativePointer.FromNativeAddress((nint)value.texture));
-
     internal static mln_metal_borrowed_texture NativeMetalBorrowedTexture(
         MetalBorrowedTexture value
     )
@@ -1150,29 +963,12 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static MetalBorrowedTextureDescriptor CopyMetalBorrowedTextureDescriptor(
-        mln_metal_borrowed_texture_descriptor value
-    ) =>
-        default(MetalBorrowedTextureDescriptor) with
-        {
-            Extent = CopyLogicalExtent(value.extent),
-            PhysicalWidth = value.physical_width,
-            PhysicalHeight = value.physical_height,
-            TexturesStorage = new(
-                NativeCallScope.CopyArray<mln_metal_borrowed_texture, MetalBorrowedTexture>(
-                    value.textures,
-                    (nuint)(value.texture_count),
-                    static item => CopyMetalBorrowedTexture(item)
-                )
-            ),
-        };
-
     internal static mln_metal_borrowed_texture_descriptor NativeMetalBorrowedTextureDescriptor(
         MetalBorrowedTextureDescriptor value,
         NativeCallScope scope
     )
     {
-        var native = NativeMethods.mln_metal_borrowed_texture_descriptor_default();
+        var native = new mln_metal_borrowed_texture_descriptor();
         native.size = (uint)sizeof(mln_metal_borrowed_texture_descriptor);
         native.extent = NativeLogicalExtent(value.Extent);
         native.physical_width = value.PhysicalWidth;
@@ -1185,10 +981,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static MetalContextDescriptor CopyMetalContextDescriptor(
-        mln_metal_context_descriptor value
-    ) => new(NativePointer.FromNativeAddress((nint)value.device));
-
     internal static mln_metal_context_descriptor NativeMetalContextDescriptor(
         MetalContextDescriptor value
     )
@@ -1198,20 +990,11 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static MetalOwnedTextureDescriptor CopyMetalOwnedTextureDescriptor(
-        mln_metal_owned_texture_descriptor value
-    ) =>
-        new(
-            CopyLogicalExtent(value.extent),
-            CopyMetalContextDescriptor(value.context),
-            value.pixel_format
-        );
-
     internal static mln_metal_owned_texture_descriptor NativeMetalOwnedTextureDescriptor(
         MetalOwnedTextureDescriptor value
     )
     {
-        var native = NativeMethods.mln_metal_owned_texture_descriptor_default();
+        var native = new mln_metal_owned_texture_descriptor();
         native.size = (uint)sizeof(mln_metal_owned_texture_descriptor);
         native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeMetalContextDescriptor(value.Context);
@@ -1219,20 +1002,11 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static MetalSurfaceDescriptor CopyMetalSurfaceDescriptor(
-        mln_metal_surface_descriptor value
-    ) =>
-        new(
-            CopyLogicalExtent(value.extent),
-            CopyMetalContextDescriptor(value.context),
-            NativePointer.FromNativeAddress((nint)value.layer)
-        );
-
     internal static mln_metal_surface_descriptor NativeMetalSurfaceDescriptor(
         MetalSurfaceDescriptor value
     )
     {
-        var native = NativeMethods.mln_metal_surface_descriptor_default();
+        var native = new mln_metal_surface_descriptor();
         native.size = (uint)sizeof(mln_metal_surface_descriptor);
         native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeMetalContextDescriptor(value.Context);
@@ -1256,14 +1030,15 @@ internal static unsafe class GeneratedValues
     internal static OfflineGeometryRegionDefinition CopyOfflineGeometryRegionDefinition(
         mln_offline_geometry_region_definition value
     ) =>
-        new(
-            RuntimeStructs.CopyUtf8((sbyte*)value.style_url.data, value.style_url.size),
-            RuntimeStructs.CopyUtf8((sbyte*)value.geometry.data, value.geometry.size),
-            value.min_zoom,
-            value.max_zoom,
-            value.pixel_ratio,
-            value.include_ideographs != 0
-        );
+        default(OfflineGeometryRegionDefinition) with
+        {
+            StyleUrl = RuntimeStructs.CopyUtf8((sbyte*)value.style_url.data, value.style_url.size),
+            Geometry = RuntimeStructs.CopyUtf8((sbyte*)value.geometry.data, value.geometry.size),
+            MinZoom = value.min_zoom,
+            MaxZoom = value.max_zoom,
+            PixelRatio = value.pixel_ratio,
+            IncludeIdeographs = value.include_ideographs != 0,
+        };
 
     internal static mln_offline_geometry_region_definition NativeOfflineGeometryRegionDefinition(
         OfflineGeometryRegionDefinition value,
@@ -1380,10 +1155,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static OpenglBorrowedTexture CopyOpenglBorrowedTexture(
-        mln_opengl_borrowed_texture value
-    ) => new(value.texture);
-
     internal static mln_opengl_borrowed_texture NativeOpenglBorrowedTexture(
         OpenglBorrowedTexture value
     )
@@ -1393,31 +1164,12 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static OpenglBorrowedTextureDescriptor CopyOpenglBorrowedTextureDescriptor(
-        mln_opengl_borrowed_texture_descriptor value
-    ) =>
-        default(OpenglBorrowedTextureDescriptor) with
-        {
-            Extent = CopyLogicalExtent(value.extent),
-            PhysicalWidth = value.physical_width,
-            PhysicalHeight = value.physical_height,
-            Context = CopyOpenglContextDescriptor(value.context),
-            TexturesStorage = new(
-                NativeCallScope.CopyArray<mln_opengl_borrowed_texture, OpenglBorrowedTexture>(
-                    value.textures,
-                    (nuint)(value.texture_count),
-                    static item => CopyOpenglBorrowedTexture(item)
-                )
-            ),
-            Target = value.target,
-        };
-
     internal static mln_opengl_borrowed_texture_descriptor NativeOpenglBorrowedTextureDescriptor(
         OpenglBorrowedTextureDescriptor value,
         NativeCallScope scope
     )
     {
-        var native = NativeMethods.mln_opengl_borrowed_texture_descriptor_default();
+        var native = new mln_opengl_borrowed_texture_descriptor();
         native.size = (uint)sizeof(mln_opengl_borrowed_texture_descriptor);
         native.extent = NativeLogicalExtent(value.Extent);
         native.physical_width = value.PhysicalWidth;
@@ -1431,32 +1183,6 @@ internal static unsafe class GeneratedValues
         native.target = value.Target;
         return native;
     }
-
-    internal static OpenglContextDescriptor CopyOpenglContextDescriptor(
-        mln_opengl_context_descriptor value
-    ) =>
-        new(
-            (OpenglContextOwnership)value.ownership,
-            value.platform switch
-            {
-                mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WGL =>
-                    new OpenglContextDescriptor.DataValue.Wgl(
-                        CopyWglContextDescriptor(value.data.wgl)
-                    ),
-                mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_EGL =>
-                    new OpenglContextDescriptor.DataValue.Egl(
-                        CopyEglContextDescriptor(value.data.egl)
-                    ),
-                mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL =>
-                    new OpenglContextDescriptor.DataValue.Webgl(
-                        CopyWebglContextDescriptor(value.data.webgl)
-                    ),
-                _ => new OpenglContextDescriptor.DataValue.Unknown(
-                    (uint)value.platform,
-                    NativeCallScope.CopyValueBytes(value.data)
-                ),
-            }
-        );
 
     internal static mln_opengl_context_descriptor NativeOpenglContextDescriptor(
         OpenglContextDescriptor value,
@@ -1485,37 +1211,24 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static OpenglOwnedTextureDescriptor CopyOpenglOwnedTextureDescriptor(
-        mln_opengl_owned_texture_descriptor value
-    ) => new(CopyLogicalExtent(value.extent), CopyOpenglContextDescriptor(value.context));
-
     internal static mln_opengl_owned_texture_descriptor NativeOpenglOwnedTextureDescriptor(
         OpenglOwnedTextureDescriptor value,
         NativeCallScope scope
     )
     {
-        var native = NativeMethods.mln_opengl_owned_texture_descriptor_default();
+        var native = new mln_opengl_owned_texture_descriptor();
         native.size = (uint)sizeof(mln_opengl_owned_texture_descriptor);
         native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeOpenglContextDescriptor(value.Context, scope);
         return native;
     }
 
-    internal static OpenglSurfaceDescriptor CopyOpenglSurfaceDescriptor(
-        mln_opengl_surface_descriptor value
-    ) =>
-        new(
-            CopyLogicalExtent(value.extent),
-            CopyOpenglContextDescriptor(value.context),
-            NativePointer.FromNativeAddress((nint)value.surface)
-        );
-
     internal static mln_opengl_surface_descriptor NativeOpenglSurfaceDescriptor(
         OpenglSurfaceDescriptor value,
         NativeCallScope scope
     )
     {
-        var native = NativeMethods.mln_opengl_surface_descriptor_default();
+        var native = new mln_opengl_surface_descriptor();
         native.size = (uint)sizeof(mln_opengl_surface_descriptor);
         native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeOpenglContextDescriptor(value.Context, scope);
@@ -1538,25 +1251,12 @@ internal static unsafe class GeneratedValues
             value.type
         );
 
-    internal static PremultipliedRgba8Image CopyPremultipliedRgba8Image(
-        mln_premultiplied_rgba8_image value
-    ) =>
-        default(PremultipliedRgba8Image) with
-        {
-            Width = value.width,
-            Height = value.height,
-            Stride = value.stride,
-            PixelsStorage = new(
-                NativeCallScope.CopyArray<byte>((byte*)value.pixels, (nuint)(value.byte_length))
-            ),
-        };
-
     internal static mln_premultiplied_rgba8_image NativePremultipliedRgba8Image(
         PremultipliedRgba8Image value,
         NativeCallScope scope
     )
     {
-        var native = NativeMethods.mln_premultiplied_rgba8_image_default();
+        var native = new mln_premultiplied_rgba8_image();
         native.size = (uint)sizeof(mln_premultiplied_rgba8_image);
         native.width = value.Width;
         native.height = value.Height;
@@ -1590,7 +1290,7 @@ internal static unsafe class GeneratedValues
 
     internal static mln_projection_mode NativeProjectionMode(ProjectionMode value)
     {
-        var native = NativeMethods.mln_projection_mode_default();
+        var native = new mln_projection_mode();
         native.fields = 0;
         native.size = (uint)sizeof(mln_projection_mode);
         native.fields |= Put(
@@ -1708,24 +1408,12 @@ internal static unsafe class GeneratedValues
             CopyMapView(value.view)
         );
 
-    internal static RenderSessionAttachOptions CopyRenderSessionAttachOptions(
-        mln_render_session_attach_options value
-    ) =>
-        new(
-            (RenderDriverKind)value.driver,
-            value.requested_texture_ring_depth,
-            (GpuSyncKind)value.producer_sync_kind,
-            default,
-            default,
-            default
-        );
-
     internal static mln_render_session_attach_options NativeRenderSessionAttachOptions(
         RenderSessionAttachOptions value,
         NativeCallScope scope
     )
     {
-        var native = NativeMethods.mln_render_session_attach_options_default();
+        var native = new mln_render_session_attach_options();
         native.size = (uint)sizeof(mln_render_session_attach_options);
         native.driver = (mln_render_driver_kind)value.Driver;
         native.requested_texture_ring_depth = value.RequestedTextureRingDepth;
@@ -1768,30 +1456,13 @@ internal static unsafe class GeneratedValues
             RuntimeStructs.CopyUtf8((sbyte*)value.state.data, value.state.size)
         );
 
-    internal static RenderedFeatureQueryOptions CopyRenderedFeatureQueryOptions(
-        mln_rendered_feature_query_options value
-    ) =>
-        new()
-        {
-            LayerIdsStorage = ValueArray.Optional(
-                value.fields.HasFlag(MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS)
-                    ? NativeCallScope.CopyArray<mln_buffer_view, string>(
-                        value.layer_ids,
-                        (nuint)(value.layer_id_count),
-                        static item => RuntimeStructs.CopyUtf8((sbyte*)item.data, item.size)
-                    )
-                    : null
-            ),
-            Filter = RuntimeStructs.CopyUtf8((sbyte*)value.filter.data, value.filter.size),
-        };
-
     internal static mln_rendered_feature_query_options NativeRenderedFeatureQueryOptions(
         RenderedFeatureQueryOptions value,
         NativeCallScope scope
     )
     {
         Required(value.Filter, "RenderedFeatureQueryOptions.Filter must not be null.");
-        var native = NativeMethods.mln_rendered_feature_query_options_default();
+        var native = new mln_rendered_feature_query_options();
         native.fields = 0;
         native.size = (uint)sizeof(mln_rendered_feature_query_options);
         if (value.LayerIdsStorage?.Items is { } fieldLayerIds)
@@ -1999,20 +1670,13 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static ResourceRoute CopyResourceRoute(mln_resource_route value) =>
-        new(
-            (ResourceKindFlag)value.kinds,
-            (UrlMatchFlag)value.flags,
-            RuntimeStructs.CopyUtf8((sbyte*)value.url.data, value.url.size)
-        );
-
     internal static mln_resource_route NativeResourceRoute(
         ResourceRoute value,
         NativeCallScope scope
     )
     {
         Required(value.Url, "ResourceRoute.Url must not be null.");
-        var native = NativeMethods.mln_resource_route_default();
+        var native = new mln_resource_route();
         native.size = (uint)sizeof(mln_resource_route);
         native.kinds = (uint)value.Kinds;
         native.flags = (uint)value.Flags;
@@ -2189,12 +1853,6 @@ internal static unsafe class GeneratedValues
         mln_runtime_event_tile_action value
     ) => new((TileOperation)value.operation, CopyTileId(value.tile_id));
 
-    internal static RuntimeOptions CopyRuntimeOptions(mln_runtime_options value) =>
-        new(
-            RuntimeStructs.CopyUtf8((sbyte*)value.asset_path.data, value.asset_path.size),
-            RuntimeStructs.CopyUtf8((sbyte*)value.cache_path.data, value.cache_path.size)
-        );
-
     internal static mln_runtime_options NativeRuntimeOptions(
         RuntimeOptions value,
         NativeCallScope scope
@@ -2202,7 +1860,7 @@ internal static unsafe class GeneratedValues
     {
         Required(value.AssetPath, "RuntimeOptions.AssetPath must not be null.");
         Required(value.CachePath, "RuntimeOptions.CachePath must not be null.");
-        var native = NativeMethods.mln_runtime_options_default();
+        var native = new mln_runtime_options();
         native.size = (uint)sizeof(mln_runtime_options);
         native.asset_path = scope.Utf8(value.AssetPath);
         native.cache_path = scope.Utf8(value.CachePath);
@@ -2247,30 +1905,13 @@ internal static unsafe class GeneratedValues
             RuntimeStructs.CopyUtf8((sbyte*)value.source_layer_id.data, value.source_layer_id.size)
         );
 
-    internal static SourceFeatureQueryOptions CopySourceFeatureQueryOptions(
-        mln_source_feature_query_options value
-    ) =>
-        new()
-        {
-            SourceLayerIdsStorage = ValueArray.Optional(
-                value.fields.HasFlag(MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS)
-                    ? NativeCallScope.CopyArray<mln_buffer_view, string>(
-                        value.source_layer_ids,
-                        (nuint)(value.source_layer_id_count),
-                        static item => RuntimeStructs.CopyUtf8((sbyte*)item.data, item.size)
-                    )
-                    : null
-            ),
-            Filter = RuntimeStructs.CopyUtf8((sbyte*)value.filter.data, value.filter.size),
-        };
-
     internal static mln_source_feature_query_options NativeSourceFeatureQueryOptions(
         SourceFeatureQueryOptions value,
         NativeCallScope scope
     )
     {
         Required(value.Filter, "SourceFeatureQueryOptions.Filter must not be null.");
-        var native = NativeMethods.mln_source_feature_query_options_default();
+        var native = new mln_source_feature_query_options();
         native.fields = 0;
         native.size = (uint)sizeof(mln_source_feature_query_options);
         if (value.SourceLayerIdsStorage?.Items is { } fieldSourceLayerIds)
@@ -2289,41 +1930,6 @@ internal static unsafe class GeneratedValues
     internal static StyleExpressionInfo CopyStyleExpressionInfo(mln_style_expression_info value) =>
         new(value.is_feature_constant != 0, value.is_zoom_constant != 0);
 
-    internal static StyleExpressionInputs CopyStyleExpressionInputs(
-        mln_style_expression_inputs value
-    ) =>
-        new()
-        {
-            Zoom = value.fields.HasFlag(MLN_STYLE_EXPRESSION_INPUT_ZOOM) ? value.zoom : null,
-            ColorRampParameter = value.fields.HasFlag(
-                MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER
-            )
-                ? value.color_ramp_parameter
-                : null,
-            Elevation = value.fields.HasFlag(MLN_STYLE_EXPRESSION_INPUT_ELEVATION)
-                ? value.elevation
-                : null,
-            Feature = RuntimeStructs.CopyUtf8((sbyte*)value.feature.data, value.feature.size),
-            FeatureState = RuntimeStructs.CopyUtf8(
-                (sbyte*)value.feature_state.data,
-                value.feature_state.size
-            ),
-            GlobalState = RuntimeStructs.CopyUtf8(
-                (sbyte*)value.global_state.data,
-                value.global_state.size
-            ),
-            CanonicalTileId = value.fields.HasFlag(MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID)
-                ? CopyCanonicalTileId(value.canonical_tile_id)
-                : null,
-            AvailableImagesStorage = new(
-                NativeCallScope.CopyArray<mln_buffer_view, string>(
-                    value.available_images,
-                    (nuint)(value.available_image_count),
-                    static item => RuntimeStructs.CopyUtf8((sbyte*)item.data, item.size)
-                )
-            ),
-        };
-
     internal static mln_style_expression_inputs NativeStyleExpressionInputs(
         StyleExpressionInputs value,
         NativeCallScope scope
@@ -2332,7 +1938,7 @@ internal static unsafe class GeneratedValues
         Required(value.Feature, "StyleExpressionInputs.Feature must not be null.");
         Required(value.FeatureState, "StyleExpressionInputs.FeatureState must not be null.");
         Required(value.GlobalState, "StyleExpressionInputs.GlobalState must not be null.");
-        var native = NativeMethods.mln_style_expression_inputs_default();
+        var native = new mln_style_expression_inputs();
         native.fields = 0;
         native.size = (uint)sizeof(mln_style_expression_inputs);
         native.fields |= Put(value.Zoom, ref native.zoom, MLN_STYLE_EXPRESSION_INPUT_ZOOM);
@@ -2363,21 +1969,11 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static StyleExpressionOptions CopyStyleExpressionOptions(
-        mln_style_expression_options value
-    ) =>
-        new()
-        {
-            ExpectedType = value.fields.HasFlag(MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE)
-                ? CopyStyleExpressionType(value.expected_type)
-                : null,
-        };
-
     internal static mln_style_expression_options NativeStyleExpressionOptions(
         StyleExpressionOptions value
     )
     {
-        var native = NativeMethods.mln_style_expression_options_default();
+        var native = new mln_style_expression_options();
         native.fields = 0;
         native.size = (uint)sizeof(mln_style_expression_options);
         native.fields |= Put(
@@ -2388,13 +1984,6 @@ internal static unsafe class GeneratedValues
         );
         return native;
     }
-
-    internal static StyleExpressionType CopyStyleExpressionType(mln_style_expression_type value) =>
-        new(
-            (StyleExpressionTypeKind)value.kind,
-            (StyleExpressionTypeKind)value.item_kind,
-            value.item_count
-        );
 
     internal static mln_style_expression_type NativeStyleExpressionType(StyleExpressionType value)
     {
@@ -2438,48 +2027,12 @@ internal static unsafe class GeneratedValues
             Sdf = value.sdf != 0,
         };
 
-    internal static StyleImageOptions CopyStyleImageOptions(mln_style_image_options value) =>
-        new()
-        {
-            StretchXStorage = ValueArray.Optional(
-                value.fields.HasFlag(MLN_STYLE_IMAGE_OPTION_STRETCH_X)
-                    ? NativeCallScope.CopyArray<mln_image_stretch, ImageStretch>(
-                        value.stretch_x,
-                        (nuint)(value.stretch_x_count),
-                        static item => CopyImageStretch(item)
-                    )
-                    : null
-            ),
-            StretchYStorage = ValueArray.Optional(
-                value.fields.HasFlag(MLN_STYLE_IMAGE_OPTION_STRETCH_Y)
-                    ? NativeCallScope.CopyArray<mln_image_stretch, ImageStretch>(
-                        value.stretch_y,
-                        (nuint)(value.stretch_y_count),
-                        static item => CopyImageStretch(item)
-                    )
-                    : null
-            ),
-            Content = value.fields.HasFlag(MLN_STYLE_IMAGE_OPTION_CONTENT)
-                ? CopyImageContent(value.content)
-                : null,
-            TextFitWidth = value.fields.HasFlag(MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH)
-                ? (StyleImageTextFit)value.text_fit_width
-                : null,
-            TextFitHeight = value.fields.HasFlag(MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT)
-                ? (StyleImageTextFit)value.text_fit_height
-                : null,
-            PixelRatio = value.fields.HasFlag(MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO)
-                ? value.pixel_ratio
-                : null,
-            Sdf = value.fields.HasFlag(MLN_STYLE_IMAGE_OPTION_SDF) ? value.sdf != 0 : null,
-        };
-
     internal static mln_style_image_options NativeStyleImageOptions(
         StyleImageOptions value,
         NativeCallScope scope
     )
     {
-        var native = NativeMethods.mln_style_image_options_default();
+        var native = new mln_style_image_options();
         native.fields = 0;
         native.size = (uint)sizeof(mln_style_image_options);
         if (value.StretchXStorage?.Items is { } fieldStretchX)
@@ -2608,7 +2161,7 @@ internal static unsafe class GeneratedValues
         StyleTransitionOptions value
     )
     {
-        var native = NativeMethods.mln_style_transition_options_default();
+        var native = new mln_style_transition_options();
         native.fields = 0;
         native.size = (uint)sizeof(mln_style_transition_options);
         native.fields |= Put(
@@ -2647,9 +2200,6 @@ internal static unsafe class GeneratedValues
             value.canonical_y
         );
 
-    internal static UnitBezier CopyUnitBezier(mln_unit_bezier value) =>
-        new(value.x1, value.y1, value.x2, value.y2);
-
     internal static mln_unit_bezier NativeUnitBezier(UnitBezier value)
     {
         var native = new mln_unit_bezier();
@@ -2671,10 +2221,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static VulkanBorrowedTexture CopyVulkanBorrowedTexture(
-        mln_vulkan_borrowed_texture value
-    ) => new(value.image, value.image_view);
-
     internal static mln_vulkan_borrowed_texture NativeVulkanBorrowedTexture(
         VulkanBorrowedTexture value
     )
@@ -2685,33 +2231,12 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static VulkanBorrowedTextureDescriptor CopyVulkanBorrowedTextureDescriptor(
-        mln_vulkan_borrowed_texture_descriptor value
-    ) =>
-        default(VulkanBorrowedTextureDescriptor) with
-        {
-            Extent = CopyLogicalExtent(value.extent),
-            PhysicalWidth = value.physical_width,
-            PhysicalHeight = value.physical_height,
-            Context = CopyVulkanContextDescriptor(value.context),
-            TexturesStorage = new(
-                NativeCallScope.CopyArray<mln_vulkan_borrowed_texture, VulkanBorrowedTexture>(
-                    value.textures,
-                    (nuint)(value.texture_count),
-                    static item => CopyVulkanBorrowedTexture(item)
-                )
-            ),
-            Format = value.format,
-            InitialLayout = value.initial_layout,
-            FinalLayout = value.final_layout,
-        };
-
     internal static mln_vulkan_borrowed_texture_descriptor NativeVulkanBorrowedTextureDescriptor(
         VulkanBorrowedTextureDescriptor value,
         NativeCallScope scope
     )
     {
-        var native = NativeMethods.mln_vulkan_borrowed_texture_descriptor_default();
+        var native = new mln_vulkan_borrowed_texture_descriptor();
         native.size = (uint)sizeof(mln_vulkan_borrowed_texture_descriptor);
         native.extent = NativeLogicalExtent(value.Extent);
         native.physical_width = value.PhysicalWidth;
@@ -2728,19 +2253,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static VulkanContextDescriptor CopyVulkanContextDescriptor(
-        mln_vulkan_context_descriptor value
-    ) =>
-        new(
-            NativePointer.FromNativeAddress((nint)value.instance),
-            NativePointer.FromNativeAddress((nint)value.physical_device),
-            NativePointer.FromNativeAddress((nint)value.device),
-            NativePointer.FromNativeAddress((nint)value.graphics_queue),
-            value.graphics_queue_family_index,
-            NativePointer.FromNativeAddress((nint)value.get_instance_proc_addr),
-            NativePointer.FromNativeAddress((nint)value.get_device_proc_addr)
-        );
-
     internal static mln_vulkan_context_descriptor NativeVulkanContextDescriptor(
         VulkanContextDescriptor value
     )
@@ -2756,35 +2268,22 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static VulkanOwnedTextureDescriptor CopyVulkanOwnedTextureDescriptor(
-        mln_vulkan_owned_texture_descriptor value
-    ) => new(CopyLogicalExtent(value.extent), CopyVulkanContextDescriptor(value.context));
-
     internal static mln_vulkan_owned_texture_descriptor NativeVulkanOwnedTextureDescriptor(
         VulkanOwnedTextureDescriptor value
     )
     {
-        var native = NativeMethods.mln_vulkan_owned_texture_descriptor_default();
+        var native = new mln_vulkan_owned_texture_descriptor();
         native.size = (uint)sizeof(mln_vulkan_owned_texture_descriptor);
         native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeVulkanContextDescriptor(value.Context);
         return native;
     }
 
-    internal static VulkanSurfaceDescriptor CopyVulkanSurfaceDescriptor(
-        mln_vulkan_surface_descriptor value
-    ) =>
-        new(
-            CopyLogicalExtent(value.extent),
-            CopyVulkanContextDescriptor(value.context),
-            value.surface
-        );
-
     internal static mln_vulkan_surface_descriptor NativeVulkanSurfaceDescriptor(
         VulkanSurfaceDescriptor value
     )
     {
-        var native = NativeMethods.mln_vulkan_surface_descriptor_default();
+        var native = new mln_vulkan_surface_descriptor();
         native.size = (uint)sizeof(mln_vulkan_surface_descriptor);
         native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeVulkanContextDescriptor(value.Context);
@@ -2845,15 +2344,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static WebglContextDescriptor CopyWebglContextDescriptor(
-        mln_webgl_context_descriptor value
-    ) =>
-        new(
-            (WebglContextKind)value.kind,
-            value.context,
-            RuntimeStructs.CopyUtf8((sbyte*)value.canvas_selector.data, value.canvas_selector.size)
-        );
-
     internal static mln_webgl_context_descriptor NativeWebglContextDescriptor(
         WebglContextDescriptor value,
         NativeCallScope scope
@@ -2866,15 +2356,6 @@ internal static unsafe class GeneratedValues
         native.canvas_selector = scope.Utf8(value.CanvasSelector);
         return native;
     }
-
-    internal static WglContextDescriptor CopyWglContextDescriptor(
-        mln_wgl_context_descriptor value
-    ) =>
-        new(
-            NativePointer.FromNativeAddress((nint)value.device_context),
-            NativePointer.FromNativeAddress((nint)value.share_context),
-            NativePointer.FromNativeAddress((nint)value.get_proc_address)
-        );
 
     internal static mln_wgl_context_descriptor NativeWglContextDescriptor(
         WglContextDescriptor value

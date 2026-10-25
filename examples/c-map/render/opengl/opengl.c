@@ -587,8 +587,9 @@ static mln_opengl_borrowed_texture_descriptor borrowed_ring_descriptor(
     entries[index] =
       (mln_opengl_borrowed_texture){.texture = ring->textures[index]};
   }
-  mln_opengl_borrowed_texture_descriptor descriptor =
-    mln_opengl_borrowed_texture_descriptor_default();
+  mln_opengl_borrowed_texture_descriptor descriptor = {
+    .size = sizeof(mln_opengl_borrowed_texture_descriptor)
+  };
   descriptor.extent = render_target_extent(current_viewport);
   descriptor.physical_width = current_viewport.physical_width;
   descriptor.physical_height = current_viewport.physical_height;
@@ -603,8 +604,9 @@ static mln_opengl_borrowed_texture_descriptor borrowed_ring_descriptor(
 static mln_opengl_surface_descriptor surface_descriptor(
   render_target* target, viewport current_viewport
 ) {
-  mln_opengl_surface_descriptor descriptor =
-    mln_opengl_surface_descriptor_default();
+  mln_opengl_surface_descriptor descriptor = {
+    .size = sizeof(mln_opengl_surface_descriptor)
+  };
   descriptor.extent = render_target_extent(current_viewport);
   descriptor.context = opengl_context_descriptor(&target->as.surface.context);
   descriptor.surface = target->as.surface.context.egl_surface;
@@ -628,8 +630,9 @@ app_error render_target_attach(
   mln_status status = MLN_STATUS_INVALID_STATE;
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE: {
-      mln_opengl_owned_texture_descriptor descriptor =
-        mln_opengl_owned_texture_descriptor_default();
+      mln_opengl_owned_texture_descriptor descriptor = {
+        .size = sizeof(mln_opengl_owned_texture_descriptor)
+      };
       descriptor.extent = render_target_extent(current_viewport);
       descriptor.context =
         opengl_context_descriptor(&target->as.owned.compositor.context);

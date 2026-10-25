@@ -72,7 +72,7 @@ void run_one_frame(
   // #region render
   if (!*pending) return;
   *pending = false;
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_PRESENT | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = ++receiver->next_frame_token;
   if (

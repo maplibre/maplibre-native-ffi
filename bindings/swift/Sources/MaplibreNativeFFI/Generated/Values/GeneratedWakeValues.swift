@@ -15,10 +15,6 @@ public struct Wake: Sendable {
     self.callback = callback
   }
 
-  public static var `default`: Self {
-    Self()
-  }
-
   func nativeValue(arena: NativeInputArena) throws -> mln_wake {
     var raw = mln_wake()
     raw.callback = callback == nil ? nil : invokeWakeCallback

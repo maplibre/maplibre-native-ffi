@@ -387,7 +387,7 @@ static void invalid_routes_are_rejected(void) {
   };
   MLN_TEST_INVALID(submit_routes(runtime, &unknown_kind, 1, NULL));
   // Zero kinds select every kind rather than none.
-  mln_resource_route zero_kinds = mln_resource_route_default();
+  mln_resource_route zero_kinds = {.size = sizeof(mln_resource_route)};
   zero_kinds.url = (mln_buffer_view)MLN_BUFFER_LITERAL("**");
   MLN_TEST_OK(submit_routes(runtime, &zero_kinds, 1, NULL));
   const mln_resource_route null_url = {
@@ -460,7 +460,7 @@ static void routes_step_by_their_declared_size(void) {
   routes[1].route.flags = MLN_URL_MATCH_GLOB;
   MLN_TEST_OK(submit_routes(runtime, &routes[0].route, 2, NULL));
 
-  mln_resource_route undersized = mln_resource_route_default();
+  mln_resource_route undersized = {.size = sizeof(mln_resource_route)};
   undersized.size = sizeof(undersized) - sizeof(uint64_t);
   undersized.url = (mln_buffer_view)MLN_BUFFER_LITERAL("**");
   MLN_TEST_INVALID(submit_routes(runtime, &undersized, 1, &diagnostic));

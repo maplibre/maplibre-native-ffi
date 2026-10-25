@@ -227,7 +227,7 @@ static inline void probe_start(void) {
 
 // Creates a runtime with the probe's resource provider.
 static inline mln_runtime probe_create_runtime(void) {
-  mln_runtime_options options = mln_runtime_options_default();
+  mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   mln_runtime runtime = MLN_HANDLE_NULL;
   probe_require(
     mln_runtime_create(&options, &runtime, NULL), "creating a runtime"
@@ -247,7 +247,7 @@ static inline mln_runtime probe_create_runtime(void) {
 static inline mln_map probe_create_map(mln_runtime runtime) {
   probe_latch latch;
   const mln_completion completion = probe_latch_completion(&latch);
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = {.size = sizeof(mln_map_options)};
   options.initial_extent =
     (mln_logical_extent){.width = 256, .height = 256, .scale_factor = 1.0};
   mln_map map = MLN_HANDLE_NULL;

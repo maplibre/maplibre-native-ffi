@@ -276,8 +276,13 @@ func nativeCommand(
   }.value()
 }
 
-func nativeDirect<T>(
-  _ call: (NativeInputArena) throws -> T
-) throws -> T {
-  try withNative(owner: nil) { arena in try call(arena) }
+/// Runs a call that cannot fail after the C ABI version check. The call has
+/// no error channel, so a library with another version traps.
+func nativeDirect<T>(_ call: () -> T) -> T {
+  do {
+    try NativeAbi.ensureCompatible()
+  } catch {
+    preconditionFailure(String(describing: error))
+  }
+  return call()
 }

@@ -10,11 +10,7 @@ import Foundation
 public struct MetalBorrowedTexture: Equatable, Hashable, Sendable {
   /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
   public var texture: NativePointer
-  public static var `default`: Self {
-    Self(raw: mln_metal_borrowed_texture())
-  }
-
-  public init(texture: NativePointer = MetalBorrowedTexture.default.texture) {
+  public init(texture: NativePointer) {
     self.texture = texture
   }
 
@@ -47,18 +43,11 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   public var physicalHeight: UInt32
   /// The ring's textures, one per slot, in slot order. Required.
   public var textures: [MetalBorrowedTexture]
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_metal_borrowed_texture_descriptor_default))
-  }
-
   public init(
-    extent: LogicalExtent = MetalBorrowedTextureDescriptor.default.extent,
-    physicalWidth: UInt32 = MetalBorrowedTextureDescriptor.default
-      .physicalWidth,
-    physicalHeight: UInt32 = MetalBorrowedTextureDescriptor.default
-      .physicalHeight,
-    textures: [MetalBorrowedTexture] = MetalBorrowedTextureDescriptor.default
-      .textures
+    extent: LogicalExtent,
+    physicalWidth: UInt32,
+    physicalHeight: UInt32,
+    textures: [MetalBorrowedTexture]
   ) {
     self.extent = extent
     self.physicalWidth = physicalWidth
@@ -82,7 +71,7 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   func nativeValue(arena: NativeInputArena) throws
     -> mln_metal_borrowed_texture_descriptor
   {
-    var raw = mln_metal_borrowed_texture_descriptor_default()
+    var raw = mln_metal_borrowed_texture_descriptor()
     raw.size = UInt32(MemoryLayout<mln_metal_borrowed_texture_descriptor>.size)
     raw.extent = extent.nativeValue()
     raw.physical_width = physicalWidth
@@ -107,15 +96,10 @@ public struct MetalOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   /// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
   /// returns RGBA8 for either format.
   public var pixelFormat: UInt64
-  public static var `default`: Self {
-    Self(raw: nativeDefault(mln_metal_owned_texture_descriptor_default))
-  }
-
   public init(
-    extent: LogicalExtent = MetalOwnedTextureDescriptor.default.extent,
-    context: MetalContextDescriptor = MetalOwnedTextureDescriptor.default
-      .context,
-    pixelFormat: UInt64 = MetalOwnedTextureDescriptor.default.pixelFormat
+    extent: LogicalExtent,
+    context: MetalContextDescriptor = .init(),
+    pixelFormat: UInt64
   ) {
     self.extent = extent
     self.context = context
@@ -129,7 +113,8 @@ public struct MetalOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_metal_owned_texture_descriptor {
-    var raw = mln_metal_owned_texture_descriptor_default()
+    var raw = mln_metal_owned_texture_descriptor()
+    raw.size = UInt32(MemoryLayout<mln_metal_owned_texture_descriptor>.size)
     raw.extent = extent.nativeValue()
     raw.context = context.nativeValue()
     raw.pixel_format = pixelFormat
@@ -161,20 +146,16 @@ public struct MetalTextureFrame: Equatable, Hashable, Sendable {
   public var device: NativePointer
   /// Backend-native pixel format value. Metal uses MTLPixelFormat.
   public var pixelFormat: UInt64
-  public static var `default`: Self {
-    Self(raw: mln_metal_texture_frame())
-  }
-
   public init(
-    generation: UInt64 = MetalTextureFrame.default.generation,
-    width: UInt32 = MetalTextureFrame.default.width,
-    height: UInt32 = MetalTextureFrame.default.height,
-    scaleFactor: Double = MetalTextureFrame.default.scaleFactor,
-    frameId: UInt64 = MetalTextureFrame.default.frameId,
-    slot: UInt32 = MetalTextureFrame.default.slot,
-    texture: NativePointer = MetalTextureFrame.default.texture,
-    device: NativePointer = MetalTextureFrame.default.device,
-    pixelFormat: UInt64 = MetalTextureFrame.default.pixelFormat
+    generation: UInt64 = 0,
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    frameId: UInt64 = 0,
+    slot: UInt32 = 0,
+    texture: NativePointer = .null,
+    device: NativePointer = .null,
+    pixelFormat: UInt64 = 0
   ) {
     self.generation = generation
     self.width = width
@@ -210,11 +191,7 @@ public struct MetalTextureFrame: Equatable, Hashable, Sendable {
 public struct OpenglBorrowedTexture: Equatable, Hashable, Sendable {
   /// Borrowed OpenGL texture object name. Required.
   public var texture: UInt32
-  public static var `default`: Self {
-    Self(raw: mln_opengl_borrowed_texture())
-  }
-
-  public init(texture: UInt32 = OpenglBorrowedTexture.default.texture) {
+  public init(texture: UInt32) {
     self.texture = texture
   }
 
@@ -249,23 +226,13 @@ public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   public var textures: [OpenglBorrowedTexture]
   /// OpenGL texture target of every texture. Required: GL_TEXTURE_2D.
   public var target: UInt32
-  public static var `default`: Self {
-    try! Self(
-      raw: nativeDefault(mln_opengl_borrowed_texture_descriptor_default)
-    )
-  }
-
   public init(
-    extent: LogicalExtent = OpenglBorrowedTextureDescriptor.default.extent,
-    physicalWidth: UInt32 = OpenglBorrowedTextureDescriptor.default
-      .physicalWidth,
-    physicalHeight: UInt32 = OpenglBorrowedTextureDescriptor.default
-      .physicalHeight,
-    context: OpenglContextDescriptor = OpenglBorrowedTextureDescriptor.default
-      .context,
-    textures: [OpenglBorrowedTexture] = OpenglBorrowedTextureDescriptor.default
-      .textures,
-    target: UInt32 = OpenglBorrowedTextureDescriptor.default.target
+    extent: LogicalExtent,
+    physicalWidth: UInt32,
+    physicalHeight: UInt32,
+    context: OpenglContextDescriptor,
+    textures: [OpenglBorrowedTexture],
+    target: UInt32
   ) {
     self.extent = extent
     self.physicalWidth = physicalWidth
@@ -293,7 +260,7 @@ public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   func nativeValue(arena: NativeInputArena) throws
     -> mln_opengl_borrowed_texture_descriptor
   {
-    var raw = mln_opengl_borrowed_texture_descriptor_default()
+    var raw = mln_opengl_borrowed_texture_descriptor()
     raw.size = UInt32(MemoryLayout<mln_opengl_borrowed_texture_descriptor>.size)
     raw.extent = extent.nativeValue()
     raw.physical_width = physicalWidth
@@ -319,15 +286,7 @@ public struct OpenglOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   /// transferred WebGL ownership creates a private core-worker context for CPU
   /// readback.
   public var context: OpenglContextDescriptor
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_opengl_owned_texture_descriptor_default))
-  }
-
-  public init(
-    extent: LogicalExtent = OpenglOwnedTextureDescriptor.default.extent,
-    context: OpenglContextDescriptor = OpenglOwnedTextureDescriptor.default
-      .context
-  ) {
+  public init(extent: LogicalExtent, context: OpenglContextDescriptor) {
     self.extent = extent
     self.context = context
   }
@@ -343,7 +302,7 @@ public struct OpenglOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   func nativeValue(arena: NativeInputArena) throws
     -> mln_opengl_owned_texture_descriptor
   {
-    var raw = mln_opengl_owned_texture_descriptor_default()
+    var raw = mln_opengl_owned_texture_descriptor()
     raw.size = UInt32(MemoryLayout<mln_opengl_owned_texture_descriptor>.size)
     raw.extent = extent.nativeValue()
     raw.context = try context.nativeValue(arena: arena)
@@ -380,22 +339,18 @@ public struct OpenglTextureFrame: Equatable, Hashable, Sendable {
   public var format: UInt32
   /// OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed texture.
   public var type: UInt32
-  public static var `default`: Self {
-    Self(raw: mln_opengl_texture_frame())
-  }
-
   public init(
-    generation: UInt64 = OpenglTextureFrame.default.generation,
-    width: UInt32 = OpenglTextureFrame.default.width,
-    height: UInt32 = OpenglTextureFrame.default.height,
-    scaleFactor: Double = OpenglTextureFrame.default.scaleFactor,
-    frameId: UInt64 = OpenglTextureFrame.default.frameId,
-    slot: UInt32 = OpenglTextureFrame.default.slot,
-    texture: UInt32 = OpenglTextureFrame.default.texture,
-    target: UInt32 = OpenglTextureFrame.default.target,
-    internalFormat: UInt32 = OpenglTextureFrame.default.internalFormat,
-    format: UInt32 = OpenglTextureFrame.default.format,
-    type: UInt32 = OpenglTextureFrame.default.type
+    generation: UInt64 = 0,
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    frameId: UInt64 = 0,
+    slot: UInt32 = 0,
+    texture: UInt32 = 0,
+    target: UInt32 = 0,
+    internalFormat: UInt32 = 0,
+    format: UInt32 = 0,
+    type: UInt32 = 0
   ) {
     self.generation = generation
     self.width = width
@@ -438,15 +393,11 @@ public struct TextureImageInfo: Equatable, Hashable, Sendable {
   public var stride: UInt32
   /// Required output buffer byte length.
   public var byteLength: Int
-  public static var `default`: Self {
-    Self(raw: mln_texture_image_info())
-  }
-
   public init(
-    width: UInt32 = TextureImageInfo.default.width,
-    height: UInt32 = TextureImageInfo.default.height,
-    stride: UInt32 = TextureImageInfo.default.stride,
-    byteLength: Int = TextureImageInfo.default.byteLength
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    stride: UInt32 = 0,
+    byteLength: Int = 0
   ) {
     self.width = width
     self.height = height
@@ -470,11 +421,7 @@ public struct TextureReadbackResult: Equatable, Hashable, Sendable {
   /// Borrowed pixel bytes, valid only during the callback.
   public var data: Data
   public var info: TextureImageInfo
-  public static var `default`: Self {
-    Self()
-  }
-
-  public init(data: Data = Data(), info: TextureImageInfo = .default) {
+  public init(data: Data = Data(), info: TextureImageInfo = .init()) {
     self.data = data
     self.info = info
   }
@@ -498,14 +445,7 @@ public struct VulkanBorrowedTexture: Equatable, Hashable, Sendable {
   /// Borrowed VkImageView for image. Required. The view must be a 2D color view
   /// that matches image and the descriptor's format.
   public var imageView: UInt64
-  public static var `default`: Self {
-    Self(raw: mln_vulkan_borrowed_texture())
-  }
-
-  public init(
-    image: UInt64 = VulkanBorrowedTexture.default.image,
-    imageView: UInt64 = VulkanBorrowedTexture.default.imageView
-  ) {
+  public init(image: UInt64, imageView: UInt64) {
     self.image = image
     self.imageView = imageView
   }
@@ -549,26 +489,15 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
   /// VK_IMAGE_LAYOUT_UNDEFINED is invalid.
   public var finalLayout: UInt32
-  public static var `default`: Self {
-    try! Self(
-      raw: nativeDefault(mln_vulkan_borrowed_texture_descriptor_default)
-    )
-  }
-
   public init(
-    extent: LogicalExtent = VulkanBorrowedTextureDescriptor.default.extent,
-    physicalWidth: UInt32 = VulkanBorrowedTextureDescriptor.default
-      .physicalWidth,
-    physicalHeight: UInt32 = VulkanBorrowedTextureDescriptor.default
-      .physicalHeight,
-    context: VulkanContextDescriptor = VulkanBorrowedTextureDescriptor.default
-      .context,
-    textures: [VulkanBorrowedTexture] = VulkanBorrowedTextureDescriptor.default
-      .textures,
-    format: UInt32 = VulkanBorrowedTextureDescriptor.default.format,
-    initialLayout: UInt32 = VulkanBorrowedTextureDescriptor.default
-      .initialLayout,
-    finalLayout: UInt32 = VulkanBorrowedTextureDescriptor.default.finalLayout
+    extent: LogicalExtent,
+    physicalWidth: UInt32,
+    physicalHeight: UInt32,
+    context: VulkanContextDescriptor,
+    textures: [VulkanBorrowedTexture],
+    format: UInt32,
+    initialLayout: UInt32 = 0,
+    finalLayout: UInt32
   ) {
     self.extent = extent
     self.physicalWidth = physicalWidth
@@ -600,7 +529,7 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   func nativeValue(arena: NativeInputArena) throws
     -> mln_vulkan_borrowed_texture_descriptor
   {
-    var raw = mln_vulkan_borrowed_texture_descriptor_default()
+    var raw = mln_vulkan_borrowed_texture_descriptor()
     raw.size = UInt32(MemoryLayout<mln_vulkan_borrowed_texture_descriptor>.size)
     raw.extent = extent.nativeValue()
     raw.physical_width = physicalWidth
@@ -625,15 +554,7 @@ public struct VulkanOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   public var extent: LogicalExtent
   /// Borrowed Vulkan context. All handles are required.
   public var context: VulkanContextDescriptor
-  public static var `default`: Self {
-    Self(raw: nativeDefault(mln_vulkan_owned_texture_descriptor_default))
-  }
-
-  public init(
-    extent: LogicalExtent = VulkanOwnedTextureDescriptor.default.extent,
-    context: VulkanContextDescriptor = VulkanOwnedTextureDescriptor.default
-      .context
-  ) {
+  public init(extent: LogicalExtent, context: VulkanContextDescriptor) {
     self.extent = extent
     self.context = context
   }
@@ -644,7 +565,8 @@ public struct VulkanOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_vulkan_owned_texture_descriptor {
-    var raw = mln_vulkan_owned_texture_descriptor_default()
+    var raw = mln_vulkan_owned_texture_descriptor()
+    raw.size = UInt32(MemoryLayout<mln_vulkan_owned_texture_descriptor>.size)
     raw.extent = extent.nativeValue()
     raw.context = context.nativeValue()
     return raw
@@ -681,22 +603,18 @@ public struct VulkanTextureFrame: Equatable, Hashable, Sendable {
   /// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for a session-owned ring, and the
   /// descriptor's final_layout for a borrowed one.
   public var layout: UInt32
-  public static var `default`: Self {
-    Self(raw: mln_vulkan_texture_frame())
-  }
-
   public init(
-    generation: UInt64 = VulkanTextureFrame.default.generation,
-    width: UInt32 = VulkanTextureFrame.default.width,
-    height: UInt32 = VulkanTextureFrame.default.height,
-    scaleFactor: Double = VulkanTextureFrame.default.scaleFactor,
-    frameId: UInt64 = VulkanTextureFrame.default.frameId,
-    slot: UInt32 = VulkanTextureFrame.default.slot,
-    image: UInt64 = VulkanTextureFrame.default.image,
-    imageView: UInt64 = VulkanTextureFrame.default.imageView,
-    device: NativePointer = VulkanTextureFrame.default.device,
-    format: UInt32 = VulkanTextureFrame.default.format,
-    layout: UInt32 = VulkanTextureFrame.default.layout
+    generation: UInt64 = 0,
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    frameId: UInt64 = 0,
+    slot: UInt32 = 0,
+    image: UInt64 = 0,
+    imageView: UInt64 = 0,
+    device: NativePointer = .null,
+    format: UInt32 = 0,
+    layout: UInt32 = 0
   ) {
     self.generation = generation
     self.width = width

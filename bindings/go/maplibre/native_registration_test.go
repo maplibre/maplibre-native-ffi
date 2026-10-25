@@ -16,7 +16,7 @@ func TestNativeRegistrationIsReleasedWhenTheCallIsNotAccepted(t *testing.T) {
 	f := newFixture(t)
 	wake := newNativeRecorderForTest(nil)
 	lock := newNativeRecorderForTest(nil)
-	options := DefaultRenderSessionAttachOptions()
+	options := RenderSessionAttachOptions{}
 	options.FrameWake = wake.wake()
 	options.QueueLock = lock.queueLock()
 	// The descriptor names no device, which every build rejects.
@@ -34,7 +34,7 @@ func TestNativeRegistrationIsReleasedWhenTheCallIsNotAccepted(t *testing.T) {
 	}
 
 	mixed := newNativeRecorderForTest(nil)
-	options = DefaultRenderSessionAttachOptions()
+	options = RenderSessionAttachOptions{}
 	options.DriverWorkWake = mixed.wake()
 	options.DriverWorkWake.Callback = func() {}
 	// The binding fails the attach before it reaches native code.

@@ -15,6 +15,7 @@ import org.maplibre.nativeffi.awaitDeliveries
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.RuntimeEventType
+import org.maplibre.nativeffi.generated.RuntimeOptions
 import org.maplibre.nativeffi.interceptUncaught
 import org.maplibre.nativeffi.internal.callback.NativeRoots
 import org.maplibre.nativeffi.requestCollection
@@ -34,7 +35,7 @@ class PageThreadTest {
     // binding started, and the page yields while that thread starts.
     val creation =
       async(start = CoroutineStart.UNDISPATCHED) {
-        GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+        GeneratedApi.runtimeCreate(RuntimeOptions())
       }
     assertFalse(creation.isCompleted, "runtime creation returned before its thread could start")
     val runtime = creation.awaitWithin("the runtime")
@@ -60,7 +61,7 @@ class PageThreadTest {
       // after the page yields, so a call that waited for the start would never return.
       val creation =
         async(start = CoroutineStart.UNDISPATCHED) {
-          GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+          GeneratedApi.runtimeCreate(RuntimeOptions())
         }
       assertFalse(creation.isCompleted, "runtime creation returned before the page yielded")
       val runtime = creation.awaitWithin("the runtime")
@@ -82,7 +83,7 @@ class PageThreadTest {
       val roots = NativeRoots.countForTesting()
       val creation =
         async(start = CoroutineStart.UNDISPATCHED) {
-          GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+          GeneratedApi.runtimeCreate(RuntimeOptions())
         }
       creation.cancel()
       // The creation's thread still runs, so the caller resumes once its runtime arrives.

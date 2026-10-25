@@ -7,14 +7,14 @@ from support import parse
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import ModelError
 from tools.bindgen.schema import validate
-from tools.bindgen.semantic import DefaultSupport, bind
+from tools.bindgen.semantic import bind
 
 # A handle, a callback registration, and an operation that opens the handle,
 # each annotated only where it departs from convention.
 REGISTRATION = """
 typedef unsigned long long session BIND("kind=handle;release=session_close");
 void session_close(session value);
-typedef void (*notify)(void *context, mln_buffer_view message);
+typedef void (*notify)(void *context, const char *message);
 typedef void (*release)(void *context);
 typedef struct listener {
   notify callback;
@@ -49,12 +49,6 @@ mln_status submit(const mln_completion *completion BIND("nullable=true"), mln_di
             (fields["text"].value.kind, fields["text"].value.encoding),
             ("buffer", "utf8"),
         )
-        self.assertEqual(label.default, "mln_label_default")
-        constructor = bound.operations_by_name["mln_label_default"]
-        self.assertEqual(
-            (constructor.execution, constructor.support),
-            ("immediate", DefaultSupport("mln_label")),
-        )
         command = bound.operations_by_name["mln_map_set_label"]
         self.assertIsNone(command.result)
         self.assertEqual(
@@ -84,8 +78,8 @@ mln_status submit(const mln_completion *completion BIND("nullable=true"), mln_di
         )
         message = notify.parameters[1].value
         self.assertEqual(
-            (message.kind, message.buffer_form, message.encoding),
-            ("buffer", "view", "utf8"),
+            (message.kind, message.length, message.encoding, message.ownership),
+            ("buffer", "nul", "utf8", "borrowed"),
         )
         self.assertEqual(notify.parameters[0].value.lifetime, "owner")
         operation = bound.operations_by_name["session_open"]
@@ -98,23 +92,6 @@ mln_status submit(const mln_completion *completion BIND("nullable=true"), mln_di
         self.assertEqual(window.value.kind, "native_pointer")
         (owner,) = operation.owned_outputs
         self.assertEqual((owner.parameter, owner.handle.parent), ("out_session", None))
-
-    def test_terminated_text_is_rejected(self):
-        # Text is an mln_buffer_view; a character pointer must name its length.
-        with self.assertRaisesRegex(ModelError, "text requires an mln_buffer_view"):
-            validate(
-                parse(
-                    REGISTRATION.replace(
-                        "mln_buffer_view message", "const char *message"
-                    )
-                )
-            )
-        with self.assertRaisesRegex(ModelError, "text requires an mln_buffer_view"):
-            validate(
-                parse(
-                    "mln_status set_label(const char *label, mln_diagnostic *out_diagnostic);"
-                )
-            )
 
     def test_an_annotation_that_restates_a_default_is_rejected(self):
         with self.assertRaisesRegex(
@@ -145,23 +122,13 @@ BIND("execution=command") mln_status session_flush(
         )
         validate(parse(source))
         command = 'BIND("execution=command'
-        message = "mln_buffer_view message"
+        message = "const char *message"
         # A key that no header writes.
         with self.assertRaisesRegex(ModelError, "unknown metadata key 'receiver'"):
             validate(parse(source.replace(command, command + ";receiver=value", 1)))
         # A value that no header writes, where it departs from the default.
         with self.assertRaisesRegex(ModelError, "unsupported lifetime='completion'"):
             parse(source.replace(message, message + ' BIND("lifetime=completion")', 1))
-
-    def test_a_default_constructor_is_inferred_only_when_it_is_unambiguous(self):
-        source = """
-typedef struct options { double zoom; } options;
-options make_options(void);
-options other_options(void);
-void use_options(const options *value);
-"""
-        bound = compile_api(parse(source))
-        self.assertIsNone(bound.values["options"].default)
 
     def test_an_annotation_that_names_an_absent_function_is_rejected(self):
         source = """

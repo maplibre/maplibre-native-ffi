@@ -141,6 +141,7 @@ class Values:
         from .swift_dynamic_values import (
             declaration,
             dynamic,
+            field_zero,
             union_cases,
             union_record,
         )
@@ -181,7 +182,7 @@ class Values:
             fields.append(
                 f"{doc(self.bound, flag.name, '  ')}  public var {local}: Bool"
             )
-            init.append(f"{local}: Bool = {public}.default.{local}")
+            init.append(f"{local}: Bool = false")
             assignments.append(f"    self.{local} = {local}")
             captures.append(
                 f"    self.{local} = raw.{flag.mask} & {flag.name}.rawValue != 0"
@@ -192,21 +193,19 @@ class Values:
         for field in value.fields:
             local, raw = identifier(camel(field.name)), "raw." + identifier(field.name)
             if field.role == "size":
-                if not value.default:
-                    materialize.append(
-                        f"    {raw} = UInt32(MemoryLayout<{value.native}>.size)"
-                    )
+                materialize.append(
+                    f"    {raw} = UInt32(MemoryLayout<{value.native}>.size)"
+                )
                 continue
             if not field.public:
                 continue
             optional = field.presence and field.presence.mask
-            field_type = self.public(field.value)
+            field_type = self.public(field.value) + ("?" if optional else "")
             fields.append(
-                f"{doc(self.bound, f'{value.native}.{field.name}', '  ')}  public var {local}: {field_type}{'?' if optional else ''}"
+                f"{doc(self.bound, f'{value.native}.{field.name}', '  ')}  public var {local}: {field_type}"
             )
-            init.append(
-                f"{local}: {field_type}{'?' if optional else ''} = {public}.default.{local}"
-            )
+            default = field_zero(self, field, field_type)
+            init.append(f"{local}: {field_type}" + (f" = {default}" if default else ""))
             assignments.append(f"    self.{local} = {local}")
             capture = self.copy(field.value, raw)
             if optional:
@@ -222,12 +221,9 @@ class Values:
                 materialize.append(
                     f"    {raw} = {self.native(field.value, 'self.' + local)}"
                 )
-        initial = f"{value.default}()" if value.default else f"{value.native}()"
-        stored = f"nativeDefault({value.default})" if value.default else initial
-        default = f"  public static var `default`: Self {{ Self(raw: {stored}) }}"
         encoder = (
             f"""  func nativeValue() -> {value.native} {{
-    var raw = {initial}
+    var raw = {value.native}()
 {chr(10).join(materialize)}
     return raw
   }}
@@ -237,7 +233,6 @@ class Values:
         )
         rendered = f"""{doc(self.bound, value.native)}public struct {public}: Equatable, Hashable, Sendable {{
 {chr(10).join(fields)}
-{default}
   public init({", ".join(init)}) {{
 {chr(10).join(assignments)}
   }}

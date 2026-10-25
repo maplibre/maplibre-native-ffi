@@ -143,6 +143,27 @@ internal readonly unsafe ref partial struct NativeCallScope
         return *pointer;
     }
 
+    /// <summary>Encodes a NUL-terminated string, which cannot carry an embedded NUL.</summary>
+    internal sbyte* CString(
+        string text,
+        [CallerArgumentExpression(nameof(text))] string? name = null
+    )
+    {
+        ArgumentNullException.ThrowIfNull(text, name);
+        if (text.Contains('\0'))
+            throw new ArgumentException("The string contains an embedded NUL character.", name);
+        var count = Encoding.UTF8.GetByteCount(text);
+        var pointer = Allocate<byte>(checked(count + 1));
+        Encoding.UTF8.GetBytes(text, new Span<byte>(pointer, count));
+        pointer[count] = 0;
+        return (sbyte*)pointer;
+    }
+
+    internal static string CopyCString(sbyte* pointer) =>
+        pointer == null
+            ? throw new InvalidOperationException("Native string pointer is null.")
+            : Marshal.PtrToStringUTF8((nint)pointer)!;
+
     internal mln_buffer_view Buffer(
         byte[] bytes,
         [CallerArgumentExpression(nameof(bytes))] string? name = null

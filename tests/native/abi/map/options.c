@@ -104,7 +104,9 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
   };
   for (size_t index = 0;
        index < sizeof(viewport_rows) / sizeof(viewport_rows[0]); index += 1) {
-    mln_map_viewport_options viewport = mln_map_viewport_options_default();
+    mln_map_viewport_options viewport = {
+      .size = sizeof(mln_map_viewport_options)
+    };
     viewport.fields = viewport_rows[index].field;
     viewport.north_orientation = viewport_rows[index].value;
     viewport.constrain_mode = viewport_rows[index].value;
@@ -125,7 +127,9 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
       viewport_rows[index].value, committed, label
     );
   }
-  mln_map_viewport_options viewport = mln_map_viewport_options_default();
+  mln_map_viewport_options viewport = {
+    .size = sizeof(mln_map_viewport_options)
+  };
   viewport.fields = MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
   viewport.frustum_offset = (mln_edge_insets){1.0, 2.0, 3.0, 4.0};
   COMMIT(
@@ -137,7 +141,7 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
     sizeof(viewport.frustum_offset)
   );
 
-  mln_map_tile_options tile = mln_map_tile_options_default();
+  mln_map_tile_options tile = {.size = sizeof(mln_map_tile_options)};
   tile.fields =
     MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA |
     MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS | MLN_MAP_TILE_OPTION_LOD_SCALE |
@@ -169,7 +173,7 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
     tile.lod_mode = MLN_TILE_LOD_MODE_DEFAULT;
   }
 
-  mln_projection_mode mode = mln_projection_mode_default();
+  mln_projection_mode mode = {.size = sizeof(mln_projection_mode)};
   mode.fields = MLN_PROJECTION_MODE_AXONOMETRIC | MLN_PROJECTION_MODE_X_SKEW |
                 MLN_PROJECTION_MODE_Y_SKEW;
   mode.axonometric = true;
@@ -196,7 +200,9 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
   // MapLibre renormalizes the altitude of a free-camera position, so only the
   // ground position round-trips. The orientation is a quarter turn about the
   // vertical axis.
-  mln_free_camera_options free_camera = mln_free_camera_options_default();
+  mln_free_camera_options free_camera = {
+    .size = sizeof(mln_free_camera_options)
+  };
   free_camera.fields = MLN_FREE_CAMERA_OPTION_POSITION;
   free_camera.position = (mln_vec3){.x = 0.25, .y = 0.25, .z = 0.5};
   COMMIT(
@@ -230,7 +236,7 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
     1e-9, free_camera.orientation.w, snapshot.free_camera.orientation.w
   );
 
-  mln_bound_options bounds = mln_bound_options_default();
+  mln_bound_options bounds = {.size = sizeof(mln_bound_options)};
   bounds.fields = MLN_BOUND_OPTION_MIN_ZOOM | MLN_BOUND_OPTION_MAX_ZOOM |
                   MLN_BOUND_OPTION_MIN_PITCH | MLN_BOUND_OPTION_MAX_PITCH;
   bounds.min_zoom = 2.0;
@@ -404,17 +410,19 @@ static void option_descriptors_reject_what_they_cannot_express(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
 
-  const mln_map_viewport_options viewport = mln_map_viewport_options_default();
+  const mln_map_viewport_options viewport = {
+    .size = sizeof(mln_map_viewport_options)
+  };
   mln_test_run_validation_table(
     viewport_cases, sizeof(viewport_cases) / sizeof(*viewport_cases), &viewport,
     sizeof(viewport), submit_viewport_row, &map
   );
-  const mln_map_tile_options tile = mln_map_tile_options_default();
+  const mln_map_tile_options tile = {.size = sizeof(mln_map_tile_options)};
   mln_test_run_validation_table(
     tile_cases, sizeof(tile_cases) / sizeof(*tile_cases), &tile, sizeof(tile),
     submit_tile_row, &map
   );
-  const mln_projection_mode mode = mln_projection_mode_default();
+  const mln_projection_mode mode = {.size = sizeof(mln_projection_mode)};
   mln_test_run_validation_table(
     projection_mode_cases,
     sizeof(projection_mode_cases) / sizeof(*projection_mode_cases), &mode,

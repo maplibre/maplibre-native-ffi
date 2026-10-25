@@ -9,8 +9,9 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_resource_provider</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
-public readonly record struct ResourceProvider
+public readonly partial record struct ResourceProvider
 {
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public ResourceProvider(ResourceProviderCallback Callback, ImmutableArray<ResourceRoute> Routes)
     {
         this.Callback = Callback;
@@ -20,7 +21,7 @@ public readonly record struct ResourceProvider
     /// <summary>
     /// Answers each request that the routes leave to the provider.
     /// </summary>
-    public ResourceProviderCallback Callback { get; init; }
+    public required ResourceProviderCallback Callback { get; init; }
 
     /// <summary>
     /// The requests that reach the provider; empty to claim every request.

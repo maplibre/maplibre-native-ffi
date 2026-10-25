@@ -59,39 +59,7 @@ internal actual object C {
   actual fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int =
     mln_kw_mln_android_init(word(jniEnv), word(context), word(outDiagnostic))
 
-  actual fun mln_animation_options_default(returned: Long) {
-    mln_kw_mln_animation_options_default(word(returned))
-  }
-
-  actual fun mln_bound_options_default(returned: Long) {
-    mln_kw_mln_bound_options_default(word(returned))
-  }
-
   actual fun mln_c_version(): Int = mln_kw_mln_c_version()
-
-  actual fun mln_camera_delta_default(returned: Long) {
-    mln_kw_mln_camera_delta_default(word(returned))
-  }
-
-  actual fun mln_camera_fit_options_default(returned: Long) {
-    mln_kw_mln_camera_fit_options_default(word(returned))
-  }
-
-  actual fun mln_camera_options_default(returned: Long) {
-    mln_kw_mln_camera_options_default(word(returned))
-  }
-
-  actual fun mln_camera_update_default(returned: Long) {
-    mln_kw_mln_camera_update_default(word(returned))
-  }
-
-  actual fun mln_custom_geometry_source_options_default(returned: Long) {
-    mln_kw_mln_custom_geometry_source_options_default(word(returned))
-  }
-
-  actual fun mln_custom_mvt_vector_source_options_default(returned: Long) {
-    mln_kw_mln_custom_mvt_vector_source_options_default(word(returned))
-  }
 
   actual fun mln_delivery_batch_release(batch: Long) {
     mln_kw_mln_delivery_batch_release(batch)
@@ -115,14 +83,6 @@ internal actual object C {
     mln_kw_mln_delivery_queue_release(queue)
   }
 
-  actual fun mln_frame_demand_default(returned: Long) {
-    mln_kw_mln_frame_demand_default(word(returned))
-  }
-
-  actual fun mln_free_camera_options_default(returned: Long) {
-    mln_kw_mln_free_camera_options_default(word(returned))
-  }
-
   actual fun mln_geojson_source_data_create(
     data: Long,
     options: Long,
@@ -138,18 +98,6 @@ internal actual object C {
 
   actual fun mln_geojson_source_data_release(data: Long) {
     mln_kw_mln_geojson_source_data_release(data)
-  }
-
-  actual fun mln_geojson_source_options_default(returned: Long) {
-    mln_kw_mln_geojson_source_options_default(word(returned))
-  }
-
-  actual fun mln_gpu_sync_default(returned: Long) {
-    mln_kw_mln_gpu_sync_default(word(returned))
-  }
-
-  actual fun mln_http_header_rule_default(returned: Long) {
-    mln_kw_mln_http_header_rule_default(word(returned))
   }
 
   actual fun mln_http_header_transform_response_set_header(
@@ -180,10 +128,6 @@ internal actual object C {
 
   actual fun mln_log_set_callback(handler: Long, outDiagnostic: Long): Int =
     mln_kw_mln_log_set_callback(word(handler), word(outDiagnostic))
-
-  actual fun mln_logical_extent_default(returned: Long) {
-    mln_kw_mln_logical_extent_default(word(returned))
-  }
 
   actual fun mln_logical_extent_physical_size(
     extent: Long,
@@ -807,10 +751,6 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_options_default(returned: Long) {
-    mln_kw_mln_map_options_default(word(returned))
-  }
-
   actual fun mln_map_projection_create(view: Long, outProjection: Long, outDiagnostic: Long): Int =
     mln_kw_mln_map_projection_create(word(view), word(outProjection), word(outDiagnostic))
 
@@ -1331,10 +1271,6 @@ internal actual object C {
   ): Int =
     mln_kw_mln_map_set_viewport_options(map, word(options), word(completion), word(outDiagnostic))
 
-  actual fun mln_map_tile_options_default(returned: Long) {
-    mln_kw_mln_map_tile_options_default(word(returned))
-  }
-
   actual fun mln_map_update_camera(
     map: Long,
     update: Long,
@@ -1342,49 +1278,17 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_kw_mln_map_update_camera(map, word(update), word(completion), word(outDiagnostic))
 
-  actual fun mln_map_viewport_options_default(returned: Long) {
-    mln_kw_mln_map_viewport_options_default(word(returned))
-  }
-
-  actual fun mln_metal_borrowed_texture_descriptor_default(returned: Long) {
-    mln_kw_mln_metal_borrowed_texture_descriptor_default(word(returned))
-  }
-
-  actual fun mln_metal_owned_texture_descriptor_default(returned: Long) {
-    mln_kw_mln_metal_owned_texture_descriptor_default(word(returned))
-  }
-
-  actual fun mln_metal_surface_descriptor_default(returned: Long) {
-    mln_kw_mln_metal_surface_descriptor_default(word(returned))
-  }
-
   actual fun mln_network_get_status(outStatus: Long, outDiagnostic: Long): Int =
     mln_kw_mln_network_get_status(word(outStatus), word(outDiagnostic))
 
   actual fun mln_network_set_status(status: Int, outDiagnostic: Long): Int =
     mln_kw_mln_network_set_status(status, word(outDiagnostic))
 
-  actual fun mln_opengl_borrowed_texture_descriptor_default(returned: Long) {
-    mln_kw_mln_opengl_borrowed_texture_descriptor_default(word(returned))
-  }
-
-  actual fun mln_opengl_owned_texture_descriptor_default(returned: Long) {
-    mln_kw_mln_opengl_owned_texture_descriptor_default(word(returned))
-  }
-
   actual fun mln_opengl_supported_context_provider_mask(): Int =
     mln_kw_mln_opengl_supported_context_provider_mask()
 
-  actual fun mln_opengl_surface_descriptor_default(returned: Long) {
-    mln_kw_mln_opengl_surface_descriptor_default(word(returned))
-  }
-
   actual fun mln_plugin_get_register_function_v1(): Long =
     unsignedWord(mln_kw_mln_plugin_get_register_function_v1())
-
-  actual fun mln_premultiplied_rgba8_image_default(returned: Long) {
-    mln_kw_mln_premultiplied_rgba8_image_default(word(returned))
-  }
 
   actual fun mln_projected_meters_for_lat_lng(
     coordinate: Long,
@@ -1392,10 +1296,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_kw_mln_projected_meters_for_lat_lng(word(coordinate), word(outMeters), word(outDiagnostic))
-
-  actual fun mln_projection_mode_default(returned: Long) {
-    mln_kw_mln_projection_mode_default(word(returned))
-  }
 
   actual fun mln_render_frame_batch_release(batch: Long) {
     mln_kw_mln_render_frame_batch_release(batch)
@@ -1409,10 +1309,6 @@ internal actual object C {
     outFrame: Long,
     outDiagnostic: Long,
   ): Int = mln_kw_mln_render_session_acquire_frame(session, word(outFrame), word(outDiagnostic))
-
-  actual fun mln_render_session_attach_options_default(returned: Long) {
-    mln_kw_mln_render_session_attach_options_default(word(returned))
-  }
 
   actual fun mln_render_session_barrier(session: Long, completion: Long, outDiagnostic: Long): Int =
     mln_kw_mln_render_session_barrier(session, word(completion), word(outDiagnostic))
@@ -1646,10 +1542,6 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_rendered_feature_query_options_default(returned: Long) {
-    mln_kw_mln_rendered_feature_query_options_default(word(returned))
-  }
-
   actual fun mln_resource_request_complete(handle: Long, response: Long, outDiagnostic: Long): Int =
     mln_kw_mln_resource_request_complete(handle, word(response), word(outDiagnostic))
 
@@ -1678,10 +1570,6 @@ internal actual object C {
       word(outCancelled),
       word(outDiagnostic),
     )
-
-  actual fun mln_resource_route_default(returned: Long) {
-    mln_kw_mln_resource_route_default(word(returned))
-  }
 
   actual fun mln_resource_transform_request_complete(
     request: Long,
@@ -1832,10 +1720,6 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_runtime_options_default(returned: Long) {
-    mln_kw_mln_runtime_options_default(word(returned))
-  }
-
   actual fun mln_runtime_release(runtime: Long, completion: Long, outDiagnostic: Long): Int =
     mln_kw_mln_runtime_release(runtime, word(completion), word(outDiagnostic))
 
@@ -1967,10 +1851,6 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_source_feature_query_options_default(returned: Long) {
-    mln_kw_mln_source_feature_query_options_default(word(returned))
-  }
-
   actual fun mln_style_expression_create(
     expression: Long,
     options: Long,
@@ -2007,51 +1887,11 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_kw_mln_style_expression_get_info(expression, word(outInfo), word(outDiagnostic))
 
-  actual fun mln_style_expression_inputs_default(returned: Long) {
-    mln_kw_mln_style_expression_inputs_default(word(returned))
-  }
-
-  actual fun mln_style_expression_options_default(returned: Long) {
-    mln_kw_mln_style_expression_options_default(word(returned))
-  }
-
   actual fun mln_style_expression_release(expression: Long) {
     mln_kw_mln_style_expression_release(expression)
   }
 
-  actual fun mln_style_image_options_default(returned: Long) {
-    mln_kw_mln_style_image_options_default(word(returned))
-  }
-
-  actual fun mln_style_transition_options_default(returned: Long) {
-    mln_kw_mln_style_transition_options_default(word(returned))
-  }
-
   actual fun mln_supported_render_backend_mask(): Int = mln_kw_mln_supported_render_backend_mask()
-
-  actual fun mln_vulkan_borrowed_texture_descriptor_default(returned: Long) {
-    mln_kw_mln_vulkan_borrowed_texture_descriptor_default(word(returned))
-  }
-
-  actual fun mln_vulkan_owned_texture_descriptor_default(returned: Long) {
-    mln_kw_mln_vulkan_owned_texture_descriptor_default(word(returned))
-  }
-
-  actual fun mln_vulkan_surface_descriptor_default(returned: Long) {
-    mln_kw_mln_vulkan_surface_descriptor_default(word(returned))
-  }
-
-  actual fun mln_webgpu_borrowed_texture_descriptor_default(returned: Long) {
-    mln_kw_mln_webgpu_borrowed_texture_descriptor_default(word(returned))
-  }
-
-  actual fun mln_webgpu_owned_texture_descriptor_default(returned: Long) {
-    mln_kw_mln_webgpu_owned_texture_descriptor_default(word(returned))
-  }
-
-  actual fun mln_webgpu_surface_descriptor_default(returned: Long) {
-    mln_kw_mln_webgpu_surface_descriptor_default(word(returned))
-  }
 }
 
 private fun mln_kw_mln_acquired_frame_discard(p0: Long, p1: Int): Int =
@@ -2105,38 +1945,8 @@ private fun mln_kw_mln_acquired_frame_view_end(p0: Int): Unit =
 private fun mln_kw_mln_android_init(p0: Int, p1: Int, p2: Int): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_android_init(p0, p1, p2)")
 
-private fun mln_kw_mln_animation_options_default(p0: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_animation_options_default(p0)")
-
-private fun mln_kw_mln_bound_options_default(p0: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_bound_options_default(p0)")
-
 private fun mln_kw_mln_c_version(): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_c_version()")
-
-private fun mln_kw_mln_camera_delta_default(p0: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_camera_delta_default(p0)")
-
-private fun mln_kw_mln_camera_fit_options_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_camera_fit_options_default(p0)",
-  )
-
-private fun mln_kw_mln_camera_options_default(p0: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_camera_options_default(p0)")
-
-private fun mln_kw_mln_camera_update_default(p0: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_camera_update_default(p0)")
-
-private fun mln_kw_mln_custom_geometry_source_options_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_custom_geometry_source_options_default(p0)",
-  )
-
-private fun mln_kw_mln_custom_mvt_vector_source_options_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_custom_mvt_vector_source_options_default(p0)",
-  )
 
 private fun mln_kw_mln_delivery_batch_release(p0: Long): Unit =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_delivery_batch_release(p0)")
@@ -2159,14 +1969,6 @@ private fun mln_kw_mln_delivery_queue_drain(p0: Long, p1: Int, p2: Int, p3: Int)
 private fun mln_kw_mln_delivery_queue_release(p0: Long): Unit =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_delivery_queue_release(p0)")
 
-private fun mln_kw_mln_frame_demand_default(p0: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_frame_demand_default(p0)")
-
-private fun mln_kw_mln_free_camera_options_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_free_camera_options_default(p0)",
-  )
-
 private fun mln_kw_mln_geojson_source_data_create(p0: Int, p1: Int, p2: Int, p3: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_geojson_source_data_create(p0, p1, p2, p3)",
@@ -2176,17 +1978,6 @@ private fun mln_kw_mln_geojson_source_data_release(p0: Long): Unit =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_geojson_source_data_release(p0)",
   )
-
-private fun mln_kw_mln_geojson_source_options_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_geojson_source_options_default(p0)",
-  )
-
-private fun mln_kw_mln_gpu_sync_default(p0: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_gpu_sync_default(p0)")
-
-private fun mln_kw_mln_http_header_rule_default(p0: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_http_header_rule_default(p0)")
 
 private fun mln_kw_mln_http_header_transform_response_set_header(
   p0: Int,
@@ -2213,9 +2004,6 @@ private fun mln_kw_mln_log_set_async_severity_mask(p0: Int, p1: Int): Int =
 
 private fun mln_kw_mln_log_set_callback(p0: Int, p1: Int): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_log_set_callback(p0, p1)")
-
-private fun mln_kw_mln_logical_extent_default(p0: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_logical_extent_default(p0)")
 
 private fun mln_kw_mln_logical_extent_physical_size(p0: Int, p1: Int, p2: Int, p3: Int): Int =
   js(
@@ -2647,9 +2435,6 @@ private fun mln_kw_mln_map_move_style_layer(p0: Long, p1: Int, p2: Int, p3: Int,
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_move_style_layer(p0, p1, p2, p3, p4)",
   )
 
-private fun mln_kw_mln_map_options_default(p0: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_options_default(p0)")
-
 private fun mln_kw_mln_map_projection_create(p0: Int, p1: Int, p2: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_create(p0, p1, p2)",
@@ -3003,32 +2788,9 @@ private fun mln_kw_mln_map_set_viewport_options(p0: Long, p1: Int, p2: Int, p3: 
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_viewport_options(p0, p1, p2, p3)",
   )
 
-private fun mln_kw_mln_map_tile_options_default(p0: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_tile_options_default(p0)")
-
 private fun mln_kw_mln_map_update_camera(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_update_camera(p0, p1, p2, p3)",
-  )
-
-private fun mln_kw_mln_map_viewport_options_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_viewport_options_default(p0)",
-  )
-
-private fun mln_kw_mln_metal_borrowed_texture_descriptor_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_metal_borrowed_texture_descriptor_default(p0)",
-  )
-
-private fun mln_kw_mln_metal_owned_texture_descriptor_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_metal_owned_texture_descriptor_default(p0)",
-  )
-
-private fun mln_kw_mln_metal_surface_descriptor_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_metal_surface_descriptor_default(p0)",
   )
 
 private fun mln_kw_mln_network_get_status(p0: Int, p1: Int): Int =
@@ -3037,24 +2799,9 @@ private fun mln_kw_mln_network_get_status(p0: Int, p1: Int): Int =
 private fun mln_kw_mln_network_set_status(p0: Int, p1: Int): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_network_set_status(p0, p1)")
 
-private fun mln_kw_mln_opengl_borrowed_texture_descriptor_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_opengl_borrowed_texture_descriptor_default(p0)",
-  )
-
-private fun mln_kw_mln_opengl_owned_texture_descriptor_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_opengl_owned_texture_descriptor_default(p0)",
-  )
-
 private fun mln_kw_mln_opengl_supported_context_provider_mask(): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_opengl_supported_context_provider_mask()",
-  )
-
-private fun mln_kw_mln_opengl_surface_descriptor_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_opengl_surface_descriptor_default(p0)",
   )
 
 private fun mln_kw_mln_plugin_get_register_function_v1(): Int =
@@ -3062,18 +2809,10 @@ private fun mln_kw_mln_plugin_get_register_function_v1(): Int =
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_plugin_get_register_function_v1()",
   )
 
-private fun mln_kw_mln_premultiplied_rgba8_image_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_premultiplied_rgba8_image_default(p0)",
-  )
-
 private fun mln_kw_mln_projected_meters_for_lat_lng(p0: Int, p1: Int, p2: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_projected_meters_for_lat_lng(p0, p1, p2)",
   )
-
-private fun mln_kw_mln_projection_mode_default(p0: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_projection_mode_default(p0)")
 
 private fun mln_kw_mln_render_frame_batch_release(p0: Long): Unit =
   js(
@@ -3088,11 +2827,6 @@ private fun mln_kw_mln_render_session_abandon(p0: Long, p1: Int, p2: Int): Int =
 private fun mln_kw_mln_render_session_acquire_frame(p0: Long, p1: Int, p2: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_acquire_frame(p0, p1, p2)",
-  )
-
-private fun mln_kw_mln_render_session_attach_options_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_attach_options_default(p0)",
   )
 
 private fun mln_kw_mln_render_session_barrier(p0: Long, p1: Int, p2: Int): Int =
@@ -3281,11 +3015,6 @@ private fun mln_kw_mln_render_session_set_webgpu_surface_target(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_webgpu_surface_target(p0, p1, p2, p3)",
   )
 
-private fun mln_kw_mln_rendered_feature_query_options_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_rendered_feature_query_options_default(p0)",
-  )
-
 private fun mln_kw_mln_resource_request_complete(p0: Long, p1: Int, p2: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_resource_request_complete(p0, p1, p2)",
@@ -3313,9 +3042,6 @@ private fun mln_kw_mln_resource_request_set_cancel_callback(
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_resource_request_set_cancel_callback(p0, p1, p2, p3)",
   )
-
-private fun mln_kw_mln_resource_route_default(p0: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_resource_route_default(p0)")
 
 private fun mln_kw_mln_resource_transform_request_complete(p0: Long, p1: Int, p2: Int): Int =
   js(
@@ -3417,9 +3143,6 @@ private fun mln_kw_mln_runtime_merge_offline_regions(p0: Long, p1: Int, p2: Int,
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_merge_offline_regions(p0, p1, p2, p3)",
   )
 
-private fun mln_kw_mln_runtime_options_default(p0: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_options_default(p0)")
-
 private fun mln_kw_mln_runtime_release(p0: Long, p1: Int, p2: Int): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_release(p0, p1, p2)")
 
@@ -3502,11 +3225,6 @@ private fun mln_kw_mln_runtime_update_offline_region_metadata(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_update_offline_region_metadata(p0, p1, p2, p3, p4, p5)",
   )
 
-private fun mln_kw_mln_source_feature_query_options_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_source_feature_query_options_default(p0)",
-  )
-
 private fun mln_kw_mln_style_expression_create(p0: Int, p1: Int, p2: Int, p3: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_style_expression_create(p0, p1, p2, p3)",
@@ -3529,60 +3247,10 @@ private fun mln_kw_mln_style_expression_get_info(p0: Long, p1: Int, p2: Int): In
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_style_expression_get_info(p0, p1, p2)",
   )
 
-private fun mln_kw_mln_style_expression_inputs_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_style_expression_inputs_default(p0)",
-  )
-
-private fun mln_kw_mln_style_expression_options_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_style_expression_options_default(p0)",
-  )
-
 private fun mln_kw_mln_style_expression_release(p0: Long): Unit =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_style_expression_release(p0)")
-
-private fun mln_kw_mln_style_image_options_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_style_image_options_default(p0)",
-  )
-
-private fun mln_kw_mln_style_transition_options_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_style_transition_options_default(p0)",
-  )
 
 private fun mln_kw_mln_supported_render_backend_mask(): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_supported_render_backend_mask()",
-  )
-
-private fun mln_kw_mln_vulkan_borrowed_texture_descriptor_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_vulkan_borrowed_texture_descriptor_default(p0)",
-  )
-
-private fun mln_kw_mln_vulkan_owned_texture_descriptor_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_vulkan_owned_texture_descriptor_default(p0)",
-  )
-
-private fun mln_kw_mln_vulkan_surface_descriptor_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_vulkan_surface_descriptor_default(p0)",
-  )
-
-private fun mln_kw_mln_webgpu_borrowed_texture_descriptor_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_webgpu_borrowed_texture_descriptor_default(p0)",
-  )
-
-private fun mln_kw_mln_webgpu_owned_texture_descriptor_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_webgpu_owned_texture_descriptor_default(p0)",
-  )
-
-private fun mln_kw_mln_webgpu_surface_descriptor_default(p0: Int): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_webgpu_surface_descriptor_default(p0)",
   )

@@ -1,8 +1,8 @@
 """Render the addon's C converters between Node-API values and C values.
 
 A writer reads one JavaScript object into a C record that the caller already
-initialized from the record's native default, or from zero with its size set,
-so a member that the object leaves out keeps that default. A reader builds a
+zeroed, with its sizes set, so a member that the object leaves out keeps its
+zero default. A reader builds a
 JavaScript object from a borrowed C record. A completion decoder reads the
 value of a drained completion, and the payload reader converts the copied
 arguments of each other drained delivery. Converters check only the shape that
@@ -55,15 +55,19 @@ class NativeValues:
     # -- Initialization -----------------------------------------------------
 
     def init(self, value: ValuePlan, target: str) -> list[str]:
-        """Statements that start a C record from its native default."""
+        """Statements that start a C record at its default: zero, with the size
+        of the record and of each sized record that it embeds."""
+        return [f"memset(&{target}, 0, sizeof {target});", *self.sizes(value, target)]
+
+    def sizes(self, value: ValuePlan, target: str) -> list[str]:
         if value.kind != "record":
-            return [f"memset(&{target}, 0, sizeof {target});"]
-        if value.default:
-            return [f"{target} = {value.default}();"]
-        lines = [f"memset(&{target}, 0, sizeof {target});"]
-        size = next((f for f in value.fields if f.role == "size"), None)
-        if size:
-            lines.append(f"{target}.{size.name} = sizeof {target};")
+            return []
+        lines = []
+        for field in value.fields:
+            if field.role == "size":
+                lines.append(f"{target}.{field.name} = sizeof {target};")
+            elif field.value.kind == "record":
+                lines += self.sizes(field.value, f"{target}.{field.name}")
         return lines
 
     # -- JavaScript to C ----------------------------------------------------
@@ -109,7 +113,9 @@ class NativeValues:
                     "json": "mln_ts_read_json_view",
                 }.get(value.encoding, "mln_ts_read_text_view")
                 return [f"if (!{reader}(call, {js}, &{target}, {path})) {fail};"]
-            raise Unsupported(f"{value.native}: text outside a view")
+            return [
+                f"{{ const char* text = NULL; if (!mln_ts_read_text(call, {js}, &text, {path})) {fail}; {target} = text; }}"
+            ]
         if value.kind == "reference" and value.element.kind == "buffer":
             return self.read(value.element, js, target, path, fail)
         if value.kind == "record" and value.registration:
@@ -305,11 +311,7 @@ class NativeValues:
                 )
             else:
                 body = []
-                if (
-                    field.value.kind == "record"
-                    and not field.value.registration
-                    and not value.default
-                ):
+                if field.value.kind == "record" and not field.value.registration:
                     body += self.init(field.value, target)
                 body += self.read(
                     field.value, "member", target, "child", "return false"
@@ -446,7 +448,8 @@ class NativeValues:
                 if value.nullable:
                     return f"(({source}).data == NULL ? mln_ts_undefined(env) : {expression})"
                 return expression
-            raise Unsupported(f"{value.native}: text outside a view")
+            expression = f"mln_ts_text(env, {source}, strlen({source}))"
+            return f"(({source}) == NULL ? mln_ts_undefined(env) : {expression})"
         if value.kind == "reference":
             element = value.element
             if element.kind != "record":

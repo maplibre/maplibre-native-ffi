@@ -36,7 +36,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
   }
 
   private func validateMetalBackend() {
-    let backends = (try! Maplibre.supportedRenderBackendMask())
+    let backends = Maplibre.supportedRenderBackendMask()
     log.info("native render backends: \(renderBackendLabel(backends))")
     guard backends.contains(.metal) else {
       fatalError("the loaded MapLibre native library does not support Metal")

@@ -397,7 +397,8 @@ void an_unavailable_drawable_releases_its_slot_for_a_retry() {
   MLN_TEST_OK(
     mln_render_session_get_snapshot(fixture.render.session, &snapshot, nullptr)
   );
-  auto demand = mln_frame_demand_default();
+  auto demand = mln_frame_demand{};
+  demand.size = sizeof(mln_frame_demand);
   demand.flags = 0;
   demand.token = 9103;
   MLN_TEST_OK(request_frame(fixture, demand));
@@ -422,7 +423,9 @@ struct UpdateDuringAttempt {
 // update, and waits until the map has announced it to the session. A case
 // cannot assert off its own thread, so this records what it saw.
 void publish_an_update(UpdateDuringAttempt& update) {
-  auto camera = mln_camera_update_default();
+  auto camera = mln_camera_update{};
+  camera.size = sizeof(mln_camera_update);
+  camera.camera.size = sizeof(mln_camera_options);
   camera.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   camera.camera.zoom = 1.0;
   auto moved = mln_test_completion_default(0);
@@ -490,7 +493,8 @@ void an_idle_demand_reports_a_failed_backend_activation() {
     fixture.runtime, fixture.map, &fixture.render, nullptr
   ));
   install_frame_failure(fixture, FrameFailure::Activation);
-  auto demand = mln_frame_demand_default();
+  auto demand = mln_frame_demand{};
+  demand.size = sizeof(mln_frame_demand);
   demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = 9104;
   MLN_TEST_OK(request_frame(fixture, demand));
@@ -537,7 +541,8 @@ void a_same_size_resize_redraws_after_an_earlier_queued_frame() {
   );
   mln_test_completion_destroy(&resize);
   mln_render_frame_batch_release(wait_for_results(fixture));
-  auto demand = mln_frame_demand_default();
+  auto demand = mln_frame_demand{};
+  demand.size = sizeof(mln_frame_demand);
   demand.flags = 0;
   demand.token = 9003;
   MLN_TEST_OK(request_frame(fixture, demand));
@@ -646,7 +651,8 @@ void unforced_demands_supersede_and_forced_demands_render() {
   create_fixture(fixture);
   auto blocker = DriverBlocker{};
   block_driver(fixture, blocker);
-  auto first = mln_frame_demand_default();
+  auto first = mln_frame_demand{};
+  first.size = sizeof(mln_frame_demand);
   first.token = 101;
   auto forced = first;
   forced.flags = MLN_FRAME_DEMAND_FORCE;
@@ -697,7 +703,8 @@ void supersession_preserves_a_forced_demand_after_a_resize() {
   );
   auto blocker = DriverBlocker{};
   block_driver(fixture, blocker);
-  auto demand = mln_frame_demand_default();
+  auto demand = mln_frame_demand{};
+  demand.size = sizeof(mln_frame_demand);
   demand.token = 101;
   MLN_TEST_OK(request_frame(fixture, demand));
   auto resize = mln_test_completion_default(0);
@@ -827,7 +834,8 @@ void concurrent_resizes_publish_matching_map_and_driver_extents() {
 // on the result reaches abandon before the call ends, which no public fence
 // can hold open.
 void request_frame_and_hold_the_call(const Fixture& fixture, uint64_t token) {
-  auto demand = mln_frame_demand_default();
+  auto demand = mln_frame_demand{};
+  demand.size = sizeof(mln_frame_demand);
   demand.flags = MLN_FRAME_DEMAND_FORCE;
   demand.token = token;
   MLN_TEST_OK(request_frame(fixture, demand));
@@ -1068,7 +1076,8 @@ struct SupersedingRequest {
 
 void request_superseding_frame(void* argument) {
   auto& request = *static_cast<SupersedingRequest*>(argument);
-  auto demand = mln_frame_demand_default();
+  auto demand = mln_frame_demand{};
+  demand.size = sizeof(mln_frame_demand);
   demand.flags = 0;
   demand.token = 122;
   request.status = request_frame(*request.fixture, demand);
@@ -1110,7 +1119,8 @@ void an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake() {
     mln_render_frame_batch_release(drained);
     drained = MLN_HANDLE_NULL;
   }
-  auto first = mln_frame_demand_default();
+  auto first = mln_frame_demand{};
+  first.size = sizeof(mln_frame_demand);
   first.flags = 0;
   first.token = 121;
   MLN_TEST_OK(request_frame(fixture, first));
@@ -1227,7 +1237,8 @@ void release_with_a_gpu_wait(
 ) {
   auto& racing = *static_cast<RacingRelease*>(user_data);
   racing.completion_status = result->status;
-  auto sync = mln_gpu_sync_default();
+  auto sync = mln_gpu_sync{};
+  sync.size = sizeof(mln_gpu_sync);
   sync.kind = static_cast<mln_gpu_sync_kind>(UINT32_MAX);
   racing.release_status =
     mln_acquired_frame_release(racing.frame, &sync, nullptr);
@@ -1353,7 +1364,8 @@ void a_demand_parked_as_disposal_quarantines_the_ring_gets_a_result() {
 }
 
 auto request_waiting(const Fixture& fixture, uint64_t token) -> mln_status {
-  auto demand = mln_frame_demand_default();
+  auto demand = mln_frame_demand{};
+  demand.size = sizeof(mln_frame_demand);
   demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = token;
   return request_frame(fixture, demand);
@@ -1481,7 +1493,9 @@ auto latest_update_generation(mln_map map) -> uint64_t {
 
 auto submit_camera_zoom(mln_map map, double zoom, mln_test_completion& done)
   -> mln_status {
-  auto update = mln_camera_update_default();
+  auto update = mln_camera_update{};
+  update.size = sizeof(mln_camera_update);
+  update.camera.size = sizeof(mln_camera_options);
   update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   update.camera.zoom = zoom;
   return mln_map_update_camera(map, &update, &done.descriptor, nullptr);
@@ -1640,7 +1654,8 @@ void a_waiting_demand_waits_for_an_update_the_session_has_yet_to_learn_of() {
   ));
   const auto held = latest_update_generation(fixture.map);
 
-  auto forced = mln_frame_demand_default();
+  auto forced = mln_frame_demand{};
+  forced.size = sizeof(mln_frame_demand);
   forced.flags = MLN_FRAME_DEMAND_FORCE;
   forced.token = 155;
   MLN_TEST_OK(request_frame(fixture, forced));

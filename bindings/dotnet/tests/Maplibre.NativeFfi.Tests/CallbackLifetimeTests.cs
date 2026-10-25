@@ -91,7 +91,7 @@ public sealed class CallbackLifetimeTests
     )
     {
         var captured = new object();
-        var animation = AnimationOptions.Default with
+        var animation = new AnimationOptions
         {
             DurationMs = 60000,
             TransitionId = ulong.MaxValue,
@@ -102,7 +102,7 @@ public sealed class CallbackLifetimeTests
             }),
         };
         var started = map.UpdateCameraAsync(
-            CameraUpdate.Default with
+            new CameraUpdate
             {
                 Mode = CameraUpdateMode.Ease,
                 Camera = new CameraOptions { Zoom = 4 },
@@ -118,10 +118,10 @@ public sealed class CallbackLifetimeTests
     )
     {
         var captured = new object();
-        var delta = CameraDelta.Default with
+        var delta = new CameraDelta
         {
             Scale = -1,
-            Animation = AnimationOptions.Default with
+            Animation = new AnimationOptions
             {
                 EndHandler = new CameraTransitionHandler(_ => GC.KeepAlive(captured)),
             },
@@ -137,7 +137,7 @@ public sealed class CallbackLifetimeTests
     [Fact]
     public async Task ACallbackKeepsItsReceiverAliveUntilExplicitClose()
     {
-        var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        var runtime = RuntimeHandle.Create(new RuntimeOptions());
         var map = RegisterCallbackCapturingItsMap(runtime);
 
         Gc.Collect();

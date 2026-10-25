@@ -172,7 +172,9 @@ mln_status mln_test_runtime_close(mln_runtime runtime) {
 }
 
 mln_runtime mln_test_create_runtime(void) {
-  return mln_test_create_runtime_with_options(mln_runtime_options_default());
+  return mln_test_create_runtime_with_options(
+    (mln_runtime_options){.size = sizeof(mln_runtime_options)}
+  );
 }
 
 mln_runtime mln_test_create_runtime_with_options(mln_runtime_options options) {
@@ -321,7 +323,7 @@ mln_map mln_test_create_map_with_options(
 }
 
 mln_map_options mln_test_map_options(void) {
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = {.size = sizeof(mln_map_options)};
   options.initial_extent =
     (mln_logical_extent){.width = 256, .height = 256, .scale_factor = 1.0};
   return options;

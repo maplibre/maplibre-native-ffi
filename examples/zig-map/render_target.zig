@@ -28,15 +28,13 @@ pub fn driverLabel(driver: maplibre.RenderDriverKind) []const u8 {
 /// Attach options for `driver` whose wakes post `frame_results` and, for a
 /// caller driver, `driver_work` app events. An owned texture asks for a ring of
 /// `borrowed_ring_depth` slots; a borrowed ring's depth is its texture count.
-pub fn attachOptions(mode: types.RenderTargetMode, driver: maplibre.RenderDriverKind) !maplibre.RenderSessionAttachOptions {
-    var defaults = try maplibre.renderSessionAttachOptionsDefault(std.heap.smp_allocator);
-    defer defaults.deinit();
-    var options = defaults.value;
-    options.driver = driver;
-    options.requested_texture_ring_depth = if (mode == .owned_texture) borrowed_ring_depth else 0;
-    options.frame_wake = events.wake(.frame_results);
-    options.driver_work_wake = if (driver == .caller_graphics_thread) events.wake(.driver_work) else .{};
-    return options;
+pub fn attachOptions(mode: types.RenderTargetMode, driver: maplibre.RenderDriverKind) maplibre.RenderSessionAttachOptions {
+    return .{
+        .driver = driver,
+        .requested_texture_ring_depth = if (mode == .owned_texture) borrowed_ring_depth else 0,
+        .frame_wake = events.wake(.frame_results),
+        .driver_work_wake = if (driver == .caller_graphics_thread) events.wake(.driver_work) else .{},
+    };
 }
 
 /// An attached render session plus the monotonic demand tokens that tie each

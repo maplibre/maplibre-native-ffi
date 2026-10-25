@@ -1,53 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 
-fn generated_copy_mln_animation_options(
-    py: Python<'_>,
-    value: &sys::mln_animation_options,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "duration_ms",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_ANIMATION_OPTION_DURATION != 0,
-            || generated_value(py, value.duration_ms),
-        )?,
-    )?;
-    dict.set_item(
-        "velocity",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_ANIMATION_OPTION_VELOCITY != 0,
-            || generated_value(py, value.velocity),
-        )?,
-    )?;
-    dict.set_item(
-        "min_zoom",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_ANIMATION_OPTION_MIN_ZOOM != 0,
-            || generated_value(py, value.min_zoom),
-        )?,
-    )?;
-    dict.set_item(
-        "easing",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_ANIMATION_OPTION_EASING != 0,
-            || generated_copy_mln_unit_bezier(py, &value.easing),
-        )?,
-    )?;
-    dict.set_item(
-        "transition_id",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_ANIMATION_OPTION_TRANSITION_ID != 0,
-            || generated_value(py, value.transition_id),
-        )?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_bound_options(
     py: Python<'_>,
     value: &sys::mln_bound_options,
@@ -114,83 +66,6 @@ fn generated_copy_mln_camera(py: Python<'_>, value: &sys::mln_camera) -> PyResul
     dict.set_item("pitch", generated_value(py, value.pitch)?)?;
     dict.set_item("roll", generated_value(py, value.roll)?)?;
     dict.set_item("field_of_view", generated_value(py, value.field_of_view)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_camera_delta(
-    py: Python<'_>,
-    value: &sys::mln_camera_delta,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "offset",
-        generated_optional(py, value.fields & sys::MLN_CAMERA_DELTA_OFFSET != 0, || {
-            generated_copy_mln_screen_point(py, &value.offset)
-        })?,
-    )?;
-    dict.set_item(
-        "scale",
-        generated_optional(py, value.fields & sys::MLN_CAMERA_DELTA_SCALE != 0, || {
-            generated_value(py, value.scale)
-        })?,
-    )?;
-    dict.set_item(
-        "bearing",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_CAMERA_DELTA_BEARING != 0,
-            || generated_value(py, value.bearing),
-        )?,
-    )?;
-    dict.set_item(
-        "pitch",
-        generated_optional(py, value.fields & sys::MLN_CAMERA_DELTA_PITCH != 0, || {
-            generated_value(py, value.pitch)
-        })?,
-    )?;
-    dict.set_item(
-        "anchor",
-        generated_optional(py, value.fields & sys::MLN_CAMERA_DELTA_ANCHOR != 0, || {
-            generated_copy_mln_screen_point(py, &value.anchor)
-        })?,
-    )?;
-    dict.set_item(
-        "animation",
-        generated_copy_mln_animation_options(py, &value.animation)?,
-    )?;
-    dict.set_item("gesture_phase", generated_value(py, value.gesture_phase)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_camera_fit_options(
-    py: Python<'_>,
-    value: &sys::mln_camera_fit_options,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "padding",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_CAMERA_FIT_OPTION_PADDING != 0,
-            || generated_copy_mln_edge_insets(py, &value.padding),
-        )?,
-    )?;
-    dict.set_item(
-        "bearing",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_CAMERA_FIT_OPTION_BEARING != 0,
-            || generated_value(py, value.bearing),
-        )?,
-    )?;
-    dict.set_item(
-        "pitch",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_CAMERA_FIT_OPTION_PITCH != 0,
-            || generated_value(py, value.pitch),
-        )?,
-    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -311,24 +186,6 @@ unsafe extern "C" fn generated_callback_mln_camera_transition_handler_callback(
     outcome
 }
 
-fn generated_copy_mln_camera_update(
-    py: Python<'_>,
-    value: &sys::mln_camera_update,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("mode", generated_value(py, value.mode)?)?;
-    dict.set_item(
-        "camera",
-        generated_copy_mln_camera_options(py, &value.camera)?,
-    )?;
-    dict.set_item(
-        "animation",
-        generated_copy_mln_animation_options(py, &value.animation)?,
-    )?;
-    dict.set_item("gesture_phase", generated_value(py, value.gesture_phase)?)?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_canonical_tile_id(
     py: Python<'_>,
     value: &sys::mln_canonical_tile_id,
@@ -378,70 +235,6 @@ unsafe extern "C" fn generated_callback_mln_custom_geometry_source_options_cance
     outcome
 }
 
-fn generated_copy_mln_custom_geometry_source_options(
-    py: Python<'_>,
-    value: &sys::mln_custom_geometry_source_options,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "min_zoom",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM != 0,
-            || generated_value(py, value.min_zoom),
-        )?,
-    )?;
-    dict.set_item(
-        "max_zoom",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM != 0,
-            || generated_value(py, value.max_zoom),
-        )?,
-    )?;
-    dict.set_item(
-        "tolerance",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE != 0,
-            || generated_value(py, value.tolerance),
-        )?,
-    )?;
-    dict.set_item(
-        "tile_size",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE != 0,
-            || generated_value(py, value.tile_size),
-        )?,
-    )?;
-    dict.set_item(
-        "buffer",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER != 0,
-            || generated_value(py, value.buffer),
-        )?,
-    )?;
-    dict.set_item(
-        "clip",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP != 0,
-            || generated_value(py, value.clip),
-        )?,
-    )?;
-    dict.set_item(
-        "wrap",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP != 0,
-            || generated_value(py, value.wrap),
-        )?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
 unsafe extern "C" fn generated_callback_mln_custom_mvt_vector_source_options_fetch_tile(
     user_data: *mut std::ffi::c_void,
     tile_id: sys::mln_canonical_tile_id,
@@ -480,30 +273,6 @@ unsafe extern "C" fn generated_callback_mln_custom_mvt_vector_source_options_can
     outcome
 }
 
-fn generated_copy_mln_custom_mvt_vector_source_options(
-    py: Python<'_>,
-    value: &sys::mln_custom_mvt_vector_source_options,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "min_zoom",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM != 0,
-            || generated_value(py, value.min_zoom),
-        )?,
-    )?;
-    dict.set_item(
-        "max_zoom",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM != 0,
-            || generated_value(py, value.max_zoom),
-        )?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_edge_insets(
     py: Python<'_>,
     value: &sys::mln_edge_insets,
@@ -513,35 +282,6 @@ fn generated_copy_mln_edge_insets(
     dict.set_item("left", generated_value(py, value.left)?)?;
     dict.set_item("bottom", generated_value(py, value.bottom)?)?;
     dict.set_item("right", generated_value(py, value.right)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_egl_context_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_egl_context_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("display", generated_value(py, value.display as usize)?)?;
-    dict.set_item("config", generated_value(py, value.config as usize)?)?;
-    dict.set_item(
-        "share_context",
-        generated_value(py, value.share_context as usize)?,
-    )?;
-    dict.set_item("client_api", generated_value(py, value.client_api)?)?;
-    dict.set_item(
-        "get_proc_address",
-        generated_value(py, value.get_proc_address as usize)?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_frame_demand(
-    py: Python<'_>,
-    value: &sys::mln_frame_demand,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("flags", generated_value(py, value.flags)?)?;
-    dict.set_item("token", generated_value(py, value.token)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -569,131 +309,10 @@ fn generated_copy_mln_free_camera_options(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_geojson_source_options(
-    py: Python<'_>,
-    value: &sys::mln_geojson_source_options,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "min_zoom",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM != 0,
-            || generated_value(py, value.min_zoom),
-        )?,
-    )?;
-    dict.set_item(
-        "max_zoom",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM != 0,
-            || generated_value(py, value.max_zoom),
-        )?,
-    )?;
-    dict.set_item(
-        "tolerance",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_GEOJSON_SOURCE_OPTION_TOLERANCE != 0,
-            || generated_value(py, value.tolerance),
-        )?,
-    )?;
-    dict.set_item(
-        "cluster_max_zoom",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM != 0,
-            || generated_value(py, value.cluster_max_zoom),
-        )?,
-    )?;
-    dict.set_item(
-        "cluster_properties",
-        generated_json(py, value.cluster_properties)?,
-    )?;
-    dict.set_item(
-        "buffer",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_GEOJSON_SOURCE_OPTION_BUFFER != 0,
-            || generated_value(py, value.buffer),
-        )?,
-    )?;
-    dict.set_item(
-        "cluster_radius",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS != 0,
-            || generated_value(py, value.cluster_radius),
-        )?,
-    )?;
-    dict.set_item(
-        "cluster_min_points",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS != 0,
-            || generated_value(py, value.cluster_min_points),
-        )?,
-    )?;
-    dict.set_item(
-        "line_metrics",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS != 0,
-            || generated_value(py, value.line_metrics),
-        )?,
-    )?;
-    dict.set_item(
-        "cluster",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER != 0,
-            || generated_value(py, value.cluster),
-        )?,
-    )?;
-    dict.set_item(
-        "synchronous_tiling",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING != 0,
-            || generated_value(py, value.synchronous_tiling),
-        )?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_gpu_sync(py: Python<'_>, value: &sys::mln_gpu_sync) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("kind", generated_value(py, value.kind)?)?;
     dict.set_item("handle", generated_value(py, value.handle)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_http_header(
-    py: Python<'_>,
-    value: &sys::mln_http_header,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("name", generated_text(py, value.name)?)?;
-    dict.set_item("value", generated_text(py, value.value)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_http_header_rule(
-    py: Python<'_>,
-    value: &sys::mln_http_header_rule,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("kinds", generated_value(py, value.kinds)?)?;
-    dict.set_item("flags", generated_value(py, value.flags)?)?;
-    dict.set_item("url", generated_text(py, value.url)?)?;
-    dict.set_item(
-        "headers",
-        generated_list(
-            py,
-            unsafe { generated_slice(value.headers, value.header_count)? },
-            |element| generated_copy_mln_http_header(py, element),
-        )?,
-    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -815,31 +434,6 @@ fn generated_copy_mln_logical_extent(
     dict.set_item("width", generated_value(py, value.width)?)?;
     dict.set_item("height", generated_value(py, value.height)?)?;
     dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_map_options(
-    py: Python<'_>,
-    value: &sys::mln_map_options,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "initial_extent",
-        generated_copy_mln_logical_extent(py, &value.initial_extent)?,
-    )?;
-    dict.set_item("map_mode", generated_value(py, value.map_mode)?)?;
-    dict.set_item(
-        "fast_pfor_enabled",
-        generated_value(py, value.fast_pfor_enabled)?,
-    )?;
-    dict.set_item(
-        "event_mask",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_MAP_OPTION_EVENT_MASK != 0,
-            || generated_value(py, value.event_mask),
-        )?,
-    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -998,83 +592,6 @@ fn generated_copy_mln_map_viewport_options(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_metal_borrowed_texture(
-    py: Python<'_>,
-    value: &sys::mln_metal_borrowed_texture,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("texture", generated_value(py, value.texture as usize)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_metal_borrowed_texture_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_metal_borrowed_texture_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "extent",
-        generated_copy_mln_logical_extent(py, &value.extent)?,
-    )?;
-    dict.set_item("physical_width", generated_value(py, value.physical_width)?)?;
-    dict.set_item(
-        "physical_height",
-        generated_value(py, value.physical_height)?,
-    )?;
-    dict.set_item(
-        "textures",
-        generated_list(
-            py,
-            unsafe { generated_slice(value.textures, value.texture_count)? },
-            |element| generated_copy_mln_metal_borrowed_texture(py, element),
-        )?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_metal_context_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_metal_context_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("device", generated_value(py, value.device as usize)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_metal_owned_texture_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_metal_owned_texture_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "extent",
-        generated_copy_mln_logical_extent(py, &value.extent)?,
-    )?;
-    dict.set_item(
-        "context",
-        generated_copy_mln_metal_context_descriptor(py, &value.context)?,
-    )?;
-    dict.set_item("pixel_format", generated_value(py, value.pixel_format)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_metal_surface_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_metal_surface_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "extent",
-        generated_copy_mln_logical_extent(py, &value.extent)?,
-    )?;
-    dict.set_item(
-        "context",
-        generated_copy_mln_metal_context_descriptor(py, &value.context)?,
-    )?;
-    dict.set_item("layer", generated_value(py, value.layer as usize)?)?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_metal_texture_frame(
     py: Python<'_>,
     value: &sys::mln_metal_texture_frame,
@@ -1208,108 +725,6 @@ fn generated_copy_mln_offline_tile_pyramid_region_definition(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_opengl_borrowed_texture(
-    py: Python<'_>,
-    value: &sys::mln_opengl_borrowed_texture,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("texture", generated_value(py, value.texture)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_opengl_borrowed_texture_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_opengl_borrowed_texture_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "extent",
-        generated_copy_mln_logical_extent(py, &value.extent)?,
-    )?;
-    dict.set_item("physical_width", generated_value(py, value.physical_width)?)?;
-    dict.set_item(
-        "physical_height",
-        generated_value(py, value.physical_height)?,
-    )?;
-    dict.set_item(
-        "context",
-        generated_copy_mln_opengl_context_descriptor(py, &value.context)?,
-    )?;
-    dict.set_item(
-        "textures",
-        generated_list(
-            py,
-            unsafe { generated_slice(value.textures, value.texture_count)? },
-            |element| generated_copy_mln_opengl_borrowed_texture(py, element),
-        )?,
-    )?;
-    dict.set_item("target", generated_value(py, value.target)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_opengl_context_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_opengl_context_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("ownership", generated_value(py, value.ownership)?)?;
-    dict.set_item(
-        "data",
-        match value.platform {
-            sys::MLN_OPENGL_CONTEXT_PLATFORM_WGL => generated_variant(
-                py,
-                "wgl",
-                generated_copy_mln_wgl_context_descriptor(py, &(unsafe { value.data.wgl }))?,
-            )?,
-            sys::MLN_OPENGL_CONTEXT_PLATFORM_EGL => generated_variant(
-                py,
-                "egl",
-                generated_copy_mln_egl_context_descriptor(py, &(unsafe { value.data.egl }))?,
-            )?,
-            sys::MLN_OPENGL_CONTEXT_PLATFORM_WEBGL => generated_variant(
-                py,
-                "webgl",
-                generated_copy_mln_webgl_context_descriptor(py, &(unsafe { value.data.webgl }))?,
-            )?,
-            tag => generated_unknown_variant(py, tag)?,
-        },
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_opengl_owned_texture_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_opengl_owned_texture_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "extent",
-        generated_copy_mln_logical_extent(py, &value.extent)?,
-    )?;
-    dict.set_item(
-        "context",
-        generated_copy_mln_opengl_context_descriptor(py, &value.context)?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_opengl_surface_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_opengl_surface_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "extent",
-        generated_copy_mln_logical_extent(py, &value.extent)?,
-    )?;
-    dict.set_item(
-        "context",
-        generated_copy_mln_opengl_context_descriptor(py, &value.context)?,
-    )?;
-    dict.set_item("surface", generated_value(py, value.surface as usize)?)?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_opengl_texture_frame(
     py: Python<'_>,
     value: &sys::mln_opengl_texture_frame,
@@ -1329,20 +744,6 @@ fn generated_copy_mln_opengl_texture_frame(
     )?;
     dict.set_item("format", generated_value(py, value.format)?)?;
     dict.set_item("type", generated_value(py, value.type_)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_premultiplied_rgba8_image(
-    py: Python<'_>,
-    value: &sys::mln_premultiplied_rgba8_image,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("width", generated_value(py, value.width)?)?;
-    dict.set_item("height", generated_value(py, value.height)?)?;
-    dict.set_item("stride", generated_value(py, value.stride)?)?;
-    dict.set_item("pixels", unsafe {
-        generated_bytes(py, generated_view(value.pixels, value.byte_length)?)
-    }?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1462,23 +863,6 @@ fn generated_copy_mln_render_frame_result(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_render_session_attach_options(
-    py: Python<'_>,
-    value: &sys::mln_render_session_attach_options,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("driver", generated_value(py, value.driver)?)?;
-    dict.set_item(
-        "requested_texture_ring_depth",
-        generated_value(py, value.requested_texture_ring_depth)?,
-    )?;
-    dict.set_item(
-        "producer_sync_kind",
-        generated_value(py, value.producer_sync_kind)?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_render_session_capabilities(
     py: Python<'_>,
     value: &sys::mln_render_session_capabilities,
@@ -1540,29 +924,6 @@ fn generated_copy_mln_rendered_feature(
         generated_text(py, value.source_layer_id)?,
     )?;
     dict.set_item("state", generated_json(py, value.state)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_rendered_feature_query_options(
-    py: Python<'_>,
-    value: &sys::mln_rendered_feature_query_options,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "layer_ids",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS != 0,
-            || {
-                generated_list(
-                    py,
-                    unsafe { generated_slice(value.layer_ids, value.layer_id_count)? },
-                    |element| generated_text(py, *element),
-                )
-            },
-        )?,
-    )?;
-    dict.set_item("filter", generated_json(py, value.filter)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1689,17 +1050,6 @@ fn generated_copy_mln_resource_request_info(
     dict.set_item("prior_data", unsafe {
         generated_bytes(py, generated_view(value.prior_data, value.prior_data_size)?)
     }?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_resource_route(
-    py: Python<'_>,
-    value: &sys::mln_resource_route,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("kinds", generated_value(py, value.kinds)?)?;
-    dict.set_item("flags", generated_value(py, value.flags)?)?;
-    dict.set_item("url", generated_text(py, value.url)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1908,16 +1258,6 @@ fn generated_copy_mln_runtime_event_tile_action(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_runtime_options(
-    py: Python<'_>,
-    value: &sys::mln_runtime_options,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("asset_path", generated_text(py, value.asset_path)?)?;
-    dict.set_item("cache_path", generated_text(py, value.cache_path)?)?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_screen_point(
     py: Python<'_>,
     value: &sys::mln_screen_point,
@@ -1941,31 +1281,6 @@ fn generated_copy_mln_source_feature(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_source_feature_query_options(
-    py: Python<'_>,
-    value: &sys::mln_source_feature_query_options,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "source_layer_ids",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS != 0,
-            || {
-                generated_list(
-                    py,
-                    unsafe {
-                        generated_slice(value.source_layer_ids, value.source_layer_id_count)?
-                    },
-                    |element| generated_text(py, *element),
-                )
-            },
-        )?,
-    )?;
-    dict.set_item("filter", generated_json(py, value.filter)?)?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_style_expression_info(
     py: Python<'_>,
     value: &sys::mln_style_expression_info,
@@ -1979,84 +1294,6 @@ fn generated_copy_mln_style_expression_info(
         "is_zoom_constant",
         generated_value(py, value.is_zoom_constant)?,
     )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_style_expression_inputs(
-    py: Python<'_>,
-    value: &sys::mln_style_expression_inputs,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "zoom",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_EXPRESSION_INPUT_ZOOM != 0,
-            || generated_value(py, value.zoom),
-        )?,
-    )?;
-    dict.set_item(
-        "color_ramp_parameter",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER != 0,
-            || generated_value(py, value.color_ramp_parameter),
-        )?,
-    )?;
-    dict.set_item(
-        "elevation",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_EXPRESSION_INPUT_ELEVATION != 0,
-            || generated_value(py, value.elevation),
-        )?,
-    )?;
-    dict.set_item("feature", generated_json(py, value.feature)?)?;
-    dict.set_item("feature_state", generated_json(py, value.feature_state)?)?;
-    dict.set_item("global_state", generated_json(py, value.global_state)?)?;
-    dict.set_item(
-        "canonical_tile_id",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID != 0,
-            || generated_copy_mln_canonical_tile_id(py, &value.canonical_tile_id),
-        )?,
-    )?;
-    dict.set_item(
-        "available_images",
-        generated_list(
-            py,
-            unsafe { generated_slice(value.available_images, value.available_image_count)? },
-            |element| generated_text(py, *element),
-        )?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_style_expression_options(
-    py: Python<'_>,
-    value: &sys::mln_style_expression_options,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "expected_type",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE != 0,
-            || generated_copy_mln_style_expression_type(py, &value.expected_type),
-        )?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_style_expression_type(
-    py: Python<'_>,
-    value: &sys::mln_style_expression_type,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("kind", generated_value(py, value.kind)?)?;
-    dict.set_item("item_kind", generated_value(py, value.item_kind)?)?;
-    dict.set_item("item_count", generated_value(py, value.item_count)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2110,82 +1347,6 @@ fn generated_copy_mln_style_image_info(
     )?;
     dict.set_item("pixel_ratio", generated_value(py, value.pixel_ratio)?)?;
     dict.set_item("sdf", generated_value(py, value.sdf)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_style_image_options(
-    py: Python<'_>,
-    value: &sys::mln_style_image_options,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "stretch_x",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_IMAGE_OPTION_STRETCH_X != 0,
-            || {
-                generated_list(
-                    py,
-                    unsafe { generated_slice(value.stretch_x, value.stretch_x_count)? },
-                    |element| generated_copy_mln_image_stretch(py, element),
-                )
-            },
-        )?,
-    )?;
-    dict.set_item(
-        "stretch_y",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_IMAGE_OPTION_STRETCH_Y != 0,
-            || {
-                generated_list(
-                    py,
-                    unsafe { generated_slice(value.stretch_y, value.stretch_y_count)? },
-                    |element| generated_copy_mln_image_stretch(py, element),
-                )
-            },
-        )?,
-    )?;
-    dict.set_item(
-        "content",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_IMAGE_OPTION_CONTENT != 0,
-            || generated_copy_mln_image_content(py, &value.content),
-        )?,
-    )?;
-    dict.set_item(
-        "text_fit_width",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH != 0,
-            || generated_value(py, value.text_fit_width),
-        )?,
-    )?;
-    dict.set_item(
-        "text_fit_height",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT != 0,
-            || generated_value(py, value.text_fit_height),
-        )?,
-    )?;
-    dict.set_item(
-        "pixel_ratio",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO != 0,
-            || generated_value(py, value.pixel_ratio),
-        )?,
-    )?;
-    dict.set_item(
-        "sdf",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_STYLE_IMAGE_OPTION_SDF != 0,
-            || generated_value(py, value.sdf),
-        )?,
-    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2343,128 +1504,11 @@ fn generated_copy_mln_tile_id(py: Python<'_>, value: &sys::mln_tile_id) -> PyRes
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_unit_bezier(
-    py: Python<'_>,
-    value: &sys::mln_unit_bezier,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("x1", generated_value(py, value.x1)?)?;
-    dict.set_item("y1", generated_value(py, value.y1)?)?;
-    dict.set_item("x2", generated_value(py, value.x2)?)?;
-    dict.set_item("y2", generated_value(py, value.y2)?)?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_vec3(py: Python<'_>, value: &sys::mln_vec3) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("x", generated_value(py, value.x)?)?;
     dict.set_item("y", generated_value(py, value.y)?)?;
     dict.set_item("z", generated_value(py, value.z)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_vulkan_borrowed_texture(
-    py: Python<'_>,
-    value: &sys::mln_vulkan_borrowed_texture,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("image", generated_value(py, value.image)?)?;
-    dict.set_item("image_view", generated_value(py, value.image_view)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_vulkan_borrowed_texture_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_vulkan_borrowed_texture_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "extent",
-        generated_copy_mln_logical_extent(py, &value.extent)?,
-    )?;
-    dict.set_item("physical_width", generated_value(py, value.physical_width)?)?;
-    dict.set_item(
-        "physical_height",
-        generated_value(py, value.physical_height)?,
-    )?;
-    dict.set_item(
-        "context",
-        generated_copy_mln_vulkan_context_descriptor(py, &value.context)?,
-    )?;
-    dict.set_item(
-        "textures",
-        generated_list(
-            py,
-            unsafe { generated_slice(value.textures, value.texture_count)? },
-            |element| generated_copy_mln_vulkan_borrowed_texture(py, element),
-        )?,
-    )?;
-    dict.set_item("format", generated_value(py, value.format)?)?;
-    dict.set_item("initial_layout", generated_value(py, value.initial_layout)?)?;
-    dict.set_item("final_layout", generated_value(py, value.final_layout)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_vulkan_context_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_vulkan_context_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("instance", generated_value(py, value.instance as usize)?)?;
-    dict.set_item(
-        "physical_device",
-        generated_value(py, value.physical_device as usize)?,
-    )?;
-    dict.set_item("device", generated_value(py, value.device as usize)?)?;
-    dict.set_item(
-        "graphics_queue",
-        generated_value(py, value.graphics_queue as usize)?,
-    )?;
-    dict.set_item(
-        "graphics_queue_family_index",
-        generated_value(py, value.graphics_queue_family_index)?,
-    )?;
-    dict.set_item(
-        "get_instance_proc_addr",
-        generated_value(py, value.get_instance_proc_addr as usize)?,
-    )?;
-    dict.set_item(
-        "get_device_proc_addr",
-        generated_value(py, value.get_device_proc_addr as usize)?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_vulkan_owned_texture_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_vulkan_owned_texture_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "extent",
-        generated_copy_mln_logical_extent(py, &value.extent)?,
-    )?;
-    dict.set_item(
-        "context",
-        generated_copy_mln_vulkan_context_descriptor(py, &value.context)?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_vulkan_surface_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_vulkan_surface_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "extent",
-        generated_copy_mln_logical_extent(py, &value.extent)?,
-    )?;
-    dict.set_item(
-        "context",
-        generated_copy_mln_vulkan_context_descriptor(py, &value.context)?,
-    )?;
-    dict.set_item("surface", generated_value(py, value.surface)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2501,48 +1545,11 @@ unsafe extern "C" fn generated_callback_mln_wake_callback(user_data: *mut std::f
     outcome
 }
 
-fn generated_copy_mln_webgl_context_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_webgl_context_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("kind", generated_value(py, value.kind)?)?;
-    dict.set_item("context", generated_value(py, value.context)?)?;
-    dict.set_item(
-        "canvas_selector",
-        generated_text(py, value.canvas_selector)?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_wgl_context_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_wgl_context_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "device_context",
-        generated_value(py, value.device_context as usize)?,
-    )?;
-    dict.set_item(
-        "share_context",
-        generated_value(py, value.share_context as usize)?,
-    )?;
-    dict.set_item(
-        "get_proc_address",
-        generated_value(py, value.get_proc_address as usize)?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_input_mln_animation_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_animation_options> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_animation_options_default() });
-    }
-    let mut raw: sys::mln_animation_options = unsafe { sys::mln_animation_options_default() };
+    let mut raw: sys::mln_animation_options = unsafe { std::mem::zeroed() };
     raw.fields = 0;
     if let Some(field) = generated_present(value, "duration_ms")? {
         raw.duration_ms = field.extract::<f64>()?;
@@ -2573,12 +1580,12 @@ fn generated_input_mln_bound_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_bound_options> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_bound_options_default() });
-    }
-    let mut raw: sys::mln_bound_options = unsafe { sys::mln_bound_options_default() };
+    let mut raw: sys::mln_bound_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_bound_options>() as _;
     raw.fields = 0;
+    if value.is_none() {
+        return Ok(raw);
+    }
     if let Some(field) = generated_present(value, "bounds")? {
         raw.bounds = generated_input_mln_lat_lng_bounds(&field, storage)?;
         raw.fields |= sys::MLN_BOUND_OPTION_BOUNDS;
@@ -2626,10 +1633,7 @@ fn generated_input_mln_camera_delta<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_camera_delta> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_camera_delta_default() });
-    }
-    let mut raw: sys::mln_camera_delta = unsafe { sys::mln_camera_delta_default() };
+    let mut raw: sys::mln_camera_delta = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_camera_delta>() as _;
     raw.fields = 0;
     raw.reserved = 0;
@@ -2664,12 +1668,12 @@ fn generated_input_mln_camera_fit_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_camera_fit_options> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_camera_fit_options_default() });
-    }
-    let mut raw: sys::mln_camera_fit_options = unsafe { sys::mln_camera_fit_options_default() };
+    let mut raw: sys::mln_camera_fit_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_camera_fit_options>() as _;
     raw.fields = 0;
+    if value.is_none() {
+        return Ok(raw);
+    }
     if let Some(field) = generated_present(value, "padding")? {
         raw.padding = generated_input_mln_edge_insets(&field, storage)?;
         raw.fields |= sys::MLN_CAMERA_FIT_OPTION_PADDING;
@@ -2689,12 +1693,12 @@ fn generated_input_mln_camera_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_camera_options> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_camera_options_default() });
-    }
-    let mut raw: sys::mln_camera_options = unsafe { sys::mln_camera_options_default() };
+    let mut raw: sys::mln_camera_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_camera_options>() as _;
     raw.fields = 0;
+    if value.is_none() {
+        return Ok(raw);
+    }
     if let Some(field) = generated_present(value, "center")? {
         raw.center = generated_input_mln_lat_lng(&field, storage)?;
         raw.fields |= sys::MLN_CAMERA_OPTION_CENTER;
@@ -2757,10 +1761,7 @@ fn generated_input_mln_camera_update<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_camera_update> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_camera_update_default() });
-    }
-    let mut raw: sys::mln_camera_update = unsafe { sys::mln_camera_update_default() };
+    let mut raw: sys::mln_camera_update = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_camera_update>() as _;
     raw.reserved = 0;
     raw.mode = value
@@ -2790,11 +1791,7 @@ fn generated_input_mln_custom_geometry_source_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_custom_geometry_source_options> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_custom_geometry_source_options_default() });
-    }
-    let mut raw: sys::mln_custom_geometry_source_options =
-        unsafe { sys::mln_custom_geometry_source_options_default() };
+    let mut raw: sys::mln_custom_geometry_source_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_custom_geometry_source_options>() as _;
     raw.fields = 0;
     if let Some(field) = generated_present(value, "min_zoom")? {
@@ -2851,11 +1848,7 @@ fn generated_input_mln_custom_mvt_vector_source_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_custom_mvt_vector_source_options> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_custom_mvt_vector_source_options_default() });
-    }
-    let mut raw: sys::mln_custom_mvt_vector_source_options =
-        unsafe { sys::mln_custom_mvt_vector_source_options_default() };
+    let mut raw: sys::mln_custom_mvt_vector_source_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_custom_mvt_vector_source_options>() as _;
     raw.fields = 0;
     if let Some(field) = generated_present(value, "min_zoom")? {
@@ -2939,10 +1932,7 @@ fn generated_input_mln_frame_demand<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_frame_demand> {
     let _ = storage;
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_frame_demand_default() });
-    }
-    let mut raw: sys::mln_frame_demand = unsafe { sys::mln_frame_demand_default() };
+    let mut raw: sys::mln_frame_demand = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_frame_demand>() as _;
     raw.flags = value
         .getattr("flags")?
@@ -2955,12 +1945,12 @@ fn generated_input_mln_free_camera_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_free_camera_options> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_free_camera_options_default() });
-    }
-    let mut raw: sys::mln_free_camera_options = unsafe { sys::mln_free_camera_options_default() };
+    let mut raw: sys::mln_free_camera_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_free_camera_options>() as _;
     raw.fields = 0;
+    if value.is_none() {
+        return Ok(raw);
+    }
     if let Some(field) = generated_present(value, "position")? {
         raw.position = generated_input_mln_vec3(&field, storage)?;
         raw.fields |= sys::MLN_FREE_CAMERA_OPTION_POSITION;
@@ -2976,13 +1966,12 @@ fn generated_input_mln_geojson_source_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_geojson_source_options> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_geojson_source_options_default() });
-    }
-    let mut raw: sys::mln_geojson_source_options =
-        unsafe { sys::mln_geojson_source_options_default() };
+    let mut raw: sys::mln_geojson_source_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_geojson_source_options>() as _;
     raw.fields = 0;
+    if value.is_none() {
+        return Ok(raw);
+    }
     if let Some(field) = generated_present(value, "min_zoom")? {
         raw.min_zoom = field.extract::<f64>()?;
         raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM;
@@ -3032,11 +2021,11 @@ fn generated_input_mln_gpu_sync<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_gpu_sync> {
     let _ = storage;
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_gpu_sync_default() });
-    }
-    let mut raw: sys::mln_gpu_sync = unsafe { sys::mln_gpu_sync_default() };
+    let mut raw: sys::mln_gpu_sync = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_gpu_sync>() as _;
+    if value.is_none() {
+        return Ok(raw);
+    }
     raw.kind = value.getattr("kind")?.extract::<sys::mln_gpu_sync_kind>()?;
     raw.handle = value.getattr("handle")?.extract::<u64>()?;
     Ok(raw)
@@ -3056,10 +2045,7 @@ fn generated_input_mln_http_header_rule<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_http_header_rule> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_http_header_rule_default() });
-    }
-    let mut raw: sys::mln_http_header_rule = unsafe { sys::mln_http_header_rule_default() };
+    let mut raw: sys::mln_http_header_rule = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_http_header_rule>() as _;
     raw.kinds = value
         .getattr("kinds")?
@@ -3175,10 +2161,7 @@ fn generated_input_mln_logical_extent<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_logical_extent> {
     let _ = storage;
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_logical_extent_default() });
-    }
-    let mut raw: sys::mln_logical_extent = unsafe { sys::mln_logical_extent_default() };
+    let mut raw: sys::mln_logical_extent = unsafe { std::mem::zeroed() };
     raw.width = value.getattr("width")?.extract::<u32>()?;
     raw.height = value.getattr("height")?.extract::<u32>()?;
     raw.scale_factor = value.getattr("scale_factor")?.extract::<f64>()?;
@@ -3189,10 +2172,7 @@ fn generated_input_mln_map_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_map_options> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_map_options_default() });
-    }
-    let mut raw: sys::mln_map_options = unsafe { sys::mln_map_options_default() };
+    let mut raw: sys::mln_map_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_map_options>() as _;
     raw.fields = 0;
     raw.initial_extent =
@@ -3211,12 +2191,12 @@ fn generated_input_mln_map_tile_options<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_map_tile_options> {
     let _ = storage;
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_map_tile_options_default() });
-    }
-    let mut raw: sys::mln_map_tile_options = unsafe { sys::mln_map_tile_options_default() };
+    let mut raw: sys::mln_map_tile_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_map_tile_options>() as _;
     raw.fields = 0;
+    if value.is_none() {
+        return Ok(raw);
+    }
     if let Some(field) = generated_present(value, "prefetch_zoom_delta")? {
         raw.prefetch_zoom_delta = field.extract::<u32>()?;
         raw.fields |= sys::MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
@@ -3262,12 +2242,12 @@ fn generated_input_mln_map_viewport_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_map_viewport_options> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_map_viewport_options_default() });
-    }
-    let mut raw: sys::mln_map_viewport_options = unsafe { sys::mln_map_viewport_options_default() };
+    let mut raw: sys::mln_map_viewport_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_map_viewport_options>() as _;
     raw.fields = 0;
+    if value.is_none() {
+        return Ok(raw);
+    }
     if let Some(field) = generated_present(value, "north_orientation")? {
         raw.north_orientation = field.extract::<sys::mln_north_orientation>()?;
         raw.fields |= sys::MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
@@ -3301,11 +2281,7 @@ fn generated_input_mln_metal_borrowed_texture_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_metal_borrowed_texture_descriptor> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_metal_borrowed_texture_descriptor_default() });
-    }
-    let mut raw: sys::mln_metal_borrowed_texture_descriptor =
-        unsafe { sys::mln_metal_borrowed_texture_descriptor_default() };
+    let mut raw: sys::mln_metal_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_metal_borrowed_texture_descriptor>() as _;
     raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
@@ -3334,11 +2310,7 @@ fn generated_input_mln_metal_owned_texture_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_metal_owned_texture_descriptor> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_metal_owned_texture_descriptor_default() });
-    }
-    let mut raw: sys::mln_metal_owned_texture_descriptor =
-        unsafe { sys::mln_metal_owned_texture_descriptor_default() };
+    let mut raw: sys::mln_metal_owned_texture_descriptor = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_metal_owned_texture_descriptor>() as _;
     raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.context =
@@ -3351,11 +2323,7 @@ fn generated_input_mln_metal_surface_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_metal_surface_descriptor> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_metal_surface_descriptor_default() });
-    }
-    let mut raw: sys::mln_metal_surface_descriptor =
-        unsafe { sys::mln_metal_surface_descriptor_default() };
+    let mut raw: sys::mln_metal_surface_descriptor = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_metal_surface_descriptor>() as _;
     raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.context =
@@ -3433,11 +2401,7 @@ fn generated_input_mln_opengl_borrowed_texture_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_opengl_borrowed_texture_descriptor> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_opengl_borrowed_texture_descriptor_default() });
-    }
-    let mut raw: sys::mln_opengl_borrowed_texture_descriptor =
-        unsafe { sys::mln_opengl_borrowed_texture_descriptor_default() };
+    let mut raw: sys::mln_opengl_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_opengl_borrowed_texture_descriptor>() as _;
     raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
@@ -3488,11 +2452,7 @@ fn generated_input_mln_opengl_owned_texture_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_opengl_owned_texture_descriptor> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_opengl_owned_texture_descriptor_default() });
-    }
-    let mut raw: sys::mln_opengl_owned_texture_descriptor =
-        unsafe { sys::mln_opengl_owned_texture_descriptor_default() };
+    let mut raw: sys::mln_opengl_owned_texture_descriptor = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_opengl_owned_texture_descriptor>() as _;
     raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.context =
@@ -3504,11 +2464,7 @@ fn generated_input_mln_opengl_surface_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_opengl_surface_descriptor> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_opengl_surface_descriptor_default() });
-    }
-    let mut raw: sys::mln_opengl_surface_descriptor =
-        unsafe { sys::mln_opengl_surface_descriptor_default() };
+    let mut raw: sys::mln_opengl_surface_descriptor = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_opengl_surface_descriptor>() as _;
     raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.context =
@@ -3521,11 +2477,7 @@ fn generated_input_mln_premultiplied_rgba8_image<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_premultiplied_rgba8_image> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_premultiplied_rgba8_image_default() });
-    }
-    let mut raw: sys::mln_premultiplied_rgba8_image =
-        unsafe { sys::mln_premultiplied_rgba8_image_default() };
+    let mut raw: sys::mln_premultiplied_rgba8_image = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_premultiplied_rgba8_image>() as _;
     raw.width = value.getattr("width")?.extract::<u32>()?;
     raw.height = value.getattr("height")?.extract::<u32>()?;
@@ -3554,10 +2506,7 @@ fn generated_input_mln_projection_mode<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_projection_mode> {
     let _ = storage;
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_projection_mode_default() });
-    }
-    let mut raw: sys::mln_projection_mode = unsafe { sys::mln_projection_mode_default() };
+    let mut raw: sys::mln_projection_mode = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_projection_mode>() as _;
     raw.fields = 0;
     if let Some(field) = generated_present(value, "axonometric")? {
@@ -3626,11 +2575,7 @@ fn generated_input_mln_render_session_attach_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_render_session_attach_options> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_render_session_attach_options_default() });
-    }
-    let mut raw: sys::mln_render_session_attach_options =
-        unsafe { sys::mln_render_session_attach_options_default() };
+    let mut raw: sys::mln_render_session_attach_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_render_session_attach_options>() as _;
     raw.driver = value
         .getattr("driver")?
@@ -3651,13 +2596,12 @@ fn generated_input_mln_rendered_feature_query_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_rendered_feature_query_options> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_rendered_feature_query_options_default() });
-    }
-    let mut raw: sys::mln_rendered_feature_query_options =
-        unsafe { sys::mln_rendered_feature_query_options_default() };
+    let mut raw: sys::mln_rendered_feature_query_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_rendered_feature_query_options>() as _;
     raw.fields = 0;
+    if value.is_none() {
+        return Ok(raw);
+    }
     if let Some(field) = generated_present(value, "layer_ids")? {
         raw.layer_ids = {
             let items = generated_items(&field, |item| storage.buffer(item, true))?;
@@ -3782,10 +2726,7 @@ fn generated_input_mln_resource_route<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_resource_route> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_resource_route_default() });
-    }
-    let mut raw: sys::mln_resource_route = unsafe { sys::mln_resource_route_default() };
+    let mut raw: sys::mln_resource_route = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_resource_route>() as _;
     raw.kinds = value
         .getattr("kinds")?
@@ -3841,11 +2782,11 @@ fn generated_input_mln_runtime_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_runtime_options> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_runtime_options_default() });
-    }
-    let mut raw: sys::mln_runtime_options = unsafe { sys::mln_runtime_options_default() };
+    let mut raw: sys::mln_runtime_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_runtime_options>() as _;
+    if value.is_none() {
+        return Ok(raw);
+    }
     raw.asset_path = storage.buffer(value.getattr("asset_path")?, true)?;
     raw.cache_path = storage.buffer(value.getattr("cache_path")?, true)?;
     Ok(raw)
@@ -3891,13 +2832,12 @@ fn generated_input_mln_source_feature_query_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_source_feature_query_options> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_source_feature_query_options_default() });
-    }
-    let mut raw: sys::mln_source_feature_query_options =
-        unsafe { sys::mln_source_feature_query_options_default() };
+    let mut raw: sys::mln_source_feature_query_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_source_feature_query_options>() as _;
     raw.fields = 0;
+    if value.is_none() {
+        return Ok(raw);
+    }
     if let Some(field) = generated_present(value, "source_layer_ids")? {
         raw.source_layer_ids = {
             let items = generated_items(&field, |item| storage.buffer(item, true))?;
@@ -3914,11 +2854,7 @@ fn generated_input_mln_style_expression_inputs<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_style_expression_inputs> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_style_expression_inputs_default() });
-    }
-    let mut raw: sys::mln_style_expression_inputs =
-        unsafe { sys::mln_style_expression_inputs_default() };
+    let mut raw: sys::mln_style_expression_inputs = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_style_expression_inputs>() as _;
     raw.fields = 0;
     if let Some(field) = generated_present(value, "zoom")? {
@@ -3954,13 +2890,12 @@ fn generated_input_mln_style_expression_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_style_expression_options> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_style_expression_options_default() });
-    }
-    let mut raw: sys::mln_style_expression_options =
-        unsafe { sys::mln_style_expression_options_default() };
+    let mut raw: sys::mln_style_expression_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_style_expression_options>() as _;
     raw.fields = 0;
+    if value.is_none() {
+        return Ok(raw);
+    }
     if let Some(field) = generated_present(value, "expected_type")? {
         raw.expected_type = generated_input_mln_style_expression_type(&field, storage)?;
         raw.fields |= sys::MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE;
@@ -3988,12 +2923,12 @@ fn generated_input_mln_style_image_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_style_image_options> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_style_image_options_default() });
-    }
-    let mut raw: sys::mln_style_image_options = unsafe { sys::mln_style_image_options_default() };
+    let mut raw: sys::mln_style_image_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_style_image_options>() as _;
     raw.fields = 0;
+    if value.is_none() {
+        return Ok(raw);
+    }
     if let Some(field) = generated_present(value, "stretch_x")? {
         raw.stretch_x = {
             let items = generated_items(&field, |item| {
@@ -4042,13 +2977,12 @@ fn generated_input_mln_style_transition_options<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_style_transition_options> {
     let _ = storage;
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_style_transition_options_default() });
-    }
-    let mut raw: sys::mln_style_transition_options =
-        unsafe { sys::mln_style_transition_options_default() };
+    let mut raw: sys::mln_style_transition_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_style_transition_options>() as _;
     raw.fields = 0;
+    if value.is_none() {
+        return Ok(raw);
+    }
     if let Some(field) = generated_present(value, "duration_ms")? {
         raw.duration_ms = field.extract::<f64>()?;
         raw.fields |= sys::MLN_STYLE_TRANSITION_OPTION_DURATION;
@@ -4104,11 +3038,7 @@ fn generated_input_mln_vulkan_borrowed_texture_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_vulkan_borrowed_texture_descriptor> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_vulkan_borrowed_texture_descriptor_default() });
-    }
-    let mut raw: sys::mln_vulkan_borrowed_texture_descriptor =
-        unsafe { sys::mln_vulkan_borrowed_texture_descriptor_default() };
+    let mut raw: sys::mln_vulkan_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_vulkan_borrowed_texture_descriptor>() as _;
     raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
@@ -4152,11 +3082,7 @@ fn generated_input_mln_vulkan_owned_texture_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_vulkan_owned_texture_descriptor> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_vulkan_owned_texture_descriptor_default() });
-    }
-    let mut raw: sys::mln_vulkan_owned_texture_descriptor =
-        unsafe { sys::mln_vulkan_owned_texture_descriptor_default() };
+    let mut raw: sys::mln_vulkan_owned_texture_descriptor = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_vulkan_owned_texture_descriptor>() as _;
     raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.context =
@@ -4168,11 +3094,7 @@ fn generated_input_mln_vulkan_surface_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_vulkan_surface_descriptor> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_vulkan_surface_descriptor_default() });
-    }
-    let mut raw: sys::mln_vulkan_surface_descriptor =
-        unsafe { sys::mln_vulkan_surface_descriptor_default() };
+    let mut raw: sys::mln_vulkan_surface_descriptor = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_vulkan_surface_descriptor>() as _;
     raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.context =
@@ -4229,227 +3151,6 @@ fn generated_input_mln_wgl_context_descriptor<'py>(
     raw.share_context = value.getattr("share_context")?.extract::<usize>()? as _;
     raw.get_proc_address = value.getattr("get_proc_address")?.extract::<usize>()? as _;
     Ok(raw)
-}
-#[pyfunction]
-fn _default_animation_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_animation_options_default() };
-    generated_copy_mln_animation_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_bound_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_bound_options_default() };
-    generated_copy_mln_bound_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_camera_delta(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_camera_delta_default() };
-    generated_copy_mln_camera_delta(py, &value)
-}
-
-#[pyfunction]
-fn _default_camera_fit_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_camera_fit_options_default() };
-    generated_copy_mln_camera_fit_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_camera_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_camera_options_default() };
-    generated_copy_mln_camera_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_camera_update(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_camera_update_default() };
-    generated_copy_mln_camera_update(py, &value)
-}
-
-#[pyfunction]
-fn _default_custom_geometry_source_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_custom_geometry_source_options_default() };
-    generated_copy_mln_custom_geometry_source_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_custom_mvt_vector_source_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_custom_mvt_vector_source_options_default() };
-    generated_copy_mln_custom_mvt_vector_source_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_frame_demand(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_frame_demand_default() };
-    generated_copy_mln_frame_demand(py, &value)
-}
-
-#[pyfunction]
-fn _default_free_camera_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_free_camera_options_default() };
-    generated_copy_mln_free_camera_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_geojson_source_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_geojson_source_options_default() };
-    generated_copy_mln_geojson_source_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_gpu_sync(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_gpu_sync_default() };
-    generated_copy_mln_gpu_sync(py, &value)
-}
-
-#[pyfunction]
-fn _default_http_header_rule(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_http_header_rule_default() };
-    generated_copy_mln_http_header_rule(py, &value)
-}
-
-#[pyfunction]
-fn _default_logical_extent(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_logical_extent_default() };
-    generated_copy_mln_logical_extent(py, &value)
-}
-
-#[pyfunction]
-fn _default_map_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_map_options_default() };
-    generated_copy_mln_map_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_map_tile_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_map_tile_options_default() };
-    generated_copy_mln_map_tile_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_map_viewport_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_map_viewport_options_default() };
-    generated_copy_mln_map_viewport_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_metal_borrowed_texture_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_metal_borrowed_texture_descriptor_default() };
-    generated_copy_mln_metal_borrowed_texture_descriptor(py, &value)
-}
-
-#[pyfunction]
-fn _default_metal_owned_texture_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_metal_owned_texture_descriptor_default() };
-    generated_copy_mln_metal_owned_texture_descriptor(py, &value)
-}
-
-#[pyfunction]
-fn _default_metal_surface_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_metal_surface_descriptor_default() };
-    generated_copy_mln_metal_surface_descriptor(py, &value)
-}
-
-#[pyfunction]
-fn _default_opengl_borrowed_texture_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_opengl_borrowed_texture_descriptor_default() };
-    generated_copy_mln_opengl_borrowed_texture_descriptor(py, &value)
-}
-
-#[pyfunction]
-fn _default_opengl_owned_texture_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_opengl_owned_texture_descriptor_default() };
-    generated_copy_mln_opengl_owned_texture_descriptor(py, &value)
-}
-
-#[pyfunction]
-fn _default_opengl_surface_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_opengl_surface_descriptor_default() };
-    generated_copy_mln_opengl_surface_descriptor(py, &value)
-}
-
-#[pyfunction]
-fn _default_premultiplied_rgba8_image(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_premultiplied_rgba8_image_default() };
-    generated_copy_mln_premultiplied_rgba8_image(py, &value)
-}
-
-#[pyfunction]
-fn _default_projection_mode(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_projection_mode_default() };
-    generated_copy_mln_projection_mode(py, &value)
-}
-
-#[pyfunction]
-fn _default_render_session_attach_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_render_session_attach_options_default() };
-    generated_copy_mln_render_session_attach_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_rendered_feature_query_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_rendered_feature_query_options_default() };
-    generated_copy_mln_rendered_feature_query_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_resource_route(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_resource_route_default() };
-    generated_copy_mln_resource_route(py, &value)
-}
-
-#[pyfunction]
-fn _default_runtime_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_runtime_options_default() };
-    generated_copy_mln_runtime_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_source_feature_query_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_source_feature_query_options_default() };
-    generated_copy_mln_source_feature_query_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_style_expression_inputs(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_style_expression_inputs_default() };
-    generated_copy_mln_style_expression_inputs(py, &value)
-}
-
-#[pyfunction]
-fn _default_style_expression_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_style_expression_options_default() };
-    generated_copy_mln_style_expression_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_style_image_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_style_image_options_default() };
-    generated_copy_mln_style_image_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_style_transition_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_style_transition_options_default() };
-    generated_copy_mln_style_transition_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_vulkan_borrowed_texture_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_vulkan_borrowed_texture_descriptor_default() };
-    generated_copy_mln_vulkan_borrowed_texture_descriptor(py, &value)
-}
-
-#[pyfunction]
-fn _default_vulkan_owned_texture_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_vulkan_owned_texture_descriptor_default() };
-    generated_copy_mln_vulkan_owned_texture_descriptor(py, &value)
-}
-
-#[pyfunction]
-fn _default_vulkan_surface_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_vulkan_surface_descriptor_default() };
-    generated_copy_mln_vulkan_surface_descriptor(py, &value)
 }
 
 unsafe extern "C" fn generated_dispose_mln_acquired_frame(
@@ -4557,7 +3258,7 @@ impl AcquiredFrameHandle {
     fn producer_sync(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
-        let mut out_sync: sys::mln_gpu_sync = unsafe { sys::mln_gpu_sync_default() };
+        let mut out_sync: sys::mln_gpu_sync = unsafe { std::mem::zeroed() };
         out_sync.size = std::mem::size_of::<sys::mln_gpu_sync>() as _;
         unsafe {
             call.status(|diagnostic| {
@@ -4680,17 +3381,16 @@ impl HttpHeaderTransformResponseScope {
 
 #[pymethods]
 impl MapHandle {
-    #[pyo3(signature = (source_id, options=None))]
+    #[pyo3(signature = (source_id, options))]
     fn add_custom_geometry_source(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_custom_geometry_source_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -4709,17 +3409,16 @@ impl MapHandle {
         self.state().retain_callback_roots(callback_roots);
         Ok(future)
     }
-    #[pyo3(signature = (source_id, options=None))]
+    #[pyo3(signature = (source_id, options))]
     fn _discard_add_custom_geometry_source(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_custom_geometry_source_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -4738,17 +3437,16 @@ impl MapHandle {
         self.state().retain_callback_roots(callback_roots);
         Ok(future)
     }
-    #[pyo3(signature = (source_id, options=None))]
+    #[pyo3(signature = (source_id, options))]
     fn add_custom_mvt_vector_source(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_custom_mvt_vector_source_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -4767,17 +3465,16 @@ impl MapHandle {
         self.state().retain_callback_roots(callback_roots);
         Ok(future)
     }
-    #[pyo3(signature = (source_id, options=None))]
+    #[pyo3(signature = (source_id, options))]
     fn _discard_add_custom_mvt_vector_source(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_custom_mvt_vector_source_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -5154,18 +3851,17 @@ impl MapHandle {
         self.state().retain_callback_roots(callback_roots);
         Ok(future)
     }
-    #[pyo3(signature = (descriptor, options=None))]
+    #[pyo3(signature = (descriptor, options))]
     fn attach_metal_borrowed_texture(
         &self,
         py: Python<'_>,
         descriptor: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor_value =
             generated_input_mln_metal_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -5197,18 +3893,17 @@ impl MapHandle {
         result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor, options=None))]
+    #[pyo3(signature = (descriptor, options))]
     fn attach_metal_owned_texture(
         &self,
         py: Python<'_>,
         descriptor: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor_value =
             generated_input_mln_metal_owned_texture_descriptor(&descriptor.clone(), storage)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -5240,18 +3935,17 @@ impl MapHandle {
         result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor, options=None))]
+    #[pyo3(signature = (descriptor, options))]
     fn attach_metal_surface(
         &self,
         py: Python<'_>,
         descriptor: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor_value =
             generated_input_mln_metal_surface_descriptor(&descriptor.clone(), storage)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -5283,18 +3977,17 @@ impl MapHandle {
         result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor, options=None))]
+    #[pyo3(signature = (descriptor, options))]
     fn attach_opengl_borrowed_texture(
         &self,
         py: Python<'_>,
         descriptor: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor_value =
             generated_input_mln_opengl_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -5326,18 +4019,17 @@ impl MapHandle {
         result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor, options=None))]
+    #[pyo3(signature = (descriptor, options))]
     fn attach_opengl_owned_texture(
         &self,
         py: Python<'_>,
         descriptor: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor_value =
             generated_input_mln_opengl_owned_texture_descriptor(&descriptor.clone(), storage)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -5369,18 +4061,17 @@ impl MapHandle {
         result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor, options=None))]
+    #[pyo3(signature = (descriptor, options))]
     fn attach_opengl_surface(
         &self,
         py: Python<'_>,
         descriptor: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor_value =
             generated_input_mln_opengl_surface_descriptor(&descriptor.clone(), storage)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -5412,18 +4103,17 @@ impl MapHandle {
         result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor, options=None))]
+    #[pyo3(signature = (descriptor, options))]
     fn attach_vulkan_borrowed_texture(
         &self,
         py: Python<'_>,
         descriptor: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor_value =
             generated_input_mln_vulkan_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -5455,18 +4145,17 @@ impl MapHandle {
         result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor, options=None))]
+    #[pyo3(signature = (descriptor, options))]
     fn attach_vulkan_owned_texture(
         &self,
         py: Python<'_>,
         descriptor: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor_value =
             generated_input_mln_vulkan_owned_texture_descriptor(&descriptor.clone(), storage)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -5498,18 +4187,17 @@ impl MapHandle {
         result.set_item("ready", future)?;
         Ok(result.into_any().unbind())
     }
-    #[pyo3(signature = (descriptor, options=None))]
+    #[pyo3(signature = (descriptor, options))]
     fn attach_vulkan_surface(
         &self,
         py: Python<'_>,
         descriptor: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let descriptor_value =
             generated_input_mln_vulkan_surface_descriptor(&descriptor.clone(), storage)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -7809,7 +6497,7 @@ impl MapProjectionHandle {
     fn get_camera(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
-        let mut out_camera: sys::mln_camera_options = unsafe { sys::mln_camera_options_default() };
+        let mut out_camera: sys::mln_camera_options = unsafe { std::mem::zeroed() };
         out_camera.size = std::mem::size_of::<sys::mln_camera_options>() as _;
         unsafe {
             call.status(|diagnostic| {
@@ -8787,11 +7475,10 @@ impl RuntimeHandle {
             })
         }
     }
-    #[pyo3(signature = (options=None))]
-    fn create_map(&self, py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (options))]
+    fn create_map(&self, py: Python<'_>, options: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_map_options(&options.clone(), storage)?;
         let handle = self.input();
         let mut out_map: sys::mln_map = unsafe { std::mem::zeroed() };
@@ -9731,85 +8418,6 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<RuntimeHandle>()?;
     module.add_class::<StyleExpressionHandle>()?;
     module.add_class::<HttpHeaderTransformResponseScope>()?;
-    module.add_function(wrap_pyfunction!(_default_animation_options, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_bound_options, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_camera_delta, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_camera_fit_options, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_camera_options, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_camera_update, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_custom_geometry_source_options,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_custom_mvt_vector_source_options,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(_default_frame_demand, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_free_camera_options, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_geojson_source_options, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_gpu_sync, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_http_header_rule, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_logical_extent, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_map_options, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_map_tile_options, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_map_viewport_options, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_metal_borrowed_texture_descriptor,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_metal_owned_texture_descriptor,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(_default_metal_surface_descriptor, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_opengl_borrowed_texture_descriptor,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_opengl_owned_texture_descriptor,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_opengl_surface_descriptor,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_premultiplied_rgba8_image,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(_default_projection_mode, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_render_session_attach_options,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_rendered_feature_query_options,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(_default_resource_route, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_runtime_options, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_source_feature_query_options,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(_default_style_expression_inputs, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_style_expression_options, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_style_image_options, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_style_transition_options, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_vulkan_borrowed_texture_descriptor,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_vulkan_owned_texture_descriptor,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_vulkan_surface_descriptor,
-        module
-    )?)?;
     module.add_function(wrap_pyfunction!(android_init, module)?)?;
     module.add_function(wrap_pyfunction!(c_version, module)?)?;
     module.add_function(wrap_pyfunction!(geojson_source_data_create, module)?)?;

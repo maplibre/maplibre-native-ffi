@@ -32,8 +32,9 @@ static void a_creating_map_runs_accepted_work_once_it_is_ready(void) {
   // Calls that read the native map wait for the completion.
   mln_map_snapshot snapshot = {.size = sizeof(snapshot)};
   MLN_TEST_INVALID_STATE(mln_map_get_snapshot(map, &snapshot, NULL));
-  const mln_render_session_attach_options options =
-    mln_render_session_attach_options_default();
+  const mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
   mln_test_completion attach = mln_test_completion_default(0);
   mln_test_render_fixture fixture = {0};
   MLN_TEST_INVALID_STATE(mln_test_render_fixture_start_attach(

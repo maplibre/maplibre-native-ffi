@@ -78,12 +78,12 @@ func newCallerDriver(eventType sdl.EventType) callerDriver {
 }
 
 func (driver *callerDriver) attachOptions(ringDepth uint32) maplibre.RenderSessionAttachOptions {
-	options := maplibre.DefaultRenderSessionAttachOptions()
-	options.Driver = maplibre.RenderDriverKindCallerGraphicsThread
-	options.RequestedTextureRingDepth = ringDepth
-	options.FrameWake = driver.wakes.frames.wake()
-	options.DriverWorkWake = driver.wakes.driverWork.wake()
-	return options
+	return maplibre.RenderSessionAttachOptions{
+		Driver:                    maplibre.RenderDriverKindCallerGraphicsThread,
+		RequestedTextureRingDepth: ringDepth,
+		FrameWake:                 driver.wakes.frames.wake(),
+		DriverWorkWake:            driver.wakes.driverWork.wake(),
+	}
 }
 
 // attach services the attachment until it completes. A failed attachment
@@ -126,8 +126,7 @@ func (driver *callerDriver) await(future *maplibre.Future[struct{}]) error {
 
 func (driver *callerDriver) RequestFrame(force bool) error {
 	driver.nextToken++
-	demand := maplibre.DefaultFrameDemand()
-	demand.Token = driver.nextToken
+	demand := maplibre.FrameDemand{Token: driver.nextToken}
 	if force {
 		demand.Flags |= maplibre.FrameDemandFlagForce
 	} else {

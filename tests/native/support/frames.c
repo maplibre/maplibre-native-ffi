@@ -29,7 +29,7 @@ void mln_test_render_prepare_map(mln_map map) {
 void mln_test_render_request_forced(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_FORCE;
   demand.token = token;
   MLN_TEST_OK(
@@ -216,7 +216,7 @@ bool mln_test_render_until_idle(
         return wait.has_stats;
       }
     }
-    mln_frame_demand demand = mln_frame_demand_default();
+    mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
     demand.flags = 0;
     MLN_TEST_OK(
       mln_render_session_request_frame(fixture->session, &demand, NULL)
@@ -246,7 +246,7 @@ mln_acquired_frame mln_test_render_and_acquire(
 }
 
 void mln_test_render_release_frame(mln_acquired_frame* frame) {
-  const mln_gpu_sync sync = mln_gpu_sync_default();
+  const mln_gpu_sync sync = {.size = sizeof(mln_gpu_sync)};
   MLN_TEST_OK(mln_acquired_frame_release(*frame, &sync, NULL));
   *frame = MLN_HANDLE_NULL;
 }

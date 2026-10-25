@@ -456,8 +456,9 @@ static mln_vulkan_borrowed_texture_descriptor borrowed_ring_descriptor(
       .image_view = vulkan_image_view_to_abi(ring->images[index].view),
     };
   }
-  mln_vulkan_borrowed_texture_descriptor descriptor =
-    mln_vulkan_borrowed_texture_descriptor_default();
+  mln_vulkan_borrowed_texture_descriptor descriptor = {
+    .size = sizeof(mln_vulkan_borrowed_texture_descriptor)
+  };
   descriptor.extent = render_target_extent(current_viewport);
   descriptor.physical_width = current_viewport.physical_width;
   descriptor.physical_height = current_viewport.physical_height;
@@ -499,8 +500,9 @@ app_error render_target_attach(
   mln_status status = MLN_STATUS_INVALID_STATE;
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE: {
-      mln_vulkan_owned_texture_descriptor descriptor =
-        mln_vulkan_owned_texture_descriptor_default();
+      mln_vulkan_owned_texture_descriptor descriptor = {
+        .size = sizeof(mln_vulkan_owned_texture_descriptor)
+      };
       descriptor.extent = render_target_extent(current_viewport);
       descriptor.context =
         vulkan_context_descriptor(&target->as.owned.compositor.context);
@@ -521,8 +523,9 @@ app_error render_target_attach(
       break;
     }
     case RENDER_TARGET_MODE_NATIVE_SURFACE: {
-      mln_vulkan_surface_descriptor descriptor =
-        mln_vulkan_surface_descriptor_default();
+      mln_vulkan_surface_descriptor descriptor = {
+        .size = sizeof(mln_vulkan_surface_descriptor)
+      };
       descriptor.extent = render_target_extent(current_viewport);
       descriptor.context =
         vulkan_context_descriptor(&target->as.surface.context);

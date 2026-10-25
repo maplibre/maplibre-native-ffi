@@ -77,11 +77,13 @@ auto retarget_retains_submission(mln_map map) -> const char* {
       return "this host has no Metal device or layer";
     }
 
-    auto descriptor = mln_metal_surface_descriptor_default();
+    auto descriptor = mln_metal_surface_descriptor{};
+    descriptor.size = sizeof(mln_metal_surface_descriptor);
     descriptor.extent = {.width = 256, .height = 256, .scale_factor = 1.0};
     descriptor.context.device = (__bridge void*)device;
     descriptor.layer = (__bridge void*)initial_layer;
-    auto options = mln_render_session_attach_options_default();
+    auto options = mln_render_session_attach_options{};
+    options.size = sizeof(mln_render_session_attach_options);
     options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
     mln_render_session session = MLN_HANDLE_NULL;
     auto attach = mln_test_completion_default(0);

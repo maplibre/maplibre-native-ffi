@@ -194,8 +194,7 @@ class Values:
                 f"func copy{typename}(raw C.{native}) {typename} {{ {self.union_copy(union, place, 'raw')} }}"
             )
         if native in self.inputs and native in self.api.inputs:
-            init = f"C.{value.default}()" if value.default else f"C.{native}{{}}"
-            lines = [f"raw := {init}"]
+            lines = [f"raw := C.{native}{{}}"]
             lines.extend(
                 f"raw.{native_identifier(f.name)} = bindingCountLike(raw.{native_identifier(f.name)}, int(unsafe.Sizeof(raw)))"
                 for f in value.fields
@@ -245,6 +244,13 @@ class Values:
                 return f"func() {self.type(value)} {{ if {expr} == nil {{ return nil }}; value := {converted}; return &value }}()"
             return converted
         if value.kind == "buffer":
+            if value.length == "nul":
+                copy = f"C.GoString({expr})"
+                return (
+                    f"func() *string {{ if {expr} == nil {{ return nil }}; value := {copy}; return &value }}()"
+                    if value.nullable
+                    else copy
+                )
             if value.ctype.pointee:
                 size = (
                     value.length
@@ -306,13 +312,14 @@ class Values:
             converted = self.native(
                 replace(value, nullable=False), f"(*{expr})", dest, scope
             )
-            pointer = dest if value.ctype.pointee else dest + ".data"
-            assignment = (
-                f"({self.c_type(value)})(arena.allocate(1))"
-                if value.ctype.pointee
-                else "arena.allocate(1)"
-            )
-            converted += f"; if {pointer} == nil {{ {pointer} = {assignment} }}"
+            if value.length != "nul":
+                pointer = dest if value.ctype.pointee else dest + ".data"
+                assignment = (
+                    f"({self.c_type(value)})(arena.allocate(1))"
+                    if value.ctype.pointee
+                    else "arena.allocate(1)"
+                )
+                converted += f"; if {pointer} == nil {{ {pointer} = {assignment} }}"
             return f"if {expr} != nil {{ {converted} }}"
         if value.kind in {"scalar", "enum"}:
             return f"{dest} = {self.c_type(value)}({expr})"
@@ -333,14 +340,16 @@ class Values:
         if value.kind == "buffer":
             data = f"[]byte({expr})" if is_text(value) else expr
             inner = f"arena.bytes({data})"
-            if not value.ctype.pointee:
+            if value.length == "nul":
+                inner = f"arena.cstring({expr})"
+            elif not value.ctype.pointee:
                 inner = (
                     f"C.mln_buffer_view{{data: {inner}, size: C.size_t(len({expr}))}}"
                 )
             else:
                 inner = f"({self.c_type(value)})({inner})"
             code = f"{dest} = {inner}"
-            if value.length and not value.length.isdigit():
+            if value.length and value.length != "nul" and not value.length.isdigit():
                 code += f"; {scope}.{native_identifier(value.length)} = bindingCountLike({scope}.{native_identifier(value.length)}, len({expr}))"
             return code
         if value.kind == "array":
@@ -550,8 +559,7 @@ class Values:
                     f"func copy{typename}(raw C.{native}) {typename} {{ var result {typename}; {'; '.join(lines)}; return result }}"
                 )
             if native in self.inputs and native in self.api.inputs:
-                init = f"C.{value.default}()" if value.default else f"C.{native}{{}}"
-                lines = [f"raw := {init}"]
+                lines = [f"raw := C.{native}{{}}"]
                 for f in visible.fields:
                     if f.role == "size":
                         lines.append(
@@ -598,10 +606,6 @@ class Values:
                     lines.append(registration_input(self, value))
                 chunks.append(
                     f"func native{typename}(input {typename}, arena *bindingArena) C.{native} {{ {'; '.join(lines)}; return raw }}"
-                )
-            if value.default:
-                chunks.append(
-                    f"func Default{typename}() {typename} {{ return copy{typename}(C.{value.default}()) }}"
                 )
         for native, value in self.views.items():
             typename = public(native) + "View"

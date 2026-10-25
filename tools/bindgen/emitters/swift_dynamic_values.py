@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 
+from ..semantic import required_callbacks
 from .swift import TEXT_ENCODINGS, camel, doc, identifier
 
 
@@ -31,7 +32,7 @@ def public(values, value):
 
 def encode_throws(value):
     if value.kind == "buffer":
-        return False
+        return value.length == "nul"
     if value.kind == "reference":
         return encode_throws(value.element)
     if value.kind == "array":
@@ -60,10 +61,13 @@ def encode(values, value, source):
             if value.kind == "array"
             or value.kind == "buffer"
             and value.buffer_form != "view"
+            and value.length != "nul"
             else "map"
         )
         return f"{'try ' if encode_throws(value) else ''}{source}.{method} {{ {converted} }}{fallback}"
     if value.kind == "buffer":
+        if value.length == "nul":
+            return f"try arena.cString({source})"
         if value.buffer_form != "view":
             pointee = (
                 "CChar"
@@ -101,8 +105,24 @@ def encode(values, value, source):
     )
 
 
-def zero(value, typ):
-    """The initial value of a field of a record without a native default."""
+def field_type(values, field):
+    """The public type of a record's member, optional when a mask marks it."""
+    typ = values.public(field.value)
+    if field.presence and field.presence.mask and not typ.endswith("?"):
+        typ += "?"
+    return typ
+
+
+def field_zero(values, field, typ=None):
+    """The zero value that a member defaults to, or None when a caller must
+    give it."""
+    if field.required:
+        return None
+    return zero(values, field.value, typ or field_type(values, field))
+
+
+def zero(values, value, typ):
+    """The zero value of a type, or None when it has none."""
     if typ.endswith("?"):
         return "nil"
     if typ == "String":
@@ -119,7 +139,20 @@ def zero(value, typ):
         return ".init(rawValue: 0)"
     if value.kind == "native_pointer":
         return ".null"
-    return ".default"
+    if value.kind == "union":
+        return union_default(values, value)
+    if value.kind == "record":
+        if value.union_member:
+            return union_default(values, value.union_member.value)
+        if value.registration and required_callbacks(value):
+            return None
+        defaultable = all(
+            field_zero(values, field) is not None
+            for field in value.fields
+            if field.public
+        )
+        return ".init()" if defaultable else None
+    return None
 
 
 def decode(values, value, source, context="raw"):
@@ -143,6 +176,8 @@ def decode(values, value, source, context="raw"):
         )
         return f"{absent} ? nil : {converted}"
     if value.kind == "buffer":
+        if value.length == "nul":
+            return f"try NativeString.copyCString({source})"
         copier = "copyUTF8" if value.encoding in TEXT_ENCODINGS else "copyData"
         if value.buffer_form != "view":
             count = (
@@ -251,13 +286,7 @@ def declaration(values, value):
         if f.value.kind == "union":
             union = f.value
             union_type = values.public(union)
-            default = (
-                f"{typ}.default.{local}"
-                if value.default
-                else ".default"
-                if union_default(values, union)
-                else None
-            )
+            default = field_zero(values, f, union_type)
             fields.append(
                 f"{doc(values.bound, f'{value.native}.{f.name}', '  ')}  public var {local}: {union_type}"
             )
@@ -271,22 +300,12 @@ def declaration(values, value):
                 f'    guard self.{local}.count == {f.value.length} else {{ throw MaplibreError.invalidArgument("incorrect fixed array length") }}'
             )
         optional = f.presence and f.presence.mask
-        field_type = values.public(f.value) + ("?" if optional else "")
-        default = (
-            None
-            if f.value.union_member
-            and not field_type.endswith("?")
-            and not union_default(values, f.value.union_member.value)
-            else zero(f.value, field_type)
-        )
+        member_type = values.public(f.value) + ("?" if optional else "")
+        default = field_zero(values, f, member_type)
         fields.append(
-            f"{doc(values.bound, f'{value.native}.{f.name}', '  ')}  public var {local}: {field_type}"
+            f"{doc(values.bound, f'{value.native}.{f.name}', '  ')}  public var {local}: {member_type}"
         )
-        args.append(
-            f"{local}: {field_type} = {typ}.default.{local}"
-            if value.default
-            else f"{local}: {field_type}" + (f" = {default}" if default else "")
-        )
+        args.append(f"{local}: {member_type}" + (f" = {default}" if default else ""))
         init.append(f"    self.{local} = {local}")
         capture = decode(values, f.value, raw)
         if optional:
@@ -303,18 +322,9 @@ def declaration(values, value):
                 f"    {raw} = {encode(values, f.value, 'self.' + local)}"
             )
             decode_lines.append(f"    self.{local} = {capture}")
-    initial = f"{value.default}()" if value.default else f"{value.native}()"
-    # A record with a required member has no zero value to default to.
-    default_member = (
-        f"  public static var `default`: Self {{ try! Self(raw: nativeDefault({value.default})) }}"
-        if value.default
-        else "  public static var `default`: Self { Self() }"
-        if all("=" in arg for arg in args)
-        else ""
-    )
     encoder = (
         f"""  func nativeValue(arena: NativeInputArena) throws -> {value.native} {{
-    var raw = {initial}
+    var raw = {value.native}()
 {chr(10).join(encode_lines)}
     return raw
   }}
@@ -324,7 +334,6 @@ def declaration(values, value):
     )
     rendered = f"""{doc(values.bound, value.native)}public struct {typ}: {conformances} {{
 {chr(10).join(fields)}
-{default_member}
   public init({", ".join(args)}) {{
 {chr(10).join(init)}
   }}
@@ -346,7 +355,7 @@ def union_default(values, union):
 
 
 def union_cases(values, union):
-    """The cases of a union's enum and its default."""
+    """The cases of a union's enum."""
     lines = [
         f"{doc(values.bound, f'{union.native}.{field.name}', '  ')}  case {identifier(camel(field.name))}({values.public(field.value)})"
         for field in union.fields
@@ -356,9 +365,6 @@ def union_cases(values, union):
     # Only a union that native returns can hold a tag this binding does not know.
     if union.native in values.bound.returned:
         lines.append("  case unknown(UInt32, Data)")
-    default = union_default(values, union)
-    if default:
-        lines.append(f"  public static var `default`: Self {{ {default} }}")
     return "".join(line + "\n" for line in lines)
 
 
@@ -391,10 +397,9 @@ def union_record(values, value):
         for f in value.fields
         if f.role == "size"
     )
-    initial = f"{value.default}()" if value.default else f"{value.native}()"
     encoder = (
         f"""  func nativeValue(arena: NativeInputArena) throws -> {value.native} {{
-    var raw = {initial}
+    var raw = {value.native}()
 {size}{union_encode(values, value, field, "self")}
     return raw
   }}

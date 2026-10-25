@@ -47,13 +47,15 @@ final class _Recorder {
   void close() => _callable.close();
 }
 
-RenderSessionAttachOptions _options({Wake? frameWake, QueueLock? queueLock}) =>
-    RenderSessionAttachOptions(
-      driver: RenderDriverKind.coreWorker,
-      requestedTextureRingDepth: 1,
-      frameWake: frameWake,
-      queueLock: queueLock,
-    );
+RenderSessionAttachOptions _options({
+  Wake frameWake = const Wake(),
+  QueueLock? queueLock,
+}) => RenderSessionAttachOptions(
+  driver: RenderDriverKind.coreWorker,
+  requestedTextureRingDepth: 1,
+  frameWake: frameWake,
+  queueLock: queueLock,
+);
 
 Matcher _throwsStatus(Status status) => throwsA(
   isA<MaplibreException>().having((error) => error.status, 'status', status),

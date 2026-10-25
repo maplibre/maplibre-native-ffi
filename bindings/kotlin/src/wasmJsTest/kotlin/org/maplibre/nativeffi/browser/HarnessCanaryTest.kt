@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.fail
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.RuntimeOptions
 import org.maplibre.nativeffi.runSuspendTest
 
 /**
@@ -14,7 +15,7 @@ import org.maplibre.nativeffi.runSuspendTest
 class HarnessCanaryTest {
   @Test
   fun aFailureAfterANativeRoundTripFailsTheRun() = runSuspendTest {
-    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    val runtime = GeneratedApi.runtimeCreate(RuntimeOptions())
     runtime.release().awaitWithin("the runtime release")
     fail("HarnessCanaryTest fails on purpose")
   }

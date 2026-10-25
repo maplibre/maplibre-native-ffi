@@ -15,14 +15,10 @@ public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
   public var context: MetalContextDescriptor
   /// `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required.
   public var layer: NativePointer
-  public static var `default`: Self {
-    Self(raw: nativeDefault(mln_metal_surface_descriptor_default))
-  }
-
   public init(
-    extent: LogicalExtent = MetalSurfaceDescriptor.default.extent,
-    context: MetalContextDescriptor = MetalSurfaceDescriptor.default.context,
-    layer: NativePointer = MetalSurfaceDescriptor.default.layer
+    extent: LogicalExtent,
+    context: MetalContextDescriptor = .init(),
+    layer: NativePointer
   ) {
     self.extent = extent
     self.context = context
@@ -36,7 +32,8 @@ public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_metal_surface_descriptor {
-    var raw = mln_metal_surface_descriptor_default()
+    var raw = mln_metal_surface_descriptor()
+    raw.size = UInt32(MemoryLayout<mln_metal_surface_descriptor>.size)
     raw.extent = extent.nativeValue()
     raw.context = context.nativeValue()
     raw.layer = layer.unsafeMutableRawPointer
@@ -58,14 +55,10 @@ public struct OpenglSurfaceDescriptor: Equatable, Hashable, Sendable {
   /// EGL, both required. Null for WebGL, whose context carries its canvas
   /// binding.
   public var surface: NativePointer
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_opengl_surface_descriptor_default))
-  }
-
   public init(
-    extent: LogicalExtent = OpenglSurfaceDescriptor.default.extent,
-    context: OpenglContextDescriptor = OpenglSurfaceDescriptor.default.context,
-    surface: NativePointer = OpenglSurfaceDescriptor.default.surface
+    extent: LogicalExtent,
+    context: OpenglContextDescriptor,
+    surface: NativePointer = .null
   ) {
     self.extent = extent
     self.context = context
@@ -87,7 +80,7 @@ public struct OpenglSurfaceDescriptor: Equatable, Hashable, Sendable {
   func nativeValue(arena: NativeInputArena) throws
     -> mln_opengl_surface_descriptor
   {
-    var raw = mln_opengl_surface_descriptor_default()
+    var raw = mln_opengl_surface_descriptor()
     raw.size = UInt32(MemoryLayout<mln_opengl_surface_descriptor>.size)
     raw.extent = extent.nativeValue()
     raw.context = try context.nativeValue(arena: arena)
@@ -110,14 +103,10 @@ public struct VulkanSurfaceDescriptor: Equatable, Hashable, Sendable {
   public var context: VulkanContextDescriptor
   /// Borrowed VkSurfaceKHR bit pattern. Required.
   public var surface: UInt64
-  public static var `default`: Self {
-    Self(raw: nativeDefault(mln_vulkan_surface_descriptor_default))
-  }
-
   public init(
-    extent: LogicalExtent = VulkanSurfaceDescriptor.default.extent,
-    context: VulkanContextDescriptor = VulkanSurfaceDescriptor.default.context,
-    surface: UInt64 = VulkanSurfaceDescriptor.default.surface
+    extent: LogicalExtent,
+    context: VulkanContextDescriptor,
+    surface: UInt64
   ) {
     self.extent = extent
     self.context = context
@@ -131,7 +120,8 @@ public struct VulkanSurfaceDescriptor: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_vulkan_surface_descriptor {
-    var raw = mln_vulkan_surface_descriptor_default()
+    var raw = mln_vulkan_surface_descriptor()
+    raw.size = UInt32(MemoryLayout<mln_vulkan_surface_descriptor>.size)
     raw.extent = extent.nativeValue()
     raw.context = context.nativeValue()
     raw.surface = surface

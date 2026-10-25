@@ -49,7 +49,7 @@ pub const MetalRenderTarget = union(types.RenderTargetMode) {
     /// worker, which renders on its own thread.
     pub fn attach(self: *MetalRenderTarget, map: *maplibre.Map, viewport: types.Viewport) !void {
         switch (self.*) {
-            inline else => |*backend| try backend.attach(map, viewport, try render_target.attachOptions(self.*, .core_worker)),
+            inline else => |*backend| try backend.attach(map, viewport, render_target.attachOptions(self.*, .core_worker)),
         }
     }
 

@@ -9,16 +9,26 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_opengl_context_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Ownership">
-/// Whether the session shares its driver thread and graphics objects with the
-/// host. A private EGL or WGL owned texture and a transferred WebGL canvas are
-/// dedicated to their core worker.
-/// </param>
-public readonly partial record struct OpenglContextDescriptor(
-    OpenglContextOwnership Ownership,
-    OpenglContextDescriptor.DataValue Data
-)
+public readonly partial record struct OpenglContextDescriptor
 {
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public OpenglContextDescriptor(
+        OpenglContextOwnership Ownership,
+        OpenglContextDescriptor.DataValue Data
+    )
+    {
+        this.Ownership = Ownership;
+        this.Data = Data;
+    }
+
+    /// <summary>
+    /// Whether the session shares its driver thread and graphics objects with
+    /// the host. A private EGL or WGL owned texture and a transferred WebGL
+    /// canvas are dedicated to their core worker.
+    /// </summary>
+    public OpenglContextOwnership Ownership { get; init; }
+    public required OpenglContextDescriptor.DataValue Data { get; init; }
+
     public abstract record DataValue
     {
         private DataValue() { }
@@ -28,30 +38,5 @@ public readonly partial record struct OpenglContextDescriptor(
         public sealed record Egl(EglContextDescriptor Value) : DataValue;
 
         public sealed record Webgl(WebglContextDescriptor Value) : DataValue;
-
-        public sealed record Unknown : DataValue
-        {
-            private readonly byte[] bytes;
-            public uint Tag { get; }
-            public byte[] PayloadBytes => (byte[])bytes.Clone();
-
-            public Unknown(uint tag, byte[] payloadBytes)
-            {
-                Tag = tag;
-                bytes = (byte[])payloadBytes.Clone();
-            }
-
-            public bool Equals(Unknown? other) =>
-                other is not null && Tag == other.Tag && bytes.AsSpan().SequenceEqual(other.bytes);
-
-            public override int GetHashCode()
-            {
-                var hash = new HashCode();
-                hash.Add(Tag);
-                foreach (var value in bytes)
-                    hash.Add(value);
-                return hash.ToHashCode();
-            }
-        }
     }
 }

@@ -9,35 +9,62 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_vulkan_context_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Instance">
-/// Borrowed VkInstance. Required.
-/// </param>
-/// <param name="PhysicalDevice">
-/// Borrowed VkPhysicalDevice. Required.
-/// </param>
-/// <param name="Device">
-/// Borrowed VkDevice. Required.
-/// </param>
-/// <param name="GraphicsQueue">
-/// Borrowed graphics VkQueue. Required. The session's driver submits to it from
-/// its own thread, so a host that uses the same queue passes
-/// <c>mln_render_session_attach_options.queue_lock</c> at attach.
-/// </param>
-/// <param name="GraphicsQueueFamilyIndex">
-/// Queue family index for graphics_queue. Must support graphics commands.
-/// </param>
-/// <param name="GetInstanceProcAddr">
-/// PFN_vkGetInstanceProcAddr for the loader that created the instance.
-/// </param>
-/// <param name="GetDeviceProcAddr">
-/// PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device.
-/// </param>
-public readonly partial record struct VulkanContextDescriptor(
-    NativePointer Instance,
-    NativePointer PhysicalDevice,
-    NativePointer Device,
-    NativePointer GraphicsQueue,
-    uint GraphicsQueueFamilyIndex,
-    NativePointer GetInstanceProcAddr,
-    NativePointer GetDeviceProcAddr
-);
+public readonly partial record struct VulkanContextDescriptor
+{
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public VulkanContextDescriptor(
+        NativePointer Instance,
+        NativePointer PhysicalDevice,
+        NativePointer Device,
+        NativePointer GraphicsQueue,
+        uint GraphicsQueueFamilyIndex,
+        NativePointer GetInstanceProcAddr,
+        NativePointer GetDeviceProcAddr
+    )
+    {
+        this.Instance = Instance;
+        this.PhysicalDevice = PhysicalDevice;
+        this.Device = Device;
+        this.GraphicsQueue = GraphicsQueue;
+        this.GraphicsQueueFamilyIndex = GraphicsQueueFamilyIndex;
+        this.GetInstanceProcAddr = GetInstanceProcAddr;
+        this.GetDeviceProcAddr = GetDeviceProcAddr;
+    }
+
+    /// <summary>
+    /// Borrowed VkInstance. Required.
+    /// </summary>
+    public required NativePointer Instance { get; init; }
+
+    /// <summary>
+    /// Borrowed VkPhysicalDevice. Required.
+    /// </summary>
+    public required NativePointer PhysicalDevice { get; init; }
+
+    /// <summary>
+    /// Borrowed VkDevice. Required.
+    /// </summary>
+    public required NativePointer Device { get; init; }
+
+    /// <summary>
+    /// Borrowed graphics VkQueue. Required. The session's driver submits to it
+    /// from its own thread, so a host that uses the same queue passes
+    /// <c>mln_render_session_attach_options.queue_lock</c> at attach.
+    /// </summary>
+    public required NativePointer GraphicsQueue { get; init; }
+
+    /// <summary>
+    /// Queue family index for graphics_queue. Must support graphics commands.
+    /// </summary>
+    public uint GraphicsQueueFamilyIndex { get; init; }
+
+    /// <summary>
+    /// PFN_vkGetInstanceProcAddr for the loader that created the instance.
+    /// </summary>
+    public NativePointer GetInstanceProcAddr { get; init; }
+
+    /// <summary>
+    /// PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device.
+    /// </summary>
+    public NativePointer GetDeviceProcAddr { get; init; }
+}

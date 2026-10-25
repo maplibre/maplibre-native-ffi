@@ -26,7 +26,7 @@ _Unreachable _unreachable(RuntimeHandle runtime) {
 }
 
 Future<_Unreachable> _unreachableRuntimeWithEvents() async {
-  final runtime = runtimeCreate(runtimeOptionsDefault());
+  final runtime = runtimeCreate(RuntimeOptions());
   await runtime.setEventHandler((_) {
     runtime.id;
   });
@@ -34,7 +34,7 @@ Future<_Unreachable> _unreachableRuntimeWithEvents() async {
 }
 
 Future<_Unreachable> _unreachableRuntimeWithProvider() async {
-  final runtime = runtimeCreate(runtimeOptionsDefault());
+  final runtime = runtimeCreate(RuntimeOptions());
   await runtime.setResourceProvider(
     routedProvider([styleRoute('capture://style')], (_, request) {
       runtime.id;
@@ -47,7 +47,7 @@ Future<_Unreachable> _unreachableRuntimeWithProvider() async {
 /// Creates a runtime and a map on it, and keeps only the map.
 Future<(MapHandle, WeakReference<RuntimeHandle>)>
 _mapWithoutItsRuntime() async {
-  final runtime = runtimeCreate(runtimeOptionsDefault());
+  final runtime = runtimeCreate(RuntimeOptions());
   final NewMap(:map, :ready) = runtime.createMap(testMapOptions());
   await within(ready, 'map creation');
   return (map, WeakReference(runtime));
@@ -55,7 +55,7 @@ _mapWithoutItsRuntime() async {
 
 /// Creates a runtime and keeps only its identity and a weak reference to it.
 _Unreachable _abandonedRuntime() =>
-    _unreachable(runtimeCreate(runtimeOptionsDefault()));
+    _unreachable(runtimeCreate(RuntimeOptions()));
 
 /// Whether native still knows [runtime], asked through the raw C API, which
 /// is the only way to name a runtime that no owner holds.
@@ -135,7 +135,7 @@ void main() {
   test('a map keeps its runtime reachable', () async {
     final (map, runtime) = await _mapWithoutItsRuntime();
     // The same collections reclaim a runtime that nothing keeps.
-    final control = WeakReference(runtimeCreate(runtimeOptionsDefault()));
+    final control = WeakReference(runtimeCreate(RuntimeOptions()));
     await collectGarbageUntil(
       () => control.target == null,
       'a runtime without a map',

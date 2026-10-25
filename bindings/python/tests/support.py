@@ -135,7 +135,7 @@ class Harness:
         self.routes: dict[str, Route] = {}
         self._pending: list[mln.RuntimeEvent] = []
         self._maps: list[mln.MapHandle] = []
-        self.runtime = mln.runtime_create(mln.RuntimeOptions.default())
+        self.runtime = mln.runtime_create(mln.RuntimeOptions())
         # Both commands run before the runtime creates a map, so its first
         # events and requests reach them without waiting for completion.
         self.runtime.discarding.set_event_handler(

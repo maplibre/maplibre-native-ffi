@@ -2279,9 +2279,6 @@ external int mln_android_init(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<mln_animation_options Function()>()
-external mln_animation_options mln_animation_options_default();
-
 @Native<
   Int32 Function(
     Pointer<Void>,
@@ -2319,31 +2316,8 @@ external int mln_binding_render_session_abandon_at_exit(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<mln_bound_options Function()>()
-external mln_bound_options mln_bound_options_default();
-
 @Native<Uint32 Function()>()
 external int mln_c_version();
-
-@Native<mln_camera_delta Function()>()
-external mln_camera_delta mln_camera_delta_default();
-
-@Native<mln_camera_fit_options Function()>()
-external mln_camera_fit_options mln_camera_fit_options_default();
-
-@Native<mln_camera_options Function()>()
-external mln_camera_options mln_camera_options_default();
-
-@Native<mln_camera_update Function()>()
-external mln_camera_update mln_camera_update_default();
-
-@Native<mln_custom_geometry_source_options Function()>()
-external mln_custom_geometry_source_options
-mln_custom_geometry_source_options_default();
-
-@Native<mln_custom_mvt_vector_source_options Function()>()
-external mln_custom_mvt_vector_source_options
-mln_custom_mvt_vector_source_options_default();
 
 @Native<Void Function(mln_delivery_batch)>()
 external void mln_delivery_batch_release(int batch);
@@ -2386,12 +2360,6 @@ external int mln_delivery_queue_drain(
 @Native<Void Function(mln_delivery_queue)>()
 external void mln_delivery_queue_release(int queue);
 
-@Native<mln_frame_demand Function()>()
-external mln_frame_demand mln_frame_demand_default();
-
-@Native<mln_free_camera_options Function()>()
-external mln_free_camera_options mln_free_camera_options_default();
-
 @Native<
   Int32 Function(
     mln_buffer_view,
@@ -2409,15 +2377,6 @@ external int mln_geojson_source_data_create(
 
 @Native<Void Function(mln_geojson_source_data)>()
 external void mln_geojson_source_data_release(int data);
-
-@Native<mln_geojson_source_options Function()>()
-external mln_geojson_source_options mln_geojson_source_options_default();
-
-@Native<mln_gpu_sync Function()>()
-external mln_gpu_sync mln_gpu_sync_default();
-
-@Native<mln_http_header_rule Function()>()
-external mln_http_header_rule mln_http_header_rule_default();
 
 @Native<
   Int32 Function(
@@ -2461,9 +2420,6 @@ external int mln_log_set_callback(
   Pointer<mln_log_handler> handler,
   Pointer<mln_diagnostic> out_diagnostic,
 );
-
-@Native<mln_logical_extent Function()>()
-external mln_logical_extent mln_logical_extent_default();
 
 @Native<
   Int32 Function(
@@ -3211,9 +3167,6 @@ external int mln_map_move_style_layer(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<mln_map_options Function()>()
-external mln_map_options mln_map_options_default();
-
 @Native<
   Int32 Function(
     Pointer<mln_map_view>,
@@ -3935,9 +3888,6 @@ external int mln_map_set_viewport_options(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<mln_map_tile_options Function()>()
-external mln_map_tile_options mln_map_tile_options_default();
-
 @Native<
   Int32 Function(
     mln_map,
@@ -3953,20 +3903,6 @@ external int mln_map_update_camera(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<mln_map_viewport_options Function()>()
-external mln_map_viewport_options mln_map_viewport_options_default();
-
-@Native<mln_metal_borrowed_texture_descriptor Function()>()
-external mln_metal_borrowed_texture_descriptor
-mln_metal_borrowed_texture_descriptor_default();
-
-@Native<mln_metal_owned_texture_descriptor Function()>()
-external mln_metal_owned_texture_descriptor
-mln_metal_owned_texture_descriptor_default();
-
-@Native<mln_metal_surface_descriptor Function()>()
-external mln_metal_surface_descriptor mln_metal_surface_descriptor_default();
-
 @Native<Int32 Function(Pointer<Uint32>, Pointer<mln_diagnostic>)>()
 external int mln_network_get_status(
   Pointer<Uint32> out_status,
@@ -3979,25 +3915,11 @@ external int mln_network_set_status(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<mln_opengl_borrowed_texture_descriptor Function()>()
-external mln_opengl_borrowed_texture_descriptor
-mln_opengl_borrowed_texture_descriptor_default();
-
-@Native<mln_opengl_owned_texture_descriptor Function()>()
-external mln_opengl_owned_texture_descriptor
-mln_opengl_owned_texture_descriptor_default();
-
 @Native<Uint32 Function()>()
 external int mln_opengl_supported_context_provider_mask();
 
-@Native<mln_opengl_surface_descriptor Function()>()
-external mln_opengl_surface_descriptor mln_opengl_surface_descriptor_default();
-
 @Native<Pointer<Void> Function()>()
 external Pointer<Void> mln_plugin_get_register_function_v1();
-
-@Native<mln_premultiplied_rgba8_image Function()>()
-external mln_premultiplied_rgba8_image mln_premultiplied_rgba8_image_default();
 
 @Native<
   Int32 Function(
@@ -4011,9 +3933,6 @@ external int mln_projected_meters_for_lat_lng(
   Pointer<mln_projected_meters> out_meters,
   Pointer<mln_diagnostic> out_diagnostic,
 );
-
-@Native<mln_projection_mode Function()>()
-external mln_projection_mode mln_projection_mode_default();
 
 @Native<Void Function(mln_render_frame_batch)>()
 external void mln_render_frame_batch_release(int batch);
@@ -4043,10 +3962,6 @@ external int mln_render_session_acquire_frame(
   Pointer<mln_acquired_frame> out_frame,
   Pointer<mln_diagnostic> out_diagnostic,
 );
-
-@Native<mln_render_session_attach_options Function()>()
-external mln_render_session_attach_options
-mln_render_session_attach_options_default();
 
 @Native<
   Int32 Function(
@@ -4361,10 +4276,6 @@ external int mln_render_session_set_vulkan_surface_target(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<mln_rendered_feature_query_options Function()>()
-external mln_rendered_feature_query_options
-mln_rendered_feature_query_options_default();
-
 @Native<
   Int32 Function(
     mln_resource_request,
@@ -4410,9 +4321,6 @@ external int mln_resource_request_set_cancel_callback(
   Pointer<Bool> out_cancelled,
   Pointer<mln_diagnostic> out_diagnostic,
 );
-
-@Native<mln_resource_route Function()>()
-external mln_resource_route mln_resource_route_default();
 
 @Native<
   Int32 Function(
@@ -4612,9 +4520,6 @@ external int mln_runtime_merge_offline_regions(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<mln_runtime_options Function()>()
-external mln_runtime_options mln_runtime_options_default();
-
 @Native<
   Int32 Function(mln_runtime, Pointer<mln_completion>, Pointer<mln_diagnostic>)
 >()
@@ -4774,10 +4679,6 @@ external int mln_runtime_update_offline_region_metadata(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<mln_source_feature_query_options Function()>()
-external mln_source_feature_query_options
-mln_source_feature_query_options_default();
-
 @Native<
   Int32 Function(
     mln_buffer_view,
@@ -4825,31 +4726,8 @@ external int mln_style_expression_get_info(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<mln_style_expression_inputs Function()>()
-external mln_style_expression_inputs mln_style_expression_inputs_default();
-
-@Native<mln_style_expression_options Function()>()
-external mln_style_expression_options mln_style_expression_options_default();
-
 @Native<Void Function(mln_style_expression)>()
 external void mln_style_expression_release(int expression);
 
-@Native<mln_style_image_options Function()>()
-external mln_style_image_options mln_style_image_options_default();
-
-@Native<mln_style_transition_options Function()>()
-external mln_style_transition_options mln_style_transition_options_default();
-
 @Native<Uint32 Function()>()
 external int mln_supported_render_backend_mask();
-
-@Native<mln_vulkan_borrowed_texture_descriptor Function()>()
-external mln_vulkan_borrowed_texture_descriptor
-mln_vulkan_borrowed_texture_descriptor_default();
-
-@Native<mln_vulkan_owned_texture_descriptor Function()>()
-external mln_vulkan_owned_texture_descriptor
-mln_vulkan_owned_texture_descriptor_default();
-
-@Native<mln_vulkan_surface_descriptor Function()>()
-external mln_vulkan_surface_descriptor mln_vulkan_surface_descriptor_default();

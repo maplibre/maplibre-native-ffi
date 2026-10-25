@@ -296,7 +296,7 @@ static void host_demands_and_a_still_image_demand_never_replace_each_other(
   MLN_TEST_OK(mln_map_request_still_image(held.map, &still.descriptor, NULL));
   render_until_tile_requested(&fixture, &held);
 
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_PRESENT | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE;
   MLN_TEST_STATUS(

@@ -172,7 +172,7 @@ function attachOwnedTexture(
  */
 export function attachSession(
   map: MapHandle,
-  options: RenderSessionAttachOptions,
+  options: Partial<RenderSessionAttachOptions>,
 ): NewRenderSession {
   const attachment = attachOwnedTexture(openGraphics(), map, {
     driver: RenderDriverKind.coreWorker,
@@ -190,7 +190,7 @@ export function attachSession(
  */
 export function attachSessionOverOwnGraphics(
   map: MapHandle,
-  options: RenderSessionAttachOptions = {},
+  options: Partial<RenderSessionAttachOptions> = {},
 ): NewRenderSession & { readonly destroyGraphics: () => void } {
   const context = addon.create(backends[backend]);
   let destroyed = false;

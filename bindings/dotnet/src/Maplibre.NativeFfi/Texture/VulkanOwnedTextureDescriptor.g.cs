@@ -9,32 +9,23 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_vulkan_owned_texture_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Extent">
-/// Logical texture extent. Required. A scale_factor that differs from the map's
-/// is accepted and logged as a warning.
-/// </param>
-/// <param name="Context">
-/// Borrowed Vulkan context. All handles are required.
-/// </param>
-public readonly partial record struct VulkanOwnedTextureDescriptor(
-    LogicalExtent Extent,
-    VulkanContextDescriptor Context
-)
+public readonly partial record struct VulkanOwnedTextureDescriptor
 {
-    public VulkanOwnedTextureDescriptor()
-        : this(default!, default!)
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public VulkanOwnedTextureDescriptor(LogicalExtent Extent, VulkanContextDescriptor Context)
     {
-        this = Default;
+        this.Extent = Extent;
+        this.Context = Context;
     }
 
-    public static VulkanOwnedTextureDescriptor Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyVulkanOwnedTextureDescriptor(
-                NativeMethods.mln_vulkan_owned_texture_descriptor_default()
-            );
-        }
-    }
+    /// <summary>
+    /// Logical texture extent. Required. A scale_factor that differs from the
+    /// map's is accepted and logged as a warning.
+    /// </summary>
+    public required LogicalExtent Extent { get; init; }
+
+    /// <summary>
+    /// Borrowed Vulkan context. All handles are required.
+    /// </summary>
+    public required VulkanContextDescriptor Context { get; init; }
 }

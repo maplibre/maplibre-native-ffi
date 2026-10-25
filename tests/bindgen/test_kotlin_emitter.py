@@ -308,6 +308,21 @@ class KotlinLayoutTests(unittest.TestCase):
             ],
         )
 
+    def test_a_required_member_has_no_default_and_others_default_to_zero(self):
+        outputs = kotlin.generate(real_api())
+        values = outputs[f"{GENERATED}/GeneratedValues.kt"]
+        options = values.split("public data class MapOptions(")[1].split("\n)")[0]
+        self.assertIn("public val initialExtent: LogicalExtent,", options)
+        self.assertIn("public val fastPforEnabled: Boolean = false", options)
+        self.assertIn("public val eventMask: RuntimeEventFlag? = null", options)
+        self.assertIn("public val extent: LogicalExtent = LogicalExtent()", values)
+        self.assertNotIn("companion object { internal val default", values)
+        # The ABI version check reads the C version, so reading it skips it.
+        self.assertIn(
+            "fun cVersion(): UInt = nativeUncheckedCall {",
+            outputs[f"{GENERATED}/GeneratedApi.kt"],
+        )
+
     def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
         values = kotlin.generate(real_api())[f"{GENERATED}/GeneratedValues.kt"]
         self.assertIn("public sealed interface RenderedQueryGeometry {", values)

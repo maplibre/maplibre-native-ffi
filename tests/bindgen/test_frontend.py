@@ -142,7 +142,6 @@ typedef enum mln_i32 : sample_i32 { MLN_I32_NEGATIVE = -17 } mln_i32;
     def test_model_is_independent_of_checkout_path(self):
         source = protocol_header("""
 typedef struct mln_options { union { int one; float two; } choice; } mln_options;
-mln_options mln_options_default(void);
 """)
         models = []
         for _ in range(2):

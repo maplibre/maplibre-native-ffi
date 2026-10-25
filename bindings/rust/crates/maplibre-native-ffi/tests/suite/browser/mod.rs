@@ -25,10 +25,11 @@ const EXTENT: LogicalExtent = LogicalExtent::new(32, 16, 1.0);
 /// A fixture whose map matches EXTENT, with the background style loaded and
 /// an update published for the first frame.
 fn styled_fixture() -> Fixture {
-    let fixture = Fixture::with_map_options(MapOptions {
-        initial_extent: LogicalExtent::new(EXTENT.width, EXTENT.height, EXTENT.scale_factor),
-        ..Default::default()
-    });
+    let fixture = Fixture::with_map_options(MapOptions::new(LogicalExtent::new(
+        EXTENT.width,
+        EXTENT.height,
+        EXTENT.scale_factor,
+    )));
     fixture.load_style(BACKGROUND_STYLE_JSON);
     fixture.repaint();
     fixture

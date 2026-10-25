@@ -25,7 +25,6 @@ PLATFORM_LIMITED = """
 typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_release");
 void mln_map_release(mln_map map);
 typedef struct mln_canvas_target { unsigned int size; double scale; } mln_canvas_target;
-mln_canvas_target mln_canvas_target_default(void);
 mln_status mln_map_redraw(mln_map map, mln_diagnostic *out_diagnostic);
 BIND("platforms=ios,macos,tvos")
 mln_status mln_map_use_metal(mln_map map, mln_diagnostic *out_diagnostic);
@@ -62,27 +61,15 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
             ):
                 validate(header)
 
-    def test_a_record_default_serves_wherever_its_record_does(self):
-        with self.assertRaisesRegex(ModelError, "serves wherever its record does"):
-            validate(
-                parse("""typedef struct mln_options { unsigned int size; double scale; } mln_options;
-BIND("platforms=web")
-mln_options mln_options_default(void);
-""")
-            )
-
     def test_a_binding_leaves_out_what_none_of_its_targets_serve(self):
         bound = compile_api(api(), frozenset({"linux", "macos"}))
         self.assertNotIn("mln_map_attach_canvas", bound.operations_by_name)
         self.assertNotIn("mln_android_start", bound.operations_by_name)
-        # The record that only the browser-only function took leaves with it,
-        # and so does its default.
+        # The record that only the browser-only function took leaves with it.
         self.assertNotIn("mln_canvas_target", bound.values)
-        self.assertNotIn("mln_canvas_target_default", bound.operations_by_name)
         self.assertIn("mln_map_use_metal", bound.operations_by_name)
         browser = compile_api(api(), frozenset({"web"}))
         self.assertIn("mln_canvas_target", browser.values)
-        self.assertIn("mln_canvas_target_default", browser.operations_by_name)
 
     def test_a_binding_that_cannot_select_a_platform_drops_only_what_none_serve(
         self,

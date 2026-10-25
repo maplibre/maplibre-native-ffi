@@ -78,13 +78,15 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   const uint8_t packed[16] = {
     255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 128, 128, 128, 255,
   };
-  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
+  mln_premultiplied_rgba8_image image = {
+    .size = sizeof(mln_premultiplied_rgba8_image)
+  };
   image.width = 2;
   image.height = 2;
   image.stride = 12;
   image.pixels = padded;
   image.byte_length = sizeof(padded);
-  mln_style_image_options options = mln_style_image_options_default();
+  mln_style_image_options options = {.size = sizeof(mln_style_image_options)};
   options.fields = MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO |
                    MLN_STYLE_IMAGE_OPTION_SDF | MLN_STYLE_IMAGE_OPTION_CONTENT |
                    MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH |
@@ -138,7 +140,7 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   TEST_ASSERT_EQUAL_UINT32(0, info->text_fit_width);
   TEST_ASSERT_EQUAL_UINT32(0, info->text_fit_height);
 
-  options = mln_style_image_options_default();
+  options = (mln_style_image_options){.size = sizeof(mln_style_image_options)};
   options.fields = MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
   options.text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
   set_image(map, "label", &image, &options);
@@ -150,7 +152,7 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
 
   const mln_image_stretch stretch_x = {.from = 0.0f, .to = 1.0f};
   const mln_image_stretch stretch_y = {.from = 0.5f, .to = 2.0f};
-  options = mln_style_image_options_default();
+  options = (mln_style_image_options){.size = sizeof(mln_style_image_options)};
   options.fields =
     MLN_STYLE_IMAGE_OPTION_STRETCH_X | MLN_STYLE_IMAGE_OPTION_STRETCH_Y;
   options.stretch_x = &stretch_x;
@@ -174,14 +176,16 @@ static void style_image_inputs_are_validated_at_submission(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   const uint8_t pixel[4] = {0, 0, 0, 0};
-  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
+  mln_premultiplied_rgba8_image image = {
+    .size = sizeof(mln_premultiplied_rgba8_image)
+  };
   image.width = 1;
   image.height = 1;
   image.stride = 4;
   image.pixels = pixel;
   image.byte_length = sizeof(pixel);
   const mln_image_stretch backwards = {2.0f, 1.0f};
-  mln_style_image_options options = mln_style_image_options_default();
+  mln_style_image_options options = {.size = sizeof(mln_style_image_options)};
   options.fields = MLN_STYLE_IMAGE_OPTION_STRETCH_X;
   options.stretch_x = &backwards;
   options.stretch_x_count = 1;

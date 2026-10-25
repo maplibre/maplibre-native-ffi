@@ -1650,9 +1650,9 @@ pub const AnimationOptions = struct {
     /// `mln_map_cancel_camera_transition()` matches.
     transition_id: ?u64 = null,
     /// Reports the end of the command's transitions. Disabled by default.
-    end_handler: CameraTransitionHandler,
+    end_handler: CameraTransitionHandler = .{},
     pub fn toNative(self: AnimationOptions, roots: *callbacks.Roots) status.Error!c.mln_animation_options {
-        var raw = c.mln_animation_options_default();
+        var raw = std.mem.zeroes(c.mln_animation_options);
         raw.fields = 0;
         marshal.present(&raw.fields, c.MLN_ANIMATION_OPTION_DURATION, &raw.duration_ms, self.duration_ms);
         marshal.present(&raw.fields, c.MLN_ANIMATION_OPTION_VELOCITY, &raw.velocity, self.velocity);
@@ -1694,9 +1694,10 @@ pub const BoundOptions = struct {
     min_pitch: ?f64 = null,
     max_pitch: ?f64 = null,
     pub fn toNative(self: BoundOptions) c.mln_bound_options {
-        var raw = c.mln_bound_options_default();
+        var raw = std.mem.zeroes(c.mln_bound_options);
         raw.fields = 0;
         if (self.unbounded) raw.fields |= c.MLN_BOUND_OPTION_UNBOUNDED;
+        raw.size = @sizeOf(c.mln_bound_options);
         marshal.present(&raw.fields, c.MLN_BOUND_OPTION_BOUNDS, &raw.bounds, self.bounds);
         marshal.present(&raw.fields, c.MLN_BOUND_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
         marshal.present(&raw.fields, c.MLN_BOUND_OPTION_MAX_ZOOM, &raw.max_zoom, self.max_zoom);
@@ -1785,10 +1786,10 @@ pub const CameraDelta = struct {
     /// Screen point in logical map pixels that scale, bearing, and pitch keep
     /// fixed.
     anchor: ?ScreenPoint = null,
-    animation: AnimationOptions,
-    gesture_phase: GesturePhase,
+    animation: AnimationOptions = .{},
+    gesture_phase: GesturePhase = .none,
     pub fn toNative(self: CameraDelta, roots: *callbacks.Roots) status.Error!c.mln_camera_delta {
-        var raw = c.mln_camera_delta_default();
+        var raw = std.mem.zeroes(c.mln_camera_delta);
         raw.fields = 0;
         raw.size = @sizeOf(c.mln_camera_delta);
         marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_OFFSET, &raw.offset, self.offset);
@@ -1823,8 +1824,9 @@ pub const CameraFitOptions = struct {
     bearing: ?f64 = null,
     pitch: ?f64 = null,
     pub fn toNative(self: CameraFitOptions) c.mln_camera_fit_options {
-        var raw = c.mln_camera_fit_options_default();
+        var raw = std.mem.zeroes(c.mln_camera_fit_options);
         raw.fields = 0;
+        raw.size = @sizeOf(c.mln_camera_fit_options);
         marshal.present(&raw.fields, c.MLN_CAMERA_FIT_OPTION_PADDING, &raw.padding, self.padding);
         marshal.present(&raw.fields, c.MLN_CAMERA_FIT_OPTION_BEARING, &raw.bearing, self.bearing);
         marshal.present(&raw.fields, c.MLN_CAMERA_FIT_OPTION_PITCH, &raw.pitch, self.pitch);
@@ -1855,8 +1857,9 @@ pub const CameraOptions = struct {
     roll: ?f64 = null,
     field_of_view: ?f64 = null,
     pub fn toNative(self: CameraOptions) c.mln_camera_options {
-        var raw = c.mln_camera_options_default();
+        var raw = std.mem.zeroes(c.mln_camera_options);
         raw.fields = 0;
+        raw.size = @sizeOf(c.mln_camera_options);
         marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_CENTER, &raw.center, self.center);
         marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_CENTER_ALTITUDE, &raw.center_altitude, self.center_altitude);
         marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_PADDING, &raw.padding, self.padding);
@@ -1998,12 +2001,12 @@ pub const CameraTransitionOutcome = enum(u32) {
 /// See `mln_camera_update` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const CameraUpdate = struct {
-    mode: CameraUpdateMode,
-    camera: CameraOptions,
-    animation: AnimationOptions,
-    gesture_phase: GesturePhase,
+    mode: CameraUpdateMode = .jump,
+    camera: CameraOptions = .{},
+    animation: AnimationOptions = .{},
+    gesture_phase: GesturePhase = .none,
     pub fn toNative(self: CameraUpdate, roots: *callbacks.Roots) status.Error!c.mln_camera_update {
-        var raw = c.mln_camera_update_default();
+        var raw = std.mem.zeroes(c.mln_camera_update);
         raw.size = @sizeOf(c.mln_camera_update);
         raw.mode = self.mode.toNative();
         raw.camera = self.camera.toNative();
@@ -2091,7 +2094,7 @@ pub const CustomGeometrySourceOptions = struct {
     clip: ?bool = null,
     wrap: ?bool = null,
     pub fn toNative(self: CustomGeometrySourceOptions, roots: *callbacks.Roots) status.Error!c.mln_custom_geometry_source_options {
-        var raw = c.mln_custom_geometry_source_options_default();
+        var raw = std.mem.zeroes(c.mln_custom_geometry_source_options);
         raw.fields = 0;
         raw.size = @sizeOf(c.mln_custom_geometry_source_options);
         marshal.present(&raw.fields, c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
@@ -2161,21 +2164,6 @@ pub const CustomGeometrySourceOptions = struct {
             }.call,
         };
     }
-    fn fromDefault(raw: c.mln_custom_geometry_source_options, fetch_tile: *const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void) CustomGeometrySourceOptions {
-        return .{
-            .context = null,
-            .release_context = null,
-            .fetch_tile = fetch_tile,
-            .cancel_tile = null,
-            .min_zoom = if (raw.fields & c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM != 0) raw.min_zoom else null,
-            .max_zoom = if (raw.fields & c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM != 0) raw.max_zoom else null,
-            .tolerance = if (raw.fields & c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE != 0) raw.tolerance else null,
-            .tile_size = if (raw.fields & c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE != 0) raw.tile_size else null,
-            .buffer = if (raw.fields & c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER != 0) raw.buffer else null,
-            .clip = if (raw.fields & c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP != 0) raw.clip else null,
-            .wrap = if (raw.fields & c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP != 0) raw.wrap else null,
-        };
-    }
 };
 
 /// Options for custom MVT vector sources.
@@ -2190,7 +2178,7 @@ pub const CustomMvtVectorSourceOptions = struct {
     min_zoom: ?f64 = null,
     max_zoom: ?f64 = null,
     pub fn toNative(self: CustomMvtVectorSourceOptions, roots: *callbacks.Roots) status.Error!c.mln_custom_mvt_vector_source_options {
-        var raw = c.mln_custom_mvt_vector_source_options_default();
+        var raw = std.mem.zeroes(c.mln_custom_mvt_vector_source_options);
         raw.fields = 0;
         raw.size = @sizeOf(c.mln_custom_mvt_vector_source_options);
         marshal.present(&raw.fields, c.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
@@ -2255,16 +2243,6 @@ pub const CustomMvtVectorSourceOptions = struct {
             }.call,
         };
     }
-    fn fromDefault(raw: c.mln_custom_mvt_vector_source_options, fetch_tile: *const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void) CustomMvtVectorSourceOptions {
-        return .{
-            .context = null,
-            .release_context = null,
-            .fetch_tile = fetch_tile,
-            .cancel_tile = null,
-            .min_zoom = if (raw.fields & c.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM != 0) raw.min_zoom else null,
-            .max_zoom = if (raw.fields & c.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM != 0) raw.max_zoom else null,
-        };
-    }
 };
 
 /// Screen-space inset in logical map pixels.
@@ -2304,10 +2282,10 @@ pub const EglContextDescriptor = struct {
     /// whole process, so a shared display must stay initialized until every
     /// session using it has detached or been destroyed. The host must not call
     /// eglTerminate per session.
-    display: ?*anyopaque = null,
+    display: ?*anyopaque,
     /// Borrowed EGLConfig used to create the session context. Required. OpenGL
     /// texture targets require EGL_SURFACE_TYPE to include EGL_PBUFFER_BIT.
-    config: ?*anyopaque = null,
+    config: ?*anyopaque,
     /// Borrowed EGLContext whose share group the session context joins.
     /// Required under shared ownership, where the session also takes its client
     /// API from this context. A dedicated session joins no share group, so it
@@ -2345,7 +2323,7 @@ pub const EglContextDescriptor = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const FeatureStateSelector = struct {
     /// Source ID. Required. Borrowed for the duration of the call.
-    source_id: []const u8 = &.{},
+    source_id: []const u8,
     /// Source layer ID, or empty for none. Required for vector-source
     /// disambiguation.
     source_layer_id: []const u8 = &.{},
@@ -2387,12 +2365,13 @@ pub const FeatureStateSelector = struct {
 pub const FrameDemand = struct {
     /// A bitwise OR of `mln_frame_demand_flag` values. Zero renders only when a
     /// newer map update exists, without presenting.
-    flags: FrameDemandFlag,
+    flags: FrameDemandFlag = .{},
     /// Host identity returned with the terminal frame result. Any value except
     /// `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE`, the maximum uint64_t value.
-    token: u64,
+    token: u64 = 0,
     pub fn toNative(self: FrameDemand) c.mln_frame_demand {
-        var raw = c.mln_frame_demand_default();
+        var raw = std.mem.zeroes(c.mln_frame_demand);
+        raw.size = @sizeOf(c.mln_frame_demand);
         raw.flags = self.flags.toNative();
         raw.token = self.token;
         return raw;
@@ -2444,8 +2423,9 @@ pub const FreeCameraOptions = struct {
     position: ?Vec3 = null,
     orientation: ?Quaternion = null,
     pub fn toNative(self: FreeCameraOptions) c.mln_free_camera_options {
-        var raw = c.mln_free_camera_options_default();
+        var raw = std.mem.zeroes(c.mln_free_camera_options);
         raw.fields = 0;
+        raw.size = @sizeOf(c.mln_free_camera_options);
         marshal.present(&raw.fields, c.MLN_FREE_CAMERA_OPTION_POSITION, &raw.position, self.position);
         marshal.present(&raw.fields, c.MLN_FREE_CAMERA_OPTION_ORIENTATION, &raw.orientation, self.orientation);
         return raw;
@@ -2490,7 +2470,7 @@ pub const GeojsonSourceOptions = struct {
     /// Absent selects false.
     synchronous_tiling: ?bool = null,
     pub fn toNative(self: GeojsonSourceOptions) status.Error!c.mln_geojson_source_options {
-        var raw = c.mln_geojson_source_options_default();
+        var raw = std.mem.zeroes(c.mln_geojson_source_options);
         raw.fields = 0;
         raw.size = @sizeOf(c.mln_geojson_source_options);
         marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
@@ -2551,11 +2531,12 @@ pub const GesturePhase = enum(u32) {
 /// See `mln_gpu_sync` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const GpuSync = struct {
-    kind: GpuSyncKind,
+    kind: GpuSyncKind = .cpu_complete,
     /// Bit pattern of the GLsync pointer.
-    handle: u64,
+    handle: u64 = 0,
     pub fn toNative(self: GpuSync) c.mln_gpu_sync {
-        var raw = c.mln_gpu_sync_default();
+        var raw = std.mem.zeroes(c.mln_gpu_sync);
+        raw.size = @sizeOf(c.mln_gpu_sync);
         raw.kind = self.kind.toNative();
         raw.handle = self.handle;
         return raw;
@@ -2591,7 +2572,7 @@ pub const GpuSyncKind = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const HttpHeader = struct {
     /// Header field name. Required.
-    name: []const u8 = &.{},
+    name: []const u8,
     value: []const u8 = &.{},
     pub fn toNative(self: HttpHeader) status.Error!c.mln_http_header {
         var raw = std.mem.zeroes(c.mln_http_header);
@@ -2614,15 +2595,15 @@ pub const HttpHeader = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const HttpHeaderRule = struct {
     /// The resource kinds to match. Zero selects every kind.
-    kinds: ResourceKindFlag,
-    flags: UrlMatchFlag,
+    kinds: ResourceKindFlag = .{},
+    flags: UrlMatchFlag = .{},
     /// The URL or glob pattern to compare.
     url: []const u8 = &.{},
     /// The headers to set. Registration validates each one as
     /// `mln_http_header_transform_response_set_header()` does.
-    headers: []const HttpHeader,
+    headers: []const HttpHeader = &.{},
     pub fn toNative(self: HttpHeaderRule, allocator: std.mem.Allocator) status.Error!c.mln_http_header_rule {
-        var raw = c.mln_http_header_rule_default();
+        var raw = std.mem.zeroes(c.mln_http_header_rule);
         raw.size = @sizeOf(c.mln_http_header_rule);
         raw.kinds = self.kinds.toNative();
         raw.flags = self.flags.toNative();
@@ -2949,13 +2930,13 @@ pub const LogSeverityFlag = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const LogicalExtent = struct {
     /// Width in UI pixels.
-    width: u32,
+    width: u32 = 0,
     /// Height in UI pixels.
-    height: u32,
+    height: u32 = 0,
     /// Device pixels per UI pixel.
-    scale_factor: f64,
+    scale_factor: f64 = 0,
     pub fn toNative(self: LogicalExtent) c.mln_logical_extent {
-        var raw = c.mln_logical_extent_default();
+        var raw = std.mem.zeroes(c.mln_logical_extent);
         raw.width = self.width;
         raw.height = self.height;
         raw.scale_factor = self.scale_factor;
@@ -3014,16 +2995,17 @@ pub const MapOptions = struct {
     /// scale_factor must be finite and positive. scale_factor is fixed for the
     /// map's lifetime.
     initial_extent: LogicalExtent,
-    map_mode: MapMode,
+    map_mode: MapMode = .continuous,
     /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
     /// encodings.
-    fast_pfor_enabled: bool,
+    fast_pfor_enabled: bool = false,
     /// Map-originated event types this map queues, as a bitwise OR of
     /// `mln_runtime_event_flag` values.
     event_mask: ?RuntimeEventFlag = null,
     pub fn toNative(self: MapOptions) c.mln_map_options {
-        var raw = c.mln_map_options_default();
+        var raw = std.mem.zeroes(c.mln_map_options);
         raw.fields = 0;
+        raw.size = @sizeOf(c.mln_map_options);
         raw.initial_extent = self.initial_extent.toNative();
         raw.map_mode = self.map_mode.toNative();
         raw.fast_pfor_enabled = self.fast_pfor_enabled;
@@ -3061,12 +3043,12 @@ pub const MapSnapshot = struct {
     /// snapshot observes, though animations and resource loads finish in later
     /// frames.
     latest_render_update_generation: u64 = 0,
-    tile: MapTileOptions,
-    bounds: BoundOptions,
-    free_camera: FreeCameraOptions,
+    tile: MapTileOptions = .{},
+    bounds: BoundOptions = .{},
+    free_camera: FreeCameraOptions = .{},
     /// The map's camera, extent, projection mode, and viewport options.
     /// `mln_map_projection_create()` converts coordinates for this view.
-    view: MapView,
+    view: MapView = .{},
     pub fn fromNative(raw: c.mln_map_snapshot) MapSnapshot {
         return .{
             .debug_options = MapDebugFlag.fromNative(raw.debug_options),
@@ -3098,8 +3080,9 @@ pub const MapTileOptions = struct {
     lod_zoom_shift: ?f64 = null,
     lod_mode: ?TileLodMode = null,
     pub fn toNative(self: MapTileOptions) c.mln_map_tile_options {
-        var raw = c.mln_map_tile_options_default();
+        var raw = std.mem.zeroes(c.mln_map_tile_options);
         raw.fields = 0;
+        raw.size = @sizeOf(c.mln_map_tile_options);
         marshal.present(&raw.fields, c.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA, &raw.prefetch_zoom_delta, self.prefetch_zoom_delta);
         marshal.present(&raw.fields, c.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS, &raw.lod_min_radius, self.lod_min_radius);
         marshal.present(&raw.fields, c.MLN_MAP_TILE_OPTION_LOD_SCALE, &raw.lod_scale, self.lod_scale);
@@ -3131,12 +3114,12 @@ pub const MapView = struct {
     camera: Camera = .{},
     /// Logical size and device-pixel scale. A snapshot carries the map's scale
     /// factor, and a frame carries the scale factor of the target that drew it.
-    extent: LogicalExtent,
+    extent: LogicalExtent = .{},
     /// Axonometric mode and skew, with every field set.
-    projection_mode: ProjectionMode,
+    projection_mode: ProjectionMode = .{},
     /// North orientation, constrain mode, viewport mode, and frustum offset,
     /// with every field set.
-    viewport: MapViewportOptions,
+    viewport: MapViewportOptions = .{},
     pub fn toNative(self: MapView) c.mln_map_view {
         var raw = std.mem.zeroes(c.mln_map_view);
         raw.size = @sizeOf(c.mln_map_view);
@@ -3166,8 +3149,9 @@ pub const MapViewportOptions = struct {
     viewport_mode: ?ViewportMode = null,
     frustum_offset: ?EdgeInsets = null,
     pub fn toNative(self: MapViewportOptions) c.mln_map_viewport_options {
-        var raw = c.mln_map_viewport_options_default();
+        var raw = std.mem.zeroes(c.mln_map_viewport_options);
         raw.fields = 0;
+        raw.size = @sizeOf(c.mln_map_viewport_options);
         marshal.present(&raw.fields, c.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION, &raw.north_orientation, self.north_orientation);
         marshal.present(&raw.fields, c.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE, &raw.constrain_mode, self.constrain_mode);
         marshal.present(&raw.fields, c.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE, &raw.viewport_mode, self.viewport_mode);
@@ -3190,7 +3174,7 @@ pub const MapViewportOptions = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const MetalBorrowedTexture = struct {
     /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
-    texture: ?*anyopaque = null,
+    texture: ?*anyopaque,
     pub fn toNative(self: MetalBorrowedTexture) c.mln_metal_borrowed_texture {
         var raw = std.mem.zeroes(c.mln_metal_borrowed_texture);
         raw.texture = self.texture;
@@ -3219,7 +3203,7 @@ pub const MetalBorrowedTextureDescriptor = struct {
     /// The ring's textures, one per slot, in slot order. Required.
     textures: []const MetalBorrowedTexture,
     pub fn toNative(self: MetalBorrowedTextureDescriptor, allocator: std.mem.Allocator) status.Error!c.mln_metal_borrowed_texture_descriptor {
-        var raw = c.mln_metal_borrowed_texture_descriptor_default();
+        var raw = std.mem.zeroes(c.mln_metal_borrowed_texture_descriptor);
         raw.size = @sizeOf(c.mln_metal_borrowed_texture_descriptor);
         raw.extent = self.extent.toNative();
         raw.physical_width = self.physical_width;
@@ -3275,13 +3259,14 @@ pub const MetalOwnedTextureDescriptor = struct {
     /// map's is accepted and logged as a warning.
     extent: LogicalExtent,
     /// Metal backend context. device is required.
-    context: MetalContextDescriptor,
+    context: MetalContextDescriptor = .{},
     /// Backend-native MTLPixelFormat value of the ring's textures: either
     /// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
     /// returns RGBA8 for either format.
     pixel_format: u64,
     pub fn toNative(self: MetalOwnedTextureDescriptor) c.mln_metal_owned_texture_descriptor {
-        var raw = c.mln_metal_owned_texture_descriptor_default();
+        var raw = std.mem.zeroes(c.mln_metal_owned_texture_descriptor);
+        raw.size = @sizeOf(c.mln_metal_owned_texture_descriptor);
         raw.extent = self.extent.toNative();
         raw.context = self.context.toNative();
         raw.pixel_format = self.pixel_format;
@@ -3305,11 +3290,12 @@ pub const MetalSurfaceDescriptor = struct {
     /// map's is accepted and logged as a warning.
     extent: LogicalExtent,
     /// Metal backend context. device is optional for Metal surfaces.
-    context: MetalContextDescriptor,
+    context: MetalContextDescriptor = .{},
     /// `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required.
     layer: ?*anyopaque,
     pub fn toNative(self: MetalSurfaceDescriptor) c.mln_metal_surface_descriptor {
-        var raw = c.mln_metal_surface_descriptor_default();
+        var raw = std.mem.zeroes(c.mln_metal_surface_descriptor);
+        raw.size = @sizeOf(c.mln_metal_surface_descriptor);
         raw.extent = self.extent.toNative();
         raw.context = self.context.toNative();
         raw.layer = self.layer;
@@ -3393,7 +3379,7 @@ pub const OfflineGeometryRegionDefinition = struct {
     /// Style URL. Copied during region creation.
     style_url: []const u8 = &.{},
     /// UTF-8 GeoJSON Geometry bytes. Required. Borrowed during region creation.
-    geometry: []const u8 = &.{},
+    geometry: []const u8,
     min_zoom: f64 = 0,
     /// Maximum zoom. Positive infinity lets each tile source use its own
     /// maximum zoom.
@@ -3557,7 +3543,7 @@ pub const OfflineTilePyramidRegionDefinition = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const OpenglBorrowedTexture = struct {
     /// Borrowed OpenGL texture object name. Required.
-    texture: u32 = 0,
+    texture: u32,
     pub fn toNative(self: OpenglBorrowedTexture) c.mln_opengl_borrowed_texture {
         var raw = std.mem.zeroes(c.mln_opengl_borrowed_texture);
         raw.texture = self.texture;
@@ -3591,7 +3577,7 @@ pub const OpenglBorrowedTextureDescriptor = struct {
     /// OpenGL texture target of every texture. Required: GL_TEXTURE_2D.
     target: u32,
     pub fn toNative(self: OpenglBorrowedTextureDescriptor, allocator: std.mem.Allocator) status.Error!c.mln_opengl_borrowed_texture_descriptor {
-        var raw = c.mln_opengl_borrowed_texture_descriptor_default();
+        var raw = std.mem.zeroes(c.mln_opengl_borrowed_texture_descriptor);
         raw.size = @sizeOf(c.mln_opengl_borrowed_texture_descriptor);
         raw.extent = self.extent.toNative();
         raw.physical_width = self.physical_width;
@@ -3648,7 +3634,7 @@ pub const OpenglContextDescriptor = struct {
     /// the host. A private EGL or WGL owned texture and a transferred WebGL
     /// canvas are dedicated to their core worker.
     ownership: OpenglContextOwnership = .shared,
-    data: OpenglContextDescriptorData = .{ .unknown = 0 },
+    data: OpenglContextDescriptorData,
     pub fn toNative(self: OpenglContextDescriptor) status.Error!c.mln_opengl_context_descriptor {
         var raw = std.mem.zeroes(c.mln_opengl_context_descriptor);
         raw.ownership = self.ownership.toNative();
@@ -3665,7 +3651,6 @@ pub const OpenglContextDescriptor = struct {
                 raw.platform = c.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
                 raw.data.webgl = try item.toNative();
             },
-            .unknown => return error.InvalidArgument,
         }
         return raw;
     }
@@ -3677,7 +3662,7 @@ pub const OpenglContextDescriptor = struct {
                 c.MLN_OPENGL_CONTEXT_PLATFORM_WGL => .{ .wgl = WglContextDescriptor.fromNative(raw.data.wgl) },
                 c.MLN_OPENGL_CONTEXT_PLATFORM_EGL => .{ .egl = EglContextDescriptor.fromNative(raw.data.egl) },
                 c.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL => .{ .webgl = try WebglContextDescriptor.fromNative(allocator, raw.data.webgl) },
-                else => |tag| .{ .unknown = @intCast(tag) },
+                else => return error.NativeError,
             },
         };
     }
@@ -3691,7 +3676,6 @@ pub const OpenglContextDescriptorData = union(enum) {
     wgl: WglContextDescriptor,
     egl: EglContextDescriptor,
     webgl: WebglContextDescriptor,
-    unknown: u32,
 };
 
 /// How a session's OpenGL context relates to its driver thread and host
@@ -3739,7 +3723,7 @@ pub const OpenglOwnedTextureDescriptor = struct {
     /// CPU readback.
     context: OpenglContextDescriptor,
     pub fn toNative(self: OpenglOwnedTextureDescriptor) status.Error!c.mln_opengl_owned_texture_descriptor {
-        var raw = c.mln_opengl_owned_texture_descriptor_default();
+        var raw = std.mem.zeroes(c.mln_opengl_owned_texture_descriptor);
         raw.size = @sizeOf(c.mln_opengl_owned_texture_descriptor);
         raw.extent = self.extent.toNative();
         raw.context = try self.context.toNative();
@@ -3769,7 +3753,7 @@ pub const OpenglSurfaceDescriptor = struct {
     /// binding.
     surface: ?*anyopaque = null,
     pub fn toNative(self: OpenglSurfaceDescriptor) status.Error!c.mln_opengl_surface_descriptor {
-        var raw = c.mln_opengl_surface_descriptor_default();
+        var raw = std.mem.zeroes(c.mln_opengl_surface_descriptor);
         raw.size = @sizeOf(c.mln_opengl_surface_descriptor);
         raw.extent = self.extent.toNative();
         raw.context = try self.context.toNative();
@@ -3845,9 +3829,9 @@ pub const PremultipliedRgba8Image = struct {
     /// Bytes per image row. Required, and at least width \* 4.
     stride: u32,
     /// Premultiplied RGBA8 pixels. Required.
-    pixels: []const u8 = &.{},
+    pixels: []const u8,
     pub fn toNative(self: PremultipliedRgba8Image) status.Error!c.mln_premultiplied_rgba8_image {
-        var raw = c.mln_premultiplied_rgba8_image_default();
+        var raw = std.mem.zeroes(c.mln_premultiplied_rgba8_image);
         raw.size = @sizeOf(c.mln_premultiplied_rgba8_image);
         raw.width = self.width;
         raw.height = self.height;
@@ -3902,8 +3886,9 @@ pub const ProjectionMode = struct {
     /// Y-skew factor of the axonometric transform.
     y_skew: ?f64 = null,
     pub fn toNative(self: ProjectionMode) c.mln_projection_mode {
-        var raw = c.mln_projection_mode_default();
+        var raw = std.mem.zeroes(c.mln_projection_mode);
         raw.fields = 0;
+        raw.size = @sizeOf(c.mln_projection_mode);
         marshal.present(&raw.fields, c.MLN_PROJECTION_MODE_AXONOMETRIC, &raw.axonometric, self.axonometric);
         marshal.present(&raw.fields, c.MLN_PROJECTION_MODE_X_SKEW, &raw.x_skew, self.x_skew);
         marshal.present(&raw.fields, c.MLN_PROJECTION_MODE_Y_SKEW, &raw.y_skew, self.y_skew);
@@ -4114,7 +4099,7 @@ pub const RenderFrameResult = struct {
     /// `mln_map_projection_create()` to place overlays where the frame drew
     /// their coordinates. Zero, with a size of zero, unless disposition is
     /// `MLN_RENDER_RESULT_RENDERED`.
-    view: MapView,
+    view: MapView = .{},
     pub fn fromNative(raw: c.mln_render_frame_result) RenderFrameResult {
         return .{
             .disposition = RenderResult.fromNative(raw.disposition),
@@ -4179,23 +4164,23 @@ pub const RenderSessionAttachOptions = struct {
     /// frame while the session renders its replacement. Private targets grant
     /// one slot regardless of this value. A borrowed texture ring's depth is
     /// its texture count, so borrowed and other targets ignore this value.
-    requested_texture_ring_depth: u32,
+    requested_texture_ring_depth: u32 = 0,
     /// Producer synchronization for acquired texture frames.
     /// `MLN_GPU_SYNC_OPENGL_FENCE` requires a shared EGL or WGL texture target
     /// and a caller-graphics-thread driver. Other targets support only CPU
     /// completion and fail an unsupported request.
-    producer_sync_kind: GpuSyncKind,
+    producer_sync_kind: GpuSyncKind = .cpu_complete,
     /// Wakes the receiver when the frame-result queue becomes nonempty.
-    frame_wake: Wake,
+    frame_wake: Wake = .{},
     /// Wakes the graphics receiver when caller-driver work is available,
     /// including work that a finished driver result releases.
-    driver_work_wake: Wake,
+    driver_work_wake: Wake = .{},
     /// Host lock on the graphics queue, disabled by default. Only Vulkan
     /// targets accept an enabled lock; other backends fail the attach with
     /// `MLN_STATUS_UNSUPPORTED`.
-    queue_lock: QueueLock,
+    queue_lock: QueueLock = .{},
     pub fn toNative(self: RenderSessionAttachOptions, roots: *callbacks.Roots) status.Error!c.mln_render_session_attach_options {
-        var raw = c.mln_render_session_attach_options_default();
+        var raw = std.mem.zeroes(c.mln_render_session_attach_options);
         raw.size = @sizeOf(c.mln_render_session_attach_options);
         raw.driver = self.driver.toNative();
         raw.requested_texture_ring_depth = self.requested_texture_ring_depth;
@@ -4261,7 +4246,7 @@ pub const RenderSessionCapabilityFlag = struct {
 pub const RenderSessionSnapshot = struct {
     state: RenderSessionState = @fromBackingInt(@intCast(0)),
     /// Logical extent applied by the driver.
-    extent: LogicalExtent,
+    extent: LogicalExtent = .{},
     /// Increases when the session's lifecycle state, target, or applied extent
     /// changes. An acquired texture frame reports the value it rendered under.
     generation: u64 = 0,
@@ -4342,7 +4327,7 @@ pub const RenderedFeatureQueryOptions = struct {
     /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
     filter: []const u8 = &.{},
     pub fn toNative(self: RenderedFeatureQueryOptions, allocator: std.mem.Allocator) status.Error!c.mln_rendered_feature_query_options {
-        var raw = c.mln_rendered_feature_query_options_default();
+        var raw = std.mem.zeroes(c.mln_rendered_feature_query_options);
         raw.fields = 0;
         raw.size = @sizeOf(c.mln_rendered_feature_query_options);
         if (self.layer_ids) |item| {
@@ -4743,12 +4728,12 @@ pub const ResourceResponseStatus = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceRoute = struct {
     /// The resource kinds to match. Zero selects every kind.
-    kinds: ResourceKindFlag,
-    flags: UrlMatchFlag,
+    kinds: ResourceKindFlag = .{},
+    flags: UrlMatchFlag = .{},
     /// The URL or glob pattern to compare.
     url: []const u8 = &.{},
     pub fn toNative(self: ResourceRoute) status.Error!c.mln_resource_route {
-        var raw = c.mln_resource_route_default();
+        var raw = std.mem.zeroes(c.mln_resource_route);
         raw.size = @sizeOf(c.mln_resource_route);
         raw.kinds = self.kinds.toNative();
         raw.flags = self.flags.toNative();
@@ -5146,7 +5131,7 @@ pub const RuntimeOptions = struct {
     /// in-memory cache.
     cache_path: []const u8 = &.{},
     pub fn toNative(self: RuntimeOptions) status.Error!c.mln_runtime_options {
-        var raw = c.mln_runtime_options_default();
+        var raw = std.mem.zeroes(c.mln_runtime_options);
         raw.size = @sizeOf(c.mln_runtime_options);
         raw.asset_path = marshal.view(self.asset_path);
         raw.cache_path = marshal.view(self.cache_path);
@@ -5260,7 +5245,7 @@ pub const SourceFeatureQueryOptions = struct {
     /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
     filter: []const u8 = &.{},
     pub fn toNative(self: SourceFeatureQueryOptions, allocator: std.mem.Allocator) status.Error!c.mln_source_feature_query_options {
-        var raw = c.mln_source_feature_query_options_default();
+        var raw = std.mem.zeroes(c.mln_source_feature_query_options);
         raw.fields = 0;
         raw.size = @sizeOf(c.mln_source_feature_query_options);
         if (self.source_layer_ids) |item| {
@@ -5359,9 +5344,9 @@ pub const StyleExpressionInputs = struct {
     canonical_tile_id: ?CanonicalTileId = null,
     /// The image IDs that the image expression reports as available. The
     /// expression reports any other ID as unavailable.
-    available_images: []const []const u8,
+    available_images: []const []const u8 = &.{},
     pub fn toNative(self: StyleExpressionInputs, allocator: std.mem.Allocator) status.Error!c.mln_style_expression_inputs {
-        var raw = c.mln_style_expression_inputs_default();
+        var raw = std.mem.zeroes(c.mln_style_expression_inputs);
         raw.fields = 0;
         raw.size = @sizeOf(c.mln_style_expression_inputs);
         marshal.present(&raw.fields, c.MLN_STYLE_EXPRESSION_INPUT_ZOOM, &raw.zoom, self.zoom);
@@ -5408,8 +5393,9 @@ pub const StyleExpressionOptions = struct {
     /// asserts it. Without it, the expression keeps the type it infers.
     expected_type: ?StyleExpressionType = null,
     pub fn toNative(self: StyleExpressionOptions) c.mln_style_expression_options {
-        var raw = c.mln_style_expression_options_default();
+        var raw = std.mem.zeroes(c.mln_style_expression_options);
         raw.fields = 0;
+        raw.size = @sizeOf(c.mln_style_expression_options);
         marshal.present(&raw.fields, c.MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE, &raw.expected_type, self.expected_type);
         return raw;
     }
@@ -5543,7 +5529,7 @@ pub const StyleImageOptions = struct {
     /// Whether the image is a signed distance field icon. Absent selects false.
     sdf: ?bool = null,
     pub fn toNative(self: StyleImageOptions, allocator: std.mem.Allocator) status.Error!c.mln_style_image_options {
-        var raw = c.mln_style_image_options_default();
+        var raw = std.mem.zeroes(c.mln_style_image_options);
         raw.fields = 0;
         raw.size = @sizeOf(c.mln_style_image_options);
         if (self.stretch_x) |item| {
@@ -5776,8 +5762,9 @@ pub const StyleTransitionOptions = struct {
     /// Whether symbol placement changes cross-fade.
     enable_placement_transitions: ?bool = null,
     pub fn toNative(self: StyleTransitionOptions) c.mln_style_transition_options {
-        var raw = c.mln_style_transition_options_default();
+        var raw = std.mem.zeroes(c.mln_style_transition_options);
         raw.fields = 0;
+        raw.size = @sizeOf(c.mln_style_transition_options);
         marshal.present(&raw.fields, c.MLN_STYLE_TRANSITION_OPTION_DURATION, &raw.duration_ms, self.duration_ms);
         marshal.present(&raw.fields, c.MLN_STYLE_TRANSITION_OPTION_DELAY, &raw.delay_ms, self.delay_ms);
         marshal.present(&raw.fields, c.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS, &raw.enable_placement_transitions, self.enable_placement_transitions);
@@ -5980,10 +5967,10 @@ pub const ViewportMode = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const VulkanBorrowedTexture = struct {
     /// Borrowed VkImage. Required.
-    image: u64 = 0,
+    image: u64,
     /// Borrowed VkImageView for image. Required. The view must be a 2D color
     /// view that matches image and the descriptor's format.
-    image_view: u64 = 0,
+    image_view: u64,
     pub fn toNative(self: VulkanBorrowedTexture) c.mln_vulkan_borrowed_texture {
         var raw = std.mem.zeroes(c.mln_vulkan_borrowed_texture);
         raw.image = self.image;
@@ -6019,13 +6006,13 @@ pub const VulkanBorrowedTextureDescriptor = struct {
     /// VK_FORMAT_UNDEFINED is invalid.
     format: u32,
     /// Backend-native VkImageLayout value expected at render-pass begin.
-    initial_layout: u32,
+    initial_layout: u32 = 0,
     /// Backend-native VkImageLayout value left after rendering succeeds, such
     /// as VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
     /// VK_IMAGE_LAYOUT_UNDEFINED is invalid.
     final_layout: u32,
     pub fn toNative(self: VulkanBorrowedTextureDescriptor, allocator: std.mem.Allocator) status.Error!c.mln_vulkan_borrowed_texture_descriptor {
-        var raw = c.mln_vulkan_borrowed_texture_descriptor_default();
+        var raw = std.mem.zeroes(c.mln_vulkan_borrowed_texture_descriptor);
         raw.size = @sizeOf(c.mln_vulkan_borrowed_texture_descriptor);
         raw.extent = self.extent.toNative();
         raw.physical_width = self.physical_width;
@@ -6067,15 +6054,15 @@ pub const VulkanBorrowedTextureDescriptor = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const VulkanContextDescriptor = struct {
     /// Borrowed VkInstance. Required.
-    instance: ?*anyopaque = null,
+    instance: ?*anyopaque,
     /// Borrowed VkPhysicalDevice. Required.
-    physical_device: ?*anyopaque = null,
+    physical_device: ?*anyopaque,
     /// Borrowed VkDevice. Required.
-    device: ?*anyopaque = null,
+    device: ?*anyopaque,
     /// Borrowed graphics VkQueue. Required. The session's driver submits to it
     /// from its own thread, so a host that uses the same queue passes
     /// `mln_render_session_attach_options.queue_lock` at attach.
-    graphics_queue: ?*anyopaque = null,
+    graphics_queue: ?*anyopaque,
     /// Queue family index for graphics_queue. Must support graphics commands.
     graphics_queue_family_index: u32 = 0,
     /// PFN_vkGetInstanceProcAddr for the loader that created the instance.
@@ -6117,7 +6104,8 @@ pub const VulkanOwnedTextureDescriptor = struct {
     /// Borrowed Vulkan context. All handles are required.
     context: VulkanContextDescriptor,
     pub fn toNative(self: VulkanOwnedTextureDescriptor) c.mln_vulkan_owned_texture_descriptor {
-        var raw = c.mln_vulkan_owned_texture_descriptor_default();
+        var raw = std.mem.zeroes(c.mln_vulkan_owned_texture_descriptor);
+        raw.size = @sizeOf(c.mln_vulkan_owned_texture_descriptor);
         raw.extent = self.extent.toNative();
         raw.context = self.context.toNative();
         return raw;
@@ -6145,7 +6133,8 @@ pub const VulkanSurfaceDescriptor = struct {
     /// Borrowed VkSurfaceKHR bit pattern. Required.
     surface: u64,
     pub fn toNative(self: VulkanSurfaceDescriptor) c.mln_vulkan_surface_descriptor {
-        var raw = c.mln_vulkan_surface_descriptor_default();
+        var raw = std.mem.zeroes(c.mln_vulkan_surface_descriptor);
+        raw.size = @sizeOf(c.mln_vulkan_surface_descriptor);
         raw.extent = self.extent.toNative();
         raw.context = self.context.toNative();
         raw.surface = self.surface;
@@ -6316,7 +6305,7 @@ pub const WglContextDescriptor = struct {
     /// Borrowed HDC used to create the session context. Required. A dedicated
     /// owned texture makes its context current on this HDC from its core
     /// worker.
-    device_context: ?*anyopaque = null,
+    device_context: ?*anyopaque,
     /// Borrowed HGLRC whose share group the session context joins. Required
     /// under shared ownership. A dedicated session joins no share group, so it
     /// must be null there.
@@ -6367,103 +6356,13 @@ pub const androidInit = if (builtin.abi.isAndroid()) struct {
     }
 }.function else {};
 
-/// Returns zeroed animation options.
-///
-/// See `mln_animation_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn animationOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(AnimationOptions) {
-    return call.direct("mln_animation_options_default", .none, {}, OwnedValue(AnimationOptions), allocator, .{});
-}
-
-/// Returns zeroed map bound options with size set for this C API version.
-///
-/// See `mln_bound_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn boundOptionsDefault() BoundOptions {
-    status.requireAbiVersion();
-    return BoundOptions.fromNative(c.mln_bound_options_default());
-}
-
 /// Reports the C ABI contract version. The value is 0 while the ABI is
 /// unstable, and will increment on each SemVer major release.
 ///
 /// See `mln_c_version` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub fn cVersion() u32 {
-    status.requireAbiVersion();
     return c.mln_c_version();
-}
-
-/// Returns a zeroed relative camera update with size set for this version.
-///
-/// See `mln_camera_delta_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn cameraDeltaDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(CameraDelta) {
-    return call.direct("mln_camera_delta_default", .none, {}, OwnedValue(CameraDelta), allocator, .{});
-}
-
-/// Returns zeroed camera fitting options with size set for this version.
-///
-/// See `mln_camera_fit_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn cameraFitOptionsDefault() CameraFitOptions {
-    status.requireAbiVersion();
-    return CameraFitOptions.fromNative(c.mln_camera_fit_options_default());
-}
-
-/// Returns zeroed camera options with size set for this C API version.
-///
-/// See `mln_camera_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn cameraOptionsDefault() CameraOptions {
-    status.requireAbiVersion();
-    return CameraOptions.fromNative(c.mln_camera_options_default());
-}
-
-/// Returns a zeroed atomic camera update, with its size and its camera's size
-/// set for this C API version.
-///
-/// See `mln_camera_update_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn cameraUpdateDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(CameraUpdate) {
-    return call.direct("mln_camera_update_default", .none, {}, OwnedValue(CameraUpdate), allocator, .{});
-}
-
-/// Returns zeroed custom geometry source options with size set.
-///
-/// See `mln_custom_geometry_source_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn customGeometrySourceOptionsDefault(fetch_tile: *const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void) status.Error!CustomGeometrySourceOptions {
-    try status.validateAbiVersion(null);
-    return CustomGeometrySourceOptions.fromDefault(c.mln_custom_geometry_source_options_default(), fetch_tile);
-}
-
-/// Returns zeroed custom MVT vector source options with size set.
-///
-/// See `mln_custom_mvt_vector_source_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn customMvtVectorSourceOptionsDefault(fetch_tile: *const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void) status.Error!CustomMvtVectorSourceOptions {
-    try status.validateAbiVersion(null);
-    return CustomMvtVectorSourceOptions.fromDefault(c.mln_custom_mvt_vector_source_options_default(), fetch_tile);
-}
-
-/// Returns a zeroed frame demand with size set for this C API version: a
-/// zero-token, render-if-needed, nonpresenting demand.
-///
-/// See `mln_frame_demand_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn frameDemandDefault() FrameDemand {
-    status.requireAbiVersion();
-    return FrameDemand.fromNative(c.mln_frame_demand_default());
-}
-
-/// Returns zeroed free camera options with size set for this C API version.
-///
-/// See `mln_free_camera_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn freeCameraOptionsDefault() FreeCameraOptions {
-    status.requireAbiVersion();
-    return FreeCameraOptions.fromNative(c.mln_free_camera_options_default());
 }
 
 /// Prepares GeoJSON source data for installation on a map.
@@ -6472,33 +6371,6 @@ pub fn freeCameraOptionsDefault() FreeCameraOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub fn geojsonSourceDataCreate(data: []const u8, options: ?GeojsonSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!GeojsonSourceData {
     return call.invoke("mln_geojson_source_data_create", .none, {}, null, diagnostic, .{ data, options, call.adopt(GeojsonSourceData) });
-}
-
-/// Returns zeroed GeoJSON source options with size set.
-///
-/// See `mln_geojson_source_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn geojsonSourceOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(GeojsonSourceOptions) {
-    return call.direct("mln_geojson_source_options_default", .none, {}, OwnedValue(GeojsonSourceOptions), allocator, .{});
-}
-
-/// Returns zeroed synchronization with size set for this C API version, which
-/// is CPU completion.
-///
-/// See `mln_gpu_sync_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-pub fn gpuSyncDefault() GpuSync {
-    status.requireAbiVersion();
-    return GpuSync.fromNative(c.mln_gpu_sync_default());
-}
-
-/// Returns a zeroed header rule with size set for this C API version: an exact
-/// match of the empty URL for every resource kind, with no headers.
-///
-/// See `mln_http_header_rule_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn httpHeaderRuleDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(HttpHeaderRule) {
-    return call.direct("mln_http_header_rule_default", .none, {}, OwnedValue(HttpHeaderRule), allocator, .{});
 }
 
 /// Converts spherical Mercator projected meters to a geographic coordinate.
@@ -6533,16 +6405,6 @@ pub fn logSetCallback(handler: LogHandler, diagnostic: ?*diagnostics.Diagnostic)
     return call.invoke("mln_log_set_callback", .none, {}, null, diagnostic, .{handler});
 }
 
-/// Returns a zeroed logical extent, which every function that takes an extent
-/// rejects.
-///
-/// See `mln_logical_extent_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn logicalExtentDefault() LogicalExtent {
-    status.requireAbiVersion();
-    return LogicalExtent.fromNative(c.mln_logical_extent_default());
-}
-
 /// Computes the physical device-pixel size of a logical extent.
 ///
 /// See `mln_logical_extent_physical_size` in the
@@ -6552,15 +6414,6 @@ pub fn logicalExtentPhysicalSize(extent: LogicalExtent, diagnostic: ?*diagnostic
     return .{ .width = out[0], .height = out[1] };
 }
 
-/// Returns zeroed map options with size set for this C API version.
-///
-/// See `mln_map_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn mapOptionsDefault() MapOptions {
-    status.requireAbiVersion();
-    return MapOptions.fromNative(c.mln_map_options_default());
-}
-
 /// Creates a standalone projection of a view, such as the view of a rendered
 /// frame or of a map snapshot.
 ///
@@ -6568,53 +6421,6 @@ pub fn mapOptionsDefault() MapOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
 pub fn mapProjectionCreate(view: MapView, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjection {
     return call.invoke("mln_map_projection_create", .none, {}, null, diagnostic, .{ view, call.adopt(MapProjection) });
-}
-
-/// Returns zeroed tile tuning options with size set for this C API version.
-///
-/// See `mln_map_tile_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn mapTileOptionsDefault() MapTileOptions {
-    status.requireAbiVersion();
-    return MapTileOptions.fromNative(c.mln_map_tile_options_default());
-}
-
-/// Returns zeroed viewport options with size set for this C API version.
-///
-/// See `mln_map_viewport_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn mapViewportOptionsDefault() MapViewportOptions {
-    status.requireAbiVersion();
-    return MapViewportOptions.fromNative(c.mln_map_viewport_options_default());
-}
-
-/// Returns a zeroed Metal borrowed-texture descriptor with size set for this C
-/// API version. The caller still sets every required member.
-///
-/// See `mln_metal_borrowed_texture_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn metalBorrowedTextureDescriptorDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(MetalBorrowedTextureDescriptor) {
-    return call.direct("mln_metal_borrowed_texture_descriptor_default", .none, {}, OwnedValue(MetalBorrowedTextureDescriptor), allocator, .{});
-}
-
-/// Returns a zeroed Metal owned-texture descriptor with size set for this C API
-/// version. The caller still sets every required member.
-///
-/// See `mln_metal_owned_texture_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn metalOwnedTextureDescriptorDefault() MetalOwnedTextureDescriptor {
-    status.requireAbiVersion();
-    return MetalOwnedTextureDescriptor.fromNative(c.mln_metal_owned_texture_descriptor_default());
-}
-
-/// Returns a zeroed Metal surface descriptor with size set for this C API
-/// version. The caller still sets every required member.
-///
-/// See `mln_metal_surface_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn metalSurfaceDescriptorDefault() MetalSurfaceDescriptor {
-    status.requireAbiVersion();
-    return MetalSurfaceDescriptor.fromNative(c.mln_metal_surface_descriptor_default());
 }
 
 /// Reads MapLibre Native's process-global network status.
@@ -6633,24 +6439,6 @@ pub fn networkSetStatus(status_input: NetworkStatus, diagnostic: ?*diagnostics.D
     return call.invoke("mln_network_set_status", .none, {}, null, diagnostic, .{status_input});
 }
 
-/// Returns a zeroed OpenGL borrowed-texture descriptor with size set for this C
-/// API version. The caller still sets every required member.
-///
-/// See `mln_opengl_borrowed_texture_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn openglBorrowedTextureDescriptorDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(OpenglBorrowedTextureDescriptor) {
-    return call.direct("mln_opengl_borrowed_texture_descriptor_default", .none, {}, OwnedValue(OpenglBorrowedTextureDescriptor), allocator, .{});
-}
-
-/// Returns a zeroed OpenGL owned-texture descriptor with size set for this C
-/// API version. The caller still sets every required member.
-///
-/// See `mln_opengl_owned_texture_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn openglOwnedTextureDescriptorDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(OpenglOwnedTextureDescriptor) {
-    return call.direct("mln_opengl_owned_texture_descriptor_default", .none, {}, OwnedValue(OpenglOwnedTextureDescriptor), allocator, .{});
-}
-
 /// Returns OpenGL context providers supported by this build.
 ///
 /// See `mln_opengl_supported_context_provider_mask` in the
@@ -6658,15 +6446,6 @@ pub fn openglOwnedTextureDescriptorDefault(allocator: std.mem.Allocator) status.
 pub fn openglSupportedContextProviderMask() OpenglContextProviderFlag {
     status.requireAbiVersion();
     return OpenglContextProviderFlag.fromNative(c.mln_opengl_supported_context_provider_mask());
-}
-
-/// Returns a zeroed OpenGL surface descriptor with size set for this C API
-/// version. The caller still sets every required member.
-///
-/// See `mln_opengl_surface_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn openglSurfaceDescriptorDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(OpenglSurfaceDescriptor) {
-    return call.direct("mln_opengl_surface_descriptor_default", .none, {}, OwnedValue(OpenglSurfaceDescriptor), allocator, .{});
 }
 
 /// Returns the process-wide `mln_plugin_register_v1` entry point; never null.
@@ -6678,56 +6457,12 @@ pub fn pluginGetRegisterFunctionV1() c.mln_plugin_register_function_v1 {
     return c.mln_plugin_get_register_function_v1();
 }
 
-/// Returns a zeroed premultiplied RGBA8 image descriptor with size set. The
-/// caller still sets every required member.
-///
-/// See `mln_premultiplied_rgba8_image_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn premultipliedRgba8ImageDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(PremultipliedRgba8Image) {
-    return call.direct("mln_premultiplied_rgba8_image_default", .none, {}, OwnedValue(PremultipliedRgba8Image), allocator, .{});
-}
-
 /// Converts a geographic coordinate to spherical Mercator projected meters.
 ///
 /// See `mln_projected_meters_for_lat_lng` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
 pub fn projectedMetersForLatLng(coordinate: LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!ProjectedMeters {
     return call.invoke("mln_projected_meters_for_lat_lng", .none, {}, null, diagnostic, .{ coordinate, call.out(ProjectedMeters) });
-}
-
-/// Returns zeroed axonometric rendering options with size set for this C API
-/// version.
-///
-/// See `mln_projection_mode_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn projectionModeDefault() ProjectionMode {
-    status.requireAbiVersion();
-    return ProjectionMode.fromNative(c.mln_projection_mode_default());
-}
-
-/// Returns zeroed attachment options with size set for this C API version.
-///
-/// See `mln_render_session_attach_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-pub fn renderSessionAttachOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(RenderSessionAttachOptions) {
-    return call.direct("mln_render_session_attach_options_default", .none, {}, OwnedValue(RenderSessionAttachOptions), allocator, .{});
-}
-
-/// Returns zeroed rendered feature query options with size set.
-///
-/// See `mln_rendered_feature_query_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub fn renderedFeatureQueryOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(RenderedFeatureQueryOptions) {
-    return call.direct("mln_rendered_feature_query_options_default", .none, {}, OwnedValue(RenderedFeatureQueryOptions), allocator, .{});
-}
-
-/// Returns a zeroed route with size set for this C API version: an exact match
-/// of the empty URL for every resource kind.
-///
-/// See `mln_resource_route_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn resourceRouteDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(ResourceRoute) {
-    return call.direct("mln_resource_route_default", .none, {}, OwnedValue(ResourceRoute), allocator, .{});
 }
 
 /// Creates a runtime.
@@ -6738,62 +6473,12 @@ pub fn runtimeCreate(options: RuntimeOptions, diagnostic: ?*diagnostics.Diagnost
     return call.invoke("mln_runtime_create", .none, {}, null, diagnostic, .{ options, call.adopt(Runtime) });
 }
 
-/// Returns zeroed runtime options with size set for this C API version.
-///
-/// See `mln_runtime_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn runtimeOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(RuntimeOptions) {
-    return call.direct("mln_runtime_options_default", .none, {}, OwnedValue(RuntimeOptions), allocator, .{});
-}
-
-/// Returns zeroed source feature query options with size set.
-///
-/// See `mln_source_feature_query_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub fn sourceFeatureQueryOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(SourceFeatureQueryOptions) {
-    return call.direct("mln_source_feature_query_options_default", .none, {}, OwnedValue(SourceFeatureQueryOptions), allocator, .{});
-}
-
 /// Parses a style expression.
 ///
 /// See `mln_style_expression_create` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 pub fn styleExpressionCreate(expression: []const u8, options: ?StyleExpressionOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!StyleExpression {
     return call.invoke("mln_style_expression_create", .none, {}, null, diagnostic, .{ expression, options, call.adopt(StyleExpression) });
-}
-
-/// Returns zeroed style expression inputs with size set, which set no input.
-///
-/// See `mln_style_expression_inputs_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-pub fn styleExpressionInputsDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(StyleExpressionInputs) {
-    return call.direct("mln_style_expression_inputs_default", .none, {}, OwnedValue(StyleExpressionInputs), allocator, .{});
-}
-
-/// Returns zeroed style expression options with size set.
-///
-/// See `mln_style_expression_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-pub fn styleExpressionOptionsDefault() StyleExpressionOptions {
-    status.requireAbiVersion();
-    return StyleExpressionOptions.fromNative(c.mln_style_expression_options_default());
-}
-
-/// Returns zeroed runtime style image options with size set.
-///
-/// See `mln_style_image_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn styleImageOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(StyleImageOptions) {
-    return call.direct("mln_style_image_options_default", .none, {}, OwnedValue(StyleImageOptions), allocator, .{});
-}
-
-/// Returns zeroed global style transition options with size set.
-///
-/// See `mln_style_transition_options_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn styleTransitionOptionsDefault() StyleTransitionOptions {
-    status.requireAbiVersion();
-    return StyleTransitionOptions.fromNative(c.mln_style_transition_options_default());
 }
 
 /// Reports the render backends available in this native library build.
@@ -6803,35 +6488,6 @@ pub fn styleTransitionOptionsDefault() StyleTransitionOptions {
 pub fn supportedRenderBackendMask() RenderBackendFlag {
     status.requireAbiVersion();
     return RenderBackendFlag.fromNative(c.mln_supported_render_backend_mask());
-}
-
-/// Returns a zeroed Vulkan borrowed-texture descriptor with size set for this C
-/// API version. The caller still sets every required member.
-///
-/// See `mln_vulkan_borrowed_texture_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn vulkanBorrowedTextureDescriptorDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(VulkanBorrowedTextureDescriptor) {
-    return call.direct("mln_vulkan_borrowed_texture_descriptor_default", .none, {}, OwnedValue(VulkanBorrowedTextureDescriptor), allocator, .{});
-}
-
-/// Returns a zeroed Vulkan owned-texture descriptor with size set for this C
-/// API version. The caller still sets every required member.
-///
-/// See `mln_vulkan_owned_texture_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn vulkanOwnedTextureDescriptorDefault() VulkanOwnedTextureDescriptor {
-    status.requireAbiVersion();
-    return VulkanOwnedTextureDescriptor.fromNative(c.mln_vulkan_owned_texture_descriptor_default());
-}
-
-/// Returns a zeroed Vulkan surface descriptor with size set for this C API
-/// version. The caller still sets every required member.
-///
-/// See `mln_vulkan_surface_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn vulkanSurfaceDescriptorDefault() VulkanSurfaceDescriptor {
-    status.requireAbiVersion();
-    return VulkanSurfaceDescriptor.fromNative(c.mln_vulkan_surface_descriptor_default());
 }
 
 pub const MapDiscarding = struct {

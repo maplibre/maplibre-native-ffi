@@ -87,8 +87,9 @@ static mln_vulkan_context_descriptor fake_context(void) {
 }
 
 static mln_vulkan_surface_descriptor surface_descriptor(void) {
-  mln_vulkan_surface_descriptor descriptor =
-    mln_vulkan_surface_descriptor_default();
+  mln_vulkan_surface_descriptor descriptor = {
+    .size = sizeof(mln_vulkan_surface_descriptor)
+  };
   descriptor.extent = mln_test_target_extent();
   descriptor.context = fake_context();
   descriptor.surface = high_handle;
@@ -103,7 +104,9 @@ static void describe_borrowed(mln_test_target_call* call) {
   };
   mln_vulkan_borrowed_texture_descriptor* descriptor =
     &call->descriptor.vulkan_borrowed;
-  *descriptor = mln_vulkan_borrowed_texture_descriptor_default();
+  *descriptor = (mln_vulkan_borrowed_texture_descriptor){
+    .size = sizeof(mln_vulkan_borrowed_texture_descriptor)
+  };
   descriptor->extent = mln_test_target_extent();
   descriptor->context = fake_context();
   descriptor->textures = call->textures.vulkan;
@@ -141,7 +144,9 @@ static void vulkan_attach_rejects_malformed_calls(void) {
     sizeof(surface_rows) / sizeof(surface_rows[0])
   );
 
-  call.descriptor.vulkan_owned = mln_vulkan_owned_texture_descriptor_default();
+  call.descriptor.vulkan_owned = (mln_vulkan_owned_texture_descriptor){
+    .size = sizeof(mln_vulkan_owned_texture_descriptor)
+  };
   call.descriptor.vulkan_owned.extent = mln_test_target_extent();
   call.descriptor.vulkan_owned.context = fake_context();
   static const mln_test_validation_case owned_rows[] = {

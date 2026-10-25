@@ -223,12 +223,6 @@ typedef struct mln_gpu_sync {
   uint64_t handle MLN_BINDING("lifetime=owner");
 } mln_gpu_sync;
 
-/**
- * Returns zeroed synchronization with size set for this C API version, which
- * is CPU completion.
- */
-MLN_API mln_gpu_sync mln_gpu_sync_default(void) MLN_NOEXCEPT;
-
 /** Metal backend context fields shared by Metal render targets. */
 typedef struct mln_metal_context_descriptor {
   /** `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it. */
@@ -423,14 +417,6 @@ typedef struct mln_opengl_context_descriptor {
   mln_opengl_context_ownership ownership;
   mln_opengl_context_descriptor_data data MLN_BINDING("tag=platform");
 } mln_opengl_context_descriptor;
-
-/**
- * Returns zeroed attachment options with size set for this C API version.
- *
- * The caller still sets every required member.
- */
-MLN_API mln_render_session_attach_options
-mln_render_session_attach_options_default(void) MLN_NOEXCEPT;
 
 /**
  * Computes the physical device-pixel size of a logical extent.

@@ -54,23 +54,10 @@ CALLER_DRIVER_NOTE = (
     "`mln_render_session_service_driver_work` on the graphics thread."
 )
 
-# Field defaults that Dart replaces, keyed like `BoundApi.doc`. Dart attaches
-# through a core worker by default, for the reason CALLER_DRIVER_NOTE gives.
-DEFAULTS = {
-    "mln_render_session_attach_options.driver": "RenderDriverKind.coreWorker",
-}
-
-# Summaries that Dart replaces, keyed like `BoundApi.doc`.
-SUMMARIES = {
-    "mln_render_session_attach_options.driver": (
-        "One `mln_render_driver_kind` value. Defaults to "
-        "`RenderDriverKind.coreWorker`, because an isolate cannot service a "
-        "caller-graphics-thread driver."
-    ),
-}
-
-# Paragraphs about what Dart adds to a declaration's C contract.
+# Paragraphs about what Dart adds to a declaration's C contract, keyed like
+# `BoundApi.doc`.
 NOTES = {
+    "mln_render_session_attach_options.driver": (CALLER_DRIVER_NOTE,),
     "mln_render_session_service_driver_work": (CALLER_DRIVER_NOTE,),
 }
 
@@ -78,8 +65,6 @@ NOTES = {
 def doc(bound: BoundApi, native: str, indent: str = "") -> str:
     """The dartdoc comment of a declaration, or empty when it has none."""
     found = bound.doc(native)
-    if found is not None and native in SUMMARIES:
-        found = replace(found, summary=SUMMARIES[native])
     if found is not None and native in NOTES:
         found = replace(found, notes=(*found.notes, *NOTES[native]))
     return docs.line_comment(found, indent)
@@ -457,6 +442,8 @@ class Values:
                     if value.encoding == "utf8"
                     else f"nativeBufferView({expression}, arena)"
                 )
+            if value.length == "nul":
+                return f"nativeUtf8CString({expression}, arena).pointer.cast<Char>()"
             view = (
                 f"nativeStringView({expression}, arena).value"
                 if value.encoding == "utf8"
@@ -507,9 +494,12 @@ class Values:
                 if value.nullable:
                     result = f"{expression}.data == nullptr ? null : {result}"
             else:
-                result = f"Uint8List.fromList({expression}.cast<Uint8>().asTypedList({count}))"
-                if value.encoding == "utf8":
-                    result = f"utf8.decode({result})"
+                if value.length == "nul":
+                    result = f"{expression}.cast<Utf8>().toDartString()"
+                else:
+                    result = f"Uint8List.fromList({expression}.cast<Uint8>().asTypedList({count}))"
+                    if value.encoding == "utf8":
+                        result = f"utf8.decode({result})"
                 if value.nullable:
                     result = f"{expression} == nullptr ? null : {result}"
         elif value.kind == "array":
@@ -566,7 +556,17 @@ class Values:
         return f"result.ref.{mask} |= {self.enum_constant(bit)};"
 
     def field_default(self, field):
-        return self.default_expression(field.value)
+        """A member's zero value, or None when a caller must give it."""
+        return None if field.required else self.default_expression(field.value)
+
+    def field_parameter(self, name, typ, field):
+        """The constructor parameter that initializes a member."""
+        if field.required:
+            return f"required this.{name}"
+        if typ.endswith("?"):
+            return f"this.{name}"
+        default = self.field_default(field)
+        return f"this.{name} = {default}" if default else f"required this.{name}"
 
     def default_expression(self, value):
         if value.nullable:
@@ -587,9 +587,11 @@ class Values:
                 else None
             )
         if value.kind == "record":
-            if value.default or any(f.value.kind == "union" for f in value.fields):
+            if any(f.value.kind == "union" for f in value.fields):
                 return None
             for _name, typ, field in self.members(value):
+                if field.required:
+                    return None
                 if typ.endswith("?"):
                     continue
                 default = self.field_default(field)
@@ -682,17 +684,14 @@ class Values:
                 + f"  final {typ} {name};"
             )
             if field.value.kind == "array":
-                args.append(f"{typ} {name} = const []")
+                args.append(
+                    f"required {typ} {name}"
+                    if field.required
+                    else f"{typ} {name} = const []"
+                )
                 initializers.append(f"{name} = List.unmodifiable({name})")
             else:
-                default = self.field_default(field)
-                args.append(
-                    f"this.{name}"
-                    if typ.endswith("?")
-                    else f"this.{name} = {default}"
-                    if default
-                    else f"required this.{name}"
-                )
+                args.append(self.field_parameter(name, typ, field))
             if field.name in skip:
                 continue
             expression = "value." + name
@@ -723,14 +722,11 @@ class Values:
         return f"final class {public} {{\n{constructor}\n" + "\n".join(fields) + "\n}"
 
     def registration_initializer(self, value):
-        initialize = (
-            f"result.ref = raw.{value.default}();"
-            if value.default
-            else f"result.ref.size = sizeOf<raw.{value.native}>();"
+        return (
+            f"    result.ref.size = sizeOf<raw.{value.native}>();\n"
             if any(f.role == "size" for f in value.fields)
             else ""
         )
-        return f"    {initialize}\n" if initialize else ""
 
     def render_queue_registration(self, value):
         """A registration whose callbacks a delivery queue carries.
@@ -1007,9 +1003,7 @@ class Values:
             writes.append(write)
             fallback = "    " + read
         initialize = (
-            f"  result.ref = raw.{value.default}();"
-            if value.default
-            else f"  result.ref.size = sizeOf<raw.{value.native}>();"
+            f"  result.ref.size = sizeOf<raw.{value.native}>();"
             if any(f.role == "size" for f in value.fields)
             else ""
         )
@@ -1029,14 +1023,7 @@ class Values:
         arguments, fields, writes, reads = [], [], [], []
         for field in members:
             name, typ = identifier(field.name), self.public(field.value)
-            default = self.field_default(field)
-            arguments.append(
-                f"this.{name}"
-                if typ.endswith("?")
-                else f"this.{name} = {default}"
-                if default
-                else f"required this.{name}"
-            )
+            arguments.append(self.field_parameter(name, typ, field))
             fields.append(
                 doc(self.bound, f"{value.native}.{field.name}", "  ")
                 + f"  final {typ} {name};"
@@ -1093,9 +1080,7 @@ class Values:
             + "\n    },"
         )
         initialize = (
-            f"  result.ref = raw.{value.default}();"
-            if value.default
-            else f"  result.ref.size = sizeOf<raw.{value.native}>();"
+            f"  result.ref.size = sizeOf<raw.{value.native}>();"
             if any(f.role == "size" for f in value.fields)
             else ""
         )
@@ -1220,44 +1205,31 @@ class Values:
             )
             args, initializers = [], []
             for name, typ, field in members:
-                if value.default and not typ.endswith("?"):
-                    args.append(f"{typ}? {name}")
-                    fallback = f"{name} ?? " + DEFAULTS.get(
-                        f"{value.native}.{field.name}",
-                        f"{camel(value.default.removeprefix('mln_'))}().{name}",
-                    )
-                    expression = (
-                        f"List.unmodifiable({fallback})"
-                        if typ.startswith("List<")
-                        else f"Uint8List.fromList({fallback}).asUnmodifiableView()"
-                        if typ == "Uint8List"
-                        else fallback
-                    )
-                    initializers.append(f"{name} = {expression}")
-                    continue
-                default = self.field_default(field)
                 copied = typ.startswith("List<") or typ.rstrip("?") == "Uint8List"
-                if copied:
+                if not copied:
+                    args.append(self.field_parameter(name, typ, field))
+                    continue
+                # A copied member converts in an initializer. Its zero value is
+                # empty, and a Uint8List has no const empty value, so null
+                # stands for it.
+                source = name
+                if field.required:
+                    args.append(f"required {typ} {name}")
+                elif typ.endswith("?") or typ.startswith("List<"):
                     args.append(
-                        ("" if typ.endswith("?") or typ == "Uint8List" else "required ")
-                        + f"{typ + '?' if typ == 'Uint8List' else typ} {name}"
+                        f"{typ} {name}" + ("" if typ.endswith("?") else " = const []")
                     )
-                    expression = (
-                        f"Uint8List.fromList({name if typ.endswith('?') else name + ' ?? const <int>[]'}).asUnmodifiableView()"
-                        if typ.rstrip("?") == "Uint8List"
-                        else f"List.unmodifiable({name})"
-                    )
-                    if typ.endswith("?"):
-                        expression = f"{name} == null ? null : {expression}"
-                    initializers.append(f"{name} = {expression}")
                 else:
-                    args.append(
-                        f"this.{name}"
-                        if typ.endswith("?")
-                        else f"this.{name} = {default}"
-                        if default
-                        else f"required this.{name}"
-                    )
+                    args.append(f"Uint8List? {name}")
+                    source = f"{name} ?? const <int>[]"
+                expression = (
+                    f"Uint8List.fromList({source}).asUnmodifiableView()"
+                    if typ.rstrip("?") == "Uint8List"
+                    else f"List.unmodifiable({source})"
+                )
+                if typ.endswith("?"):
+                    expression = f"{name} == null ? null : {expression}"
+                initializers.append(f"{name} = {expression}")
             args += [f"this.{name} = false" for name, _ in flags]
             signature = ", ".join(args)
             signature = "{" + signature + "}"
@@ -1314,7 +1286,7 @@ class Values:
                     + ");\n"
                 )
             declarations.append(
-                f"final class {public} extends _Value {{\n  {'const ' if not initializers and not value.default else ''}{public}({signature}){' : ' + ', '.join(initializers) if initializers else ''};\n{fields}\n{copy}\n  @override List<Object?> get _members => [{compared}];\n"
+                f"final class {public} extends _Value {{\n  {'const ' if not initializers else ''}{public}({signature}){' : ' + ', '.join(initializers) if initializers else ''};\n{fields}\n{copy}\n  @override List<Object?> get _members => [{compared}];\n"
                 f"  @override String toString() => _describe('{public}', const [{described}]);\n}}\n"
                 + "".join("\n" + helper for helper in helpers)
             )
@@ -1328,9 +1300,7 @@ class Values:
                 + f", {{Pointer<raw.{value.native}>? into}}) {{",
                 f"  final result = into ?? arena<raw.{value.native}>();",
             ]
-            if value.default:
-                write.append(f"  result.ref = raw.{value.default}();")
-            elif any(f.role == "size" for f in value.fields):
+            if any(f.role == "size" for f in value.fields):
                 write.append(f"  result.ref.size = sizeOf<raw.{value.native}>();")
             read = []
             for name, flag in flags:
@@ -1352,7 +1322,7 @@ class Values:
                 if (
                     field.value.kind == "buffer"
                     and field.value.buffer_form != "view"
-                    and field.value.length not in {None, "1"}
+                    and field.value.length not in {None, "nul", "1"}
                 ):
                     view = (
                         f"nativeStringView({expression}, arena).value"

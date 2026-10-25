@@ -391,12 +391,9 @@ test "a provider receives only the requests its routes match" {
 
     var scratch = std.heap.ArenaAllocator.init(testing.allocator);
     defer scratch.deinit();
-    var fallback = try maplibre.resourceRouteDefault(scratch.allocator());
-    fallback.value.flags = .{ .glob = true };
-    fallback.value.url = try scratch.allocator().dupe(u8, "custom://routed/**");
     const routes = try scratch.allocator().dupe(maplibre.ResourceRoute, &.{
         .{ .kinds = .{ .tile = true }, .flags = .{ .glob = true }, .url = try scratch.allocator().dupe(u8, "**") },
-        fallback.value,
+        .{ .flags = .{ .glob = true }, .url = try scratch.allocator().dupe(u8, "custom://routed/**") },
     });
     var routed = maplibre.ResourceProvider.init(&provider, RoutedProvider.provide, null);
     routed.routes = routes;
@@ -427,12 +424,12 @@ test "a camera end handler inside a command is released after it runs" {
     defer fixture.destroy();
 
     var ended = support.EndProbe{};
-    var update = try maplibre.cameraUpdateDefault(testing.allocator);
-    defer update.deinit();
-    update.value.mode = .ease;
-    update.value.camera = .{ .zoom = 4.0 };
-    update.value.animation = .{ .duration_ms = 60_000, .transition_id = 3, .end_handler = ended.handler() };
-    try support.expectCommitted(try fixture.map.updateCamera(update.value, null));
+    const update: maplibre.CameraUpdate = .{
+        .mode = .ease,
+        .camera = .{ .zoom = 4.0 },
+        .animation = .{ .duration_ms = 60_000, .transition_id = 3, .end_handler = ended.handler() },
+    };
+    try support.expectCommitted(try fixture.map.updateCamera(update, null));
     try testing.expectEqual(@as(usize, 0), ended.releases.get());
     try support.expectCommitted(try fixture.map.cancelCameraTransition(3, null));
     try testing.expectEqual(@as(u32, 1), ended.ends.load(.acquire));
@@ -440,11 +437,8 @@ test "a camera end handler inside a command is released after it runs" {
     try ended.releases.waitFor(1);
 
     var rejected = support.EndProbe{};
-    var delta = try maplibre.cameraDeltaDefault(testing.allocator);
-    defer delta.deinit();
-    delta.value.scale = -1;
-    delta.value.animation.end_handler = rejected.handler();
-    try testing.expectError(error.InvalidArgument, fixture.map.applyCameraDelta(delta.value, null));
+    const delta: maplibre.CameraDelta = .{ .scale = -1, .animation = .{ .end_handler = rejected.handler() } };
+    try testing.expectError(error.InvalidArgument, fixture.map.applyCameraDelta(delta, null));
     try fixture.fence();
     try testing.expectEqual(@as(usize, 0), rejected.releases.get());
     try testing.expectEqual(@as(u32, 0), rejected.ends.load(.acquire));

@@ -199,8 +199,9 @@ static bool create_fixture(
   *fixture = (mln_test_render_fixture){0};
   fixture->driver = driver;
   fixture->serviced_on_main_thread = serviced_on_main_thread;
-  mln_render_session_attach_options options =
-    mln_render_session_attach_options_default();
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
   options.driver = fixture->driver;
   options.frame_wake = (mln_wake){
     .callback = mln_test_render_count_wake, .user_data = &fixture->frame_wakes

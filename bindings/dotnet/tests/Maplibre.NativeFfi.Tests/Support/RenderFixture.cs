@@ -60,7 +60,7 @@ internal sealed class RenderFixture : IDisposable
             // current on, the way Rust and Kotlin attach on WGL and EGL.
             if (backend is TestGraphicsBackend.Egl or TestGraphicsBackend.Wgl)
                 Graphics.MakeCurrent();
-            Runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+            Runtime = RuntimeHandle.Create(new RuntimeOptions());
             Runtime.Discarding.SetResourceProvider(NativeFixture.DenyingProvider);
             Map = Runtime.CreateMap(
                 NativeFixture.SmallMap with

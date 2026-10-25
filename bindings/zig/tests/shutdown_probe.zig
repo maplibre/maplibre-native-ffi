@@ -25,13 +25,9 @@ pub fn main() !void {
     const allocator = std.heap.smp_allocator;
     try maplibre.logSetCallback(.{ .callback = consumeLog }, null);
 
-    var options = try maplibre.runtimeOptionsDefault(allocator);
-    defer options.deinit();
-    const runtime = try maplibre.runtimeCreate(options.value, null);
+    const runtime = try maplibre.runtimeCreate(.{}, null);
     _ = try resolve(try runtime.setResourceProvider(allocator, .{ .callback = passThrough }, null));
-    var map_options = maplibre.mapOptionsDefault();
-    map_options.initial_extent = .{ .width = 256, .height = 256, .scale_factor = 1.0 };
-    const created = try runtime.createMap(map_options, null);
+    const created = try runtime.createMap(.{ .initial_extent = .{ .width = 256, .height = 256, .scale_factor = 1.0 } }, null);
     const map = created.map;
     try resolve(created.ready);
     _ = try resolve(try map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}", null));

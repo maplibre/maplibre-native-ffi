@@ -27,14 +27,4 @@ public sealed record StyleTransitionOptions
     /// Whether symbol placement changes cross-fade.
     /// </summary>
     public bool? EnablePlacementTransitions { get; init; }
-    public static StyleTransitionOptions Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyStyleTransitionOptions(
-                NativeMethods.mln_style_transition_options_default()
-            );
-        }
-    }
 }

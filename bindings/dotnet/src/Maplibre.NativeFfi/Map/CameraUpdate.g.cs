@@ -17,17 +17,5 @@ public readonly partial record struct CameraUpdate(
 )
 {
     public CameraUpdate()
-        : this(default!, default!, default!, default!)
-    {
-        this = Default;
-    }
-
-    public static CameraUpdate Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyCameraUpdate(NativeMethods.mln_camera_update_default());
-        }
-    }
+        : this(default, new(), new(), default) { }
 }

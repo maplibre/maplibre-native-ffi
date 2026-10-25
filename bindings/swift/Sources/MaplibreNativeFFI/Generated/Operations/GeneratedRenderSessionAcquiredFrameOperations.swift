@@ -23,7 +23,7 @@ public extension AcquiredFrameHandle {
   func withProducerSync<Result>(_ body: (GpuSyncView) throws -> Result) throws
     -> Result
   {
-    var raw = mln_gpu_sync_default()
+    var raw = mln_gpu_sync()
     raw.size = UInt32(MemoryLayout<mln_gpu_sync>.size)
     return try nativeView(
       reading: raw,

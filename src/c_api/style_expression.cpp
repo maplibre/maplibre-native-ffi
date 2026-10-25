@@ -7,16 +7,6 @@
 #include "c_api/boundary.hpp"
 #include "maplibre_native_c.h"
 
-auto mln_style_expression_options_default(void) noexcept
-  -> mln_style_expression_options {
-  return mln::c_api::sized<mln_style_expression_options>();
-}
-
-auto mln_style_expression_inputs_default(void) noexcept
-  -> mln_style_expression_inputs {
-  return mln::c_api::sized<mln_style_expression_inputs>();
-}
-
 auto mln_style_expression_create(
   mln_buffer_view expression, const mln_style_expression_options* options,
   mln_style_expression* out_expression, mln_diagnostic* out_diagnostic

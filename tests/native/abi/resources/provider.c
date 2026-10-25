@@ -326,7 +326,7 @@ static void a_released_request_does_not_hold_its_runtime_open(void) {
   dropped_request_probe probe = {0};
   // The case releases both handles itself, so it creates them untracked.
   mln_runtime runtime = MLN_HANDLE_NULL;
-  mln_runtime_options options = mln_runtime_options_default();
+  mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, MLN_TEST_DIAGNOSTIC));
   const mln_resource_provider provider = {
     .size = sizeof(mln_resource_provider),

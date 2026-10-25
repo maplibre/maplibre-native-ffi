@@ -9,13 +9,9 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_opengl_borrowed_texture_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
-public readonly record struct OpenglBorrowedTextureDescriptor
+public readonly partial record struct OpenglBorrowedTextureDescriptor
 {
-    public OpenglBorrowedTextureDescriptor()
-    {
-        this = Default;
-    }
-
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public OpenglBorrowedTextureDescriptor(
         LogicalExtent Extent,
         uint PhysicalWidth,
@@ -38,28 +34,28 @@ public readonly record struct OpenglBorrowedTextureDescriptor
     /// give the texture's size. A scale_factor that differs from the map's is
     /// accepted and logged as a warning.
     /// </summary>
-    public LogicalExtent Extent { get; init; }
+    public required LogicalExtent Extent { get; init; }
 
     /// <summary>
     /// Physical texture width in device pixels. Required.
     /// </summary>
-    public uint PhysicalWidth { get; init; }
+    public required uint PhysicalWidth { get; init; }
 
     /// <summary>
     /// Physical texture height in device pixels. Required.
     /// </summary>
-    public uint PhysicalHeight { get; init; }
+    public required uint PhysicalHeight { get; init; }
 
     /// <summary>
     /// Borrowed OpenGL context provider data. The textures must belong to this
     /// context or a context in the same share group.
     /// </summary>
-    public OpenglContextDescriptor Context { get; init; }
+    public required OpenglContextDescriptor Context { get; init; }
 
     /// <summary>
     /// The ring's textures, one per slot, in slot order. Required.
     /// </summary>
-    public ImmutableArray<OpenglBorrowedTexture> Textures
+    public required ImmutableArray<OpenglBorrowedTexture> Textures
     {
         get => TexturesStorage.AsImmutable();
         init => TexturesStorage = ValueArray.From(value);
@@ -69,15 +65,5 @@ public readonly record struct OpenglBorrowedTextureDescriptor
     /// <summary>
     /// OpenGL texture target of every texture. Required: GL_TEXTURE_2D.
     /// </summary>
-    public uint Target { get; init; }
-    public static OpenglBorrowedTextureDescriptor Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyOpenglBorrowedTextureDescriptor(
-                NativeMethods.mln_opengl_borrowed_texture_descriptor_default()
-            );
-        }
-    }
+    public required uint Target { get; init; }
 }

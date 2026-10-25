@@ -66,8 +66,9 @@ static void style_commands_reject_invalid_inputs(void) {
   mln_test_style_serve(runtime, NULL, 0);
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
-  mln_premultiplied_rgba8_image no_pixels =
-    mln_premultiplied_rgba8_image_default();
+  mln_premultiplied_rgba8_image no_pixels = {
+    .size = sizeof(mln_premultiplied_rgba8_image)
+  };
   no_pixels.width = 1;
   no_pixels.height = 1;
   no_pixels.stride = 4;

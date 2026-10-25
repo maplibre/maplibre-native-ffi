@@ -158,8 +158,9 @@ MLN_TEST_SET_TARGET_SUBMITTER(
 #endif
 
 static mln_opengl_surface_descriptor surface_descriptor(void) {
-  mln_opengl_surface_descriptor descriptor =
-    mln_opengl_surface_descriptor_default();
+  mln_opengl_surface_descriptor descriptor = {
+    .size = sizeof(mln_opengl_surface_descriptor)
+  };
   descriptor.extent = mln_test_target_extent();
   descriptor.context = fake_context(PRESET_PLATFORM);
 #if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
@@ -169,8 +170,9 @@ static mln_opengl_surface_descriptor surface_descriptor(void) {
 }
 
 static mln_opengl_owned_texture_descriptor owned_descriptor(uint32_t platform) {
-  mln_opengl_owned_texture_descriptor descriptor =
-    mln_opengl_owned_texture_descriptor_default();
+  mln_opengl_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_opengl_owned_texture_descriptor)
+  };
   descriptor.extent = mln_test_target_extent();
   descriptor.context = fake_context(platform);
   return descriptor;
@@ -181,7 +183,9 @@ static void describe_borrowed(mln_test_target_call* call) {
   call->textures.opengl[0] = (mln_opengl_borrowed_texture){.texture = 1};
   mln_opengl_borrowed_texture_descriptor* descriptor =
     &call->descriptor.opengl_borrowed;
-  *descriptor = mln_opengl_borrowed_texture_descriptor_default();
+  *descriptor = (mln_opengl_borrowed_texture_descriptor){
+    .size = sizeof(mln_opengl_borrowed_texture_descriptor)
+  };
   descriptor->extent = mln_test_target_extent();
   descriptor->context = fake_context(PRESET_PLATFORM);
   descriptor->textures = call->textures.opengl;

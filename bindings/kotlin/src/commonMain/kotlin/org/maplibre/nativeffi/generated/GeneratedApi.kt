@@ -8,153 +8,16 @@ import org.maplibre.nativeffi.internal.memory.*
 
 public object GeneratedApi {
   /**
-   * Returns zeroed animation options.
-   *
-   * See `mln_animation_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun animationOptionsDefault(): AnimationOptions =
-    nativeCall(null, null) {
-      val out = allocate(w(96, 104), 8)
-      C.mln_animation_options_default(out)
-      readAnimationOptions(out)
-    }
-
-  /**
-   * Returns zeroed map bound options with size set for this C API version.
-   *
-   * See `mln_bound_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun boundOptionsDefault(): BoundOptions =
-    nativeCall(null, null) {
-      val out = sized(72, 8)
-      C.mln_bound_options_default(out)
-      readBoundOptions(out)
-    }
-
-  /**
    * Reports the C ABI contract version. The value is 0 while the ABI is unstable, and will
    * increment on each SemVer major release.
    *
    * See `mln_c_version` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
    */
-  public fun cVersion(): UInt =
-    nativeCall(null, null) {
-      val raw = C.mln_c_version()
-      raw.toUInt()
-    }
-
-  /**
-   * Returns a zeroed relative camera update with size set for this version.
-   *
-   * See `mln_camera_delta_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun cameraDeltaDefault(): CameraDelta =
-    nativeCall(null, null) {
-      val out = sized(w(168, 176), 8)
-      C.mln_camera_delta_default(out)
-      readCameraDelta(out)
-    }
-
-  /**
-   * Returns zeroed camera fitting options with size set for this version.
-   *
-   * See `mln_camera_fit_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun cameraFitOptionsDefault(): CameraFitOptions =
-    nativeCall(null, null) {
-      val out = sized(56, 8)
-      C.mln_camera_fit_options_default(out)
-      readCameraFitOptions(out)
-    }
-
-  /**
-   * Returns zeroed camera options with size set for this C API version.
-   *
-   * See `mln_camera_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun cameraOptionsDefault(): CameraOptions =
-    nativeCall(null, null) {
-      val out = sized(120, 8)
-      C.mln_camera_options_default(out)
-      readCameraOptions(out)
-    }
-
-  /**
-   * Returns a zeroed atomic camera update, with its size and its camera's size set for this C API
-   * version.
-   *
-   * See `mln_camera_update_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun cameraUpdateDefault(): CameraUpdate =
-    nativeCall(null, null) {
-      val out = sized(w(232, 240), 8)
-      C.mln_camera_update_default(out)
-      readCameraUpdate(out)
-    }
-
-  /**
-   * Returns zeroed custom geometry source options with size set.
-   *
-   * See `mln_custom_geometry_source_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun customGeometrySourceOptionsDefault(
-    fetchTile: CustomSourceFetchTileCallback,
-  ): CustomGeometrySourceOptions =
-    nativeCall(null, null) {
-      val out = sized(w(72, 88), 8)
-      C.mln_custom_geometry_source_options_default(out)
-      readCustomGeometrySourceOptions(out, fetchTile)
-    }
-
-  /**
-   * Returns zeroed custom MVT vector source options with size set.
-   *
-   * See `mln_custom_mvt_vector_source_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun customMvtVectorSourceOptionsDefault(
-    fetchTile: CustomSourceFetchTileCallback,
-  ): CustomMvtVectorSourceOptions =
-    nativeCall(null, null) {
-      val out = sized(w(56, 64), 8)
-      C.mln_custom_mvt_vector_source_options_default(out)
-      readCustomMvtVectorSourceOptions(out, fetchTile)
-    }
-
-  /**
-   * Returns a zeroed frame demand with size set for this C API version: a zero-token,
-   * render-if-needed, nonpresenting demand.
-   *
-   * See `mln_frame_demand_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-   */
-  public fun frameDemandDefault(): FrameDemand =
-    nativeCall(null, null) {
-      val out = sized(16, 8)
-      C.mln_frame_demand_default(out)
-      readFrameDemand(out)
-    }
-
-  /**
-   * Returns zeroed free camera options with size set for this C API version.
-   *
-   * See `mln_free_camera_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun freeCameraOptionsDefault(): FreeCameraOptions =
-    nativeCall(null, null) {
-      val out = sized(64, 8)
-      C.mln_free_camera_options_default(out)
-      readFreeCameraOptions(out)
-    }
+  public fun cVersion(): UInt = nativeUncheckedCall {
+    val raw = C.mln_c_version()
+    raw.toUInt()
+  }
 
   /**
    * Prepares GeoJSON source data for installation on a map.
@@ -177,46 +40,6 @@ public object GeneratedApi {
         ),
       )
       adopt(out, GeneratedOwnerDisposal::geojsonSourceData) { GeojsonSourceDataHandle(it) }
-    }
-
-  /**
-   * Returns zeroed GeoJSON source options with size set.
-   *
-   * See `mln_geojson_source_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun geojsonSourceOptionsDefault(): GeojsonSourceOptions =
-    nativeCall(null, null) {
-      val out = sized(w(64, 72), 8)
-      C.mln_geojson_source_options_default(out)
-      readGeojsonSourceOptions(out)
-    }
-
-  /**
-   * Returns zeroed synchronization with size set for this C API version, which is CPU completion.
-   *
-   * See `mln_gpu_sync_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-   */
-  public fun gpuSyncDefault(): GpuSync =
-    nativeCall(null, null) {
-      val out = sized(16, 8)
-      C.mln_gpu_sync_default(out)
-      readGpuSync(out)
-    }
-
-  /**
-   * Returns a zeroed header rule with size set for this C API version: an exact match of the empty
-   * URL for every resource kind, with no headers.
-   *
-   * See `mln_http_header_rule_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  public fun httpHeaderRuleDefault(): HttpHeaderRule =
-    nativeCall(null, null) {
-      val out = sized(w(28, 48), w(4, 8))
-      C.mln_http_header_rule_default(out)
-      readHttpHeaderRule(out)
     }
 
   /**
@@ -253,19 +76,6 @@ public object GeneratedApi {
     }
 
   /**
-   * Returns a zeroed logical extent, which every function that takes an extent rejects.
-   *
-   * See `mln_logical_extent_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-   */
-  public fun logicalExtentDefault(): LogicalExtent =
-    nativeCall(null, null) {
-      val out = allocate(16, 8)
-      C.mln_logical_extent_default(out)
-      readLogicalExtent(out)
-    }
-
-  /**
    * Computes the physical device-pixel size of a logical extent.
    *
    * See `mln_logical_extent_physical_size` in the
@@ -280,19 +90,6 @@ public object GeneratedApi {
     }
 
   /**
-   * Returns zeroed map options with size set for this C API version.
-   *
-   * See `mln_map_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-   */
-  public fun mapOptionsDefault(): MapOptions =
-    nativeCall(null, null) {
-      val out = sized(40, 8)
-      C.mln_map_options_default(out)
-      readMapOptions(out)
-    }
-
-  /**
    * Creates a standalone projection of a view, such as the view of a rendered frame or of a map
    * snapshot.
    *
@@ -304,74 +101,6 @@ public object GeneratedApi {
       val out = allocate(8, 8)
       check(C.mln_map_projection_create(writeMapView(view), out, diagnostic))
       adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle(it) }
-    }
-
-  /**
-   * Returns zeroed tile tuning options with size set for this C API version.
-   *
-   * See `mln_map_tile_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun mapTileOptionsDefault(): MapTileOptions =
-    nativeCall(null, null) {
-      val out = sized(56, 8)
-      C.mln_map_tile_options_default(out)
-      readMapTileOptions(out)
-    }
-
-  /**
-   * Returns zeroed viewport options with size set for this C API version.
-   *
-   * See `mln_map_viewport_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun mapViewportOptionsDefault(): MapViewportOptions =
-    nativeCall(null, null) {
-      val out = sized(56, 8)
-      C.mln_map_viewport_options_default(out)
-      readMapViewportOptions(out)
-    }
-
-  /**
-   * Returns a zeroed Metal borrowed-texture descriptor with size set for this C API version. The
-   * caller still sets every required member.
-   *
-   * See `mln_metal_borrowed_texture_descriptor_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun metalBorrowedTextureDescriptorDefault(): MetalBorrowedTextureDescriptor =
-    nativeCall(null, null) {
-      val out = sized(w(40, 48), 8)
-      C.mln_metal_borrowed_texture_descriptor_default(out)
-      readMetalBorrowedTextureDescriptor(out)
-    }
-
-  /**
-   * Returns a zeroed Metal owned-texture descriptor with size set for this C API version. The
-   * caller still sets every required member.
-   *
-   * See `mln_metal_owned_texture_descriptor_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun metalOwnedTextureDescriptorDefault(): MetalOwnedTextureDescriptor =
-    nativeCall(null, null) {
-      val out = sized(40, 8)
-      C.mln_metal_owned_texture_descriptor_default(out)
-      readMetalOwnedTextureDescriptor(out)
-    }
-
-  /**
-   * Returns a zeroed Metal surface descriptor with size set for this C API version. The caller
-   * still sets every required member.
-   *
-   * See `mln_metal_surface_descriptor_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  public fun metalSurfaceDescriptorDefault(): MetalSurfaceDescriptor =
-    nativeCall(null, null) {
-      val out = sized(w(32, 40), 8)
-      C.mln_metal_surface_descriptor_default(out)
-      readMetalSurfaceDescriptor(out)
     }
 
   /**
@@ -397,34 +126,6 @@ public object GeneratedApi {
     nativeCall(null, null) { check(C.mln_network_set_status(status.rawValue.toInt(), diagnostic)) }
 
   /**
-   * Returns a zeroed OpenGL borrowed-texture descriptor with size set for this C API version. The
-   * caller still sets every required member.
-   *
-   * See `mln_opengl_borrowed_texture_descriptor_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun openglBorrowedTextureDescriptorDefault(): OpenglBorrowedTextureDescriptor =
-    nativeCall(null, null) {
-      val out = sized(w(72, 104), 8)
-      C.mln_opengl_borrowed_texture_descriptor_default(out)
-      readOpenglBorrowedTextureDescriptor(out)
-    }
-
-  /**
-   * Returns a zeroed OpenGL owned-texture descriptor with size set for this C API version. The
-   * caller still sets every required member.
-   *
-   * See `mln_opengl_owned_texture_descriptor_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun openglOwnedTextureDescriptorDefault(): OpenglOwnedTextureDescriptor =
-    nativeCall(null, null) {
-      val out = sized(w(56, 72), 8)
-      C.mln_opengl_owned_texture_descriptor_default(out)
-      readOpenglOwnedTextureDescriptor(out)
-    }
-
-  /**
    * Returns OpenGL context providers supported by this build.
    *
    * See `mln_opengl_supported_context_provider_mask` in the
@@ -434,34 +135,6 @@ public object GeneratedApi {
     nativeCall(null, null) {
       val raw = C.mln_opengl_supported_context_provider_mask()
       OpenglContextProviderFlag(raw.toUInt())
-    }
-
-  /**
-   * Returns a zeroed OpenGL surface descriptor with size set for this C API version. The caller
-   * still sets every required member.
-   *
-   * See `mln_opengl_surface_descriptor_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  public fun openglSurfaceDescriptorDefault(): OpenglSurfaceDescriptor =
-    nativeCall(null, null) {
-      val out = sized(w(56, 80), 8)
-      C.mln_opengl_surface_descriptor_default(out)
-      readOpenglSurfaceDescriptor(out)
-    }
-
-  /**
-   * Returns a zeroed premultiplied RGBA8 image descriptor with size set. The caller still sets
-   * every required member.
-   *
-   * See `mln_premultiplied_rgba8_image_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun premultipliedRgba8ImageDefault(): PremultipliedRgba8Image =
-    nativeCall(null, null) {
-      val out = sized(w(24, 32), w(4, 8))
-      C.mln_premultiplied_rgba8_image_default(out)
-      readPremultipliedRgba8Image(out)
     }
 
   /**
@@ -475,59 +148,6 @@ public object GeneratedApi {
       val out = allocate(16, 8)
       check(C.mln_projected_meters_for_lat_lng(writeLatLng(coordinate), out, diagnostic))
       readProjectedMeters(out)
-    }
-
-  /**
-   * Returns zeroed axonometric rendering options with size set for this C API version.
-   *
-   * See `mln_projection_mode_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun projectionModeDefault(): ProjectionMode =
-    nativeCall(null, null) {
-      val out = sized(32, 8)
-      C.mln_projection_mode_default(out)
-      readProjectionMode(out)
-    }
-
-  /**
-   * Returns zeroed attachment options with size set for this C API version.
-   *
-   * See `mln_render_session_attach_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-   */
-  public fun renderSessionAttachOptionsDefault(): RenderSessionAttachOptions =
-    nativeCall(null, null) {
-      val out = sized(w(56, 96), w(4, 8))
-      C.mln_render_session_attach_options_default(out)
-      readRenderSessionAttachOptions(out)
-    }
-
-  /**
-   * Returns zeroed rendered feature query options with size set.
-   *
-   * See `mln_rendered_feature_query_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-   */
-  public fun renderedFeatureQueryOptionsDefault(): RenderedFeatureQueryOptions =
-    nativeCall(null, null) {
-      val out = sized(w(24, 40), w(4, 8))
-      C.mln_rendered_feature_query_options_default(out)
-      readRenderedFeatureQueryOptions(out)
-    }
-
-  /**
-   * Returns a zeroed route with size set for this C API version: an exact match of the empty URL
-   * for every resource kind.
-   *
-   * See `mln_resource_route_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  public fun resourceRouteDefault(): ResourceRoute =
-    nativeCall(null, null) {
-      val out = sized(w(20, 32), w(4, 8))
-      C.mln_resource_route_default(out)
-      readResourceRoute(out)
     }
 
   /**
@@ -548,32 +168,6 @@ public object GeneratedApi {
         C.mln_runtime_create(writeRuntimeOptions(options), out, diagnostic)
       }
       adopt(out, GeneratedOwnerDisposal::runtime) { RuntimeHandle(it) }
-    }
-
-  /**
-   * Returns zeroed runtime options with size set for this C API version.
-   *
-   * See `mln_runtime_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  public fun runtimeOptionsDefault(): RuntimeOptions =
-    nativeCall(null, null) {
-      val out = sized(w(20, 40), w(4, 8))
-      C.mln_runtime_options_default(out)
-      readRuntimeOptions(out)
-    }
-
-  /**
-   * Returns zeroed source feature query options with size set.
-   *
-   * See `mln_source_feature_query_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-   */
-  public fun sourceFeatureQueryOptionsDefault(): SourceFeatureQueryOptions =
-    nativeCall(null, null) {
-      val out = sized(w(24, 40), w(4, 8))
-      C.mln_source_feature_query_options_default(out)
-      readSourceFeatureQueryOptions(out)
     }
 
   /**
@@ -600,58 +194,6 @@ public object GeneratedApi {
     }
 
   /**
-   * Returns zeroed style expression inputs with size set, which set no input.
-   *
-   * See `mln_style_expression_inputs_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-   */
-  public fun styleExpressionInputsDefault(): StyleExpressionInputs =
-    nativeCall(null, null) {
-      val out = sized(w(80, 112), 8)
-      C.mln_style_expression_inputs_default(out)
-      readStyleExpressionInputs(out)
-    }
-
-  /**
-   * Returns zeroed style expression options with size set.
-   *
-   * See `mln_style_expression_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-   */
-  public fun styleExpressionOptionsDefault(): StyleExpressionOptions =
-    nativeCall(null, null) {
-      val out = sized(20, 4)
-      C.mln_style_expression_options_default(out)
-      readStyleExpressionOptions(out)
-    }
-
-  /**
-   * Returns zeroed runtime style image options with size set.
-   *
-   * See `mln_style_image_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun styleImageOptionsDefault(): StyleImageOptions =
-    nativeCall(null, null) {
-      val out = sized(w(56, 72), w(4, 8))
-      C.mln_style_image_options_default(out)
-      readStyleImageOptions(out)
-    }
-
-  /**
-   * Returns zeroed global style transition options with size set.
-   *
-   * See `mln_style_transition_options_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun styleTransitionOptionsDefault(): StyleTransitionOptions =
-    nativeCall(null, null) {
-      val out = sized(32, 8)
-      C.mln_style_transition_options_default(out)
-      readStyleTransitionOptions(out)
-    }
-
-  /**
    * Reports the render backends available in this native library build.
    *
    * See `mln_supported_render_backend_mask` in the
@@ -661,89 +203,5 @@ public object GeneratedApi {
     nativeCall(null, null) {
       val raw = C.mln_supported_render_backend_mask()
       RenderBackendFlag(raw.toUInt())
-    }
-
-  /**
-   * Returns a zeroed Vulkan borrowed-texture descriptor with size set for this C API version. The
-   * caller still sets every required member.
-   *
-   * See `mln_vulkan_borrowed_texture_descriptor_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun vulkanBorrowedTextureDescriptorDefault(): VulkanBorrowedTextureDescriptor =
-    nativeCall(null, null) {
-      val out = sized(w(80, 120), 8)
-      C.mln_vulkan_borrowed_texture_descriptor_default(out)
-      readVulkanBorrowedTextureDescriptor(out)
-    }
-
-  /**
-   * Returns a zeroed Vulkan owned-texture descriptor with size set for this C API version. The
-   * caller still sets every required member.
-   *
-   * See `mln_vulkan_owned_texture_descriptor_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun vulkanOwnedTextureDescriptorDefault(): VulkanOwnedTextureDescriptor =
-    nativeCall(null, null) {
-      val out = sized(w(56, 80), 8)
-      C.mln_vulkan_owned_texture_descriptor_default(out)
-      readVulkanOwnedTextureDescriptor(out)
-    }
-
-  /**
-   * Returns a zeroed Vulkan surface descriptor with size set for this C API version. The caller
-   * still sets every required member.
-   *
-   * See `mln_vulkan_surface_descriptor_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  public fun vulkanSurfaceDescriptorDefault(): VulkanSurfaceDescriptor =
-    nativeCall(null, null) {
-      val out = sized(w(64, 88), 8)
-      C.mln_vulkan_surface_descriptor_default(out)
-      readVulkanSurfaceDescriptor(out)
-    }
-
-  /**
-   * Returns a zeroed WebGPU borrowed-texture descriptor with size set for this C API version. The
-   * caller still sets every required member.
-   *
-   * See `mln_webgpu_borrowed_texture_descriptor_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun webgpuBorrowedTextureDescriptorDefault(): WebgpuBorrowedTextureDescriptor =
-    nativeCall(null, null) {
-      val out = sized(w(56, 80), 8)
-      C.mln_webgpu_borrowed_texture_descriptor_default(out)
-      readWebgpuBorrowedTextureDescriptor(out)
-    }
-
-  /**
-   * Returns a zeroed WebGPU owned-texture descriptor with size set for this C API version. The
-   * caller still sets every required member.
-   *
-   * See `mln_webgpu_owned_texture_descriptor_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun webgpuOwnedTextureDescriptorDefault(): WebgpuOwnedTextureDescriptor =
-    nativeCall(null, null) {
-      val out = sized(w(40, 48), 8)
-      C.mln_webgpu_owned_texture_descriptor_default(out)
-      readWebgpuOwnedTextureDescriptor(out)
-    }
-
-  /**
-   * Returns a zeroed WebGPU surface descriptor with size set for this C API version. The caller
-   * still sets every required member.
-   *
-   * See `mln_webgpu_surface_descriptor_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  public fun webgpuSurfaceDescriptorDefault(): WebgpuSurfaceDescriptor =
-    nativeCall(null, null) {
-      val out = sized(w(48, 64), 8)
-      C.mln_webgpu_surface_descriptor_default(out)
-      readWebgpuSurfaceDescriptor(out)
     }
 }

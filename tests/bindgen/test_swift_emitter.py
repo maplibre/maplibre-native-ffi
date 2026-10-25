@@ -112,6 +112,28 @@ class SwiftEmitterTests(unittest.TestCase):
         self.assertFalse(swift.repeats("setHeader", "name"))
         self.assertFalse(swift.repeats("queryFeatureExtensions", "sourceId"))
 
+    def test_a_required_member_has_no_default_and_others_default_to_zero(self):
+        outputs = swift.generate(real_api())
+        values = "".join(
+            text for path, text in outputs.items() if path.startswith("Generated/")
+        )
+        self.assertIn(
+            "public init(`initialExtent`: LogicalExtent, `mapMode`: MapMode = "
+            ".init(rawValue: 0), `fastPforEnabled`: Bool = false, `eventMask`: "
+            "RuntimeEventFlag? = nil)",
+            values,
+        )
+        self.assertNotIn("static var `default`", values)
+        # A call that returns a value cannot fail, and reading the C version
+        # skips the ABI version check, which reads it.
+        words = " ".join(values.split())
+        self.assertIn("static func `cVersion`() -> UInt32 { mln_c_version() }", words)
+        self.assertIn(
+            "static func `supportedRenderBackendMask`() -> RenderBackendFlag { "
+            "nativeDirect {",
+            words,
+        )
+
     def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
         values = "".join(
             text
@@ -137,7 +159,6 @@ class SwiftEmitterTests(unittest.TestCase):
                 "values",
                 "defaults",
                 "keywords",
-                "default_registration",
                 "absent_handle",
                 "absent_value",
                 "strided_records",

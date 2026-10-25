@@ -17,7 +17,7 @@
 static uint32_t render_frame(
   const mln_test_render_fixture* fixture, uint64_t token, uint32_t flags
 ) {
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_FORCE | flags;
   demand.token = token;
   MLN_TEST_OK(
@@ -262,7 +262,7 @@ static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
   );
   mln_acquired_frame first = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &first, NULL));
-  mln_gpu_sync producer = mln_gpu_sync_default();
+  mln_gpu_sync producer = {.size = sizeof(mln_gpu_sync)};
   MLN_TEST_OK(mln_acquired_frame_get_producer_sync(first, &producer, NULL));
   TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_OPENGL_FENCE, producer.kind);
   TEST_ASSERT_TRUE(is_sync((void*)(uintptr_t)producer.handle));
@@ -409,8 +409,9 @@ static void a_surface_replacement_can_change_the_scale_factor(void) {
   TEST_ASSERT_TRUE(mln_test_graphics_get_context(graphics, &context));
   mln_test_graphics_surface_info info = {0};
   TEST_ASSERT_TRUE(mln_test_graphics_surface_get_info(replacement, &info));
-  mln_metal_surface_descriptor descriptor =
-    mln_metal_surface_descriptor_default();
+  mln_metal_surface_descriptor descriptor = {
+    .size = sizeof(mln_metal_surface_descriptor)
+  };
   descriptor.extent = (mln_logical_extent){
     .width = MLN_TEST_HOST_TARGET_SIZE,
     .height = MLN_TEST_HOST_TARGET_SIZE,

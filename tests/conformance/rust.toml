@@ -40,7 +40,6 @@
 # slice length into a native count, which this test cannot allocate.
 "VAL-04" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::open_enums_keep_unknown_values_and_64_bit_masks_cross_whole"
 "VAL-05" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::array_inputs_are_copied_when_they_are_submitted"
-"VAL-06" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::a_record_built_from_its_default_equals_the_native_default"
 "VAL-07" = "bindings/rust/crates/maplibre-native-ffi/src/completion.rs::an_array_result_is_read_at_its_value_size"
 "VAL-08" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::synchronous_calls_fill_caller_sized_outputs_in_input_order"
 "VAL-09" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::caller_sized_text_returns_results_longer_than_its_first_storage"

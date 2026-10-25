@@ -60,8 +60,9 @@ static void ignore_completion(
 
 static mln_status attach_owned_texture(still_image_job* job) {
   // #region attach
-  mln_opengl_owned_texture_descriptor descriptor =
-    mln_opengl_owned_texture_descriptor_default();
+  mln_opengl_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_opengl_owned_texture_descriptor)
+  };
   descriptor.extent.width = job->width;
   descriptor.extent.height = job->height;
   descriptor.extent.scale_factor = 1.0;
@@ -70,8 +71,9 @@ static mln_status attach_owned_texture(still_image_job* job) {
   descriptor.context.data.egl.display = job->egl_display;
   descriptor.context.data.egl.config = job->egl_config;
   descriptor.context.data.egl.client_api = MLN_OPENGL_CLIENT_API_GLES;
-  mln_render_session_attach_options options =
-    mln_render_session_attach_options_default();
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
   options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
   options.requested_texture_ring_depth = 1;
   const mln_completion completion = {
@@ -98,7 +100,7 @@ static void map_ready(void* user_data, const mln_completion_result* result) {
 
 mln_status start_still_image(still_image_job* job) {
   // #region create
-  mln_map_options options = mln_map_options_default();
+  mln_map_options options = {.size = sizeof(mln_map_options)};
   options.initial_extent = (mln_logical_extent){
     .width = job->width, .height = job->height, .scale_factor = 1.0
   };

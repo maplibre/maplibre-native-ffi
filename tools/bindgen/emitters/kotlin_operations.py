@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from ..semantic import DefaultSupport, output_member, required_callbacks
+from ..semantic import output_member
 from .kotlin_values import Unsupported, identifier, is_text, name, owner_name
 
 EXECUTIONS = {
@@ -189,15 +189,12 @@ def outputs_signature(plan, values):
     return result_name
 
 
-def declaration(params, defaults=None):
+def declaration(params):
     """Kotlin parameter declarations, defaulting each nullable parameter to null."""
-    result = []
-    for local, typ in params:
-        default = (defaults or {}).get(local)
-        if default is None and typ.endswith("?"):
-            default = "null"
-        result.append(f"{local}: {typ}" + (f" = {default}" if default else ""))
-    return ", ".join(result)
+    return ", ".join(
+        f"{local}: {typ}" + (" = null" if typ.endswith("?") else "")
+        for local, typ in params
+    )
 
 
 def counted_inputs(plan):
@@ -205,7 +202,8 @@ def counted_inputs(plan):
     return {
         p.value.length: p
         for p in plan.inputs
-        if p.value.kind in {"array", "buffer"} and p.value.length not in {None, "1"}
+        if p.value.kind in {"array", "buffer"}
+        and p.value.length not in {None, "nul", "1"}
     }
 
 
@@ -412,16 +410,6 @@ def operation(plan, values, native, *, discard=False):
 
 def immediate(plan, values, native):
     method, params, _inputs, result, result_type = signature(plan, values)
-    if isinstance(plan.support, DefaultSupport) and result:
-        # The native default holds no callbacks, so its caller passes the
-        # required ones, which the copy then names.
-        params = [
-            *params,
-            *(
-                (identifier(f.name), values.public(f.value))
-                for f in required_callbacks(result)
-            ),
-        ]
     arguments = call_arguments(plan, values)
     setup, decoded = [], None
     if plan.outputs:
@@ -444,7 +432,10 @@ def immediate(plan, values, native):
         setup.append(native.checked(plan.function, arguments))
     if decoded:
         setup.append(decoded)
-    helper = call_helper(plan)
+    # The ABI version check reads the C version, so reading it skips the check.
+    helper = (
+        "nativeUncheckedCall" if plan.name == "mln_c_version" else call_helper(plan)
+    )
     body = encodings(plan) + "; ".join(setup)
     return f"  public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
 
@@ -497,7 +488,10 @@ def caller_sized_text(plan, values, native, text):
         + " }",
         f"readBytes(textStorage, {written}).decodeToString()",
     ]
-    helper = call_helper(plan)
+    # The ABI version check reads the C version, so reading it skips the check.
+    helper = (
+        "nativeUncheckedCall" if plan.name == "mln_c_version" else call_helper(plan)
+    )
     body = encodings(plan) + "; ".join(setup)
     return f"  public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
 
@@ -513,7 +507,10 @@ def multiple_outputs(plan, values, native):
         copied.append(f"{field} = " + decoded.replace("{out}", f"out{index}"))
     setup.append(native.checked(plan.function, arguments))
     setup.append(f"{result_type}({', '.join(copied)})")
-    helper = call_helper(plan)
+    # The ABI version check reads the C version, so reading it skips the check.
+    helper = (
+        "nativeUncheckedCall" if plan.name == "mln_c_version" else call_helper(plan)
+    )
     body = encodings(plan) + "; ".join(setup)
     return f"  public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
 
@@ -661,16 +658,7 @@ def thread_start(plan, values, native, head, arguments, create, handle):
 
 
 def lifecycle(plan, values, native):
-    method, params, inputs, _result, _result_type = signature(plan, values)
-    defaults = {}
-    for (local, _typ), parameter in zip(params, inputs, strict=True):
-        value = parameter.value.unwrapped
-        if value.default and not _typ.endswith("?"):
-            defaults[local] = (
-                "GeneratedApi."
-                + method_name(values.bound.operations_by_name[value.default])
-                + "()"
-            )
+    method, params, _inputs, _result, _result_type = signature(plan, values)
     arguments = call_arguments(plan, values)
     receiver_index = next(
         i for i, p in enumerate(plan.inputs) if p.name == plan.receiver
@@ -684,7 +672,7 @@ def lifecycle(plan, values, native):
             f"val holder = {values.storage(slot)}.also {{ writeI64(it, handle) }}"
         )
         arguments[receiver_index] = "holder"
-    parameters = declaration(params, defaults)
+    parameters = declaration(params)
 
     def body(*completion):
         call = native.checked(plan.function, [*arguments, *completion])

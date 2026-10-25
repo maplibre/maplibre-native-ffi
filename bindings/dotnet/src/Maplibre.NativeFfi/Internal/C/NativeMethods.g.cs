@@ -73,37 +73,7 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_animation_options mln_animation_options_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_bound_options mln_bound_options_default();
-
-    [LibraryImport(LibraryName)]
     internal static partial uint mln_c_version();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_camera_delta mln_camera_delta_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_camera_fit_options mln_camera_fit_options_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_camera_options mln_camera_options_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_camera_update mln_camera_update_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_custom_geometry_source_options mln_custom_geometry_source_options_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_custom_mvt_vector_source_options mln_custom_mvt_vector_source_options_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_frame_demand mln_frame_demand_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_free_camera_options mln_free_camera_options_default();
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_geojson_source_data_create(
@@ -115,15 +85,6 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial void mln_geojson_source_data_release(MlnGeojsonSourceData data);
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_geojson_source_options mln_geojson_source_options_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_gpu_sync mln_gpu_sync_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_http_header_rule mln_http_header_rule_default();
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_http_header_transform_response_set_header(
@@ -154,9 +115,6 @@ internal static unsafe partial class NativeMethods
         mln_log_handler* handler,
         mln_diagnostic* out_diagnostic
     );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_logical_extent mln_logical_extent_default();
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_logical_extent_physical_size(
@@ -582,9 +540,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_map_options mln_map_options_default();
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_projection_create(
         mln_map_view* view,
         MlnMapProjection* out_projection,
@@ -976,27 +931,12 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_map_tile_options mln_map_tile_options_default();
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_update_camera(
         MlnMap map,
         mln_camera_update* update,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_map_viewport_options mln_map_viewport_options_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_metal_borrowed_texture_descriptor mln_metal_borrowed_texture_descriptor_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_metal_owned_texture_descriptor mln_metal_owned_texture_descriptor_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_metal_surface_descriptor mln_metal_surface_descriptor_default();
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_network_get_status(
@@ -1011,22 +951,10 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_opengl_borrowed_texture_descriptor mln_opengl_borrowed_texture_descriptor_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_opengl_owned_texture_descriptor mln_opengl_owned_texture_descriptor_default();
-
-    [LibraryImport(LibraryName)]
     internal static partial uint mln_opengl_supported_context_provider_mask();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_opengl_surface_descriptor mln_opengl_surface_descriptor_default();
-
-    [LibraryImport(LibraryName)]
     internal static partial void* mln_plugin_get_register_function_v1();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_premultiplied_rgba8_image mln_premultiplied_rgba8_image_default();
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_projected_meters_for_lat_lng(
@@ -1034,9 +962,6 @@ internal static unsafe partial class NativeMethods
         mln_projected_meters* out_meters,
         mln_diagnostic* out_diagnostic
     );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_projection_mode mln_projection_mode_default();
 
     [LibraryImport(LibraryName)]
     internal static partial void mln_render_frame_batch_release(MlnRenderFrameBatch batch);
@@ -1054,9 +979,6 @@ internal static unsafe partial class NativeMethods
         MlnAcquiredFrame* out_frame,
         mln_diagnostic* out_diagnostic
     );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_render_session_attach_options mln_render_session_attach_options_default();
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_barrier(
@@ -1229,9 +1151,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_rendered_feature_query_options mln_rendered_feature_query_options_default();
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_resource_request_complete(
         MlnResourceRequest handle,
         mln_resource_response* response,
@@ -1261,9 +1180,6 @@ internal static unsafe partial class NativeMethods
         bool* out_cancelled,
         mln_diagnostic* out_diagnostic
     );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_resource_route mln_resource_route_default();
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_resource_transform_request_complete(
@@ -1392,9 +1308,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_runtime_options mln_runtime_options_default();
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_runtime_release(
         MlnRuntime runtime,
         mln_completion* completion,
@@ -1485,9 +1398,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_source_feature_query_options mln_source_feature_query_options_default();
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_style_expression_create(
         mln_buffer_view expression,
         mln_style_expression_options* options,
@@ -1513,29 +1423,8 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_style_expression_inputs mln_style_expression_inputs_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_style_expression_options mln_style_expression_options_default();
-
-    [LibraryImport(LibraryName)]
     internal static partial void mln_style_expression_release(MlnStyleExpression expression);
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_style_image_options mln_style_image_options_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_style_transition_options mln_style_transition_options_default();
-
-    [LibraryImport(LibraryName)]
     internal static partial uint mln_supported_render_backend_mask();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_vulkan_borrowed_texture_descriptor mln_vulkan_borrowed_texture_descriptor_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_vulkan_owned_texture_descriptor mln_vulkan_owned_texture_descriptor_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_vulkan_surface_descriptor mln_vulkan_surface_descriptor_default();
 }

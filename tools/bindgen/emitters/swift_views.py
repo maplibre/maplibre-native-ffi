@@ -39,10 +39,9 @@ def operation(plan, values):
     functions = values.bound.source.functions_by_name
     begin = native_call(functions[view.begin], "raw", "token")
     read = native_call(plan.function, "raw", "value")
-    initial = value.default + "()" if value.default else value.native + "()"
     return (
         f"""func {method}<Result>(_ body: ({scoped}) throws -> Result) throws -> Result {{
-  var raw = {initial}
+  var raw = {value.native}()
   raw.size = UInt32(MemoryLayout<{value.native}>.size)
   return try nativeView(reading: raw, begin: {{ raw, token, diagnostic in {begin} }}, end: {{ {view.end}($0) }}, get: {{ raw, value, diagnostic in {read} }}) {{ raw, scope in try body({scoped}({copied}, scope: scope)) }}
 }}

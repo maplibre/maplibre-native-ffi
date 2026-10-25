@@ -659,12 +659,6 @@ typedef struct mln_resource_route {
   mln_buffer_view url;
 } mln_resource_route;
 
-/**
- * Returns a zeroed route with size set for this C API version: an exact match
- * of the empty URL for every resource kind.
- */
-MLN_API mln_resource_route mln_resource_route_default(void) MLN_NOEXCEPT;
-
 /** One HTTP header that a header rule supplies. */
 typedef struct mln_http_header {
   /** Header field name. Required. */
@@ -695,12 +689,6 @@ typedef struct mln_http_header_rule {
   const mln_http_header* headers MLN_BINDING("length=header_count");
   size_t header_count;
 } mln_http_header_rule;
-
-/**
- * Returns a zeroed header rule with size set for this C API version: an exact
- * match of the empty URL for every resource kind, with no headers.
- */
-MLN_API mln_http_header_rule mln_http_header_rule_default(void) MLN_NOEXCEPT;
 
 /**
  * Asks the host for the URL of one network resource request.
@@ -1077,11 +1065,6 @@ typedef struct mln_resource_provider {
 } mln_resource_provider MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
-
-/**
- * Returns zeroed runtime options with size set for this C API version.
- */
-MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
 
 /**
  * Creates a runtime.

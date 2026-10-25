@@ -244,8 +244,8 @@ def sources(values, plan):
         plain_fields(plan),
         extra_fields=fields,
         extra_methods="\n" + "\n".join(methods),
-        # Native never returns callbacks, so a copy of a registration's
-        # default leaves them at None.
+        # Native never returns callbacks, so a copy of a registration takes
+        # them from its caller.
         copied=plan.native in values.api.returned,
         registration=True,
         required=[f.name for f in required_callbacks(plan)],

@@ -113,9 +113,8 @@ pub fn attach_options(
     driver: RenderDriverKind,
 ) -> RenderSessionAttachOptions {
     let mut options = RenderSessionAttachOptions {
-        driver,
         frame_wake: wakes.wake(AppEvent::FrameResults),
-        ..RenderSessionAttachOptions::default()
+        ..RenderSessionAttachOptions::new(driver)
     };
     if mode == Mode::OwnedTexture {
         options.requested_texture_ring_depth = RING_DEPTH as u32;

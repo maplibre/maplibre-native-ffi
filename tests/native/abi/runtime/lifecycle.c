@@ -32,7 +32,7 @@ static mln_status create_runtime_from(
 }
 
 static void runtime_creation_validates_its_options(void) {
-  const mln_runtime_options defaults = mln_runtime_options_default();
+  const mln_runtime_options defaults = {.size = sizeof(mln_runtime_options)};
   mln_test_run_validation_table(
     runtime_option_cases,
     sizeof(runtime_option_cases) / sizeof(*runtime_option_cases), &defaults,
@@ -107,7 +107,8 @@ static void map_options_with_unknown_field(void* descriptor) {
 
 // The initial extent is required, so the zeroed default options are rejected.
 static void map_options_without_extent(void* descriptor) {
-  *(mln_map_options*)descriptor = mln_map_options_default();
+  *(mln_map_options*)descriptor =
+    (mln_map_options){.size = sizeof(mln_map_options)};
 }
 
 static const mln_test_validation_case map_creation_cases[] = {
@@ -241,7 +242,7 @@ typedef struct creator_thread_probe {
 
 static void create_on_temporary_thread(void* argument) {
   creator_thread_probe* probe = argument;
-  const mln_runtime_options options = mln_runtime_options_default();
+  const mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   probe->status = mln_runtime_create(&options, &probe->runtime, NULL);
   if (probe->status != MLN_STATUS_OK) return;
 
@@ -301,7 +302,7 @@ typedef struct close_probe {
 } close_probe;
 
 static mln_runtime create_untracked_runtime(void) {
-  const mln_runtime_options options = mln_runtime_options_default();
+  const mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   mln_runtime runtime = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, NULL));
   return runtime;
@@ -346,7 +347,7 @@ static void disposal_release(void* user_data) {
 static void disposal_waits_for_children_and_retires_callback_state(void) {
   atomic_bool released;
   atomic_init(&released, false);
-  mln_runtime_options options = mln_runtime_options_default();
+  mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   mln_runtime runtime = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, NULL));
   const mln_resource_provider provider = {
@@ -405,7 +406,7 @@ static void complete_other_retirement(void* user_data) {
 static void runtime_state_release_can_wait_for_another_runtime(void) {
   retirement_wait wait = {0};
   retirement_result result = {.status = MLN_STATUS_NATIVE_ERROR};
-  mln_runtime_options options = mln_runtime_options_default();
+  mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   mln_runtime waiting = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_runtime_create(&options, &waiting, NULL));
   const mln_resource_provider provider = {

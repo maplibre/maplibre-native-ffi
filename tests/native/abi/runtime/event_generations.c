@@ -243,7 +243,10 @@ static mln_status set_malformed_style(
 static mln_status jump_to_zoom_three(
   mln_map map, const mln_completion* completion
 ) {
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.mode = MLN_CAMERA_UPDATE_MODE_JUMP;
   update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   update.camera.zoom = 3.0;
@@ -393,7 +396,7 @@ static bool animated_change_recorded(void* context) {
 // loaded.
 static void state_events_follow_a_snapshot_that_includes_them(void) {
   static const double target_zoom = 5.0;
-  mln_runtime_options runtime_options = mln_runtime_options_default();
+  mln_runtime_options runtime_options = {.size = sizeof(mln_runtime_options)};
   // The fixture's runtime helper installs its own wake, so this creates the
   // runtime directly.
   mln_runtime runtime = MLN_HANDLE_NULL;
@@ -422,7 +425,10 @@ static void state_events_follow_a_snapshot_that_includes_them(void) {
     &fixture, idle_recorded, NULL, "the map never went idle"
   ));
 
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.mode = MLN_CAMERA_UPDATE_MODE_EASE;
   update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   update.camera.zoom = target_zoom;

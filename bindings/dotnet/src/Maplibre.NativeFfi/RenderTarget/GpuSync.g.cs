@@ -12,20 +12,4 @@ namespace Maplibre.NativeFfi;
 /// <param name="Handle">
 /// Bit pattern of the GLsync pointer.
 /// </param>
-public readonly partial record struct GpuSync(GpuSyncKind Kind, ulong Handle)
-{
-    public GpuSync()
-        : this(default!, default!)
-    {
-        this = Default;
-    }
-
-    public static GpuSync Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyGpuSync(NativeMethods.mln_gpu_sync_default());
-        }
-    }
-}
+public readonly partial record struct GpuSync(GpuSyncKind Kind, ulong Handle);

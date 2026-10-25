@@ -27,13 +27,4 @@ public sealed record CustomGeometrySourceOptions
     public uint? Buffer { get; init; }
     public bool? Clip { get; init; }
     public bool? Wrap { get; init; }
-
-    public static CustomGeometrySourceOptions Default(CustomSourceFetchTileCallback fetchTile)
-    {
-        using var call = NativeCall.Enter(null);
-        return GeneratedValues.CopyCustomGeometrySourceOptions(
-            NativeMethods.mln_custom_geometry_source_options_default(),
-            fetchTile
-        );
-    }
 }

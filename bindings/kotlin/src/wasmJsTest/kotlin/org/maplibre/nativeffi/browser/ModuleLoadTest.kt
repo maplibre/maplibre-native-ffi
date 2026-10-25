@@ -19,10 +19,10 @@ class ModuleLoadTest {
     // The suite's page loads the module once, before the first test that needs it, so the test
     // removes it for the call.
     val failure = ModuleLoader.withoutModuleForTesting {
-      assertFailsWith<IllegalStateException> { GeneratedApi.runtimeOptionsDefault() }
+      assertFailsWith<IllegalStateException> { GeneratedApi.supportedRenderBackendMask() }
     }
     assertTrue("Maplibre.loadModule" in failure.message.orEmpty(), failure.message)
-    GeneratedApi.runtimeOptionsDefault()
+    GeneratedApi.supportedRenderBackendMask()
   }
 
   @Test

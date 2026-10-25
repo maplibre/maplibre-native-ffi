@@ -25,12 +25,4 @@ public sealed record ProjectionMode
     /// Y-skew factor of the axonometric transform.
     /// </summary>
     public double? YSkew { get; init; }
-    public static ProjectionMode Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyProjectionMode(NativeMethods.mln_projection_mode_default());
-        }
-    }
 }

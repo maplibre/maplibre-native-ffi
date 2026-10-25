@@ -1396,9 +1396,10 @@ final class OpenglTextureFrame extends _Value {
 /// See `mln_gpu_sync` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class GpuSync extends _Value {
-  GpuSync({GpuSyncKind? kind, int? handle})
-    : kind = kind ?? gpuSyncDefault().kind,
-      handle = handle ?? gpuSyncDefault().handle;
+  const GpuSync({
+    this.kind = const GpuSyncKind.fromRawValue(0),
+    this.handle = 0,
+  });
   final GpuSyncKind kind;
 
   /// Bit pattern of the GLsync pointer.
@@ -1549,10 +1550,7 @@ final class Camera extends _Value {
 /// See `mln_logical_extent` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class LogicalExtent extends _Value {
-  LogicalExtent({int? width, int? height, double? scaleFactor})
-    : width = width ?? logicalExtentDefault().width,
-      height = height ?? logicalExtentDefault().height,
-      scaleFactor = scaleFactor ?? logicalExtentDefault().scaleFactor;
+  const LogicalExtent({this.width = 0, this.height = 0, this.scaleFactor = 0});
 
   /// Width in UI pixels.
   final int width;
@@ -1583,7 +1581,7 @@ final class LogicalExtent extends _Value {
 /// See `mln_projection_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class ProjectionMode extends _Value {
-  ProjectionMode({this.axonometric, this.xSkew, this.ySkew});
+  const ProjectionMode({this.axonometric, this.xSkew, this.ySkew});
 
   /// Enables a non-perspective axonometric render transform.
   final bool? axonometric;
@@ -1614,7 +1612,7 @@ final class ProjectionMode extends _Value {
 /// See `mln_map_viewport_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class MapViewportOptions extends _Value {
-  MapViewportOptions({
+  const MapViewportOptions({
     this.northOrientation,
     this.constrainMode,
     this.viewportMode,
@@ -1662,9 +1660,9 @@ final class MapViewportOptions extends _Value {
 final class MapView extends _Value {
   const MapView({
     this.camera = const Camera(),
-    required this.extent,
-    required this.projectionMode,
-    required this.viewport,
+    this.extent = const LogicalExtent(),
+    this.projectionMode = const ProjectionMode(),
+    this.viewport = const MapViewportOptions(),
   });
 
   /// The camera. Its center is unwrapped: the longitude keeps the visible world
@@ -1719,7 +1717,7 @@ final class RenderFrameResult extends _Value {
     this.generation = 0,
     this.frameGeneration = 0,
     this.needsRepaint = false,
-    required this.view,
+    this.view = const MapView(),
   });
   final RenderResult disposition;
   final int token;
@@ -1861,661 +1859,13 @@ final class VulkanTextureFrame extends _Value {
   ]);
 }
 
-/// Cubic easing curve for animated camera transitions.
-///
-/// See `mln_unit_bezier` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class UnitBezier extends _Value {
-  const UnitBezier({this.x1 = 0, this.y1 = 0, this.x2 = 0, this.y2 = 0});
-  final double x1;
-  final double y1;
-  final double x2;
-  final double y2;
-
-  /// A copy of this value with the given members replaced.
-  UnitBezier copyWith({double? x1, double? y1, double? x2, double? y2}) =>
-      UnitBezier(
-        x1: x1 ?? this.x1,
-        y1: y1 ?? this.y1,
-        x2: x2 ?? this.x2,
-        y2: y2 ?? this.y2,
-      );
-
-  @override
-  List<Object?> get _members => [x1, y1, x2, y2];
-  @override
-  String toString() => _describe('UnitBezier', const ['x1', 'y1', 'x2', 'y2']);
-}
-
-/// The end of one camera command's transitions, borrowed for the callback.
-///
-/// See `mln_camera_transition_end` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class CameraTransitionEnd extends _Value {
-  const CameraTransitionEnd({
-    this.outcome = const CameraTransitionOutcome.fromRawValue(0),
-    this.generation = 0,
-  });
-  final CameraTransitionOutcome outcome;
-
-  /// Generation of the published snapshot that shows the camera where the
-  /// transitions left it. The map events of the change that ended them carry
-  /// this generation and are queued before the callback runs. Zero for
-  /// `MLN_CAMERA_TRANSITION_OUTCOME_CLOSED`.
-  final int generation;
-
-  @override
-  List<Object?> get _members => [outcome, generation];
-  @override
-  String toString() =>
-      _describe('CameraTransitionEnd', const ['outcome', 'generation']);
-}
-
-/// Receives the end of one camera command's transitions.
-///
-/// See `mln_camera_transition_end_callback` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-typedef CameraTransitionEndCallback = void Function(CameraTransitionEnd end);
-
-/// Optional animation controls for camera transitions.
-///
-/// See `mln_animation_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class AnimationOptions extends _Value {
-  AnimationOptions({
-    this.durationMs,
-    this.velocity,
-    this.minZoom,
-    this.easing,
-    this.transitionId,
-    this.endHandler,
-  });
-
-  /// Duration in milliseconds. Must be finite, non-negative, and short enough
-  /// to represent as a duration.
-  final double? durationMs;
-
-  /// Average fly velocity in screenfuls per second. Must be positive and
-  /// finite; absent selects 1.2. A flight whose derived duration is too long to
-  /// represent fails its completion with `MLN_STATUS_NATIVE_ERROR`. An explicit
-  /// duration overrides velocity.
-  final double? velocity;
-
-  /// Peak zoom for flyTo transitions.
-  final double? minZoom;
-  final UnitBezier? easing;
-
-  /// Caller-chosen identity of the command that these options animate, which
-  /// `mln_map_cancel_camera_transition()` matches.
-  final int? transitionId;
-
-  /// Reports the end of the command's transitions. Disabled by default.
-  final CameraTransitionEndCallback? endHandler;
-
-  /// A copy of this value with the given members replaced.
-  AnimationOptions copyWith({
-    double? durationMs,
-    double? velocity,
-    double? minZoom,
-    UnitBezier? easing,
-    int? transitionId,
-    CameraTransitionEndCallback? endHandler =
-        _unchangedCameraTransitionEndCallback,
-  }) => AnimationOptions(
-    durationMs: durationMs ?? this.durationMs,
-    velocity: velocity ?? this.velocity,
-    minZoom: minZoom ?? this.minZoom,
-    easing: easing ?? this.easing,
-    transitionId: transitionId ?? this.transitionId,
-    endHandler: identical(endHandler, _unchangedCameraTransitionEndCallback)
-        ? this.endHandler
-        : endHandler,
-  );
-
-  @override
-  List<Object?> get _members => [
-    durationMs,
-    velocity,
-    minZoom,
-    easing,
-    transitionId,
-    endHandler,
-  ];
-  @override
-  String toString() => _describe('AnimationOptions', const [
-    'durationMs',
-    'velocity',
-    'minZoom',
-    'easing',
-    'transitionId',
-    'endHandler',
-  ]);
-}
-
-void _unchangedCameraTransitionEndCallback(CameraTransitionEnd end) {}
-
-/// Geographic bounds in degrees.
-///
-/// See `mln_lat_lng_bounds` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class LatLngBounds extends _Value {
-  const LatLngBounds({
-    this.southwest = const LatLng(),
-    this.northeast = const LatLng(),
-  });
-  final LatLng southwest;
-  final LatLng northeast;
-
-  /// A copy of this value with the given members replaced.
-  LatLngBounds copyWith({LatLng? southwest, LatLng? northeast}) => LatLngBounds(
-    southwest: southwest ?? this.southwest,
-    northeast: northeast ?? this.northeast,
-  );
-
-  @override
-  List<Object?> get _members => [southwest, northeast];
-  @override
-  String toString() =>
-      _describe('LatLngBounds', const ['southwest', 'northeast']);
-}
-
-/// Optional map camera constraint fields.
-///
-/// See `mln_bound_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class BoundOptions extends _Value {
-  BoundOptions({
-    this.bounds,
-    this.minZoom,
-    this.maxZoom,
-    this.minPitch,
-    this.maxPitch,
-    this.unbounded = false,
-  });
-
-  /// Read when fields contains `MLN_BOUND_OPTION_BOUNDS`.
-  final LatLngBounds? bounds;
-  final double? minZoom;
-  final double? maxZoom;
-  final double? minPitch;
-  final double? maxPitch;
-
-  /// Selects the unbounded geographic constraint, which leaves every camera
-  /// center unconstrained and lets the map pan freely across the antimeridian.
-  /// This differs from world bounds of -90/-180 to 90/180, which clamp
-  /// longitude to that range. Mutually exclusive with
-  /// `MLN_BOUND_OPTION_BOUNDS`, and leaves `mln_bound_options.bounds` unread.
-  final bool unbounded;
-
-  /// A copy of this value with the given members replaced.
-  BoundOptions copyWith({
-    LatLngBounds? bounds,
-    double? minZoom,
-    double? maxZoom,
-    double? minPitch,
-    double? maxPitch,
-    bool? unbounded,
-  }) => BoundOptions(
-    bounds: bounds ?? this.bounds,
-    minZoom: minZoom ?? this.minZoom,
-    maxZoom: maxZoom ?? this.maxZoom,
-    minPitch: minPitch ?? this.minPitch,
-    maxPitch: maxPitch ?? this.maxPitch,
-    unbounded: unbounded ?? this.unbounded,
-  );
-
-  @override
-  List<Object?> get _members => [
-    bounds,
-    minZoom,
-    maxZoom,
-    minPitch,
-    maxPitch,
-    unbounded,
-  ];
-  @override
-  String toString() => _describe('BoundOptions', const [
-    'bounds',
-    'minZoom',
-    'maxZoom',
-    'minPitch',
-    'maxPitch',
-    'unbounded',
-  ]);
-}
-
-/// Screen-space point in logical map pixels, from the top-left of the viewport
-/// with y growing downward.
-///
-/// See `mln_screen_point` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class ScreenPoint extends _Value {
-  const ScreenPoint({this.x = 0, this.y = 0});
-  final double x;
-  final double y;
-
-  /// A copy of this value with the given members replaced.
-  ScreenPoint copyWith({double? x, double? y}) =>
-      ScreenPoint(x: x ?? this.x, y: y ?? this.y);
-
-  @override
-  List<Object?> get _members => [x, y];
-  @override
-  String toString() => _describe('ScreenPoint', const ['x', 'y']);
-}
-
-/// One atomic relative camera update.
-///
-/// See `mln_camera_delta` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class CameraDelta extends _Value {
-  CameraDelta({
-    this.offset,
-    this.scale,
-    this.bearing,
-    this.pitch,
-    this.anchor,
-    AnimationOptions? animation,
-    GesturePhase? gesturePhase,
-  }) : animation = animation ?? cameraDeltaDefault().animation,
-       gesturePhase = gesturePhase ?? cameraDeltaDefault().gesturePhase;
-
-  /// Pan in logical map pixels; the content moves by this offset.
-  final ScreenPoint? offset;
-
-  /// Positive zoom factor; 2 zooms in one level.
-  final double? scale;
-
-  /// Degrees added to the bearing.
-  final double? bearing;
-
-  /// Degrees added to the pitch; positive tilts further from straight down.
-  final double? pitch;
-
-  /// Screen point in logical map pixels that scale, bearing, and pitch keep
-  /// fixed.
-  final ScreenPoint? anchor;
-  final AnimationOptions animation;
-  final GesturePhase gesturePhase;
-
-  /// A copy of this value with the given members replaced.
-  CameraDelta copyWith({
-    ScreenPoint? offset,
-    double? scale,
-    double? bearing,
-    double? pitch,
-    ScreenPoint? anchor,
-    AnimationOptions? animation,
-    GesturePhase? gesturePhase,
-  }) => CameraDelta(
-    offset: offset ?? this.offset,
-    scale: scale ?? this.scale,
-    bearing: bearing ?? this.bearing,
-    pitch: pitch ?? this.pitch,
-    anchor: anchor ?? this.anchor,
-    animation: animation ?? this.animation,
-    gesturePhase: gesturePhase ?? this.gesturePhase,
-  );
-
-  @override
-  List<Object?> get _members => [
-    offset,
-    scale,
-    bearing,
-    pitch,
-    anchor,
-    animation,
-    gesturePhase,
-  ];
-  @override
-  String toString() => _describe('CameraDelta', const [
-    'offset',
-    'scale',
-    'bearing',
-    'pitch',
-    'anchor',
-    'animation',
-    'gesturePhase',
-  ]);
-}
-
-/// Optional fitting controls for camera-for-viewport queries.
-///
-/// See `mln_camera_fit_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class CameraFitOptions extends _Value {
-  CameraFitOptions({this.padding, this.bearing, this.pitch});
-  final EdgeInsets? padding;
-  final double? bearing;
-  final double? pitch;
-
-  /// A copy of this value with the given members replaced.
-  CameraFitOptions copyWith({
-    EdgeInsets? padding,
-    double? bearing,
-    double? pitch,
-  }) => CameraFitOptions(
-    padding: padding ?? this.padding,
-    bearing: bearing ?? this.bearing,
-    pitch: pitch ?? this.pitch,
-  );
-
-  @override
-  List<Object?> get _members => [padding, bearing, pitch];
-  @override
-  String toString() =>
-      _describe('CameraFitOptions', const ['padding', 'bearing', 'pitch']);
-}
-
-/// Camera fields used by snapshots and camera updates.
-///
-/// See `mln_camera_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class CameraOptions extends _Value {
-  CameraOptions({
-    this.center,
-    this.centerAltitude,
-    this.padding,
-    this.anchor,
-    this.zoom,
-    this.bearing,
-    this.pitch,
-    this.roll,
-    this.fieldOfView,
-  });
-  final LatLng? center;
-  final double? centerAltitude;
-  final EdgeInsets? padding;
-
-  /// Optional screen-space focal point in logical map pixels.
-  final ScreenPoint? anchor;
-  final double? zoom;
-  final double? bearing;
-  final double? pitch;
-  final double? roll;
-  final double? fieldOfView;
-
-  /// A copy of this value with the given members replaced.
-  CameraOptions copyWith({
-    LatLng? center,
-    double? centerAltitude,
-    EdgeInsets? padding,
-    ScreenPoint? anchor,
-    double? zoom,
-    double? bearing,
-    double? pitch,
-    double? roll,
-    double? fieldOfView,
-  }) => CameraOptions(
-    center: center ?? this.center,
-    centerAltitude: centerAltitude ?? this.centerAltitude,
-    padding: padding ?? this.padding,
-    anchor: anchor ?? this.anchor,
-    zoom: zoom ?? this.zoom,
-    bearing: bearing ?? this.bearing,
-    pitch: pitch ?? this.pitch,
-    roll: roll ?? this.roll,
-    fieldOfView: fieldOfView ?? this.fieldOfView,
-  );
-
-  @override
-  List<Object?> get _members => [
-    center,
-    centerAltitude,
-    padding,
-    anchor,
-    zoom,
-    bearing,
-    pitch,
-    roll,
-    fieldOfView,
-  ];
-  @override
-  String toString() => _describe('CameraOptions', const [
-    'center',
-    'centerAltitude',
-    'padding',
-    'anchor',
-    'zoom',
-    'bearing',
-    'pitch',
-    'roll',
-    'fieldOfView',
-  ]);
-}
-
-/// One atomic absolute camera update.
-///
-/// See `mln_camera_update` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class CameraUpdate extends _Value {
-  CameraUpdate({
-    CameraUpdateMode? mode,
-    CameraOptions? camera,
-    AnimationOptions? animation,
-    GesturePhase? gesturePhase,
-  }) : mode = mode ?? cameraUpdateDefault().mode,
-       camera = camera ?? cameraUpdateDefault().camera,
-       animation = animation ?? cameraUpdateDefault().animation,
-       gesturePhase = gesturePhase ?? cameraUpdateDefault().gesturePhase;
-  final CameraUpdateMode mode;
-  final CameraOptions camera;
-  final AnimationOptions animation;
-  final GesturePhase gesturePhase;
-
-  /// A copy of this value with the given members replaced.
-  CameraUpdate copyWith({
-    CameraUpdateMode? mode,
-    CameraOptions? camera,
-    AnimationOptions? animation,
-    GesturePhase? gesturePhase,
-  }) => CameraUpdate(
-    mode: mode ?? this.mode,
-    camera: camera ?? this.camera,
-    animation: animation ?? this.animation,
-    gesturePhase: gesturePhase ?? this.gesturePhase,
-  );
-
-  @override
-  List<Object?> get _members => [mode, camera, animation, gesturePhase];
-  @override
-  String toString() => _describe('CameraUpdate', const [
-    'mode',
-    'camera',
-    'animation',
-    'gesturePhase',
-  ]);
-}
-
-/// Canonical tile identity used by custom geometry and custom MVT vector source
-/// callbacks.
-///
-/// See `mln_canonical_tile_id` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class CanonicalTileId extends _Value {
-  const CanonicalTileId({this.z = 0, this.x = 0, this.y = 0});
-  final int z;
-  final int x;
-  final int y;
-
-  /// A copy of this value with the given members replaced.
-  CanonicalTileId copyWith({int? z, int? x, int? y}) =>
-      CanonicalTileId(z: z ?? this.z, x: x ?? this.x, y: y ?? this.y);
-
-  @override
-  List<Object?> get _members => [z, x, y];
-  @override
-  String toString() => _describe('CanonicalTileId', const ['z', 'x', 'y']);
-}
-
-/// Requests one tile of a custom geometry or custom MVT vector source.
-///
-/// See `mln_custom_source_fetch_tile_callback` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-typedef CustomSourceFetchTileCallback = void Function(CanonicalTileId tileId);
-
-/// Cancels a request for one tile of a custom geometry or custom MVT vector
-/// source, best effort.
-///
-/// See `mln_custom_source_cancel_tile_callback` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-typedef CustomSourceCancelTileCallback = void Function(CanonicalTileId tileId);
-
-/// Options for custom geometry sources.
-///
-/// See `mln_custom_geometry_source_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class CustomGeometrySourceOptions {
-  const CustomGeometrySourceOptions({
-    required this.fetchTile,
-    this.cancelTile,
-    this.minZoom,
-    this.maxZoom,
-    this.tolerance,
-    this.tileSize,
-    this.buffer,
-    this.clip,
-    this.wrap,
-  });
-
-  /// Tile fetch callback. Required in callback mode; null in queue mode.
-  final CustomSourceFetchTileCallback fetchTile;
-
-  /// Optional best-effort tile cancel callback. Null in queue mode.
-  final CustomSourceCancelTileCallback? cancelTile;
-  final double? minZoom;
-  final double? maxZoom;
-  final double? tolerance;
-  final int? tileSize;
-  final int? buffer;
-  final bool? clip;
-  final bool? wrap;
-}
-
-/// Options for custom MVT vector sources.
-///
-/// See `mln_custom_mvt_vector_source_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class CustomMvtVectorSourceOptions {
-  const CustomMvtVectorSourceOptions({
-    required this.fetchTile,
-    this.cancelTile,
-    this.minZoom,
-    this.maxZoom,
-  });
-
-  /// Tile fetch callback. Required in callback mode; null in queue mode.
-  final CustomSourceFetchTileCallback fetchTile;
-
-  /// Optional best-effort tile cancel callback. Null in queue mode.
-  final CustomSourceCancelTileCallback? cancelTile;
-  final double? minZoom;
-  final double? maxZoom;
-}
-
-/// One nonblocking request for a frame.
-///
-/// See `mln_frame_demand` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-final class FrameDemand extends _Value {
-  FrameDemand({FrameDemandFlag? flags, int? token})
-    : flags = flags ?? frameDemandDefault().flags,
-      token = token ?? frameDemandDefault().token;
-
-  /// A bitwise OR of `mln_frame_demand_flag` values. Zero renders only when a
-  /// newer map update exists, without presenting.
-  final FrameDemandFlag flags;
-
-  /// Host identity returned with the terminal frame result. Any value except
-  /// `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE`, the maximum uint64_t value.
-  final int token;
-
-  /// A copy of this value with the given members replaced.
-  FrameDemand copyWith({FrameDemandFlag? flags, int? token}) =>
-      FrameDemand(flags: flags ?? this.flags, token: token ?? this.token);
-
-  @override
-  List<Object?> get _members => [flags, token];
-  @override
-  String toString() => _describe('FrameDemand', const ['flags', 'token']);
-}
-
-/// Three-component vector used by free camera options.
-///
-/// See `mln_vec3` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class Vec3 extends _Value {
-  const Vec3({this.x = 0, this.y = 0, this.z = 0});
-  final double x;
-  final double y;
-  final double z;
-
-  /// A copy of this value with the given members replaced.
-  Vec3 copyWith({double? x, double? y, double? z}) =>
-      Vec3(x: x ?? this.x, y: y ?? this.y, z: z ?? this.z);
-
-  @override
-  List<Object?> get _members => [x, y, z];
-  @override
-  String toString() => _describe('Vec3', const ['x', 'y', 'z']);
-}
-
-/// Quaternion stored as x, y, z, w components.
-///
-/// See `mln_quaternion` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class Quaternion extends _Value {
-  const Quaternion({this.x = 0, this.y = 0, this.z = 0, this.w = 0});
-  final double x;
-  final double y;
-  final double z;
-  final double w;
-
-  /// A copy of this value with the given members replaced.
-  Quaternion copyWith({double? x, double? y, double? z, double? w}) =>
-      Quaternion(
-        x: x ?? this.x,
-        y: y ?? this.y,
-        z: z ?? this.z,
-        w: w ?? this.w,
-      );
-
-  @override
-  List<Object?> get _members => [x, y, z, w];
-  @override
-  String toString() => _describe('Quaternion', const ['x', 'y', 'z', 'w']);
-}
-
-/// Free camera position and orientation in MapLibre Native camera space.
-///
-/// See `mln_free_camera_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class FreeCameraOptions extends _Value {
-  FreeCameraOptions({this.position, this.orientation});
-  final Vec3? position;
-  final Quaternion? orientation;
-
-  /// A copy of this value with the given members replaced.
-  FreeCameraOptions copyWith({Vec3? position, Quaternion? orientation}) =>
-      FreeCameraOptions(
-        position: position ?? this.position,
-        orientation: orientation ?? this.orientation,
-      );
-
-  @override
-  List<Object?> get _members => [position, orientation];
-  @override
-  String toString() =>
-      _describe('FreeCameraOptions', const ['position', 'orientation']);
-}
-
 /// Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
 /// size.
 ///
 /// See `mln_geojson_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class GeojsonSourceOptions extends _Value {
-  GeojsonSourceOptions({
+  const GeojsonSourceOptions({
     this.minZoom,
     this.maxZoom,
     this.tolerance,
@@ -2624,73 +1974,6 @@ final class GeojsonSourceOptions extends _Value {
   ]);
 }
 
-/// One HTTP header that a header rule supplies.
-///
-/// See `mln_http_header` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class HttpHeader extends _Value {
-  const HttpHeader({this.name = '', this.value = ''});
-
-  /// Header field name. Required.
-  final String name;
-  final String value;
-
-  /// A copy of this value with the given members replaced.
-  HttpHeader copyWith({String? name, String? value}) =>
-      HttpHeader(name: name ?? this.name, value: value ?? this.value);
-
-  @override
-  List<Object?> get _members => [name, value];
-  @override
-  String toString() => _describe('HttpHeader', const ['name', 'value']);
-}
-
-/// One rule of a native HTTP header transform.
-///
-/// See `mln_http_header_rule` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class HttpHeaderRule extends _Value {
-  HttpHeaderRule({
-    ResourceKindFlag? kinds,
-    UrlMatchFlag? flags,
-    String? url,
-    List<HttpHeader>? headers,
-  }) : kinds = kinds ?? httpHeaderRuleDefault().kinds,
-       flags = flags ?? httpHeaderRuleDefault().flags,
-       url = url ?? httpHeaderRuleDefault().url,
-       headers = List.unmodifiable(headers ?? httpHeaderRuleDefault().headers);
-
-  /// The resource kinds to match. Zero selects every kind.
-  final ResourceKindFlag kinds;
-  final UrlMatchFlag flags;
-
-  /// The URL or glob pattern to compare.
-  final String url;
-
-  /// The headers to set. Registration validates each one as
-  /// `mln_http_header_transform_response_set_header()` does.
-  final List<HttpHeader> headers;
-
-  /// A copy of this value with the given members replaced.
-  HttpHeaderRule copyWith({
-    ResourceKindFlag? kinds,
-    UrlMatchFlag? flags,
-    String? url,
-    List<HttpHeader>? headers,
-  }) => HttpHeaderRule(
-    kinds: kinds ?? this.kinds,
-    flags: flags ?? this.flags,
-    url: url ?? this.url,
-    headers: headers ?? this.headers,
-  );
-
-  @override
-  List<Object?> get _members => [kinds, flags, url, headers];
-  @override
-  String toString() =>
-      _describe('HttpHeaderRule', const ['kinds', 'flags', 'url', 'headers']);
-}
-
 /// Lower-level Spherical Mercator projected-meter coordinate.
 ///
 /// See `mln_projected_meters` in the
@@ -2730,22 +2013,103 @@ typedef LogCallback =
       String message,
     );
 
+/// Canonical tile identity used by custom geometry and custom MVT vector source
+/// callbacks.
+///
+/// See `mln_canonical_tile_id` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+final class CanonicalTileId extends _Value {
+  const CanonicalTileId({this.z = 0, this.x = 0, this.y = 0});
+  final int z;
+  final int x;
+  final int y;
+
+  /// A copy of this value with the given members replaced.
+  CanonicalTileId copyWith({int? z, int? x, int? y}) =>
+      CanonicalTileId(z: z ?? this.z, x: x ?? this.x, y: y ?? this.y);
+
+  @override
+  List<Object?> get _members => [z, x, y];
+  @override
+  String toString() => _describe('CanonicalTileId', const ['z', 'x', 'y']);
+}
+
+/// Requests one tile of a custom geometry or custom MVT vector source.
+///
+/// See `mln_custom_source_fetch_tile_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+typedef CustomSourceFetchTileCallback = void Function(CanonicalTileId tileId);
+
+/// Cancels a request for one tile of a custom geometry or custom MVT vector
+/// source, best effort.
+///
+/// See `mln_custom_source_cancel_tile_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+typedef CustomSourceCancelTileCallback = void Function(CanonicalTileId tileId);
+
+/// Options for custom geometry sources.
+///
+/// See `mln_custom_geometry_source_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+final class CustomGeometrySourceOptions {
+  const CustomGeometrySourceOptions({
+    required this.fetchTile,
+    this.cancelTile,
+    this.minZoom,
+    this.maxZoom,
+    this.tolerance,
+    this.tileSize,
+    this.buffer,
+    this.clip,
+    this.wrap,
+  });
+
+  /// Tile fetch callback. Required in callback mode; null in queue mode.
+  final CustomSourceFetchTileCallback fetchTile;
+
+  /// Optional best-effort tile cancel callback. Null in queue mode.
+  final CustomSourceCancelTileCallback? cancelTile;
+  final double? minZoom;
+  final double? maxZoom;
+  final double? tolerance;
+  final int? tileSize;
+  final int? buffer;
+  final bool? clip;
+  final bool? wrap;
+}
+
+/// Options for custom MVT vector sources.
+///
+/// See `mln_custom_mvt_vector_source_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+final class CustomMvtVectorSourceOptions {
+  const CustomMvtVectorSourceOptions({
+    required this.fetchTile,
+    this.cancelTile,
+    this.minZoom,
+    this.maxZoom,
+  });
+
+  /// Tile fetch callback. Required in callback mode; null in queue mode.
+  final CustomSourceFetchTileCallback fetchTile;
+
+  /// Optional best-effort tile cancel callback. Null in queue mode.
+  final CustomSourceCancelTileCallback? cancelTile;
+  final double? minZoom;
+  final double? maxZoom;
+}
+
 /// Caller-owned premultiplied RGBA8 image pixels.
 ///
 /// See `mln_premultiplied_rgba8_image` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class PremultipliedRgba8Image extends _Value {
   PremultipliedRgba8Image({
-    int? width,
-    int? height,
-    int? stride,
-    Uint8List? pixels,
-  }) : width = width ?? premultipliedRgba8ImageDefault().width,
-       height = height ?? premultipliedRgba8ImageDefault().height,
-       stride = stride ?? premultipliedRgba8ImageDefault().stride,
-       pixels = Uint8List.fromList(
-         pixels ?? premultipliedRgba8ImageDefault().pixels,
-       ).asUnmodifiableView();
+    required this.width,
+    required this.height,
+    required this.stride,
+    required Uint8List pixels,
+  }) : pixels = Uint8List.fromList(pixels).asUnmodifiableView();
 
   /// Image width in pixels. Required.
   final int width;
@@ -2783,12 +2147,239 @@ final class PremultipliedRgba8Image extends _Value {
   ]);
 }
 
+/// Screen-space point in logical map pixels, from the top-left of the viewport
+/// with y growing downward.
+///
+/// See `mln_screen_point` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class ScreenPoint extends _Value {
+  const ScreenPoint({this.x = 0, this.y = 0});
+  final double x;
+  final double y;
+
+  /// A copy of this value with the given members replaced.
+  ScreenPoint copyWith({double? x, double? y}) =>
+      ScreenPoint(x: x ?? this.x, y: y ?? this.y);
+
+  @override
+  List<Object?> get _members => [x, y];
+  @override
+  String toString() => _describe('ScreenPoint', const ['x', 'y']);
+}
+
+/// Cubic easing curve for animated camera transitions.
+///
+/// See `mln_unit_bezier` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class UnitBezier extends _Value {
+  const UnitBezier({this.x1 = 0, this.y1 = 0, this.x2 = 0, this.y2 = 0});
+  final double x1;
+  final double y1;
+  final double x2;
+  final double y2;
+
+  /// A copy of this value with the given members replaced.
+  UnitBezier copyWith({double? x1, double? y1, double? x2, double? y2}) =>
+      UnitBezier(
+        x1: x1 ?? this.x1,
+        y1: y1 ?? this.y1,
+        x2: x2 ?? this.x2,
+        y2: y2 ?? this.y2,
+      );
+
+  @override
+  List<Object?> get _members => [x1, y1, x2, y2];
+  @override
+  String toString() => _describe('UnitBezier', const ['x1', 'y1', 'x2', 'y2']);
+}
+
+/// The end of one camera command's transitions, borrowed for the callback.
+///
+/// See `mln_camera_transition_end` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class CameraTransitionEnd extends _Value {
+  const CameraTransitionEnd({
+    this.outcome = const CameraTransitionOutcome.fromRawValue(0),
+    this.generation = 0,
+  });
+  final CameraTransitionOutcome outcome;
+
+  /// Generation of the published snapshot that shows the camera where the
+  /// transitions left it. The map events of the change that ended them carry
+  /// this generation and are queued before the callback runs. Zero for
+  /// `MLN_CAMERA_TRANSITION_OUTCOME_CLOSED`.
+  final int generation;
+
+  @override
+  List<Object?> get _members => [outcome, generation];
+  @override
+  String toString() =>
+      _describe('CameraTransitionEnd', const ['outcome', 'generation']);
+}
+
+/// Receives the end of one camera command's transitions.
+///
+/// See `mln_camera_transition_end_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+typedef CameraTransitionEndCallback = void Function(CameraTransitionEnd end);
+
+/// Optional animation controls for camera transitions.
+///
+/// See `mln_animation_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class AnimationOptions extends _Value {
+  const AnimationOptions({
+    this.durationMs,
+    this.velocity,
+    this.minZoom,
+    this.easing,
+    this.transitionId,
+    this.endHandler,
+  });
+
+  /// Duration in milliseconds. Must be finite, non-negative, and short enough
+  /// to represent as a duration.
+  final double? durationMs;
+
+  /// Average fly velocity in screenfuls per second. Must be positive and
+  /// finite; absent selects 1.2. A flight whose derived duration is too long to
+  /// represent fails its completion with `MLN_STATUS_NATIVE_ERROR`. An explicit
+  /// duration overrides velocity.
+  final double? velocity;
+
+  /// Peak zoom for flyTo transitions.
+  final double? minZoom;
+  final UnitBezier? easing;
+
+  /// Caller-chosen identity of the command that these options animate, which
+  /// `mln_map_cancel_camera_transition()` matches.
+  final int? transitionId;
+
+  /// Reports the end of the command's transitions. Disabled by default.
+  final CameraTransitionEndCallback? endHandler;
+
+  /// A copy of this value with the given members replaced.
+  AnimationOptions copyWith({
+    double? durationMs,
+    double? velocity,
+    double? minZoom,
+    UnitBezier? easing,
+    int? transitionId,
+    CameraTransitionEndCallback? endHandler =
+        _unchangedCameraTransitionEndCallback,
+  }) => AnimationOptions(
+    durationMs: durationMs ?? this.durationMs,
+    velocity: velocity ?? this.velocity,
+    minZoom: minZoom ?? this.minZoom,
+    easing: easing ?? this.easing,
+    transitionId: transitionId ?? this.transitionId,
+    endHandler: identical(endHandler, _unchangedCameraTransitionEndCallback)
+        ? this.endHandler
+        : endHandler,
+  );
+
+  @override
+  List<Object?> get _members => [
+    durationMs,
+    velocity,
+    minZoom,
+    easing,
+    transitionId,
+    endHandler,
+  ];
+  @override
+  String toString() => _describe('AnimationOptions', const [
+    'durationMs',
+    'velocity',
+    'minZoom',
+    'easing',
+    'transitionId',
+    'endHandler',
+  ]);
+}
+
+void _unchangedCameraTransitionEndCallback(CameraTransitionEnd end) {}
+
+/// One atomic relative camera update.
+///
+/// See `mln_camera_delta` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class CameraDelta extends _Value {
+  const CameraDelta({
+    this.offset,
+    this.scale,
+    this.bearing,
+    this.pitch,
+    this.anchor,
+    this.animation = const AnimationOptions(),
+    this.gesturePhase = const GesturePhase.fromRawValue(0),
+  });
+
+  /// Pan in logical map pixels; the content moves by this offset.
+  final ScreenPoint? offset;
+
+  /// Positive zoom factor; 2 zooms in one level.
+  final double? scale;
+
+  /// Degrees added to the bearing.
+  final double? bearing;
+
+  /// Degrees added to the pitch; positive tilts further from straight down.
+  final double? pitch;
+
+  /// Screen point in logical map pixels that scale, bearing, and pitch keep
+  /// fixed.
+  final ScreenPoint? anchor;
+  final AnimationOptions animation;
+  final GesturePhase gesturePhase;
+
+  /// A copy of this value with the given members replaced.
+  CameraDelta copyWith({
+    ScreenPoint? offset,
+    double? scale,
+    double? bearing,
+    double? pitch,
+    ScreenPoint? anchor,
+    AnimationOptions? animation,
+    GesturePhase? gesturePhase,
+  }) => CameraDelta(
+    offset: offset ?? this.offset,
+    scale: scale ?? this.scale,
+    bearing: bearing ?? this.bearing,
+    pitch: pitch ?? this.pitch,
+    anchor: anchor ?? this.anchor,
+    animation: animation ?? this.animation,
+    gesturePhase: gesturePhase ?? this.gesturePhase,
+  );
+
+  @override
+  List<Object?> get _members => [
+    offset,
+    scale,
+    bearing,
+    pitch,
+    anchor,
+    animation,
+    gesturePhase,
+  ];
+  @override
+  String toString() => _describe('CameraDelta', const [
+    'offset',
+    'scale',
+    'bearing',
+    'pitch',
+    'anchor',
+    'animation',
+    'gesturePhase',
+  ]);
+}
+
 /// One caller-owned Metal texture of a borrowed texture ring.
 ///
 /// See `mln_metal_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class MetalBorrowedTexture extends _Value {
-  const MetalBorrowedTexture({this.texture = NativePointer.nullPointer});
+  const MetalBorrowedTexture({required this.texture});
 
   /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
   final NativePointer texture;
@@ -2809,20 +2400,11 @@ final class MetalBorrowedTexture extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class MetalBorrowedTextureDescriptor extends _Value {
   MetalBorrowedTextureDescriptor({
-    LogicalExtent? extent,
-    int? physicalWidth,
-    int? physicalHeight,
-    List<MetalBorrowedTexture>? textures,
-  }) : extent = extent ?? metalBorrowedTextureDescriptorDefault().extent,
-       physicalWidth =
-           physicalWidth ??
-           metalBorrowedTextureDescriptorDefault().physicalWidth,
-       physicalHeight =
-           physicalHeight ??
-           metalBorrowedTextureDescriptorDefault().physicalHeight,
-       textures = List.unmodifiable(
-         textures ?? metalBorrowedTextureDescriptorDefault().textures,
-       );
+    required this.extent,
+    required this.physicalWidth,
+    required this.physicalHeight,
+    required List<MetalBorrowedTexture> textures,
+  }) : textures = List.unmodifiable(textures);
 
   /// Logical texture extent. Required. physical_width and physical_height give
   /// the texture's size. A scale_factor that differs from the map's is accepted
@@ -2937,27 +2519,21 @@ final class QueueLock {
 /// See `mln_render_session_attach_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class RenderSessionAttachOptions extends _Value {
-  RenderSessionAttachOptions({
-    RenderDriverKind? driver,
-    int? requestedTextureRingDepth,
-    GpuSyncKind? producerSyncKind,
-    Wake? frameWake,
-    Wake? driverWorkWake,
+  const RenderSessionAttachOptions({
+    required this.driver,
+    this.requestedTextureRingDepth = 0,
+    this.producerSyncKind = const GpuSyncKind.fromRawValue(0),
+    this.frameWake = const Wake(),
+    this.driverWorkWake = const Wake(),
     this.queueLock,
-  }) : driver = driver ?? RenderDriverKind.coreWorker,
-       requestedTextureRingDepth =
-           requestedTextureRingDepth ??
-           renderSessionAttachOptionsDefault().requestedTextureRingDepth,
-       producerSyncKind =
-           producerSyncKind ??
-           renderSessionAttachOptionsDefault().producerSyncKind,
-       frameWake = frameWake ?? renderSessionAttachOptionsDefault().frameWake,
-       driverWorkWake =
-           driverWorkWake ?? renderSessionAttachOptionsDefault().driverWorkWake;
+  });
 
-  /// One `mln_render_driver_kind` value. Defaults to
-  /// `RenderDriverKind.coreWorker`, because an isolate cannot service a
-  /// caller-graphics-thread driver.
+  /// Where the session's driver runs. Required.
+  ///
+  /// An isolate cannot service a caller-graphics-thread driver, because Dart
+  /// can resume it on another native thread after any `await`. Host native code
+  /// services such a session by passing its `id` to
+  /// `mln_render_session_service_driver_work` on the graphics thread.
   final RenderDriverKind driver;
 
   /// Requested slot count of a session-owned texture ring, up to
@@ -3048,14 +2624,11 @@ final class MetalContextDescriptor extends _Value {
 /// See `mln_metal_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class MetalOwnedTextureDescriptor extends _Value {
-  MetalOwnedTextureDescriptor({
-    LogicalExtent? extent,
-    MetalContextDescriptor? context,
-    int? pixelFormat,
-  }) : extent = extent ?? metalOwnedTextureDescriptorDefault().extent,
-       context = context ?? metalOwnedTextureDescriptorDefault().context,
-       pixelFormat =
-           pixelFormat ?? metalOwnedTextureDescriptorDefault().pixelFormat;
+  const MetalOwnedTextureDescriptor({
+    required this.extent,
+    this.context = const MetalContextDescriptor(),
+    required this.pixelFormat,
+  });
 
   /// Logical texture extent. Required. A scale_factor that differs from the
   /// map's is accepted and logged as a warning.
@@ -3095,13 +2668,11 @@ final class MetalOwnedTextureDescriptor extends _Value {
 /// See `mln_metal_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 final class MetalSurfaceDescriptor extends _Value {
-  MetalSurfaceDescriptor({
-    LogicalExtent? extent,
-    MetalContextDescriptor? context,
-    NativePointer? layer,
-  }) : extent = extent ?? metalSurfaceDescriptorDefault().extent,
-       context = context ?? metalSurfaceDescriptorDefault().context,
-       layer = layer ?? metalSurfaceDescriptorDefault().layer;
+  const MetalSurfaceDescriptor({
+    required this.extent,
+    this.context = const MetalContextDescriptor(),
+    required this.layer,
+  });
 
   /// Logical surface extent. Required. A scale_factor that differs from the
   /// map's is accepted and logged as a warning.
@@ -3137,7 +2708,7 @@ final class MetalSurfaceDescriptor extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class WglContextDescriptor extends _Value {
   const WglContextDescriptor({
-    this.deviceContext = NativePointer.nullPointer,
+    required this.deviceContext,
     this.shareContext = NativePointer.nullPointer,
     this.getProcAddress = NativePointer.nullPointer,
   });
@@ -3181,8 +2752,8 @@ final class WglContextDescriptor extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class EglContextDescriptor extends _Value {
   const EglContextDescriptor({
-    this.display = NativePointer.nullPointer,
-    this.config = NativePointer.nullPointer,
+    required this.display,
+    required this.config,
     this.shareContext = NativePointer.nullPointer,
     this.clientApi = const OpenglClientApi.fromRawValue(0),
     this.getProcAddress = NativePointer.nullPointer,
@@ -3323,21 +2894,12 @@ final class OpenglContextDescriptorDataWebgl
   final WebglContextDescriptor value;
 }
 
-final class OpenglContextDescriptorDataUnknown
-    extends OpenglContextDescriptorData {
-  OpenglContextDescriptorDataUnknown(this.tag, Uint8List rawRecord)
-    : rawRecord = Uint8List.fromList(rawRecord).asUnmodifiableView(),
-      super._();
-  final int tag;
-  final Uint8List rawRecord;
-}
-
 /// One caller-owned OpenGL texture of a borrowed texture ring.
 ///
 /// See `mln_opengl_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class OpenglBorrowedTexture extends _Value {
-  const OpenglBorrowedTexture({this.texture = 0});
+  const OpenglBorrowedTexture({required this.texture});
 
   /// Borrowed OpenGL texture object name. Required.
   final int texture;
@@ -3358,24 +2920,13 @@ final class OpenglBorrowedTexture extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class OpenglBorrowedTextureDescriptor extends _Value {
   OpenglBorrowedTextureDescriptor({
-    LogicalExtent? extent,
-    int? physicalWidth,
-    int? physicalHeight,
-    OpenglContextDescriptor? context,
-    List<OpenglBorrowedTexture>? textures,
-    int? target,
-  }) : extent = extent ?? openglBorrowedTextureDescriptorDefault().extent,
-       physicalWidth =
-           physicalWidth ??
-           openglBorrowedTextureDescriptorDefault().physicalWidth,
-       physicalHeight =
-           physicalHeight ??
-           openglBorrowedTextureDescriptorDefault().physicalHeight,
-       context = context ?? openglBorrowedTextureDescriptorDefault().context,
-       textures = List.unmodifiable(
-         textures ?? openglBorrowedTextureDescriptorDefault().textures,
-       ),
-       target = target ?? openglBorrowedTextureDescriptorDefault().target;
+    required this.extent,
+    required this.physicalWidth,
+    required this.physicalHeight,
+    required this.context,
+    required List<OpenglBorrowedTexture> textures,
+    required this.target,
+  }) : textures = List.unmodifiable(textures);
 
   /// Logical texture extent. Required. physical_width and physical_height give
   /// the texture's size. A scale_factor that differs from the map's is accepted
@@ -3440,11 +2991,10 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
 /// See `mln_opengl_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class OpenglOwnedTextureDescriptor extends _Value {
-  OpenglOwnedTextureDescriptor({
-    LogicalExtent? extent,
-    OpenglContextDescriptor? context,
-  }) : extent = extent ?? openglOwnedTextureDescriptorDefault().extent,
-       context = context ?? openglOwnedTextureDescriptorDefault().context;
+  const OpenglOwnedTextureDescriptor({
+    required this.extent,
+    required this.context,
+  });
 
   /// Logical texture extent. Required. A scale_factor that differs from the
   /// map's is accepted and logged as a warning.
@@ -3477,13 +3027,11 @@ final class OpenglOwnedTextureDescriptor extends _Value {
 /// See `mln_opengl_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 final class OpenglSurfaceDescriptor extends _Value {
-  OpenglSurfaceDescriptor({
-    LogicalExtent? extent,
-    OpenglContextDescriptor? context,
-    NativePointer? surface,
-  }) : extent = extent ?? openglSurfaceDescriptorDefault().extent,
-       context = context ?? openglSurfaceDescriptorDefault().context,
-       surface = surface ?? openglSurfaceDescriptorDefault().surface;
+  const OpenglSurfaceDescriptor({
+    required this.extent,
+    required this.context,
+    this.surface = NativePointer.nullPointer,
+  });
 
   /// Logical surface extent. Required. A scale_factor that differs from the
   /// map's is accepted and logged as a warning.
@@ -3524,10 +3072,10 @@ final class OpenglSurfaceDescriptor extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class VulkanContextDescriptor extends _Value {
   const VulkanContextDescriptor({
-    this.instance = NativePointer.nullPointer,
-    this.physicalDevice = NativePointer.nullPointer,
-    this.device = NativePointer.nullPointer,
-    this.graphicsQueue = NativePointer.nullPointer,
+    required this.instance,
+    required this.physicalDevice,
+    required this.device,
+    required this.graphicsQueue,
     this.graphicsQueueFamilyIndex = 0,
     this.getInstanceProcAddr = NativePointer.nullPointer,
     this.getDeviceProcAddr = NativePointer.nullPointer,
@@ -3603,7 +3151,7 @@ final class VulkanContextDescriptor extends _Value {
 /// See `mln_vulkan_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class VulkanBorrowedTexture extends _Value {
-  const VulkanBorrowedTexture({this.image = 0, this.imageView = 0});
+  const VulkanBorrowedTexture({required this.image, required this.imageView});
 
   /// Borrowed VkImage. Required.
   final int image;
@@ -3632,31 +3180,15 @@ final class VulkanBorrowedTexture extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class VulkanBorrowedTextureDescriptor extends _Value {
   VulkanBorrowedTextureDescriptor({
-    LogicalExtent? extent,
-    int? physicalWidth,
-    int? physicalHeight,
-    VulkanContextDescriptor? context,
-    List<VulkanBorrowedTexture>? textures,
-    int? format,
-    int? initialLayout,
-    int? finalLayout,
-  }) : extent = extent ?? vulkanBorrowedTextureDescriptorDefault().extent,
-       physicalWidth =
-           physicalWidth ??
-           vulkanBorrowedTextureDescriptorDefault().physicalWidth,
-       physicalHeight =
-           physicalHeight ??
-           vulkanBorrowedTextureDescriptorDefault().physicalHeight,
-       context = context ?? vulkanBorrowedTextureDescriptorDefault().context,
-       textures = List.unmodifiable(
-         textures ?? vulkanBorrowedTextureDescriptorDefault().textures,
-       ),
-       format = format ?? vulkanBorrowedTextureDescriptorDefault().format,
-       initialLayout =
-           initialLayout ??
-           vulkanBorrowedTextureDescriptorDefault().initialLayout,
-       finalLayout =
-           finalLayout ?? vulkanBorrowedTextureDescriptorDefault().finalLayout;
+    required this.extent,
+    required this.physicalWidth,
+    required this.physicalHeight,
+    required this.context,
+    required List<VulkanBorrowedTexture> textures,
+    required this.format,
+    this.initialLayout = 0,
+    required this.finalLayout,
+  }) : textures = List.unmodifiable(textures);
 
   /// Logical texture extent. Required. physical_width and physical_height give
   /// the texture's size. A scale_factor that differs from the map's is accepted
@@ -3737,11 +3269,10 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
 /// See `mln_vulkan_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class VulkanOwnedTextureDescriptor extends _Value {
-  VulkanOwnedTextureDescriptor({
-    LogicalExtent? extent,
-    VulkanContextDescriptor? context,
-  }) : extent = extent ?? vulkanOwnedTextureDescriptorDefault().extent,
-       context = context ?? vulkanOwnedTextureDescriptorDefault().context;
+  const VulkanOwnedTextureDescriptor({
+    required this.extent,
+    required this.context,
+  });
 
   /// Logical texture extent. Required. A scale_factor that differs from the
   /// map's is accepted and logged as a warning.
@@ -3771,13 +3302,11 @@ final class VulkanOwnedTextureDescriptor extends _Value {
 /// See `mln_vulkan_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 final class VulkanSurfaceDescriptor extends _Value {
-  VulkanSurfaceDescriptor({
-    LogicalExtent? extent,
-    VulkanContextDescriptor? context,
-    int? surface,
-  }) : extent = extent ?? vulkanSurfaceDescriptorDefault().extent,
-       context = context ?? vulkanSurfaceDescriptorDefault().context,
-       surface = surface ?? vulkanSurfaceDescriptorDefault().surface;
+  const VulkanSurfaceDescriptor({
+    required this.extent,
+    required this.context,
+    required this.surface,
+  });
 
   /// Logical surface extent. Required. A scale_factor that differs from the
   /// map's is accepted and logged as a warning.
@@ -3812,6 +3341,136 @@ final class VulkanSurfaceDescriptor extends _Value {
   ]);
 }
 
+/// Optional fitting controls for camera-for-viewport queries.
+///
+/// See `mln_camera_fit_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class CameraFitOptions extends _Value {
+  const CameraFitOptions({this.padding, this.bearing, this.pitch});
+  final EdgeInsets? padding;
+  final double? bearing;
+  final double? pitch;
+
+  /// A copy of this value with the given members replaced.
+  CameraFitOptions copyWith({
+    EdgeInsets? padding,
+    double? bearing,
+    double? pitch,
+  }) => CameraFitOptions(
+    padding: padding ?? this.padding,
+    bearing: bearing ?? this.bearing,
+    pitch: pitch ?? this.pitch,
+  );
+
+  @override
+  List<Object?> get _members => [padding, bearing, pitch];
+  @override
+  String toString() =>
+      _describe('CameraFitOptions', const ['padding', 'bearing', 'pitch']);
+}
+
+/// Camera fields used by snapshots and camera updates.
+///
+/// See `mln_camera_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class CameraOptions extends _Value {
+  const CameraOptions({
+    this.center,
+    this.centerAltitude,
+    this.padding,
+    this.anchor,
+    this.zoom,
+    this.bearing,
+    this.pitch,
+    this.roll,
+    this.fieldOfView,
+  });
+  final LatLng? center;
+  final double? centerAltitude;
+  final EdgeInsets? padding;
+
+  /// Optional screen-space focal point in logical map pixels.
+  final ScreenPoint? anchor;
+  final double? zoom;
+  final double? bearing;
+  final double? pitch;
+  final double? roll;
+  final double? fieldOfView;
+
+  /// A copy of this value with the given members replaced.
+  CameraOptions copyWith({
+    LatLng? center,
+    double? centerAltitude,
+    EdgeInsets? padding,
+    ScreenPoint? anchor,
+    double? zoom,
+    double? bearing,
+    double? pitch,
+    double? roll,
+    double? fieldOfView,
+  }) => CameraOptions(
+    center: center ?? this.center,
+    centerAltitude: centerAltitude ?? this.centerAltitude,
+    padding: padding ?? this.padding,
+    anchor: anchor ?? this.anchor,
+    zoom: zoom ?? this.zoom,
+    bearing: bearing ?? this.bearing,
+    pitch: pitch ?? this.pitch,
+    roll: roll ?? this.roll,
+    fieldOfView: fieldOfView ?? this.fieldOfView,
+  );
+
+  @override
+  List<Object?> get _members => [
+    center,
+    centerAltitude,
+    padding,
+    anchor,
+    zoom,
+    bearing,
+    pitch,
+    roll,
+    fieldOfView,
+  ];
+  @override
+  String toString() => _describe('CameraOptions', const [
+    'center',
+    'centerAltitude',
+    'padding',
+    'anchor',
+    'zoom',
+    'bearing',
+    'pitch',
+    'roll',
+    'fieldOfView',
+  ]);
+}
+
+/// Geographic bounds in degrees.
+///
+/// See `mln_lat_lng_bounds` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class LatLngBounds extends _Value {
+  const LatLngBounds({
+    this.southwest = const LatLng(),
+    this.northeast = const LatLng(),
+  });
+  final LatLng southwest;
+  final LatLng northeast;
+
+  /// A copy of this value with the given members replaced.
+  LatLngBounds copyWith({LatLng? southwest, LatLng? northeast}) => LatLngBounds(
+    southwest: southwest ?? this.southwest,
+    northeast: northeast ?? this.northeast,
+  );
+
+  @override
+  List<Object?> get _members => [southwest, northeast];
+  @override
+  String toString() =>
+      _describe('LatLngBounds', const ['southwest', 'northeast']);
+}
+
 /// Camera result borrowed for an ordered camera-query completion.
 ///
 /// See `mln_camera_query_result` in the
@@ -3834,7 +3493,7 @@ final class CameraQueryResult extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class FeatureStateSelector extends _Value {
   const FeatureStateSelector({
-    this.sourceId = '',
+    required this.sourceId,
     this.sourceLayerId = '',
     this.featureId,
     this.stateKey = '',
@@ -3885,7 +3544,7 @@ final class FeatureStateSelector extends _Value {
 /// See `mln_map_tile_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class MapTileOptions extends _Value {
-  MapTileOptions({
+  const MapTileOptions({
     this.prefetchZoomDelta,
     this.lodMinRadius,
     this.lodScale,
@@ -3939,6 +3598,140 @@ final class MapTileOptions extends _Value {
   ]);
 }
 
+/// Optional map camera constraint fields.
+///
+/// See `mln_bound_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class BoundOptions extends _Value {
+  const BoundOptions({
+    this.bounds,
+    this.minZoom,
+    this.maxZoom,
+    this.minPitch,
+    this.maxPitch,
+    this.unbounded = false,
+  });
+
+  /// Read when fields contains `MLN_BOUND_OPTION_BOUNDS`.
+  final LatLngBounds? bounds;
+  final double? minZoom;
+  final double? maxZoom;
+  final double? minPitch;
+  final double? maxPitch;
+
+  /// Selects the unbounded geographic constraint, which leaves every camera
+  /// center unconstrained and lets the map pan freely across the antimeridian.
+  /// This differs from world bounds of -90/-180 to 90/180, which clamp
+  /// longitude to that range. Mutually exclusive with
+  /// `MLN_BOUND_OPTION_BOUNDS`, and leaves `mln_bound_options.bounds` unread.
+  final bool unbounded;
+
+  /// A copy of this value with the given members replaced.
+  BoundOptions copyWith({
+    LatLngBounds? bounds,
+    double? minZoom,
+    double? maxZoom,
+    double? minPitch,
+    double? maxPitch,
+    bool? unbounded,
+  }) => BoundOptions(
+    bounds: bounds ?? this.bounds,
+    minZoom: minZoom ?? this.minZoom,
+    maxZoom: maxZoom ?? this.maxZoom,
+    minPitch: minPitch ?? this.minPitch,
+    maxPitch: maxPitch ?? this.maxPitch,
+    unbounded: unbounded ?? this.unbounded,
+  );
+
+  @override
+  List<Object?> get _members => [
+    bounds,
+    minZoom,
+    maxZoom,
+    minPitch,
+    maxPitch,
+    unbounded,
+  ];
+  @override
+  String toString() => _describe('BoundOptions', const [
+    'bounds',
+    'minZoom',
+    'maxZoom',
+    'minPitch',
+    'maxPitch',
+    'unbounded',
+  ]);
+}
+
+/// Three-component vector used by free camera options.
+///
+/// See `mln_vec3` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class Vec3 extends _Value {
+  const Vec3({this.x = 0, this.y = 0, this.z = 0});
+  final double x;
+  final double y;
+  final double z;
+
+  /// A copy of this value with the given members replaced.
+  Vec3 copyWith({double? x, double? y, double? z}) =>
+      Vec3(x: x ?? this.x, y: y ?? this.y, z: z ?? this.z);
+
+  @override
+  List<Object?> get _members => [x, y, z];
+  @override
+  String toString() => _describe('Vec3', const ['x', 'y', 'z']);
+}
+
+/// Quaternion stored as x, y, z, w components.
+///
+/// See `mln_quaternion` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class Quaternion extends _Value {
+  const Quaternion({this.x = 0, this.y = 0, this.z = 0, this.w = 0});
+  final double x;
+  final double y;
+  final double z;
+  final double w;
+
+  /// A copy of this value with the given members replaced.
+  Quaternion copyWith({double? x, double? y, double? z, double? w}) =>
+      Quaternion(
+        x: x ?? this.x,
+        y: y ?? this.y,
+        z: z ?? this.z,
+        w: w ?? this.w,
+      );
+
+  @override
+  List<Object?> get _members => [x, y, z, w];
+  @override
+  String toString() => _describe('Quaternion', const ['x', 'y', 'z', 'w']);
+}
+
+/// Free camera position and orientation in MapLibre Native camera space.
+///
+/// See `mln_free_camera_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class FreeCameraOptions extends _Value {
+  const FreeCameraOptions({this.position, this.orientation});
+  final Vec3? position;
+  final Quaternion? orientation;
+
+  /// A copy of this value with the given members replaced.
+  FreeCameraOptions copyWith({Vec3? position, Quaternion? orientation}) =>
+      FreeCameraOptions(
+        position: position ?? this.position,
+        orientation: orientation ?? this.orientation,
+      );
+
+  @override
+  List<Object?> get _members => [position, orientation];
+  @override
+  String toString() =>
+      _describe('FreeCameraOptions', const ['position', 'orientation']);
+}
+
 /// Immutable map state copied from the latest published generation.
 ///
 /// See `mln_map_snapshot` in the
@@ -3953,10 +3746,10 @@ final class MapSnapshot extends _Value {
     this.transitionInProgress = false,
     this.eventMask = RuntimeEventFlag.none,
     this.latestRenderUpdateGeneration = 0,
-    required this.tile,
-    required this.bounds,
-    required this.freeCamera,
-    required this.view,
+    this.tile = const MapTileOptions(),
+    this.bounds = const BoundOptions(),
+    this.freeCamera = const FreeCameraOptions(),
+    this.view = const MapView(),
   });
 
   /// Debug overlay mask of `mln_map_debug_flag` values.
@@ -4082,8 +3875,8 @@ final class StyleImageInfo extends _Value {
     this.width = 0,
     this.height = 0,
     Uint8List? pixels,
-    required List<ImageStretch> stretchX,
-    required List<ImageStretch> stretchY,
+    List<ImageStretch> stretchX = const [],
+    List<ImageStretch> stretchY = const [],
     this.content,
     this.textFitWidth,
     this.textFitHeight,
@@ -4216,7 +4009,7 @@ final class StyleLayerInfo extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class StyleSourceTileInfo extends _Value {
   StyleSourceTileInfo({
-    required List<String> tileUrls,
+    List<String> tileUrls = const [],
     this.minZoom = 0,
     this.maxZoom = 0,
     this.scheme = const StyleTileScheme.fromRawValue(0),
@@ -4322,7 +4115,7 @@ final class StyleSourceInfo extends _Value {
 /// See `mln_style_transition_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class StyleTransitionOptions extends _Value {
-  StyleTransitionOptions({
+  const StyleTransitionOptions({
     this.durationMs,
     this.delayMs,
     this.enablePlacementTransitions,
@@ -4362,63 +4155,6 @@ final class StyleTransitionOptions extends _Value {
     'durationMs',
     'delayMs',
     'enablePlacementTransitions',
-  ]);
-}
-
-/// Options used when creating a map.
-///
-/// See `mln_map_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class MapOptions extends _Value {
-  MapOptions({
-    LogicalExtent? initialExtent,
-    MapMode? mapMode,
-    bool? fastPforEnabled,
-    this.eventMask,
-  }) : initialExtent = initialExtent ?? mapOptionsDefault().initialExtent,
-       mapMode = mapMode ?? mapOptionsDefault().mapMode,
-       fastPforEnabled = fastPforEnabled ?? mapOptionsDefault().fastPforEnabled;
-
-  /// Initial logical extent. Required. Width and height must be nonzero, and
-  /// scale_factor must be finite and positive. scale_factor is fixed for the
-  /// map's lifetime.
-  final LogicalExtent initialExtent;
-  final MapMode mapMode;
-
-  /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
-  /// encodings.
-  final bool fastPforEnabled;
-
-  /// Map-originated event types this map queues, as a bitwise OR of
-  /// `mln_runtime_event_flag` values.
-  final RuntimeEventFlag? eventMask;
-
-  /// A copy of this value with the given members replaced.
-  MapOptions copyWith({
-    LogicalExtent? initialExtent,
-    MapMode? mapMode,
-    bool? fastPforEnabled,
-    RuntimeEventFlag? eventMask,
-  }) => MapOptions(
-    initialExtent: initialExtent ?? this.initialExtent,
-    mapMode: mapMode ?? this.mapMode,
-    fastPforEnabled: fastPforEnabled ?? this.fastPforEnabled,
-    eventMask: eventMask ?? this.eventMask,
-  );
-
-  @override
-  List<Object?> get _members => [
-    initialExtent,
-    mapMode,
-    fastPforEnabled,
-    eventMask,
-  ];
-  @override
-  String toString() => _describe('MapOptions', const [
-    'initialExtent',
-    'mapMode',
-    'fastPforEnabled',
-    'eventMask',
   ]);
 }
 
@@ -4502,6 +4238,46 @@ final class StyleImageOptions extends _Value {
   ]);
 }
 
+/// One atomic absolute camera update.
+///
+/// See `mln_camera_update` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class CameraUpdate extends _Value {
+  const CameraUpdate({
+    this.mode = const CameraUpdateMode.fromRawValue(0),
+    this.camera = const CameraOptions(),
+    this.animation = const AnimationOptions(),
+    this.gesturePhase = const GesturePhase.fromRawValue(0),
+  });
+  final CameraUpdateMode mode;
+  final CameraOptions camera;
+  final AnimationOptions animation;
+  final GesturePhase gesturePhase;
+
+  /// A copy of this value with the given members replaced.
+  CameraUpdate copyWith({
+    CameraUpdateMode? mode,
+    CameraOptions? camera,
+    AnimationOptions? animation,
+    GesturePhase? gesturePhase,
+  }) => CameraUpdate(
+    mode: mode ?? this.mode,
+    camera: camera ?? this.camera,
+    animation: animation ?? this.animation,
+    gesturePhase: gesturePhase ?? this.gesturePhase,
+  );
+
+  @override
+  List<Object?> get _members => [mode, camera, animation, gesturePhase];
+  @override
+  String toString() => _describe('CameraUpdate', const [
+    'mode',
+    'camera',
+    'animation',
+    'gesturePhase',
+  ]);
+}
+
 final class RenderAbandonResult extends _Value {
   const RenderAbandonResult({
     this.disposition = const RenderAbandonDisposition.fromRawValue(0),
@@ -4555,7 +4331,7 @@ final class RenderSessionCapabilities extends _Value {
 final class RenderSessionSnapshot extends _Value {
   const RenderSessionSnapshot({
     required this.state,
-    required this.extent,
+    this.extent = const LogicalExtent(),
     this.generation = 0,
     this.mapUpdateGeneration = 0,
     this.renderedUpdateGeneration = 0,
@@ -4640,7 +4416,7 @@ final class ScreenBox extends _Value {
 /// See `mln_screen_line_string` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 final class ScreenLineString extends _Value {
-  ScreenLineString({required List<ScreenPoint> points})
+  ScreenLineString({List<ScreenPoint> points = const []})
     : points = List.unmodifiable(points);
 
   /// Points. Null only when point_count is 0.
@@ -4870,6 +4646,31 @@ final class TextureReadbackResult extends _Value {
       _describe('TextureReadbackResult', const ['data', 'info']);
 }
 
+/// One nonblocking request for a frame.
+///
+/// See `mln_frame_demand` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+final class FrameDemand extends _Value {
+  const FrameDemand({this.flags = FrameDemandFlag.none, this.token = 0});
+
+  /// A bitwise OR of `mln_frame_demand_flag` values. Zero renders only when a
+  /// newer map update exists, without presenting.
+  final FrameDemandFlag flags;
+
+  /// Host identity returned with the terminal frame result. Any value except
+  /// `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE`, the maximum uint64_t value.
+  final int token;
+
+  /// A copy of this value with the given members replaced.
+  FrameDemand copyWith({FrameDemandFlag? flags, int? token}) =>
+      FrameDemand(flags: flags ?? this.flags, token: token ?? this.token);
+
+  @override
+  List<Object?> get _members => [flags, token];
+  @override
+  String toString() => _describe('FrameDemand', const ['flags', 'token']);
+}
+
 /// A resource provider's answer to one request.
 ///
 /// See `mln_resource_response` in the
@@ -4953,49 +4754,12 @@ final class ResourceResponse extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 typedef ResourceRequestCancelCallback = void Function();
 
-/// One request pattern that a resource provider claims.
-///
-/// See `mln_resource_route` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class ResourceRoute extends _Value {
-  ResourceRoute({ResourceKindFlag? kinds, UrlMatchFlag? flags, String? url})
-    : kinds = kinds ?? resourceRouteDefault().kinds,
-      flags = flags ?? resourceRouteDefault().flags,
-      url = url ?? resourceRouteDefault().url;
-
-  /// The resource kinds to match. Zero selects every kind.
-  final ResourceKindFlag kinds;
-  final UrlMatchFlag flags;
-
-  /// The URL or glob pattern to compare.
-  final String url;
-
-  /// A copy of this value with the given members replaced.
-  ResourceRoute copyWith({
-    ResourceKindFlag? kinds,
-    UrlMatchFlag? flags,
-    String? url,
-  }) => ResourceRoute(
-    kinds: kinds ?? this.kinds,
-    flags: flags ?? this.flags,
-    url: url ?? this.url,
-  );
-
-  @override
-  List<Object?> get _members => [kinds, flags, url];
-  @override
-  String toString() =>
-      _describe('ResourceRoute', const ['kinds', 'flags', 'url']);
-}
-
 /// Options used when creating a runtime.
 ///
 /// See `mln_runtime_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class RuntimeOptions extends _Value {
-  RuntimeOptions({String? assetPath, String? cachePath})
-    : assetPath = assetPath ?? runtimeOptionsDefault().assetPath,
-      cachePath = cachePath ?? runtimeOptionsDefault().cachePath;
+  const RuntimeOptions({this.assetPath = '', this.cachePath = ''});
 
   /// Directory root for asset:// URLs. Copied during runtime creation. Empty
   /// selects `/android_asset` on Android and `.` elsewhere.
@@ -5017,6 +4781,61 @@ final class RuntimeOptions extends _Value {
   @override
   String toString() =>
       _describe('RuntimeOptions', const ['assetPath', 'cachePath']);
+}
+
+/// Options used when creating a map.
+///
+/// See `mln_map_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class MapOptions extends _Value {
+  const MapOptions({
+    required this.initialExtent,
+    this.mapMode = const MapMode.fromRawValue(0),
+    this.fastPforEnabled = false,
+    this.eventMask,
+  });
+
+  /// Initial logical extent. Required. Width and height must be nonzero, and
+  /// scale_factor must be finite and positive. scale_factor is fixed for the
+  /// map's lifetime.
+  final LogicalExtent initialExtent;
+  final MapMode mapMode;
+
+  /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
+  /// encodings.
+  final bool fastPforEnabled;
+
+  /// Map-originated event types this map queues, as a bitwise OR of
+  /// `mln_runtime_event_flag` values.
+  final RuntimeEventFlag? eventMask;
+
+  /// A copy of this value with the given members replaced.
+  MapOptions copyWith({
+    LogicalExtent? initialExtent,
+    MapMode? mapMode,
+    bool? fastPforEnabled,
+    RuntimeEventFlag? eventMask,
+  }) => MapOptions(
+    initialExtent: initialExtent ?? this.initialExtent,
+    mapMode: mapMode ?? this.mapMode,
+    fastPforEnabled: fastPforEnabled ?? this.fastPforEnabled,
+    eventMask: eventMask ?? this.eventMask,
+  );
+
+  @override
+  List<Object?> get _members => [
+    initialExtent,
+    mapMode,
+    fastPforEnabled,
+    eventMask,
+  ];
+  @override
+  String toString() => _describe('MapOptions', const [
+    'initialExtent',
+    'mapMode',
+    'fastPforEnabled',
+    'eventMask',
+  ]);
 }
 
 /// Tile-pyramid offline region definition.
@@ -5088,7 +4907,7 @@ final class OfflineTilePyramidRegionDefinition extends _Value {
 final class OfflineGeometryRegionDefinition extends _Value {
   const OfflineGeometryRegionDefinition({
     this.styleUrl = '',
-    this.geometry,
+    required this.geometry,
     this.minZoom = 0,
     this.maxZoom = 0,
     this.pixelRatio = 0,
@@ -5560,6 +5379,70 @@ final class RuntimeEventPayloadUnknown extends RuntimeEventPayload {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 typedef RuntimeEventCallback = void Function(List<RuntimeEvent> events);
 
+/// One HTTP header that a header rule supplies.
+///
+/// See `mln_http_header` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class HttpHeader extends _Value {
+  const HttpHeader({required this.name, this.value = ''});
+
+  /// Header field name. Required.
+  final String name;
+  final String value;
+
+  /// A copy of this value with the given members replaced.
+  HttpHeader copyWith({String? name, String? value}) =>
+      HttpHeader(name: name ?? this.name, value: value ?? this.value);
+
+  @override
+  List<Object?> get _members => [name, value];
+  @override
+  String toString() => _describe('HttpHeader', const ['name', 'value']);
+}
+
+/// One rule of a native HTTP header transform.
+///
+/// See `mln_http_header_rule` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class HttpHeaderRule extends _Value {
+  HttpHeaderRule({
+    this.kinds = ResourceKindFlag.none,
+    this.flags = UrlMatchFlag.exact,
+    this.url = '',
+    List<HttpHeader> headers = const [],
+  }) : headers = List.unmodifiable(headers);
+
+  /// The resource kinds to match. Zero selects every kind.
+  final ResourceKindFlag kinds;
+  final UrlMatchFlag flags;
+
+  /// The URL or glob pattern to compare.
+  final String url;
+
+  /// The headers to set. Registration validates each one as
+  /// `mln_http_header_transform_response_set_header()` does.
+  final List<HttpHeader> headers;
+
+  /// A copy of this value with the given members replaced.
+  HttpHeaderRule copyWith({
+    ResourceKindFlag? kinds,
+    UrlMatchFlag? flags,
+    String? url,
+    List<HttpHeader>? headers,
+  }) => HttpHeaderRule(
+    kinds: kinds ?? this.kinds,
+    flags: flags ?? this.flags,
+    url: url ?? this.url,
+    headers: headers ?? this.headers,
+  );
+
+  @override
+  List<Object?> get _members => [kinds, flags, url, headers];
+  @override
+  String toString() =>
+      _describe('HttpHeaderRule', const ['kinds', 'flags', 'url', 'headers']);
+}
+
 /// HTTP header transform state: a callback, or native header rules.
 ///
 /// See `mln_http_header_transform` in the
@@ -5667,6 +5550,42 @@ final class ResourceRequestInfo extends _Value {
 typedef ResourceProviderCallback =
     void Function(ResourceRequestInfo request, ResourceRequestHandle handle);
 
+/// One request pattern that a resource provider claims.
+///
+/// See `mln_resource_route` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceRoute extends _Value {
+  const ResourceRoute({
+    this.kinds = ResourceKindFlag.none,
+    this.flags = UrlMatchFlag.exact,
+    this.url = '',
+  });
+
+  /// The resource kinds to match. Zero selects every kind.
+  final ResourceKindFlag kinds;
+  final UrlMatchFlag flags;
+
+  /// The URL or glob pattern to compare.
+  final String url;
+
+  /// A copy of this value with the given members replaced.
+  ResourceRoute copyWith({
+    ResourceKindFlag? kinds,
+    UrlMatchFlag? flags,
+    String? url,
+  }) => ResourceRoute(
+    kinds: kinds ?? this.kinds,
+    flags: flags ?? this.flags,
+    url: url ?? this.url,
+  );
+
+  @override
+  List<Object?> get _members => [kinds, flags, url];
+  @override
+  String toString() =>
+      _describe('ResourceRoute', const ['kinds', 'flags', 'url']);
+}
+
 /// Resource provider state.
 ///
 /// See `mln_resource_provider` in the
@@ -5736,7 +5655,7 @@ final class StyleExpressionType extends _Value {
 /// See `mln_style_expression_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 final class StyleExpressionOptions extends _Value {
-  StyleExpressionOptions({this.expectedType});
+  const StyleExpressionOptions({this.expectedType});
 
   /// The type that the expression must produce. A string type coerces the
   /// result to a string, as a string layer property does; every other type
@@ -5767,10 +5686,8 @@ final class StyleExpressionInputs extends _Value {
     this.featureState,
     this.globalState,
     this.canonicalTileId,
-    List<String>? availableImages,
-  }) : availableImages = List.unmodifiable(
-         availableImages ?? styleExpressionInputsDefault().availableImages,
-       );
+    List<String> availableImages = const [],
+  }) : availableImages = List.unmodifiable(availableImages);
 
   /// The value of the zoom expression.
   final double? zoom;

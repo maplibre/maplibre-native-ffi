@@ -190,8 +190,9 @@ bool mln_test_backend_attach(
     return false;
   }
   *out_state = NULL;
-  mln_webgpu_owned_texture_descriptor descriptor =
-    mln_webgpu_owned_texture_descriptor_default();
+  mln_webgpu_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_webgpu_owned_texture_descriptor)
+  };
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
   descriptor.extent.scale_factor = 1.0;
@@ -254,8 +255,9 @@ static bool attach_borrowed_ring(
       .texture_view = view,
     };
   }
-  mln_webgpu_borrowed_texture_descriptor descriptor =
-    mln_webgpu_borrowed_texture_descriptor_default();
+  mln_webgpu_borrowed_texture_descriptor descriptor = {
+    .size = sizeof(mln_webgpu_borrowed_texture_descriptor)
+  };
   descriptor.extent.width = ring_texture_size;
   descriptor.extent.height = ring_texture_size;
   descriptor.extent.scale_factor = 1.0;
@@ -427,8 +429,9 @@ static bool attach_main_thread_texture(
   const mln_completion* completion, mln_status* out_status
 ) {
   *out_state = NULL;
-  mln_webgpu_owned_texture_descriptor descriptor =
-    mln_webgpu_owned_texture_descriptor_default();
+  mln_webgpu_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_webgpu_owned_texture_descriptor)
+  };
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
   descriptor.extent.scale_factor = 1.0;

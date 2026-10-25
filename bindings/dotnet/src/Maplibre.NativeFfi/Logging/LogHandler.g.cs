@@ -9,7 +9,16 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_log_handler</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Callback">
-/// Receives each record.
-/// </param>
-public readonly partial record struct LogHandler(LogCallback Callback);
+public readonly partial record struct LogHandler
+{
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public LogHandler(LogCallback Callback)
+    {
+        this.Callback = Callback;
+    }
+
+    /// <summary>
+    /// Receives each record.
+    /// </summary>
+    public required LogCallback Callback { get; init; }
+}

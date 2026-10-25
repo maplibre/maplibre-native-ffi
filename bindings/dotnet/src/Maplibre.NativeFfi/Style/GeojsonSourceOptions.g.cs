@@ -37,7 +37,7 @@ public sealed record GeojsonSourceOptions
     /// whose members follow the MapLibre Style Spec clusterProperties form, or
     /// empty for none. The UTF-8 bytes are borrowed for the call.
     /// </summary>
-    public required string ClusterProperties { get; init; }
+    public string ClusterProperties { get; init; } = "";
 
     /// <summary>
     /// Tile buffer in pixels within [0, 512]. Absent selects 128.
@@ -69,14 +69,4 @@ public sealed record GeojsonSourceOptions
     /// Absent selects false.
     /// </summary>
     public bool? SynchronousTiling { get; init; }
-    public static GeojsonSourceOptions Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyGeojsonSourceOptions(
-                NativeMethods.mln_geojson_source_options_default()
-            );
-        }
-    }
 }

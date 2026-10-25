@@ -78,7 +78,9 @@ static inline mln_test_target_call mln_test_target_call_default(
   mln_map map, uint32_t driver
 ) {
   mln_test_target_call call = {.map = map};
-  call.options = mln_render_session_attach_options_default();
+  call.options = (mln_render_session_attach_options){
+    .size = sizeof(mln_render_session_attach_options)
+  };
   call.options.driver = driver;
   return call;
 }

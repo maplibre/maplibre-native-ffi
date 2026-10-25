@@ -144,7 +144,8 @@ class Host {
     self.condition_.notify_all();
   }
   void arm() {
-    auto demand = mln_frame_demand_default();
+    auto demand = mln_frame_demand{};
+    demand.size = sizeof(mln_frame_demand);
     demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
     check(mln_render_session_request_frame(session_, &demand, nullptr));
   }
@@ -168,7 +169,8 @@ class Host {
         if (result->disposition == MLN_RENDER_RESULT_RENDERED) {
           auto frame = mln_acquired_frame{MLN_HANDLE_NULL};
           check(mln_render_session_acquire_frame(session_, &frame, nullptr));
-          auto sync = mln_gpu_sync_default();
+          auto sync = mln_gpu_sync{};
+          sync.size = sizeof(mln_gpu_sync);
           check(mln_acquired_frame_release(frame, &sync, nullptr));
           frames.fetch_add(1);
         }
@@ -182,7 +184,8 @@ class Host {
     if (!graphics) std::abort();
     auto context = mln_test_graphics_context{};
     if (!mln_test_graphics_get_context(graphics, &context)) std::abort();
-    auto target = mln_vulkan_owned_texture_descriptor_default();
+    auto target = mln_vulkan_owned_texture_descriptor{};
+    target.size = sizeof(mln_vulkan_owned_texture_descriptor);
     target.extent = {.width = 64, .height = 64, .scale_factor = 1};
     target.context = {
       .instance = context.vulkan_instance,
@@ -193,7 +196,8 @@ class Host {
       .get_instance_proc_addr = context.vulkan_get_instance_proc_addr,
       .get_device_proc_addr = context.vulkan_get_device_proc_addr
     };
-    auto options = mln_render_session_attach_options_default();
+    auto options = mln_render_session_attach_options{};
+    options.size = sizeof(mln_render_session_attach_options);
     options.driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
     options.driver_work_wake = {.callback = wake, .user_data = this};
     options.frame_wake = {.callback = wake, .user_data = this};
@@ -274,7 +278,8 @@ void measure(
   uint64_t frames = 0;
   const auto live = mln::core::lease_runtime(runtime);
   std::vector<uint8_t> pixels(image_size * image_size * 4);
-  auto image = mln_premultiplied_rgba8_image_default();
+  auto image = mln_premultiplied_rgba8_image{};
+  image.size = sizeof(mln_premultiplied_rgba8_image);
   image.width = image_size;
   image.height = image_size;
   image.stride = image_size * 4;
@@ -371,9 +376,11 @@ int main(int argc, char** argv) {
   measured_thread = true;
   const auto repetitions = argc > 1 ? std::max(1, std::atoi(argv[1])) : 100;
   auto runtime = mln_runtime{MLN_HANDLE_NULL};
-  auto options = mln_runtime_options_default();
+  auto options = mln_runtime_options{};
+  options.size = sizeof(mln_runtime_options);
   check(mln_runtime_create(&options, &runtime, nullptr));
-  auto map_options = mln_map_options_default();
+  auto map_options = mln_map_options{};
+  map_options.size = sizeof(mln_map_options);
   map_options.map_mode = MLN_MAP_MODE_CONTINUOUS;
   map_options.initial_extent = {.width = 64, .height = 64, .scale_factor = 1};
   auto created = Done{};

@@ -57,7 +57,7 @@ static void a_registered_layer_type_renders_through_the_c_api(void) {
   bool square_rendered = false;
   const mln_test_deadline deadline = mln_test_deadline_default();
   while (!square_rendered && !mln_test_deadline_passed(deadline)) {
-    mln_frame_demand demand = mln_frame_demand_default();
+    mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
     demand.flags = MLN_FRAME_DEMAND_FORCE;
     MLN_TEST_OK(
       mln_render_session_request_frame(fixture.session, &demand, NULL)

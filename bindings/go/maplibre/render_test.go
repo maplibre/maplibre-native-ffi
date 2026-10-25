@@ -84,12 +84,12 @@ func newGraphicsFixture(t *testing.T) *renderFixture {
 // options returns the fixture's attach options, whose wakes notify frames and
 // driverWork.
 func (r *renderFixture) options() RenderSessionAttachOptions {
-	options := DefaultRenderSessionAttachOptions()
-	options.Driver = RenderDriverKindCallerGraphicsThread
-	options.RequestedTextureRingDepth = 2
-	options.FrameWake = Wake{Callback: func() { notify(r.frames) }}
-	options.DriverWorkWake = Wake{Callback: func() { notify(r.driverWork) }}
-	return options
+	return RenderSessionAttachOptions{
+		Driver:                    RenderDriverKindCallerGraphicsThread,
+		RequestedTextureRingDepth: 2,
+		FrameWake:                 Wake{Callback: func() { notify(r.frames) }},
+		DriverWorkWake:            Wake{Callback: func() { notify(r.driverWork) }},
+	}
 }
 
 // attachTexture starts attaching the fixture's texture with options.

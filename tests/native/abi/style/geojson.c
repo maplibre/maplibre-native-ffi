@@ -235,7 +235,9 @@ static void geojson_data_preparation_validates_documents_and_options(void) {
        index < sizeof(geojson_data_cases) / sizeof(geojson_data_cases[0]);
        index += 1) {
     const geojson_data_case* row = &geojson_data_cases[index];
-    mln_geojson_source_options options = mln_geojson_source_options_default();
+    mln_geojson_source_options options = {
+      .size = sizeof(mln_geojson_source_options)
+    };
     if (row->options != NULL) {
       row->options(&options);
     }
@@ -270,18 +272,23 @@ static void geojson_data_preparation_validates_documents_and_options(void) {
   // Every field in range prepares. The clustering constraints belong to
   // clustering alone, so the same data tiles fine without it, and an empty
   // collection carries nothing to cluster, so a later update supplies them.
-  mln_geojson_source_options options = mln_geojson_source_options_default();
+  mln_geojson_source_options options = {
+    .size = sizeof(mln_geojson_source_options)
+  };
   every_option(&options);
   mln_geojson_source_data_release(prepare(POINT_COLLECTION("a"), &options));
   mln_geojson_source_data_release(prepare(point_and_collection, NULL));
   mln_geojson_source_data_release(prepare(bare_point, NULL));
-  options = mln_geojson_source_options_default();
+  options =
+    (mln_geojson_source_options){.size = sizeof(mln_geojson_source_options)};
   clustered(&options);
   mln_geojson_source_data_release(prepare(EMPTY_COLLECTION, &options));
 }
 
 static void geojson_max_zoom_respects_the_tiling_limit(void) {
-  mln_geojson_source_options options = mln_geojson_source_options_default();
+  mln_geojson_source_options options = {
+    .size = sizeof(mln_geojson_source_options)
+  };
   options.fields = MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM;
   options.max_zoom = 24.0;
   mln_geojson_source_data_release(
@@ -301,7 +308,9 @@ static void geojson_max_zoom_respects_the_tiling_limit(void) {
 }
 
 static void geojson_pixel_options_respect_the_scaled_limits(void) {
-  mln_geojson_source_options options = mln_geojson_source_options_default();
+  mln_geojson_source_options options = {
+    .size = sizeof(mln_geojson_source_options)
+  };
   options.fields = MLN_GEOJSON_SOURCE_OPTION_BUFFER;
   options.buffer = 512;
   mln_geojson_source_data_release(
@@ -317,7 +326,8 @@ static void geojson_pixel_options_respect_the_scaled_limits(void) {
   TEST_ASSERT_EQUAL_STRING("buffer must be at most 512", mln_test_last_error());
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, data);
 
-  options = mln_geojson_source_options_default();
+  options =
+    (mln_geojson_source_options){.size = sizeof(mln_geojson_source_options)};
   options.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
                    MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
   options.cluster = true;
@@ -348,7 +358,9 @@ static void geojson_sources_take_and_validate_their_options(void) {
   mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   const mln_buffer_view url = MLN_BUFFER_LITERAL("fixture://points.geojson");
 
-  mln_geojson_source_options options = mln_geojson_source_options_default();
+  mln_geojson_source_options options = {
+    .size = sizeof(mln_geojson_source_options)
+  };
   every_option(&options);
   mln_geojson_source_data data = prepare(POINT_COLLECTION("a"), &options);
   MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
@@ -360,7 +372,8 @@ static void geojson_sources_take_and_validate_their_options(void) {
     NULL
   ));
 
-  options = mln_geojson_source_options_default();
+  options =
+    (mln_geojson_source_options){.size = sizeof(mln_geojson_source_options)};
   inverted_zoom_range(&options);
   MLN_TEST_EXPECT_COMMAND_REJECTED(
     "min_zoom must be less than or equal to max_zoom",
@@ -369,7 +382,8 @@ static void geojson_sources_take_and_validate_their_options(void) {
       &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
-  options = mln_geojson_source_options_default();
+  options =
+    (mln_geojson_source_options){.size = sizeof(mln_geojson_source_options)};
   cluster_properties_array(&options);
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT,
@@ -476,7 +490,9 @@ static void prepared_data_must_match_the_source_options(void) {
   static const char points[] = POINT_COLLECTION("clustered");
   const mln_buffer_view id = MLN_BUFFER_LITERAL("clustered");
 
-  mln_geojson_source_options source = mln_geojson_source_options_default();
+  mln_geojson_source_options source = {
+    .size = sizeof(mln_geojson_source_options)
+  };
   clustered(&source);
   source.cluster_properties = MLN_BUFFER_LITERAL(
     "{\"total\":[\"+\",[\"get\",\"rank\"]],\"top\":[\"max\",[\"get\","
@@ -604,7 +620,9 @@ static void clustering_fields_decide_which_points_the_source_holds(void) {
     "\"coordinates\":[0,0]},\"properties\":{}},"
     "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
     "\"coordinates\":[11.25,0]},\"properties\":{}}]}";
-  mln_geojson_source_options options = mln_geojson_source_options_default();
+  mln_geojson_source_options options = {
+    .size = sizeof(mln_geojson_source_options)
+  };
   options.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER |
                    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
                    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;

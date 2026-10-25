@@ -75,7 +75,9 @@ static void style_commands_copy_inputs_and_fail_on_duplicate_or_missing_ids(
   );
 
   const uint8_t pixel[4] = {0, 0, 0, 0};
-  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
+  mln_premultiplied_rgba8_image image = {
+    .size = sizeof(mln_premultiplied_rgba8_image)
+  };
   image.width = 1;
   image.height = 1;
   image.stride = 4;
@@ -361,7 +363,9 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
 
-  mln_style_transition_options applied = mln_style_transition_options_default();
+  mln_style_transition_options applied = {
+    .size = sizeof(mln_style_transition_options)
+  };
   applied.fields = timing;
   applied.duration_ms = 250.0;
   applied.delay_ms = 75.0;
@@ -372,8 +376,9 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
   TEST_ASSERT_TRUE(read.enable_placement_transitions);
 
   // Placement transitions stay on unless a set names them.
-  mln_style_transition_options placement =
-    mln_style_transition_options_default();
+  mln_style_transition_options placement = {
+    .size = sizeof(mln_style_transition_options)
+  };
   placement.fields = MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
   placement.enable_placement_transitions = false;
   set_transition_options(map, &placement);

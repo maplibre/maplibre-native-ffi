@@ -24,15 +24,5 @@ public sealed record RenderedFeatureQueryOptions
     /// <summary>
     /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
     /// </summary>
-    public required string Filter { get; init; }
-    public static RenderedFeatureQueryOptions Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyRenderedFeatureQueryOptions(
-                NativeMethods.mln_rendered_feature_query_options_default()
-            );
-        }
-    }
+    public string Filter { get; init; } = "";
 }

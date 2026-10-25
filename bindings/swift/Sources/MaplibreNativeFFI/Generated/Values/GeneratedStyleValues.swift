@@ -12,15 +12,7 @@ public struct CanonicalTileId: Equatable, Hashable, Sendable {
   public var z: UInt32
   public var x: UInt32
   public var y: UInt32
-  public static var `default`: Self {
-    Self(raw: mln_canonical_tile_id())
-  }
-
-  public init(
-    z: UInt32 = CanonicalTileId.default.z,
-    x: UInt32 = CanonicalTileId.default.x,
-    y: UInt32 = CanonicalTileId.default.y
-  ) {
+  public init(z: UInt32 = 0, x: UInt32 = 0, y: UInt32 = 0) {
     self.z = z
     self.x = x
     self.y = y
@@ -79,32 +71,10 @@ public struct CustomGeometrySourceOptions: Sendable {
     self.wrap = wrap
   }
 
-  init(
-    raw: mln_custom_geometry_source_options,
-    fetchTile: @escaping CustomSourceFetchTileCallback
-  ) throws {
-    self.fetchTile = fetchTile
-    cancelTile = nil
-    minZoom = raw.fields & MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM
-      .rawValue != 0 ? raw.min_zoom : nil
-    maxZoom = raw.fields & MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM
-      .rawValue != 0 ? raw.max_zoom : nil
-    tolerance = raw.fields & MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE
-      .rawValue != 0 ? raw.tolerance : nil
-    tileSize = raw.fields & MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE
-      .rawValue != 0 ? raw.tile_size : nil
-    buffer = raw.fields & MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER
-      .rawValue != 0 ? raw.buffer : nil
-    clip = raw.fields & MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP
-      .rawValue != 0 ? raw.clip : nil
-    wrap = raw.fields & MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP
-      .rawValue != 0 ? raw.wrap : nil
-  }
-
   func nativeValue(arena: NativeInputArena) throws
     -> mln_custom_geometry_source_options
   {
-    var raw = mln_custom_geometry_source_options_default()
+    var raw = mln_custom_geometry_source_options()
     raw.size = UInt32(MemoryLayout<mln_custom_geometry_source_options>.size)
     raw.fetch_tile = invokeCustomGeometrySourceOptionsFetchTile
     raw
@@ -187,22 +157,10 @@ public struct CustomMvtVectorSourceOptions: Sendable {
     self.maxZoom = maxZoom
   }
 
-  init(
-    raw: mln_custom_mvt_vector_source_options,
-    fetchTile: @escaping CustomSourceFetchTileCallback
-  ) throws {
-    self.fetchTile = fetchTile
-    cancelTile = nil
-    minZoom = raw.fields & MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
-      .rawValue != 0 ? raw.min_zoom : nil
-    maxZoom = raw.fields & MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
-      .rawValue != 0 ? raw.max_zoom : nil
-  }
-
   func nativeValue(arena: NativeInputArena) throws
     -> mln_custom_mvt_vector_source_options
   {
-    var raw = mln_custom_mvt_vector_source_options_default()
+    var raw = mln_custom_mvt_vector_source_options()
     raw.size = UInt32(MemoryLayout<mln_custom_mvt_vector_source_options>.size)
     raw.fetch_tile = invokeCustomMvtVectorSourceOptionsFetchTile
     raw
@@ -288,22 +246,18 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
   /// Tiles the data for the next render update instead of in the background.
   /// Absent selects false.
   public var synchronousTiling: Bool?
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_geojson_source_options_default))
-  }
-
   public init(
-    minZoom: Double? = GeojsonSourceOptions.default.minZoom,
-    maxZoom: Double? = GeojsonSourceOptions.default.maxZoom,
-    tolerance: Double? = GeojsonSourceOptions.default.tolerance,
-    clusterMaxZoom: Double? = GeojsonSourceOptions.default.clusterMaxZoom,
-    clusterProperties: String = GeojsonSourceOptions.default.clusterProperties,
-    buffer: UInt32? = GeojsonSourceOptions.default.buffer,
-    clusterRadius: UInt32? = GeojsonSourceOptions.default.clusterRadius,
-    clusterMinPoints: UInt32? = GeojsonSourceOptions.default.clusterMinPoints,
-    lineMetrics: Bool? = GeojsonSourceOptions.default.lineMetrics,
-    cluster: Bool? = GeojsonSourceOptions.default.cluster,
-    synchronousTiling: Bool? = GeojsonSourceOptions.default.synchronousTiling
+    minZoom: Double? = nil,
+    maxZoom: Double? = nil,
+    tolerance: Double? = nil,
+    clusterMaxZoom: Double? = nil,
+    clusterProperties: String = "",
+    buffer: UInt32? = nil,
+    clusterRadius: UInt32? = nil,
+    clusterMinPoints: UInt32? = nil,
+    lineMetrics: Bool? = nil,
+    cluster: Bool? = nil,
+    synchronousTiling: Bool? = nil
   ) {
     self.minZoom = minZoom
     self.maxZoom = maxZoom
@@ -352,7 +306,7 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
   func nativeValue(arena: NativeInputArena) throws
     -> mln_geojson_source_options
   {
-    var raw = mln_geojson_source_options_default()
+    var raw = mln_geojson_source_options()
     raw.fields = 0
     raw.size = UInt32(MemoryLayout<mln_geojson_source_options>.size)
     if let item = minZoom {
@@ -409,15 +363,11 @@ public struct ImageContent: Equatable, Hashable, Sendable {
   public var top: Float
   public var right: Float
   public var bottom: Float
-  public static var `default`: Self {
-    Self(raw: mln_image_content())
-  }
-
   public init(
-    left: Float = ImageContent.default.left,
-    top: Float = ImageContent.default.top,
-    right: Float = ImageContent.default.right,
-    bottom: Float = ImageContent.default.bottom
+    left: Float = 0,
+    top: Float = 0,
+    right: Float = 0,
+    bottom: Float = 0
   ) {
     self.left = left
     self.top = top
@@ -449,14 +399,7 @@ public struct ImageContent: Equatable, Hashable, Sendable {
 public struct ImageStretch: Equatable, Hashable, Sendable {
   public var from: Float
   public var to: Float
-  public static var `default`: Self {
-    Self(raw: mln_image_stretch())
-  }
-
-  public init(
-    from: Float = ImageStretch.default.from,
-    to: Float = ImageStretch.default.to
-  ) {
+  public init(from: Float = 0, to: Float = 0) {
     self.from = from
     self.to = to
   }
@@ -487,16 +430,7 @@ public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
   public var stride: UInt32
   /// Premultiplied RGBA8 pixels. Required.
   public var pixels: Data
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_premultiplied_rgba8_image_default))
-  }
-
-  public init(
-    width: UInt32 = PremultipliedRgba8Image.default.width,
-    height: UInt32 = PremultipliedRgba8Image.default.height,
-    stride: UInt32 = PremultipliedRgba8Image.default.stride,
-    pixels: Data = PremultipliedRgba8Image.default.pixels
-  ) {
+  public init(width: UInt32, height: UInt32, stride: UInt32, pixels: Data) {
     self.width = width
     self.height = height
     self.stride = stride
@@ -519,7 +453,7 @@ public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
   func nativeValue(arena: NativeInputArena) throws
     -> mln_premultiplied_rgba8_image
   {
-    var raw = mln_premultiplied_rgba8_image_default()
+    var raw = mln_premultiplied_rgba8_image()
     raw.size = UInt32(MemoryLayout<mln_premultiplied_rgba8_image>.size)
     raw.width = width
     raw.height = height
@@ -556,10 +490,6 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
   public var pixelRatio: Float
   /// Whether the image is a signed distance field icon.
   public var sdf: Bool
-  public static var `default`: Self {
-    Self()
-  }
-
   public init(
     width: UInt32 = 0,
     height: UInt32 = 0,
@@ -638,18 +568,14 @@ public struct StyleImageOptions: Equatable, Hashable, Sendable {
   public var pixelRatio: Float?
   /// Whether the image is a signed distance field icon. Absent selects false.
   public var sdf: Bool?
-  public static var `default`: Self {
-    try! Self(raw: nativeDefault(mln_style_image_options_default))
-  }
-
   public init(
-    stretchX: [ImageStretch]? = StyleImageOptions.default.stretchX,
-    stretchY: [ImageStretch]? = StyleImageOptions.default.stretchY,
-    content: ImageContent? = StyleImageOptions.default.content,
-    textFitWidth: StyleImageTextFit? = StyleImageOptions.default.textFitWidth,
-    textFitHeight: StyleImageTextFit? = StyleImageOptions.default.textFitHeight,
-    pixelRatio: Float? = StyleImageOptions.default.pixelRatio,
-    sdf: Bool? = StyleImageOptions.default.sdf
+    stretchX: [ImageStretch]? = nil,
+    stretchY: [ImageStretch]? = nil,
+    content: ImageContent? = nil,
+    textFitWidth: StyleImageTextFit? = nil,
+    textFitHeight: StyleImageTextFit? = nil,
+    pixelRatio: Float? = nil,
+    sdf: Bool? = nil
   ) {
     self.stretchX = stretchX
     self.stretchY = stretchY
@@ -690,7 +616,7 @@ public struct StyleImageOptions: Equatable, Hashable, Sendable {
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_style_image_options {
-    var raw = mln_style_image_options_default()
+    var raw = mln_style_image_options()
     raw.fields = 0
     raw.size = UInt32(MemoryLayout<mln_style_image_options>.size)
     if let item = stretchX {
@@ -769,10 +695,6 @@ public struct StyleLayerInfo: Equatable, Hashable, Sendable {
   /// Highest zoom at which the layer draws; INFINITY with no upper bound.
   public var maxZoom: Double
   public var visibility: StyleLayerVisibility
-  public static var `default`: Self {
-    Self()
-  }
-
   public init(
     id: String = "",
     type: String = "",
@@ -881,10 +803,6 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
   public var vectorEncoding: StyleVectorTileEncoding?
   /// DEM raster encoding, when inline TileJSON sets one.
   public var rasterEncoding: StyleRasterDemEncoding?
-  public static var `default`: Self {
-    Self()
-  }
-
   public init(
     id: String = "",
     type: StyleSourceType = .init(rawValue: 0),
@@ -948,10 +866,6 @@ public struct StyleSourceTileInfo: Equatable, Hashable, Sendable {
   /// Highest zoom level the TileJSON provides tiles for.
   public var maxZoom: Double
   public var scheme: StyleTileScheme
-  public static var `default`: Self {
-    Self()
-  }
-
   public init(
     tileUrls: [String] = [],
     minZoom: Double = 0,
@@ -1053,15 +967,10 @@ public struct StyleTransitionOptions: Equatable, Hashable, Sendable {
   public var delayMs: Double?
   /// Whether symbol placement changes cross-fade.
   public var enablePlacementTransitions: Bool?
-  public static var `default`: Self {
-    Self(raw: nativeDefault(mln_style_transition_options_default))
-  }
-
   public init(
-    durationMs: Double? = StyleTransitionOptions.default.durationMs,
-    delayMs: Double? = StyleTransitionOptions.default.delayMs,
-    enablePlacementTransitions: Bool? = StyleTransitionOptions.default
-      .enablePlacementTransitions
+    durationMs: Double? = nil,
+    delayMs: Double? = nil,
+    enablePlacementTransitions: Bool? = nil
   ) {
     self.durationMs = durationMs
     self.delayMs = delayMs
@@ -1079,8 +988,9 @@ public struct StyleTransitionOptions: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_style_transition_options {
-    var raw = mln_style_transition_options_default()
+    var raw = mln_style_transition_options()
     raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_style_transition_options>.size)
     if let item = durationMs {
       raw.fields |= MLN_STYLE_TRANSITION_OPTION_DURATION.rawValue; raw
         .duration_ms = item

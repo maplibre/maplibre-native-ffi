@@ -19,17 +19,13 @@ const smokeStyle = `{"version":8,"sources":{},"layers":[` +
 
 // newRuntimeMapState creates the runtime and its map.
 func newRuntimeMapState(v viewport, smoke bool) (*runtimeMapState, error) {
-	runtimeOptions := maplibre.DefaultRuntimeOptions()
-	runtimeOptions.CachePath = ":memory:"
-	runtimeHandle, err := maplibre.RuntimeCreate(runtimeOptions)
+	runtimeHandle, err := maplibre.RuntimeCreate(maplibre.RuntimeOptions{CachePath: ":memory:"})
 	if err != nil {
 		return nil, fmt.Errorf("runtime create failed: %w", err)
 	}
 	state := &runtimeMapState{runtime: runtimeHandle}
-	mapOptions := maplibre.DefaultMapOptions()
-	mapOptions.InitialExtent = v.extent()
 	noEvents := maplibre.RuntimeEventFlagNone
-	mapOptions.EventMask = &noEvents
+	mapOptions := maplibre.MapOptions{InitialExtent: v.extent(), EventMask: &noEvents}
 	mapHandle, ready, err := runtimeHandle.CreateMap(mapOptions)
 	if err != nil {
 		_ = state.Close()

@@ -359,6 +359,30 @@ fn generated_caller_sized_text(
     }
 }
 
+/// Copies a terminated UTF-8 string, which is `None` when null and `optional`.
+///
+/// # Safety
+///
+/// A nonnull pointer must address a terminated string.
+unsafe fn generated_c_string(
+    py: Python<'_>,
+    text: *const c_char,
+    optional: bool,
+) -> PyResult<Py<PyAny>> {
+    if text.is_null() {
+        return if optional {
+            Ok(py.None())
+        } else {
+            Err(native_error("null native string"))
+        };
+    }
+    // SAFETY: the caller guarantees a terminated string.
+    let text = unsafe { std::ffi::CStr::from_ptr(text) }
+        .to_str()
+        .map_err(|_| native_error("native string is not UTF-8"))?;
+    generated_value(py, text)
+}
+
 fn generated_list<T>(
     py: Python<'_>,
     items: impl IntoIterator<Item = T>,

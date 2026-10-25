@@ -53,12 +53,12 @@ int main(void) {
   // Registered first, so this runs after the library's exit handler.
   if (atexit(after_library_exit_gate) != 0) return 2;
   if (pthread_key_create(&thread_exit_key, record_thread_exit) != 0) return 2;
-  const mln_runtime_options options = mln_runtime_options_default();
+  const mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   mln_runtime runtime = MLN_HANDLE_NULL;
   probe_require(mln_runtime_create(&options, &runtime, NULL), "create runtime");
   probe_latch creation;
   const mln_completion created = probe_latch_completion(&creation);
-  mln_map_options map_options = mln_map_options_default();
+  mln_map_options map_options = {.size = sizeof(mln_map_options)};
   map_options.initial_extent =
     (mln_logical_extent){.width = 256, .height = 256, .scale_factor = 1.0};
   mln_map map = MLN_HANDLE_NULL;
@@ -67,7 +67,10 @@ int main(void) {
     "create map"
   );
   probe_require(probe_latch_wait(&creation), "map completion");
-  mln_camera_update camera = mln_camera_update_default();
+  mln_camera_update camera = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   camera.mode = MLN_CAMERA_UPDATE_MODE_EASE;
   camera.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   camera.camera.zoom = 3;

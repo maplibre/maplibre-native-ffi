@@ -159,7 +159,7 @@ static void a_detached_session_frees_its_map_and_refuses_work(void) {
 
   const mln_render_session detached = fixture.session;
   const mln_completion discard = mln_test_discard_completion();
-  const mln_frame_demand demand = mln_frame_demand_default();
+  const mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   const mln_logical_extent extent = {
     .width = 32,
     .height = 32,
@@ -566,8 +566,9 @@ static void abandon_from_an_attach_completion_is_busy(void) {
   attach_abandon_probe probe = {.abandon_status = MLN_STATUS_INVALID_STATE};
   atomic_init(&probe.published, false);
   atomic_init(&probe.completed, false);
-  mln_render_session_attach_options options =
-    mln_render_session_attach_options_default();
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
   options.requested_texture_ring_depth = 2;
   options.frame_wake = mln_test_pulse_wake();
   options.driver_work_wake = mln_test_pulse_wake();
@@ -615,8 +616,9 @@ static void a_session_disposed_while_attaching_frees_the_map(void) {
   mln_map map = mln_test_create_map(runtime);
   atomic_bool released;
   atomic_init(&released, false);
-  mln_render_session_attach_options options =
-    mln_render_session_attach_options_default();
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
   options.requested_texture_ring_depth = 2;
   options.frame_wake = (mln_wake){
     .callback = count_nothing,
@@ -664,8 +666,9 @@ static void a_disposed_attached_session_releases_its_wakes_before_the_device(
   mln_test_render_prepare_map(map);
   atomic_bool released;
   atomic_init(&released, false);
-  mln_render_session_attach_options options =
-    mln_render_session_attach_options_default();
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
   options.requested_texture_ring_depth = 2;
   options.frame_wake = (mln_wake){
     .callback = count_nothing,
@@ -805,7 +808,7 @@ static void retirement_release(void* context) {
 
 static void parent_first_disposal_retires_a_native_render_attachment(void) {
   atomic_bool retired = false;
-  mln_runtime_options options = mln_runtime_options_default();
+  mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   mln_runtime runtime = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, NULL));
   const mln_resource_provider provider = {
@@ -840,8 +843,9 @@ static void lock_nothing(void* context) { (void)context; }
 static void attach_checks_the_queue_lock(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_render_session_attach_options options =
-    mln_render_session_attach_options_default();
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
   options.queue_lock.release_user_data = lock_nothing;
   mln_test_completion attach = mln_test_completion_default(0);
   mln_test_render_fixture fixture = {0};
@@ -962,8 +966,9 @@ static void attach_reentrant_host(
 ) {
   reentrant = (reentrant_host){.token = 7};
   on_graphics_thread = true;
-  mln_render_session_attach_options options =
-    mln_render_session_attach_options_default();
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
   options.requested_texture_ring_depth = 2;
   options.frame_wake = (mln_wake){
     .callback = drain_inside_frame_wake,

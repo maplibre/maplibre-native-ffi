@@ -11,7 +11,7 @@ static void host_string_views_reject_nul_and_null_data_with_a_length(void) {
   for (size_t index = 0; index < sizeof(invalid) / sizeof(invalid[0]);
        ++index) {
     mln_runtime runtime = MLN_HANDLE_NULL;
-    mln_runtime_options options = mln_runtime_options_default();
+    mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
     options.asset_path = invalid[index];
     MLN_TEST_INVALID(mln_runtime_create(&options, &runtime, NULL));
     options.asset_path = (mln_buffer_view){0};
@@ -65,7 +65,7 @@ static void an_asset_style_resolves_under_the_runtime_asset_path(void) {
   (void)snprintf(url, sizeof(url), "asset://%s", separator + 1);
   *separator = '\0';
 
-  mln_runtime_options options = mln_runtime_options_default();
+  mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   options.asset_path = mln_buffer_view_from_cstr(directory);
   mln_runtime runtime = mln_test_create_runtime_with_options(options);
   mln_map map = mln_test_create_map(runtime);

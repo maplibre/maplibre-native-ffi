@@ -9,7 +9,7 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_screen_line_string</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.
 /// </remarks>
-public readonly record struct ScreenLineString
+public readonly partial record struct ScreenLineString
 {
     public ScreenLineString(ImmutableArray<ScreenPoint> Points)
     {

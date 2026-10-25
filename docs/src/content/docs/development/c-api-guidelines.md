@@ -51,14 +51,13 @@ Follow these rules, which keep the ABI open to growth:
   its end. Small value types, such as coordinates and IDs, carry no size and
   never change; a change adds a new type.
 - A zeroed input struct is the default, as in sokol_gfx: each member means "use
-  the default" at zero, so a caller sets only `size` and the members it cares
-  about. A member that no default suits for every host, such as an extent or a
-  native handle, is required instead: native rejects its zero, and the member
-  carries `MLN_BINDING("required=true")` and states "Required." in its comment.
-  A presence mask, tag, size, reserved, or count member is never required, and
-  neither is a masked member, whose absence is its default. The
-  `mln_<struct>_default()` functions still exist and return only the zeroed
-  struct with its sizes set, until bindings stop calling them.
+  the default" at zero, so a caller sets only the members it cares about and
+  `size`, in the struct and in each sized struct that it embeds. A member that
+  no default suits for every host, such as an extent or a native handle, is
+  required instead: native rejects its zero, and the member carries
+  `MLN_BINDING("required=true")` and states "Required." in its comment. A
+  presence mask, tag, size, reserved, or count member is never required, and
+  neither is a masked member, whose absence is its default.
 - An optional member has its own bit in the struct's `fields` mask. Text is the
   exception: empty text means absent, and text has a bit only where the empty
   string is a value of its own, as a feature ID is.
@@ -81,8 +80,7 @@ default.
 A function that only some platforms' builds can use, such as one that takes a
 Metal object, lists those platforms in `platforms=`, as `mln_android_init()`
 does. Each binding leaves it out on targets that cannot use it, along with any
-record that only such functions take. Leave a record's default unannotated; it
-follows its record.
+record that only such functions take.
 
 ## Document a declaration
 

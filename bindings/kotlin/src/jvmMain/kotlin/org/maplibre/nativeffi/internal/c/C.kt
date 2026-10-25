@@ -2,7 +2,6 @@
 package org.maplibre.nativeffi.internal.c
 
 import java.lang.foreign.GroupLayout
-import java.lang.foreign.MemorySegment
 import java.lang.foreign.ValueLayout.*
 
 /** The FFM downcall behind each C function. */
@@ -29,25 +28,7 @@ internal actual object C {
     Ffm.downcall("mln_acquired_frame_view_end", null, JAVA_LONG)
   private val mln_android_init =
     Ffm.downcall("mln_android_init", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_animation_options_default =
-    Ffm.downcall("mln_animation_options_default", mln_animation_options)
-  private val mln_bound_options_default =
-    Ffm.downcall("mln_bound_options_default", mln_bound_options)
   private val mln_c_version = Ffm.downcall("mln_c_version", JAVA_INT)
-  private val mln_camera_delta_default = Ffm.downcall("mln_camera_delta_default", mln_camera_delta)
-  private val mln_camera_fit_options_default =
-    Ffm.downcall("mln_camera_fit_options_default", mln_camera_fit_options)
-  private val mln_camera_options_default =
-    Ffm.downcall("mln_camera_options_default", mln_camera_options)
-  private val mln_camera_update_default =
-    Ffm.downcall("mln_camera_update_default", mln_camera_update)
-  private val mln_custom_geometry_source_options_default =
-    Ffm.downcall("mln_custom_geometry_source_options_default", mln_custom_geometry_source_options)
-  private val mln_custom_mvt_vector_source_options_default =
-    Ffm.downcall(
-      "mln_custom_mvt_vector_source_options_default",
-      mln_custom_mvt_vector_source_options,
-    )
   private val mln_delivery_batch_release =
     Ffm.downcall("mln_delivery_batch_release", null, JAVA_LONG)
   private val mln_delivery_batch_take =
@@ -58,9 +39,6 @@ internal actual object C {
     Ffm.downcall("mln_delivery_queue_drain", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_delivery_queue_release =
     Ffm.downcall("mln_delivery_queue_release", null, JAVA_LONG)
-  private val mln_frame_demand_default = Ffm.downcall("mln_frame_demand_default", mln_frame_demand)
-  private val mln_free_camera_options_default =
-    Ffm.downcall("mln_free_camera_options_default", mln_free_camera_options)
   private val mln_geojson_source_data_create =
     Ffm.downcall(
       "mln_geojson_source_data_create",
@@ -72,11 +50,6 @@ internal actual object C {
     )
   private val mln_geojson_source_data_release =
     Ffm.downcall("mln_geojson_source_data_release", null, JAVA_LONG)
-  private val mln_geojson_source_options_default =
-    Ffm.downcall("mln_geojson_source_options_default", mln_geojson_source_options)
-  private val mln_gpu_sync_default = Ffm.downcall("mln_gpu_sync_default", mln_gpu_sync)
-  private val mln_http_header_rule_default =
-    Ffm.downcall("mln_http_header_rule_default", mln_http_header_rule)
   private val mln_http_header_transform_response_set_header =
     Ffm.downcall(
       "mln_http_header_transform_response_set_header",
@@ -99,8 +72,6 @@ internal actual object C {
     Ffm.downcall("mln_log_set_async_severity_mask", JAVA_INT, JAVA_INT, JAVA_LONG)
   private val mln_log_set_callback =
     Ffm.downcall("mln_log_set_callback", JAVA_INT, JAVA_LONG, JAVA_LONG)
-  private val mln_logical_extent_default =
-    Ffm.downcall("mln_logical_extent_default", mln_logical_extent)
   private val mln_logical_extent_physical_size =
     Ffm.downcall(
       "mln_logical_extent_physical_size",
@@ -518,7 +489,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_options_default = Ffm.downcall("mln_map_options_default", mln_map_options)
   private val mln_map_projection_create =
     Ffm.downcall("mln_map_projection_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_projection_get_camera =
@@ -884,52 +854,24 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_tile_options_default =
-    Ffm.downcall("mln_map_tile_options_default", mln_map_tile_options)
   private val mln_map_update_camera =
     Ffm.downcall("mln_map_update_camera", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_map_viewport_options_default =
-    Ffm.downcall("mln_map_viewport_options_default", mln_map_viewport_options)
-  private val mln_metal_borrowed_texture_descriptor_default =
-    Ffm.downcall(
-      "mln_metal_borrowed_texture_descriptor_default",
-      mln_metal_borrowed_texture_descriptor,
-    )
-  private val mln_metal_owned_texture_descriptor_default =
-    Ffm.downcall("mln_metal_owned_texture_descriptor_default", mln_metal_owned_texture_descriptor)
-  private val mln_metal_surface_descriptor_default =
-    Ffm.downcall("mln_metal_surface_descriptor_default", mln_metal_surface_descriptor)
   private val mln_network_get_status =
     Ffm.downcall("mln_network_get_status", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_network_set_status =
     Ffm.downcall("mln_network_set_status", JAVA_INT, JAVA_INT, JAVA_LONG)
-  private val mln_opengl_borrowed_texture_descriptor_default =
-    Ffm.downcall(
-      "mln_opengl_borrowed_texture_descriptor_default",
-      mln_opengl_borrowed_texture_descriptor,
-    )
-  private val mln_opengl_owned_texture_descriptor_default =
-    Ffm.downcall("mln_opengl_owned_texture_descriptor_default", mln_opengl_owned_texture_descriptor)
   private val mln_opengl_supported_context_provider_mask =
     Ffm.downcall("mln_opengl_supported_context_provider_mask", JAVA_INT)
-  private val mln_opengl_surface_descriptor_default =
-    Ffm.downcall("mln_opengl_surface_descriptor_default", mln_opengl_surface_descriptor)
   private val mln_plugin_get_register_function_v1 =
     Ffm.downcall("mln_plugin_get_register_function_v1", JAVA_LONG)
-  private val mln_premultiplied_rgba8_image_default =
-    Ffm.downcall("mln_premultiplied_rgba8_image_default", mln_premultiplied_rgba8_image)
   private val mln_projected_meters_for_lat_lng =
     Ffm.downcall("mln_projected_meters_for_lat_lng", JAVA_INT, mln_lat_lng, JAVA_LONG, JAVA_LONG)
-  private val mln_projection_mode_default =
-    Ffm.downcall("mln_projection_mode_default", mln_projection_mode)
   private val mln_render_frame_batch_release =
     Ffm.downcall("mln_render_frame_batch_release", null, JAVA_LONG)
   private val mln_render_session_abandon =
     Ffm.downcall("mln_render_session_abandon", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_acquire_frame =
     Ffm.downcall("mln_render_session_acquire_frame", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_render_session_attach_options_default =
-    Ffm.downcall("mln_render_session_attach_options_default", mln_render_session_attach_options)
   private val mln_render_session_barrier =
     Ffm.downcall("mln_render_session_barrier", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_clear_data =
@@ -1075,8 +1017,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_rendered_feature_query_options_default =
-    Ffm.downcall("mln_rendered_feature_query_options_default", mln_rendered_feature_query_options)
   private val mln_resource_request_complete =
     Ffm.downcall("mln_resource_request_complete", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_resource_request_is_cancelled =
@@ -1094,8 +1034,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_resource_route_default =
-    Ffm.downcall("mln_resource_route_default", mln_resource_route)
   private val mln_resource_transform_request_complete =
     Ffm.downcall(
       "mln_resource_transform_request_complete",
@@ -1194,8 +1132,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_runtime_options_default =
-    Ffm.downcall("mln_runtime_options_default", mln_runtime_options)
   private val mln_runtime_release =
     Ffm.downcall("mln_runtime_release", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_runtime_run_ambient_cache_operation =
@@ -1285,8 +1221,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_source_feature_query_options_default =
-    Ffm.downcall("mln_source_feature_query_options_default", mln_source_feature_query_options)
   private val mln_style_expression_create =
     Ffm.downcall(
       "mln_style_expression_create",
@@ -1309,36 +1243,10 @@ internal actual object C {
     )
   private val mln_style_expression_get_info =
     Ffm.downcall("mln_style_expression_get_info", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_style_expression_inputs_default =
-    Ffm.downcall("mln_style_expression_inputs_default", mln_style_expression_inputs)
-  private val mln_style_expression_options_default =
-    Ffm.downcall("mln_style_expression_options_default", mln_style_expression_options)
   private val mln_style_expression_release =
     Ffm.downcall("mln_style_expression_release", null, JAVA_LONG)
-  private val mln_style_image_options_default =
-    Ffm.downcall("mln_style_image_options_default", mln_style_image_options)
-  private val mln_style_transition_options_default =
-    Ffm.downcall("mln_style_transition_options_default", mln_style_transition_options)
   private val mln_supported_render_backend_mask =
     Ffm.downcall("mln_supported_render_backend_mask", JAVA_INT)
-  private val mln_vulkan_borrowed_texture_descriptor_default =
-    Ffm.downcall(
-      "mln_vulkan_borrowed_texture_descriptor_default",
-      mln_vulkan_borrowed_texture_descriptor,
-    )
-  private val mln_vulkan_owned_texture_descriptor_default =
-    Ffm.downcall("mln_vulkan_owned_texture_descriptor_default", mln_vulkan_owned_texture_descriptor)
-  private val mln_vulkan_surface_descriptor_default =
-    Ffm.downcall("mln_vulkan_surface_descriptor_default", mln_vulkan_surface_descriptor)
-  private val mln_webgpu_borrowed_texture_descriptor_default =
-    Ffm.downcall(
-      "mln_webgpu_borrowed_texture_descriptor_default",
-      mln_webgpu_borrowed_texture_descriptor,
-    )
-  private val mln_webgpu_owned_texture_descriptor_default =
-    Ffm.downcall("mln_webgpu_owned_texture_descriptor_default", mln_webgpu_owned_texture_descriptor)
-  private val mln_webgpu_surface_descriptor_default =
-    Ffm.downcall("mln_webgpu_surface_descriptor_default", mln_webgpu_surface_descriptor)
 
   actual fun mln_acquired_frame_discard(frame: Long, outDiagnostic: Long): Int =
     mln_acquired_frame_discard.invokeExact(frame, outDiagnostic) as Int
@@ -1392,45 +1300,7 @@ internal actual object C {
   actual fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int =
     mln_android_init.invokeExact(jniEnv, context, outDiagnostic) as Int
 
-  actual fun mln_animation_options_default(returned: Long) {
-    mln_animation_options_default.invokeExact(Ffm.into(returned, mln_animation_options))
-      as MemorySegment
-  }
-
-  actual fun mln_bound_options_default(returned: Long) {
-    mln_bound_options_default.invokeExact(Ffm.into(returned, mln_bound_options)) as MemorySegment
-  }
-
   actual fun mln_c_version(): Int = mln_c_version.invokeExact() as Int
-
-  actual fun mln_camera_delta_default(returned: Long) {
-    mln_camera_delta_default.invokeExact(Ffm.into(returned, mln_camera_delta)) as MemorySegment
-  }
-
-  actual fun mln_camera_fit_options_default(returned: Long) {
-    mln_camera_fit_options_default.invokeExact(Ffm.into(returned, mln_camera_fit_options))
-      as MemorySegment
-  }
-
-  actual fun mln_camera_options_default(returned: Long) {
-    mln_camera_options_default.invokeExact(Ffm.into(returned, mln_camera_options)) as MemorySegment
-  }
-
-  actual fun mln_camera_update_default(returned: Long) {
-    mln_camera_update_default.invokeExact(Ffm.into(returned, mln_camera_update)) as MemorySegment
-  }
-
-  actual fun mln_custom_geometry_source_options_default(returned: Long) {
-    mln_custom_geometry_source_options_default.invokeExact(
-      Ffm.into(returned, mln_custom_geometry_source_options),
-    ) as MemorySegment
-  }
-
-  actual fun mln_custom_mvt_vector_source_options_default(returned: Long) {
-    mln_custom_mvt_vector_source_options_default.invokeExact(
-      Ffm.into(returned, mln_custom_mvt_vector_source_options),
-    ) as MemorySegment
-  }
 
   actual fun mln_delivery_batch_release(batch: Long) {
     mln_delivery_batch_release.invoke(batch)
@@ -1453,15 +1323,6 @@ internal actual object C {
     mln_delivery_queue_release.invoke(queue)
   }
 
-  actual fun mln_frame_demand_default(returned: Long) {
-    mln_frame_demand_default.invokeExact(Ffm.into(returned, mln_frame_demand)) as MemorySegment
-  }
-
-  actual fun mln_free_camera_options_default(returned: Long) {
-    mln_free_camera_options_default.invokeExact(Ffm.into(returned, mln_free_camera_options))
-      as MemorySegment
-  }
-
   actual fun mln_geojson_source_data_create(
     data: Long,
     options: Long,
@@ -1477,20 +1338,6 @@ internal actual object C {
 
   actual fun mln_geojson_source_data_release(data: Long) {
     mln_geojson_source_data_release.invoke(data)
-  }
-
-  actual fun mln_geojson_source_options_default(returned: Long) {
-    mln_geojson_source_options_default.invokeExact(Ffm.into(returned, mln_geojson_source_options))
-      as MemorySegment
-  }
-
-  actual fun mln_gpu_sync_default(returned: Long) {
-    mln_gpu_sync_default.invokeExact(Ffm.into(returned, mln_gpu_sync)) as MemorySegment
-  }
-
-  actual fun mln_http_header_rule_default(returned: Long) {
-    mln_http_header_rule_default.invokeExact(Ffm.into(returned, mln_http_header_rule))
-      as MemorySegment
   }
 
   actual fun mln_http_header_transform_response_set_header(
@@ -1525,10 +1372,6 @@ internal actual object C {
 
   actual fun mln_log_set_callback(handler: Long, outDiagnostic: Long): Int =
     mln_log_set_callback.invokeExact(handler, outDiagnostic) as Int
-
-  actual fun mln_logical_extent_default(returned: Long) {
-    mln_logical_extent_default.invokeExact(Ffm.into(returned, mln_logical_extent)) as MemorySegment
-  }
 
   actual fun mln_logical_extent_physical_size(
     extent: Long,
@@ -2159,10 +2002,6 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_options_default(returned: Long) {
-    mln_map_options_default.invokeExact(Ffm.into(returned, mln_map_options)) as MemorySegment
-  }
-
   actual fun mln_map_projection_create(view: Long, outProjection: Long, outDiagnostic: Long): Int =
     mln_map_projection_create.invokeExact(view, outProjection, outDiagnostic) as Int
 
@@ -2702,11 +2541,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_map_set_viewport_options.invokeExact(map, options, completion, outDiagnostic) as Int
 
-  actual fun mln_map_tile_options_default(returned: Long) {
-    mln_map_tile_options_default.invokeExact(Ffm.into(returned, mln_map_tile_options))
-      as MemorySegment
-  }
-
   actual fun mln_map_update_camera(
     map: Long,
     update: Long,
@@ -2714,64 +2548,17 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_map_update_camera.invokeExact(map, update, completion, outDiagnostic) as Int
 
-  actual fun mln_map_viewport_options_default(returned: Long) {
-    mln_map_viewport_options_default.invokeExact(Ffm.into(returned, mln_map_viewport_options))
-      as MemorySegment
-  }
-
-  actual fun mln_metal_borrowed_texture_descriptor_default(returned: Long) {
-    mln_metal_borrowed_texture_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_metal_borrowed_texture_descriptor),
-    ) as MemorySegment
-  }
-
-  actual fun mln_metal_owned_texture_descriptor_default(returned: Long) {
-    mln_metal_owned_texture_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_metal_owned_texture_descriptor),
-    ) as MemorySegment
-  }
-
-  actual fun mln_metal_surface_descriptor_default(returned: Long) {
-    mln_metal_surface_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_metal_surface_descriptor),
-    ) as MemorySegment
-  }
-
   actual fun mln_network_get_status(outStatus: Long, outDiagnostic: Long): Int =
     mln_network_get_status.invokeExact(outStatus, outDiagnostic) as Int
 
   actual fun mln_network_set_status(status: Int, outDiagnostic: Long): Int =
     mln_network_set_status.invokeExact(status, outDiagnostic) as Int
 
-  actual fun mln_opengl_borrowed_texture_descriptor_default(returned: Long) {
-    mln_opengl_borrowed_texture_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_opengl_borrowed_texture_descriptor),
-    ) as MemorySegment
-  }
-
-  actual fun mln_opengl_owned_texture_descriptor_default(returned: Long) {
-    mln_opengl_owned_texture_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_opengl_owned_texture_descriptor),
-    ) as MemorySegment
-  }
-
   actual fun mln_opengl_supported_context_provider_mask(): Int =
     mln_opengl_supported_context_provider_mask.invokeExact() as Int
 
-  actual fun mln_opengl_surface_descriptor_default(returned: Long) {
-    mln_opengl_surface_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_opengl_surface_descriptor),
-    ) as MemorySegment
-  }
-
   actual fun mln_plugin_get_register_function_v1(): Long =
     mln_plugin_get_register_function_v1.invokeExact() as Long
-
-  actual fun mln_premultiplied_rgba8_image_default(returned: Long) {
-    mln_premultiplied_rgba8_image_default.invokeExact(
-      Ffm.into(returned, mln_premultiplied_rgba8_image),
-    ) as MemorySegment
-  }
 
   actual fun mln_projected_meters_for_lat_lng(
     coordinate: Long,
@@ -2783,11 +2570,6 @@ internal actual object C {
       outMeters,
       outDiagnostic,
     ) as Int
-
-  actual fun mln_projection_mode_default(returned: Long) {
-    mln_projection_mode_default.invokeExact(Ffm.into(returned, mln_projection_mode))
-      as MemorySegment
-  }
 
   actual fun mln_render_frame_batch_release(batch: Long) {
     mln_render_frame_batch_release.invoke(batch)
@@ -2801,12 +2583,6 @@ internal actual object C {
     outFrame: Long,
     outDiagnostic: Long,
   ): Int = mln_render_session_acquire_frame.invokeExact(session, outFrame, outDiagnostic) as Int
-
-  actual fun mln_render_session_attach_options_default(returned: Long) {
-    mln_render_session_attach_options_default.invokeExact(
-      Ffm.into(returned, mln_render_session_attach_options),
-    ) as MemorySegment
-  }
 
   actual fun mln_render_session_barrier(session: Long, completion: Long, outDiagnostic: Long): Int =
     mln_render_session_barrier.invokeExact(session, completion, outDiagnostic) as Int
@@ -3041,12 +2817,6 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_rendered_feature_query_options_default(returned: Long) {
-    mln_rendered_feature_query_options_default.invokeExact(
-      Ffm.into(returned, mln_rendered_feature_query_options),
-    ) as MemorySegment
-  }
-
   actual fun mln_resource_request_complete(handle: Long, response: Long, outDiagnostic: Long): Int =
     mln_resource_request_complete.invokeExact(handle, response, outDiagnostic) as Int
 
@@ -3075,10 +2845,6 @@ internal actual object C {
       outCancelled,
       outDiagnostic,
     ) as Int
-
-  actual fun mln_resource_route_default(returned: Long) {
-    mln_resource_route_default.invokeExact(Ffm.into(returned, mln_resource_route)) as MemorySegment
-  }
 
   actual fun mln_resource_transform_request_complete(
     request: Long,
@@ -3211,11 +2977,6 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_runtime_options_default(returned: Long) {
-    mln_runtime_options_default.invokeExact(Ffm.into(returned, mln_runtime_options))
-      as MemorySegment
-  }
-
   actual fun mln_runtime_release(runtime: Long, completion: Long, outDiagnostic: Long): Int =
     mln_runtime_release.invokeExact(runtime, completion, outDiagnostic) as Int
 
@@ -3326,12 +3087,6 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_source_feature_query_options_default(returned: Long) {
-    mln_source_feature_query_options_default.invokeExact(
-      Ffm.into(returned, mln_source_feature_query_options),
-    ) as MemorySegment
-  }
-
   actual fun mln_style_expression_create(
     expression: Long,
     options: Long,
@@ -3368,244 +3123,17 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_style_expression_get_info.invokeExact(expression, outInfo, outDiagnostic) as Int
 
-  actual fun mln_style_expression_inputs_default(returned: Long) {
-    mln_style_expression_inputs_default.invokeExact(Ffm.into(returned, mln_style_expression_inputs))
-      as MemorySegment
-  }
-
-  actual fun mln_style_expression_options_default(returned: Long) {
-    mln_style_expression_options_default.invokeExact(
-      Ffm.into(returned, mln_style_expression_options),
-    ) as MemorySegment
-  }
-
   actual fun mln_style_expression_release(expression: Long) {
     mln_style_expression_release.invoke(expression)
   }
 
-  actual fun mln_style_image_options_default(returned: Long) {
-    mln_style_image_options_default.invokeExact(Ffm.into(returned, mln_style_image_options))
-      as MemorySegment
-  }
-
-  actual fun mln_style_transition_options_default(returned: Long) {
-    mln_style_transition_options_default.invokeExact(
-      Ffm.into(returned, mln_style_transition_options),
-    ) as MemorySegment
-  }
-
   actual fun mln_supported_render_backend_mask(): Int =
     mln_supported_render_backend_mask.invokeExact() as Int
-
-  actual fun mln_vulkan_borrowed_texture_descriptor_default(returned: Long) {
-    mln_vulkan_borrowed_texture_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_vulkan_borrowed_texture_descriptor),
-    ) as MemorySegment
-  }
-
-  actual fun mln_vulkan_owned_texture_descriptor_default(returned: Long) {
-    mln_vulkan_owned_texture_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_vulkan_owned_texture_descriptor),
-    ) as MemorySegment
-  }
-
-  actual fun mln_vulkan_surface_descriptor_default(returned: Long) {
-    mln_vulkan_surface_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_vulkan_surface_descriptor),
-    ) as MemorySegment
-  }
-
-  actual fun mln_webgpu_borrowed_texture_descriptor_default(returned: Long) {
-    mln_webgpu_borrowed_texture_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_webgpu_borrowed_texture_descriptor),
-    ) as MemorySegment
-  }
-
-  actual fun mln_webgpu_owned_texture_descriptor_default(returned: Long) {
-    mln_webgpu_owned_texture_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_webgpu_owned_texture_descriptor),
-    ) as MemorySegment
-  }
-
-  actual fun mln_webgpu_surface_descriptor_default(returned: Long) {
-    mln_webgpu_surface_descriptor_default.invokeExact(
-      Ffm.into(returned, mln_webgpu_surface_descriptor),
-    ) as MemorySegment
-  }
 }
 
 // The layout of each record that C passes or returns by value, nested ones first.
-internal val mln_unit_bezier: GroupLayout =
-  Ffm.struct(
-    JAVA_DOUBLE.withName("x1"),
-    JAVA_DOUBLE.withName("y1"),
-    JAVA_DOUBLE.withName("x2"),
-    JAVA_DOUBLE.withName("y2"),
-  )
-internal val mln_camera_transition_handler: GroupLayout =
-  Ffm.struct(
-    ADDRESS.withName("callback"),
-    ADDRESS.withName("user_data"),
-    ADDRESS.withName("release_user_data"),
-    JAVA_LONG.withName("queue"),
-  )
-internal val mln_animation_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("fields"),
-    Ffm.pad(4),
-    JAVA_DOUBLE.withName("duration_ms"),
-    JAVA_DOUBLE.withName("velocity"),
-    JAVA_DOUBLE.withName("min_zoom"),
-    mln_unit_bezier.withName("easing"),
-    JAVA_LONG.withName("transition_id"),
-    mln_camera_transition_handler.withName("end_handler"),
-  )
-internal val mln_lat_lng: GroupLayout =
-  Ffm.struct(JAVA_DOUBLE.withName("latitude"), JAVA_DOUBLE.withName("longitude"))
-internal val mln_lat_lng_bounds: GroupLayout =
-  Ffm.struct(mln_lat_lng.withName("southwest"), mln_lat_lng.withName("northeast"))
-internal val mln_bound_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    mln_lat_lng_bounds.withName("bounds"),
-    JAVA_DOUBLE.withName("min_zoom"),
-    JAVA_DOUBLE.withName("max_zoom"),
-    JAVA_DOUBLE.withName("min_pitch"),
-    JAVA_DOUBLE.withName("max_pitch"),
-  )
-internal val mln_screen_point: GroupLayout =
-  Ffm.struct(JAVA_DOUBLE.withName("x"), JAVA_DOUBLE.withName("y"))
-internal val mln_camera_delta: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    mln_screen_point.withName("offset"),
-    JAVA_DOUBLE.withName("scale"),
-    JAVA_DOUBLE.withName("bearing"),
-    JAVA_DOUBLE.withName("pitch"),
-    mln_screen_point.withName("anchor"),
-    mln_animation_options.withName("animation"),
-    JAVA_INT.withName("gesture_phase"),
-    JAVA_INT.withName("reserved"),
-  )
-internal val mln_edge_insets: GroupLayout =
-  Ffm.struct(
-    JAVA_DOUBLE.withName("top"),
-    JAVA_DOUBLE.withName("left"),
-    JAVA_DOUBLE.withName("bottom"),
-    JAVA_DOUBLE.withName("right"),
-  )
-internal val mln_camera_fit_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    mln_edge_insets.withName("padding"),
-    JAVA_DOUBLE.withName("bearing"),
-    JAVA_DOUBLE.withName("pitch"),
-  )
-internal val mln_camera_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    mln_lat_lng.withName("center"),
-    JAVA_DOUBLE.withName("center_altitude"),
-    mln_edge_insets.withName("padding"),
-    mln_screen_point.withName("anchor"),
-    JAVA_DOUBLE.withName("zoom"),
-    JAVA_DOUBLE.withName("bearing"),
-    JAVA_DOUBLE.withName("pitch"),
-    JAVA_DOUBLE.withName("roll"),
-    JAVA_DOUBLE.withName("field_of_view"),
-  )
-internal val mln_camera_update: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("mode"),
-    mln_camera_options.withName("camera"),
-    mln_animation_options.withName("animation"),
-    JAVA_INT.withName("gesture_phase"),
-    JAVA_INT.withName("reserved"),
-  )
-internal val mln_custom_geometry_source_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    ADDRESS.withName("fetch_tile"),
-    ADDRESS.withName("cancel_tile"),
-    ADDRESS.withName("user_data"),
-    JAVA_DOUBLE.withName("min_zoom"),
-    JAVA_DOUBLE.withName("max_zoom"),
-    JAVA_DOUBLE.withName("tolerance"),
-    JAVA_INT.withName("tile_size"),
-    JAVA_INT.withName("buffer"),
-    JAVA_BOOLEAN.withName("clip"),
-    JAVA_BOOLEAN.withName("wrap"),
-    Ffm.pad(6),
-    ADDRESS.withName("release_user_data"),
-    JAVA_LONG.withName("queue"),
-  )
-internal val mln_custom_mvt_vector_source_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    ADDRESS.withName("fetch_tile"),
-    ADDRESS.withName("cancel_tile"),
-    ADDRESS.withName("user_data"),
-    JAVA_DOUBLE.withName("min_zoom"),
-    JAVA_DOUBLE.withName("max_zoom"),
-    ADDRESS.withName("release_user_data"),
-    JAVA_LONG.withName("queue"),
-  )
-internal val mln_frame_demand: GroupLayout =
-  Ffm.struct(JAVA_INT.withName("size"), JAVA_INT.withName("flags"), JAVA_LONG.withName("token"))
-internal val mln_vec3: GroupLayout =
-  Ffm.struct(JAVA_DOUBLE.withName("x"), JAVA_DOUBLE.withName("y"), JAVA_DOUBLE.withName("z"))
-internal val mln_quaternion: GroupLayout =
-  Ffm.struct(
-    JAVA_DOUBLE.withName("x"),
-    JAVA_DOUBLE.withName("y"),
-    JAVA_DOUBLE.withName("z"),
-    JAVA_DOUBLE.withName("w"),
-  )
-internal val mln_free_camera_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    mln_vec3.withName("position"),
-    mln_quaternion.withName("orientation"),
-  )
 internal val mln_buffer_view: GroupLayout =
   Ffm.struct(ADDRESS.withName("data"), JAVA_LONG.withName("size"))
-internal val mln_geojson_source_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    JAVA_DOUBLE.withName("min_zoom"),
-    JAVA_DOUBLE.withName("max_zoom"),
-    JAVA_DOUBLE.withName("tolerance"),
-    JAVA_DOUBLE.withName("cluster_max_zoom"),
-    mln_buffer_view.withName("cluster_properties"),
-    JAVA_INT.withName("buffer"),
-    JAVA_INT.withName("cluster_radius"),
-    JAVA_INT.withName("cluster_min_points"),
-    JAVA_BOOLEAN.withName("line_metrics"),
-    JAVA_BOOLEAN.withName("cluster"),
-    JAVA_BOOLEAN.withName("synchronous_tiling"),
-    Ffm.pad(1),
-  )
-internal val mln_gpu_sync: GroupLayout =
-  Ffm.struct(JAVA_INT.withName("size"), JAVA_INT.withName("kind"), JAVA_LONG.withName("handle"))
-internal val mln_http_header_rule: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("kinds"),
-    JAVA_INT.withName("flags"),
-    Ffm.pad(4),
-    mln_buffer_view.withName("url"),
-    ADDRESS.withName("headers"),
-    JAVA_LONG.withName("header_count"),
-  )
 internal val mln_projected_meters: GroupLayout =
   Ffm.struct(JAVA_DOUBLE.withName("northing"), JAVA_DOUBLE.withName("easting"))
 internal val mln_logical_extent: GroupLayout =
@@ -3614,329 +3142,11 @@ internal val mln_logical_extent: GroupLayout =
     JAVA_INT.withName("height"),
     JAVA_DOUBLE.withName("scale_factor"),
   )
+internal val mln_lat_lng: GroupLayout =
+  Ffm.struct(JAVA_DOUBLE.withName("latitude"), JAVA_DOUBLE.withName("longitude"))
+internal val mln_lat_lng_bounds: GroupLayout =
+  Ffm.struct(mln_lat_lng.withName("southwest"), mln_lat_lng.withName("northeast"))
 internal val mln_canonical_tile_id: GroupLayout =
   Ffm.struct(JAVA_INT.withName("z"), JAVA_INT.withName("x"), JAVA_INT.withName("y"))
-internal val mln_map_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    mln_logical_extent.withName("initial_extent"),
-    JAVA_INT.withName("map_mode"),
-    JAVA_BOOLEAN.withName("fast_pfor_enabled"),
-    Ffm.pad(3),
-    JAVA_LONG.withName("event_mask"),
-  )
-internal val mln_map_tile_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    JAVA_INT.withName("prefetch_zoom_delta"),
-    Ffm.pad(4),
-    JAVA_DOUBLE.withName("lod_min_radius"),
-    JAVA_DOUBLE.withName("lod_scale"),
-    JAVA_DOUBLE.withName("lod_pitch_threshold"),
-    JAVA_DOUBLE.withName("lod_zoom_shift"),
-    JAVA_INT.withName("lod_mode"),
-    Ffm.pad(4),
-  )
-internal val mln_map_viewport_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    JAVA_INT.withName("north_orientation"),
-    JAVA_INT.withName("constrain_mode"),
-    JAVA_INT.withName("viewport_mode"),
-    Ffm.pad(4),
-    mln_edge_insets.withName("frustum_offset"),
-  )
-internal val mln_metal_borrowed_texture_descriptor: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
-    mln_logical_extent.withName("extent"),
-    JAVA_INT.withName("physical_width"),
-    JAVA_INT.withName("physical_height"),
-    ADDRESS.withName("textures"),
-    JAVA_LONG.withName("texture_count"),
-  )
-internal val mln_metal_context_descriptor: GroupLayout = Ffm.struct(ADDRESS.withName("device"))
-internal val mln_metal_owned_texture_descriptor: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
-    mln_logical_extent.withName("extent"),
-    mln_metal_context_descriptor.withName("context"),
-    JAVA_LONG.withName("pixel_format"),
-  )
-internal val mln_metal_surface_descriptor: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
-    mln_logical_extent.withName("extent"),
-    mln_metal_context_descriptor.withName("context"),
-    ADDRESS.withName("layer"),
-  )
-internal val mln_wgl_context_descriptor: GroupLayout =
-  Ffm.struct(
-    ADDRESS.withName("device_context"),
-    ADDRESS.withName("share_context"),
-    ADDRESS.withName("get_proc_address"),
-  )
-internal val mln_egl_context_descriptor: GroupLayout =
-  Ffm.struct(
-    ADDRESS.withName("display"),
-    ADDRESS.withName("config"),
-    ADDRESS.withName("share_context"),
-    JAVA_INT.withName("client_api"),
-    Ffm.pad(4),
-    ADDRESS.withName("get_proc_address"),
-  )
-internal val mln_webgl_context_descriptor: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("kind"),
-    JAVA_INT.withName("context"),
-    mln_buffer_view.withName("canvas_selector"),
-  )
-internal val mln_opengl_context_descriptor_data: GroupLayout =
-  Ffm.union(
-    mln_wgl_context_descriptor.withName("wgl"),
-    mln_egl_context_descriptor.withName("egl"),
-    mln_webgl_context_descriptor.withName("webgl"),
-  )
-internal val mln_opengl_context_descriptor: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("platform"),
-    JAVA_INT.withName("ownership"),
-    mln_opengl_context_descriptor_data.withName("data"),
-  )
-internal val mln_opengl_borrowed_texture_descriptor: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
-    mln_logical_extent.withName("extent"),
-    JAVA_INT.withName("physical_width"),
-    JAVA_INT.withName("physical_height"),
-    mln_opengl_context_descriptor.withName("context"),
-    ADDRESS.withName("textures"),
-    JAVA_LONG.withName("texture_count"),
-    JAVA_INT.withName("target"),
-    Ffm.pad(4),
-  )
-internal val mln_opengl_owned_texture_descriptor: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
-    mln_logical_extent.withName("extent"),
-    mln_opengl_context_descriptor.withName("context"),
-  )
-internal val mln_opengl_surface_descriptor: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
-    mln_logical_extent.withName("extent"),
-    mln_opengl_context_descriptor.withName("context"),
-    ADDRESS.withName("surface"),
-  )
-internal val mln_premultiplied_rgba8_image: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("width"),
-    JAVA_INT.withName("height"),
-    JAVA_INT.withName("stride"),
-    ADDRESS.withName("pixels"),
-    JAVA_LONG.withName("byte_length"),
-  )
-internal val mln_projection_mode: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    JAVA_BOOLEAN.withName("axonometric"),
-    Ffm.pad(7),
-    JAVA_DOUBLE.withName("x_skew"),
-    JAVA_DOUBLE.withName("y_skew"),
-  )
-internal val mln_wake: GroupLayout =
-  Ffm.struct(
-    ADDRESS.withName("callback"),
-    ADDRESS.withName("user_data"),
-    ADDRESS.withName("release_user_data"),
-  )
-internal val mln_queue_lock: GroupLayout =
-  Ffm.struct(
-    ADDRESS.withName("lock"),
-    ADDRESS.withName("unlock"),
-    ADDRESS.withName("user_data"),
-    ADDRESS.withName("release_user_data"),
-  )
-internal val mln_render_session_attach_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("driver"),
-    JAVA_INT.withName("requested_texture_ring_depth"),
-    JAVA_INT.withName("producer_sync_kind"),
-    mln_wake.withName("frame_wake"),
-    mln_wake.withName("driver_work_wake"),
-    mln_queue_lock.withName("queue_lock"),
-  )
-internal val mln_rendered_feature_query_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    ADDRESS.withName("layer_ids"),
-    JAVA_LONG.withName("layer_id_count"),
-    mln_buffer_view.withName("filter"),
-  )
-internal val mln_resource_route: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("kinds"),
-    JAVA_INT.withName("flags"),
-    Ffm.pad(4),
-    mln_buffer_view.withName("url"),
-  )
-internal val mln_runtime_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
-    mln_buffer_view.withName("asset_path"),
-    mln_buffer_view.withName("cache_path"),
-  )
-internal val mln_source_feature_query_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    ADDRESS.withName("source_layer_ids"),
-    JAVA_LONG.withName("source_layer_id_count"),
-    mln_buffer_view.withName("filter"),
-  )
-internal val mln_style_expression_inputs: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    JAVA_DOUBLE.withName("zoom"),
-    JAVA_DOUBLE.withName("color_ramp_parameter"),
-    JAVA_DOUBLE.withName("elevation"),
-    mln_buffer_view.withName("feature"),
-    mln_buffer_view.withName("feature_state"),
-    mln_buffer_view.withName("global_state"),
-    mln_canonical_tile_id.withName("canonical_tile_id"),
-    Ffm.pad(4),
-    ADDRESS.withName("available_images"),
-    JAVA_LONG.withName("available_image_count"),
-  )
-internal val mln_style_expression_type: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("kind"),
-    JAVA_INT.withName("item_kind"),
-    JAVA_INT.withName("item_count"),
-  )
-internal val mln_style_expression_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    mln_style_expression_type.withName("expected_type"),
-  )
-internal val mln_image_content: GroupLayout =
-  Ffm.struct(
-    JAVA_FLOAT.withName("left"),
-    JAVA_FLOAT.withName("top"),
-    JAVA_FLOAT.withName("right"),
-    JAVA_FLOAT.withName("bottom"),
-  )
-internal val mln_style_image_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    ADDRESS.withName("stretch_x"),
-    JAVA_LONG.withName("stretch_x_count"),
-    ADDRESS.withName("stretch_y"),
-    JAVA_LONG.withName("stretch_y_count"),
-    mln_image_content.withName("content"),
-    JAVA_INT.withName("text_fit_width"),
-    JAVA_INT.withName("text_fit_height"),
-    JAVA_FLOAT.withName("pixel_ratio"),
-    JAVA_BOOLEAN.withName("sdf"),
-    Ffm.pad(3),
-  )
-internal val mln_style_transition_options: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    JAVA_DOUBLE.withName("duration_ms"),
-    JAVA_DOUBLE.withName("delay_ms"),
-    JAVA_BOOLEAN.withName("enable_placement_transitions"),
-    Ffm.pad(7),
-  )
-internal val mln_vulkan_context_descriptor: GroupLayout =
-  Ffm.struct(
-    ADDRESS.withName("instance"),
-    ADDRESS.withName("physical_device"),
-    ADDRESS.withName("device"),
-    ADDRESS.withName("graphics_queue"),
-    JAVA_INT.withName("graphics_queue_family_index"),
-    Ffm.pad(4),
-    ADDRESS.withName("get_instance_proc_addr"),
-    ADDRESS.withName("get_device_proc_addr"),
-  )
-internal val mln_vulkan_borrowed_texture_descriptor: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
-    mln_logical_extent.withName("extent"),
-    JAVA_INT.withName("physical_width"),
-    JAVA_INT.withName("physical_height"),
-    mln_vulkan_context_descriptor.withName("context"),
-    ADDRESS.withName("textures"),
-    JAVA_LONG.withName("texture_count"),
-    JAVA_INT.withName("format"),
-    JAVA_INT.withName("initial_layout"),
-    JAVA_INT.withName("final_layout"),
-    Ffm.pad(4),
-  )
-internal val mln_vulkan_owned_texture_descriptor: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
-    mln_logical_extent.withName("extent"),
-    mln_vulkan_context_descriptor.withName("context"),
-  )
-internal val mln_vulkan_surface_descriptor: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
-    mln_logical_extent.withName("extent"),
-    mln_vulkan_context_descriptor.withName("context"),
-    JAVA_LONG.withName("surface"),
-  )
-internal val mln_webgpu_context_descriptor: GroupLayout =
-  Ffm.struct(ADDRESS.withName("instance"), ADDRESS.withName("device"), ADDRESS.withName("queue"))
-internal val mln_webgpu_borrowed_texture_descriptor: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
-    mln_logical_extent.withName("extent"),
-    JAVA_INT.withName("physical_width"),
-    JAVA_INT.withName("physical_height"),
-    mln_webgpu_context_descriptor.withName("context"),
-    ADDRESS.withName("textures"),
-    JAVA_LONG.withName("texture_count"),
-    JAVA_INT.withName("format"),
-    Ffm.pad(4),
-  )
-internal val mln_webgpu_owned_texture_descriptor: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
-    mln_logical_extent.withName("extent"),
-    mln_webgpu_context_descriptor.withName("context"),
-  )
-internal val mln_webgpu_surface_descriptor: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
-    mln_logical_extent.withName("extent"),
-    mln_webgpu_context_descriptor.withName("context"),
-    ADDRESS.withName("surface"),
-    JAVA_INT.withName("format"),
-    Ffm.pad(4),
-  )
+internal val mln_screen_point: GroupLayout =
+  Ffm.struct(JAVA_DOUBLE.withName("x"), JAVA_DOUBLE.withName("y"))

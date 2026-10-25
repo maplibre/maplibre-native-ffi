@@ -17,6 +17,7 @@ import org.maplibre.nativeffi.internal.lifecycle.ViewScope
 import org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive
 import org.maplibre.nativeffi.internal.lifecycle.endGraphicsAtExit
 import org.maplibre.nativeffi.internal.loader.ensureNativeLibrary
+import org.maplibre.nativeffi.internal.loader.loadNativeLibraryUnchecked
 import org.maplibre.nativeffi.internal.memory.NativeArena
 import org.maplibre.nativeffi.internal.memory.readAddress
 import org.maplibre.nativeffi.internal.memory.readI64
@@ -189,6 +190,15 @@ private inline fun <T> receive(owner: Any?, state: HandleState?, body: (Long) ->
 
 internal fun <T> nativeCall(owner: Any?, state: HandleState?, body: NativeCall.() -> T): T =
   receive(owner, state) { handle -> NativeCall(handle).use { it.body() } }
+
+/**
+ * Runs a call that reads no struct without the C ABI version check, so that reading the version
+ * reports a library of another version rather than throwing.
+ */
+internal inline fun <T> nativeUncheckedCall(body: () -> T): T {
+  loadNativeLibraryUnchecked()
+  return body()
+}
 
 /**
  * Runs a call that suspends until a native thread that it starts is running. The wait does not

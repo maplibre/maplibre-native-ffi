@@ -206,34 +206,6 @@ auto add_callback_source(
 
 }  // namespace
 
-auto mln_geojson_source_options_default(void) noexcept
-  -> mln_geojson_source_options {
-  return mln::c_api::sized<mln_geojson_source_options>();
-}
-
-auto mln_custom_geometry_source_options_default(void) noexcept
-  -> mln_custom_geometry_source_options {
-  return mln::c_api::sized<mln_custom_geometry_source_options>();
-}
-
-auto mln_custom_mvt_vector_source_options_default(void) noexcept
-  -> mln_custom_mvt_vector_source_options {
-  return mln::c_api::sized<mln_custom_mvt_vector_source_options>();
-}
-
-auto mln_premultiplied_rgba8_image_default(void) noexcept
-  -> mln_premultiplied_rgba8_image {
-  return mln::c_api::sized<mln_premultiplied_rgba8_image>();
-}
-
-auto mln_style_image_options_default(void) noexcept -> mln_style_image_options {
-  return mln::c_api::sized<mln_style_image_options>();
-}
-
-auto mln_style_transition_options_default(void) noexcept
-  -> mln_style_transition_options {
-  return mln::c_api::sized<mln_style_transition_options>();
-}
 auto mln_map_set_style_url(
   mln_map map, mln_buffer_view url, const mln_completion* completion,
   mln_diagnostic* out_diagnostic

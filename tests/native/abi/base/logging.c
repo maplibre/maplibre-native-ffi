@@ -338,7 +338,10 @@ static void dump_debug_logs(dump_probe* probe) {
   MLN_TEST_OK(mln_test_map_set_style_json(map, mln_test_empty_style_json));
   // An empty camera command identifies the worker shared by this map's
   // commands without changing its camera or relying on a completion's thread.
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.animation.end_handler = (mln_camera_transition_handler){
     .callback = record_command_thread,
     .user_data = probe,

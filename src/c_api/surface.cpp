@@ -4,26 +4,6 @@
 #include "maplibre_native_c.h"
 #include "render/surface_session.hpp"
 
-auto mln_metal_surface_descriptor_default(void) noexcept
-  -> mln_metal_surface_descriptor {
-  return mln::c_api::sized<mln_metal_surface_descriptor>();
-}
-
-auto mln_vulkan_surface_descriptor_default(void) noexcept
-  -> mln_vulkan_surface_descriptor {
-  return mln::c_api::sized<mln_vulkan_surface_descriptor>();
-}
-
-auto mln_opengl_surface_descriptor_default(void) noexcept
-  -> mln_opengl_surface_descriptor {
-  return mln::c_api::sized<mln_opengl_surface_descriptor>();
-}
-
-auto mln_webgpu_surface_descriptor_default(void) noexcept
-  -> mln_webgpu_surface_descriptor {
-  return mln::c_api::sized<mln_webgpu_surface_descriptor>();
-}
-
 auto mln_map_attach_metal_surface(
   mln_map map, const mln_metal_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,

@@ -9,37 +9,34 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_metal_surface_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Extent">
-/// Logical surface extent. Required. A scale_factor that differs from the map's
-/// is accepted and logged as a warning.
-/// </param>
-/// <param name="Context">
-/// Metal backend context. device is optional for Metal surfaces.
-/// </param>
-/// <param name="Layer">
-/// <c>CAMetalLayer*</c> / <c>CA::MetalLayer*</c> retained by the session.
-/// Required.
-/// </param>
-public readonly partial record struct MetalSurfaceDescriptor(
-    LogicalExtent Extent,
-    MetalContextDescriptor Context,
-    NativePointer Layer
-)
+public readonly partial record struct MetalSurfaceDescriptor
 {
-    public MetalSurfaceDescriptor()
-        : this(default!, default!, default!)
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public MetalSurfaceDescriptor(
+        LogicalExtent Extent,
+        MetalContextDescriptor Context,
+        NativePointer Layer
+    )
     {
-        this = Default;
+        this.Extent = Extent;
+        this.Context = Context;
+        this.Layer = Layer;
     }
 
-    public static MetalSurfaceDescriptor Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyMetalSurfaceDescriptor(
-                NativeMethods.mln_metal_surface_descriptor_default()
-            );
-        }
-    }
+    /// <summary>
+    /// Logical surface extent. Required. A scale_factor that differs from the
+    /// map's is accepted and logged as a warning.
+    /// </summary>
+    public required LogicalExtent Extent { get; init; }
+
+    /// <summary>
+    /// Metal backend context. device is optional for Metal surfaces.
+    /// </summary>
+    public MetalContextDescriptor Context { get; init; }
+
+    /// <summary>
+    /// <c>CAMetalLayer*</c> / <c>CA::MetalLayer*</c> retained by the session.
+    /// Required.
+    /// </summary>
+    public required NativePointer Layer { get; init; }
 }

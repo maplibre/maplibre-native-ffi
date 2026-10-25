@@ -9,7 +9,7 @@ retains callback roots, and decodes outputs and completion results.
 from dataclasses import replace
 
 from ..names import camel, pascal
-from ..semantic import DefaultSupport, output_member, required_callbacks
+from ..semantic import output_member
 from .zig import (
     DIAGNOSTIC_PARAMETER,
     failure,
@@ -125,12 +125,6 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
         return view_operation(plan, values, method)
     if plan.drain:
         return drain_operation(plan, values, method)
-    if (
-        isinstance(plan.support, DefaultSupport)
-        and plan.result
-        and required_callbacks(plan.result)
-    ):
-        return default_with_callbacks(plan, values)
     inputs = {p.name: p.value for p in plan.inputs}
     outputs = {p.name: p.value for p in plan.outputs}
     owned_outputs = {p.parameter: p for p in plan.owned_outputs}
@@ -146,7 +140,10 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
     length_sources = {
         v.length: n
         for n, v in inputs.items()
-        if v.kind in {"array", "buffer"} and v.length and not v.length.isdigit()
+        if v.kind in {"array", "buffer"}
+        and v.length
+        and v.length != "nul"
+        and not v.length.isdigit()
     }
     # Caller-sized text marks its storage, capacity, and length, which the
     # call fills in and passes again with enough storage when the text did
@@ -232,6 +229,13 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
             needs_allocator |= encoding(
                 value.element if value.kind == "reference" else value
             )[0]
+        if value.kind == "buffer" and value.length == "nul":
+            arguments.append(
+                f"if ({local}) |text| call.cString(text) else null"
+                if value.nullable
+                else f"call.cString({local})"
+            )
+            continue
         arguments.append(local)
     mode = access(plan)
     receiver = names[receiver_name] if receiver_name else "{}"
@@ -306,9 +310,10 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
                 else f"return {values.capture(plan.result, native_call)};"
             ]
             infallible = True
-            if mode == "none":
+            if mode == "none" and function.name != "mln_c_version":
                 # A call without a handle can be a program's first, and with
-                # no error channel it panics on another C ABI version.
+                # no error channel it panics on another C ABI version. The
+                # version itself is what the check reads, so it never fails.
                 body.insert(0, "status.requireAbiVersion();")
     else:
         if not function.diagnostic:
@@ -419,24 +424,6 @@ def consume(function, receiver, body, return_type, infallible=False, release=Tru
         f"{receiver}.closed = true;",
         "return released;",
     ]
-
-
-def default_with_callbacks(plan, values):
-    """A record default that takes the callbacks its copy cannot hold."""
-    from .zig_callbacks import callback_type
-
-    values.add(plan.result)
-    typ = values.public(plan.result)
-    required = required_callbacks(plan.result)
-    parameters = ", ".join(
-        f"{identifier(f.name)}: {callback_type(values, f)}" for f in required
-    )
-    arguments = "".join(f", {identifier(f.name)}" for f in required)
-    return (
-        f"pub fn {function_name(plan, values)}({parameters}) status.Error!{typ} {{\n"
-        "    try status.validateAbiVersion(null);\n"
-        f"    return {typ}.fromDefault(c.{plan.name}(){arguments});\n}}\n"
-    )
 
 
 def view_operation(plan, values, method=False):

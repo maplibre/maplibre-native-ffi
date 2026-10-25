@@ -48,7 +48,7 @@ static const char cached_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
 static void load_style_with_cache(const char* url, const char* cache_path) {
-  mln_runtime_options options = mln_runtime_options_default();
+  mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   options.cache_path = mln_buffer_view_from_cstr(cache_path);
   mln_runtime runtime = mln_test_create_runtime_with_options(options);
   mln_map map = mln_test_create_map(runtime);

@@ -23,4 +23,8 @@ public readonly partial record struct OfflineTilePyramidRegionDefinition(
     double MaxZoom,
     float PixelRatio,
     bool IncludeIdeographs
-);
+)
+{
+    public OfflineTilePyramidRegionDefinition()
+        : this("", default, default, default, default, default) { }
+}

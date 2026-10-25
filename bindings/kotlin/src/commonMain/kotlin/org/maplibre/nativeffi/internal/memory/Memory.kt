@@ -95,6 +95,9 @@ internal fun readCString(pointer: Long): String {
     .decodeToString()
 }
 
+internal fun readCStringOrNull(pointer: Long): String? =
+  if (pointer == 0L) null else readCString(pointer)
+
 /** The bytes of the `mln_buffer_view` at [address]. */
 internal fun readView(address: Long): ByteArray =
   readBytes(readAddress(address), readSize(address + NativeMemory.addressSize))

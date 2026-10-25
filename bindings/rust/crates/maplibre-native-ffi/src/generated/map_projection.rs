@@ -20,7 +20,7 @@ impl MapProjectionHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
     pub fn get_camera(&self) -> Result<CameraOptions> {
         let mut call = self.inner.call();
-        let mut out_camera: sys::mln_camera_options = unsafe { sys::mln_camera_options_default() };
+        let mut out_camera: sys::mln_camera_options = unsafe { std::mem::zeroed() };
         out_camera.size = std::mem::size_of::<sys::mln_camera_options>() as _;
         call.status(|projection, out_diagnostic| unsafe {
             sys::mln_map_projection_get_camera(projection, &mut out_camera, out_diagnostic)

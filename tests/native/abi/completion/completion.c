@@ -76,7 +76,7 @@ static void runtime_events_wake_the_receiver_directly(void) {
     .callback = record_wake,
     .user_data = &wakes,
   };
-  mln_runtime_options options = mln_runtime_options_default();
+  mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   mln_runtime runtime = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, NULL));
   mln_test_configure_events(runtime, event_wake);
@@ -103,7 +103,10 @@ static void discarded_commands_publish_state_and_events_before_a_later_query(
   const mln_logical_extent extent = {
     .width = 96, .height = 80, .scale_factor = 1
   };
-  mln_camera_update camera = mln_camera_update_default();
+  mln_camera_update camera = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   mln_test_transition_end end;
   mln_test_transition_end_init(&end);
   camera.animation.end_handler = mln_test_transition_end_handler(&end);

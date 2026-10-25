@@ -26,7 +26,8 @@ auto created(const mln_completion& descriptor)
 }
 
 auto create_runtime() -> mln_runtime {
-  const auto options = mln_runtime_options_default();
+  auto options = mln_runtime_options{};
+  options.size = sizeof(mln_runtime_options);
   auto runtime = mln_runtime{MLN_HANDLE_NULL};
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, nullptr));
   return runtime;
@@ -125,7 +126,9 @@ void map_release_waits_for_a_lease_queued_after_close_begins() {
   MLN_TEST_OK(mln_test_completion_settle(&creation));
   auto transition = mln_test_transition_end{};
   mln_test_transition_end_init(&transition);
-  auto camera = mln_camera_update_default();
+  auto camera = mln_camera_update{};
+  camera.size = sizeof(mln_camera_update);
+  camera.camera.size = sizeof(mln_camera_options);
   camera.mode = MLN_CAMERA_UPDATE_MODE_EASE;
   camera.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   camera.camera.zoom = 6;

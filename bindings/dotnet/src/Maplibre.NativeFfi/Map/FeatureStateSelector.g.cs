@@ -20,7 +20,7 @@ public sealed record FeatureStateSelector
     /// Source layer ID, or empty for none. Required for vector-source
     /// disambiguation.
     /// </summary>
-    public required string SourceLayerId { get; init; }
+    public string SourceLayerId { get; init; } = "";
 
     /// <summary>
     /// Optional feature ID. Required by set and get, optional for remove. A
@@ -33,5 +33,5 @@ public sealed record FeatureStateSelector
     /// State key, or empty to select every key. Used only by remove, and
     /// requires feature_id.
     /// </summary>
-    public required string StateKey { get; init; }
+    public string StateKey { get; init; } = "";
 }

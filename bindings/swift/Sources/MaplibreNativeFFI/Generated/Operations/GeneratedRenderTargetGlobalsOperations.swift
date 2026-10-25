@@ -4,15 +4,6 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Returns zeroed synchronization with size set for this C API version, which
-  /// is CPU completion.
-  ///
-  /// See `mln_gpu_sync_default` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-  static func gpuSyncDefault() throws -> GpuSync {
-    try nativeDirect { _ in GpuSync(raw: mln_gpu_sync_default()) }
-  }
-
   /// Computes the physical device-pixel size of a logical extent.
   ///
   /// See `mln_logical_extent_physical_size` in the
@@ -36,26 +27,12 @@ public extension Maplibre {
   ///
   /// See `mln_opengl_supported_context_provider_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-  static func openglSupportedContextProviderMask() throws
+  static func openglSupportedContextProviderMask()
     -> OpenglContextProviderFlag
   {
-    try nativeDirect { _ in
+    nativeDirect {
       OpenglContextProviderFlag(
         rawValue: mln_opengl_supported_context_provider_mask()
-      )
-    }
-  }
-
-  /// Returns zeroed attachment options with size set for this C API version.
-  ///
-  /// See `mln_render_session_attach_options_default` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-  static func renderSessionAttachOptionsDefault() throws
-    -> RenderSessionAttachOptions
-  {
-    try nativeDirect { _ in
-      try RenderSessionAttachOptions(
-        raw: mln_render_session_attach_options_default()
       )
     }
   }

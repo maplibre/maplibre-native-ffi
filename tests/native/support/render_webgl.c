@@ -173,8 +173,9 @@ bool mln_test_backend_attach(
   if (!create_backend_state(out_state, &context)) {
     return false;
   }
-  mln_opengl_owned_texture_descriptor descriptor =
-    mln_opengl_owned_texture_descriptor_default();
+  mln_opengl_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_opengl_owned_texture_descriptor)
+  };
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
   descriptor.extent.scale_factor = 1.0;
@@ -216,8 +217,9 @@ bool mln_test_transferred_webgl_surface_create(
 
   char target[sizeof(state->id) + 1];
   (void)snprintf(target, sizeof(target), "#%s", state->id);
-  mln_opengl_surface_descriptor descriptor =
-    mln_opengl_surface_descriptor_default();
+  mln_opengl_surface_descriptor descriptor = {
+    .size = sizeof(mln_opengl_surface_descriptor)
+  };
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
   descriptor.extent.scale_factor = 1.0;
@@ -227,8 +229,9 @@ bool mln_test_transferred_webgl_surface_create(
     .kind = MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS,
     .canvas_selector = mln_buffer_view_from_cstr(target),
   };
-  mln_render_session_attach_options options =
-    mln_render_session_attach_options_default();
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
   options.driver = fixture->driver;
   options.frame_wake = (mln_wake){
     .callback = mln_test_render_count_wake, .user_data = &fixture->frame_wakes

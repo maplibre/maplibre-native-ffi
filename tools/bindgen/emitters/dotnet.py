@@ -18,13 +18,11 @@ from tools.bindgen.model import Api, Function
 from tools.bindgen.names import camel, pascal, type_name
 from tools.bindgen.semantic import (
     BoundApi,
-    DefaultSupport,
     HandlePlan,
     OperationPlan,
     enum_member_prefix,
     output_member,
     public_stem,
-    required_callbacks,
 )
 
 from . import dotnet_native
@@ -114,6 +112,7 @@ def operation_contract(plan: OperationPlan) -> str | None:
         value = planned.value
         if (
             value.length not in (None, "1")
+            and not (value.length == "nul" and value.encoding == "utf8")
             and planned.direction != "in"
             and not planned.sized_by
             and not planned.result_length
@@ -512,7 +511,7 @@ def emit_operation(
         parameter.value.length: parameter.name
         for parameter in plan.inputs
         if parameter.value.kind in {"array", "buffer"}
-        and parameter.value.length is not None
+        and parameter.value.length not in {None, "nul"}
     }
     outputs_by_name = {parameter.name: parameter for parameter in plan.outputs}
     # Caller-sized text starts in scope memory of a guessed size, and the call
@@ -612,7 +611,7 @@ def emit_operation(
         elif (
             parameter.name in input_plans
             and input_plans[parameter.name].kind in {"array", "buffer"}
-            and input_plans[parameter.name].length is not None
+            and input_plans[parameter.name].length not in {None, "nul"}
             and input_plans[parameter.name].encoding in {"utf8", "bytes", "json"}
             and (
                 input_plans[parameter.name].kind == "buffer"
@@ -690,6 +689,15 @@ def emit_operation(
                 omittable.add(name)
             scoped = True
             args.append(values.encode(value_plan, name))
+        elif (
+            value_plan
+            and value_plan.buffer_form == "pointer"
+            and value_plan.length == "nul"
+            and value_plan.encoding == "utf8"
+        ):
+            parameters.append(f"string {name}")
+            scoped = True
+            args.append(f"scope.CString({name})")
         elif (
             parameter.name in input_plans
             and input_plans[parameter.name].kind == "array"
@@ -791,6 +799,10 @@ def emit_operation(
         parameters[index] += " = null"
     if (scoped or asynchronous) and not plan.scoped_receiver:
         entry = [f"using var scope = new NativeCallScope({owner_expression});"]
+    elif function.name == "mln_c_version":
+        # The ABI check calls this function, so reporting the version must not
+        # run the check.
+        entry = ["EnterUnchecked();"]
     else:
         entry = [f"using var call = Enter({owner_expression});"]
         if scoped:
@@ -1028,19 +1040,11 @@ def emit(api: Api | BoundApi) -> Emission:
     unsupported = {
         name: "\n".join(reasons) for name, reasons in bound.unsupported.items()
     }
-    default_records: set[str] = set()
     owner_headers: dict[str, str] = {}
     for plan in bound.operations:
         function = plan.function
         try:
             if plan.support:
-                if isinstance(plan.support, DefaultSupport):
-                    value_name = plan.support.value
-                    values = Values(bound)
-                    values.decoder(values.record(value_name))
-                    default_records.update(values.plans)
-                    supported.append(function.name)
-                    continue
                 raise Unsupported("support operation requires its generated owner")
             owner, emitted, used_records = emit_operation(plan, bound)
         except Unsupported as error:
@@ -1190,9 +1194,7 @@ def emit(api: Api | BoundApi) -> Emission:
             )
         )
         methods[owner].insert(0, declarations)
-    used_records = default_records | (
-        set().union(*records.values()) if records else set()
-    )
+    used_records = set().union(*records.values()) if records else set()
     values = Values(bound)
     enum_names = set()
     for value in bound.public_values.values():
@@ -1299,9 +1301,7 @@ def emit(api: Api | BoundApi) -> Emission:
             + "\n".join(body)
             + "}\n"
         )
-    used_records = default_records | (
-        set().union(*records.values()) if records else set()
-    )
+    used_records = set().union(*records.values()) if records else set()
     converters = []
     for record_name in sorted(used_records):
         plan = values.record(record_name)
@@ -1329,34 +1329,6 @@ def emit(api: Api | BoundApi) -> Emission:
         directory = directory_for(record.location.path)
         plan = values.record(name)
         declaration = values.declaration(plan)
-        required = [
-            (values.public_type(f.value), member(camel(f.name)))
-            for f in required_callbacks(plan)
-        ]
-        if plan.default and required:
-            # A copy holds no callbacks, so the default takes the required ones.
-            default = (
-                f"    public static {public_type(name)} Default("
-                + ", ".join(f"{typ} {local}" for typ, local in required)
-                + ")\n    {\n"
-                "        using var call = NativeCall.Enter(null);\n"
-                f"        return GeneratedValues.Copy{public_type(name)}(NativeMethods.{plan.default}(), "
-                + ", ".join(local for _, local in required)
-                + ");\n    }\n"
-            )
-        elif plan.default:
-            default = (
-                f"    public static {public_type(name)} Default\n    {{\n"
-                "        get\n        {\n"
-                "            using var call = NativeCall.Enter(null);\n"
-                f"            return GeneratedValues.Copy{public_type(name)}(NativeMethods.{plan.default}());\n"
-                "        }\n    }\n"
-            )
-        if plan.default:
-            if declaration.rstrip().endswith(";"):
-                declaration = declaration.rstrip()[:-1] + "\n{\n" + default + "}\n"
-            else:
-                declaration = declaration.rstrip()[:-1] + default + "}\n"
         files[f"{directory}/{public_type(name)}.g.cs"] = (
             HEADER + f"namespace {NAMESPACE};\n\n" + doc(bound, name) + declaration
         )

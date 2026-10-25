@@ -127,9 +127,7 @@ fn countRelease(counter: *support.Counter) void {
 // the last map goes.
 test "a child map keeps its disposed runtime's callbacks alive" {
     var handler_releases = support.Counter{};
-    var options = try maplibre.runtimeOptionsDefault(testing.allocator);
-    defer options.deinit();
-    var runtime = try maplibre.runtimeCreate(options.value, null);
+    var runtime = try maplibre.runtimeCreate(.{}, null);
     try support.expectCommitted(try runtime.setEventHandler(.init(&handler_releases, ignoreEvents, countRelease), null));
     const created = try runtime.createMap(support.mapOptions(), null);
     var map = created.map;

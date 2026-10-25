@@ -392,7 +392,7 @@ static void accessors_and_release_reject_a_broken_frame_or_record(void) {
     );
   }
 
-  const mln_gpu_sync sync = mln_gpu_sync_default();
+  const mln_gpu_sync sync = {.size = sizeof(mln_gpu_sync)};
   MLN_TEST_INVALID(mln_acquired_frame_release(MLN_HANDLE_NULL, &sync, NULL));
   mln_acquired_frame stale_copy = stale;
   MLN_TEST_INVALID_STATE(mln_acquired_frame_release(stale_copy, &sync, NULL));
@@ -467,7 +467,7 @@ static void a_stale_release_during_detach_is_refused_before_its_sync(void) {
   MLN_TEST_OK(
     mln_render_session_detach(fixture.session, &detached.descriptor, NULL)
   );
-  mln_gpu_sync unsupported = mln_gpu_sync_default();
+  mln_gpu_sync unsupported = {.size = sizeof(mln_gpu_sync)};
   unsupported.kind = 999;
   MLN_TEST_INVALID_STATE(mln_acquired_frame_release(stale, &unsupported, NULL));
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &detached));
@@ -496,7 +496,7 @@ static void borrowed_views_hold_a_frame_until_every_view_ends(void) {
     MLN_TEST_OK(mln_acquired_frame_view_begin(frame, &scopes[index], NULL));
     TEST_ASSERT_NOT_NULL(scopes[index]);
   }
-  mln_gpu_sync sync = mln_gpu_sync_default();
+  mln_gpu_sync sync = {.size = sizeof(mln_gpu_sync)};
   for (size_t index = 0; index < 2; index += 1) {
     const mln_acquired_frame held = frame;
     MLN_TEST_STATUS(
@@ -611,7 +611,7 @@ static void a_fully_quarantined_ring_takes_no_more_demands(void) {
     );
   }
 
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.token = 5;
   MLN_TEST_INVALID_STATE(mln_render_session_request_frame(
     fixture.session, &demand, MLN_TEST_DIAGNOSTIC
@@ -724,7 +724,10 @@ static mln_render_frame_result render_one(
 }
 
 static void set_zoom(mln_map map, uint32_t mode, double zoom) {
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.mode = mode;
   update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   update.camera.zoom = zoom;

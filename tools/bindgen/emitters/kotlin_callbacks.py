@@ -337,7 +337,13 @@ def declaration(value, values):
         values.members(value), key=lambda member: member[2].value.kind == "callback"
     )
     for member, typ, field in members:
-        default = "null" if typ.endswith("?") else values.field_default(field)
+        default = (
+            None
+            if field.required
+            else "null"
+            if typ.endswith("?")
+            else values.field_default(field)
+        )
         defaults.append(f"{member}: {typ}" + (f" = {default}" if default else ""))
         parameters.append(
             doc(values.bound, f"{value.native}.{field.name}", "  ")
@@ -618,6 +624,10 @@ def callback_argument(parameter, values):
             return f"{public_name(value.element, values)}({local}, scope)"
         decoded = values.decode(value.element, local)
         return f"if ({local} == 0L) null else {decoded}" if value.nullable else decoded
+    if value.kind == "buffer" and value.length == "nul":
+        return (
+            f"readCStringOrNull({local})" if value.nullable else f"readCString({local})"
+        )
     if value.kind == "record" or (
         value.kind == "buffer" and value.buffer_form == "view"
     ):
@@ -1019,8 +1029,8 @@ def writer(value, values, public):
 
 
 def read_function(value, values):
-    """Copy a registration's native default, whose callbacks are unset. The
-    reader takes the required callbacks, which the copy cannot hold."""
+    """Copy a registration that native returns, whose callbacks are unset.
+    The reader takes the required callbacks, which the copy cannot hold."""
     public_name = name(value.native)
     omitted = omitted_fields(value, values)
     callbacks = [f for f in value.fields if f.name in value.registration.callbacks]

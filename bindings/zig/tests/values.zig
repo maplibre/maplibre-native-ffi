@@ -18,11 +18,8 @@ test "host strings use views and native-lent strings decode" {
     const request = try maplibre.ResourceRequestInfo.fromNative(raw_request);
     try testing.expectEqual(@as([*]const u8, lent_url), request.resolved_url.ptr);
 
-    var options = try maplibre.runtimeOptionsDefault(testing.allocator);
-    defer options.deinit();
-    options.value.asset_path = "asset\x00path";
     var diagnostic: maplibre.Diagnostic = .{};
-    try testing.expectError(error.InvalidArgument, maplibre.runtimeCreate(options.value, &diagnostic));
+    try testing.expectError(error.InvalidArgument, maplibre.runtimeCreate(.{ .asset_path = "asset\x00path" }, &diagnostic));
     try testing.expect(diagnostic.status != null);
     try testing.expect(std.mem.indexOf(u8, diagnostic.message(), "embedded NUL") != null);
 
@@ -43,13 +40,10 @@ test "optional fields and masks round-trip through presence bits" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
 
-    var update = try maplibre.cameraUpdateDefault(testing.allocator);
-    defer update.deinit();
-    update.value.mode = .jump;
-    update.value.camera = .{ .zoom = 3.0, .pitch = 30.0 };
-    try support.expectCommitted(try fixture.map.updateCamera(update.value, null));
-    update.value.camera = .{ .zoom = 5.0 };
-    try support.expectCommitted(try fixture.map.updateCamera(update.value, null));
+    var update: maplibre.CameraUpdate = .{ .mode = .jump, .camera = .{ .zoom = 3.0, .pitch = 30.0 } };
+    try support.expectCommitted(try fixture.map.updateCamera(update, null));
+    update.camera = .{ .zoom = 5.0 };
+    try support.expectCommitted(try fixture.map.updateCamera(update, null));
     const snapshot = try fixture.map.getSnapshot(null);
     try testing.expectEqual(@as(f64, 5.0), snapshot.view.camera.zoom);
     try testing.expectApproxEqAbs(@as(f64, 30.0), snapshot.view.camera.pitch, 1e-9);
@@ -153,12 +147,12 @@ test "open enums keep unknown values and 64-bit carriers round-trip" {
     // completes.
     const transition_id: u64 = 0x8000_0000_0000_0029;
     var ended = support.EndProbe{};
-    var update = try maplibre.cameraUpdateDefault(testing.allocator);
-    defer update.deinit();
-    update.value.mode = .ease;
-    update.value.camera = .{ .zoom = 4.0 };
-    update.value.animation = .{ .duration_ms = 60_000, .transition_id = transition_id, .end_handler = ended.handler() };
-    try support.expectCommitted(try fixture.map.updateCamera(update.value, null));
+    const update: maplibre.CameraUpdate = .{
+        .mode = .ease,
+        .camera = .{ .zoom = 4.0 },
+        .animation = .{ .duration_ms = 60_000, .transition_id = transition_id, .end_handler = ended.handler() },
+    };
+    try support.expectCommitted(try fixture.map.updateCamera(update, null));
     try support.expectCommitted(try fixture.map.cancelCameraTransition(transition_id & 0x7fff_ffff_ffff_ffff, null));
     try testing.expectEqual(@as(u32, 0), ended.ends.load(.acquire));
     try support.expectCommitted(try fixture.map.cancelCameraTransition(transition_id, null));
@@ -190,8 +184,8 @@ test "an array input is copied at submission" {
     for (copy.value.pixels) |byte| try testing.expectEqual(@as(u8, 0x80), byte);
 }
 
-test "native record defaults round trip through generated conversion" {
-    const options = maplibre.mapOptionsDefault();
+test "a record round trips through generated conversion" {
+    const options: maplibre.MapOptions = .{ .initial_extent = .{ .width = 256, .height = 128, .scale_factor = 2.0 } };
     try testing.expectEqual(options, maplibre.MapOptions.fromNative(options.toNative()));
 }
 

@@ -22,24 +22,4 @@ public extension Maplibre {
       )
     } result: { try StyleExpressionHandle(adopting: value0) }
   }
-
-  /// Returns zeroed style expression inputs with size set, which set no input.
-  ///
-  /// See `mln_style_expression_inputs_default` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-  static func styleExpressionInputsDefault() throws -> StyleExpressionInputs {
-    try nativeDirect { _ in
-      try StyleExpressionInputs(raw: mln_style_expression_inputs_default())
-    }
-  }
-
-  /// Returns zeroed style expression options with size set.
-  ///
-  /// See `mln_style_expression_options_default` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-  static func styleExpressionOptionsDefault() throws -> StyleExpressionOptions {
-    try nativeDirect { _ in
-      StyleExpressionOptions(raw: mln_style_expression_options_default())
-    }
-  }
 }

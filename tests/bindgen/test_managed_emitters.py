@@ -147,6 +147,29 @@ mln_status mln_measurement_create(mln_measurement *out_measurement BIND("directi
                 path,
             )
 
+    def test_dotnet_requires_only_required_members_and_zeroes_the_rest(self):
+        # A record struct's own default leaves a string null, so a constructor
+        # sets each member a host may omit to zero, and a required member is a
+        # required property that the full constructor sets.
+        generated = dotnet.generate(real_api())
+        self.assertIn(
+            'public RuntimeOptions()\n        : this("", "") { }',
+            generated["Runtime/RuntimeOptions.g.cs"],
+        )
+        header = generated["Runtime/HttpHeader.g.cs"]
+        self.assertIn("public required string Name { get; init; }", header)
+        self.assertIn('public string Value { get; init; } = "";', header)
+        self.assertIn("[System.Diagnostics.CodeAnalysis.SetsRequiredMembers]", header)
+        self.assertIn(
+            "public required LogicalExtent InitialExtent { get; init; }",
+            generated["Map/MapOptions.g.cs"],
+        )
+        # The ABI check reads the version, so reading it runs no check.
+        self.assertIn(
+            "EnterUnchecked();\n        var returned = NativeMethods.mln_c_version();",
+            generated["Base/MaplibreNative.Operations.g.cs"],
+        )
+
     def test_dart_generates_callback_registrations_only_with_queue_delivery(
         self,
     ):
@@ -278,14 +301,6 @@ using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Memory;
 using static Maplibre.NativeFfi.Internal.C.mln_camera_field;
 using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-namespace Maplibre.NativeFfi.Internal.C {
-  static partial class NativeMethods {
-    public static mln_camera mln_camera_default() => new() {
-      fields = MLN_CAMERA_CENTER | MLN_CAMERA_ZOOM,
-      center = new mln_lat_lng { latitude = 80, longitude = 90 }, zoom = 99
-    };
-  }
-}
 """
             + declarations
             + "\nunsafe class Probe {\n"

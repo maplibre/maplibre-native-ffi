@@ -20,12 +20,4 @@ public sealed record MapTileOptions
     public double? LodPitchThreshold { get; init; }
     public double? LodZoomShift { get; init; }
     public TileLodMode? LodMode { get; init; }
-    public static MapTileOptions Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null);
-            return GeneratedValues.CopyMapTileOptions(NativeMethods.mln_map_tile_options_default());
-        }
-    }
 }

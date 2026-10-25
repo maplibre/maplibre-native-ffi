@@ -33,10 +33,9 @@ impl MapState {
             .map_err(|error| format!("runtime creation failed: {error}"))?;
 
         let map_options = MapOptions {
-            initial_extent: extent(viewport),
             map_mode: MapMode::Continuous,
             event_mask: Some(RuntimeEventFlag::empty()),
-            ..MapOptions::default()
+            ..MapOptions::new(extent(viewport))
         };
         let (map, ready) = match runtime.create_map(&map_options) {
             Ok(created) => created,

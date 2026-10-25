@@ -24,7 +24,7 @@ static mln_screen_point logical_point(double x, double y, viewport value) {
 }
 
 static mln_animation_options animation(double duration_ms) {
-  mln_animation_options options = mln_animation_options_default();
+  mln_animation_options options = {};
   options.fields = MLN_ANIMATION_OPTION_DURATION;
   options.duration_ms = duration_ms;
   return options;
@@ -55,7 +55,7 @@ static app_error apply_delta(map_state* state, const mln_camera_delta* delta) {
 static app_error pan(
   map_state* state, double dx, double dy, uint32_t mode, double duration_ms
 ) {
-  mln_camera_delta delta = mln_camera_delta_default();
+  mln_camera_delta delta = {.size = sizeof(mln_camera_delta)};
   delta.fields = MLN_CAMERA_DELTA_OFFSET;
   delta.offset = (mln_screen_point){.x = dx, .y = dy};
   if (mode != MLN_CAMERA_UPDATE_MODE_JUMP)
@@ -67,7 +67,7 @@ static app_error zoom(
   map_state* state, double scale, mln_screen_point anchor, uint32_t mode,
   double duration_ms
 ) {
-  mln_camera_delta delta = mln_camera_delta_default();
+  mln_camera_delta delta = {.size = sizeof(mln_camera_delta)};
   delta.fields = MLN_CAMERA_DELTA_SCALE | MLN_CAMERA_DELTA_ANCHOR;
   delta.scale = scale;
   delta.anchor = anchor;
@@ -80,7 +80,7 @@ static app_error adjust_orientation(
   map_state* state, double bearing_delta, double pitch_delta, uint32_t mode,
   double duration_ms
 ) {
-  mln_camera_delta delta = mln_camera_delta_default();
+  mln_camera_delta delta = {.size = sizeof(mln_camera_delta)};
   if (bearing_delta != 0.0) delta.fields |= MLN_CAMERA_DELTA_BEARING;
   if (pitch_delta != 0.0) delta.fields |= MLN_CAMERA_DELTA_PITCH;
   if (delta.fields == 0) return APP_OK;
@@ -111,7 +111,7 @@ static app_error handle_mouse_button_down(
   controller->drag_mode = mode;
   controller->drag_button = button->button;
   MAP_TRY(map_state_cancel_transitions(state));
-  mln_camera_options camera = mln_camera_options_default();
+  mln_camera_options camera = {.size = sizeof(mln_camera_options)};
   return map_state_update_camera(
     state, &camera, MLN_CAMERA_UPDATE_MODE_JUMP, NULL, MLN_GESTURE_PHASE_BEGIN
   );
@@ -126,7 +126,7 @@ static app_error handle_mouse_button_up(
   if (button->button != controller->drag_button) return APP_OK;
   controller->drag_mode = DRAG_MODE_NONE;
   controller->drag_button = 0;
-  mln_camera_options camera = mln_camera_options_default();
+  mln_camera_options camera = {.size = sizeof(mln_camera_options)};
   return map_state_update_camera(
     state, &camera, MLN_CAMERA_UPDATE_MODE_JUMP, NULL, MLN_GESTURE_PHASE_END
   );
@@ -239,7 +239,7 @@ static app_error handle_key_down(
       );
       break;
     case SDL_SCANCODE_0: {
-      mln_camera_options target = mln_camera_options_default();
+      mln_camera_options target = {.size = sizeof(mln_camera_options)};
       target.fields = MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH;
       target.bearing = 0.0;
       target.pitch = 0.0;

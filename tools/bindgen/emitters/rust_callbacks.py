@@ -200,7 +200,7 @@ def trampoline(values, callback, name, host, state="Self"):
 
 def required_parameters(values, value):
     """The (name, function bound) of each callback that a registration
-    requires, which its constructor and its default take."""
+    requires, which its constructor takes."""
     return [
         (
             identifier(field.name),
@@ -225,6 +225,8 @@ def declaration(values, value):
     raw = f"sys::{value.native}"
     fields, writes, copies, trampolines, constructors = [], [], [], [], []
     required = {f.name for f in required_callbacks(value)}
+    if any(field.required for field in value.fields):
+        raise Unsupported(f"{value.native}: a registration's required member")
     for index, (field, callback) in enumerate(callbacks(values, value)):
         public = identifier(field.name)
         code, _output = trampoline(
@@ -301,25 +303,14 @@ def declaration(values, value):
         else:
             writes.append(f"{place} = {encode(values, field.value, 'self.' + public)};")
             copies.append(f"{public}: {copied},")
-    initial = (
-        f"unsafe {{ sys::{value.default}() }}"
-        if value.default
-        else "unsafe { std::mem::zeroed() }"
-    )
     empty = " && ".join(
         f"raw.{native_identifier(field.name)}.is_none()"
         for field, _ in callbacks(values, value)
     )
-    default = (
-        f"impl Default for {name} {{ fn default() -> Self {{ maplibre_core::require_abi_version(); convert::native_default(unsafe {{ sys::{value.default}() }}) }} }}\n"
-        if value.default and not required
-        else ""
-    )
     parameters = required_parameters(values, value)
     if parameters:
         # A registration that requires a callback has no default value: its
-        # constructor takes each required callback, and a native default
-        # supplies the other fields.
+        # constructor takes each required callback.
         types = (
             ["F"]
             if len(parameters) == 1
@@ -334,24 +325,20 @@ def declaration(values, value):
             f"{public}: {typ}"
             for typ, (public, _) in zip(types, parameters, strict=True)
         )
-        shared = ", ".join(f"std::sync::Arc::new({public})" for public, _ in parameters)
-        if value.default:
-            body = f'maplibre_core::require_abi_version(); unsafe {{ Self::from_default(sys::{value.default}(), {shared}) }}.expect("native default must be valid")'
-        else:
-            # Each other member starts unset or empty.
-            body = (
-                "Self { "
-                + " ".join(
-                    f"{identifier(field.name)}: std::sync::Arc::new({identifier(field.name)}),"
-                    if field.name in required
-                    else f"{identifier(field.name)}: None,"
-                    if field.name in value.registration.callbacks
-                    else f"{identifier(field.name)}: Default::default(),"
-                    for field in value.fields
-                    if field.public or field.name in value.registration.callbacks
-                )
-                + " }"
+        # Each other member starts unset or empty.
+        body = (
+            "Self { "
+            + " ".join(
+                f"{identifier(field.name)}: std::sync::Arc::new({identifier(field.name)}),"
+                if field.name in required
+                else f"{identifier(field.name)}: None,"
+                if field.name in value.registration.callbacks
+                else f"{identifier(field.name)}: Default::default(),"
+                for field in value.fields
+                if field.public or field.name in value.registration.callbacks
             )
+            + " }"
+        )
         constructors.append(
             f"pub fn new<{generics}>({arguments}) -> Self where {bounds} {{ {body} }}"
         )
@@ -359,25 +346,14 @@ def declaration(values, value):
     release = native_identifier(value.registration.release)
     returned = value.native in values.bound.returned
     if parameters and returned:
-        # A copy holds no callbacks, so the default's caller passes the
-        # required ones.
-        stored = ", ".join(
-            f"{public}: std::sync::Arc<dyn {function}>"
-            for public, function in parameters
-        )
-        constructors.append(
-            "/// Copies a native default, whose callbacks are unset, with the required ones.\n"
-            f"    pub(crate) unsafe fn from_default(raw: {raw}, {stored}) -> Result<Self> {{ Ok(Self {{ "
-            + " ".join(copies)
-            + " }) }"
-        )
+        # A copy holds no callbacks, so it can't hold the required ones.
+        raise Unsupported(f"{value.native}: a returned registration requires callbacks")
     return (
         doc(values.bound, value.native)
-        + f"#[derive(Clone{', Default' if not value.default and not parameters else ''})]\n"
+        + f"#[derive(Clone{'' if parameters else ', Default'})]\n"
         f"pub struct {name} {{\n"
         + "\n".join(fields)
         + "\n}\n"
-        + default
         + f'impl std::fmt::Debug for {name} {{ fn fmt(&self, f: &mut std::fmt::Formatter<\'_>) -> std::fmt::Result {{ f.debug_struct("{name}").finish_non_exhaustive() }} }}\n'
         + f"impl {name} {{\n"
         + "".join(f"    {line}\n" for line in constructors)
@@ -385,7 +361,7 @@ def declaration(values, value):
         + "\n}\n"
         + f"impl ToNative<{raw}> for {name} {{\n"
         + f"    fn to_native(&self, arena: &mut InputArena) -> Result<{raw}> {{\n"
-        + f"        let mut raw: {raw} = {initial};\n"
+        + f"        let mut raw: {raw} = unsafe {{ std::mem::zeroed() }};\n"
         + "".join(f"        {line}\n" for line in writes)
         + f"        if !({empty}) {{\n"
         + "            // SAFETY: the release reclaims exactly this state.\n"
@@ -394,7 +370,7 @@ def declaration(values, value):
         + "        }\n        Ok(raw)\n    }\n}\n"
         + (
             f"impl FromNative<{raw}> for {name} {{\n"
-            + "    /// Copies a native default, whose callbacks are unset.\n"
+            + "    /// Copies a registration, whose callbacks are unset.\n"
             + f"    unsafe fn from_native(raw: {raw}) -> Result<Self> {{\n"
             + "        Ok(Self {\n"
             + "".join(f"            {line}\n" for line in copies)
@@ -422,7 +398,7 @@ def lent_text(value):
         value.kind == "buffer"
         and is_text(value)
         and not value.nullable
-        and value.buffer_form == "view"
+        and (value.length == "nul" or value.buffer_form == "view")
     )
 
 
@@ -439,7 +415,12 @@ def callback_parameter_capture(values, parameter, local=None):
     if scoped:
         return f"&mut {values.name(scoped)}::new({local})?"
     if lent_text(parameter.value):
-        return f"unsafe {{ maplibre_core::string::borrow_string_view({local}) }}?"
+        borrow = (
+            "borrow_c_string"
+            if parameter.value.length == "nul"
+            else "borrow_string_view"
+        )
+        return f"unsafe {{ maplibre_core::string::{borrow}({local}) }}?"
     if parameter.value.kind == "handle" and parameter.value.ownership == "owned":
         return f"{values.public(parameter.value)}::adopt({local}, None)?"
     if parameter.value.kind == "handle":
@@ -458,7 +439,9 @@ def response_declaration(values, value):
         counts = {
             p.value.length: p.name
             for p in plan.inputs
-            if p.value.kind in {"buffer", "array"} and p.value.length
+            if p.value.kind in {"buffer", "array"}
+            and p.value.length
+            and p.value.length != "nul"
         }
         for parameter in plan.inputs:
             local = identifier(parameter.name)
@@ -475,8 +458,8 @@ def response_declaration(values, value):
                 signature.append(f"{local}: {public}")
                 if (
                     parameter.value.buffer_form == "view"
-                    and "let arena = &mut InputArena::default();" not in setup
-                ):
+                    or parameter.value.length == "nul"
+                ) and "let arena = &mut InputArena::default();" not in setup:
                     setup.insert(0, "let arena = &mut InputArena::default();")
                 setup.append(
                     f"let native_{local} = {encode(values, parameter.value, local)};"

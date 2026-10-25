@@ -9,7 +9,20 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_http_header</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Name">
-/// Header field name. Required.
-/// </param>
-public readonly partial record struct HttpHeader(string Name, string Value);
+public readonly partial record struct HttpHeader
+{
+    public HttpHeader() { }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public HttpHeader(string Name, string Value)
+    {
+        this.Name = Name;
+        this.Value = Value;
+    }
+
+    /// <summary>
+    /// Header field name. Required.
+    /// </summary>
+    public required string Name { get; init; }
+    public string Value { get; init; } = "";
+}

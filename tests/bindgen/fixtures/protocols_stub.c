@@ -9,7 +9,6 @@
 #define MLN_PROTOCOL_VALUES
 #define MLN_PROTOCOL_KEYWORDS
 #define MLN_PROTOCOL_DEFAULTS
-#define MLN_PROTOCOL_DEFAULT_REGISTRATION
 #define MLN_PROTOCOL_ABSENT_HANDLE
 #define MLN_PROTOCOL_ABSENT_VALUE
 #define MLN_PROTOCOL_STRIDED_RECORDS
@@ -57,23 +56,10 @@ mln_status mln_keyword_combine(
   return MLN_STATUS_OK;
 }
 
-mln_probe_settings mln_probe_settings_default(void) {
-  return (mln_probe_settings){
-    .size = sizeof(mln_probe_settings),
-    .extent = {.width = 256, .scale = 1.5, .fit = MLN_PROBE_MODE_FIRST},
-    .mode = MLN_PROBE_MODE_SECOND,
-    .flags = MLN_PROBE_FLAG_ALL,
-    .heading = MLN_PROBE_FLAG_SOUTH,
-    .ratio = 0.25F,
-    .offset = -3,
-    .enabled = true,
-  };
-}
-
 mln_status mln_probe_settings_check(
   mln_probe_settings settings, mln_diagnostic* out_diagnostic
 ) {
-  const mln_probe_settings expected = mln_probe_settings_default();
+  const mln_probe_settings expected = {.size = sizeof(mln_probe_settings)};
   if (settings.size != expected.size) return fail(out_diagnostic, "size");
   if (settings.extent.width != expected.extent.width) {
     return fail(out_diagnostic, "extent.width");
@@ -96,14 +82,6 @@ mln_status mln_probe_settings_check(
   }
   if (settings.count != expected.count) return fail(out_diagnostic, "count");
   return MLN_STATUS_OK;
-}
-
-mln_probe_hooks mln_probe_hooks_default(void) {
-  return (mln_probe_hooks){
-    .size = sizeof(mln_probe_hooks),
-    .limit = 4,
-    .signal = {0},
-  };
 }
 
 // Reports the output of call `count` of an absence probe: none on the first,

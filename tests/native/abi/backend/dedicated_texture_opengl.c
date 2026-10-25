@@ -40,7 +40,7 @@ static void dedicated_texture_uses_a_readback_only_core_worker(void) {
     mln_test_map_set_style_json(map, mln_test_red_background_style_json)
   );
   MLN_TEST_OK(mln_test_map_fence(map));
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_FORCE;
   demand.token = 41;
   MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));

@@ -122,7 +122,7 @@ static uint32_t render_frame(
   const mln_test_render_fixture* fixture, uint32_t flags
 ) {
   static uint64_t next_token = 1;
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_FORCE | flags;
   demand.token = next_token++;
   MLN_TEST_OK(
@@ -279,7 +279,7 @@ static mln_status acquire(
 }
 
 static void release(mln_acquired_frame* frame) {
-  const mln_gpu_sync sync = mln_gpu_sync_default();
+  const mln_gpu_sync sync = {.size = sizeof(mln_gpu_sync)};
   MLN_TEST_OK(mln_acquired_frame_release(*frame, &sync, NULL));
   *frame = MLN_HANDLE_NULL;
 }
@@ -351,7 +351,7 @@ static void a_borrowed_retarget_returns_quarantined_slots_to_service(void) {
     MLN_TEST_OK(acquire(fixture, &frame));
     MLN_TEST_OK(mln_acquired_frame_discard(frame, NULL));
   }
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_FORCE;
   demand.token = 2000;
   TEST_ASSERT_EQUAL_INT(
@@ -404,7 +404,7 @@ static void frames_published_before_a_retarget_cannot_be_acquired(void) {
 
   // Forced, since the map may have published nothing newer than the frame
   // above.
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_FORCE;
   demand.token = 1000;
   MLN_TEST_OK(
@@ -460,7 +460,7 @@ static void a_borrowed_retarget_renders_a_waiting_demand(void) {
   TEST_ASSERT_NOT_NULL_MESSAGE(replacement, mln_test_graphics_last_error());
   restore_fixture_context(fixture);
 
-  mln_frame_demand demand = mln_frame_demand_default();
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = 3000;
   MLN_TEST_OK(
@@ -727,8 +727,9 @@ static mln_status submit_metal_texture(
   const mln_test_completion* completion
 ) {
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-  mln_metal_borrowed_texture_descriptor descriptor =
-    mln_metal_borrowed_texture_descriptor_default();
+  mln_metal_borrowed_texture_descriptor descriptor = {
+    .size = sizeof(mln_metal_borrowed_texture_descriptor)
+  };
   descriptor.extent = (mln_logical_extent){
     .width = MLN_TEST_HOST_TARGET_SIZE,
     .height = MLN_TEST_HOST_TARGET_SIZE,

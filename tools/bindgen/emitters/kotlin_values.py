@@ -322,10 +322,9 @@ class Values:
             value.native in writers for writers in self.split_writers.values()
         )
 
-    def field_default(self, field, record=None):
-        if record and record.default:
-            return f"{name(record.native)}.default.{identifier(field.name)}"
-        return self.default(field.value)
+    def field_default(self, field):
+        """A field's zero value, or None when a caller must give it."""
+        return None if field.required else self.default(field.value)
 
     def default(self, value):
         """A field's default, or None when a caller must give it."""
@@ -346,7 +345,8 @@ class Values:
                 if not value.union_member
                 and not self.output_only(value)
                 and all(
-                    typ.endswith("?") or self.field_default(field)
+                    not field.required
+                    and (typ.endswith("?") or self.field_default(field))
                     for _, typ, field in self.members(value)
                 )
                 else None
@@ -438,10 +438,10 @@ class Values:
                 typed.append((member, typ))
                 default = (
                     None
-                    if required
+                    if required or field.required
                     else "null"
                     if typ.endswith("?")
-                    else self.field_default(field, value)
+                    else self.field_default(field)
                 )
                 args.append(
                     doc(self.bound, f"{value.native}.{field.name}", "  ")
@@ -456,10 +456,6 @@ class Values:
             typed.extend(
                 (self.flag_name(value, flag), "Boolean") for flag in value.mask_flags
             )
-            if value.default:
-                companion = f"  public companion object {{ internal val default: {public} by lazy {{ GeneratedApi.{camel(value.default.removeprefix('mln_'))}() }} }}"
-            else:
-                companion = ""
             if value.native in self.views:
                 # A view's scope guards only what its owner lends; a copy of
                 # any other member stays readable after the scope ends.
@@ -487,12 +483,6 @@ class Values:
                     + "\n)"
                     + content_equality(public, typed)
                 )
-            if companion:
-                declaration = result[-1]
-                if declaration.rstrip().endswith("}"):
-                    result[-1] = declaration.rstrip()[:-1] + "\n" + companion + "\n}"
-                else:
-                    result[-1] += " {\n" + companion + "\n}"
         for public, (field, value) in self.attachments.items():
             result.append(
                 f"/** A new {field} and the completion that reports it ready. */\n"
@@ -646,6 +636,10 @@ class Values:
             return f"{expression}?.let {{ {written} }} ?: 0L" if nullable else written
         if value.kind == "buffer" and value.buffer_form == "view":
             return f"view({expression})"
+        if value.kind == "buffer" and value.length == "nul":
+            if value.nullable:
+                return f"{expression}?.let {{ cString(it) }} ?: 0L"
+            return f"cString({expression})"
         if value.kind == "buffer":
             data = f"{expression}.encodeToByteArray()" if is_text(value) else expression
             if value.nullable:
@@ -746,7 +740,7 @@ class Values:
         value = field.value
         lines = [self.place(value, self.at("target", record, field.name), expression)]
         if value.kind == "array" or (
-            value.kind == "buffer" and value.length not in {None, "1"}
+            value.kind == "buffer" and value.length not in {None, "nul", "1"}
         ):
             lines.append(self.write_count(record, value, expression))
         return lines
@@ -853,6 +847,12 @@ class Values:
                     f"readAddress({address}).takeIf {{ it != 0L }}?.let {{ {inner} }}"
                 )
             return self.decode(value.element, f"readAddress({address})", scope)
+        if value.kind == "buffer" and value.length == "nul":
+            return (
+                f"readCStringOrNull(readAddress({address}))"
+                if value.nullable
+                else f"readCString(readAddress({address}))"
+            )
         if value.kind == "buffer" and value.buffer_form == "view":
             text = is_text(value)
             if value.nullable:
@@ -915,7 +915,7 @@ class Values:
         value = field.value
         address = self.at("source", record, field.name)
         if value.kind == "array" or (
-            value.kind == "buffer" and value.length not in {None, "1"}
+            value.kind == "buffer" and value.length not in {None, "nul", "1"}
         ):
             count = self.read_count(record, value.length)
             pointer = f"readAddress({address})"

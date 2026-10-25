@@ -2,7 +2,6 @@
 
 import type {
   AmbientCacheOperation,
-  AnimationOptions,
   BoundOptions,
   CameraDelta,
   CameraFitOptions,
@@ -18,7 +17,6 @@ import type {
   FreeCameraOptions,
   GeojsonSourceOptions,
   GpuSync,
-  HttpHeaderRule,
   HttpHeaderTransform,
   LatLng,
   LatLngBounds,
@@ -60,7 +58,6 @@ import type {
   ResourceProvider,
   ResourceRequestCancelHandler,
   ResourceResponse,
-  ResourceRoute,
   ResourceTransform,
   RuntimeEventFlag,
   RuntimeEventHandler,
@@ -112,26 +109,6 @@ import {
 } from "./internal/realm.ts";
 
 /**
- * Returns zeroed animation options.
- *
- * See `mln_animation_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
- */
-export function animationOptionsDefault(): AnimationOptions {
-  return native.mln_animation_options_default();
-}
-
-/**
- * Returns zeroed map bound options with size set for this C API version.
- *
- * See `mln_bound_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
- */
-export function boundOptionsDefault(): BoundOptions {
-  return native.mln_bound_options_default();
-}
-
-/**
  * Reports the C ABI contract version. The value is 0 while the ABI is unstable,
  * and will increment on each SemVer major release.
  *
@@ -140,95 +117,6 @@ export function boundOptionsDefault(): BoundOptions {
  */
 export function cVersion(): number {
   return native.mln_c_version();
-}
-
-/**
- * Returns a zeroed relative camera update with size set for this version.
- *
- * See `mln_camera_delta_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
- */
-export function cameraDeltaDefault(): CameraDelta {
-  return native.mln_camera_delta_default();
-}
-
-/**
- * Returns zeroed camera fitting options with size set for this version.
- *
- * See `mln_camera_fit_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
- */
-export function cameraFitOptionsDefault(): CameraFitOptions {
-  return native.mln_camera_fit_options_default();
-}
-
-/**
- * Returns zeroed camera options with size set for this C API version.
- *
- * See `mln_camera_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
- */
-export function cameraOptionsDefault(): CameraOptions {
-  return native.mln_camera_options_default();
-}
-
-/**
- * Returns a zeroed atomic camera update, with its size and its camera's size
- * set for this C API version.
- *
- * See `mln_camera_update_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
- */
-export function cameraUpdateDefault(): CameraUpdate {
-  return native.mln_camera_update_default();
-}
-
-/**
- * Returns zeroed custom geometry source options with size set.
- *
- * See `mln_custom_geometry_source_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-export function customGeometrySourceOptionsDefault(
-  fetchTile: CustomGeometrySourceOptions["fetchTile"],
-): CustomGeometrySourceOptions {
-  return { ...native.mln_custom_geometry_source_options_default(), fetchTile };
-}
-
-/**
- * Returns zeroed custom MVT vector source options with size set.
- *
- * See `mln_custom_mvt_vector_source_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-export function customMvtVectorSourceOptionsDefault(
-  fetchTile: CustomMvtVectorSourceOptions["fetchTile"],
-): CustomMvtVectorSourceOptions {
-  return {
-    ...native.mln_custom_mvt_vector_source_options_default(),
-    fetchTile,
-  };
-}
-
-/**
- * Returns a zeroed frame demand with size set for this C API version: a
- * zero-token, render-if-needed, nonpresenting demand.
- *
- * See `mln_frame_demand_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
- */
-export function frameDemandDefault(): FrameDemand {
-  return native.mln_frame_demand_default();
-}
-
-/**
- * Returns zeroed free camera options with size set for this C API version.
- *
- * See `mln_free_camera_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
- */
-export function freeCameraOptionsDefault(): FreeCameraOptions {
-  return native.mln_free_camera_options_default();
 }
 
 /**
@@ -247,38 +135,6 @@ export function geojsonSourceDataCreate(
     () => new GeojsonSourceDataHandle(ADOPT, handle),
     (disposed) => native.mln_geojson_source_data_release(disposed, undefined),
   );
-}
-
-/**
- * Returns zeroed GeoJSON source options with size set.
- *
- * See `mln_geojson_source_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-export function geojsonSourceOptionsDefault(): GeojsonSourceOptions {
-  return native.mln_geojson_source_options_default();
-}
-
-/**
- * Returns zeroed synchronization with size set for this C API version, which is
- * CPU completion.
- *
- * See `mln_gpu_sync_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-export function gpuSyncDefault(): GpuSync {
-  return native.mln_gpu_sync_default();
-}
-
-/**
- * Returns a zeroed header rule with size set for this C API version: an exact
- * match of the empty URL for every resource kind, with no headers.
- *
- * See `mln_http_header_rule_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-export function httpHeaderRuleDefault(): HttpHeaderRule {
-  return native.mln_http_header_rule_default();
 }
 
 /**
@@ -325,17 +181,6 @@ export function logSetCallback(handler: LogHandler): void {
 }
 
 /**
- * Returns a zeroed logical extent, which every function that takes an extent
- * rejects.
- *
- * See `mln_logical_extent_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export function logicalExtentDefault(): LogicalExtent {
-  return native.mln_logical_extent_default();
-}
-
-/**
  * Computes the physical device-pixel size of a logical extent.
  *
  * See `mln_logical_extent_physical_size` in the
@@ -346,16 +191,6 @@ export function logicalExtentPhysicalSize(extent: LogicalExtent = {}): {
   readonly height: number;
 } {
   return native.mln_logical_extent_physical_size(extent);
-}
-
-/**
- * Returns zeroed map options with size set for this C API version.
- *
- * See `mln_map_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export function mapOptionsDefault(): MapOptions {
-  return native.mln_map_options_default();
 }
 
 /**
@@ -372,59 +207,6 @@ export function mapProjectionCreate(view: MapView = {}): MapProjectionHandle {
     () => new MapProjectionHandle(ADOPT, handle),
     (disposed) => native.mln_map_projection_release(disposed, undefined),
   );
-}
-
-/**
- * Returns zeroed tile tuning options with size set for this C API version.
- *
- * See `mln_map_tile_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
- */
-export function mapTileOptionsDefault(): MapTileOptions {
-  return native.mln_map_tile_options_default();
-}
-
-/**
- * Returns zeroed viewport options with size set for this C API version.
- *
- * See `mln_map_viewport_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
- */
-export function mapViewportOptionsDefault(): MapViewportOptions {
-  return native.mln_map_viewport_options_default();
-}
-
-/**
- * Returns a zeroed Metal borrowed-texture descriptor with size set for this C
- * API version. The caller still sets every required member.
- *
- * See `mln_metal_borrowed_texture_descriptor_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-export function metalBorrowedTextureDescriptorDefault(): MetalBorrowedTextureDescriptor {
-  return native.mln_metal_borrowed_texture_descriptor_default();
-}
-
-/**
- * Returns a zeroed Metal owned-texture descriptor with size set for this C API
- * version. The caller still sets every required member.
- *
- * See `mln_metal_owned_texture_descriptor_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-export function metalOwnedTextureDescriptorDefault(): MetalOwnedTextureDescriptor {
-  return native.mln_metal_owned_texture_descriptor_default();
-}
-
-/**
- * Returns a zeroed Metal surface descriptor with size set for this C API
- * version. The caller still sets every required member.
- *
- * See `mln_metal_surface_descriptor_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-export function metalSurfaceDescriptorDefault(): MetalSurfaceDescriptor {
-  return native.mln_metal_surface_descriptor_default();
 }
 
 /**
@@ -448,28 +230,6 @@ export function networkSetStatus(status: NetworkStatus): void {
 }
 
 /**
- * Returns a zeroed OpenGL borrowed-texture descriptor with size set for this C
- * API version. The caller still sets every required member.
- *
- * See `mln_opengl_borrowed_texture_descriptor_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-export function openglBorrowedTextureDescriptorDefault(): OpenglBorrowedTextureDescriptor {
-  return native.mln_opengl_borrowed_texture_descriptor_default();
-}
-
-/**
- * Returns a zeroed OpenGL owned-texture descriptor with size set for this C API
- * version. The caller still sets every required member.
- *
- * See `mln_opengl_owned_texture_descriptor_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-export function openglOwnedTextureDescriptorDefault(): OpenglOwnedTextureDescriptor {
-  return native.mln_opengl_owned_texture_descriptor_default();
-}
-
-/**
  * Returns OpenGL context providers supported by this build.
  *
  * See `mln_opengl_supported_context_provider_mask` in the
@@ -480,17 +240,6 @@ export function openglSupportedContextProviderMask(): OpenglContextProviderFlag 
 }
 
 /**
- * Returns a zeroed OpenGL surface descriptor with size set for this C API
- * version. The caller still sets every required member.
- *
- * See `mln_opengl_surface_descriptor_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-export function openglSurfaceDescriptorDefault(): OpenglSurfaceDescriptor {
-  return native.mln_opengl_surface_descriptor_default();
-}
-
-/**
  * Returns the process-wide `mln_plugin_register_v1` entry point; never null.
  *
  * See `mln_plugin_get_register_function_v1` in the
@@ -498,17 +247,6 @@ export function openglSurfaceDescriptorDefault(): OpenglSurfaceDescriptor {
  */
 export function pluginGetRegisterFunctionV1(): bigint {
   return native.mln_plugin_get_register_function_v1();
-}
-
-/**
- * Returns a zeroed premultiplied RGBA8 image descriptor with size set. The
- * caller still sets every required member.
- *
- * See `mln_premultiplied_rgba8_image_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-export function premultipliedRgba8ImageDefault(): PremultipliedRgba8Image {
-  return native.mln_premultiplied_rgba8_image_default();
 }
 
 /**
@@ -524,48 +262,6 @@ export function projectedMetersForLatLng(
 }
 
 /**
- * Returns zeroed axonometric rendering options with size set for this C API
- * version.
- *
- * See `mln_projection_mode_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
- */
-export function projectionModeDefault(): ProjectionMode {
-  return native.mln_projection_mode_default();
-}
-
-/**
- * Returns zeroed attachment options with size set for this C API version.
- *
- * See `mln_render_session_attach_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-export function renderSessionAttachOptionsDefault(): RenderSessionAttachOptions {
-  return native.mln_render_session_attach_options_default();
-}
-
-/**
- * Returns zeroed rendered feature query options with size set.
- *
- * See `mln_rendered_feature_query_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-export function renderedFeatureQueryOptionsDefault(): RenderedFeatureQueryOptions {
-  return native.mln_rendered_feature_query_options_default();
-}
-
-/**
- * Returns a zeroed route with size set for this C API version: an exact match
- * of the empty URL for every resource kind.
- *
- * See `mln_resource_route_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-export function resourceRouteDefault(): ResourceRoute {
-  return native.mln_resource_route_default();
-}
-
-/**
  * Creates a runtime.
  *
  * See `mln_runtime_create` in the
@@ -578,26 +274,6 @@ export function runtimeCreate(options: RuntimeOptions = {}): RuntimeHandle {
     () => new RuntimeHandle(ADOPT, handle),
     (disposed) => native.mln_runtime_dispose(disposed, undefined),
   );
-}
-
-/**
- * Returns zeroed runtime options with size set for this C API version.
- *
- * See `mln_runtime_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-export function runtimeOptionsDefault(): RuntimeOptions {
-  return native.mln_runtime_options_default();
-}
-
-/**
- * Returns zeroed source feature query options with size set.
- *
- * See `mln_source_feature_query_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-export function sourceFeatureQueryOptionsDefault(): SourceFeatureQueryOptions {
-  return native.mln_source_feature_query_options_default();
 }
 
 /**
@@ -619,46 +295,6 @@ export function styleExpressionCreate(
 }
 
 /**
- * Returns zeroed style expression inputs with size set, which set no input.
- *
- * See `mln_style_expression_inputs_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
- */
-export function styleExpressionInputsDefault(): StyleExpressionInputs {
-  return native.mln_style_expression_inputs_default();
-}
-
-/**
- * Returns zeroed style expression options with size set.
- *
- * See `mln_style_expression_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
- */
-export function styleExpressionOptionsDefault(): StyleExpressionOptions {
-  return native.mln_style_expression_options_default();
-}
-
-/**
- * Returns zeroed runtime style image options with size set.
- *
- * See `mln_style_image_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-export function styleImageOptionsDefault(): StyleImageOptions {
-  return native.mln_style_image_options_default();
-}
-
-/**
- * Returns zeroed global style transition options with size set.
- *
- * See `mln_style_transition_options_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-export function styleTransitionOptionsDefault(): StyleTransitionOptions {
-  return native.mln_style_transition_options_default();
-}
-
-/**
  * Reports the render backends available in this native library build.
  *
  * See `mln_supported_render_backend_mask` in the
@@ -666,39 +302,6 @@ export function styleTransitionOptionsDefault(): StyleTransitionOptions {
  */
 export function supportedRenderBackendMask(): RenderBackendFlag {
   return native.mln_supported_render_backend_mask();
-}
-
-/**
- * Returns a zeroed Vulkan borrowed-texture descriptor with size set for this C
- * API version. The caller still sets every required member.
- *
- * See `mln_vulkan_borrowed_texture_descriptor_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-export function vulkanBorrowedTextureDescriptorDefault(): VulkanBorrowedTextureDescriptor {
-  return native.mln_vulkan_borrowed_texture_descriptor_default();
-}
-
-/**
- * Returns a zeroed Vulkan owned-texture descriptor with size set for this C API
- * version. The caller still sets every required member.
- *
- * See `mln_vulkan_owned_texture_descriptor_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-export function vulkanOwnedTextureDescriptorDefault(): VulkanOwnedTextureDescriptor {
-  return native.mln_vulkan_owned_texture_descriptor_default();
-}
-
-/**
- * Returns a zeroed Vulkan surface descriptor with size set for this C API
- * version. The caller still sets every required member.
- *
- * See `mln_vulkan_surface_descriptor_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-export function vulkanSurfaceDescriptorDefault(): VulkanSurfaceDescriptor {
-  return native.mln_vulkan_surface_descriptor_default();
 }
 
 /**
@@ -1031,7 +634,7 @@ export class MapHandle extends Owner {
   addImageSourceImage(
     sourceId: string,
     coordinates: readonly LatLng[],
-    image: PremultipliedRgba8Image = {},
+    image: PremultipliedRgba8Image,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_add_image_source_image(
@@ -1128,8 +731,8 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   attachMetalBorrowedTexture(
-    descriptor: MetalBorrowedTextureDescriptor = {},
-    options: RenderSessionAttachOptions = {},
+    descriptor: MetalBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions,
   ): NewRenderSession {
     return withRegistrations((registrations) => {
       const [session, ready] = attach(
@@ -1159,8 +762,8 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   attachMetalOwnedTexture(
-    descriptor: MetalOwnedTextureDescriptor = {},
-    options: RenderSessionAttachOptions = {},
+    descriptor: MetalOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions,
   ): NewRenderSession {
     return withRegistrations((registrations) => {
       const [session, ready] = attach(
@@ -1190,8 +793,8 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
   attachMetalSurface(
-    descriptor: MetalSurfaceDescriptor = {},
-    options: RenderSessionAttachOptions = {},
+    descriptor: MetalSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
   ): NewRenderSession {
     return withRegistrations((registrations) => {
       const [session, ready] = attach(
@@ -1221,8 +824,8 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   attachOpenglBorrowedTexture(
-    descriptor: OpenglBorrowedTextureDescriptor = {},
-    options: RenderSessionAttachOptions = {},
+    descriptor: OpenglBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions,
   ): NewRenderSession {
     return withRegistrations((registrations) => {
       const [session, ready] = attach(
@@ -1252,8 +855,8 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   attachOpenglOwnedTexture(
-    descriptor: OpenglOwnedTextureDescriptor = {},
-    options: RenderSessionAttachOptions = {},
+    descriptor: OpenglOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions,
   ): NewRenderSession {
     return withRegistrations((registrations) => {
       const [session, ready] = attach(
@@ -1283,8 +886,8 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
   attachOpenglSurface(
-    descriptor: OpenglSurfaceDescriptor = {},
-    options: RenderSessionAttachOptions = {},
+    descriptor: OpenglSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
   ): NewRenderSession {
     return withRegistrations((registrations) => {
       const [session, ready] = attach(
@@ -1314,8 +917,8 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   attachVulkanBorrowedTexture(
-    descriptor: VulkanBorrowedTextureDescriptor = {},
-    options: RenderSessionAttachOptions = {},
+    descriptor: VulkanBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions,
   ): NewRenderSession {
     return withRegistrations((registrations) => {
       const [session, ready] = attach(
@@ -1345,8 +948,8 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   attachVulkanOwnedTexture(
-    descriptor: VulkanOwnedTextureDescriptor = {},
-    options: RenderSessionAttachOptions = {},
+    descriptor: VulkanOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions,
   ): NewRenderSession {
     return withRegistrations((registrations) => {
       const [session, ready] = attach(
@@ -1376,8 +979,8 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
   attachVulkanSurface(
-    descriptor: VulkanSurfaceDescriptor = {},
-    options: RenderSessionAttachOptions = {},
+    descriptor: VulkanSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
   ): NewRenderSession {
     return withRegistrations((registrations) => {
       const [session, ready] = attach(
@@ -2210,7 +1813,7 @@ export class MapHandle extends Owner {
    */
   setImageSourceImage(
     sourceId: string,
-    image: PremultipliedRgba8Image = {},
+    image: PremultipliedRgba8Image,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_image_source_image(
@@ -2270,7 +1873,7 @@ export class MapHandle extends Owner {
    */
   setStyleImage(
     imageId: string,
-    image: PremultipliedRgba8Image = {},
+    image: PremultipliedRgba8Image,
     options?: StyleImageOptions,
   ): Promise<CommandCompletion> {
     return command((completion) =>
@@ -2547,7 +2150,7 @@ export class MapHandleDiscarding {
   addImageSourceImage(
     sourceId: string,
     coordinates: readonly LatLng[],
-    image: PremultipliedRgba8Image = {},
+    image: PremultipliedRgba8Image,
   ): void {
     native.mln_map_add_image_source_image(
       this.#owner.id,
@@ -3026,10 +2629,7 @@ export class MapHandleDiscarding {
    * See `mln_map_set_image_source_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  setImageSourceImage(
-    sourceId: string,
-    image: PremultipliedRgba8Image = {},
-  ): void {
+  setImageSourceImage(sourceId: string, image: PremultipliedRgba8Image): void {
     native.mln_map_set_image_source_image(
       this.#owner.id,
       sourceId,
@@ -3085,7 +2685,7 @@ export class MapHandleDiscarding {
    */
   setStyleImage(
     imageId: string,
-    image: PremultipliedRgba8Image = {},
+    image: PremultipliedRgba8Image,
     options?: StyleImageOptions,
   ): void {
     native.mln_map_set_style_image(
@@ -3698,7 +3298,7 @@ export class RenderSessionHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   setMetalBorrowedTextureTarget(
-    descriptor: MetalBorrowedTextureDescriptor = {},
+    descriptor: MetalBorrowedTextureDescriptor,
   ): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_metal_borrowed_texture_target(
@@ -3715,9 +3315,7 @@ export class RenderSessionHandle extends Owner {
    * See `mln_render_session_set_metal_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
-  setMetalSurfaceTarget(
-    descriptor: MetalSurfaceDescriptor = {},
-  ): Promise<void> {
+  setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_metal_surface_target(
         this.id,
@@ -3735,7 +3333,7 @@ export class RenderSessionHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   setOpenglBorrowedTextureTarget(
-    descriptor: OpenglBorrowedTextureDescriptor = {},
+    descriptor: OpenglBorrowedTextureDescriptor,
   ): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_opengl_borrowed_texture_target(
@@ -3752,9 +3350,7 @@ export class RenderSessionHandle extends Owner {
    * See `mln_render_session_set_opengl_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
-  setOpenglSurfaceTarget(
-    descriptor: OpenglSurfaceDescriptor = {},
-  ): Promise<void> {
+  setOpenglSurfaceTarget(descriptor: OpenglSurfaceDescriptor): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_opengl_surface_target(
         this.id,
@@ -3771,7 +3367,7 @@ export class RenderSessionHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   setVulkanBorrowedTextureTarget(
-    descriptor: VulkanBorrowedTextureDescriptor = {},
+    descriptor: VulkanBorrowedTextureDescriptor,
   ): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_vulkan_borrowed_texture_target(
@@ -3788,9 +3384,7 @@ export class RenderSessionHandle extends Owner {
    * See `mln_render_session_set_vulkan_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
-  setVulkanSurfaceTarget(
-    descriptor: VulkanSurfaceDescriptor = {},
-  ): Promise<void> {
+  setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_vulkan_surface_target(
         this.id,
@@ -3880,7 +3474,7 @@ export class ResourceRequestHandle extends Owner {
    * See `mln_resource_request_complete` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  complete(response: ResourceResponse): void {
+  complete(response: ResourceResponse = {}): void {
     answerSync(this, (handle, token) =>
       native.mln_resource_request_complete(handle, token, response),
     );
@@ -4090,7 +3684,7 @@ export class RuntimeHandle extends Owner {
    * See `mln_runtime_create_map` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  createMap(options: MapOptions = {}): NewMap {
+  createMap(options: MapOptions): NewMap {
     const [map, ready] = attach(
       (completion) =>
         native.mln_runtime_create_map(this.id, options, completion),

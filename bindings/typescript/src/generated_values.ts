@@ -377,12 +377,12 @@ export interface EglContextDescriptor {
    * using it has detached or been destroyed. The host must not call
    * eglTerminate per session.
    */
-  display?: bigint;
+  display: bigint;
   /**
    * Borrowed EGLConfig used to create the session context. Required. OpenGL
    * texture targets require EGL_SURFACE_TYPE to include EGL_PBUFFER_BIT.
    */
-  config?: bigint;
+  config: bigint;
   /**
    * Borrowed EGLContext whose share group the session context joins. Required
    * under shared ownership, where the session also takes its client API from
@@ -417,7 +417,7 @@ export interface FeatureStateSelector {
    * Source layer ID, or empty for none. Required for vector-source
    * disambiguation.
    */
-  sourceLayerId: string;
+  sourceLayerId?: string;
   /**
    * Optional feature ID. Required by set and get, optional for remove. A
    * numeric feature ID matches its decimal text, such as "7" for the GeoJSON id
@@ -428,7 +428,7 @@ export interface FeatureStateSelector {
    * State key, or empty to select every key. Used only by remove, and requires
    * feature_id.
    */
-  stateKey: string;
+  stateKey?: string;
 }
 
 /**
@@ -638,7 +638,7 @@ export interface HttpHeader {
    * Header field name. Required.
    */
   name: string;
-  value: string;
+  value?: string;
 }
 
 /**
@@ -674,7 +674,7 @@ export interface HttpHeaderTransform {
   /**
    * Header rules for a transform without a callback; empty with one.
    */
-  rules: readonly HttpHeaderRule[];
+  rules?: readonly HttpHeaderRule[];
 }
 
 /**
@@ -876,7 +876,7 @@ export interface MapOptions {
    * scale_factor must be finite and positive. scale_factor is fixed for the
    * map's lifetime.
    */
-  initialExtent?: LogicalExtent;
+  initialExtent: LogicalExtent;
   mapMode?: MapMode;
   /**
    * Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
@@ -1002,7 +1002,7 @@ export interface MetalBorrowedTexture {
   /**
    * Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
    */
-  texture?: bigint;
+  texture: bigint;
 }
 
 /**
@@ -1017,19 +1017,19 @@ export interface MetalBorrowedTextureDescriptor {
    * the texture's size. A scale_factor that differs from the map's is accepted
    * and logged as a warning.
    */
-  extent?: LogicalExtent;
+  extent: LogicalExtent;
   /**
    * Physical texture width in device pixels. Required.
    */
-  physicalWidth?: number;
+  physicalWidth: number;
   /**
    * Physical texture height in device pixels. Required.
    */
-  physicalHeight?: number;
+  physicalHeight: number;
   /**
    * The ring's textures, one per slot, in slot order. Required.
    */
-  textures?: readonly MetalBorrowedTexture[];
+  textures: readonly MetalBorrowedTexture[];
 }
 
 /**
@@ -1056,7 +1056,7 @@ export interface MetalOwnedTextureDescriptor {
    * Logical texture extent. Required. A scale_factor that differs from the
    * map's is accepted and logged as a warning.
    */
-  extent?: LogicalExtent;
+  extent: LogicalExtent;
   /**
    * Metal backend context. device is required.
    */
@@ -1066,7 +1066,7 @@ export interface MetalOwnedTextureDescriptor {
    * MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
    * returns RGBA8 for either format.
    */
-  pixelFormat?: bigint;
+  pixelFormat: bigint;
 }
 
 /**
@@ -1080,7 +1080,7 @@ export interface MetalSurfaceDescriptor {
    * Logical surface extent. Required. A scale_factor that differs from the
    * map's is accepted and logged as a warning.
    */
-  extent?: LogicalExtent;
+  extent: LogicalExtent;
   /**
    * Metal backend context. device is optional for Metal surfaces.
    */
@@ -1088,7 +1088,7 @@ export interface MetalSurfaceDescriptor {
   /**
    * `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required.
    */
-  layer?: bigint;
+  layer: bigint;
 }
 
 /**
@@ -1173,7 +1173,7 @@ export interface OfflineGeometryRegionDefinition {
   /**
    * Style URL. Copied during region creation.
    */
-  styleUrl: string;
+  styleUrl?: string;
   /**
    * UTF-8 GeoJSON Geometry bytes. Required. Borrowed during region creation.
    */
@@ -1261,7 +1261,7 @@ export interface OfflineTilePyramidRegionDefinition {
   /**
    * Style URL. Copied during region creation.
    */
-  styleUrl: string;
+  styleUrl?: string;
   bounds?: LatLngBounds;
   minZoom?: number;
   /**
@@ -1283,7 +1283,7 @@ export interface OpenglBorrowedTexture {
   /**
    * Borrowed OpenGL texture object name. Required.
    */
-  texture?: number;
+  texture: number;
 }
 
 /**
@@ -1298,28 +1298,28 @@ export interface OpenglBorrowedTextureDescriptor {
    * the texture's size. A scale_factor that differs from the map's is accepted
    * and logged as a warning.
    */
-  extent?: LogicalExtent;
+  extent: LogicalExtent;
   /**
    * Physical texture width in device pixels. Required.
    */
-  physicalWidth?: number;
+  physicalWidth: number;
   /**
    * Physical texture height in device pixels. Required.
    */
-  physicalHeight?: number;
+  physicalHeight: number;
   /**
    * Borrowed OpenGL context provider data. The textures must belong to this
    * context or a context in the same share group.
    */
-  context?: OpenglContextDescriptor;
+  context: OpenglContextDescriptor;
   /**
    * The ring's textures, one per slot, in slot order. Required.
    */
-  textures?: readonly OpenglBorrowedTexture[];
+  textures: readonly OpenglBorrowedTexture[];
   /**
    * OpenGL texture target of every texture. Required: GL_TEXTURE_2D.
    */
-  target?: number;
+  target: number;
 }
 
 /**
@@ -1372,12 +1372,7 @@ export interface OpenglContextDescriptor {
 export type OpenglContextDescriptorData =
   | { readonly kind: "wgl"; readonly value: WglContextDescriptor }
   | { readonly kind: "egl"; readonly value: EglContextDescriptor }
-  | { readonly kind: "webgl"; readonly value: WebglContextDescriptor }
-  | {
-      readonly kind: "unknown";
-      readonly tag: number;
-      readonly bytes: Uint8Array;
-    };
+  | { readonly kind: "webgl"; readonly value: WebglContextDescriptor };
 
 /**
  * How a session's OpenGL context relates to its driver thread and host graphics
@@ -1429,14 +1424,14 @@ export interface OpenglOwnedTextureDescriptor {
    * Logical texture extent. Required. A scale_factor that differs from the
    * map's is accepted and logged as a warning.
    */
-  extent?: LogicalExtent;
+  extent: LogicalExtent;
   /**
    * Borrowed OpenGL context provider data. Shared ownership creates a context
    * whose texture frames the host can acquire. Dedicated EGL, WGL, or
    * transferred WebGL ownership creates a private core-worker context for CPU
    * readback.
    */
-  context?: OpenglContextDescriptor;
+  context: OpenglContextDescriptor;
 }
 
 /**
@@ -1450,11 +1445,11 @@ export interface OpenglSurfaceDescriptor {
    * Logical surface extent. Required. A scale_factor that differs from the
    * map's is accepted and logged as a warning.
    */
-  extent?: LogicalExtent;
+  extent: LogicalExtent;
   /**
    * Borrowed OpenGL context provider data.
    */
-  context?: OpenglContextDescriptor;
+  context: OpenglContextDescriptor;
   /**
    * Borrowed platform surface handle: an HDC for WGL and an EGLSurface for EGL,
    * both required. Null for WebGL, whose context carries its canvas binding.
@@ -1527,19 +1522,19 @@ export interface PremultipliedRgba8Image {
   /**
    * Image width in pixels. Required.
    */
-  width?: number;
+  width: number;
   /**
    * Image height in pixels. Required.
    */
-  height?: number;
+  height: number;
   /**
    * Bytes per image row. Required, and at least width &#42; 4.
    */
-  stride?: number;
+  stride: number;
   /**
    * Premultiplied RGBA8 pixels. Required.
    */
-  pixels?: Uint8Array;
+  pixels: Uint8Array;
 }
 
 /**
@@ -1809,7 +1804,7 @@ export interface RenderSessionAttachOptions {
   /**
    * Where the session's driver runs. Required.
    */
-  driver?: RenderDriverKind;
+  driver: RenderDriverKind;
   /**
    * Requested slot count of a session-owned texture ring, up to
    * `MLN_TEXTURE_RING_MAX_DEPTH`. Zero selects 2, so the host can retain one
@@ -2095,7 +2090,7 @@ export interface ResourceProvider {
   /**
    * The requests that reach the provider; empty to claim every request.
    */
-  routes: readonly ResourceRoute[];
+  routes?: readonly ResourceRoute[];
 }
 
 /**
@@ -2161,11 +2156,11 @@ export interface ResourceResponse {
    * Response bytes. May be null only when byte_count is 0.
    */
   bytes?: Uint8Array;
-  errorMessage: string;
+  errorMessage?: string;
   mustRevalidate?: boolean;
   modifiedUnixMs?: bigint;
   expiresUnixMs?: bigint;
-  etag: string;
+  etag?: string;
   retryAfterUnixMs?: bigint;
 }
 
@@ -2510,7 +2505,7 @@ export interface ScreenLineString {
   /**
    * Points. Null only when point_count is 0.
    */
-  points: readonly ScreenPoint[];
+  points?: readonly ScreenPoint[];
 }
 
 /**
@@ -3201,12 +3196,12 @@ export interface VulkanBorrowedTexture {
   /**
    * Borrowed VkImage. Required.
    */
-  image?: bigint;
+  image: bigint;
   /**
    * Borrowed VkImageView for image. Required. The view must be a 2D color view
    * that matches image and the descriptor's format.
    */
-  imageView?: bigint;
+  imageView: bigint;
 }
 
 /**
@@ -3221,28 +3216,28 @@ export interface VulkanBorrowedTextureDescriptor {
    * the texture's size. A scale_factor that differs from the map's is accepted
    * and logged as a warning.
    */
-  extent?: LogicalExtent;
+  extent: LogicalExtent;
   /**
    * Physical image width in device pixels. Required.
    */
-  physicalWidth?: number;
+  physicalWidth: number;
   /**
    * Physical image height in device pixels. Required.
    */
-  physicalHeight?: number;
+  physicalHeight: number;
   /**
    * Borrowed Vulkan context. All handles are required.
    */
-  context?: VulkanContextDescriptor;
+  context: VulkanContextDescriptor;
   /**
    * The ring's images, one per slot, in slot order. Required.
    */
-  textures?: readonly VulkanBorrowedTexture[];
+  textures: readonly VulkanBorrowedTexture[];
   /**
    * Backend-native VkFormat value of every image. Required, so
    * VK_FORMAT_UNDEFINED is invalid.
    */
-  format?: number;
+  format: number;
   /**
    * Backend-native VkImageLayout value expected at render-pass begin.
    */
@@ -3252,7 +3247,7 @@ export interface VulkanBorrowedTextureDescriptor {
    * VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
    * VK_IMAGE_LAYOUT_UNDEFINED is invalid.
    */
-  finalLayout?: number;
+  finalLayout: number;
 }
 
 /**
@@ -3265,21 +3260,21 @@ export interface VulkanContextDescriptor {
   /**
    * Borrowed VkInstance. Required.
    */
-  instance?: bigint;
+  instance: bigint;
   /**
    * Borrowed VkPhysicalDevice. Required.
    */
-  physicalDevice?: bigint;
+  physicalDevice: bigint;
   /**
    * Borrowed VkDevice. Required.
    */
-  device?: bigint;
+  device: bigint;
   /**
    * Borrowed graphics VkQueue. Required. The session's driver submits to it
    * from its own thread, so a host that uses the same queue passes
    * `mln_render_session_attach_options.queue_lock` at attach.
    */
-  graphicsQueue?: bigint;
+  graphicsQueue: bigint;
   /**
    * Queue family index for graphics_queue. Must support graphics commands.
    */
@@ -3305,11 +3300,11 @@ export interface VulkanOwnedTextureDescriptor {
    * Logical texture extent. Required. A scale_factor that differs from the
    * map's is accepted and logged as a warning.
    */
-  extent?: LogicalExtent;
+  extent: LogicalExtent;
   /**
    * Borrowed Vulkan context. All handles are required.
    */
-  context?: VulkanContextDescriptor;
+  context: VulkanContextDescriptor;
 }
 
 /**
@@ -3323,17 +3318,17 @@ export interface VulkanSurfaceDescriptor {
    * Logical surface extent. Required. A scale_factor that differs from the
    * map's is accepted and logged as a warning.
    */
-  extent?: LogicalExtent;
+  extent: LogicalExtent;
   /**
    * Borrowed Vulkan context. All handles are required. The device must support
    * VK_KHR_swapchain, and the queue family must support graphics and
    * presentation to this descriptor's surface.
    */
-  context?: VulkanContextDescriptor;
+  context: VulkanContextDescriptor;
   /**
    * Borrowed VkSurfaceKHR bit pattern. Required.
    */
-  surface?: bigint;
+  surface: bigint;
 }
 
 /**
@@ -3447,7 +3442,7 @@ export interface WebglContextDescriptor {
    * Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
    * canvas must still be transferable when attachment starts.
    */
-  canvasSelector: string;
+  canvasSelector?: string;
 }
 
 /**
@@ -3483,7 +3478,7 @@ export interface WglContextDescriptor {
    * Borrowed HDC used to create the session context. Required. A dedicated
    * owned texture makes its context current on this HDC from its core worker.
    */
-  deviceContext?: bigint;
+  deviceContext: bigint;
   /**
    * Borrowed HGLRC whose share group the session context joins. Required under
    * shared ownership. A dedicated session joins no share group, so it must be

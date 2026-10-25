@@ -9,8 +9,9 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_offline_region_info</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
 /// </remarks>
-public readonly record struct OfflineRegionInfo
+public readonly partial record struct OfflineRegionInfo
 {
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public OfflineRegionInfo(
         long Id,
         OfflineRegionDefinition Definition,
@@ -23,7 +24,7 @@ public readonly record struct OfflineRegionInfo
     }
 
     public long Id { get; init; }
-    public OfflineRegionDefinition Definition { get; init; }
+    public required OfflineRegionDefinition Definition { get; init; }
 
     /// <summary>
     /// Metadata bytes.

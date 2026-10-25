@@ -4,36 +4,6 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Returns zeroed custom geometry source options with size set.
-  ///
-  /// See `mln_custom_geometry_source_options_default` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  static func customGeometrySourceOptionsDefault(
-    fetchTile: @escaping CustomSourceFetchTileCallback
-  ) throws
-    -> CustomGeometrySourceOptions
-  {
-    try nativeDirect { _ in try CustomGeometrySourceOptions(
-      raw: mln_custom_geometry_source_options_default(),
-      fetchTile: fetchTile
-    ) }
-  }
-
-  /// Returns zeroed custom MVT vector source options with size set.
-  ///
-  /// See `mln_custom_mvt_vector_source_options_default` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  static func customMvtVectorSourceOptionsDefault(
-    fetchTile: @escaping CustomSourceFetchTileCallback
-  ) throws
-    -> CustomMvtVectorSourceOptions
-  {
-    try nativeDirect { _ in try CustomMvtVectorSourceOptions(
-      raw: mln_custom_mvt_vector_source_options_default(),
-      fetchTile: fetchTile
-    ) }
-  }
-
   /// Prepares GeoJSON source data for installation on a map.
   ///
   /// See `mln_geojson_source_data_create` in the
@@ -51,48 +21,5 @@ public extension Maplibre {
         diagnostic
       )
     } result: { try GeojsonSourceDataHandle(adopting: value0) }
-  }
-
-  /// Returns zeroed GeoJSON source options with size set.
-  ///
-  /// See `mln_geojson_source_options_default` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  static func geojsonSourceOptionsDefault() throws -> GeojsonSourceOptions {
-    try nativeDirect { _ in
-      try GeojsonSourceOptions(raw: mln_geojson_source_options_default())
-    }
-  }
-
-  /// Returns a zeroed premultiplied RGBA8 image descriptor with size set. The
-  /// caller still sets every required member.
-  ///
-  /// See `mln_premultiplied_rgba8_image_default` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  static func premultipliedRgba8ImageDefault() throws
-    -> PremultipliedRgba8Image
-  {
-    try nativeDirect { _ in
-      try PremultipliedRgba8Image(raw: mln_premultiplied_rgba8_image_default())
-    }
-  }
-
-  /// Returns zeroed runtime style image options with size set.
-  ///
-  /// See `mln_style_image_options_default` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  static func styleImageOptionsDefault() throws -> StyleImageOptions {
-    try nativeDirect { _ in
-      try StyleImageOptions(raw: mln_style_image_options_default())
-    }
-  }
-
-  /// Returns zeroed global style transition options with size set.
-  ///
-  /// See `mln_style_transition_options_default` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  static func styleTransitionOptionsDefault() throws -> StyleTransitionOptions {
-    try nativeDirect { _ in
-      StyleTransitionOptions(raw: mln_style_transition_options_default())
-    }
   }
 }

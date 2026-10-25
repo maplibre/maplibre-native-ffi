@@ -33,7 +33,6 @@ GROUPS = (
     "values",
     "keywords",
     "defaults",
-    "default_registration",
     "absent_handle",
     "absent_value",
     "strided_records",
@@ -264,14 +263,19 @@ class TypeScriptEmitterTests(unittest.TestCase):
         self.assertIn("  fetchTile: (tileId: CanonicalTileId) => void;", values)
         self.assertIn("  cancelTile?: (tileId: CanonicalTileId) => void;", values)
         self.assertIn("  endHandler?: CameraTransitionHandler;", values)
-        # The native default holds no callback, so its caller passes the one
-        # that the record requires.
+
+    def test_only_a_required_member_must_be_given(self):
+        # A member that a host leaves out is zero, as native reads it, except
+        # a required one, which makes its record a required argument too.
+        generated = typescript.generate(self.api)
+        values = generated["bindings/typescript/src/generated_values.ts"]
+        operations = generated["bindings/typescript/src/generated_operations.ts"]
+        self.assertIn("  initialExtent: LogicalExtent;\n", values)
+        self.assertIn("  mapMode?: MapMode;\n", values)
+        self.assertIn("  assetPath?: string;\n", values)
+        self.assertIn("createMap(options: MapOptions): NewMap", operations)
         self.assertIn(
-            "export function customGeometrySourceOptionsDefault(fetchTile: "
-            'CustomGeometrySourceOptions["fetchTile"]): CustomGeometrySourceOptions {\n'
-            "  return { ...native.mln_custom_geometry_source_options_default(), "
-            "fetchTile };\n}",
-            operations,
+            "runtimeCreate(options: RuntimeOptions = {}): RuntimeHandle", operations
         )
 
     def test_only_synchronous_categories_return_without_a_promise(self):

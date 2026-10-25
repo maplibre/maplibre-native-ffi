@@ -10,7 +10,7 @@ public sealed class HandleLifecycleTests
     [Fact]
     public async Task SynchronousCloseIsIdempotentAndAsyncReleaseReachesNative()
     {
-        var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        var runtime = RuntimeHandle.Create(new RuntimeOptions());
         var map = runtime.CreateMap(NativeFixture.SmallMap);
         await map.Ready.WaitAsync(TestWaits.Token);
 
@@ -43,7 +43,7 @@ public sealed class HandleLifecycleTests
         runtime.Dispose();
         runtime.Dispose();
 
-        var disposed = RuntimeHandle.Create(RuntimeOptions.Default);
+        var disposed = RuntimeHandle.Create(new RuntimeOptions());
         disposed.Dispose();
         await disposed.DisposeAsync();
     }
@@ -64,7 +64,7 @@ public sealed class HandleLifecycleTests
         Assert.Equal($"MapProjectionHandle(id={projectionId}, closed=true)", projection.ToString());
         projection.Dispose();
 
-        var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        var runtime = RuntimeHandle.Create(new RuntimeOptions());
         var runtimeId = $"0x{runtime.Id:x}";
         Assert.False(runtime.IsClosed);
         Assert.Equal($"RuntimeHandle(id={runtimeId}, closed=false)", runtime.ToString());
@@ -92,7 +92,7 @@ public sealed class HandleLifecycleTests
     [Fact]
     public async Task ARefusedCloseLeavesTheHandleUsableAndARetrySucceeds()
     {
-        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = runtime.CreateMap(NativeFixture.SmallMap);
         await map.Ready.WaitAsync(TestWaits.Token);
 
@@ -111,7 +111,7 @@ public sealed class HandleLifecycleTests
     [Fact]
     public async Task AClosedHandlePassesItsStaleIdToNative()
     {
-        var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        var runtime = RuntimeHandle.Create(new RuntimeOptions());
         var map = runtime.CreateMap(NativeFixture.SmallMap);
         await map.Ready.WaitAsync(TestWaits.Token);
         await map.CloseAsync();
@@ -141,7 +141,7 @@ public sealed class HandleLifecycleTests
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static (MapHandle Map, WeakReference Runtime) CreateMapOfUnreferencedRuntime()
     {
-        var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        var runtime = RuntimeHandle.Create(new RuntimeOptions());
         var map = runtime.CreateMap(NativeFixture.SmallMap);
         map.Ready.GetAwaiter().GetResult();
         return (map, new WeakReference(runtime));

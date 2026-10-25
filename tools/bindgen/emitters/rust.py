@@ -385,6 +385,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         if (
             value.kind in {"array", "buffer"}
             and value.length
+            and value.length != "nul"
             and not value.length.isdigit()
         ):
             source = names[parameter.name]
@@ -457,6 +458,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         elif (
             value_plan
             and value_plan.kind == "buffer"
+            and value_plan.length != "nul"
             and value_plan.buffer_form != "view"
         ):
             public = "&str" if is_text(value_plan) else "&[u8]"
@@ -561,13 +563,8 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
                 element = value.element
                 value_types.add(element, "out")
                 raw_type = SCALARS.get(ctype(pointee), "sys::" + ctype(pointee))
-                initial = (
-                    f"unsafe {{ sys::{element.default}() }}"
-                    if element.default
-                    else "unsafe { std::mem::zeroed() }"
-                )
                 prelude.append(
-                    f"let mut {local}: Vec<{raw_type}> = (0..{lengths[value.length]}).map(|_| {initial}).collect();"
+                    f"let mut {local}: Vec<{raw_type}> = (0..{lengths[value.length]}).map(|_| unsafe {{ std::mem::zeroed() }}).collect();"
                 )
                 if element.kind == "record" and any(
                     field.role == "size" for field in element.fields
@@ -610,9 +607,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
                 raise Unsupported("borrowed output record needs its native owner scope")
             raw_type = ctype(pointee)
             initial = (
-                f"unsafe {{ sys::{value.default}() }}"
-                if value.default
-                else "Default::default()"
+                "Default::default()"
                 if value.kind in {"scalar", "enum"}
                 else "unsafe { std::mem::zeroed() }"
             )
@@ -674,28 +669,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
         elif plan.result:
             value_types.add(plan.result, "out")
             public = value_types.public(plan.result)
-            from .rust_callbacks import required_parameters
-
-            required = (
-                required_parameters(value_types, plan.result)
-                if plan.result.kind == "record" and plan.result.default == function.name
-                else []
-            )
-            if required:
-                # A copy holds no callbacks, so the caller passes the
-                # required ones.
-                signature += [
-                    f"{name}: std::sync::Arc<dyn {bound}>" for name, bound in required
-                ]
-                output = (
-                    f"unsafe {{ {public}::from_default({value_local}, "
-                    + ", ".join(name for name, _ in required)
-                    + ') }.expect("native default must be valid")'
-                )
-            elif plan.result.kind == "record" and plan.result.default == function.name:
-                output = f"convert::native_default({value_local})"
-            else:
-                output = decode(value_types, plan.result, value_local)
+            output = decode(value_types, plan.result, value_local)
             ending = [
                 f"let {value_local} = {call_local}.run({closure} {native});",
                 f"Ok({output})",
@@ -822,8 +796,9 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             body.pop()
             returns = ""
     # An entry point that takes no handle can be a program's first call, so it
-    # checks the C ABI version before anything reaches C.
-    if receiver is None and not consuming:
+    # checks the C ABI version before anything reaches C. The version itself
+    # is what the check reads, so it never fails.
+    if receiver is None and not consuming and function.name != "mln_c_version":
         body.insert(
             1,
             "maplibre_core::validate_abi_version()?;"

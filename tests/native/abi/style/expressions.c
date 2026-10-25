@@ -64,7 +64,9 @@ static mln_status evaluate_status(
 }
 
 static mln_style_expression_inputs feature_inputs(const char* feature) {
-  mln_style_expression_inputs inputs = mln_style_expression_inputs_default();
+  mln_style_expression_inputs inputs = {
+    .size = sizeof(mln_style_expression_inputs)
+  };
   inputs.feature = mln_buffer_view_from_cstr(feature);
   return inputs;
 }
@@ -99,7 +101,9 @@ static void constants_evaluate_without_inputs(void) {
 }
 
 static void each_input_reaches_the_expression_that_reads_it(void) {
-  mln_style_expression_inputs inputs = mln_style_expression_inputs_default();
+  mln_style_expression_inputs inputs = {
+    .size = sizeof(mln_style_expression_inputs)
+  };
   inputs.fields = MLN_STYLE_EXPRESSION_INPUT_ZOOM;
   inputs.zoom = 5.0;
   expect_evaluates(
@@ -107,13 +111,15 @@ static void each_input_reaches_the_expression_that_reads_it(void) {
     "50.0"
   );
 
-  inputs = mln_style_expression_inputs_default();
+  inputs =
+    (mln_style_expression_inputs){.size = sizeof(mln_style_expression_inputs)};
   inputs.fields = MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER;
   inputs.color_ramp_parameter = 0.25;
   expect_evaluates("[\"heatmap-density\"]", &inputs, "0.25");
   expect_evaluates("[\"line-progress\"]", &inputs, "0.25");
 
-  inputs = mln_style_expression_inputs_default();
+  inputs =
+    (mln_style_expression_inputs){.size = sizeof(mln_style_expression_inputs)};
   inputs.fields = MLN_STYLE_EXPRESSION_INPUT_ELEVATION;
   inputs.elevation = 120.0;
   expect_evaluates("[\"elevation\"]", &inputs, "120.0");
@@ -127,17 +133,20 @@ static void each_input_reaches_the_expression_that_reads_it(void) {
   expect_evaluates("[\"geometry-type\"]", &inputs, "\"Point\"");
 
   static const char state[] = "{\"hover\":true}";
-  inputs = mln_style_expression_inputs_default();
+  inputs =
+    (mln_style_expression_inputs){.size = sizeof(mln_style_expression_inputs)};
   inputs.feature_state = MLN_BUFFER_LITERAL(state);
   expect_evaluates("[\"feature-state\", \"hover\"]", &inputs, "true");
 
   static const char global[] = "{\"theme\":\"dark\"}";
-  inputs = mln_style_expression_inputs_default();
+  inputs =
+    (mln_style_expression_inputs){.size = sizeof(mln_style_expression_inputs)};
   inputs.global_state = MLN_BUFFER_LITERAL(global);
   expect_evaluates("[\"global-state\", \"theme\"]", &inputs, "\"dark\"");
 
   const mln_buffer_view images[] = {MLN_BUFFER_LITERAL("monument-15")};
-  inputs = mln_style_expression_inputs_default();
+  inputs =
+    (mln_style_expression_inputs){.size = sizeof(mln_style_expression_inputs)};
   inputs.available_images = images;
   inputs.available_image_count = 1;
   expect_image(&inputs, "monument-15", "\"available\":true");
@@ -185,7 +194,9 @@ static void values_serialize_as_style_json(void) {
 }
 
 static void an_expected_type_coerces_strings_and_asserts_the_rest(void) {
-  mln_style_expression_options options = mln_style_expression_options_default();
+  mln_style_expression_options options = {
+    .size = sizeof(mln_style_expression_options)
+  };
   options.fields = MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE;
   options.expected_type.kind = MLN_STYLE_EXPRESSION_TYPE_STRING;
   mln_style_expression expression = create_typed("[\"get\", \"n\"]", &options);
@@ -261,13 +272,19 @@ static void creation_rejects_invalid_arguments(void) {
   TEST_ASSERT_EQUAL_UINT64(expression, occupied);
   mln_style_expression_release(expression);
 
-  mln_style_expression_options options = mln_style_expression_options_default();
+  mln_style_expression_options options = {
+    .size = sizeof(mln_style_expression_options)
+  };
   options.size = 4;
   MLN_TEST_INVALID(create_status("1", &options));
-  options = mln_style_expression_options_default();
+  options = (mln_style_expression_options){
+    .size = sizeof(mln_style_expression_options)
+  };
   options.fields = 1U << 7U;
   MLN_TEST_INVALID(create_status("1", &options));
-  options = mln_style_expression_options_default();
+  options = (mln_style_expression_options){
+    .size = sizeof(mln_style_expression_options)
+  };
   options.fields = MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE;
   options.expected_type.kind = 99;
   MLN_TEST_INVALID(create_status("1", &options));
@@ -353,7 +370,9 @@ static void a_short_buffer_reports_the_length_it_needs(void) {
 // An input is absent when its field bit is clear or, for JSON, when it is
 // empty, whether the inputs are null or name an empty view.
 static void absent_inputs_fail_the_expressions_that_need_them(void) {
-  mln_style_expression_inputs empty = mln_style_expression_inputs_default();
+  mln_style_expression_inputs empty = {
+    .size = sizeof(mln_style_expression_inputs)
+  };
   empty.feature = (mln_buffer_view){.data = "{}", .size = 0};
   empty.feature_state = (mln_buffer_view){.data = "{}", .size = 0};
   empty.global_state = (mln_buffer_view){.data = NULL, .size = 0};
@@ -383,11 +402,14 @@ static void absent_inputs_fail_the_expressions_that_need_them(void) {
 
 static void evaluation_rejects_invalid_inputs(void) {
   const mln_style_expression expression = create("1");
-  mln_style_expression_inputs inputs = mln_style_expression_inputs_default();
+  mln_style_expression_inputs inputs = {
+    .size = sizeof(mln_style_expression_inputs)
+  };
   inputs.size = 4;
   MLN_TEST_INVALID(evaluate_status(expression, &inputs));
 
-  inputs = mln_style_expression_inputs_default();
+  inputs =
+    (mln_style_expression_inputs){.size = sizeof(mln_style_expression_inputs)};
   inputs.fields = 1U << 20U;
   MLN_TEST_INVALID(evaluate_status(expression, &inputs));
 
@@ -398,7 +420,9 @@ static void evaluation_rejects_invalid_inputs(void) {
   };
   for (size_t index = 0; index < sizeof(numbers) / sizeof(numbers[0]);
        ++index) {
-    inputs = mln_style_expression_inputs_default();
+    inputs = (mln_style_expression_inputs){
+      .size = sizeof(mln_style_expression_inputs)
+    };
     inputs.fields = numbers[index];
     inputs.zoom = NAN;
     inputs.color_ramp_parameter = INFINITY;
@@ -413,25 +437,30 @@ static void evaluation_rejects_invalid_inputs(void) {
   MLN_TEST_INVALID(evaluate_status(expression, &inputs));
 
   static const char array[] = "[1]";
-  inputs = mln_style_expression_inputs_default();
+  inputs =
+    (mln_style_expression_inputs){.size = sizeof(mln_style_expression_inputs)};
   inputs.feature_state = MLN_BUFFER_LITERAL(array);
   MLN_TEST_INVALID(evaluate_status(expression, &inputs));
   TEST_ASSERT_NOT_NULL(
     strstr(mln_test_last_error(), "feature_state must contain a JSON object")
   );
-  inputs = mln_style_expression_inputs_default();
+  inputs =
+    (mln_style_expression_inputs){.size = sizeof(mln_style_expression_inputs)};
   inputs.global_state = MLN_BUFFER_LITERAL(array);
   MLN_TEST_INVALID(evaluate_status(expression, &inputs));
-  inputs = mln_style_expression_inputs_default();
+  inputs =
+    (mln_style_expression_inputs){.size = sizeof(mln_style_expression_inputs)};
   inputs.global_state = (mln_buffer_view){.data = NULL, .size = 2};
   MLN_TEST_INVALID(evaluate_status(expression, &inputs));
 
-  inputs = mln_style_expression_inputs_default();
+  inputs =
+    (mln_style_expression_inputs){.size = sizeof(mln_style_expression_inputs)};
   inputs.fields = MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID;
   inputs.canonical_tile_id = (mln_canonical_tile_id){.z = 1, .x = 2, .y = 0};
   MLN_TEST_INVALID(evaluate_status(expression, &inputs));
 
-  inputs = mln_style_expression_inputs_default();
+  inputs =
+    (mln_style_expression_inputs){.size = sizeof(mln_style_expression_inputs)};
   inputs.available_image_count = 1;
   MLN_TEST_INVALID(evaluate_status(expression, &inputs));
   const mln_buffer_view empty_id = {.data = NULL, .size = 0};

@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::ffi::c_char;
 
 /// Owns temporary C input allocations until a native call returns.
 #[derive(Default)]
@@ -16,5 +17,11 @@ impl InputStorage {
         let pointer = values.as_ptr();
         self.roots.push(Box::new(values));
         pointer
+    }
+    pub fn c_string(&mut self, value: &str) -> crate::Result<*const c_char> {
+        let value = crate::string::c_string(value)?;
+        let pointer = value.as_ptr();
+        self.roots.push(Box::new(value));
+        Ok(pointer)
     }
 }

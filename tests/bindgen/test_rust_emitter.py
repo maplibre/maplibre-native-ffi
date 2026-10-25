@@ -118,6 +118,41 @@ class RustEmitterTests(unittest.TestCase):
         )
         self.assertNotIn("EventBatchView", values)
 
+    def test_a_record_with_a_required_member_takes_it_in_place_of_a_default(self):
+        values = rust.generate(real_api())[
+            "crates/maplibre-native-ffi/src/generated/values.rs"
+        ]
+        self.assertIn(
+            "#[derive(Debug, Clone, Copy, PartialEq)]\npub struct MapOptions {", values
+        )
+        # The others start at zero, which native reads as their defaults.
+        self.assertIn(
+            "pub fn new(initial_extent: LogicalExtent) -> Self { Self { "
+            "initial_extent, map_mode: Default::default(), "
+            "fast_pfor_enabled: Default::default(), event_mask: None } }",
+            values,
+        )
+        self.assertIn(
+            "#[derive(Debug, Clone, PartialEq, Default)]\npub struct RuntimeOptions {",
+            values,
+        )
+
+    def test_the_c_version_is_a_plain_return_that_checks_no_abi_version(self):
+        source = rust.generate(real_api())[
+            "crates/maplibre-native-ffi/src/generated/global.rs"
+        ]
+        self.assertIn(
+            "pub fn c_version() -> u32 {\n        let mut call = Call::global();\n"
+            "        let value = call.run(|_| unsafe { sys::mln_c_version() });",
+            source,
+        )
+        self.assertIn(
+            "pub fn supported_render_backend_mask() -> RenderBackendFlag {\n"
+            "        let mut call = Call::global();\n"
+            "        maplibre_core::require_abi_version();",
+            source,
+        )
+
     def test_a_callback_documents_its_arguments_and_returns_a_bool_result(self):
         values = rust.generate(real_api())[
             "crates/maplibre-native-ffi/src/generated/values.rs"
@@ -213,7 +248,6 @@ void mln_query_release(mln_query query);
                 "caller_sized_output",
                 "caller_sized_text",
                 "keywords",
-                "default_registration",
                 "absent_handle",
                 "absent_value",
             ),
@@ -231,7 +265,6 @@ void mln_query_release(mln_query query);
                 "mln_map_match",
                 "mln_map_move",
                 "mln_map_release",
-                "mln_probe_hooks_default",
                 "mln_probe_parcel_release",
                 "mln_probe_read_level",
                 "mln_probe_take_parcel",

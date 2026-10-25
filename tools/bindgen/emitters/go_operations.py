@@ -44,6 +44,12 @@ def argument(values, value, expr):
             return f"bindingStoreOptional({expr}, arena, {converter(values, value.element)})"
         return f"bindingStore({argument(values, value.element, expr)}, arena)"
     if value.kind == "buffer":
+        if value.length == "nul":
+            return (
+                f"func() *C.char {{ if {expr} == nil {{ return nil }}; return arena.cstring(*{expr}) }}()"
+                if value.nullable
+                else f"arena.cstring({expr})"
+            )
         if value.ctype.pointee:
             if value.nullable:
                 return f"({values.c_type(value)})(func() unsafe.Pointer {{ if {expr} == nil {{ return nil }}; p := arena.bytes([]byte(*{expr})); if p == nil {{ p = arena.allocate(1) }}; return p }}())"
@@ -67,7 +73,12 @@ def converter(values, value):
     """A function value that converts one binding value and the arena to native."""
     if value.kind == "record":
         return f"native{public(value.native)}"
-    if value.kind == "buffer" and not value.nullable and not value.ctype.pointee:
+    if (
+        value.kind == "buffer"
+        and not value.nullable
+        and not value.ctype.pointee
+        and value.length != "nul"
+    ):
         return f"bindingView[{values.type(value)}]"
     native = (
         f"C.{value.native}"
@@ -81,7 +92,7 @@ def copier(values, value):
     """A function value that copies one native value to its binding value."""
     if value.kind == "record":
         return f"copy{public(value.native)}"
-    if value.kind == "buffer" and not value.ctype.pointee:
+    if value.kind == "buffer" and not value.ctype.pointee and value.length != "nul":
         text = "Text" if is_text(value) else "Bytes"
         if not value.nullable:
             return f"copyView{text}"
@@ -166,6 +177,7 @@ def operation(plan, values, *, discard=False, dispose=False):
         for p in plan.inputs
         if p.value.kind in {"array", "buffer"}
         and p.value.length
+        and p.value.length != "nul"
         and not p.value.length.isdigit()
     }
     # Caller-sized text passes its storage, capacity, and length to a closure
@@ -241,11 +253,7 @@ def operation(plan, values, *, discard=False, dispose=False):
             arguments[p.name] = f"unsafe.SliceData({local})"
             outputs.append((p, value, local))
             continue
-        setup.append(
-            f"{local} := C.{value.default}()"
-            if value.default
-            else f"var {local} {values.c_type(value)}"
-        )
+        setup.append(f"var {local} {values.c_type(value)}")
         for member in value.fields:
             if member.role == "size":
                 setup.append(

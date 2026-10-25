@@ -183,8 +183,9 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
   };
   for (size_t index = 0; index < sizeof(rows) / sizeof(rows[0]); index += 1) {
     const rendered_row* row = &rows[index];
-    mln_rendered_feature_query_options options =
-      mln_rendered_feature_query_options_default();
+    mln_rendered_feature_query_options options = {
+      .size = sizeof(mln_rendered_feature_query_options)
+    };
     const mln_buffer_view layer = row->layer == NULL
                                     ? (mln_buffer_view){0}
                                     : mln_buffer_view_from_cstr(row->layer);
@@ -242,7 +243,9 @@ static void location_indicator_hits_name_only_their_layer(void) {
   mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(indicator_style_json));
   static uint8_t white[16 * 16 * 4];
   memset(white, 0xff, sizeof(white));
-  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
+  mln_premultiplied_rgba8_image image = {
+    .size = sizeof(mln_premultiplied_rgba8_image)
+  };
   image.width = 16;
   image.height = 16;
   image.stride = 16 * 4;
@@ -414,8 +417,9 @@ static bool both_layers_loaded(void* context) {
   const mln_buffer_view layers[] = {
     MLN_BUFFER_LITERAL("points"), MLN_BUFFER_LITERAL("labels")
   };
-  mln_source_feature_query_options query =
-    mln_source_feature_query_options_default();
+  mln_source_feature_query_options query = {
+    .size = sizeof(mln_source_feature_query_options)
+  };
   query.fields = MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
   query.source_layer_ids = layers;
   query.source_layer_id_count = 2;
@@ -442,8 +446,9 @@ static void source_queries_read_the_named_source_layers(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
-  mln_custom_mvt_vector_source_options options =
-    mln_custom_mvt_vector_source_options_default();
+  mln_custom_mvt_vector_source_options options = {
+    .size = sizeof(mln_custom_mvt_vector_source_options)
+  };
   options.fetch_tile = count_fetch;
   options.cancel_tile = ignore_cancel;
   options.user_data = &fetches;
@@ -488,8 +493,9 @@ static void source_queries_read_the_named_source_layers(void) {
   };
   for (size_t index = 0; index < sizeof(rows) / sizeof(rows[0]); index += 1) {
     const source_row* row = &rows[index];
-    mln_source_feature_query_options query =
-      mln_source_feature_query_options_default();
+    mln_source_feature_query_options query = {
+      .size = sizeof(mln_source_feature_query_options)
+    };
     mln_buffer_view layers[2] = {0};
     for (size_t layer = 0; layer < row->layer_count; layer += 1) {
       layers[layer] = mln_buffer_view_from_cstr(row->layers[layer]);
@@ -753,8 +759,14 @@ static void malformed_queries_are_rejected_at_submission(void) {
         .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT,
         .data = {.point = (mln_screen_point){.x = 32, .y = 32}}
       },
-    .rendered = mln_rendered_feature_query_options_default(),
-    .source = mln_source_feature_query_options_default(),
+    .rendered =
+      (mln_rendered_feature_query_options){
+        .size = sizeof(mln_rendered_feature_query_options)
+      },
+    .source =
+      (mln_source_feature_query_options){
+        .size = sizeof(mln_source_feature_query_options)
+      },
     .source_id = MLN_BUFFER_LITERAL("points"),
   };
   mln_test_run_validation_table(

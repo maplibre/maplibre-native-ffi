@@ -17,7 +17,7 @@ public static unsafe partial class MaplibreNative
     /// </remarks>
     public static uint CVersion()
     {
-        using var call = Enter(null);
+        EnterUnchecked();
         var returned = NativeMethods.mln_c_version();
         return returned;
     }

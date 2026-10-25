@@ -62,7 +62,7 @@
     /// before it returns.
     init(
       extent: LogicalExtent,
-      context: MetalContextDescriptor = MetalSurfaceDescriptor.default.context,
+      context: MetalContextDescriptor = .init(),
       layer: CAMetalLayer
     ) {
       self.init(

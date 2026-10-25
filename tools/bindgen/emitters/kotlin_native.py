@@ -32,7 +32,7 @@ from ..protocol import (
     DELIVERY_PAYLOAD,
     DIAGNOSTIC,
 )
-from ..semantic import DefaultSupport, DeliverySupport
+from ..semantic import DeliverySupport
 from .kotlin_abi import (
     POINTER,
     Abi,
@@ -254,8 +254,8 @@ class NativeShims:
 
     @staticmethod
     def critical_native(plan):
-        # Defaults, published snapshots, and event drains neither wait for work
-        # nor invoke host code. Other immediate calls can wait or release callbacks;
+        # Published snapshots and event drains neither wait for work nor invoke
+        # host code. Other immediate calls can wait or release callbacks;
         # submissions can deliver their completion inline, including on rejection.
         # A delivery queue drain can wake its queue again, which runs host code.
         def has_callback(value):
@@ -267,10 +267,7 @@ class NativeShims:
             )
 
         return (
-            (
-                isinstance(plan.support, DefaultSupport)
-                or plan.execution in {"snapshot", "event_batch"}
-            )
+            plan.execution in {"snapshot", "event_batch"}
             and not isinstance(plan.support, DeliverySupport)
             and not plan.completion
             and not plan.registrations

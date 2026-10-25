@@ -12,7 +12,10 @@ static void fitted(void* user_data, const mln_completion_result* result) {
   if (result->status != MLN_STATUS_OK || result->value_count != 1) return;
 
   // #region fit
-  mln_camera_update update = mln_camera_update_default();
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
   update.mode = MLN_CAMERA_UPDATE_MODE_FLY;
   update.camera = *(const mln_camera_options*)result->value;
   mln_map_update_camera(state->map, &update, &state->fly_completion, NULL);
@@ -24,7 +27,7 @@ mln_status fly_to_bounds(
   const mln_completion* fly_completion
 ) {
   // #region padding
-  mln_camera_fit_options fit = mln_camera_fit_options_default();
+  mln_camera_fit_options fit = {.size = sizeof(mln_camera_fit_options)};
   fit.fields = MLN_CAMERA_FIT_OPTION_PADDING;
   fit.padding =
     (mln_edge_insets){.top = 24, .left = 24, .bottom = 24, .right = 24};

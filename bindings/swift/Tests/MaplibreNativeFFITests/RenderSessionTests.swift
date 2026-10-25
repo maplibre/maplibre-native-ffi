@@ -57,8 +57,7 @@ private struct OwnedTextureSession {
 /// once the attach completes, closing the session afterwards.
 private func withOwnedTextureSession<Result>(
   style: String = emptyStyle,
-  ringDepth: UInt32 = RenderSessionAttachOptions.default
-    .requestedTextureRingDepth,
+  ringDepth: UInt32 = 0,
   _ body: (OwnedTextureSession) async throws -> Result
 ) async throws -> Result {
   try await attachOwnedTextureSession(style: style, ringDepth: ringDepth)
@@ -72,8 +71,7 @@ private func withOwnedTextureSession<Result>(
 /// drives it.
 private func attachOwnedTextureSession(
   style: String = emptyStyle,
-  ringDepth: UInt32 = RenderSessionAttachOptions.default
-    .requestedTextureRingDepth
+  ringDepth: UInt32 = 0
 ) async throws -> OwnedTextureSession {
   let fixture = try await MapFixture.make()
   var thread: RenderThread?
@@ -93,8 +91,7 @@ private func attachOwnedTextureSession(
         driver: thread == nil ? .coreWorker : .callerGraphicsThread,
         requestedTextureRingDepth: ringDepth,
         frameWake: pulsingFrameWake,
-        driverWorkWake: thread?.driverWorkWake ??
-          RenderSessionAttachOptions.default.driverWorkWake
+        driverWorkWake: thread?.driverWorkWake ?? Wake()
       )
     )
   } catch {
@@ -154,7 +151,7 @@ private func attachOwnedTextureSession(
         #expect(try view.mtlDevice === rendered.graphics.metalDevice)
         #expect(texture.device === rendered.graphics.metalDevice)
       }
-      try frame.release(consumerCompletion: .default)
+      try frame.release(consumerCompletion: GpuSync())
     }
   }
 #endif
@@ -192,7 +189,7 @@ private func attachOwnedTextureSession(
       #expect(try rendered.graphics
         .withTextureView(of: first) { $0.width } == 32)
       do {
-        try first.release(consumerCompletion: .default)
+        try first.release(consumerCompletion: GpuSync())
         Issue.record("release inside a view should be busy")
       } catch let error as MaplibreError {
         #expect(error.status == .busy)

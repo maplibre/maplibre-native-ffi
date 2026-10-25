@@ -251,14 +251,6 @@ void main() {
     expect(await pending, expected);
   });
 
-  // Constructors copy the native record defaults.
-  test(
-    'a record built from its constructor defaults equals the native default',
-    () {
-      expect(MapOptions(), mapOptionsDefault());
-    },
-  );
-
   test('byte-backed values own their storage and compare by content', () {
     final pixels = Uint8List.fromList([1, 2, 3, 4]);
     final image = PremultipliedRgba8Image(

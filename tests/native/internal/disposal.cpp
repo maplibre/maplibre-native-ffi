@@ -81,7 +81,8 @@ auto expired(const auto& weak) -> bool {
 }
 
 auto create_runtime() -> mln_runtime {
-  auto options = mln_runtime_options_default();
+  auto options = mln_runtime_options{};
+  options.size = sizeof(mln_runtime_options);
   auto runtime = mln_runtime{MLN_HANDLE_NULL};
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, nullptr));
   return runtime;
@@ -313,7 +314,8 @@ void disposal_retires_an_attached_graph_after_driver_quiescence() {
     std::weak_ptr{mln::core::handle_table<mln::core::MapObject>().lease(map)};
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
-  auto options = mln_render_session_attach_options_default();
+  auto options = mln_render_session_attach_options{};
+  options.size = sizeof(mln_render_session_attach_options);
   options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
   auto capabilities = mln_render_session_capabilities{};
   capabilities.size = sizeof(capabilities);
@@ -390,7 +392,8 @@ void flag_wake_release(void* context) {
 void attach_observed(
   mln_map map, mln_test_render_fixture& fixture, std::atomic_bool& released
 ) {
-  auto options = mln_render_session_attach_options_default();
+  auto options = mln_render_session_attach_options{};
+  options.size = sizeof(mln_render_session_attach_options);
   options.requested_texture_ring_depth = 2;
   options.frame_wake = mln_wake{
     .callback = [](void*) {},
@@ -600,7 +603,8 @@ void a_view_and_its_own_abandonment_keep_a_session_busy() {
     MLN_STATUS_BUSY, mln_render_session_abandon(session, &result, nullptr)
   );
   mln_acquired_frame_view_end(scope);
-  auto sync = mln_gpu_sync_default();
+  auto sync = mln_gpu_sync{};
+  sync.size = sizeof(mln_gpu_sync);
   MLN_TEST_OK(mln_acquired_frame_release(fake.frame, &sync, nullptr));
   MLN_TEST_OK(mln_render_session_abandon(session, &result, nullptr));
   MLN_TEST_OK(reentrant_dispose_status.load());
@@ -680,7 +684,8 @@ void a_running_driver_call_parks_its_retirement_without_stalling_others() {
   const auto other_map = create_map(runtime);
   auto busy = std::make_shared<mln_render_session_object>();
   busy->map = busy_map;
-  auto options = mln_render_session_attach_options_default();
+  auto options = mln_render_session_attach_options{};
+  options.size = sizeof(mln_render_session_attach_options);
   options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
   auto capabilities = mln_render_session_capabilities{};
   capabilities.size = sizeof(capabilities);
@@ -744,7 +749,8 @@ void a_serviced_driver_call_parks_its_retirement_without_stalling_others() {
   const auto other_map = create_map(runtime);
   auto busy = std::make_shared<mln_render_session_object>();
   busy->map = busy_map;
-  auto options = mln_render_session_attach_options_default();
+  auto options = mln_render_session_attach_options{};
+  options.size = sizeof(mln_render_session_attach_options);
   options.driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
   auto capabilities = mln_render_session_capabilities{};
   capabilities.size = sizeof(capabilities);
@@ -853,7 +859,9 @@ void map_query_admission_failure_releases_its_map_lease() {
     MLN_TEST_OK(mln_test_completion_settle(&creation));
     auto transition = mln_test_transition_end{};
     mln_test_transition_end_init(&transition);
-    auto camera = mln_camera_update_default();
+    auto camera = mln_camera_update{};
+    camera.size = sizeof(mln_camera_update);
+    camera.camera.size = sizeof(mln_camera_options);
     camera.mode = MLN_CAMERA_UPDATE_MODE_EASE;
     camera.camera.fields = MLN_CAMERA_OPTION_ZOOM;
     camera.camera.zoom = 6;

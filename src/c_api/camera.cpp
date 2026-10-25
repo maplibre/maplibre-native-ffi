@@ -7,49 +7,6 @@
 #include "map/map.hpp"
 #include "maplibre_native_c.h"
 
-auto mln_camera_options_default(void) noexcept -> mln_camera_options {
-  return mln::c_api::sized<mln_camera_options>();
-}
-
-auto mln_animation_options_default(void) noexcept -> mln_animation_options {
-  return mln_animation_options{};
-}
-
-auto mln_camera_delta_default(void) noexcept -> mln_camera_delta {
-  return mln::c_api::sized<mln_camera_delta>();
-}
-
-auto mln_camera_update_default(void) noexcept -> mln_camera_update {
-  auto update = mln::c_api::sized<mln_camera_update>();
-  update.camera = mln::c_api::sized<mln_camera_options>();
-  return update;
-}
-
-auto mln_camera_fit_options_default(void) noexcept -> mln_camera_fit_options {
-  return mln::c_api::sized<mln_camera_fit_options>();
-}
-
-auto mln_bound_options_default(void) noexcept -> mln_bound_options {
-  return mln::c_api::sized<mln_bound_options>();
-}
-
-auto mln_free_camera_options_default(void) noexcept -> mln_free_camera_options {
-  return mln::c_api::sized<mln_free_camera_options>();
-}
-
-auto mln_projection_mode_default(void) noexcept -> mln_projection_mode {
-  return mln::c_api::sized<mln_projection_mode>();
-}
-
-auto mln_map_viewport_options_default(void) noexcept
-  -> mln_map_viewport_options {
-  return mln::c_api::sized<mln_map_viewport_options>();
-}
-
-auto mln_map_tile_options_default(void) noexcept -> mln_map_tile_options {
-  return mln::c_api::sized<mln_map_tile_options>();
-}
-
 auto mln_map_update_camera(
   mln_map map, const mln_camera_update* update,
   const mln_completion* completion, mln_diagnostic* out_diagnostic

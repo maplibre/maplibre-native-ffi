@@ -6,7 +6,6 @@ import threading
 import typing
 import weakref
 from collections.abc import Callable
-from dataclasses import replace
 
 import maplibre_native_ffi as mln
 import pytest
@@ -93,8 +92,7 @@ def test_a_camera_end_handler_is_rooted_until_it_runs(
     # it while the ease runs, and runs it once when its identity is cancelled.
     ended = _Retiring()
     ended_retired = ended.retired
-    update = replace(
-        mln.CameraUpdate.default(),
+    update = mln.CameraUpdate(
         mode=mln.CameraUpdateMode.EASE,
         camera=mln.CameraOptions(zoom=4.0),
         animation=mln.AnimationOptions(
@@ -115,8 +113,7 @@ def test_a_camera_end_handler_is_rooted_until_it_runs(
     # A rejected command releases the handler before the call returns.
     rejected = _Retiring()
     rejected_retired = rejected.retired
-    delta = replace(
-        mln.CameraDelta.default(),
+    delta = mln.CameraDelta(
         scale=-1.0,
         animation=mln.AnimationOptions(
             end_handler=mln.CameraTransitionHandler(rejected)
@@ -142,7 +139,7 @@ def test_a_registered_callback_does_not_keep_its_receiver_alive() -> None:
             woke.set()
 
     callback = weakref.ref(receive_events)
-    runtime = mln.runtime_create(mln.RuntimeOptions.default())
+    runtime = mln.runtime_create(mln.RuntimeOptions())
     runtime.discarding.set_event_handler(mln.RuntimeEventHandler(receive_events))
     receiver["runtime"] = runtime
     owner = weakref.ref(runtime)

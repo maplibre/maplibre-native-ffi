@@ -480,8 +480,9 @@ static mln_metal_borrowed_texture_descriptor borrowed_ring_descriptor(
     entries[index] =
       (mln_metal_borrowed_texture){.texture = ring->textures[index]};
   }
-  mln_metal_borrowed_texture_descriptor descriptor =
-    mln_metal_borrowed_texture_descriptor_default();
+  mln_metal_borrowed_texture_descriptor descriptor = {
+    .size = sizeof(mln_metal_borrowed_texture_descriptor)
+  };
   descriptor.extent = render_target_extent(current_viewport);
   descriptor.physical_width = current_viewport.physical_width;
   descriptor.physical_height = current_viewport.physical_height;
@@ -504,8 +505,9 @@ app_error render_target_attach(
   mln_status status = MLN_STATUS_INVALID_STATE;
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE: {
-      mln_metal_owned_texture_descriptor descriptor =
-        mln_metal_owned_texture_descriptor_default();
+      mln_metal_owned_texture_descriptor descriptor = {
+        .size = sizeof(mln_metal_owned_texture_descriptor)
+      };
       descriptor.extent = render_target_extent(current_viewport);
       descriptor.context =
         metal_context_descriptor(target->as.owned.compositor.view.device);
@@ -527,8 +529,9 @@ app_error render_target_attach(
       break;
     }
     case RENDER_TARGET_MODE_NATIVE_SURFACE: {
-      mln_metal_surface_descriptor descriptor =
-        mln_metal_surface_descriptor_default();
+      mln_metal_surface_descriptor descriptor = {
+        .size = sizeof(mln_metal_surface_descriptor)
+      };
       descriptor.extent = render_target_extent(current_viewport);
       descriptor.context =
         metal_context_descriptor(target->as.surface.view.device);

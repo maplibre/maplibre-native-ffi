@@ -199,8 +199,9 @@ bool mln_test_backend_attach(
   }
   *out_state = state;
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-  mln_metal_owned_texture_descriptor descriptor =
-    mln_metal_owned_texture_descriptor_default();
+  mln_metal_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_metal_owned_texture_descriptor)
+  };
   descriptor.extent = host_extent();
   descriptor.context = host_context(&state->context);
   descriptor.pixel_format =
@@ -209,8 +210,9 @@ bool mln_test_backend_attach(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  mln_vulkan_owned_texture_descriptor descriptor =
-    mln_vulkan_owned_texture_descriptor_default();
+  mln_vulkan_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_vulkan_owned_texture_descriptor)
+  };
   descriptor.extent = host_extent();
   descriptor.context = host_context(&state->context);
   mln_render_session_attach_options attach = *options;
@@ -221,8 +223,9 @@ bool mln_test_backend_attach(
     map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #else
-  mln_opengl_owned_texture_descriptor descriptor =
-    mln_opengl_owned_texture_descriptor_default();
+  mln_opengl_owned_texture_descriptor descriptor = {
+    .size = sizeof(mln_opengl_owned_texture_descriptor)
+  };
   descriptor.extent = host_extent();
   descriptor.context = host_context(&state->context);
   mln_render_session_attach_options attach = *options;
@@ -276,15 +279,21 @@ static bool describe_ring(
   // Every texture of the ring shares the last one's format and size.
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   (void)context;
-  *out = mln_metal_borrowed_texture_descriptor_default();
+  *out = (mln_metal_borrowed_texture_descriptor){
+    .size = sizeof(mln_metal_borrowed_texture_descriptor)
+  };
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  *out = mln_vulkan_borrowed_texture_descriptor_default();
+  *out = (mln_vulkan_borrowed_texture_descriptor){
+    .size = sizeof(mln_vulkan_borrowed_texture_descriptor)
+  };
   out->context = host_context(context);
   out->format = info.format;
   out->initial_layout = info.vulkan_initial_layout;
   out->final_layout = info.vulkan_final_layout;
 #else
-  *out = mln_opengl_borrowed_texture_descriptor_default();
+  *out = (mln_opengl_borrowed_texture_descriptor){
+    .size = sizeof(mln_opengl_borrowed_texture_descriptor)
+  };
   out->context = host_context(context);
   out->target = info.opengl_target;
 #endif
@@ -308,13 +317,19 @@ static bool describe_surface(
     return false;
   }
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-  *out = mln_metal_surface_descriptor_default();
+  *out = (mln_metal_surface_descriptor){
+    .size = sizeof(mln_metal_surface_descriptor)
+  };
   out->layer = info.metal_layer;
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  *out = mln_vulkan_surface_descriptor_default();
+  *out = (mln_vulkan_surface_descriptor){
+    .size = sizeof(mln_vulkan_surface_descriptor)
+  };
   out->surface = info.vulkan_surface;
 #else
-  *out = mln_opengl_surface_descriptor_default();
+  *out = (mln_opengl_surface_descriptor){
+    .size = sizeof(mln_opengl_surface_descriptor)
+  };
   out->surface = info.opengl_surface;
 #endif
   out->extent = (mln_logical_extent){
