@@ -2626,6 +2626,7 @@ pub const HttpHeaderRule = struct {
     headers: []const HttpHeader,
     pub fn toNative(self: HttpHeaderRule, allocator: std.mem.Allocator) status.Error!c.mln_http_header_rule {
         var raw = c.mln_http_header_rule_default();
+        raw.size = @sizeOf(c.mln_http_header_rule);
         raw.kinds = self.kinds.toNative();
         raw.flags = self.flags.toNative();
         raw.url = marshal.view(self.url);
@@ -4755,6 +4756,7 @@ pub const ResourceRoute = struct {
     url: []const u8 = &.{},
     pub fn toNative(self: ResourceRoute) status.Error!c.mln_resource_route {
         var raw = c.mln_resource_route_default();
+        raw.size = @sizeOf(c.mln_resource_route);
         raw.kinds = self.kinds.toNative();
         raw.flags = self.flags.toNative();
         raw.url = marshal.view(self.url);

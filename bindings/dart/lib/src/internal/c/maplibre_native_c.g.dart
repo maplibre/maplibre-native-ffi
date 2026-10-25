@@ -481,6 +481,8 @@ final class mln_http_header extends Struct {
 
 final class mln_http_header_rule extends Struct {
   @Uint32()
+  external int size;
+  @Uint32()
   external int kinds;
   @Uint32()
   external int flags;
@@ -1126,6 +1128,8 @@ final class mln_resource_response extends Struct {
 }
 
 final class mln_resource_route extends Struct {
+  @Uint32()
+  external int size;
   @Uint32()
   external int kinds;
   @Uint32()

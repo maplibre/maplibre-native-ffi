@@ -87,6 +87,7 @@ auto table_of(mln_resource_route route) -> mln::core::RouteTable {
 // Routes compare the resolved URL and match the kinds that their masks name.
 void routes_match_resolved_urls_and_selected_kinds() {
   const auto resolved = table_of({
+    .size = sizeof(mln_resource_route),
     .kinds = MLN_RESOURCE_KIND_FLAG_STYLE | MLN_RESOURCE_KIND_FLAG_SOURCE,
     .flags = MLN_URL_MATCH_EXACT,
     .url = MLN_BUFFER_LITERAL("https://maps.localhost/style.json"),

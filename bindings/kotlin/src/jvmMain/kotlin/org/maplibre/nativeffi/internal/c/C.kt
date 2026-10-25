@@ -3598,8 +3598,10 @@ internal val mln_gpu_sync: GroupLayout =
   Ffm.struct(JAVA_INT.withName("size"), JAVA_INT.withName("kind"), JAVA_LONG.withName("handle"))
 internal val mln_http_header_rule: GroupLayout =
   Ffm.struct(
+    JAVA_INT.withName("size"),
     JAVA_INT.withName("kinds"),
     JAVA_INT.withName("flags"),
+    Ffm.pad(4),
     mln_buffer_view.withName("url"),
     ADDRESS.withName("headers"),
     JAVA_LONG.withName("header_count"),
@@ -3786,8 +3788,10 @@ internal val mln_rendered_feature_query_options: GroupLayout =
   )
 internal val mln_resource_route: GroupLayout =
   Ffm.struct(
+    JAVA_INT.withName("size"),
     JAVA_INT.withName("kinds"),
     JAVA_INT.withName("flags"),
+    Ffm.pad(4),
     mln_buffer_view.withName("url"),
   )
 internal val mln_runtime_options: GroupLayout =

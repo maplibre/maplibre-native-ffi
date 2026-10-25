@@ -920,7 +920,7 @@ internal fun NativeCall.putResourceProvider(target: Long, value: ResourceProvide
   writeU32(target, w(32, 56).toUInt())
   writeAddress(
     target + w(24, 40),
-    array(value.routes, w(16, 24), w(4, 8)) { at, item -> putResourceRoute(at, item) },
+    array(value.routes, w(20, 32), w(4, 8)) { at, item -> putResourceRoute(at, item) },
   )
   writeSize(target + w(28, 48), value.routes.size.toULong())
   writeAddress(target + w(8, 16), registrations.register(value))
@@ -986,18 +986,19 @@ internal fun NativeArena.writeStyleExpressionInputs(value: StyleExpressionInputs
   allocate(w(80, 112), 8).also { putStyleExpressionInputs(it, value) }
 
 internal fun NativeArena.putHttpHeaderRule(target: Long, value: HttpHeaderRule) {
-  writeU32(target, value.kinds.rawValue)
-  writeU32(target + 4, value.flags.rawValue)
-  putView(target + 8, value.url)
+  writeU32(target, w(28, 48).toUInt())
+  writeU32(target + 4, value.kinds.rawValue)
+  writeU32(target + 8, value.flags.rawValue)
+  putView(target + w(12, 16), value.url)
   writeAddress(
-    target + w(16, 24),
+    target + w(20, 32),
     array(value.headers, w(16, 32), w(4, 8)) { at, item -> putHttpHeader(at, item) },
   )
-  writeSize(target + w(20, 32), value.headers.size.toULong())
+  writeSize(target + w(24, 40), value.headers.size.toULong())
 }
 
 internal fun NativeArena.writeHttpHeaderRule(value: HttpHeaderRule): Long =
-  allocate(w(24, 40), w(4, 8)).also { putHttpHeaderRule(it, value) }
+  allocate(w(28, 48), w(4, 8)).also { putHttpHeaderRule(it, value) }
 
 internal fun readMetalTextureFrame(source: Long, scope: ViewScope? = null): MetalTextureFrame =
   MetalTextureFrame(
@@ -1224,13 +1225,13 @@ internal fun readGeojsonSourceOptions(source: Long): GeojsonSourceOptions {
 
 internal fun readHttpHeaderRule(source: Long): HttpHeaderRule =
   HttpHeaderRule(
-    kinds = ResourceKindFlag(readU32(source)),
-    flags = UrlMatchFlag(readU32(source + 4)),
-    url = readViewString(source + 8),
+    kinds = ResourceKindFlag(readU32(source + 4)),
+    flags = UrlMatchFlag(readU32(source + 8)),
+    url = readViewString(source + w(12, 16)),
     headers =
       readArray(
-        readAddress(source + w(16, 24)),
-        readSize(source + w(20, 32)),
+        readAddress(source + w(20, 32)),
+        readSize(source + w(24, 40)),
         w(16, 32).toLong(),
       ) { item ->
         readHttpHeader(item)
@@ -1377,9 +1378,9 @@ internal fun readRenderedFeatureQueryOptions(source: Long): RenderedFeatureQuery
 
 internal fun readResourceRoute(source: Long): ResourceRoute =
   ResourceRoute(
-    kinds = ResourceKindFlag(readU32(source)),
-    flags = UrlMatchFlag(readU32(source + 4)),
-    url = readViewString(source + 8),
+    kinds = ResourceKindFlag(readU32(source + 4)),
+    flags = UrlMatchFlag(readU32(source + 8)),
+    url = readViewString(source + w(12, 16)),
   )
 
 internal fun readRuntimeOptions(source: Long): RuntimeOptions =
@@ -1946,13 +1947,14 @@ internal fun NativeArena.writeOfflineGeometryRegionDefinition(
 ): Long = allocate(w(40, 56), 8).also { putOfflineGeometryRegionDefinition(it, value) }
 
 internal fun NativeArena.putResourceRoute(target: Long, value: ResourceRoute) {
-  writeU32(target, value.kinds.rawValue)
-  writeU32(target + 4, value.flags.rawValue)
-  putView(target + 8, value.url)
+  writeU32(target, w(20, 32).toUInt())
+  writeU32(target + 4, value.kinds.rawValue)
+  writeU32(target + 8, value.flags.rawValue)
+  putView(target + w(12, 16), value.url)
 }
 
 internal fun NativeArena.writeResourceRoute(value: ResourceRoute): Long =
-  allocate(w(16, 24), w(4, 8)).also { putResourceRoute(it, value) }
+  allocate(w(20, 32), w(4, 8)).also { putResourceRoute(it, value) }
 
 internal fun NativeArena.putHttpHeader(target: Long, value: HttpHeader) {
   putView(target, value.name)

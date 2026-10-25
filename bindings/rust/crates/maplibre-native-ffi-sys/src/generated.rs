@@ -700,6 +700,7 @@ pub struct mln_http_header {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_http_header_rule {
+    pub size: u32,
     pub kinds: mln_resource_kind_flags,
     pub flags: mln_url_match_flags,
     pub url: mln_buffer_view,
@@ -1193,6 +1194,7 @@ pub struct mln_resource_response {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_resource_route {
+    pub size: u32,
     pub kinds: mln_resource_kind_flags,
     pub flags: mln_url_match_flags,
     pub url: mln_buffer_view,

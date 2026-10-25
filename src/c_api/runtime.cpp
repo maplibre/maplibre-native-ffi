@@ -12,12 +12,16 @@
 
 auto mln_resource_route_default(void) noexcept -> mln_resource_route {
   return mln_resource_route{
-    .kinds = MLN_RESOURCE_KIND_FLAG_ALL, .flags = 0, .url = {}
+    .size = sizeof(mln_resource_route),
+    .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
+    .flags = 0,
+    .url = {}
   };
 }
 
 auto mln_http_header_rule_default(void) noexcept -> mln_http_header_rule {
   return mln_http_header_rule{
+    .size = sizeof(mln_http_header_rule),
     .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
     .flags = 0,
     .url = {},

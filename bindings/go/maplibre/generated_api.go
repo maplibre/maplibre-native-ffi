@@ -2497,6 +2497,7 @@ func copyHttpHeaderRule(raw C.mln_http_header_rule) HttpHeaderRule {
 
 func nativeHttpHeaderRule(input HttpHeaderRule, arena *bindingArena) C.mln_http_header_rule {
 	raw := C.mln_http_header_rule_default()
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.kinds = C.mln_resource_kind_flags(input.Kinds)
 	raw.flags = C.mln_url_match_flags(input.Flags)
 	raw.url = C.mln_buffer_view{data: arena.bytes([]byte(input.Url)), size: C.size_t(len(input.Url))}
@@ -4200,6 +4201,7 @@ func copyResourceRoute(raw C.mln_resource_route) ResourceRoute {
 
 func nativeResourceRoute(input ResourceRoute, arena *bindingArena) C.mln_resource_route {
 	raw := C.mln_resource_route_default()
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.kinds = C.mln_resource_kind_flags(input.Kinds)
 	raw.flags = C.mln_url_match_flags(input.Flags)
 	raw.url = C.mln_buffer_view{data: arena.bytes([]byte(input.Url)), size: C.size_t(len(input.Url))}

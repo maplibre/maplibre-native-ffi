@@ -1459,6 +1459,7 @@ impl Default for HttpHeaderRule {
 impl ToNative<sys::mln_http_header_rule> for HttpHeaderRule {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_http_header_rule> {
         let mut raw: sys::mln_http_header_rule = unsafe { sys::mln_http_header_rule_default() };
+        raw.size = std::mem::size_of::<sys::mln_http_header_rule>() as _;
         raw.kinds = to_native(&self.kinds, arena)?;
         raw.flags = to_native(&self.flags, arena)?;
         raw.url = to_native(&self.url, arena)?;
@@ -4056,6 +4057,7 @@ impl Default for ResourceRoute {
 impl ToNative<sys::mln_resource_route> for ResourceRoute {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_route> {
         let mut raw: sys::mln_resource_route = unsafe { sys::mln_resource_route_default() };
+        raw.size = std::mem::size_of::<sys::mln_resource_route>() as _;
         raw.kinds = to_native(&self.kinds, arena)?;
         raw.flags = to_native(&self.flags, arena)?;
         raw.url = to_native(&self.url, arena)?;

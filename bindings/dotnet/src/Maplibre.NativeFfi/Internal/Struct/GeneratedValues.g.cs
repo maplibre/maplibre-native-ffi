@@ -796,6 +796,7 @@ internal static unsafe class GeneratedValues
     {
         Required(value.Url, "HttpHeaderRule.Url must not be null.");
         var native = NativeMethods.mln_http_header_rule_default();
+        native.size = (uint)sizeof(mln_http_header_rule);
         native.kinds = (uint)value.Kinds;
         native.flags = (uint)value.Flags;
         native.url = scope.Utf8(value.Url);
@@ -2003,6 +2004,7 @@ internal static unsafe class GeneratedValues
     {
         Required(value.Url, "ResourceRoute.Url must not be null.");
         var native = NativeMethods.mln_resource_route_default();
+        native.size = (uint)sizeof(mln_resource_route);
         native.kinds = (uint)value.Kinds;
         native.flags = (uint)value.Flags;
         native.url = scope.Utf8(value.Url);

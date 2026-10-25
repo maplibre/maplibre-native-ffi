@@ -130,6 +130,7 @@ public struct HttpHeaderRule: Equatable, Hashable, Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_http_header_rule {
     var raw = mln_http_header_rule_default()
+    raw.size = UInt32(MemoryLayout<mln_http_header_rule>.size)
     raw.kinds = kinds.rawValue
     raw.flags = flags.rawValue
     raw.url = arena.view(url)
@@ -883,6 +884,7 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_route {
     var raw = mln_resource_route_default()
+    raw.size = UInt32(MemoryLayout<mln_resource_route>.size)
     raw.kinds = kinds.rawValue
     raw.flags = flags.rawValue
     raw.url = arena.view(url)

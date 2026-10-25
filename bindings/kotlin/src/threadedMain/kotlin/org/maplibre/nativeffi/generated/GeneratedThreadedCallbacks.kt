@@ -94,7 +94,7 @@ internal fun NativeCall.putHttpHeaderTransform(target: Long, value: HttpHeaderTr
   writeU32(target, w(24, 48).toUInt())
   writeAddress(
     target + w(16, 32),
-    array(value.rules, w(24, 40), w(4, 8)) { at, item -> putHttpHeaderRule(at, item) },
+    array(value.rules, w(28, 48), w(4, 8)) { at, item -> putHttpHeaderRule(at, item) },
   )
   writeSize(target + w(20, 40), value.rules.size.toULong())
   if (value.callback == null) return

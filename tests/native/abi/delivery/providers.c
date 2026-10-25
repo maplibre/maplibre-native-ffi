@@ -370,16 +370,20 @@ static void invalid_routes_are_rejected(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_resource_route routes[] = {
-    {.kinds = MLN_RESOURCE_KIND_FLAG_ALL,
+    {.size = sizeof(mln_resource_route),
+     .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
      .url = MLN_BUFFER_LITERAL("custom://first")},
-    {.kinds = MLN_RESOURCE_KIND_FLAG_ALL,
+    {.size = sizeof(mln_resource_route),
+     .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
      .flags = 1U << 31U,
      .url = MLN_BUFFER_LITERAL("**")},
   };
   MLN_TEST_INVALID(submit_routes(runtime, routes, 2, &diagnostic));
   TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "route 1"));
   const mln_resource_route unknown_kind = {
-    .kinds = 1U << 31U, .url = MLN_BUFFER_LITERAL("**")
+    .size = sizeof(mln_resource_route),
+    .kinds = 1U << 31U,
+    .url = MLN_BUFFER_LITERAL("**")
   };
   MLN_TEST_INVALID(submit_routes(runtime, &unknown_kind, 1, NULL));
   mln_resource_route zero_kinds = mln_resource_route_default();
@@ -387,6 +391,7 @@ static void invalid_routes_are_rejected(void) {
   zero_kinds.url = (mln_buffer_view)MLN_BUFFER_LITERAL("**");
   MLN_TEST_INVALID(submit_routes(runtime, &zero_kinds, 1, NULL));
   const mln_resource_route null_url = {
+    .size = sizeof(mln_resource_route),
     .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
     .url = (mln_buffer_view){.data = NULL, .size = 1}
   };
@@ -398,6 +403,7 @@ static void invalid_routes_are_rejected(void) {
   static char long_url[4097];
   memset(long_url, '?', sizeof(long_url));
   mln_resource_route long_route = {
+    .size = sizeof(mln_resource_route),
     .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
     .flags = MLN_URL_MATCH_GLOB,
     .url = {.data = long_url, .size = 4096},
@@ -417,11 +423,50 @@ static void invalid_routes_are_rejected(void) {
   }
   memset(escapes_and_run + 4095 * 2, '*', 8192);
   const mln_resource_route boundary_route = {
+    .size = sizeof(mln_resource_route),
     .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
     .flags = MLN_URL_MATCH_GLOB,
     .url = {.data = escapes_and_run, .size = sizeof(escapes_and_run)},
   };
   MLN_TEST_OK(submit_routes(runtime, &boundary_route, 1, NULL));
+  mln_test_destroy_runtime(runtime);
+}
+
+// Each route's size steps to the next, so a caller built against a later
+// header passes larger routes, and native skips the members it does not know.
+// A route smaller than this header's struct is rejected.
+static void routes_step_by_their_declared_size(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  typedef struct later_route {
+    mln_resource_route route;
+    uint64_t later_member;
+  } later_route;
+  later_route routes[] = {
+    {.route =
+       {.size = sizeof(later_route),
+        .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
+        .url = MLN_BUFFER_LITERAL("custom://first")},
+     .later_member = UINT64_MAX},
+    {.route = {
+       .size = sizeof(later_route),
+       .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
+       .flags = 1U << 31U,
+       .url = MLN_BUFFER_LITERAL("**")
+     }},
+  };
+  MLN_TEST_INVALID(submit_routes(runtime, &routes[0].route, 2, &diagnostic));
+  TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "route 1"));
+  routes[1].route.flags = MLN_URL_MATCH_GLOB;
+  MLN_TEST_OK(submit_routes(runtime, &routes[0].route, 2, NULL));
+
+  mln_resource_route undersized = mln_resource_route_default();
+  undersized.size = sizeof(undersized) - sizeof(uint64_t);
+  undersized.url = (mln_buffer_view)MLN_BUFFER_LITERAL("**");
+  MLN_TEST_INVALID(submit_routes(runtime, &undersized, 1, &diagnostic));
+  TEST_ASSERT_NOT_NULL(
+    strstr(diagnostic.message, "route 0 has an invalid size")
+  );
   mln_test_destroy_runtime(runtime);
 }
 
@@ -466,10 +511,12 @@ static void routes_filter_a_callback_provider(void) {
   atomic_store(&calls, 0);
   const mln_resource_route routes[] = {
     // Another kind: claims nothing here.
-    {.kinds = MLN_RESOURCE_KIND_FLAG_TILE,
+    {.size = sizeof(mln_resource_route),
+     .kinds = MLN_RESOURCE_KIND_FLAG_TILE,
      .flags = MLN_URL_MATCH_GLOB,
      .url = MLN_BUFFER_LITERAL("**")},
-    {.kinds = MLN_RESOURCE_KIND_FLAG_STYLE,
+    {.size = sizeof(mln_resource_route),
+     .kinds = MLN_RESOURCE_KIND_FLAG_STYLE,
      .flags = MLN_URL_MATCH_GLOB,
      .url = MLN_BUFFER_LITERAL("http://127.0.0.1:*/routed/**")},
   };
@@ -514,6 +561,7 @@ static void routes_filter_a_queue_provider(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   const mln_resource_route route = {
+    .size = sizeof(mln_resource_route),
     .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
     .flags = MLN_URL_MATCH_GLOB,
     .url = MLN_BUFFER_LITERAL("custom://routed/**"),
@@ -633,6 +681,7 @@ MLN_TEST_GROUP {
   RUN_TEST(releasing_a_queue_fails_its_pending_requests);
   RUN_TEST(a_queue_provider_rejects_an_invalid_shape);
   RUN_TEST(invalid_routes_are_rejected);
+  RUN_TEST(routes_step_by_their_declared_size);
 #if !defined(__EMSCRIPTEN__)
   RUN_TEST(routes_filter_a_callback_provider);
   RUN_TEST(routes_filter_a_queue_provider);

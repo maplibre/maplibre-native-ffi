@@ -1,4 +1,5 @@
 #include <bitset>
+#include <cstddef>
 #include <cstring>
 #include <stdexcept>
 #include <string>
@@ -22,6 +23,22 @@ auto reject(const char* what, std::size_t index, const char* reason)
     (std::string{what} + " " + std::to_string(index) + " " + reason).c_str()
   );
   return MLN_STATUS_INVALID_ARGUMENT;
+}
+
+// Returns the element at cursor and advances cursor past it by the element's
+// declared size, so a host built against a later header, whose elements carry
+// members this library does not know, steps over them. Null when the element
+// is smaller than this library's struct or its size would misalign the next.
+template <typename Element>
+auto next_sized_element(const std::byte*& cursor) -> const Element* {
+  const auto* element = reinterpret_cast<const Element*>(cursor);
+  if (
+    element->size < sizeof(Element) || element->size % alignof(Element) != 0
+  ) {
+    return nullptr;
+  }
+  cursor += element->size;
+  return element;
 }
 
 // Checks the members that routes and header rules share.
@@ -154,8 +171,12 @@ auto copy_routes(
   }
   out.routes.clear();
   out.routes.reserve(count);
+  const auto* cursor = reinterpret_cast<const std::byte*>(routes);
   for (std::size_t index = 0; index < count; ++index) {
-    const auto& route = routes[index];
+    const auto* element = next_sized_element<mln_resource_route>(cursor);
+    if (element == nullptr)
+      return reject("route", index, "has an invalid size");
+    const auto& route = *element;
     const auto status =
       check_pattern("route", index, route.kinds, route.flags, route.url);
     if (status != MLN_STATUS_OK) return status;
@@ -175,8 +196,13 @@ auto copy_header_rules(
   }
   out.rules.clear();
   out.rules.reserve(count);
+  const auto* cursor = reinterpret_cast<const std::byte*>(rules);
   for (std::size_t index = 0; index < count; ++index) {
-    const auto& rule = rules[index];
+    const auto* element = next_sized_element<mln_http_header_rule>(cursor);
+    if (element == nullptr) {
+      return reject("header rule", index, "has an invalid size");
+    }
+    const auto& rule = *element;
     const auto status =
       check_pattern("header rule", index, rule.kinds, rule.flags, rule.url);
     if (status != MLN_STATUS_OK) return status;

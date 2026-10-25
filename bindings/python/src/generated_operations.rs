@@ -3053,6 +3053,7 @@ fn generated_input_mln_http_header_rule<'py>(
         return Ok(unsafe { sys::mln_http_header_rule_default() });
     }
     let mut raw: sys::mln_http_header_rule = unsafe { sys::mln_http_header_rule_default() };
+    raw.size = std::mem::size_of::<sys::mln_http_header_rule>() as _;
     raw.kinds = value
         .getattr("kinds")?
         .extract::<sys::mln_resource_kind_flags>()?;
@@ -3776,6 +3777,7 @@ fn generated_input_mln_resource_route<'py>(
         return Ok(unsafe { sys::mln_resource_route_default() });
     }
     let mut raw: sys::mln_resource_route = unsafe { sys::mln_resource_route_default() };
+    raw.size = std::mem::size_of::<sys::mln_resource_route>() as _;
     raw.kinds = value
         .getattr("kinds")?
         .extract::<sys::mln_resource_kind_flags>()?;

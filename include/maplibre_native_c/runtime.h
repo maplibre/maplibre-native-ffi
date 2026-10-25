@@ -646,9 +646,12 @@ typedef uint32_t mln_url_match_flags;
 /**
  * One request pattern that a resource provider claims.
  *
- * Routes compare the normalized resolved URL that native loading fetches.
+ * Routes compare the normalized resolved URL that native loading fetches. In
+ * an array of routes, each route's size steps to the next, so a caller built
+ * against a later version of this header passes its larger routes unchanged.
  */
 typedef struct mln_resource_route {
+  uint32_t size;
   /** The resource kinds to match. */
   mln_resource_kind_flags kinds;
   mln_url_match_flags flags;
@@ -670,8 +673,12 @@ typedef struct mln_http_header {
  *
  * The first rule whose kind and URL match supplies all its headers, including
  * an empty header list that stops the search.
+ *
+ * In an array of rules, each rule's size steps to the next, so a caller built
+ * against a later version of this header passes its larger rules unchanged.
  */
 typedef struct mln_http_header_rule {
+  uint32_t size;
   /** The resource kinds to match. */
   mln_resource_kind_flags kinds;
   mln_url_match_flags flags;
@@ -1127,8 +1134,8 @@ MLN_API mln_status mln_runtime_create(
  *   null, provider->size is too small, neither or both of callback and queue
  *   are set, release_user_data is set in queue mode, queue is an invalid
  *   handle, a route is invalid, or completion is invalid. A route is invalid
- *   when routes is null with a nonzero route_count, or the route's url is null
- *   or its kinds are zero or hold unknown bits,
+ *   when routes is null with a nonzero route_count, its size is too small, its
+ *   url is null, or its kinds are zero or hold unknown bits,
  *   or its flags hold an unknown bit; the diagnostic names the route's index.
  * - MLN_STATUS_INVALID_STATE when runtime or queue has been released, or
  *   runtime is closing.
@@ -1416,9 +1423,9 @@ MLN_API void mln_resource_transform_request_release(
  *   a callback comes with rules, a rules
  *   transform carries user_data or release_user_data, a rule is invalid, or
  *   completion is invalid. A rule is invalid when rules is null with a nonzero
- *   rule_count, its url is null, its kinds are zero or hold unknown bits, its
- *   flags hold an unknown bit, its headers are null with a nonzero
- *   header_count, or a header breaks a rule of
+ *   rule_count, its size is too small, its url is null, its kinds are zero or
+ * hold unknown bits, its flags hold an unknown bit, its headers are null with a
+ * nonzero header_count, or a header breaks a rule of
  *   mln_http_header_transform_response_set_header(). The diagnostic names the
  *   rule's index and never includes a header value.
  * - MLN_STATUS_UNSUPPORTED on OpenHarmony and in the browser, whose HTTP

@@ -211,7 +211,7 @@ public object GeneratedApi {
    */
   public fun httpHeaderRuleDefault(): HttpHeaderRule =
     nativeCall(null, null) {
-      val out = allocate(w(24, 40), w(4, 8))
+      val out = sized(w(28, 48), w(4, 8))
       C.mln_http_header_rule_default(out)
       readHttpHeaderRule(out)
     }
@@ -515,7 +515,7 @@ public object GeneratedApi {
    */
   public fun resourceRouteDefault(): ResourceRoute =
     nativeCall(null, null) {
-      val out = allocate(w(16, 24), w(4, 8))
+      val out = sized(w(20, 32), w(4, 8))
       C.mln_resource_route_default(out)
       readResourceRoute(out)
     }

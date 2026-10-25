@@ -290,6 +290,7 @@ internal unsafe struct mln_http_header
 
 internal unsafe struct mln_http_header_rule
 {
+    public uint size;
     public uint kinds;
     public uint flags;
     public mln_buffer_view url;
@@ -814,6 +815,7 @@ internal unsafe struct mln_resource_response
 
 internal unsafe struct mln_resource_route
 {
+    public uint size;
     public uint kinds;
     public uint flags;
     public mln_buffer_view url;
