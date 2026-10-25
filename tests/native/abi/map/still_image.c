@@ -189,7 +189,7 @@ static void render_until_tile_requested(
 // Copies the one frame result queued on `session`, which needs no service.
 static mln_render_frame_result drain_one_result(mln_render_session session) {
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_render_session_drain_frame_results(session, &batch, NULL));
+  MLN_TEST_OK(mln_test_drain_frame_results(session, &batch, NULL));
   const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
   TEST_ASSERT_EQUAL_size_t(1, view.result_count);
   const mln_render_frame_result result = *mln_test_render_view_result(&view, 0);
