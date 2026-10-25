@@ -1,14 +1,9 @@
-#if canImport(Darwin)
-  import Darwin
-#elseif canImport(Glibc)
-  import Glibc
-#endif
 import Foundation
 import MaplibreNativeC
 @testable import MaplibreNativeFFI
 import Testing
 
-/// Tests that change the process log callback or standard error run in order.
+/// Tests that change the process log callback or report observer run in order.
 @Suite(.serialized)
 struct GlobalStateTests {
   /// Replacing the log callback releases the registration it replaces, and
@@ -48,7 +43,7 @@ struct GlobalStateTests {
   /// A callback's thrown error is reported to standard error, native receives
   /// the callback's fallback, and the runtime keeps working.
   @Test func aCallbackThatThrowsIsContainedAndReported() async throws {
-    let capture = try StandardErrorCapture()
+    let capture = ReportCapture()
     defer { capture.finish() }
     defer { try? Maplibre.logClearCallback() }
     try Maplibre.logSetCallback(handler: LogHandler { _, _, _, _ in
@@ -71,7 +66,7 @@ struct GlobalStateTests {
   /// error.
   @Test func anAbandonedHandleIsDisposedOffTheCallbackStackAndReported(
   ) async throws {
-    let capture = try StandardErrorCapture()
+    let capture = ReportCapture()
     try abandonInsideACallback()
     let failed =
       "Leaked leaky_handle native handle 0x3 (native disposal failed); "
@@ -145,46 +140,26 @@ private func abandonInsideACallback() throws {
   }
 }
 
-/// Redirects the process's standard error into a pipe until ``finish()``,
-/// which restores it and writes everything captured back to it.
-private final class StandardErrorCapture: @unchecked Sendable {
-  private let saved: Int32
-  private let pipe = Pipe()
-  private let captured = LockedBox(Data())
-  private let drained = DispatchSemaphore(value: 0)
+/// Records the runtime's reports until ``finish()``; they still reach standard
+/// error. Redirecting file descriptor 2 instead races the suite's other
+/// threads: when `dup2` replaces a descriptor that a thread's pipe write is
+/// blocked on, XNU fails that write with EPIPE and the SIGPIPE kills the
+/// process.
+private final class ReportCapture: Sendable {
+  private let captured = LockedBox("")
 
-  init() throws {
-    // Flushing every stream reaches standard error without naming Glibc's
-    // global `stderr`, which strict concurrency rejects as shared state.
-    fflush(nil)
-    saved = dup(STDERR_FILENO)
-    guard saved >= 0,
-          dup2(pipe.fileHandleForWriting.fileDescriptor, STDERR_FILENO) >= 0
-    else { throw FixtureError("standard error could not be redirected") }
-    let reader = pipe.fileHandleForReading
-    Thread { [captured, drained] in
-      while true {
-        let chunk = reader.availableData
-        if chunk.isEmpty {
-          break
-        }
-        captured.update { $0.append(chunk) }
-      }
-      drained.signal()
-    }.start()
+  init() {
+    reportObserver.set { [captured] message in
+      captured.update { $0 += message }
+    }
   }
 
   var text: String {
-    String(decoding: captured.value, as: UTF8.self)
+    captured.value
   }
 
   func finish() {
-    fflush(nil)
-    dup2(saved, STDERR_FILENO)
-    close(saved)
-    try? pipe.fileHandleForWriting.close()
-    _ = isSignalled(drained)
-    FileHandle.standardError.write(captured.value)
+    reportObserver.set(nil)
   }
 }
 
