@@ -103,11 +103,15 @@ void a_frame_of_an_older_update_does_not_complete_a_still_image() {
   auto still = mln_test_completion_default(0);
   MLN_TEST_OK(mln_map_request_still_image(map, &still.descriptor, nullptr));
   render_forced_frame(fixture);
+  // The request's own demand can render the image as soon as the request
+  // runs, so the held point keeps that frame's messages behind this check.
+  points.hold(SyncPoint::StillImageFrameHeldBack);
   mln_test_gate_release(parked.get());
 
   // The request runs first, since it was queued before the frame's messages.
   TEST_ASSERT_TRUE(points.wait_for_hits(SyncPoint::StillImageFrameHeldBack, 1));
   TEST_ASSERT_FALSE(mln_test_completion_poll(&still));
+  points.release(SyncPoint::StillImageFrameHeldBack);
 
   MLN_TEST_OK(mln_test_render_pending_still_image(&fixture, &still));
   mln_test_completion_destroy(&still);
@@ -187,7 +191,9 @@ void a_request_behind_an_unfinished_demand_still_renders() {
   MLN_TEST_OK(next.second_submitted);
   MLN_TEST_OK(next.fence);
 
-  MLN_TEST_OK(mln_test_render_pending_still_image(&fixture, &second));
+  // A caller driver renders the next image within the same service, so the
+  // wait above can drain its frame's result; this waits for its completion.
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &second));
   mln_test_completion_destroy(&first);
   mln_test_completion_destroy(&second);
   mln_test_render_fixture_destroy(&fixture);
