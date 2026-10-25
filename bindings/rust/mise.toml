@@ -33,8 +33,8 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 # The preset selects the runner: Android presets and OpenHarmony x64 presets
 # push to an emulator, iOS simulator presets spawn on a booted simulator,
-# Emscripten presets run as a page in headless Chromium, and host presets run in
-# process.
+# Emscripten presets run as a page in headless Chromium, and host and Mac
+# Catalyst presets run in process.
 run = '''
 case "$usage_preset" in
   android-* | ohos-* | ios-simulator-*)
@@ -43,8 +43,9 @@ case "$usage_preset" in
   emscripten-*)
     exec "$MISE_MONOREPO_ROOT/scripts/test-rust-browser.sh" "$usage_preset"
     ;;
+  ios-maccatalyst-*) ;;
   ios-*)
-    echo "The Rust binding tests need a runnable target; test an ios-simulator preset instead of $usage_preset." >&2
+    echo "The Rust binding tests need a runnable target; test an ios-simulator or ios-maccatalyst preset instead of $usage_preset." >&2
     exit 2
     ;;
 esac

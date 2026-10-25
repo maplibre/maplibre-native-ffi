@@ -273,7 +273,12 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
         )
     elif target_platform == "ios-maccatalyst":
         # Kotlin/Native and Zig have no Mac Catalyst target.
-        commands.append(f"mise run //bindings/swift:test {preset}")
+        commands.extend(
+            [
+                f"mise run //bindings/swift:test {preset}",
+                f"mise run //bindings/rust:test {preset}",
+            ]
+        )
     elif target_platform == "tvos":
         commands.extend(
             [

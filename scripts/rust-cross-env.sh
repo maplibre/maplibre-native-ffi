@@ -1,8 +1,9 @@
 # Sourced by the Rust binding's cross-compilation tasks with a native preset as
-# $1. Maps musl, Android, iOS, and OpenHarmony presets to their Cargo target.
-# Exports the cross-compilation environment (CC/CXX, linker) from the Zig and
-# Rust toolchains, Android NDK, or OpenHarmony SDK. Leaves `cargo_target` empty
-# for host presets, where Cargo picks its own target and toolchain.
+# $1. Maps musl, Android, iOS, Mac Catalyst, and OpenHarmony presets to their
+# Cargo target. Exports the cross-compilation environment (CC/CXX, linker) from
+# the Zig and Rust toolchains, Android NDK, or OpenHarmony SDK. Leaves
+# `cargo_target` empty for host presets, where Cargo picks its own target and
+# toolchain.
 # shellcheck shell=bash
 
 cargo_target=
@@ -12,6 +13,7 @@ case "$1" in
   android-arm64-*) cargo_target=aarch64-linux-android ;;
   android-x64-*) cargo_target=x86_64-linux-android ;;
   ios-arm64-*) cargo_target=aarch64-apple-ios ;;
+  ios-maccatalyst-arm64-*) cargo_target=aarch64-apple-ios-macabi ;;
   ios-simulator-arm64-*) cargo_target=aarch64-apple-ios-sim ;;
   linux-musl-arm64-*) cargo_target=aarch64-unknown-linux-musl ;;
   linux-musl-x64-*) cargo_target=x86_64-unknown-linux-musl ;;
