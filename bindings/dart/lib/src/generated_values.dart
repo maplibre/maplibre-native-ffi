@@ -1977,14 +1977,17 @@ final class AnimationOptions extends _Value {
     double? minZoom,
     UnitBezier? easing,
     int? transitionId,
-    CameraTransitionEndCallback? endHandler,
+    CameraTransitionEndCallback? endHandler =
+        _unchangedCameraTransitionEndCallback,
   }) => AnimationOptions(
     durationMs: durationMs ?? this.durationMs,
     velocity: velocity ?? this.velocity,
     minZoom: minZoom ?? this.minZoom,
     easing: easing ?? this.easing,
     transitionId: transitionId ?? this.transitionId,
-    endHandler: endHandler ?? this.endHandler,
+    endHandler: identical(endHandler, _unchangedCameraTransitionEndCallback)
+        ? this.endHandler
+        : endHandler,
   );
 
   @override
@@ -2006,6 +2009,8 @@ final class AnimationOptions extends _Value {
     'endHandler',
   ]);
 }
+
+void _unchangedCameraTransitionEndCallback(CameraTransitionEnd end) {}
 
 /// Geographic bounds in degrees.
 ///

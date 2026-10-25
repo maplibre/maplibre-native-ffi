@@ -110,6 +110,8 @@ class Values:
         }
 
         self.results: dict[str, str] = {}
+        # The no-op defaults that copyWith declares for optional callbacks.
+        self.unchanged: set[str] = set()
 
     def scalar(self, value):
         return SCALARS.get(
@@ -1268,13 +1270,38 @@ class Values:
             compared = ", ".join(names)
             described = ", ".join(f"'{name}'" for name in names)
             copy = ""
+            helpers = []
             if value.native in self.bound.inputs:
                 # A JSON member takes null as a value meaning absent, so its
                 # parameter defaults to a sentinel instead of null.
                 json = {name for name, typ, _ in members if typ == "Object?"}
+                # An optional lone callback takes null to disable it, so its
+                # parameter defaults to a no-op of its own type instead.
+                unchanged = {
+                    name: f"_unchanged{typ.removesuffix('?')}"
+                    for name, typ, field in members
+                    if typ.endswith("?") and self.single_callback(field.value)
+                }
+                for name, typ, field in members:
+                    if name in unchanged and unchanged[name] not in self.unchanged:
+                        callback = self.single_callback(field.value)
+                        arguments = self.bound.callbacks[
+                            callback.value.native
+                        ].arguments
+                        self.unchanged.add(unchanged[name])
+                        helpers.append(
+                            f"void {unchanged[name]}("
+                            + ", ".join(
+                                f"{self.public(p.value)} {identifier(p.name)}"
+                                for p in arguments
+                            )
+                            + ") {}\n"
+                        )
                 parameters = ", ".join(
                     f"Object? {name} = _unchanged"
                     if name in json
+                    else f"{typ} {name} = {unchanged[name]}"
+                    if name in unchanged
                     else f"{typ.removesuffix('?')}? {name}"
                     for name, typ, _ in members
                 ) + "".join(f", bool? {name}" for name, _ in flags)
@@ -1284,6 +1311,8 @@ class Values:
                     + ", ".join(
                         f"{name}: identical({name}, _unchanged) ? this.{name} : {name}"
                         if name in json
+                        else f"{name}: identical({name}, {unchanged[name]}) ? this.{name} : {name}"
+                        if name in unchanged
                         else f"{name}: {name} ?? this.{name}"
                         for name in names
                     )
@@ -1292,6 +1321,7 @@ class Values:
             declarations.append(
                 f"final class {public} extends _Value {{\n  {'const ' if not initializers and not value.default else ''}{public}({signature}){' : ' + ', '.join(initializers) if initializers else ''};\n{fields}\n{copy}\n  @override List<Object?> get _members => [{compared}];\n"
                 f"  @override String toString() => _describe('{public}', const [{described}]);\n}}\n"
+                + "".join("\n" + helper for helper in helpers)
             )
             write = [
                 f"Pointer<raw.{value.native}> _write{public}({public} value, Allocator arena"
