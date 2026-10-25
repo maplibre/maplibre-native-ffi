@@ -23,14 +23,13 @@ import org.maplibre.nativeffi.generated.LatLng
 import org.maplibre.nativeffi.generated.LogSeverityFlag
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.MapOptions
+import org.maplibre.nativeffi.generated.OfflineRegionDefinition
 import org.maplibre.nativeffi.generated.PremultipliedRgba8Image
-import org.maplibre.nativeffi.generated.RenderedQueryGeometry
-import org.maplibre.nativeffi.generated.RenderedQueryGeometryData
 import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.generated.StyleExpressionInputs
 import org.maplibre.nativeffi.generated.StyleImageOptions
 import org.maplibre.nativeffi.generated.UrlMatchFlag
-import org.maplibre.nativeffi.generated.writeRenderedQueryGeometry
+import org.maplibre.nativeffi.generated.writeOfflineRegionDefinition
 import org.maplibre.nativeffi.internal.memory.NativeArena
 import org.maplibre.nativeffi.internal.memory.readCString
 import org.maplibre.nativeffi.runSuspendTest
@@ -76,8 +75,8 @@ class GeneratedShapesTest {
   @Test
   fun submittingAnUnknownUnionVariantIsAnIllegalArgument() {
     NativeArena().use { arena ->
-      val geometry = RenderedQueryGeometry(RenderedQueryGeometryData.Unknown(900u, byteArrayOf()))
-      assertFailsWith<IllegalArgumentException> { arena.writeRenderedQueryGeometry(geometry) }
+      val definition = OfflineRegionDefinition.Unknown(900u, byteArrayOf())
+      assertFailsWith<IllegalArgumentException> { arena.writeOfflineRegionDefinition(definition) }
     }
   }
 

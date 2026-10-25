@@ -1194,17 +1194,7 @@ export interface OfflineGeometryRegionDefinition {
  * See `mln_offline_region_definition` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-export interface OfflineRegionDefinition {
-  data: OfflineRegionDefinitionData;
-}
-
-/**
- * Offline region definition data.
- *
- * See `mln_offline_region_definition_data` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export type OfflineRegionDefinitionData =
+export type OfflineRegionDefinition =
   | {
       readonly kind: "tilePyramid";
       readonly value: OfflineTilePyramidRegionDefinition;
@@ -1980,25 +1970,10 @@ export interface RenderedFeatureQueryOptions {
  * See `mln_rendered_query_geometry` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
-export interface RenderedQueryGeometry {
-  data: RenderedQueryGeometryData;
-}
-
-/**
- * Screen-space query geometry data.
- *
- * See `mln_rendered_query_geometry_data` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-export type RenderedQueryGeometryData =
+export type RenderedQueryGeometry =
   | { readonly kind: "point"; readonly value: ScreenPoint }
   | { readonly kind: "box"; readonly value: ScreenBox }
-  | { readonly kind: "lineString"; readonly value: ScreenLineString }
-  | {
-      readonly kind: "unknown";
-      readonly tag: number;
-      readonly bytes: Uint8Array;
-    };
+  | { readonly kind: "lineString"; readonly value: ScreenLineString };
 
 /**
  * Rendering statistics reported in `MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME`.

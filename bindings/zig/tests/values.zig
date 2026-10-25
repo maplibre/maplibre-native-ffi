@@ -117,6 +117,25 @@ test "a strided event batch with an unknown payload arm decodes without loss" {
     try probe.checked;
 }
 
+// A record of only a tag and its union is that union: the conversion writes the
+// size and the variant's tag. Only a union that native returns keeps a tag the
+// binding does not know, and that tag cannot be submitted.
+test "a tag-and-union record converts as the union itself" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const geometry: maplibre.RenderedQueryGeometry = .{ .box = .{ .min = .{ .x = 1, .y = 2 }, .max = .{ .x = 3, .y = 4 } } };
+    const raw_geometry = try geometry.toNative(arena.allocator());
+    try testing.expectEqual(@sizeOf(@TypeOf(raw_geometry)), raw_geometry.size);
+    try testing.expectEqual(geometry, try maplibre.RenderedQueryGeometry.fromNative(arena.allocator(), raw_geometry));
+
+    const RawDefinition = @typeInfo(@TypeOf(maplibre.OfflineRegionDefinition.fromNative)).@"fn".param_types[1].?;
+    var raw_definition = std.mem.zeroes(RawDefinition);
+    raw_definition.type = 77;
+    const definition = try maplibre.OfflineRegionDefinition.fromNative(arena.allocator(), raw_definition);
+    try testing.expectEqual(@as(u32, 77), definition.unknown);
+    try testing.expectError(error.InvalidArgument, definition.toNative());
+}
+
 // An enum value the binding does not name crosses unchanged, so native is the
 // one that rejects it, and a 64-bit identifier keeps its high bits.
 // Zig integer types mirror the C widths, so a narrowing would not compile.

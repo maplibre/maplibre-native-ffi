@@ -1779,15 +1779,7 @@ napi_value mln_ts_read_offline_geometry_region_definition(
 napi_value mln_ts_read_offline_region_definition(
   napi_env env, const mln_offline_region_definition* source, size_t size
 ) {
-  (void)size;
-  napi_value result = mln_ts_object(env);
-  if (result == NULL) return NULL;
-  if (!mln_ts_set(
-        env, result, "data",
-        mln_ts_read_offline_region_definition_data(env, source, size)
-      ))
-    return NULL;
-  return result;
+  return mln_ts_read_offline_region_definition_data(env, source, size);
 }
 
 napi_value mln_ts_read_offline_region_definition_data(
@@ -5876,23 +5868,18 @@ bool mln_ts_write_offline_region_definition(
   mln_ts_call* call, napi_value value, mln_offline_region_definition* out,
   const char* path
 ) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "data", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "data");
-  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_read_record(call, value, path)) return false;
   {
     static const char* const kinds[] = {"tilePyramid", "geometry"};
     napi_value arm;
     char arm_path[256];
     (void)arm;
     (void)arm_path;
-    switch (mln_ts_read_kind(call, member, kinds, 2, child)) {
+    switch (mln_ts_read_kind(call, value, kinds, 2, path)) {
       case 0:
         out->type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID;
-        if (!mln_ts_member(call, member, "value", &arm)) return false;
-        mln_ts_path(arm_path, sizeof arm_path, child, "value");
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
         memset(&out->data.tile_pyramid, 0, sizeof out->data.tile_pyramid);
         if (!mln_ts_read_record(call, arm, arm_path)) return false;
         if (!mln_ts_write_offline_tile_pyramid_region_definition(
@@ -5902,8 +5889,8 @@ bool mln_ts_write_offline_region_definition(
         break;
       case 1:
         out->type = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY;
-        if (!mln_ts_member(call, member, "value", &arm)) return false;
-        mln_ts_path(arm_path, sizeof arm_path, child, "value");
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
         memset(&out->data.geometry, 0, sizeof out->data.geometry);
         if (!mln_ts_read_record(call, arm, arm_path)) return false;
         if (!mln_ts_write_offline_geometry_region_definition(
@@ -6503,23 +6490,18 @@ bool mln_ts_write_rendered_query_geometry(
   mln_ts_call* call, napi_value value, mln_rendered_query_geometry* out,
   const char* path
 ) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "data", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "data");
-  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_read_record(call, value, path)) return false;
   {
     static const char* const kinds[] = {"point", "box", "lineString"};
     napi_value arm;
     char arm_path[256];
     (void)arm;
     (void)arm_path;
-    switch (mln_ts_read_kind(call, member, kinds, 3, child)) {
+    switch (mln_ts_read_kind(call, value, kinds, 3, path)) {
       case 0:
         out->type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT;
-        if (!mln_ts_member(call, member, "value", &arm)) return false;
-        mln_ts_path(arm_path, sizeof arm_path, child, "value");
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
         memset(&out->data.point, 0, sizeof out->data.point);
         if (!mln_ts_read_record(call, arm, arm_path)) return false;
         if (!mln_ts_write_screen_point(call, arm, &out->data.point, arm_path))
@@ -6527,8 +6509,8 @@ bool mln_ts_write_rendered_query_geometry(
         break;
       case 1:
         out->type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX;
-        if (!mln_ts_member(call, member, "value", &arm)) return false;
-        mln_ts_path(arm_path, sizeof arm_path, child, "value");
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
         memset(&out->data.box, 0, sizeof out->data.box);
         if (!mln_ts_read_record(call, arm, arm_path)) return false;
         if (!mln_ts_write_screen_box(call, arm, &out->data.box, arm_path))
@@ -6536,8 +6518,8 @@ bool mln_ts_write_rendered_query_geometry(
         break;
       case 2:
         out->type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING;
-        if (!mln_ts_member(call, member, "value", &arm)) return false;
-        mln_ts_path(arm_path, sizeof arm_path, child, "value");
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
         memset(&out->data.line_string, 0, sizeof out->data.line_string);
         if (!mln_ts_read_record(call, arm, arm_path)) return false;
         if (!mln_ts_write_screen_line_string(

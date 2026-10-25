@@ -6,7 +6,6 @@ import org.maplibre.nativeffi.generated.CameraUpdate
 import org.maplibre.nativeffi.generated.LatLng
 import org.maplibre.nativeffi.generated.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.generated.RenderedQueryGeometry
-import org.maplibre.nativeffi.generated.RenderedQueryGeometryData
 import org.maplibre.nativeffi.generated.ScreenBox
 import org.maplibre.nativeffi.generated.ScreenPoint
 import org.maplibre.nativeffi.generated.SourceFeatureQueryOptions
@@ -52,12 +51,10 @@ internal suspend fun assertFilterSelects(
     val rendered =
       complete(
         session.queryRenderedFeatures(
-          RenderedQueryGeometry(
-            RenderedQueryGeometryData.Box(
-              ScreenBox(
-                ScreenPoint(0.0, 0.0),
-                ScreenPoint(FILTER_MAP_SIZE.toDouble(), FILTER_MAP_SIZE.toDouble()),
-              ),
+          RenderedQueryGeometry.Box(
+            ScreenBox(
+              ScreenPoint(0.0, 0.0),
+              ScreenPoint(FILTER_MAP_SIZE.toDouble(), FILTER_MAP_SIZE.toDouble()),
             ),
           ),
           RenderedFeatureQueryOptions(layerIds = listOf("cases")),

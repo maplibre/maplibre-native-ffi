@@ -3393,12 +3393,15 @@ pub const OfflineGeometryRegionDefinition = struct {
 ///
 /// See `mln_offline_region_definition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const OfflineRegionDefinition = struct {
-    data: OfflineRegionDefinitionData = .{ .unknown = 0 },
+pub const OfflineRegionDefinition = union(enum) {
+    tile_pyramid: OfflineTilePyramidRegionDefinition,
+    geometry: OfflineGeometryRegionDefinition,
+    unknown: u32,
+
     pub fn toNative(self: OfflineRegionDefinition) status.Error!c.mln_offline_region_definition {
         var raw = std.mem.zeroes(c.mln_offline_region_definition);
         raw.size = @sizeOf(c.mln_offline_region_definition);
-        switch (self.data) {
+        switch (self) {
             .tile_pyramid => |item| {
                 raw.type = c.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID;
                 raw.data.tile_pyramid = try item.toNative();
@@ -3413,24 +3416,12 @@ pub const OfflineRegionDefinition = struct {
     }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_offline_region_definition) status.Error!OfflineRegionDefinition {
-        return .{
-            .data = switch (raw.type) {
-                c.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID => .{ .tile_pyramid = try OfflineTilePyramidRegionDefinition.fromNative(allocator, raw.data.tile_pyramid) },
-                c.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY => .{ .geometry = try OfflineGeometryRegionDefinition.fromNative(allocator, raw.data.geometry) },
-                else => |tag| .{ .unknown = @intCast(tag) },
-            },
+        return switch (raw.type) {
+            c.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID => .{ .tile_pyramid = try OfflineTilePyramidRegionDefinition.fromNative(allocator, raw.data.tile_pyramid) },
+            c.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY => .{ .geometry = try OfflineGeometryRegionDefinition.fromNative(allocator, raw.data.geometry) },
+            else => |tag| .{ .unknown = @intCast(tag) },
         };
     }
-};
-
-/// Offline region definition data.
-///
-/// See `mln_offline_region_definition_data` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const OfflineRegionDefinitionData = union(enum) {
-    tile_pyramid: OfflineTilePyramidRegionDefinition,
-    geometry: OfflineGeometryRegionDefinition,
-    unknown: u32,
 };
 
 pub const OfflineRegionDownloadState = enum(u32) {
@@ -3447,7 +3438,7 @@ pub const OfflineRegionDownloadState = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const OfflineRegionInfo = struct {
     id: i64 = 0,
-    definition: OfflineRegionDefinition = .{},
+    definition: OfflineRegionDefinition = .{ .unknown = 0 },
     /// Metadata bytes.
     metadata: []const u8 = &.{},
 
@@ -4349,12 +4340,15 @@ pub const RenderedFeatureQueryOptions = struct {
 ///
 /// See `mln_rendered_query_geometry` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub const RenderedQueryGeometry = struct {
-    data: RenderedQueryGeometryData = .{ .unknown = 0 },
+pub const RenderedQueryGeometry = union(enum) {
+    point: ScreenPoint,
+    box: ScreenBox,
+    line_string: ScreenLineString,
+
     pub fn toNative(self: RenderedQueryGeometry, allocator: std.mem.Allocator) status.Error!c.mln_rendered_query_geometry {
         var raw = std.mem.zeroes(c.mln_rendered_query_geometry);
         raw.size = @sizeOf(c.mln_rendered_query_geometry);
-        switch (self.data) {
+        switch (self) {
             .point => |item| {
                 raw.type = c.MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT;
                 raw.data.point = item.toNative();
@@ -4367,32 +4361,18 @@ pub const RenderedQueryGeometry = struct {
                 raw.type = c.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING;
                 raw.data.line_string = try item.toNative(allocator);
             },
-            .unknown => return error.InvalidArgument,
         }
         return raw;
     }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_rendered_query_geometry) status.Error!RenderedQueryGeometry {
-        return .{
-            .data = switch (raw.type) {
-                c.MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT => .{ .point = ScreenPoint.fromNative(raw.data.point) },
-                c.MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX => .{ .box = ScreenBox.fromNative(raw.data.box) },
-                c.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING => .{ .line_string = try ScreenLineString.fromNative(allocator, raw.data.line_string) },
-                else => |tag| .{ .unknown = @intCast(tag) },
-            },
+        return switch (raw.type) {
+            c.MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT => .{ .point = ScreenPoint.fromNative(raw.data.point) },
+            c.MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX => .{ .box = ScreenBox.fromNative(raw.data.box) },
+            c.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING => .{ .line_string = try ScreenLineString.fromNative(allocator, raw.data.line_string) },
+            else => return error.NativeError,
         };
     }
-};
-
-/// Screen-space query geometry data.
-///
-/// See `mln_rendered_query_geometry_data` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-pub const RenderedQueryGeometryData = union(enum) {
-    point: ScreenPoint,
-    box: ScreenBox,
-    line_string: ScreenLineString,
-    unknown: u32,
 };
 
 /// Rendering statistics reported in `MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME`.

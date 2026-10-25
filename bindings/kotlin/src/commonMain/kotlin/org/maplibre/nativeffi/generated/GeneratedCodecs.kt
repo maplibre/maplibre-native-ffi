@@ -751,21 +751,19 @@ internal fun NativeArena.writeScreenPoint(value: ScreenPoint): Long =
 
 internal fun NativeArena.putRenderedQueryGeometry(target: Long, value: RenderedQueryGeometry) {
   writeU32(target, 40.toUInt())
-  when (val variant = value.data) {
-    is RenderedQueryGeometryData.Point -> {
+  when (val variant = value) {
+    is RenderedQueryGeometry.Point -> {
       writeU32(target + 4, 1u)
       putScreenPoint(target + 8, variant.value)
     }
-    is RenderedQueryGeometryData.Box -> {
+    is RenderedQueryGeometry.Box -> {
       writeU32(target + 4, 2u)
       putScreenBox(target + 8, variant.value)
     }
-    is RenderedQueryGeometryData.LineString -> {
+    is RenderedQueryGeometry.LineString -> {
       writeU32(target + 4, 3u)
       putScreenLineString(target + 8, variant.value)
     }
-    is RenderedQueryGeometryData.Unknown ->
-      throw IllegalArgumentException("unknown native union variants cannot be submitted")
   }
 }
 
@@ -887,16 +885,16 @@ internal fun NativeArena.writeMapOptions(value: MapOptions): Long =
 
 internal fun NativeArena.putOfflineRegionDefinition(target: Long, value: OfflineRegionDefinition) {
   writeU32(target, w(72, 80).toUInt())
-  when (val variant = value.data) {
-    is OfflineRegionDefinitionData.TilePyramid -> {
+  when (val variant = value) {
+    is OfflineRegionDefinition.TilePyramid -> {
       writeU32(target + 4, 1u)
       putOfflineTilePyramidRegionDefinition(target + 8, variant.value)
     }
-    is OfflineRegionDefinitionData.Geometry -> {
+    is OfflineRegionDefinition.Geometry -> {
       writeU32(target + 4, 2u)
       putOfflineGeometryRegionDefinition(target + 8, variant.value)
     }
-    is OfflineRegionDefinitionData.Unknown ->
+    is OfflineRegionDefinition.Unknown ->
       throw IllegalArgumentException("unknown native union variants cannot be submitted")
   }
 }
@@ -2112,21 +2110,13 @@ internal fun readTextureImageInfo(source: Long): TextureImageInfo =
   )
 
 internal fun readOfflineRegionDefinition(source: Long): OfflineRegionDefinition =
-  OfflineRegionDefinition(
-    data =
-      readU32(source + 4).let { tag ->
-        when (tag) {
-          1u ->
-            OfflineRegionDefinitionData.TilePyramid(
-              readOfflineTilePyramidRegionDefinition(source + 8),
-            )
-          2u ->
-            OfflineRegionDefinitionData.Geometry(readOfflineGeometryRegionDefinition(source + 8))
-          else ->
-            OfflineRegionDefinitionData.Unknown(tag, NativeMemory.getBytes(source + 8, w(64, 72)))
-        }
-      },
-  )
+  readU32(source + 4).let { tag ->
+    when (tag) {
+      1u -> OfflineRegionDefinition.TilePyramid(readOfflineTilePyramidRegionDefinition(source + 8))
+      2u -> OfflineRegionDefinition.Geometry(readOfflineGeometryRegionDefinition(source + 8))
+      else -> OfflineRegionDefinition.Unknown(tag, NativeMemory.getBytes(source + 8, w(64, 72)))
+    }
+  }
 
 internal fun NativeArena.putUnitBezier(target: Long, value: UnitBezier) {
   writeF64(target, value.x1)

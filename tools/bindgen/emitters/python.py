@@ -1031,13 +1031,23 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         facade[owner].append(
             f"    @property\n    def discarding(self) -> {owner}Discarding:\n        return {owner}Discarding(self)\n"
         )
-    imports = "\n".join(
-        f"from ._generated_values import {public_name(record)}"
-        for record in sorted(values.records | values.enums)
+    imported = {
+        public_name(record)
+        for record in values.records | values.enums
         if not values.records.get(record, values.enums.get(record)).response
+    }
+    # A result that is a record of only a union copies into its variants.
+    imported.update(
+        values.variant_name(value.union_member.value, variant)
+        for value in values.records.values()
+        if value.union_member
+        for variant in value.union_member.value.fields
+    )
+    imports = "\n".join(
+        f"from ._generated_values import {name}" for name in sorted(imported)
     )
     files["python/maplibre_native_ffi/_generated_operations.py"] = (
-        f'"""{notice}"""\n\nfrom __future__ import annotations\n\nfrom collections.abc import Buffer, Sequence\nfrom concurrent.futures import Future\nfrom contextlib import AbstractContextManager\nfrom dataclasses import dataclass\nfrom typing import TYPE_CHECKING, Any, Callable, NamedTuple\nfrom . import _native\nfrom ._completion import CommandCompletion\nfrom ._future import map_future\nfrom ._operation import GeneratedOperations, _adopt_value, _view\nfrom ._generated_values import _maybe\n{imports}\nif TYPE_CHECKING:\n    from ._generated_owners import {", ".join([*OWNERS.values(), *scope_owners.values()]) or "__name__"}\n\n'
+        f'"""{notice}"""\n\nfrom __future__ import annotations\n\nfrom collections.abc import Buffer, Sequence\nfrom concurrent.futures import Future\nfrom contextlib import AbstractContextManager\nfrom dataclasses import dataclass\nfrom typing import TYPE_CHECKING, Any, Callable, NamedTuple\nfrom . import _native\nfrom ._completion import CommandCompletion\nfrom ._future import map_future\nfrom ._operation import GeneratedOperations, _adopt_value, _view\nfrom ._generated_values import _copy_variant, _maybe\n{imports}\nif TYPE_CHECKING:\n    from ._generated_owners import {", ".join([*OWNERS.values(), *scope_owners.values()]) or "__name__"}\n\n'
         + "\n".join(sorted(records))
         + "\n".join(
             f"class _{owner}Operations(GeneratedOperations):\n    _native: _native._{owner}\n\n{chr(10).join(methods)}"
@@ -1135,9 +1145,9 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
         + "\n".join(owner_classes)
     )
     public_values_names = sorted(
-        node.name
+        node.name.id if isinstance(node, ast.TypeAlias) else node.name
         for node in ast.parse(public_values).body
-        if isinstance(node, ast.ClassDef)
+        if isinstance(node, (ast.ClassDef, ast.TypeAlias))
     )
     public_globals = sorted(
         plan.member

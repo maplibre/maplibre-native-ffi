@@ -304,7 +304,7 @@ class Values:
         result = []
         for field in self.fields(value):
             typ = (
-                name(value.native) + pascal(field.name)
+                self.union_name(value, field)
                 if field.value.kind == "union"
                 else self.public(field.value)
             )
@@ -343,7 +343,8 @@ class Values:
         if value.kind == "record":
             return (
                 name(value.native) + "()"
-                if not self.output_only(value)
+                if not value.union_member
+                and not self.output_only(value)
                 and all(
                     typ.endswith("?") or self.field_default(field)
                     for _, typ, field in self.members(value)
@@ -410,29 +411,23 @@ class Values:
                     ]
                 )
                 continue
+            if value.union_member:
+                # The record is presented as its union, under the record's name.
+                result.append(
+                    self.union_declaration(
+                        public, value.union_member.value, doc(self.bound, value.native)
+                    )
+                )
+                continue
             for field in self.fields(value):
                 if field.value.kind != "union":
                     continue
-                union_name = public + pascal(field.name)
-                variants = [
-                    f"{doc(self.bound, f'{field.value.native}.{v.name}', '  ')}  public data class {pascal(v.name)}(public val value: {self.public(v.value)}): {union_name}"
-                    + content_equality(
-                        pascal(v.name), [("value", self.public(v.value))]
-                    )
-                    for v in field.value.fields
-                ]
-                if field.value.empty_variant:
-                    variants.append(f"  public data object None: {union_name}")
-                variants.append(
-                    f"  public data class Unknown(public val tag: UInt, public val bytes: ByteArray): {union_name}"
-                    + content_equality(
-                        "Unknown", [("tag", "UInt"), ("bytes", "ByteArray")]
-                    )
-                )
                 result.append(
-                    f"{doc(self.bound, field.value.native)}public sealed interface {union_name} {{\n"
-                    + "\n".join(variants)
-                    + "\n}"
+                    self.union_declaration(
+                        self.union_name(value, field),
+                        field.value,
+                        doc(self.bound, field.value.native),
+                    )
                 )
             args = []
             typed = []
@@ -513,6 +508,32 @@ class Values:
                 )
             )
         return "\n".join(result) + "\n" + kotlin_callbacks.common(self)
+
+    def union_name(self, record, field):
+        """The public type of [record]'s union [field]."""
+        if record.union_member:
+            return name(record.native)
+        return name(record.native) + pascal(field.name)
+
+    def union_declaration(self, public, union, documentation):
+        variants = [
+            f"{doc(self.bound, f'{union.native}.{v.name}', '  ')}  public data class {pascal(v.name)}(public val value: {self.public(v.value)}): {public}"
+            + content_equality(pascal(v.name), [("value", self.public(v.value))])
+            for v in union.fields
+        ]
+        if union.empty_variant:
+            variants.append(f"  public data object None: {public}")
+        # Only a union that native returns can hold a tag this binding does not know.
+        if union.native in self.bound.returned:
+            variants.append(
+                f"  public data class Unknown(public val tag: UInt, public val bytes: ByteArray): {public}"
+                + content_equality("Unknown", [("tag", "UInt"), ("bytes", "ByteArray")])
+            )
+        return (
+            f"{documentation}public sealed interface {public} {{\n"
+            + "\n".join(variants)
+            + "\n}"
+        )
 
     def storage(self, ctype):
         """Allocate one value of a C type with that type's size and alignment."""
@@ -682,7 +703,9 @@ class Values:
             lines.append(
                 f"  if (value.{member}) {self.mark(value, flag.mask, flag.name)}"
             )
-        for member, _typ, field in self.members(value):
+        if value.union_member:
+            lines += self.union_write(value, value.union_member, "value")
+        for member, _typ, field in [] if value.union_member else self.members(value):
             if field.value.kind == "union":
                 lines += self.union_write(value, field, f"value.{member}")
                 continue
@@ -757,7 +780,7 @@ class Values:
         return f"{local} = {local} or {literal(self.bound.enum_number(bit), typ)}"
 
     def union_write(self, record, field, expression):
-        public = name(record.native) + pascal(field.name)
+        public = self.union_name(record, field)
         union = self.at("target", record, field.name)
         tag = self.field_plan(record, field.presence.tag)
         tag_address = self.at("target", record, field.presence.tag)
@@ -772,9 +795,10 @@ class Values:
                 + self.place(variant.value, union, "variant.value")
                 + " }"
             )
-        lines.append(
-            f'    is {public}.Unknown -> throw IllegalArgumentException("unknown native union variants cannot be submitted")'
-        )
+        if field.value.native in self.bound.returned:
+            lines.append(
+                f'    is {public}.Unknown -> throw IllegalArgumentException("unknown native union variants cannot be submitted")'
+            )
         lines.append("  }")
         return lines
 
@@ -851,6 +875,8 @@ class Values:
                 f"{self.public(field.value)} = {self.field_read(value, field, None)}"
             )
         public = name(value.native)
+        if value.union_member:
+            return f"internal fun {self.read(value)}(source: Long): {public} = {self.union_read(value, value.union_member)}"
         scoped = value.native in self.views
         scope = "scope" if scoped else None
         parameters = "source: Long"
@@ -929,7 +955,7 @@ class Values:
         return f"({identifier(mask)} and {literal(number, typ)}) != {zero}"
 
     def union_read(self, record, field):
-        public = name(record.native) + pascal(field.name)
+        public = self.union_name(record, field)
         tag = self.field_plan(record, field.presence.tag)
         tag_suffix, tag_type = self.accessor(tag.value)
         union = self.at("source", record, field.name)
@@ -949,6 +975,8 @@ class Values:
         )
         arms.append(
             f"else -> {public}.Unknown({'tag' if tag_type == 'UInt' else 'tag.toUInt()'}, NativeMemory.getBytes({union}, {width_expression(sizes)}))"
+            if field.value.native in self.bound.returned
+            else 'else -> throw IllegalStateException("native union contains an unsupported variant")'
         )
         return (
             f"read{tag_suffix}({self.at('source', record, field.presence.tag)}).let {{ tag -> when (tag) {{ "

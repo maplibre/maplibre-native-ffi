@@ -114,66 +114,16 @@ public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
 ///
 /// See `mln_rendered_query_geometry` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-public struct RenderedQueryGeometry: Equatable, Hashable, Sendable {
-  public var data: RenderedQueryGeometryData
-  public static var `default`: Self {
-    Self()
-  }
-
-  public static func point(_ value: ScreenPoint)
-    -> Self
-  {
-    Self(data: .point(value))
-  }
-
-  public static func box(_ value: ScreenBox) -> Self {
-    Self(data: .box(value))
-  }
-
-  public static func lineString(_ value: ScreenLineString)
-    -> Self
-  {
-    Self(data: .lineString(value))
-  }
-
-  public init(data: RenderedQueryGeometryData = .default) {
-    self.data = data
-  }
-
-  init(
-    raw: mln_rendered_query_geometry,
-    recordBytes: UnsafeRawBufferPointer? = nil
-  ) throws {
-    data = try { () throws -> RenderedQueryGeometryData in
-      switch raw.type
-        .rawValue
-      {
-      case MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT
-        .rawValue: return .point(ScreenPoint(raw: raw.data
-            .point)) case MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX
-                  .rawValue: return .box(ScreenBox(raw: raw.data
-            .box)) case MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING
-                  .rawValue: return try .lineString(ScreenLineString(raw: raw
-            .data
-            .line_string)) default: return .unknown(
-          raw.type.rawValue,
-          recordBytes
-            .map {
-              Data($0
-                .dropFirst(MemoryLayout<mln_rendered_query_geometry>
-                  .offset(of: \.data)!))
-            } ?? withUnsafeBytes(of: raw.data) { Data($0) }
-        )
-      }
-    }()
-  }
-
+public enum RenderedQueryGeometry: Equatable, Hashable, Sendable {
+  case point(ScreenPoint)
+  case box(ScreenBox)
+  case lineString(ScreenLineString)
   func nativeValue(arena: NativeInputArena) throws
     -> mln_rendered_query_geometry
   {
     var raw = mln_rendered_query_geometry()
     raw.size = UInt32(MemoryLayout<mln_rendered_query_geometry>.size)
-    switch data {
+    switch self {
     case let .point(item): raw
       .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT; raw.data.point = item
       .nativeValue()
@@ -182,25 +132,8 @@ public struct RenderedQueryGeometry: Equatable, Hashable, Sendable {
     case let .lineString(item): raw
       .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING; raw.data
       .line_string = try item.nativeValue(arena: arena)
-    case .unknown: throw MaplibreError
-      .invalidArgument("unknown union variant cannot be submitted")
     }
     return raw
-  }
-}
-
-/// Screen-space query geometry data.
-///
-/// See `mln_rendered_query_geometry_data` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-public enum RenderedQueryGeometryData: Equatable, Hashable, Sendable {
-  case point(ScreenPoint)
-  case box(ScreenBox)
-  case lineString(ScreenLineString)
-
-  case unknown(UInt32, Data)
-  public static var `default`: Self {
-    .unknown(0, Data())
   }
 }
 

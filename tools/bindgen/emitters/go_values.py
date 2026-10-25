@@ -152,7 +152,61 @@ class Values:
             for f in p.fields
             if f.value.native == value.native
         )
+        # A record that holds only a union presents the union in its place.
+        if parent.union_member:
+            return public(parent.native)
         return public(parent.native) + name(member.name)
+
+    def unknown(self, value):
+        """Whether a union keeps tags this binding predates as UnknownVariant:
+        only one that native returns does."""
+        return value.native in self.api.returned
+
+    def union_input(self, union, expr, dest, tag):
+        """Writes the variant `expr` of `union` into the storage `dest` and
+        its tag into `tag`."""
+        arms = []
+        for variant in union.fields:
+            write = f"*(*C.{variant.value.native})(unsafe.Pointer(&{dest}))"
+            arms.append(
+                f"case {self.union_name(union)}{name(variant.name)}Variant: {self.native(variant.value, 'variant.Value', write)}"
+            )
+        if self.unknown(union):
+            arms.append('default: arena.fail("unknown input union variant")')
+        return f'if {expr} == nil {{ arena.fail("missing union variant") }}; {tag}({expr}.bindingTag()); switch variant := {expr}.(type) {{ {"; ".join(arms)} }}'
+
+    def tag_write(self, record, union):
+        """The start of the assignment that writes a variant's tag."""
+        tag = next(f.value for f in record.fields if f.name == union.tag)
+        return f"raw.{native_identifier(union.tag)} = {self.c_type(tag)}"
+
+    def union_record(self, value, member):
+        """The copy and the native conversion of a record that holds only a
+        union, which Go presents as the union's interface. Conversion writes
+        the size, and the tag from the variant."""
+        typename = public(value.native)
+        native, union = value.native, member.value
+        place = "raw." + native_identifier(member.name)
+        chunks = []
+        if native in self.api.returned:
+            chunks.append(
+                f"func copy{typename}(raw C.{native}) {typename} {{ {self.union_copy(union, place, 'raw')} }}"
+            )
+        if native in self.inputs and native in self.api.inputs:
+            init = f"C.{value.default}()" if value.default else f"C.{native}{{}}"
+            lines = [f"raw := {init}"]
+            lines.extend(
+                f"raw.{native_identifier(f.name)} = bindingCountLike(raw.{native_identifier(f.name)}, int(unsafe.Sizeof(raw)))"
+                for f in value.fields
+                if f.role == "size"
+            )
+            lines.append(
+                self.union_input(union, "input", place, self.tag_write(value, union))
+            )
+            chunks.append(
+                f"func native{typename}(input {typename}, arena *bindingArena) C.{native} {{ {'; '.join(lines)}; return raw }}"
+            )
+        return chunks
 
     def owner(self, native):
         return name(self.api.handles[native].stem) + "Handle"
@@ -234,17 +288,24 @@ class Values:
             copy = self.copy(elem, "item")
             return f"func() {output} {{ {f'if {source} == nil {{ return nil }}; ' if value.nullable else ''}length := bindingLength(uint64({count})); result := make({output}, length); for i := range result {{ item := *(*C.{ctype})(bindingElement(unsafe.Pointer({source}), i, uint64({stride}), unsafe.Sizeof(*{source}), unsafe.Alignof(*{source}))); result[i] = {copy}; }}; return result }}()"
         if value.kind == "union":
-            tag = f"{scope}.{native_identifier(value.tag)}"
-            arms = []
-            for f in value.fields:
-                read = f"*(*C.{f.value.native})(unsafe.Pointer(&{expr}))"
-                arms.append(
-                    f"case C.{f.presence.variant}: return {self.union_name(value)}{name(f.name)}Variant{{Value: {self.copy(f.value, read)}}}"
-                )
-            if value.empty_variant:
-                arms.append(f"case C.{value.empty_variant[0]}: return nil")
-            return f"func() {self.type(value)} {{ switch {tag} {{ {'; '.join(arms)} }}; return UnknownVariant{{Tag: uint32({tag})}} }}()"
+            return f"func() {self.type(value)} {{ {self.union_copy(value, expr, scope)} }}()"
         self.fail(value, "missing copied value conversion")
+
+    def union_copy(self, value, expr, scope):
+        """Statements that return the variant of the union `expr` that the
+        tag in `scope` selects."""
+        tag = f"{scope}.{native_identifier(value.tag)}"
+        arms = []
+        for f in value.fields:
+            read = f"*(*C.{f.value.native})(unsafe.Pointer(&{expr}))"
+            arms.append(
+                f"case C.{f.presence.variant}: return {self.union_name(value)}{name(f.name)}Variant{{Value: {self.copy(f.value, read)}}}"
+            )
+        if value.empty_variant:
+            arms.append(f"case C.{value.empty_variant[0]}: return nil")
+        if not self.unknown(value):
+            self.fail(value, "only a union that native returns is copied")
+        return f"switch {tag} {{ {'; '.join(arms)} }}; return UnknownVariant{{Tag: uint32({tag})}}"
 
     def native(self, value, expr, dest, scope="raw"):
         if value.kind == "buffer" and value.nullable:
@@ -390,15 +451,29 @@ class Values:
                 )
         for native, value in sorted(self.unions.items()):
             typename = self.union_name(value)
-            chunks.append(
-                doc(self.api, native, typename)
-                + f"type {typename} interface {{ bindingTag() uint32 }}"
+            owner = next(
+                (
+                    record
+                    for record in self.records.values()
+                    if record.union_member
+                    and record.union_member.value.native == native
+                ),
+                value,
             )
+            # The unexported method seals the interface to its own variants,
+            # and to UnknownVariant only when native returns the union.
+            marker = "is" + typename
+            chunks.append(
+                doc(self.api, owner.native, typename)
+                + f"type {typename} interface {{ bindingTag() uint32; {marker}() }}"
+            )
+            if self.unknown(value):
+                chunks.append(f"func (UnknownVariant) {marker}() {{}}")
             for f in value.fields:
                 wrapper = typename + name(f.name) + "Variant"
                 chunks.append(
                     doc(self.api, f"{native}.{f.name}", wrapper)
-                    + f"type {wrapper} struct {{ Value {self.type(f.value)} }}\nfunc ({wrapper}) bindingTag() uint32 {{ return uint32(C.{f.presence.variant}) }}"
+                    + f"type {wrapper} struct {{ Value {self.type(f.value)} }}\nfunc ({wrapper}) bindingTag() uint32 {{ return uint32(C.{f.presence.variant}) }}\nfunc ({wrapper}) {marker}() {{}}"
                 )
         for native, value in sorted(self.records.items()):
             typename = public(native)
@@ -417,6 +492,9 @@ class Values:
                 signature,
             )
 
+            if member := value.union_member:
+                chunks.extend(self.union_record(value, member))
+                continue
             visible = plain(value) if value.registration else value
             members = list(self.members(visible))
             fields = [
@@ -498,18 +576,14 @@ class Values:
                         )
                         continue
                     if v.kind == "union":
-                        arms = []
-                        for variant in v.fields:
-                            write = f"*(*C.{variant.value.native})(unsafe.Pointer(&raw.{native_identifier(f.name)}))"
-                            arms.append(
-                                f"case {self.union_name(v)}{name(variant.name)}Variant: {self.native(variant.value, 'variant.Value', write)}"
+                        lines.append(
+                            self.union_input(
+                                v,
+                                expr,
+                                f"raw.{native_identifier(f.name)}",
+                                self.tag_write(value, v),
                             )
-                        tag_type = next(
-                            f.value for f in value.fields if f.name == v.tag
                         )
-                        tag = f"raw.{native_identifier(v.tag)} = {self.c_type(tag_type)}({expr}.bindingTag())"
-                        body = f'if {expr} == nil {{ arena.fail("missing union variant") }}; {tag}; switch variant := {expr}.(type) {{ {"; ".join(arms)}; default: arena.fail("unknown input union variant") }}'
-                        lines.append(body)
                         continue
                     body = self.native(
                         f.value,

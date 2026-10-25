@@ -169,6 +169,25 @@ class TypeScriptEmitterTests(unittest.TestCase):
             text,
         )
 
+    def test_a_record_of_only_a_union_is_that_union(self):
+        # The union takes the record's name. Only a union that native returns
+        # keeps an arm for a tag this binding predates.
+        text = self.values.render()
+        self.assertIn(
+            "export type RenderedQueryGeometry =\n"
+            '  | { readonly kind: "point"; readonly value: ScreenPoint }\n'
+            '  | { readonly kind: "box"; readonly value: ScreenBox }\n'
+            '  | { readonly kind: "lineString"; readonly value: ScreenLineString };\n',
+            text,
+        )
+        definition = text[text.index("export type OfflineRegionDefinition =") :]
+        self.assertIn(
+            '| { readonly kind: "unknown"; readonly tag: number;',
+            definition[: definition.index(";\n")],
+        )
+        self.assertNotIn("RenderedQueryGeometryData", text)
+        self.assertNotIn("OfflineRegionDefinitionData", text)
+
     def test_only_event_sources_document_their_id_as_an_event_source(self):
         # Every owner inherits its ID, closed state, and debug text from
         # Owner. Only the handles that runtime events name redeclare the ID,

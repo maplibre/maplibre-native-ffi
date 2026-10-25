@@ -114,19 +114,7 @@ def decode(values, value, source, context="raw"):
             return f"unsafe {{ convert::copy_strided({source}, {count(value, context)}, {context}.{native_identifier(value.stride)}) }}?"
         return f"unsafe {{ convert::copy_array({source}, {count(value, context)}) }}?"
     if value.kind == "union":
-        name = values.public(value)
-        cases = []
-        for field in value.fields:
-            place = f"{source}.{native_identifier(field.name)}"
-            copied = decode(values, field.value, place, context)
-            if copied == place:
-                copied = f"unsafe {{ {place} }}"
-            cases.append(
-                f"sys::{field.presence.variant} => {name}::{pascal(field.name)}({copied})"
-            )
-        if value.empty_variant:
-            cases.append(f"sys::{value.empty_variant[0]} => {name}::Empty")
-        return f"match {context}.{native_identifier(value.tag)} {{ {', '.join(cases)}, tag => {name}::Unknown(tag as u32) }}"
+        return variant(values, value, value, source, context)
     if value.kind in {"scalar", "native_pointer"}:
         return source
     if value.kind == "enum":
@@ -136,9 +124,50 @@ def decode(values, value, source, context="raw"):
     return TRAIT_COPY.format(source)
 
 
-def defaultable(value):
+def variant(values, union, owner, source, context):
+    """Copies the variant of `union` at `source` that the tag in `context`
+    selects, into the enum named after `owner`."""
+    name = values.name(owner)
+    cases = []
+    for field in union.fields:
+        place = f"{source}.{native_identifier(field.name)}"
+        copied = decode(values, field.value, place, context)
+        if copied == place:
+            copied = f"unsafe {{ {place} }}"
+        cases.append(
+            f"sys::{field.presence.variant} => {name}::{pascal(field.name)}({copied})"
+        )
+    if union.empty_variant:
+        cases.append(f"sys::{union.empty_variant[0]} => {name}::Empty")
+    unknown = (
+        f"tag => {name}::Unknown(tag as u32)"
+        if owner.native in values.bound.returned
+        else '_ => return Err(Error::invalid_argument("unknown union variant"))'
+    )
+    return f"match {context}.{native_identifier(union.tag)} {{ {', '.join(cases)}, {unknown} }}"
+
+
+def submit(values, union, owner, source, place):
+    """Writes the variant of the enum `source`, named after `owner`, and its
+    tag into the union storage `place`."""
+    name = values.name(owner)
+    tag = native_identifier(union.tag)
+    cases = [
+        f"{name}::{pascal(member.name)}(item) => {{ raw.{tag} = sys::{member.presence.variant}; {place}.{native_identifier(member.name)} = {encode(values, member.value, '(*item)')}; }}"
+        for member in union.fields
+    ]
+    if union.empty_variant:
+        cases.append(f"{name}::Empty => raw.{tag} = sys::{union.empty_variant[0]},")
+    if owner.native in values.bound.returned:
+        cases.append(
+            f'{name}::Unknown(_) => return Err(Error::invalid_argument("unknown union variant cannot be submitted")),'
+        )
+    return f"match {source} {{ {' '.join(cases)} }}"
+
+
+def defaultable(values, value):
     """Whether the value's Rust type implements `Default`. An enum does only
-    when 0 is one of its members."""
+    when 0 is one of its members, and a union only when it has `Unknown`."""
     if value.kind == "enum":
         return value.enum_kind == "bitmask" or any(
             number == 0 for _, number in value.enum_values
@@ -146,11 +175,13 @@ def defaultable(value):
     if value.kind == "handle":
         return False
     if value.kind == "reference":
-        return defaultable(value.element)
+        return defaultable(values, value.element)
+    if value.kind == "union" or value.union_member:
+        return value.native in values.bound.returned
     if value.kind != "record" or value.default:
         return True
     return all(
-        defaultable(field.value)
+        defaultable(values, field.value)
         for field in value.fields
         if field.public and not (field.presence and field.presence.mask)
     )
@@ -228,19 +259,11 @@ def declaration(values, value):
             continue
         if field.value.kind == "union":
             union = field.value
-            union_name = values.public(union)
             fields.append(
-                f"{doc(values.bound, f'{value.native}.{field.name}', '    ')}    pub {local}: {union_name},"
+                f"{doc(values.bound, f'{value.native}.{field.name}', '    ')}    pub {local}: {values.public(union)},"
             )
             copies.append(f"{local}: {decode(values, union, place)},")
-            tag = native_identifier(union.tag)
-            cases = " ".join(
-                f"{union_name}::{pascal(member.name)}(item) => {{ raw.{tag} = sys::{member.presence.variant}; {place}.{native_identifier(member.name)} = {encode(values, member.value, '(*item)')}; }}"
-                for member in union.fields
-            )
-            writes.append(
-                f'match &self.{local} {{ {cases} {union_name}::Unknown(_) => return Err(Error::invalid_argument("unknown union variant cannot be submitted")), }}'
-            )
+            writes.append(submit(values, union, union, f"&self.{local}", place))
             continue
         typ = values.public(field.value)
         masked = field.presence and field.presence.mask
@@ -262,16 +285,7 @@ def declaration(values, value):
             args.append(f"{local}: {typ}")
             names.append(local)
     constructors = []
-    public_fields = [field for field in value.fields if field.public]
-    if len(public_fields) == 1 and public_fields[0].value.kind == "union":
-        field = public_fields[0]
-        union_name = values.public(field.value)
-        for member in field.value.fields:
-            method = identifier(member.name)
-            constructors.append(
-                f"pub fn {method}(value: {values.public(member.value)}) -> Self {{ Self {{ {identifier(field.name)}: {union_name}::{pascal(member.name)}(value) }} }}"
-            )
-    elif numeric(value) and "in" in values.directions.get(value.native, {"in", "out"}):
+    if numeric(value) and "in" in values.directions.get(value.native, {"in", "out"}):
         # Only a small value made of numbers, such as a coordinate, takes its
         # fields in order. Any other record is built from its default, so a
         # field C adds doesn't break callers.
@@ -288,7 +302,7 @@ def declaration(values, value):
         derives += ["Copy", "PartialEq"]
     elif comparable(value):
         derives.append("PartialEq")
-    if not value.default and defaultable(value):
+    if not value.default and defaultable(values, value):
         derives.append("Default")
     default = (
         f"impl Default for {name} {{ fn default() -> Self {{ maplibre_core::require_abi_version(); convert::native_default(unsafe {{ sys::{value.default}() }}) }} }}\n"
@@ -352,3 +366,45 @@ def mask_mark(mask, bit):
 
 def mask_test(mask, bit):
     return f"{mask} & {bit} != 0"
+
+
+def union_declaration(values, value):
+    """The enum of a record that holds only a union and its tag, and its
+    conversions, which write the size and the tag from the variant."""
+    from .rust_values import union_enum
+
+    name = values.name(value)
+    raw = f"sys::{value.native}"
+    member = value.union_member
+    place = f"raw.{native_identifier(member.name)}"
+    writes = [
+        f"raw.{native_identifier(field.name)} = std::mem::size_of::<{raw}>() as _;"
+        for field in value.fields
+        if field.role == "size"
+    ]
+    writes.append(submit(values, member.value, value, "self", place))
+    initial = (
+        f"unsafe {{ sys::{value.default}() }}"
+        if value.default
+        else "unsafe { std::mem::zeroed() }"
+    )
+    arena = "arena" if any("arena" in line for line in writes) else "_arena"
+    directions = values.directions.get(value.native, {"in", "out"})
+    to_native = (
+        f"impl ToNative<{raw}> for {name} {{\n"
+        + f"    fn to_native(&self, {arena}: &mut InputArena) -> Result<{raw}> {{\n"
+        + f"        let mut raw: {raw} = {initial};\n"
+        + "".join(f"        {line}\n" for line in writes)
+        + "        Ok(raw)\n    }\n}\n"
+        if "in" in directions
+        else ""
+    )
+    from_native = (
+        f"impl FromNative<{raw}> for {name} {{\n"
+        + f"    unsafe fn from_native(raw: {raw}) -> Result<Self> {{\n"
+        + f"        Ok({variant(values, member.value, value, place, 'raw')})\n"
+        + "    }\n}\n"
+        if "out" in directions
+        else ""
+    )
+    return "\n" + union_enum(values, value) + to_native + from_native

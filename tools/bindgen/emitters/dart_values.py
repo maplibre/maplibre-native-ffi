@@ -493,12 +493,11 @@ class Values:
                 parent = expression.rsplit(".", 1)[0]
                 pointer = f"({expression}.cast<Uint8>() + index * {parent}.{value.stride}).cast<{self.ffi(value.element)}>()"
                 item_expression = pointer + ".ref"
-                # Only a record that ends in a tagged union keeps the raw bytes
-                # an unknown variant forwards.
+                # Only a record whose union has an unknown variant keeps the
+                # raw bytes that variant forwards.
                 raw_record = (
                     f", rawRecord: () => {pointer}.cast<Uint8>().asTypedList({parent}.{value.stride})"
-                    if any(f.value.kind == "union" for f in value.element.fields)
-                    and len(self.fields(value.element)) > 1
+                    if self.unknown_union(value.element)
                     else ""
                 )
                 item = f"_read{public_name(value.element.native)}({item_expression}{raw_record})"
@@ -920,6 +919,23 @@ class Values:
             conversion + reader,
         )
 
+    def unknown_union(self, record):
+        """Whether [record]'s union has an unknown variant, as only one that native returns does."""
+        return any(
+            f.value.kind == "union" and f.value.native in self.bound.returned
+            for f in record.fields
+        )
+
+    def unknown_variant(self, value, union, base):
+        """The unknown variant of [value]'s union: its class, its write case, and its read case."""
+        unknown = base + "Unknown"
+        capture = f"withNativeArena((arena) {{ final copy = arena<raw.{value.native}>()..ref = source; return Uint8List.fromList(copy.cast<Uint8>().asTypedList(sizeOf<raw.{value.native}>())); }})"
+        return (
+            f"final class {unknown} extends {base} {{\n  {unknown}(this.tag, Uint8List rawRecord) : rawRecord = Uint8List.fromList(rawRecord).asUnmodifiableView(), super._();\n  final int tag;\n  final Uint8List rawRecord;\n}}",
+            f"    case {unknown}(): throwInvalidArgument('unknown native union variant cannot be submitted');",
+            f"final tag => {unknown}(tag, rawRecord?.call() ?? {capture}),",
+        )
+
     def render_union(self, value, union):
         public = public_name(value.native)
         declarations = [f"sealed class {public} {{", f"  const {public}._();"]
@@ -944,6 +960,13 @@ class Values:
             )
         declarations.append("}")
         declarations.extend(children)
+        unknown = self.unknown_union(value)
+        fallback = "    _ => throwInvalidState('native union contains an unsupported variant'),"
+        if unknown:
+            child, write, read = self.unknown_variant(value, union, public)
+            declarations.append(child)
+            writes.append(write)
+            fallback = "    " + read
         initialize = (
             f"  result.ref = raw.{value.default}();"
             if value.default
@@ -954,9 +977,9 @@ class Values:
         conversion = (
             f"Pointer<raw.{value.native}> _write{public}({public} value, Allocator arena, {{Pointer<raw.{value.native}>? into}}) {{\n  final result = into ?? arena<raw.{value.native}>();\n{initialize}\n  switch(value) {{\n"
             + "\n".join(writes)
-            + f"\n  }}\n  return result;\n}}\n{public} _read{public}(raw.{value.native} source) => switch(source.{union.presence.tag}) {{\n"
+            + f"\n  }}\n  return result;\n}}\n{public} _read{public}(raw.{value.native} source{', {Uint8List Function()? rawRecord}' if unknown else ''}) => switch(source.{union.presence.tag}) {{\n"
             + "\n".join(reads)
-            + "\n    _ => throwInvalidState('native union contains an unsupported variant'),\n};\n"
+            + f"\n{fallback}\n}};\n"
         )
         return "\n".join(declarations), conversion
 
@@ -1015,17 +1038,16 @@ class Values:
                 f"final class {variant} extends {payload} {{ const {variant}() : super._(); }}"
             )
             read_cases.append(f"      {tag} => const {variant}(),")
-        unknown = payload + "Unknown"
-        declarations.append(
-            f"final class {unknown} extends {payload} {{\n  {unknown}(this.tag, Uint8List rawRecord) : rawRecord = Uint8List.fromList(rawRecord).asUnmodifiableView(), super._();\n  final int tag;\n  final Uint8List rawRecord;\n}}"
-        )
-        cases.append(
-            f"    case {unknown}(): throwInvalidArgument('unknown native union variant cannot be submitted');"
-        )
-        capture = f"withNativeArena((arena) {{ final copy = arena<raw.{value.native}>()..ref = source; return Uint8List.fromList(copy.cast<Uint8>().asTypedList(sizeOf<raw.{value.native}>())); }})"
-        read_cases.append(
-            f"      final tag => {unknown}(tag, rawRecord?.call() ?? {capture}),"
-        )
+        unknown = self.unknown_union(value)
+        if unknown:
+            child, write, read = self.unknown_variant(value, union, payload)
+            declarations.append(child)
+            cases.append(write)
+            read_cases.append("      " + read)
+        else:
+            read_cases.append(
+                "      _ => throwInvalidState('native union contains an unsupported variant'),"
+            )
         reads.append(
             f"    {identifier(union.name)}: switch(source.{union.presence.tag}) {{\n"
             + "\n".join(read_cases)
@@ -1043,7 +1065,7 @@ class Values:
             + "\n".join(writes)
             + f"\n  switch(value.{identifier(union.name)}) {{\n"
             + "\n".join(cases)
-            + f"\n  }}\n  return result;\n}}\n{public} _read{public}(raw.{value.native} source, {{Uint8List Function()? rawRecord}}) => {public}(\n"
+            + f"\n  }}\n  return result;\n}}\n{public} _read{public}(raw.{value.native} source{', {Uint8List Function()? rawRecord}' if unknown else ''}) => {public}(\n"
             + "\n".join(reads)
             + "\n);\n"
         )
@@ -1132,9 +1154,9 @@ class Values:
             union = next((f for f in value.fields if f.value.kind == "union"), None)
             if union:
                 declaration, conversion = (
-                    self.render_mixed_union(value, union)
-                    if len(self.fields(value)) > 1
-                    else self.render_union(value, union)
+                    self.render_union(value, value.union_member)
+                    if value.union_member
+                    else self.render_mixed_union(value, union)
                 )
                 declarations.append(declaration)
                 if value.native not in self.bound.inputs:

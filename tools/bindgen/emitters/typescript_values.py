@@ -2,8 +2,9 @@
 
 Records are plain object interfaces, open enums are `const` objects with an
 integer type that admits unknown values, bitmasks are integers with named flag
-constants, and unions are discriminated by a `kind` member that keeps an
-unknown tag. Integers of 32 bits or fewer and floating-point values are
+constants, and unions are discriminated by a `kind` member. A union copied
+from native keeps an unknown tag, and a record of only a union and its tag is
+that union. Integers of 32 bits or fewer and floating-point values are
 `number`; 64-bit integers and native pointers are `bigint`. A JSON value is
 `unknown`, any value that `JSON.stringify` takes or `JSON.parse` returns. A callback
 registration takes the form that `async_hosts.py` chooses for a host that runs
@@ -441,7 +442,9 @@ class Values:
             if not arm.presence or not arm.presence.variant:
                 raise Unsupported(f"{record.native}: union arm needs a variant")
             self.check(arm.value, direction)
-        self.used[field.value.native] = field.value
+        if not record.union_member:
+            # A record of only a union presents the union under its own name.
+            self.used[field.value.native] = field.value
 
     # -- TypeScript types ---------------------------------------------------
 
@@ -536,7 +539,9 @@ class Values:
             if value.kind == "enum":
                 chunks.append(self.render_enum(value))
             elif value.kind == "union":
-                chunks.append(self.render_union(value))
+                chunks.append(self.render_union(value, value))
+            elif value.kind == "record" and value.union_member:
+                chunks.append(self.render_union(value.union_member.value, value))
             elif value.kind == "callback":
                 callback = self.bound.callbacks[native]
                 chunks.append(
@@ -688,8 +693,10 @@ class Values:
             + "}\n"
         )
 
-    def render_union(self, value: ValuePlan) -> str:
-        public = public_name(value.native)
+    def render_union(self, value: ValuePlan, owner: ValuePlan) -> str:
+        """The union `value` as a type named after `owner`: the union itself, or
+        the record that holds only it and its tag."""
+        public = public_name(owner.native)
         arms = []
         for _, kind, arm in union_kinds(value):
             if arm is None:
@@ -699,12 +706,14 @@ class Values:
             arms.append(
                 f'  | {{ readonly kind: "{kind}"; readonly value: {self.ts(field.value)} }}\n'
             )
-        arms.append(
-            '  | { readonly kind: "unknown"; readonly tag: number; readonly bytes: Uint8Array }'
-        )
+        if owner.native in self.bound.returned:
+            # Only a copy from native can hold a tag this binding predates.
+            arms.append(
+                '  | { readonly kind: "unknown"; readonly tag: number; readonly bytes: Uint8Array }'
+            )
         return (
-            doc(self.bound, value.native)
+            doc(self.bound, owner.native)
             + f"export type {public} =\n"
-            + "".join(arms)
+            + "".join(arms).rstrip("\n")
             + ";\n"
         )

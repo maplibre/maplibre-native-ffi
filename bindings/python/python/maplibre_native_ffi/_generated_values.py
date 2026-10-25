@@ -2224,32 +2224,16 @@ class OfflineGeometryRegionDefinition:
         )
 
 
-@dataclass(frozen=True, slots=True)
-class OfflineRegionDefinition:
-    """Tagged offline region definition.
+type OfflineRegionDefinition = (
+    OfflineRegionDefinitionTilePyramidVariant
+    | OfflineRegionDefinitionGeometryVariant
+    | UnknownVariant
+)
+"""Tagged offline region definition.
 
-    See `mln_offline_region_definition` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    """
-
-    data: (
-        OfflineRegionDefinitionTilePyramidVariant
-        | OfflineRegionDefinitionGeometryVariant
-        | UnknownVariant
-    )
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            data=_copy_variant(
-                raw["data"],
-                {
-                    "tile_pyramid": OfflineRegionDefinitionTilePyramidVariant,
-                    "geometry": OfflineRegionDefinitionGeometryVariant,
-                },
-                None,
-            )
-        )
+See `mln_offline_region_definition` in the
+[C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -2271,7 +2255,14 @@ class OfflineRegionInfo:
     def _from_native(cls, raw):
         return cls(
             id=raw["id"],
-            definition=OfflineRegionDefinition._from_native(raw["definition"]),
+            definition=_copy_variant(
+                raw["definition"],
+                {
+                    "tile_pyramid": OfflineRegionDefinitionTilePyramidVariant,
+                    "geometry": OfflineRegionDefinitionGeometryVariant,
+                },
+                None,
+            ),
             metadata=raw["metadata"],
         )
 
@@ -3089,34 +3080,16 @@ class RenderedFeatureQueryOptions:
         return cls._from_native(_native._default_rendered_feature_query_options())
 
 
-@dataclass(frozen=True, slots=True)
-class RenderedQueryGeometry:
-    """Rendered feature query geometry descriptor.
+type RenderedQueryGeometry = (
+    RenderedQueryGeometryPointVariant
+    | RenderedQueryGeometryBoxVariant
+    | RenderedQueryGeometryLineStringVariant
+)
+"""Rendered feature query geometry descriptor.
 
-    See `mln_rendered_query_geometry` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-    """
-
-    data: (
-        RenderedQueryGeometryPointVariant
-        | RenderedQueryGeometryBoxVariant
-        | RenderedQueryGeometryLineStringVariant
-        | UnknownVariant
-    )
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            data=_copy_variant(
-                raw["data"],
-                {
-                    "point": RenderedQueryGeometryPointVariant,
-                    "box": RenderedQueryGeometryBoxVariant,
-                    "line_string": RenderedQueryGeometryLineStringVariant,
-                },
-                None,
-            )
-        )
+See `mln_rendered_query_geometry` in the
+[C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+"""
 
 
 @dataclass(frozen=True, slots=True)

@@ -93,17 +93,15 @@ class Values:
         if value.kind in {"array", "reference"}:
             self.add(value.element)
         if value.kind == "union":
-            if not value.tag or any(
-                not f.presence or not f.presence.variant for f in value.fields
-            ):
-                raise ModelError(
-                    [f"Swift: {value.native}: union requires tagged variants"]
-                )
-            for field in value.fields:
-                self.add(field.value)
+            self.add_variants(value)
             self.used[value.native] = value
             return
         if value.kind != "record":
+            return
+        if value.union_member:
+            # The record is presented as its union, so the union type is not.
+            self.add_variants(value.union_member.value)
+            self.used[value.native] = value
             return
         if value.native in self.bound.slices:
             self.add(self.bound.slices[value.native].value)
@@ -117,6 +115,14 @@ class Values:
                 )
             self.add(field.value)
         self.used[value.native] = value
+
+    def add_variants(self, union):
+        if not union.tag or any(
+            not f.presence or not f.presence.variant for f in union.fields
+        ):
+            raise ModelError([f"Swift: {union.native}: union requires tagged variants"])
+        for field in union.fields:
+            self.add(field.value)
 
     def copy(self, value, expression):
         from .swift_dynamic_values import decode
@@ -132,7 +138,12 @@ class Values:
         return "\n".join(self.record(value) for _, value in sorted(self.used.items()))
 
     def record(self, value):
-        from .swift_dynamic_values import declaration, dynamic
+        from .swift_dynamic_values import (
+            declaration,
+            dynamic,
+            union_cases,
+            union_record,
+        )
 
         if value.response:
             public = self.public(value)
@@ -153,11 +164,9 @@ class Values:
 
             return declaration(self, value)
         if value.kind == "union":
-            variants = "\n".join(
-                f"{doc(self.bound, f'{value.native}.{field.name}', '  ')}  case {identifier(camel(field.name))}({self.public(field.value)})"
-                for field in value.fields
-            )
-            return f"{doc(self.bound, value.native)}public enum {self.public(value)}: Equatable, Hashable, Sendable {{\n{variants}\n{'  case none' if value.empty_variant else ''}\n  case unknown(UInt32, Data)\n  public static var `default`: Self {{ {'.none' if value.empty_variant else '.unknown(0, Data())'} }}\n}}\n"
+            return f"{doc(self.bound, value.native)}public enum {self.public(value)}: Equatable, Hashable, Sendable {{\n{union_cases(self, value)}}}\n"
+        if value.union_member:
+            return union_record(self, value)
         if dynamic(value):
             return declaration(self, value)
         public = self.public(value)

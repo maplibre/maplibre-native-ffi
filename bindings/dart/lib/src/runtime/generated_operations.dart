@@ -2462,20 +2462,34 @@ Pointer<raw.mln_offline_region_definition> _writeOfflineRegionDefinition(
         value.value,
         arena,
       ).ref;
+    case OfflineRegionDefinitionUnknown():
+      throwInvalidArgument('unknown native union variant cannot be submitted');
   }
   return result;
 }
 
 OfflineRegionDefinition _readOfflineRegionDefinition(
-  raw.mln_offline_region_definition source,
-) => switch (source.type) {
+  raw.mln_offline_region_definition source, {
+  Uint8List Function()? rawRecord,
+}) => switch (source.type) {
   1 => OfflineRegionDefinition.tilePyramid(
     _readOfflineTilePyramidRegionDefinition(source.data.tile_pyramid),
   ),
   2 => OfflineRegionDefinition.geometry(
     _readOfflineGeometryRegionDefinition(source.data.geometry),
   ),
-  _ => throwInvalidState('native union contains an unsupported variant'),
+  final tag => OfflineRegionDefinitionUnknown(
+    tag,
+    rawRecord?.call() ??
+        withNativeArena((arena) {
+          final copy = arena<raw.mln_offline_region_definition>()..ref = source;
+          return Uint8List.fromList(
+            copy.cast<Uint8>().asTypedList(
+              sizeOf<raw.mln_offline_region_definition>(),
+            ),
+          );
+        }),
+  ),
 };
 
 OfflineRegionInfo _readOfflineRegionInfo(raw.mln_offline_region_info source) =>

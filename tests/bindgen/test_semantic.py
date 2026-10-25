@@ -103,6 +103,31 @@ mln_status read_event(event *value BIND("direction=out"), mln_diagnostic *out_di
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, message):
                 bind(self.parse(source.replace(before, after)), require_complete=True)
 
+    def test_a_record_of_only_a_tag_and_its_union_presents_the_union(self):
+        source = """
+typedef enum choice : unsigned { TEXT = 1, NUMBER = 2 } choice;
+typedef struct value {
+  unsigned size;
+  choice tag;
+  union {
+    double text BIND("variant=TEXT");
+    double number BIND("variant=NUMBER");
+  } data BIND("tag=tag");
+} value;
+mln_status write_value(const value *input, mln_diagnostic *out_diagnostic);
+"""
+        api = bind(self.parse(source), require_complete=True)
+        member = api.values["value"].union_member
+        self.assertEqual(member.name, "data")
+        # Another public member keeps the record a record.
+        widened = bind(
+            self.parse(
+                source.replace("  choice tag;", "  choice tag;\n  double scale;")
+            ),
+            require_complete=True,
+        )
+        self.assertIsNone(widened.values["value"].union_member)
+
     def test_nested_count_and_union_are_resolved_once(self):
         source = """
 typedef enum choice : unsigned { TEXT = 1, NUMBER = 2 } choice;

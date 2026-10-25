@@ -29,13 +29,15 @@ await assert.rejects(map.findTile(), {
   message: "native completion stride is too small",
 });
 
-// A union keeps a known arm's value. An unknown arm keeps its tag and the
-// bytes of the whole record, as far as the reported stride reaches, which
-// here includes a member that this header does not declare.
+// A record of only a tag and a union is the union itself. It keeps a known
+// arm's value. An unknown arm keeps its tag and the bytes of the whole record,
+// as far as the reported stride reaches, which here includes a member that
+// this header does not declare.
 assert.deepEqual(await map.event(), {
-  payload: { kind: "frame", value: { timestamp: 2.5 } },
+  kind: "frame",
+  value: { timestamp: 2.5 },
 });
-const unknown = (await map.event()).payload;
+const unknown = await map.event();
 assert.ok(unknown.kind === "unknown");
 assert.equal(unknown.tag, 7);
 assert.equal(unknown.bytes.length, 24);

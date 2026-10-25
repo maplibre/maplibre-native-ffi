@@ -190,9 +190,10 @@ class Values:
         elif plan.kind == "native_pointer":
             result = "int"
         elif plan.kind == "union":
-            result = (
-                " | ".join(self.variant_name(plan, field) for field in plan.fields)
-                + " | UnknownVariant"
+            # Only a copy from native can hold a tag this binding predates.
+            result = " | ".join(
+                [self.variant_name(plan, field) for field in plan.fields]
+                + (["UnknownVariant"] if plan.native in self.api.returned else [])
             )
             if plan.empty_variant:
                 result += " | None"
@@ -364,6 +365,8 @@ class Values:
             return f"_wrap_response({expr}, {public_name(plan.native) + 'Scope'!r})"
         if plan.native in self.api.slices:
             return self.facade_copy(self.api.slices[plan.native].value, expr)
+        if plan.union_member:
+            return self.facade_copy(plan.union_member.value, expr)
         if plan.kind == "record":
             return f"{public_name(plan.native)}._from_native({expr})"
         if plan.kind == "enum":
@@ -465,7 +468,12 @@ class Values:
                     f"raw.{rust_field(field.name)} = {'false' if field.value.ctype.canonical in {'bool', '_Bool'} else '0'};"
                 )
         for member, value, field in self.members(plan):
-            lines.append(f'let field = value.getattr("{member}")?;')
+            # A record of only a union is presented as the selected variant.
+            lines.append(
+                "let field = value;"
+                if plan.union_member
+                else f'let field = value.getattr("{member}")?;'
+            )
             if value is not None and value.kind == "union":
                 arms = []
                 for variant in value.fields:
@@ -576,6 +584,26 @@ class Values:
         python.append(python_callbacks.protocol_sources(self))
         return "\n".join(rust) + "\n" + self.input_sources(), "\n".join(python)
 
+    def union_member_sources(self, plan, *, copied=True):
+        """The Rust copy and the Python alias of a record of only a union,
+        which is presented as the union's variants under the record's name."""
+        name = plan.native
+        python = (
+            f"type {public_name(name)} = {self.type(plan.union_member.value)}\n"
+            + docs.docstring(self.api.doc(name), "")
+        )
+        if not copied or name not in self.outputs:
+            return "", python
+        copy = self.copy(
+            plan.union_member.value,
+            "value." + rust_field(plan.union_member.name),
+        )
+        rust = (
+            f"fn generated_copy_{name}(py: Python<'_>, value: &sys::{name}) -> PyResult<Py<PyAny>> {{\n"
+            f"    Ok({copy})\n}}\n"
+        )
+        return rust, python
+
     def record_sources(
         self,
         plan,
@@ -593,6 +621,8 @@ class Values:
         registration take its `required` callbacks.
         """
         name = plan.native
+        if plan.union_member:
+            return self.union_member_sources(plan, copied=copied)
         rust, python = [], []
         fields, copies, public_copies = list(extra_fields), [], []
         # An input record copies a sequence into a tuple and a byte buffer into

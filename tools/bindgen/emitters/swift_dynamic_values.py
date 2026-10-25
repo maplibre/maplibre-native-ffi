@@ -209,7 +209,13 @@ def decode(values, value, source, context="raw"):
         )
         offset = f"MemoryLayout<{parent.native}>.offset(of: \\.{field.name})!"
         data = f"recordBytes.map {{ Data($0.dropFirst({offset})) }} ?? withUnsafeBytes(of: {source}) {{ Data($0) }}"
-        return f"try {{ () throws -> {values.public(value)} in switch {tag} {{ {cases} default: return .unknown({tag}, {data}) }} }}()"
+        fallback = (
+            f"return .unknown({tag}, {data})"
+            if value.native in values.bound.returned
+            else 'throw MaplibreError.invalidState("native union contains an unsupported variant")'
+        )
+        typ = values.public(parent if parent.union_member else value)
+        return f"try {{ () throws -> {typ} in switch {tag} {{ {cases} default: {fallback} }} }}()"
     return (
         source
         if value.kind == "scalar"
@@ -250,29 +256,20 @@ def declaration(values, value):
         if f.value.kind == "union":
             union = f.value
             union_type = values.public(union)
+            default = (
+                f"{typ}.default.{local}"
+                if value.default
+                else ".default"
+                if union_default(values, union)
+                else None
+            )
             fields.append(
                 f"{doc(values.bound, f'{value.native}.{f.name}', '  ')}  public var {local}: {union_type}"
             )
-            args.append(
-                f"{local}: {union_type} = {typ}.default.{local}"
-                if value.default
-                else f"{local}: {union_type} = .default"
-            )
+            args.append(f"{local}: {union_type}" + (f" = {default}" if default else ""))
             init.append(f"    self.{local} = {local}")
             decode_lines.append(f"    self.{local} = {decode(values, union, raw)}")
-            tag_value = next(
-                field.value for field in value.fields if field.name == union.tag
-            )
-            tag_suffix = (
-                "" if tag_value.ctype.canonical.startswith("enum ") else ".rawValue"
-            )
-            cases = "\n".join(
-                f"    case .{identifier(camel(member.name))}(let item): raw.{identifier(union.tag)} = {member.presence.variant}{tag_suffix}; {raw}.{identifier(member.name)} = {encode(values, member.value, 'item')}"
-                for member in union.fields
-            )
-            encode_lines.append(
-                f'    switch self.{local} {{\n{cases}\n    case .unknown: throw MaplibreError.invalidArgument("unknown union variant cannot be submitted")\n    }}'
-            )
+            encode_lines.append(union_encode(values, value, f, f"self.{local}"))
             continue
         if f.value.kind == "array" and f.value.ctype.kind == "array":
             encode_lines.append(
@@ -280,14 +277,20 @@ def declaration(values, value):
             )
         optional = f.presence and f.presence.mask
         field_type = values.public(f.value) + ("?" if optional else "")
-        default = zero(f.value, field_type)
+        default = (
+            None
+            if f.value.union_member
+            and not field_type.endswith("?")
+            and not union_default(values, f.value.union_member.value)
+            else zero(f.value, field_type)
+        )
         fields.append(
             f"{doc(values.bound, f'{value.native}.{f.name}', '  ')}  public var {local}: {field_type}"
         )
         args.append(
             f"{local}: {field_type} = {typ}.default.{local}"
             if value.default
-            else f"{local}: {field_type} = {default}"
+            else f"{local}: {field_type}" + (f" = {default}" if default else "")
         )
         init.append(f"    self.{local} = {local}")
         capture = decode(values, f.value, raw)
@@ -305,15 +308,15 @@ def declaration(values, value):
                 f"    {raw} = {encode(values, f.value, 'self.' + local)}"
             )
             decode_lines.append(f"    self.{local} = {capture}")
-    constructors = []
-    members = [f for f in value.fields if f.role == "value"]
-    if len(members) == 1 and members[0].value.kind == "union":
-        field = members[0]
-        for variant in field.value.fields:
-            constructors.append(
-                f"  public static func {identifier(camel(variant.name))}(_ value: {values.public(variant.value)}) -> Self {{ Self({identifier(camel(field.name))}: .{identifier(camel(variant.name))}(value)) }}"
-            )
     initial = f"{value.default}()" if value.default else f"{value.native}()"
+    # A record with a required member has no zero value to default to.
+    default_member = (
+        f"  public static var `default`: Self {{ try! Self(raw: nativeDefault({value.default})) }}"
+        if value.default
+        else "  public static var `default`: Self { Self() }"
+        if all("=" in arg for arg in args)
+        else ""
+    )
     encoder = (
         f"""  func nativeValue(arena: NativeInputArena) throws -> {value.native} {{
     var raw = {initial}
@@ -326,8 +329,7 @@ def declaration(values, value):
     )
     rendered = f"""{doc(values.bound, value.native)}public struct {typ}: {conformances} {{
 {chr(10).join(fields)}
-  public static var `default`: Self {{ {f"try! Self(raw: nativeDefault({value.default}))" if value.default else "Self()"} }}
-{chr(10).join(constructors)}
+{default_member}
   public init({", ".join(args)}) {{
 {chr(10).join(init)}
   }}
@@ -337,3 +339,82 @@ def declaration(values, value):
 {encoder}}}
 """
     return rendered
+
+
+def union_default(values, union):
+    """The default case of a union, or None when it has no case to default to."""
+    if union.empty_variant:
+        return ".none"
+    if union.native in values.bound.returned:
+        return ".unknown(0, Data())"
+    return None
+
+
+def union_cases(values, union):
+    """The cases of a union's enum and its default."""
+    lines = [
+        f"{doc(values.bound, f'{union.native}.{field.name}', '  ')}  case {identifier(camel(field.name))}({values.public(field.value)})"
+        for field in union.fields
+    ]
+    if union.empty_variant:
+        lines.append("  case none")
+    # Only a union that native returns can hold a tag this binding does not know.
+    if union.native in values.bound.returned:
+        lines.append("  case unknown(UInt32, Data)")
+    default = union_default(values, union)
+    if default:
+        lines.append(f"  public static var `default`: Self {{ {default} }}")
+    return "".join(line + "\n" for line in lines)
+
+
+def union_encode(values, record, field, selector):
+    """Write the tag and the union storage of [record]'s union [field] from [selector]."""
+    union = field.value
+    raw = f"raw.{identifier(field.name)}"
+    tag_value = next(f.value for f in record.fields if f.name == union.tag)
+    tag_suffix = "" if tag_value.ctype.canonical.startswith("enum ") else ".rawValue"
+    tag = f"raw.{identifier(union.tag)}"
+    cases = [
+        f"    case .{identifier(camel(member.name))}(let item): {tag} = {member.presence.variant}{tag_suffix}; {raw}.{identifier(member.name)} = {encode(values, member.value, 'item')}"
+        for member in union.fields
+    ]
+    if union.empty_variant:
+        cases.append(f"    case .none: {tag} = {union.empty_variant[0]}{tag_suffix}")
+    if union.native in values.bound.returned:
+        cases.append(
+            '    case .unknown: throw MaplibreError.invalidArgument("unknown union variant cannot be submitted")'
+        )
+    return f"    switch {selector} {{\n" + "\n".join(cases) + "\n    }"
+
+
+def union_record(values, value):
+    """A record of only a tag and its union, presented as the union under the record's name."""
+    field = value.union_member
+    typ = values.public(value)
+    size = "".join(
+        f"    raw.{identifier(f.name)} = UInt32(MemoryLayout<{value.native}>.size)\n"
+        for f in value.fields
+        if f.role == "size"
+    )
+    initial = f"{value.default}()" if value.default else f"{value.native}()"
+    encoder = (
+        f"""  func nativeValue(arena: NativeInputArena) throws -> {value.native} {{
+    var raw = {initial}
+{size}{union_encode(values, value, field, "self")}
+    return raw
+  }}
+"""
+        if value.native in values.bound.inputs
+        else ""
+    )
+    decoder = (
+        f"""  init(raw: {value.native}, recordBytes: UnsafeRawBufferPointer? = nil) throws {{
+    self = {decode(values, field.value, f"raw.{identifier(field.name)}")}
+  }}
+"""
+        if value.native in values.bound.returned
+        else ""
+    )
+    return f"""{doc(values.bound, value.native)}public enum {typ}: Equatable, Hashable, Sendable {{
+{union_cases(values, field.value)}{decoder}{encoder}}}
+"""

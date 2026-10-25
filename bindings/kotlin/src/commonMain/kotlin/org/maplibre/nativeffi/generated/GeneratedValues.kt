@@ -3726,38 +3726,18 @@ public data class ScreenLineString(
 )
 
 /**
- * Screen-space query geometry data.
- *
- * See `mln_rendered_query_geometry_data` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-public sealed interface RenderedQueryGeometryData {
-  public data class Point(public val value: ScreenPoint) : RenderedQueryGeometryData
-
-  public data class Box(public val value: ScreenBox) : RenderedQueryGeometryData
-
-  public data class LineString(public val value: ScreenLineString) : RenderedQueryGeometryData
-
-  public data class Unknown(public val tag: UInt, public val bytes: ByteArray) :
-    RenderedQueryGeometryData {
-    private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
-
-    override fun equals(other: Any?): Boolean =
-      this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
-
-    override fun hashCode(): Int = contentFields().contentDeepHashCode()
-  }
-}
-
-/**
  * Rendered feature query geometry descriptor.
  *
  * See `mln_rendered_query_geometry` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
-public data class RenderedQueryGeometry(
-  public val data: RenderedQueryGeometryData,
-)
+public sealed interface RenderedQueryGeometry {
+  public data class Point(public val value: ScreenPoint) : RenderedQueryGeometry
+
+  public data class Box(public val value: ScreenBox) : RenderedQueryGeometry
+
+  public data class LineString(public val value: ScreenLineString) : RenderedQueryGeometry
+}
 
 /**
  * One rendered-feature query hit borrowed for a completion callback.
@@ -3895,20 +3875,20 @@ public data class OfflineGeometryRegionDefinition(
 )
 
 /**
- * Offline region definition data.
+ * Tagged offline region definition.
  *
- * See `mln_offline_region_definition_data` in the
+ * See `mln_offline_region_definition` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-public sealed interface OfflineRegionDefinitionData {
+public sealed interface OfflineRegionDefinition {
   public data class TilePyramid(public val value: OfflineTilePyramidRegionDefinition) :
-    OfflineRegionDefinitionData
+    OfflineRegionDefinition
 
   public data class Geometry(public val value: OfflineGeometryRegionDefinition) :
-    OfflineRegionDefinitionData
+    OfflineRegionDefinition
 
   public data class Unknown(public val tag: UInt, public val bytes: ByteArray) :
-    OfflineRegionDefinitionData {
+    OfflineRegionDefinition {
     private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
 
     override fun equals(other: Any?): Boolean =
@@ -3917,16 +3897,6 @@ public sealed interface OfflineRegionDefinitionData {
     override fun hashCode(): Int = contentFields().contentDeepHashCode()
   }
 }
-
-/**
- * Tagged offline region definition.
- *
- * See `mln_offline_region_definition` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class OfflineRegionDefinition(
-  public val data: OfflineRegionDefinitionData,
-)
 
 /**
  * Region data delivered by an offline completion.

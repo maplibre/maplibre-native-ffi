@@ -38,6 +38,7 @@ func checkCABIVersion(version uint32) error {
 }
 
 // UnknownVariant preserves a discriminator whose payload this binding cannot interpret.
+// Only a union that native returns admits it, and submitting one fails.
 type UnknownVariant struct{ Tag uint32 }
 
 func (value UnknownVariant) bindingTag() uint32 { return value.Tag }

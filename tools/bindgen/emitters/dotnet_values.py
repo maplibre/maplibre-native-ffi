@@ -218,7 +218,7 @@ class Values:
         if field.value.kind == "union":
             return (
                 public_name(plan.native)
-                if self.union_only(plan)
+                if plan.union_member is not None
                 else f"{public_name(plan.native)}.{name}Value"
             )
         return self.public_type(field.value)
@@ -400,10 +400,6 @@ class Values:
             return f"scope.Array<{self.raw_type(plan.element)}, {self.public_type(plan.element)}>({expression}, static (item, scope) => {element})"
         raise Unsupported(f"{plan.native}: input requires an allocation scope")
 
-    def union_only(self, plan: ValuePlan) -> bool:
-        fields = self.fields(plan)
-        return len(fields) == 1 and fields[0].value.kind == "union"
-
     def is_reference_type(self, plan: ValuePlan) -> bool:
         return (
             bool(plan.registration)
@@ -411,7 +407,7 @@ class Values:
             or (
                 plan.kind == "record"
                 and (
-                    self.union_only(plan)
+                    plan.union_member is not None
                     or any(
                         field.presence and field.presence.mask
                         for field in self.fields(plan)
@@ -577,7 +573,7 @@ class Values:
         masked = any(
             field.presence and field.presence.mask for field in self.fields(plan)
         )
-        if self.union_only(plan):
+        if plan.union_member is not None:
             copied = values[0]
         elif masked or any(array for array, _ in arrays.values()):
             copied = (
@@ -662,7 +658,7 @@ class Values:
             reference = type_ == "string" or (
                 value.kind == "record" and self.declares_class(value)
             )
-            if not reference or self.union_only(plan):
+            if not reference or plan.union_member is not None:
                 continue
             message = f"{public_name(plan.native)}.{name} must not be null."
             checks.append(f'        Required(value.{name}, "{message}");')
@@ -672,7 +668,7 @@ class Values:
         """Whether declaration() emits the record as a class rather than a
         record struct."""
         return bool(plan.response) or (
-            self.union_only(plan)
+            plan.union_member is not None
             or any(
                 field.presence and field.presence.mask for field in self.fields(plan)
             )
@@ -737,7 +733,7 @@ class Values:
             array, optional = self.array_member(plan, name, field)
             expression = (
                 "value"
-                if self.union_only(plan)
+                if plan.union_member is not None
                 else f"value.{name}Storage{'?' if optional else ''}.Items"
                 if array
                 else f"value.{name}"
@@ -1119,9 +1115,9 @@ class Values:
                 f"    internal {plan.native}* Pointer {{ get {{ scope.EnsureActive(); return pointer; }} }}\n"
                 "    internal void Expire() => scope.Expire();\n}\n"
             )
-        if self.union_only(plan):
+        if plan.union_member is not None:
             name = public_name(plan.native)
-            union = self.fields(plan)[0].value
+            union = plan.union_member.value
             return (
                 f"public abstract record {name}\n{{\n    private {name}() {{ }}\n"
                 + "".join(
@@ -1129,7 +1125,7 @@ class Values:
                         self.bound.doc(f"{union.native}.{field.name}"), "Value", "    "
                     )
                     + f"    public sealed record {pascal(field.name)}({self.public_type(field.value)} Value) : {name};\n"
-                    for field in self.fields(plan)[0].value.fields
+                    for field in union.fields
                 )
                 + (
                     f"    public sealed record None : {name};\n"
@@ -1145,6 +1141,7 @@ class Values:
                             if field.name == union.tag
                         )
                     ),
+                    plan,
                 )
                 + "}\n"
             )
@@ -1177,6 +1174,7 @@ class Values:
                             item.value for item in plan.fields if item.name == union.tag
                         )
                     ),
+                    union,
                 )
                 + "    }\n"
             )
@@ -1197,8 +1195,11 @@ class Values:
             or self.native_type(value)
         )
 
-    @staticmethod
-    def unknown_variant(base: str, tag: str) -> str:
+    def unknown_variant(self, base: str, tag: str, value: ValuePlan) -> str:
+        """The arm that carries a tag this binding does not know. Only a value
+        copied from native can hold one, so an input-only union has none."""
+        if value.native not in self.bound.returned:
+            return ""
         return (
             f"        public sealed record Unknown : {base}\n        {{\n"
             "            private readonly byte[] bytes;\n"

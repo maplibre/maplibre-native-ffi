@@ -2461,36 +2461,31 @@ impl FromNative<sys::mln_offline_geometry_region_definition> for OfflineGeometry
 ///
 /// See `mln_offline_region_definition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct OfflineRegionDefinition {
-    pub data: OfflineRegionDefinitionData,
+#[derive(Debug, Clone, PartialEq)]
+pub enum OfflineRegionDefinition {
+    TilePyramid(OfflineTilePyramidRegionDefinition),
+    Geometry(OfflineGeometryRegionDefinition),
+    Unknown(u32),
 }
-impl OfflineRegionDefinition {
-    pub fn tile_pyramid(value: OfflineTilePyramidRegionDefinition) -> Self {
-        Self {
-            data: OfflineRegionDefinitionData::TilePyramid(value),
-        }
-    }
-    pub fn geometry(value: OfflineGeometryRegionDefinition) -> Self {
-        Self {
-            data: OfflineRegionDefinitionData::Geometry(value),
-        }
+impl Default for OfflineRegionDefinition {
+    fn default() -> Self {
+        Self::Unknown(0)
     }
 }
 impl ToNative<sys::mln_offline_region_definition> for OfflineRegionDefinition {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_offline_region_definition> {
         let mut raw: sys::mln_offline_region_definition = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_offline_region_definition>() as _;
-        match &self.data {
-            OfflineRegionDefinitionData::TilePyramid(item) => {
+        match self {
+            OfflineRegionDefinition::TilePyramid(item) => {
                 raw.type_ = sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID;
                 raw.data.tile_pyramid = to_native(&(*item), arena)?;
             }
-            OfflineRegionDefinitionData::Geometry(item) => {
+            OfflineRegionDefinition::Geometry(item) => {
                 raw.type_ = sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY;
                 raw.data.geometry = to_native(&(*item), arena)?;
             }
-            OfflineRegionDefinitionData::Unknown(_) => {
+            OfflineRegionDefinition::Unknown(_) => {
                 return Err(Error::invalid_argument(
                     "unknown union variant cannot be submitted",
                 ));
@@ -2501,37 +2496,15 @@ impl ToNative<sys::mln_offline_region_definition> for OfflineRegionDefinition {
 }
 impl FromNative<sys::mln_offline_region_definition> for OfflineRegionDefinition {
     unsafe fn from_native(raw: sys::mln_offline_region_definition) -> Result<Self> {
-        Ok(Self {
-            data: match raw.type_ {
-                sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID => {
-                    OfflineRegionDefinitionData::TilePyramid(unsafe {
-                        from_native(raw.data.tile_pyramid)
-                    }?)
-                }
-                sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY => {
-                    OfflineRegionDefinitionData::Geometry(unsafe {
-                        from_native(raw.data.geometry)
-                    }?)
-                }
-                tag => OfflineRegionDefinitionData::Unknown(tag as u32),
-            },
+        Ok(match raw.type_ {
+            sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID => {
+                OfflineRegionDefinition::TilePyramid(unsafe { from_native(raw.data.tile_pyramid) }?)
+            }
+            sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY => {
+                OfflineRegionDefinition::Geometry(unsafe { from_native(raw.data.geometry) }?)
+            }
+            tag => OfflineRegionDefinition::Unknown(tag as u32),
         })
-    }
-}
-
-/// Offline region definition data.
-///
-/// See `mln_offline_region_definition_data` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-#[derive(Debug, Clone, PartialEq)]
-pub enum OfflineRegionDefinitionData {
-    TilePyramid(OfflineTilePyramidRegionDefinition),
-    Geometry(OfflineGeometryRegionDefinition),
-    Unknown(u32),
-}
-impl Default for OfflineRegionDefinitionData {
-    fn default() -> Self {
-        Self::Unknown(0)
     }
 }
 
@@ -3621,68 +3594,31 @@ impl FromNative<sys::mln_rendered_feature_query_options> for RenderedFeatureQuer
 ///
 /// See `mln_rendered_query_geometry` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct RenderedQueryGeometry {
-    pub data: RenderedQueryGeometryData,
-}
-impl RenderedQueryGeometry {
-    pub fn point(value: ScreenPoint) -> Self {
-        Self {
-            data: RenderedQueryGeometryData::Point(value),
-        }
-    }
-    pub fn r#box(value: ScreenBox) -> Self {
-        Self {
-            data: RenderedQueryGeometryData::Box(value),
-        }
-    }
-    pub fn line_string(value: ScreenLineString) -> Self {
-        Self {
-            data: RenderedQueryGeometryData::LineString(value),
-        }
-    }
+#[derive(Debug, Clone, PartialEq)]
+pub enum RenderedQueryGeometry {
+    Point(ScreenPoint),
+    Box(ScreenBox),
+    LineString(ScreenLineString),
 }
 impl ToNative<sys::mln_rendered_query_geometry> for RenderedQueryGeometry {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_rendered_query_geometry> {
         let mut raw: sys::mln_rendered_query_geometry = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_rendered_query_geometry>() as _;
-        match &self.data {
-            RenderedQueryGeometryData::Point(item) => {
+        match self {
+            RenderedQueryGeometry::Point(item) => {
                 raw.type_ = sys::MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT;
                 raw.data.point = to_native(&(*item), arena)?;
             }
-            RenderedQueryGeometryData::Box(item) => {
+            RenderedQueryGeometry::Box(item) => {
                 raw.type_ = sys::MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX;
                 raw.data.box_ = to_native(&(*item), arena)?;
             }
-            RenderedQueryGeometryData::LineString(item) => {
+            RenderedQueryGeometry::LineString(item) => {
                 raw.type_ = sys::MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING;
                 raw.data.line_string = to_native(&(*item), arena)?;
             }
-            RenderedQueryGeometryData::Unknown(_) => {
-                return Err(Error::invalid_argument(
-                    "unknown union variant cannot be submitted",
-                ));
-            }
         }
         Ok(raw)
-    }
-}
-
-/// Screen-space query geometry data.
-///
-/// See `mln_rendered_query_geometry_data` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-#[derive(Debug, Clone, PartialEq)]
-pub enum RenderedQueryGeometryData {
-    Point(ScreenPoint),
-    Box(ScreenBox),
-    LineString(ScreenLineString),
-    Unknown(u32),
-}
-impl Default for RenderedQueryGeometryData {
-    fn default() -> Self {
-        Self::Unknown(0)
     }
 }
 

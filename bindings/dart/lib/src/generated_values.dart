@@ -5155,6 +5155,14 @@ final class OfflineRegionDefinitionGeometry extends OfflineRegionDefinition {
   int get hashCode => value.hashCode;
 }
 
+final class OfflineRegionDefinitionUnknown extends OfflineRegionDefinition {
+  OfflineRegionDefinitionUnknown(this.tag, Uint8List rawRecord)
+    : rawRecord = Uint8List.fromList(rawRecord).asUnmodifiableView(),
+      super._();
+  final int tag;
+  final Uint8List rawRecord;
+}
+
 /// Region data delivered by an offline completion.
 ///
 /// See `mln_offline_region_info` in the

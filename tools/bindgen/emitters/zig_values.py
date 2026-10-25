@@ -19,6 +19,9 @@ def field_default(values, field) -> str | None:
             if zero
             else "@enumFromInt(0)"
         )
+    if value.union_member:
+        # Only a union that keeps unknown tags has a value to start from.
+        return ".{ .unknown = 0 }" if value.native in values.bound.returned else None
     if value.kind != "record":
         public = values.public(value)
         if public.startswith("?"):
@@ -146,17 +149,15 @@ class Values:
         if value.kind in {"array", "reference"}:
             self.add(value.element)
         if value.kind == "union":
-            if not value.tag or any(
-                not f.presence or not f.presence.variant for f in value.fields
-            ):
-                raise ModelError(
-                    [f"Zig: {value.native}: union requires tagged variants"]
-                )
-            for field in value.fields:
-                self.add(field.value)
+            self.add_variants(value)
             self.used[value.native] = value
             return
         if value.kind != "record":
+            return
+        if member := value.union_member:
+            # A record that holds only a union presents the union in its place.
+            self.add_variants(member.value)
+            self.used[value.native] = value
             return
         for field in value.fields:
             if not field.public:
@@ -167,6 +168,14 @@ class Values:
                 )
             self.add(field.value)
         self.used[value.native] = value
+
+    def add_variants(self, union):
+        if not union.tag or any(
+            not f.presence or not f.presence.variant for f in union.fields
+        ):
+            raise ModelError([f"Zig: {union.native}: union requires tagged variants"])
+        for field in union.fields:
+            self.add(field.value)
 
     def capture(self, value, source):
         return (
@@ -206,6 +215,21 @@ class Values:
             ]
         )
 
+    def variants(self, union, owner):
+        """The fields of the union(enum) of `union`'s variants, which keeps
+        tags this binding predates as `unknown` only when native returns
+        `owner`: the union, or the record that holds only it."""
+        fields = "".join(
+            doc(self.bound, f"{union.native}.{field.name}", "    ")
+            + f"    {identifier(field.name)}: {self.public(field.value)},\n"
+            for field in union.fields
+        )
+        if union.empty_variant:
+            fields += "    empty,\n"
+        if owner.native in self.bound.returned:
+            fields += "    unknown: u32,\n"
+        return fields
+
     def record(self, value: ValuePlan):
         from .zig_dynamic_values import declaration, dynamic
 
@@ -213,13 +237,11 @@ class Values:
             methods = "\n".join(self.methods.get(value.native, []))
             return f"pub const {self.public(value)} = struct {{ native: *c.{value.native},\n{methods}\n}};\n"
         if value.kind == "union":
-            fields = "\n".join(
-                doc(self.bound, f"{value.native}.{field.name}", "    ")
-                + f"    {identifier(field.name)}: {self.public(field.value)},"
-                for field in value.fields
-            )
-            empty = "    empty,\n" if value.empty_variant else ""
-            return f"pub const {self.public(value)} = union(enum) {{\n{fields}\n{empty}    unknown: u32,\n}};\n"
+            return f"pub const {self.public(value)} = union(enum) {{\n{self.variants(value, value)}}};\n"
+        if value.union_member:
+            from .zig_dynamic_values import union_declaration
+
+            return union_declaration(self, value)
         if dynamic(value):
             return declaration(self, value)
         public = self.public(value)

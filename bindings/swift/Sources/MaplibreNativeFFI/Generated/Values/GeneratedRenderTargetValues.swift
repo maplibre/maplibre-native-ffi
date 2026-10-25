@@ -267,7 +267,6 @@ public enum OpenglContextDescriptorData: Equatable, Hashable, Sendable {
   case wgl(WglContextDescriptor)
   case egl(EglContextDescriptor)
   case webgl(WebglContextDescriptor)
-
   case unknown(UInt32, Data)
   public static var `default`: Self {
     .unknown(0, Data())

@@ -261,6 +261,17 @@ class NativeValues:
             callbacks = entry.callbacks
             if entry.form == "queue":
                 lines += self.registration_callbacks(value, entry)
+        if value.union_member:
+            # A record of only a union is the selected variant itself.
+            lines = [
+                f"  {line}"
+                for line in self.union_writer(
+                    value, value.union_member, "value", "path"
+                )
+            ]
+            lines.append("  return true;")
+            self.functions[name] = (prototype, "\n".join(lines))
+            return name
         for field in self.values.fields(value):
             if field in callbacks:
                 continue
@@ -271,7 +282,7 @@ class NativeValues:
             lines.append(f"  mln_ts_path(child, sizeof child, path, {c_string(key)});")
             target = f"out->{field.name}"
             if field.value.kind == "union":
-                body = self.union_writer(value, field)
+                body = self.union_writer(value, field, "member", "child")
             elif field.value.kind == "array":
                 count = field.value.length
                 body = self.read_list(
@@ -376,20 +387,23 @@ class NativeValues:
             "  }",
         ]
 
-    def union_writer(self, record: ValuePlan, field: FieldPlan) -> list[str]:
-        """Statements that read a `{kind, value}` object into a tagged union."""
+    def union_writer(
+        self, record: ValuePlan, field: FieldPlan, js: str, path: str
+    ) -> list[str]:
+        """Statements that read the `{kind, value}` object `js` into a tagged
+        union. A kind outside the union's arms fails."""
         arms = {arm.name: arm for arm in field.value.fields}
         cases = union_kinds(field.value)
         kinds = ", ".join(c_string(kind) for _, kind, _ in cases)
         lines = [
-            "if (!mln_ts_read_record(call, member, child)) return false;",
+            f"if (!mln_ts_read_record(call, {js}, {path})) return false;",
             "{",
             f"  static const char* const kinds[] = {{{kinds}}};",
             "  napi_value arm;",
             "  char arm_path[256];",
             "  (void)arm;",
             "  (void)arm_path;",
-            f"  switch (mln_ts_read_kind(call, member, kinds, {len(cases)}, child)) {{",
+            f"  switch (mln_ts_read_kind(call, {js}, kinds, {len(cases)}, {path})) {{",
         ]
         for index, (constant, _, name) in enumerate(cases):
             lines.append(f"    case {index}:")
@@ -402,8 +416,8 @@ class NativeValues:
                 )
                 read += self.read(arm.value, "arm", target, "arm_path", "return false")
                 lines += [
-                    '      if (!mln_ts_member(call, member, "value", &arm)) return false;',
-                    '      mln_ts_path(arm_path, sizeof arm_path, child, "value");',
+                    f'      if (!mln_ts_member(call, {js}, "value", &arm)) return false;',
+                    f'      mln_ts_path(arm_path, sizeof arm_path, {path}, "value");',
                     *[f"      {line}" for line in read],
                 ]
             lines.append("      break;")
@@ -483,6 +497,11 @@ class NativeValues:
             array = self.array_reader(value, self.values.bound.slices[value.native])
             body = f"  (void)size;\n  return {array}(env, source);"
             self.functions[name] = (prototype, body)
+            return name
+        if value.union_member:
+            # A record of only a union converts to the selected variant.
+            union = self.union_reader(value, value.union_member)
+            self.functions[name] = (prototype, f"  return {union}(env, source, size);")
             return name
         lines = [
             "  (void)size;",

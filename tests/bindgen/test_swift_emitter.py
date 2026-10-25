@@ -11,6 +11,7 @@ from support import (
     parse,
     parse_sources,
     protocol_header,
+    real_api,
     require_tool,
     run,
 )
@@ -110,6 +111,21 @@ class SwiftEmitterTests(unittest.TestCase):
         self.assertFalse(swift.repeats("createMap", "options"))
         self.assertFalse(swift.repeats("setHeader", "name"))
         self.assertFalse(swift.repeats("queryFeatureExtensions", "sourceId"))
+
+    def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
+        values = "".join(
+            text
+            for path, text in swift.generate(real_api()).items()
+            if path.startswith("Generated/Values/")
+        )
+        self.assertNotIn("RenderedQueryGeometryData", values)
+        geometry = values.split("public enum RenderedQueryGeometry:")[1].split("\n}")[0]
+        self.assertIn("case `point`(ScreenPoint)", geometry)
+        # Native never returns a query geometry, so it has no unknown case; it
+        # returns a region definition, which keeps one.
+        self.assertNotIn("unknown", geometry)
+        definition = values.split("public enum OfflineRegionDefinition:")[1]
+        self.assertIn("case unknown(UInt32, Data)", definition.split("\n}")[0])
 
     def test_generated_values_and_keyword_parameters_round_trip(self):
         swiftc = require_tool(self, "swiftc", ROOT / "bindings/swift")

@@ -176,13 +176,7 @@ def decode(values, value, source, context="raw"):
             return f"blk: {{ {storage} for (0..{count}) |index| {{ const item = try marshal.stridedAt({values.native_type(value.element)}, {source}, {count}, {context}.{identifier(value.stride)}, index); copied[index] = {copied}; }} break :blk copied; }}"
         return f"blk: {{ {storage} for ({items}, 0..) |item, index| copied[index] = {copied}; break :blk copied; }}"
     if value.kind == "union":
-        cases = ", ".join(
-            f"c.{field.presence.variant} => .{{ .{identifier(field.name)} = {decode(values, field.value, source + '.' + identifier(field.name), context)} }}"
-            for field in value.fields
-        )
-        if value.empty_variant:
-            cases += f", c.{value.empty_variant[0]} => .empty"
-        return f"switch ({context}.{identifier(value.tag)}) {{ {cases}, else => |tag| .{{ .unknown = @intCast(tag) }} }}"
+        return variant(values, value, value, source, context)
     if value.kind in {"scalar", "native_pointer"}:
         return source
     return (
@@ -190,6 +184,37 @@ def decode(values, value, source, context="raw"):
         if dynamic(value)
         else f"{values.public(value)}.fromNative({source})"
     )
+
+
+def variant(values, union, owner, source, context):
+    """Copies the variant of the union at `source` that the tag in `context`
+    selects. Only a returned `owner` keeps a tag it predates as `unknown`."""
+    cases = ", ".join(
+        f"c.{field.presence.variant} => .{{ .{identifier(field.name)} = {decode(values, field.value, source + '.' + identifier(field.name), context)} }}"
+        for field in union.fields
+    )
+    if union.empty_variant:
+        cases += f", c.{union.empty_variant[0]} => .empty"
+    unknown = (
+        "else => |tag| .{ .unknown = @intCast(tag) }"
+        if owner.native in values.bound.returned
+        else "else => return error.NativeError"
+    )
+    return f"switch ({context}.{identifier(union.tag)}) {{ {cases}, {unknown} }}"
+
+
+def submit(values, union, owner, source, place):
+    """Writes the variant `source` and its tag into the union storage `place`."""
+    tag = f"raw.{identifier(union.tag)}"
+    cases = [
+        f".{identifier(member.name)} => |item| {{ {tag} = c.{member.presence.variant}; {place}.{identifier(member.name)} = {encode(values, member.value, 'item')}; }},"
+        for member in union.fields
+    ]
+    if union.empty_variant:
+        cases.append(f".empty => {tag} = c.{union.empty_variant[0]},")
+    if owner.native in values.bound.returned:
+        cases.append(".unknown => return error.InvalidArgument,")
+    return f"        switch ({source}) {{ {' '.join(cases)} }}"
 
 
 def declaration(values, value):
@@ -236,18 +261,15 @@ def declaration(values, value):
             continue
         if field.value.kind == "union":
             union = field.value
+            default = (
+                " = .{ .unknown = 0 }" if union.native in values.bound.returned else ""
+            )
             fields.append(
                 doc(values.bound, f"{value.native}.{field.name}", "    ")
-                + f"    {local}: {values.public(union)} = .{{ .unknown = 0 }},"
+                + f"    {local}: {values.public(union)}{default},"
             )
             captures.append(f"            .{local} = {decode(values, union, raw)},")
-            cases = " ".join(
-                f".{identifier(member.name)} => |item| {{ raw.{identifier(union.tag)} = c.{member.presence.variant}; {raw}.{identifier(member.name)} = {encode(values, member.value, 'item')}; }},"
-                for member in union.fields
-            )
-            writes.append(
-                f"        switch (self.{local}) {{ {cases} .unknown => return error.InvalidArgument, }}"
-            )
+            writes.append(submit(values, union, union, f"self.{local}", raw))
             continue
         optional = field.presence and field.presence.mask
         public_type = values.public(field.value)
@@ -372,3 +394,47 @@ def declaration(values, value):
 {copy}}};
 """
     return rendered
+
+
+def union_declaration(values, value):
+    """The union(enum) of a record that holds only a union and its tag. Its
+    conversion writes the size, and the tag from the variant."""
+    typ = values.public(value)
+    member = value.union_member
+    raw = f"raw.{identifier(member.name)}"
+    writes = [
+        f"        raw.{identifier(field.name)} = @sizeOf(c.{value.native});"
+        for field in value.fields
+        if field.role == "size"
+    ]
+    writes.append(submit(values, member.value, value, "self", raw))
+    initial = (
+        f"c.{value.default}()" if value.default else f"std.mem.zeroes(c.{value.native})"
+    )
+    signature = "".join(
+        {
+            "allocator": ", allocator: std.mem.Allocator",
+            "roots": ", roots: *callbacks.Roots",
+        }[name]
+        for name in to_native_parameters(value)
+    )
+    copied = variant(values, member.value, value, raw, "raw")
+    capture_use = "" if "allocator" in copied else "        _ = allocator;\n"
+    encoder = (
+        f"""    pub fn toNative(self: {typ}{signature}) status.Error!c.{value.native} {{
+        var raw = {initial};
+{chr(10).join(writes)}
+        return raw;
+    }}
+
+"""
+        if value.native in values.bound.inputs
+        else ""
+    )
+    return f"""pub const {typ} = union(enum) {{
+{values.variants(member.value, value)}
+{encoder}    pub fn fromNative(allocator: std.mem.Allocator, raw: c.{value.native}) status.Error!{typ} {{
+{capture_use}        return {copied};
+    }}
+}};
+"""

@@ -102,9 +102,12 @@ class Values:
             if value.native in self.used and wanted <= known:
                 return self.public(value)
             self.used[value.native] = value
+            # A record that holds only a union presents the union's variants.
+            member = value.union_member
+            fields = member.value.fields if member else value.fields
             for added in sorted(wanted - known):
                 known.add(added)
-                for field in value.fields:
+                for field in fields:
                     if field.role == "value":
                         self.add(field.value, added)
         return self.public(value)
@@ -143,7 +146,7 @@ class Values:
         return self.scalar(value) if value.kind == "scalar" else self.name(value)
 
     def declaration(self, value: ValuePlan) -> str:
-        from .rust_dynamic_values import declaration
+        from .rust_dynamic_values import declaration, union_declaration
 
         if value.response:
             from .rust_callbacks import response_declaration
@@ -154,16 +157,11 @@ class Values:
 
             return registration(self, value)
         if value.kind == "union":
-            members = ", ".join(
-                doc(self.bound, f"{value.native}.{field.name}")
-                + f"{pascal(field.name)}({self.public(field.value)})"
-                for field in value.fields
-            )
-            if value.empty_variant:
-                members += ", Empty"
-            return f"{doc(self.bound, value.native)}#[derive(Debug, Clone, PartialEq)]\npub enum {self.name(value)} {{ {members}, Unknown(u32) }}\nimpl Default for {self.name(value)} {{ fn default() -> Self {{ Self::Unknown(0) }} }}\n"
+            return union_enum(self, value)
         if value.kind == "enum":
             return self.enum(value)
+        if value.union_member:
+            return union_declaration(self, value)
         return declaration(self, value)
 
     def enum(self, value: ValuePlan) -> str:
@@ -212,3 +210,25 @@ class Values:
         return "\n".join(
             self.declaration(value) for _, value in sorted(self.used.items())
         )
+
+
+def union_enum(values: Values, owner: ValuePlan) -> str:
+    """The enum of a union's variants, named and documented after `owner`: the
+    union itself, or the record that holds only it. A union that native returns
+    keeps tags this binding predates as `Unknown`."""
+    union = owner.union_member.value if owner.union_member else owner
+    members = ", ".join(
+        doc(values.bound, f"{union.native}.{field.name}")
+        + f"{pascal(field.name)}({values.public(field.value)})"
+        for field in union.fields
+    )
+    if union.empty_variant:
+        members += ", Empty"
+    unknown = owner.native in values.bound.returned
+    if unknown:
+        members += ", Unknown(u32)"
+    name = values.name(owner)
+    rendered = f"{doc(values.bound, owner.native)}#[derive(Debug, Clone, PartialEq)]\npub enum {name} {{ {members} }}\n"
+    if unknown:
+        rendered += f"impl Default for {name} {{ fn default() -> Self {{ Self::Unknown(0) }} }}\n"
+    return rendered

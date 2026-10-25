@@ -1093,30 +1093,25 @@ fn generated_copy_mln_offline_region_definition(
     py: Python<'_>,
     value: &sys::mln_offline_region_definition,
 ) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "data",
-        match value.type_ {
-            sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID => generated_variant(
+    Ok(match value.type_ {
+        sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID => generated_variant(
+            py,
+            "tile_pyramid",
+            generated_copy_mln_offline_tile_pyramid_region_definition(
                 py,
-                "tile_pyramid",
-                generated_copy_mln_offline_tile_pyramid_region_definition(
-                    py,
-                    &(unsafe { value.data.tile_pyramid }),
-                )?,
+                &(unsafe { value.data.tile_pyramid }),
             )?,
-            sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY => generated_variant(
+        )?,
+        sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY => generated_variant(
+            py,
+            "geometry",
+            generated_copy_mln_offline_geometry_region_definition(
                 py,
-                "geometry",
-                generated_copy_mln_offline_geometry_region_definition(
-                    py,
-                    &(unsafe { value.data.geometry }),
-                )?,
+                &(unsafe { value.data.geometry }),
             )?,
-            tag => generated_unknown_variant(py, tag)?,
-        },
-    )?;
-    Ok(dict.into_any().unbind())
+        )?,
+        tag => generated_unknown_variant(py, tag)?,
+    })
 }
 
 fn generated_copy_mln_offline_region_info(
@@ -3350,7 +3345,7 @@ fn generated_input_mln_offline_region_definition<'py>(
 ) -> PyResult<sys::mln_offline_region_definition> {
     let mut raw: sys::mln_offline_region_definition = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_offline_region_definition>() as _;
-    let field = value.getattr("data")?;
+    let field = value;
     let tag = field.getattr("_tag")?.extract::<u32>()?;
     match tag {
         sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID => {
@@ -3642,7 +3637,7 @@ fn generated_input_mln_rendered_query_geometry<'py>(
 ) -> PyResult<sys::mln_rendered_query_geometry> {
     let mut raw: sys::mln_rendered_query_geometry = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_rendered_query_geometry>() as _;
-    let field = value.getattr("data")?;
+    let field = value;
     let tag = field.getattr("_tag")?.extract::<u32>()?;
     match tag {
         sys::MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT => {

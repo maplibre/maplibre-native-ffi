@@ -1391,33 +1391,19 @@ public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
 ///
 /// See `mln_offline_region_definition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct OfflineRegionDefinition: Equatable, Hashable, Sendable {
-  public var data: OfflineRegionDefinitionData
+public enum OfflineRegionDefinition: Equatable, Hashable, Sendable {
+  case tilePyramid(OfflineTilePyramidRegionDefinition)
+  case geometry(OfflineGeometryRegionDefinition)
+  case unknown(UInt32, Data)
   public static var `default`: Self {
-    Self()
-  }
-
-  public static func tilePyramid(_ value: OfflineTilePyramidRegionDefinition)
-    -> Self
-  {
-    Self(data: .tilePyramid(value))
-  }
-
-  public static func geometry(_ value: OfflineGeometryRegionDefinition)
-    -> Self
-  {
-    Self(data: .geometry(value))
-  }
-
-  public init(data: OfflineRegionDefinitionData = .default) {
-    self.data = data
+    .unknown(0, Data())
   }
 
   init(
     raw: mln_offline_region_definition,
     recordBytes: UnsafeRawBufferPointer? = nil
   ) throws {
-    data = try { () throws -> OfflineRegionDefinitionData in
+    self = try { () throws -> OfflineRegionDefinition in
       switch raw.type
         .rawValue
       {
@@ -1445,7 +1431,7 @@ public struct OfflineRegionDefinition: Equatable, Hashable, Sendable {
   {
     var raw = mln_offline_region_definition()
     raw.size = UInt32(MemoryLayout<mln_offline_region_definition>.size)
-    switch data {
+    switch self {
     case let .tilePyramid(item): raw
       .type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID; raw.data
       .tile_pyramid = try item.nativeValue(arena: arena)
@@ -1456,20 +1442,6 @@ public struct OfflineRegionDefinition: Equatable, Hashable, Sendable {
       .invalidArgument("unknown union variant cannot be submitted")
     }
     return raw
-  }
-}
-
-/// Offline region definition data.
-///
-/// See `mln_offline_region_definition_data` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public enum OfflineRegionDefinitionData: Equatable, Hashable, Sendable {
-  case tilePyramid(OfflineTilePyramidRegionDefinition)
-  case geometry(OfflineGeometryRegionDefinition)
-
-  case unknown(UInt32, Data)
-  public static var `default`: Self {
-    .unknown(0, Data())
   }
 }
 

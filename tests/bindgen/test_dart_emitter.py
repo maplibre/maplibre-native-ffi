@@ -113,6 +113,18 @@ class DartEmitterTests(unittest.TestCase):
             dart.generate(real_api()),
         )
 
+    def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
+        values = dart.generate_values(real_api())
+        self.assertIn("sealed class RenderedQueryGeometry {", values)
+        self.assertNotIn("RenderedQueryGeometryData", values)
+        # Native never returns a query geometry, so it has no unknown variant;
+        # it returns a region definition, which keeps one.
+        self.assertNotIn("RenderedQueryGeometryUnknown", values)
+        self.assertIn(
+            "final class OfflineRegionDefinitionUnknown extends OfflineRegionDefinition {",
+            values,
+        )
+
     def test_generated_values_and_keyword_parameters_round_trip(self):
         dart_tool = require_tool(self, "dart", BINDING)
         clang = require_tool(self, "clang")

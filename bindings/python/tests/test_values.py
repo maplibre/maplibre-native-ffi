@@ -89,7 +89,7 @@ def test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native(
     assert {event.source for event in events} == {map_handle.id}
     assert events[-1].generation == loaded.generation
 
-    unknown = mln.OfflineRegionDefinition(mln.UnknownVariant(999))
+    unknown = mln.UnknownVariant(999)
     with pytest.raises(mln.MaplibreError) as raised:
         harness.runtime.create_offline_region(unknown, b"")
     # Native saw the arm's tag and refused it; the binding passed it through.

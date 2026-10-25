@@ -308,6 +308,19 @@ class KotlinLayoutTests(unittest.TestCase):
             ],
         )
 
+    def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
+        values = kotlin.generate(real_api())[f"{GENERATED}/GeneratedValues.kt"]
+        self.assertIn("public sealed interface RenderedQueryGeometry {", values)
+        self.assertNotIn("RenderedQueryGeometryData", values)
+        # Native never returns a query geometry, so it has no unknown variant;
+        # it returns a region definition, which keeps one.
+        geometry = values.split("public sealed interface RenderedQueryGeometry {")[1]
+        self.assertNotIn("Unknown", geometry.split("\n}")[0])
+        definition = values.split("public sealed interface OfflineRegionDefinition {")[
+            1
+        ]
+        self.assertIn("public data class Unknown(", definition.split("\n}")[0])
+
     def test_split_registrations_take_a_form_per_target(self):
         _functions, _unsupported, bodies, split, values, _native = kotlin.lowered(
             real_api()

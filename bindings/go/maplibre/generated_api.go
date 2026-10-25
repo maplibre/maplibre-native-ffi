@@ -1521,103 +1521,132 @@ func (value WebglContextKind) String() string {
 	return fmt.Sprintf("WebglContextKind(%d)", value)
 }
 
-// OfflineRegionDefinitionData corresponds to
-// mln_offline_region_definition_data. Offline region definition data.
+// OfflineRegionDefinition corresponds to mln_offline_region_definition. Tagged
+// offline region definition.
 //
-// See mln_offline_region_definition_data in the C API reference:
+// See mln_offline_region_definition in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type OfflineRegionDefinitionData interface{ bindingTag() uint32 }
+type OfflineRegionDefinition interface {
+	bindingTag() uint32
+	isOfflineRegionDefinition()
+}
 
-type OfflineRegionDefinitionDataTilePyramidVariant struct {
+func (UnknownVariant) isOfflineRegionDefinition() {}
+
+type OfflineRegionDefinitionTilePyramidVariant struct {
 	Value OfflineTilePyramidRegionDefinition
 }
 
-func (OfflineRegionDefinitionDataTilePyramidVariant) bindingTag() uint32 {
+func (OfflineRegionDefinitionTilePyramidVariant) bindingTag() uint32 {
 	return uint32(C.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID)
 }
+func (OfflineRegionDefinitionTilePyramidVariant) isOfflineRegionDefinition() {}
 
-type OfflineRegionDefinitionDataGeometryVariant struct {
+type OfflineRegionDefinitionGeometryVariant struct {
 	Value OfflineGeometryRegionDefinition
 }
 
-func (OfflineRegionDefinitionDataGeometryVariant) bindingTag() uint32 {
+func (OfflineRegionDefinitionGeometryVariant) bindingTag() uint32 {
 	return uint32(C.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY)
 }
+func (OfflineRegionDefinitionGeometryVariant) isOfflineRegionDefinition() {}
 
 // OpenglContextDescriptorData corresponds to
 // mln_opengl_context_descriptor_data. Backend-specific OpenGL context data.
 //
 // See mln_opengl_context_descriptor_data in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-type OpenglContextDescriptorData interface{ bindingTag() uint32 }
+type OpenglContextDescriptorData interface {
+	bindingTag() uint32
+	isOpenglContextDescriptorData()
+}
+
+func (UnknownVariant) isOpenglContextDescriptorData() {}
 
 type OpenglContextDescriptorDataWglVariant struct{ Value WglContextDescriptor }
 
 func (OpenglContextDescriptorDataWglVariant) bindingTag() uint32 {
 	return uint32(C.MLN_OPENGL_CONTEXT_PLATFORM_WGL)
 }
+func (OpenglContextDescriptorDataWglVariant) isOpenglContextDescriptorData() {}
 
 type OpenglContextDescriptorDataEglVariant struct{ Value EglContextDescriptor }
 
 func (OpenglContextDescriptorDataEglVariant) bindingTag() uint32 {
 	return uint32(C.MLN_OPENGL_CONTEXT_PLATFORM_EGL)
 }
+func (OpenglContextDescriptorDataEglVariant) isOpenglContextDescriptorData() {}
 
 type OpenglContextDescriptorDataWebglVariant struct{ Value WebglContextDescriptor }
 
 func (OpenglContextDescriptorDataWebglVariant) bindingTag() uint32 {
 	return uint32(C.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL)
 }
+func (OpenglContextDescriptorDataWebglVariant) isOpenglContextDescriptorData() {}
 
-// RenderedQueryGeometryData corresponds to mln_rendered_query_geometry_data.
-// Screen-space query geometry data.
+// RenderedQueryGeometry corresponds to mln_rendered_query_geometry. Rendered
+// feature query geometry descriptor.
 //
-// See mln_rendered_query_geometry_data in the C API reference:
+// See mln_rendered_query_geometry in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-type RenderedQueryGeometryData interface{ bindingTag() uint32 }
+type RenderedQueryGeometry interface {
+	bindingTag() uint32
+	isRenderedQueryGeometry()
+}
 
-type RenderedQueryGeometryDataPointVariant struct{ Value ScreenPoint }
+type RenderedQueryGeometryPointVariant struct{ Value ScreenPoint }
 
-func (RenderedQueryGeometryDataPointVariant) bindingTag() uint32 {
+func (RenderedQueryGeometryPointVariant) bindingTag() uint32 {
 	return uint32(C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT)
 }
+func (RenderedQueryGeometryPointVariant) isRenderedQueryGeometry() {}
 
-type RenderedQueryGeometryDataBoxVariant struct{ Value ScreenBox }
+type RenderedQueryGeometryBoxVariant struct{ Value ScreenBox }
 
-func (RenderedQueryGeometryDataBoxVariant) bindingTag() uint32 {
+func (RenderedQueryGeometryBoxVariant) bindingTag() uint32 {
 	return uint32(C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX)
 }
+func (RenderedQueryGeometryBoxVariant) isRenderedQueryGeometry() {}
 
-type RenderedQueryGeometryDataLineStringVariant struct{ Value ScreenLineString }
+type RenderedQueryGeometryLineStringVariant struct{ Value ScreenLineString }
 
-func (RenderedQueryGeometryDataLineStringVariant) bindingTag() uint32 {
+func (RenderedQueryGeometryLineStringVariant) bindingTag() uint32 {
 	return uint32(C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING)
 }
+func (RenderedQueryGeometryLineStringVariant) isRenderedQueryGeometry() {}
 
 // RuntimeEventPayload corresponds to mln_runtime_event_payload. Typed event
 // payload carried inline by every event.
 //
 // See mln_runtime_event_payload in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type RuntimeEventPayload interface{ bindingTag() uint32 }
+type RuntimeEventPayload interface {
+	bindingTag() uint32
+	isRuntimeEventPayload()
+}
+
+func (UnknownVariant) isRuntimeEventPayload() {}
 
 type RuntimeEventPayloadRenderFrameVariant struct{ Value RuntimeEventRenderFrame }
 
 func (RuntimeEventPayloadRenderFrameVariant) bindingTag() uint32 {
 	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME)
 }
+func (RuntimeEventPayloadRenderFrameVariant) isRuntimeEventPayload() {}
 
 type RuntimeEventPayloadRenderMapVariant struct{ Value RuntimeEventRenderMap }
 
 func (RuntimeEventPayloadRenderMapVariant) bindingTag() uint32 {
 	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP)
 }
+func (RuntimeEventPayloadRenderMapVariant) isRuntimeEventPayload() {}
 
 type RuntimeEventPayloadTileActionVariant struct{ Value RuntimeEventTileAction }
 
 func (RuntimeEventPayloadTileActionVariant) bindingTag() uint32 {
 	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION)
 }
+func (RuntimeEventPayloadTileActionVariant) isRuntimeEventPayload() {}
 
 type RuntimeEventPayloadOfflineRegionStatusVariant struct {
 	Value RuntimeEventOfflineRegionStatus
@@ -1626,6 +1655,7 @@ type RuntimeEventPayloadOfflineRegionStatusVariant struct {
 func (RuntimeEventPayloadOfflineRegionStatusVariant) bindingTag() uint32 {
 	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS)
 }
+func (RuntimeEventPayloadOfflineRegionStatusVariant) isRuntimeEventPayload() {}
 
 type RuntimeEventPayloadOfflineRegionResponseErrorVariant struct {
 	Value RuntimeEventOfflineRegionResponseError
@@ -1634,6 +1664,7 @@ type RuntimeEventPayloadOfflineRegionResponseErrorVariant struct {
 func (RuntimeEventPayloadOfflineRegionResponseErrorVariant) bindingTag() uint32 {
 	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR)
 }
+func (RuntimeEventPayloadOfflineRegionResponseErrorVariant) isRuntimeEventPayload() {}
 
 type RuntimeEventPayloadOfflineRegionTileCountLimitVariant struct {
 	Value RuntimeEventOfflineRegionTileCountLimit
@@ -1642,6 +1673,7 @@ type RuntimeEventPayloadOfflineRegionTileCountLimitVariant struct {
 func (RuntimeEventPayloadOfflineRegionTileCountLimitVariant) bindingTag() uint32 {
 	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT)
 }
+func (RuntimeEventPayloadOfflineRegionTileCountLimitVariant) isRuntimeEventPayload() {}
 
 // AnimationOptions corresponds to mln_animation_options. Optional animation
 // controls for camera transitions.
@@ -3109,38 +3141,27 @@ func nativeOfflineGeometryRegionDefinition(input OfflineGeometryRegionDefinition
 	return raw
 }
 
-// OfflineRegionDefinition corresponds to mln_offline_region_definition. Tagged
-// offline region definition.
-//
-// See mln_offline_region_definition in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type OfflineRegionDefinition struct{ Data OfflineRegionDefinitionData }
-
 func copyOfflineRegionDefinition(raw C.mln_offline_region_definition) OfflineRegionDefinition {
-	var result OfflineRegionDefinition
-	result.Data = func() OfflineRegionDefinitionData {
-		switch raw._type {
-		case C.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID:
-			return OfflineRegionDefinitionDataTilePyramidVariant{Value: copyOfflineTilePyramidRegionDefinition((*(*C.mln_offline_tile_pyramid_region_definition)(unsafe.Pointer(&raw.data))))}
-		case C.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY:
-			return OfflineRegionDefinitionDataGeometryVariant{Value: copyOfflineGeometryRegionDefinition((*(*C.mln_offline_geometry_region_definition)(unsafe.Pointer(&raw.data))))}
-		}
-		return UnknownVariant{Tag: uint32(raw._type)}
-	}()
-	return result
+	switch raw._type {
+	case C.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID:
+		return OfflineRegionDefinitionTilePyramidVariant{Value: copyOfflineTilePyramidRegionDefinition((*(*C.mln_offline_tile_pyramid_region_definition)(unsafe.Pointer(&raw.data))))}
+	case C.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY:
+		return OfflineRegionDefinitionGeometryVariant{Value: copyOfflineGeometryRegionDefinition((*(*C.mln_offline_geometry_region_definition)(unsafe.Pointer(&raw.data))))}
+	}
+	return UnknownVariant{Tag: uint32(raw._type)}
 }
 
 func nativeOfflineRegionDefinition(input OfflineRegionDefinition, arena *bindingArena) C.mln_offline_region_definition {
 	raw := C.mln_offline_region_definition{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	if input.Data == nil {
+	if input == nil {
 		arena.fail("missing union variant")
 	}
-	raw._type = C.mln_offline_region_definition_type(input.Data.bindingTag())
-	switch variant := input.Data.(type) {
-	case OfflineRegionDefinitionDataTilePyramidVariant:
+	raw._type = C.mln_offline_region_definition_type(input.bindingTag())
+	switch variant := input.(type) {
+	case OfflineRegionDefinitionTilePyramidVariant:
 		*(*C.mln_offline_tile_pyramid_region_definition)(unsafe.Pointer(&raw.data)) = nativeOfflineTilePyramidRegionDefinition(variant.Value, arena)
-	case OfflineRegionDefinitionDataGeometryVariant:
+	case OfflineRegionDefinitionGeometryVariant:
 		*(*C.mln_offline_geometry_region_definition)(unsafe.Pointer(&raw.data)) = nativeOfflineGeometryRegionDefinition(variant.Value, arena)
 	default:
 		arena.fail("unknown input union variant")
@@ -3921,29 +3942,20 @@ func DefaultRenderedFeatureQueryOptions() RenderedFeatureQueryOptions {
 	return copyRenderedFeatureQueryOptions(C.mln_rendered_feature_query_options_default())
 }
 
-// RenderedQueryGeometry corresponds to mln_rendered_query_geometry. Rendered
-// feature query geometry descriptor.
-//
-// See mln_rendered_query_geometry in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-type RenderedQueryGeometry struct{ Data RenderedQueryGeometryData }
-
 func nativeRenderedQueryGeometry(input RenderedQueryGeometry, arena *bindingArena) C.mln_rendered_query_geometry {
 	raw := C.mln_rendered_query_geometry{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	if input.Data == nil {
+	if input == nil {
 		arena.fail("missing union variant")
 	}
-	raw._type = C.mln_rendered_query_geometry_type(input.Data.bindingTag())
-	switch variant := input.Data.(type) {
-	case RenderedQueryGeometryDataPointVariant:
+	raw._type = C.mln_rendered_query_geometry_type(input.bindingTag())
+	switch variant := input.(type) {
+	case RenderedQueryGeometryPointVariant:
 		*(*C.mln_screen_point)(unsafe.Pointer(&raw.data)) = nativeScreenPoint(variant.Value, arena)
-	case RenderedQueryGeometryDataBoxVariant:
+	case RenderedQueryGeometryBoxVariant:
 		*(*C.mln_screen_box)(unsafe.Pointer(&raw.data)) = nativeScreenBox(variant.Value, arena)
-	case RenderedQueryGeometryDataLineStringVariant:
+	case RenderedQueryGeometryLineStringVariant:
 		*(*C.mln_screen_line_string)(unsafe.Pointer(&raw.data)) = nativeScreenLineString(variant.Value, arena)
-	default:
-		arena.fail("unknown input union variant")
 	}
 	return raw
 }

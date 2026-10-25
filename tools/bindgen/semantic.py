@@ -163,6 +163,23 @@ class ValuePlan:
     def unwrapped(self) -> ValuePlan:
         return self.element if self.kind == "reference" else self
 
+    @property
+    def union_member(self) -> FieldPlan | None:
+        """The union of a record that holds only that union and its tag.
+
+        A binding presents such a record as the union itself, under the record's
+        name, and encodes the tag and the size from the selected variant.
+        """
+        if self.kind != "record" or any(
+            field.role not in {"value", "tag", "size", "reserved"}
+            for field in self.fields
+        ):
+            return None
+        values = [field for field in self.fields if field.role == "value"]
+        if len(values) == 1 and values[0].value.kind == "union":
+            return values[0]
+        return None
+
 
 def plain_value(value: ValuePlan) -> bool:
     """Whether a value is fixed-size data that zeroed storage represents."""
