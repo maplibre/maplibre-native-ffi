@@ -8,7 +8,7 @@ as an array's count or a presence mask.
 
 from dataclasses import replace
 
-from .rust import Unsupported, doc, identifier, native_identifier, pascal
+from .rust import Unsupported, doc, identifier, is_text, native_identifier, pascal
 
 TRAIT_COPY = "unsafe {{ from_native({}) }}?"
 
@@ -31,7 +31,7 @@ def public(values, value):
     if array := slice_of(values, value):
         return values.public(array.value)
     if value.kind == "buffer":
-        result = "String" if value.encoding == "utf8" else "Vec<u8>"
+        result = "String" if is_text(value) else "Vec<u8>"
     elif value.kind == "array":
         result = f"Vec<{values.public(value.element)}>"
     elif value.kind == "reference":

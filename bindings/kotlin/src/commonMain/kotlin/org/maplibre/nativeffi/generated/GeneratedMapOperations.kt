@@ -162,7 +162,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun addStyleLayerJson(
-    layerJson: ByteArray,
+    layerJson: String,
     beforeLayerId: String,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -183,10 +183,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_add_style_source_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun addStyleSourceJson(
-    sourceId: String,
-    sourceJson: ByteArray,
-  ): Deferred<CommandCompletion> =
+  public fun addStyleSourceJson(sourceId: String, sourceJson: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_add_style_source_json(
@@ -318,7 +315,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun cameraForGeometry(
-    geometry: ByteArray,
+    geometry: String,
     fitOptions: CameraFitOptions? = null,
   ): Deferred<CameraOptions> =
     nativeSubmit(this, binding, { result -> readCameraOptions(CompletionBridge.value(result)) }) {
@@ -455,8 +452,8 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_get_feature_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun getFeatureState(selector: FeatureStateSelector): Deferred<ByteArray> =
-    nativeSubmit(this, binding, { result -> readView(CompletionBridge.value(result)) }) {
+  public fun getFeatureState(selector: FeatureStateSelector): Deferred<String> =
+    nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) {
       check(
         C.mln_map_get_feature_state(
           handle,
@@ -474,8 +471,8 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_get_global_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getGlobalState(): Deferred<ByteArray> =
-    nativeSubmit(this, binding, { result -> readView(CompletionBridge.value(result)) }) {
+  public fun getGlobalState(): Deferred<String> =
+    nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) {
       check(C.mln_map_get_global_state(handle, completion, diagnostic))
     }
 
@@ -509,8 +506,8 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_get_loaded_style_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun getLoadedStyleJson(): Deferred<ByteArray> =
-    nativeSubmit(this, binding, { result -> readView(CompletionBridge.value(result)) }) {
+  public fun getLoadedStyleJson(): Deferred<String> =
+    nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) {
       check(C.mln_map_get_loaded_style_json(handle, completion, diagnostic))
     }
 
@@ -569,13 +566,13 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_get_style_layer_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleLayerJson(layerId: String): Deferred<ByteArray?> =
+  public fun getStyleLayerJson(layerId: String): Deferred<String?> =
     nativeSubmit(
       this,
       binding,
       { result ->
         if (CompletionBridge.valueCount(result) == 0uL) null
-        else readView(CompletionBridge.value(result))
+        else readViewString(CompletionBridge.value(result))
       },
     ) {
       check(C.mln_map_get_style_layer_json(handle, view(layerId), completion, diagnostic))
@@ -587,13 +584,13 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_get_style_layer_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleLayerProperty(layerId: String, propertyName: String): Deferred<ByteArray?> =
+  public fun getStyleLayerProperty(layerId: String, propertyName: String): Deferred<String?> =
     nativeSubmit(
       this,
       binding,
       { result ->
         if (CompletionBridge.valueCount(result) == 0uL) null
-        else readView(CompletionBridge.value(result))
+        else readViewString(CompletionBridge.value(result))
       },
     ) {
       check(
@@ -613,13 +610,13 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_get_style_light_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleLightProperty(propertyName: String): Deferred<ByteArray?> =
+  public fun getStyleLightProperty(propertyName: String): Deferred<String?> =
     nativeSubmit(
       this,
       binding,
       { result ->
         if (CompletionBridge.valueCount(result) == 0uL) null
-        else readView(CompletionBridge.value(result))
+        else readViewString(CompletionBridge.value(result))
       },
     ) {
       check(C.mln_map_get_style_light_property(handle, view(propertyName), completion, diagnostic))
@@ -951,7 +948,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun setCustomGeometrySourceTileData(
     sourceId: String,
     tileId: CanonicalTileId,
-    data: ByteArray,
+    data: String,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
@@ -1068,7 +1065,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    */
   public fun setFeatureState(
     selector: FeatureStateSelector,
-    state: ByteArray,
+    state: String,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
@@ -1165,7 +1162,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    */
   public fun setGlobalStateProperty(
     propertyName: String,
-    value: ByteArray,
+    value: String,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
@@ -1291,7 +1288,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_set_style_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun setStyleJson(json: ByteArray): Deferred<CommandCompletion> =
+  public fun setStyleJson(json: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_set_style_json(handle, view(json), completion, diagnostic))
     }
@@ -1305,7 +1302,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun setStyleLayerProperty(
     layerId: String,
     propertyName: String,
-    value: ByteArray,
+    value: String,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
@@ -1326,7 +1323,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_set_style_light_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun setStyleLightJson(lightJson: ByteArray): Deferred<CommandCompletion> =
+  public fun setStyleLightJson(lightJson: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_set_style_light_json(handle, view(lightJson), completion, diagnostic))
     }
@@ -1339,7 +1336,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    */
   public fun setStyleLightProperty(
     propertyName: String,
-    value: ByteArray,
+    value: String,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
@@ -1566,7 +1563,7 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
     }
 
   /** [MapHandle.addStyleLayerJson] without its completion. */
-  public fun addStyleLayerJson(layerJson: ByteArray, beforeLayerId: String): Unit =
+  public fun addStyleLayerJson(layerJson: String, beforeLayerId: String): Unit =
     nativeDiscard(owner, binding) {
       check(
         C.mln_map_add_style_layer_json(
@@ -1580,7 +1577,7 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
     }
 
   /** [MapHandle.addStyleSourceJson] without its completion. */
-  public fun addStyleSourceJson(sourceId: String, sourceJson: ByteArray): Unit =
+  public fun addStyleSourceJson(sourceId: String, sourceJson: String): Unit =
     nativeDiscard(owner, binding) {
       check(
         C.mln_map_add_style_source_json(
@@ -1740,7 +1737,7 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
   public fun setCustomGeometrySourceTileData(
     sourceId: String,
     tileId: CanonicalTileId,
-    data: ByteArray,
+    data: String,
   ): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -1825,7 +1822,7 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
     }
 
   /** [MapHandle.setFeatureState] without its completion. */
-  public fun setFeatureState(selector: FeatureStateSelector, state: ByteArray): Unit =
+  public fun setFeatureState(selector: FeatureStateSelector, state: String): Unit =
     nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_feature_state(
@@ -1888,7 +1885,7 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
     }
 
   /** [MapHandle.setGlobalStateProperty] without its completion. */
-  public fun setGlobalStateProperty(propertyName: String, value: ByteArray): Unit =
+  public fun setGlobalStateProperty(propertyName: String, value: String): Unit =
     nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_global_state_property(
@@ -1972,13 +1969,13 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
     }
 
   /** [MapHandle.setStyleJson] without its completion. */
-  public fun setStyleJson(json: ByteArray): Unit =
+  public fun setStyleJson(json: String): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_set_style_json(handle, view(json), completion, diagnostic))
     }
 
   /** [MapHandle.setStyleLayerProperty] without its completion. */
-  public fun setStyleLayerProperty(layerId: String, propertyName: String, value: ByteArray): Unit =
+  public fun setStyleLayerProperty(layerId: String, propertyName: String, value: String): Unit =
     nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_style_layer_property(
@@ -1993,13 +1990,13 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
     }
 
   /** [MapHandle.setStyleLightJson] without its completion. */
-  public fun setStyleLightJson(lightJson: ByteArray): Unit =
+  public fun setStyleLightJson(lightJson: String): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_set_style_light_json(handle, view(lightJson), completion, diagnostic))
     }
 
   /** [MapHandle.setStyleLightProperty] without its completion. */
-  public fun setStyleLightProperty(propertyName: String, value: ByteArray): Unit =
+  public fun setStyleLightProperty(propertyName: String, value: String): Unit =
     nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_style_light_property(

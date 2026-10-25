@@ -67,7 +67,7 @@ public sealed unsafe partial class StyleExpressionHandle
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html">C API reference</see>.
     /// </remarks>
     public static StyleExpressionHandle Create(
-        byte[] expression,
+        string expression,
         StyleExpressionOptions? options = null
     )
     {
@@ -78,7 +78,7 @@ public sealed unsafe partial class StyleExpressionHandle
         MlnStyleExpression outExpression = default;
         Check(
             NativeMethods.mln_style_expression_create(
-                scope.Buffer(expression),
+                scope.Utf8(expression),
                 options is null ? null : &nativeOptions,
                 &outExpression,
                 Diagnostic
@@ -95,7 +95,7 @@ public sealed unsafe partial class StyleExpressionHandle
     /// See <c>mln_style_expression_evaluate</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html">C API reference</see>.
     /// </remarks>
-    public byte[] Evaluate(StyleExpressionInputs? inputs = null)
+    public string Evaluate(StyleExpressionInputs? inputs = null)
     {
         using var scope = new NativeCallScope(this);
         var nativeInputs = inputs is null
@@ -122,7 +122,7 @@ public sealed unsafe partial class StyleExpressionHandle
             outJson = scope.OutputArray<sbyte>(checked((int)jsonCapacity));
         }
         scope.Accept();
-        return new ReadOnlySpan<byte>(outJson, checked((int)outJsonLength)).ToArray();
+        return RuntimeStructs.CopyUtf8(outJson, outJsonLength);
     }
 
     /// <summary>

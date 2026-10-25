@@ -367,7 +367,7 @@ def test_replacing_the_log_callback_releases_the_previous_one(
         assert first_retired.wait(TIMEOUT)
 
         # The replacement receives what the map logs.
-        map_handle.set_style_json(b"{")
+        map_handle.set_style_json([])
         assert logged.wait(TIMEOUT)
     finally:
         mln.log_clear_callback()
@@ -390,7 +390,7 @@ def test_a_log_handler_that_returns_none_leaves_records_unconsumed(
     try:
         mln.log_set_callback(mln.LogHandler(handler))
         del handler
-        map_handle.set_style_json(b"{")
+        map_handle.set_style_json([])
         assert logged.wait(TIMEOUT)
     finally:
         mln.log_clear_callback()
@@ -434,9 +434,12 @@ def test_a_providers_routes_decide_which_requests_reach_it(
     seen: list[tuple[mln.ResourceKind, str]] = []
     sprites = {mln.ResourceKind.SPRITE_JSON, mln.ResourceKind.SPRITE_IMAGE}
     sprites_seen = threading.Event()
-    routed_style = (
-        b'{"version":8,"sprite":"custom://routed/sprite","sources":{},"layers":[]}'
-    )
+    routed_style = {
+        "version": 8,
+        "sprite": "custom://routed/sprite",
+        "sources": {},
+        "layers": [],
+    }
 
     def provide(
         request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle

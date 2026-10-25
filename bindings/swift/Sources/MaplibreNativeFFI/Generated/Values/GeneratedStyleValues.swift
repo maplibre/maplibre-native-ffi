@@ -284,7 +284,7 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
   /// Cluster aggregation expressions keyed by property name, as a JSON object
   /// whose members follow the MapLibre Style Spec clusterProperties form, or
   /// empty for none. The UTF-8 bytes are borrowed for the call.
-  public var clusterProperties: Data
+  public var clusterProperties: String
   /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
   public var buffer: UInt32?
   /// Cluster radius in pixels within \[0, 4095\]. Defaults to 50.
@@ -307,7 +307,7 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
     maxZoom: Double? = GeojsonSourceOptions.default.maxZoom,
     tolerance: Double? = GeojsonSourceOptions.default.tolerance,
     clusterMaxZoom: Double? = GeojsonSourceOptions.default.clusterMaxZoom,
-    clusterProperties: Data = GeojsonSourceOptions.default.clusterProperties,
+    clusterProperties: String = GeojsonSourceOptions.default.clusterProperties,
     buffer: UInt32? = GeojsonSourceOptions.default.buffer,
     clusterRadius: UInt32? = GeojsonSourceOptions.default.clusterRadius,
     clusterMinPoints: UInt32? = GeojsonSourceOptions.default.clusterMinPoints,
@@ -340,7 +340,7 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
       .rawValue != 0 ? raw.tolerance : nil
     clusterMaxZoom = raw.fields & MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
       .rawValue != 0 ? raw.cluster_max_zoom : nil
-    clusterProperties = try NativeString.copyData(
+    clusterProperties = try NativeString.copyUTF8(
       data: raw.cluster_properties.data,
       size: raw.cluster_properties.size
     )

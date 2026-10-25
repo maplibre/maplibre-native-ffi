@@ -452,6 +452,8 @@ def operation(
 
     def copy_output(output, value):
         if text and output == text.name:
+            if text.value.encoding == "json":
+                return f"generated_json(py, sys::mln_buffer_view {{ data: {output}.as_ptr().cast(), size: {output}.len() }})?"
             return f"PyBytes::new(py, &{output}).into_any().unbind()"
         if any(p.name == output and p.sized_by for p in plan.outputs):
             copied = values.copy(value.element, "*element")
@@ -1052,7 +1054,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         for owner, methods in discards.items()
     )
     files["python/maplibre_native_ffi/_generated_values.py"] = (
-        f'"""{notice}"""\n\nfrom __future__ import annotations\nfrom collections.abc import Buffer, Sequence\nfrom dataclasses import dataclass, field\nfrom enum import IntFlag\nfrom typing import TYPE_CHECKING, Protocol\nfrom ._enum import UnknownIntEnum\n'
+        f'"""{notice}"""\n\nfrom __future__ import annotations\nfrom collections.abc import Buffer, Sequence\nfrom dataclasses import dataclass, field\nfrom enum import IntFlag\nfrom typing import TYPE_CHECKING, Any, Protocol\nfrom ._enum import UnknownIntEnum\n'
         + (
             "from ._operation import _wrap_response\n"
             if any(value.response for value in values.records.values())

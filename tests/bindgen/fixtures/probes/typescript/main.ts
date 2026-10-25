@@ -38,11 +38,11 @@ assert.deepEqual(probeRoundtrip({ left: [], right: [] }), {
 });
 assert.deepEqual(probeRoundtrip({ right: [] }), { right: [] });
 
-// Caller-sized text that fits the addon's first storage, and text that does
-// not, which the addon fetches again with enough storage.
-assert.equal(probeZerosJson(0), "[]");
-assert.equal(probeZerosJson(3), "[0,0,0]");
-assert.equal(probeZerosJson(300), `[${Array(300).fill(0).join(",")}]`);
+// Caller-sized JSON that fits the addon's first storage, and JSON that does
+// not, which the addon fetches again with enough storage, parsed.
+assert.deepEqual(probeZerosJson(0), []);
+assert.deepEqual(probeZerosJson(3), [0, 0, 0]);
+assert.deepEqual(probeZerosJson(300), Array(300).fill(0));
 
 // A caller-sized output array holds one element per input element, in input
 // order.

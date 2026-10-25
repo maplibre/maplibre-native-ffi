@@ -239,11 +239,11 @@ func bindingBytes(pointer unsafe.Pointer, count uint64) []byte {
 }
 
 // bindingCallerSizedText makes a call that writes text into storage the
-// caller sizes, and stores the text in text. A call reports the text's length
-// whether or not it fit, and reports the same text for the same inputs, so a
-// call that did not fit is made again with enough storage. The storage holds
-// no Go pointers, which cgo lets a call borrow.
-func bindingCallerSizedText(text *[]byte, call func(storage *C.char, capacity C.size_t, length *C.size_t) int32) int32 {
+// caller sizes, and copies the text into text. A call reports the text's
+// length whether or not it fit, and reports the same text for the same inputs,
+// so a call that did not fit is made again with enough storage. The storage
+// holds no Go pointers, which cgo lets a call borrow.
+func bindingCallerSizedText(text *string, call func(storage *C.char, capacity C.size_t, length *C.size_t) int32) int32 {
 	storage := make([]byte, 256)
 	for {
 		var length C.size_t
@@ -252,7 +252,7 @@ func bindingCallerSizedText(text *[]byte, call func(storage *C.char, capacity C.
 			return status
 		}
 		if uint64(length) < uint64(len(storage)) {
-			*text = storage[:length:length]
+			*text = string(storage[:length])
 			return status
 		}
 		storage = make([]byte, bindingLength(uint64(length))+1)

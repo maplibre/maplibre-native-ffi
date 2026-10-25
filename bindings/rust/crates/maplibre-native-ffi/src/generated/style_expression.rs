@@ -18,7 +18,7 @@ impl StyleExpressionHandle {
     ///
     /// See `mln_style_expression_evaluate` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-    pub fn evaluate(&self, inputs: Option<&StyleExpressionInputs>) -> Result<Vec<u8>> {
+    pub fn evaluate(&self, inputs: Option<&StyleExpressionInputs>) -> Result<String> {
         let mut call = self.inner.call();
         let mut out_json = Vec::new();
         let inputs = call.optional_reference(inputs.as_ref())?;
@@ -34,7 +34,7 @@ impl StyleExpressionHandle {
                 )
             })
         })?;
-        Ok(out_json)
+        Ok(convert::utf8(out_json)?)
     }
 
     /// Copies what a parsed expression depends on into out_info.

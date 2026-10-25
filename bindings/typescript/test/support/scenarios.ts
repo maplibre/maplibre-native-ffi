@@ -53,10 +53,7 @@ export async function routeRequests(
     "a command",
   );
   await bounded(
-    map.addStyleLayerJson(
-      JSON.stringify({ id: "fill", type: "fill", source: "custom" }),
-      "",
-    ),
+    map.addStyleLayerJson({ id: "fill", type: "fill", source: "custom" }, ""),
     "a command",
   );
   const worker = await TestSession.attach(map);

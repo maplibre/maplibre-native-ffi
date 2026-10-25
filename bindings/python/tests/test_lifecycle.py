@@ -33,7 +33,7 @@ def test_closing_twice_is_safe_and_a_closed_handle_refuses_use() -> None:
     ):
         runtime.close()
 
-    data = mln.geojson_source_data_create(b'{"type":"FeatureCollection","features":[]}')
+    data = mln.geojson_source_data_create({"type": "FeatureCollection", "features": []})
     _check_handle(data, closed=False)
     data.close()
     data.close()

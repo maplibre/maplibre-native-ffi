@@ -147,17 +147,18 @@ import Testing
   }
 }
 
+/// JSON goes in and comes back as a String, transcoded through UTF-8.
 @Test func callerSizedTextReturnsResultsLongerThanItsFirstStorage() throws {
   let zoom = try Maplibre.styleExpressionCreate(
-    Data(#"["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"#
-      .utf8)
+    #"["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"#
   )
   #expect(try zoom.evaluate(inputs: StyleExpressionInputs(zoom: 5)) ==
-    Data("50.0".utf8))
+    "50.0")
   zoom.close()
 
-  // The result outgrows the runtime's first storage, so the call runs again.
-  let text = Data(("\"" + String(repeating: "a", count: 1000) + "\"").utf8)
+  // The result outgrows the runtime's first storage, so the call runs again,
+  // and its multibyte characters decode whole.
+  let text = "\"" + String(repeating: "aé", count: 500) + "\""
   let long = try Maplibre.styleExpressionCreate(text)
   #expect(try long.evaluate() == text)
   long.close()

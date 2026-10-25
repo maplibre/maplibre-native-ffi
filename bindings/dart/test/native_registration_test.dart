@@ -63,7 +63,7 @@ void main() {
   test(
     'a native wake reaches native unchanged and only its first call',
     () async {
-      final map = await openRenderMap(emptyStyleJson);
+      final map = await openRenderMap(emptyStyle);
       final graphics = TestGraphics.open();
       final wakes = _Recorder();
       final releases = _Recorder();
@@ -127,7 +127,7 @@ void main() {
   );
 
   test('a native queue lock reaches native with its context', () async {
-    final map = await openRenderMap(emptyStyleJson);
+    final map = await openRenderMap(emptyStyle);
     final graphics = TestGraphics.open();
     // A Vulkan session takes the lock around its queue calls, which this
     // listener answers at once. The host shares no queue with the session.

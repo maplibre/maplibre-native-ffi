@@ -148,6 +148,14 @@ bool mln_ts_read_text(
 bool mln_ts_read_text_view(
   mln_ts_call* call, napi_value value, mln_buffer_view* out, const char* path
 );
+/**
+ * The JSON.stringify text of a value, which lives for the call. undefined is
+ * absent and leaves out empty; a value that JSON.stringify rejects throws its
+ * error, and one that it skips, such as a function, throws a TypeError.
+ */
+bool mln_ts_read_json_view(
+  mln_ts_call* call, napi_value value, mln_buffer_view* out, const char* path
+);
 /** A copy of the bytes of a Uint8Array, which lives for the call. */
 bool mln_ts_read_bytes_view(
   mln_ts_call* call, napi_value value, mln_buffer_view* out, const char* path
@@ -224,6 +232,8 @@ napi_value mln_ts_number(napi_env env, double value);
 napi_value mln_ts_u64(napi_env env, uint64_t value);
 napi_value mln_ts_i64(napi_env env, int64_t value);
 napi_value mln_ts_text(napi_env env, const void* data, size_t size);
+/** The JSON.parse value of UTF-8 JSON, or undefined for empty text. */
+napi_value mln_ts_json(napi_env env, const void* data, size_t size);
 napi_value mln_ts_bytes(napi_env env, const void* data, size_t size);
 napi_value mln_ts_object(napi_env env);
 napi_value mln_ts_array(napi_env env, size_t length);

@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from .swift import camel, doc, identifier
+from .swift import TEXT_ENCODINGS, camel, doc, identifier
 
 
 def dynamic(value):
@@ -15,7 +15,7 @@ def dynamic(value):
 
 def public(values, value):
     if value.kind == "buffer":
-        typ = "String" if value.encoding == "utf8" else "Data"
+        typ = "String" if value.encoding in TEXT_ENCODINGS else "Data"
     elif value.kind == "array":
         typ = (
             "Data"
@@ -148,7 +148,7 @@ def decode(values, value, source, context="raw"):
     if value.kind == "buffer":
         if value.length == "nul":
             return f"try NativeString.copyCString({source})"
-        copier = "copyUTF8" if value.encoding == "utf8" else "copyData"
+        copier = "copyUTF8" if value.encoding in TEXT_ENCODINGS else "copyData"
         if value.buffer_form != "view":
             count = (
                 value.length

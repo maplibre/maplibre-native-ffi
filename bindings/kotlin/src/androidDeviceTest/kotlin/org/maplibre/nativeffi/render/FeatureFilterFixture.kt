@@ -36,14 +36,17 @@ internal suspend fun assertFilterSelects(
     map
       .updateCamera(CameraUpdate(camera = CameraOptions(center = LatLng(0.0, 0.0), zoom = 2.0)))
       .await()
-    complete(map.setStyleJson(style.encode()))
+    complete(map.setStyleJson(style.trimIndent()))
     // The still image waits for the source to load and the layer to render.
     renderStill()
 
     val ids = expected.map { "case-$it" }.toSet()
     val source =
       complete(
-        session.querySourceFeatures("point", SourceFeatureQueryOptions(filter = filter.encode())),
+        session.querySourceFeatures(
+          "point",
+          SourceFeatureQueryOptions(filter = filter.trimIndent()),
+        ),
       )
     assertEquals(ids, source.map { it.feature.stringId() }.toSet(), "source query: $filter")
     val rendered =
@@ -70,9 +73,7 @@ internal suspend fun assertFilterSelects(
 
 private const val FILTER_MAP_SIZE = 64
 
-private fun String.encode(): ByteArray = trimIndent().encodeToByteArray()
-
 private val STRING_ID = Regex("\"id\"\\s*:\\s*\"([^\"]*)\"")
 
 /** The feature's string id. The fixture's properties hold no member named id. */
-private fun ByteArray.stringId(): String? = STRING_ID.find(decodeToString())?.groupValues?.get(1)
+private fun String.stringId(): String? = STRING_ID.find(this)?.groupValues?.get(1)

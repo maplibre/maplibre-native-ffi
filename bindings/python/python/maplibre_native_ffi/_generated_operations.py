@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Buffer, Sequence
 from concurrent.futures import Future
 from contextlib import AbstractContextManager
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from . import _native
 from ._completion import CommandCompletion
@@ -335,7 +335,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.add_image_source_url(source_id, coordinates, url)
 
     def add_style_layer_json(
-        self, layer_json: bytes, before_layer_id: str
+        self, layer_json: Any, before_layer_id: str
     ) -> Future[CommandCompletion]:
         """Adds one style layer from a full style-spec layer JSON object.
 
@@ -345,7 +345,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.add_style_layer_json(layer_json, before_layer_id)
 
     def add_style_source_json(
-        self, source_id: str, source_json: bytes
+        self, source_id: str, source_json: Any
     ) -> Future[CommandCompletion]:
         """Adds one style source from a style-spec source JSON object.
 
@@ -516,7 +516,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.begin_command_group()
 
     def camera_for_geometry(
-        self, geometry: bytes, fit_options: CameraFitOptions | None = None
+        self, geometry: Any, fit_options: CameraFitOptions | None = None
     ) -> Future[CameraOptions]:
         """Starts an ordered query for a camera that fits a GeoJSON geometry.
 
@@ -600,7 +600,7 @@ class _MapHandleOperations(GeneratedOperations):
             lambda value: CameraQueryResult._from_native(value),
         )
 
-    def get_feature_state(self, selector: FeatureStateSelector) -> Future[bytes]:
+    def get_feature_state(self, selector: FeatureStateSelector) -> Future[Any]:
         """Starts an ordered read of per-feature state from this map.
 
         See `mln_map_get_feature_state` in the
@@ -608,7 +608,7 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.get_feature_state(selector)
 
-    def get_global_state(self) -> Future[bytes]:
+    def get_global_state(self) -> Future[Any]:
         """Queries the global-state JSON object, including style defaults.
         Completion borrows one `mln_buffer_view` for the duration of the
         callback.
@@ -631,7 +631,7 @@ class _MapHandleOperations(GeneratedOperations):
             lambda value: tuple(LatLng._from_native(item) for item in value),
         )
 
-    def get_loaded_style_json(self) -> Future[bytes]:
+    def get_loaded_style_json(self) -> Future[Any]:
         """Starts an ordered copy of the last successfully parsed style
         document.
 
@@ -670,7 +670,7 @@ class _MapHandleOperations(GeneratedOperations):
             lambda value: _maybe(StyleLayerInfo._from_native, value),
         )
 
-    def get_style_layer_json(self, layer_id: str) -> Future[bytes | None]:
+    def get_style_layer_json(self, layer_id: str) -> Future[Any]:
         """Serializes one style layer as a full style-spec layer JSON object.
 
         See `mln_map_get_style_layer_json` in the
@@ -680,7 +680,7 @@ class _MapHandleOperations(GeneratedOperations):
 
     def get_style_layer_property(
         self, layer_id: str, property_name: str
-    ) -> Future[bytes | None]:
+    ) -> Future[Any]:
         """Serializes one layer property as a style-spec JSON value.
 
         See `mln_map_get_style_layer_property` in the
@@ -688,7 +688,7 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.get_style_layer_property(layer_id, property_name)
 
-    def get_style_light_property(self, property_name: str) -> Future[bytes | None]:
+    def get_style_light_property(self, property_name: str) -> Future[Any]:
         """Serializes one style light property as a style-spec JSON value.
 
         See `mln_map_get_style_light_property` in the
@@ -891,7 +891,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_bounds(options)
 
     def set_custom_geometry_source_tile_data(
-        self, source_id: str, tile_id: CanonicalTileId, data: bytes
+        self, source_id: str, tile_id: CanonicalTileId, data: Any
     ) -> Future[CommandCompletion]:
         """Sets custom geometry source data for one canonical tile.
 
@@ -955,7 +955,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_event_mask(mask)
 
     def set_feature_state(
-        self, selector: FeatureStateSelector, input_state: bytes
+        self, selector: FeatureStateSelector, input_state: Any
     ) -> Future[CommandCompletion]:
         """Submits a copied per-feature-state command.
 
@@ -1005,7 +1005,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_geojson_source_url(source_id, url)
 
     def set_global_state_property(
-        self, property_name: str, value: bytes
+        self, property_name: str, value: Any
     ) -> Future[CommandCompletion]:
         """Submits a global-state JSON value. JSON null restores the style
         default.
@@ -1076,7 +1076,7 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.set_style_image(image_id, image, options)
 
-    def set_style_json(self, json: bytes) -> Future[CommandCompletion]:
+    def set_style_json(self, json: Any) -> Future[CommandCompletion]:
         """Queues an inline style JSON command.
 
         See `mln_map_set_style_json` in the
@@ -1085,7 +1085,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_style_json(json)
 
     def set_style_layer_property(
-        self, layer_id: str, property_name: str, value: bytes
+        self, layer_id: str, property_name: str, value: Any
     ) -> Future[CommandCompletion]:
         """Sets one layer property using its MapLibre style-spec property name.
 
@@ -1094,7 +1094,7 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.set_style_layer_property(layer_id, property_name, value)
 
-    def set_style_light_json(self, light_json: bytes) -> Future[CommandCompletion]:
+    def set_style_light_json(self, light_json: Any) -> Future[CommandCompletion]:
         """Sets the style light from a style-spec light JSON object.
 
         See `mln_map_set_style_light_json` in the
@@ -1103,7 +1103,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_style_light_json(light_json)
 
     def set_style_light_property(
-        self, property_name: str, value: bytes
+        self, property_name: str, value: Any
     ) -> Future[CommandCompletion]:
         """Sets one style light property using its MapLibre style-spec property
         name.
@@ -1374,11 +1374,11 @@ class _RenderSessionHandleOperations(GeneratedOperations):
     def query_feature_extensions(
         self,
         source_id: str,
-        feature: bytes,
+        feature: Any,
         extension: str,
         extension_field: str,
-        arguments: bytes,
-    ) -> Future[bytes]:
+        arguments: Any,
+    ) -> Future[Any]:
         """Starts a feature-extension query against the latest driver state. The
         completion borrows one `mln_buffer_view` holding UTF-8 JSON
         (value_count 1), valid only for the callback.
@@ -1859,7 +1859,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
 class _StyleExpressionHandleOperations(GeneratedOperations):
     _native: _native._StyleExpressionHandle
 
-    def evaluate(self, inputs: StyleExpressionInputs | None = None) -> bytes:
+    def evaluate(self, inputs: StyleExpressionInputs | None = None) -> Any:
         """Evaluates a parsed expression and writes its result as UTF-8 JSON.
 
         See `mln_style_expression_evaluate` in the
@@ -1904,7 +1904,7 @@ def c_version() -> int:
 
 
 def geojson_source_data_create(
-    data: Buffer, options: GeojsonSourceOptions | None = None
+    data: Any, options: GeojsonSourceOptions | None = None
 ) -> GeojsonSourceDataHandle:
     """Prepares GeoJSON source data for installation on a map.
 
@@ -2039,7 +2039,7 @@ def runtime_create(options: RuntimeOptions | None = None) -> RuntimeHandle:
 
 
 def style_expression_create(
-    expression: bytes, options: StyleExpressionOptions | None = None
+    expression: Any, options: StyleExpressionOptions | None = None
 ) -> StyleExpressionHandle:
     """Parses a style expression.
 
@@ -2134,7 +2134,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_add_image_source_url(source_id, coordinates, url)
 
-    def add_style_layer_json(self, layer_json: bytes, before_layer_id: str) -> None:
+    def add_style_layer_json(self, layer_json: Any, before_layer_id: str) -> None:
         """Adds one style layer from a full style-spec layer JSON object.
 
         See `mln_map_add_style_layer_json` in the
@@ -2142,7 +2142,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_add_style_layer_json(layer_json, before_layer_id)
 
-    def add_style_source_json(self, source_id: str, source_json: bytes) -> None:
+    def add_style_source_json(self, source_id: str, source_json: Any) -> None:
         """Adds one style source from a style-spec source JSON object.
 
         See `mln_map_add_style_source_json` in the
@@ -2302,7 +2302,7 @@ class MapHandleDiscarding:
         return self._native._discard_set_bounds(options)
 
     def set_custom_geometry_source_tile_data(
-        self, source_id: str, tile_id: CanonicalTileId, data: bytes
+        self, source_id: str, tile_id: CanonicalTileId, data: Any
     ) -> None:
         """Sets custom geometry source data for one canonical tile.
 
@@ -2366,7 +2366,7 @@ class MapHandleDiscarding:
         return self._native._discard_set_event_mask(mask)
 
     def set_feature_state(
-        self, selector: FeatureStateSelector, input_state: bytes
+        self, selector: FeatureStateSelector, input_state: Any
     ) -> None:
         """Submits a copied per-feature-state command.
 
@@ -2413,7 +2413,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_set_geojson_source_url(source_id, url)
 
-    def set_global_state_property(self, property_name: str, value: bytes) -> None:
+    def set_global_state_property(self, property_name: str, value: Any) -> None:
         """Submits a global-state JSON value. JSON null restores the style
         default.
 
@@ -2481,7 +2481,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_set_style_image(image_id, image, options)
 
-    def set_style_json(self, json: bytes) -> None:
+    def set_style_json(self, json: Any) -> None:
         """Queues an inline style JSON command.
 
         See `mln_map_set_style_json` in the
@@ -2490,7 +2490,7 @@ class MapHandleDiscarding:
         return self._native._discard_set_style_json(json)
 
     def set_style_layer_property(
-        self, layer_id: str, property_name: str, value: bytes
+        self, layer_id: str, property_name: str, value: Any
     ) -> None:
         """Sets one layer property using its MapLibre style-spec property name.
 
@@ -2501,7 +2501,7 @@ class MapHandleDiscarding:
             layer_id, property_name, value
         )
 
-    def set_style_light_json(self, light_json: bytes) -> None:
+    def set_style_light_json(self, light_json: Any) -> None:
         """Sets the style light from a style-spec light JSON object.
 
         See `mln_map_set_style_light_json` in the
@@ -2509,7 +2509,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_set_style_light_json(light_json)
 
-    def set_style_light_property(self, property_name: str, value: bytes) -> None:
+    def set_style_light_property(self, property_name: str, value: Any) -> None:
         """Sets one style light property using its MapLibre style-spec property
         name.
 

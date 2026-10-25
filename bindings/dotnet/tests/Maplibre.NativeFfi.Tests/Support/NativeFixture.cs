@@ -12,7 +12,7 @@ namespace Maplibre.NativeFfi.Tests;
 /// </remarks>
 internal sealed class NativeFixture : IAsyncDisposable
 {
-    internal static byte[] EmptyStyle => """{"version":8,"sources":{},"layers":[]}"""u8.ToArray();
+    internal const string EmptyStyle = """{"version":8,"sources":{},"layers":[]}""";
 
     internal static MapOptions SmallMap =>
         MapOptions.Default with

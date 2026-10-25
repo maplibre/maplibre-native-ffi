@@ -22,9 +22,9 @@ final _extent = LogicalExtent(
   scaleFactor: 1,
 );
 
-/// Opens a runtime and a map sized for the render targets, with [styleJson]
+/// Opens a runtime and a map sized for the render targets, with [style]
 /// committed. Teardowns close both.
-Future<MapHandle> openRenderMap(String styleJson) async {
+Future<MapHandle> openRenderMap(Object? style) async {
   final runtime = await openRuntime();
   final map = await runtime.openMap(
     MapOptions(
@@ -36,7 +36,7 @@ Future<MapHandle> openRenderMap(String styleJson) async {
       eventMask: RuntimeEventFlag.all,
     ),
   );
-  await expectCommitted(map.setStyleJson(jsonBytes(styleJson)));
+  await expectCommitted(map.setStyleJson(style));
   return map;
 }
 

@@ -1,11 +1,10 @@
-import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 
-const _styleJson = '{"version":8,"sources":{},"layers":[]}';
-
-Uint8List _json(String value) => Uint8List.fromList(utf8.encode(value));
+const _style = {
+  'version': 8,
+  'sources': <String, Object?>{},
+  'layers': <Object?>[],
+};
 
 /// Registers each kind of long-lived callback: the log callback, an event
 /// wake, a resource transform, a resource provider, and a custom source.
@@ -28,7 +27,7 @@ Future<(RuntimeHandle, MapHandle)> _register() async {
   );
   final NewMap(:map, :ready) = runtime.createMap(mapOptionsDefault());
   await ready;
-  await map.setStyleJson(_json(_styleJson));
+  await map.setStyleJson(_style);
   await map.addCustomGeometrySource(
     'source',
     CustomGeometrySourceOptions(fetchTile: (_) {}),

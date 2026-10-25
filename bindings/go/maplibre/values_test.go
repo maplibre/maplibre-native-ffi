@@ -28,7 +28,7 @@ func TestHostStringsUseViewsAndNativeLentStringsDecode(t *testing.T) {
 // when native reports them absent.
 func TestPresenceFieldsRoundTrip(t *testing.T) {
 	f := newFixture(t)
-	await(t, submitted(f.m.SetStyleJson([]byte(emptyStyle))))
+	await(t, submitted(f.m.SetStyleJson(emptyStyle)))
 	fit := StyleImageTextFitProportional
 	await(t, submitted(f.m.SetStyleImage("patch", PremultipliedRgba8Image{Width: 2, Height: 2, Stride: 8, Pixels: make([]byte, 16)}, &StyleImageOptions{
 		StretchX:      []ImageStretch{{From: 0, To: 1}},
@@ -69,7 +69,7 @@ func TestPresenceFieldsRoundTrip(t *testing.T) {
 // them afterwards leaves what native received alone.
 func TestArrayInputsAreCopiedAtSubmission(t *testing.T) {
 	f := newFixture(t)
-	await(t, submitted(f.m.SetStyleJson([]byte(emptyStyle))))
+	await(t, submitted(f.m.SetStyleJson(emptyStyle)))
 	coordinates := []LatLng{
 		{Latitude: 1, Longitude: 1},
 		{Latitude: 1, Longitude: 2},
@@ -145,7 +145,7 @@ func TestSynchronousCallsFillCallerSizedOutputsInInputOrder(t *testing.T) {
 }
 
 func TestCallerSizedTextReturnsResultsLongerThanItsFirstStorage(t *testing.T) {
-	zoom, err := StyleExpressionCreate([]byte(`["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]`), nil)
+	zoom, err := StyleExpressionCreate(`["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]`, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,13 +155,13 @@ func TestCallerSizedTextReturnsResultsLongerThanItsFirstStorage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got) != "50.0" {
+	if got != "50.0" {
 		t.Fatalf("zoom result = %s, want 50.0", got)
 	}
 
 	// The result outgrows the runtime's first storage, so the call runs again.
 	text := `"` + strings.Repeat("a", 1000) + `"`
-	long, err := StyleExpressionCreate([]byte(text), nil)
+	long, err := StyleExpressionCreate(text, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestCallerSizedTextReturnsResultsLongerThanItsFirstStorage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got) != text {
+	if got != text {
 		t.Fatalf("long result has %d bytes, want %d", len(got), len(text))
 	}
 }

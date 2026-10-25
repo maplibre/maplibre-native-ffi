@@ -7,7 +7,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlinx.coroutines.CompletableDeferred
-import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.generated.AnimationOptions
@@ -27,7 +26,6 @@ import org.maplibre.nativeffi.generated.MapOptions
 import org.maplibre.nativeffi.generated.PremultipliedRgba8Image
 import org.maplibre.nativeffi.generated.RenderedQueryGeometry
 import org.maplibre.nativeffi.generated.RenderedQueryGeometryData
-import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.generated.StyleExpressionInputs
 import org.maplibre.nativeffi.generated.StyleImageOptions
@@ -45,18 +43,12 @@ import org.maplibre.nativeffi.withMap
 class GeneratedShapesTest {
   @Test
   fun callerSizedTextReturnsResultsLongerThanItsFirstStorage() {
-    GeneratedApi.styleExpressionCreate(
-        """["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]""".encodeToByteArray(),
-      )
-      .use { zoom ->
-        assertEquals("50.0", zoom.evaluate(StyleExpressionInputs(zoom = 5.0)).decodeToString())
-      }
+    GeneratedApi.styleExpressionCreate("""["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]""")
+      .use { zoom -> assertEquals("50.0", zoom.evaluate(StyleExpressionInputs(zoom = 5.0))) }
 
     // The result outgrows the call's first storage, so the call runs again.
     val text = "\"" + "a".repeat(1000) + "\""
-    GeneratedApi.styleExpressionCreate(text.encodeToByteArray()).use { long ->
-      assertEquals(text, long.evaluate().decodeToString())
-    }
+    GeneratedApi.styleExpressionCreate(text).use { long -> assertEquals(text, long.evaluate()) }
   }
 
   @Test
@@ -100,17 +92,13 @@ class GeneratedShapesTest {
 
       // A feature ID crosses as an explicit-length view, so "a\u0000b" and "a" are two IDs.
       val withNul = FeatureStateSelector("source", featureId = "a\u0000b")
-      map.setFeatureState(withNul, """{"hover":true}""".encodeToByteArray()).await()
-      assertEquals(
-        """{"hover":true}""",
-        map.getFeatureState(withNul).awaitWithin("the state").decodeToString(),
-      )
+      map.setFeatureState(withNul, """{"hover":true}""").await()
+      assertEquals("""{"hover":true}""", map.getFeatureState(withNul).awaitWithin("the state"))
       assertEquals(
         "{}",
         map
           .getFeatureState(FeatureStateSelector("source", featureId = "a"))
-          .awaitWithin("the truncated ID's state")
-          .decodeToString(),
+          .awaitWithin("the truncated ID's state"),
       )
     }
   }
@@ -135,12 +123,9 @@ class GeneratedShapesTest {
 
       // A selector's optional state key narrows a removal to one member.
       val selector = FeatureStateSelector("source", featureId = "feature")
-      map.setFeatureState(selector, """{"hover":true,"radius":2}""".encodeToByteArray()).await()
+      map.setFeatureState(selector, """{"hover":true,"radius":2}""").await()
       map.removeFeatureState(selector.copy(stateKey = "hover")).await()
-      assertEquals(
-        """{"radius":2}""",
-        map.getFeatureState(selector).awaitWithin("the state").decodeToString(),
-      )
+      assertEquals("""{"radius":2}""", map.getFeatureState(selector).awaitWithin("the state"))
     }
   }
 
@@ -218,11 +203,15 @@ class GeneratedShapesTest {
       coordinates.clear()
       assertEquals(expected, pending.awaitWithin("the copied camera fit"))
 
-      val style = EMPTY_STYLE_JSON.encodeToByteArray()
-      val loading = map.setStyleJson(style)
-      style.fill(0)
-      loading.await()
-      awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
+      loadStyle()
+      val pixels = byteArrayOf(0, 255.toByte(), 0, 255.toByte())
+      val marking = map.setStyleImage("marker", PremultipliedRgba8Image(1u, 1u, 4u, pixels))
+      pixels.fill(0)
+      marking.await()
+      assertContentEquals(
+        byteArrayOf(0, 255.toByte(), 0, 255.toByte()),
+        map.getStyleImage("marker").awaitWithin("the marker")?.pixels,
+      )
     }
   }
 

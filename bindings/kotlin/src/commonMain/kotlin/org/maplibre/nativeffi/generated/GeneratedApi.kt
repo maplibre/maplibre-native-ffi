@@ -157,7 +157,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   public fun geojsonSourceDataCreate(
-    data: ByteArray,
+    data: String,
     options: GeojsonSourceOptions? = null,
   ): GeojsonSourceDataHandle =
     nativeCall(null, null) {
@@ -569,7 +569,7 @@ public object GeneratedApi {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
    */
   public fun styleExpressionCreate(
-    expression: ByteArray,
+    expression: String,
     options: StyleExpressionOptions? = null,
   ): StyleExpressionHandle =
     nativeCall(null, null) {

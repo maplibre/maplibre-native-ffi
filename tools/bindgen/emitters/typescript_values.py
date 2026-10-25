@@ -4,7 +4,8 @@ Records are plain object interfaces, open enums are `const` objects with an
 integer type that admits unknown values, bitmasks are integers with named flag
 constants, and unions are discriminated by a `kind` member that keeps an
 unknown tag. Integers of 32 bits or fewer and floating-point values are
-`number`; 64-bit integers and native pointers are `bigint`. A callback
+`number`; 64-bit integers and native pointers are `bigint`. A JSON value is
+`unknown`, any value that `JSON.stringify` takes or `JSON.parse` returns. A callback
 registration takes the form that `async_hosts.py` chooses for a host that runs
 no code on native threads: its callback's function type, an object of its
 callbacks and members, or its members alone when native rules answer. A
@@ -342,6 +343,8 @@ class Values:
         if value.kind == "buffer":
             if value.encoding not in {"utf8", "json", "bytes"}:
                 raise Unsupported(f"{value.native}: unsupported buffer encoding")
+            if value.encoding == "json" and value.buffer_form != "view":
+                raise Unsupported(f"{value.native}: JSON outside a view")
             if value.buffer_form != "view" and value.length == "nul":
                 if value.encoding == "bytes":
                     raise Unsupported(f"{value.native}: NUL-terminated bytes")
@@ -453,6 +456,8 @@ class Values:
         if value.kind == "handle":
             return owner_class(value.handle)
         if value.kind == "buffer":
+            if value.encoding == "json":
+                return "unknown"
             return "Uint8Array" if value.encoding == "bytes" else "string"
         if value.kind == "reference":
             return self.ts(value.element)

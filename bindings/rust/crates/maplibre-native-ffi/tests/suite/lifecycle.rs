@@ -64,9 +64,7 @@ fn a_released_projection_is_closed_and_a_second_release_does_nothing() {
 #[test]
 fn a_handle_id_names_its_events_and_outlives_close() {
     let fixture = Fixture::new();
-    let loaded = fixture
-        .map()
-        .set_style_json(BACKGROUND_STYLE_JSON.as_bytes());
+    let loaded = fixture.map().set_style_json(BACKGROUND_STYLE_JSON);
     let event = fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
     wait_for(loaded);
     assert_eq!(event.source, fixture.map().id());
@@ -98,7 +96,7 @@ fn a_map_keeps_its_runtime_alive_after_the_runtime_handle_drops() {
     let (runtime, map) = Fixture::new().into_parts();
     drop(runtime);
     // The map holds its runtime, so the runtime's worker still runs commands.
-    wait_for(map.set_style_json(BACKGROUND_STYLE_JSON.as_bytes()));
+    wait_for(map.set_style_json(BACKGROUND_STYLE_JSON));
     // Releasing the map drops the last hold on the runtime, which the
     // binding then disposes on this thread without a leak.
     wait_for(map.release());

@@ -1,4 +1,3 @@
-using System.Text;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Struct;
@@ -9,32 +8,42 @@ namespace Maplibre.NativeFfi.Tests;
 /// <summary>One representative of each generated value shape, crossing to native and back.</summary>
 public sealed class GeneratedValueTests
 {
+    // JSON goes in and comes back as a string, transcoded through UTF-8.
     [Fact]
     public void CallerSizedTextReturnsResultsLongerThanItsFirstStorage()
     {
         using var zoom = StyleExpressionHandle.Create(
-            """["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"""u8.ToArray()
+            """["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"""
         );
-        Assert.Equal("50.0"u8.ToArray(), zoom.Evaluate(new StyleExpressionInputs { Zoom = 5 }));
+        Assert.Equal("50.0", zoom.Evaluate(StyleExpressionInputs.Default with { Zoom = 5 }));
 
-        // The result outgrows the call's first storage, so the call runs again.
-        var text = Encoding.UTF8.GetBytes($"\"{new string('a', 1000)}\"");
+        // The result outgrows the call's first storage, so the call runs again, and its
+        // multibyte characters decode whole.
+        var text = $"\"{string.Concat(Enumerable.Repeat("aé", 500))}\"";
         using var expression = StyleExpressionHandle.Create(text);
         Assert.Equal(text, expression.Evaluate());
     }
 
     // C borrows a byte input only for the call, so the binding pins the caller's span instead of
-    // copying it. An empty span pins to null, which C accepts with a zero size.
+    // copying it. An empty span pins to null, which C accepts with a zero size. No source has the
+    // ID, so each accepted call completes with NotFound.
     [Fact]
-    public void ByteInputsCrossAsPinnedSpans()
+    public async Task ByteInputsCrossAsPinnedSpans()
     {
-        using var data = GeojsonSourceDataHandle.Create(
-            """{"type":"FeatureCollection","features":[]}"""u8
+        await using var fixture = await NativeFixture.WithEmptyStyleAsync();
+        var tile = new CanonicalTileId(0, 0, 0);
+        var filled = await Assert.ThrowsAsync<MaplibreException>(() =>
+            fixture.Map.SetCustomMvtVectorSourceTileDataAsync("missing", tile, [1, 2, 3])
         );
-        var error = Assert.Throws<MaplibreException>(() =>
-            GeojsonSourceDataHandle.Create(ReadOnlySpan<byte>.Empty)
+        Assert.Equal(Status.NotFound, filled.Status);
+        var empty = await Assert.ThrowsAsync<MaplibreException>(() =>
+            fixture.Map.SetCustomMvtVectorSourceTileDataAsync(
+                "missing",
+                tile,
+                ReadOnlySpan<byte>.Empty
+            )
         );
-        Assert.Equal(Status.InvalidArgument, error.Status);
+        Assert.Equal(Status.NotFound, empty.Status);
     }
 
     [Fact]
@@ -55,8 +64,8 @@ public sealed class GeneratedValueTests
         Assert.Empty(projection.LatLngsForPixelsUnwrapped([]));
     }
 
-    private static byte[] EmptyGeoJsonSource =>
-        """{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}"""u8.ToArray();
+    private const string EmptyGeoJsonSource =
+        """{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}""";
 
     [Fact]
     public async Task HostStringsUseViewsAndNativeLentStringsDecode()
@@ -69,10 +78,7 @@ public sealed class GeneratedValueTests
         Assert.Null(await fixture.Map.GetStyleSourceAsync("before"));
 
         // The layer ID comes back as text that native lends for the completion.
-        await fixture.Map.AddStyleLayerJsonAsync(
-            """{"id":"café-层","type":"background"}"""u8.ToArray(),
-            ""
-        );
+        await fixture.Map.AddStyleLayerJsonAsync("""{"id":"café-层","type":"background"}""", "");
         Assert.Equal(["café-层"], (await fixture.Map.ListStyleLayersAsync()).Select(l => l.Id));
 
         // Native rejects a NUL in a URL view before a C-string consumer reads it.

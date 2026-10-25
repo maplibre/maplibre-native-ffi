@@ -1,6 +1,5 @@
 """The generated value shapes, one representative each against native."""
 
-import json
 import typing
 from dataclasses import replace
 
@@ -35,22 +34,16 @@ def test_host_strings_use_views_and_native_lent_strings_decode(
     assert seen == ["custom://native-lent.json"]
     result(map_handle.set_style_json(EMPTY_STYLE))
     layer_id = "café-层"
-    layer = json.dumps({"id": layer_id, "type": "background"}, ensure_ascii=False)
 
-    # The layer JSON crosses as sized UTF-8 bytes, and the ID comes back
-    # through a lookup that also takes an explicit-length view.
-    result(map_handle.add_style_layer_json(layer.encode(), ""))
+    # The ID comes back through a lookup that also takes an explicit-length
+    # view.
+    result(map_handle.add_style_layer_json({"id": layer_id, "type": "background"}, ""))
     assert [entry.id for entry in result(map_handle.list_style_layers())] == [layer_id]
-    stored = result(map_handle.get_style_layer_json(layer_id))
-    assert stored is not None
-    assert json.loads(stored)["id"] == layer_id
 
     with pytest.raises(mln.MaplibreError) as raised:
         map_handle.set_style_url("custom://bad\0url")
     assert raised.value.status == mln.Status.INVALID_ARGUMENT
     assert "embedded NUL" in raised.value.diagnostic
-    with pytest.raises(TypeError, match="bytes-like object"):
-        map_handle.add_style_layer_json(typing.cast(typing.Any, layer), "")
 
 
 def test_absent_fields_stay_distinct_from_present_values(
@@ -67,11 +60,14 @@ def test_absent_fields_stay_distinct_from_present_values(
     assert camera.zoom == pytest.approx(5.0)
     assert camera.bearing == 0.0
 
+    collection = {"type": "FeatureCollection", "features": []}
     result(
         map_handle.set_style_json(
-            b'{"version":8,"sources":{"points":{"type":"geojson","data":'
-            b'{"type":"FeatureCollection","features":[]}}},"layers":'
-            b'[{"id":"circles","type":"circle","source":"points"}]}'
+            {
+                "version": 8,
+                "sources": {"points": {"type": "geojson", "data": collection}},
+                "layers": [{"id": "circles", "type": "circle", "source": "points"}],
+            }
         )
     )
     # An absent optional output comes back as None.
@@ -166,17 +162,62 @@ def test_synchronous_calls_fill_caller_sized_outputs_in_input_order(
         projection.close()
 
 
+def test_json_crosses_as_json_dumps_and_json_loads_values(
+    map_handle: mln.MapHandle,
+) -> None:
+    result(
+        map_handle.set_style_json(
+            {
+                "version": 8,
+                "sources": {},
+                "layers": [{"id": "fill", "type": "background"}],
+            }
+        )
+    )
+    # A value goes in as json.dumps writes it and comes back as json.loads
+    # reads it, so a style-spec string needs no inner quotes.
+    result(map_handle.set_global_state_property("mode", "dark"))
+    assert result(map_handle.get_global_state()) == {"mode": "dark"}
+    result(map_handle.set_style_layer_property("fill", "background-opacity", 0.5))
+    opacity = result(map_handle.get_style_layer_property("fill", "background-opacity"))
+    assert opacity == 0.5
+    # A parameter that is None is JSON null, which restores the default, and a
+    # property without a value comes back absent as None.
+    result(map_handle.set_style_layer_property("fill", "background-opacity", None))
+    assert (
+        result(map_handle.get_style_layer_property("fill", "background-opacity"))
+        is None
+    )
+
+    # A record member that is None is absent, an empty view.
+    expression = mln.style_expression_create(["get", "name"])
+    try:
+        feature = {
+            "type": "Feature",
+            "properties": {"name": "a"},
+            "geometry": {"type": "Point", "coordinates": [0, 0]},
+        }
+        inputs = mln.StyleExpressionInputs(feature=feature, feature_state=None)
+        assert expression.evaluate(inputs) == "a"
+    finally:
+        expression.close()
+
+    # A value that json.dumps rejects raises its error before native runs.
+    with pytest.raises(TypeError, match="not JSON serializable"):
+        mln.style_expression_create(object())
+
+
 def test_caller_sized_text_returns_results_longer_than_its_first_storage() -> None:
     zoom = mln.style_expression_create(
-        b'["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]'
+        ["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]
     )
     try:
-        assert zoom.evaluate(mln.StyleExpressionInputs(zoom=5.0)) == b"50.0"
+        assert zoom.evaluate(mln.StyleExpressionInputs(zoom=5.0)) == 50.0
     finally:
         zoom.close()
 
     # The result outgrows the runtime's first storage, so the call runs again.
-    text = b'"' + b"a" * 1000 + b'"'
+    text = "a" * 1000
     long = mln.style_expression_create(text)
     try:
         assert long.evaluate() == text
@@ -201,16 +242,15 @@ def test_inputs_take_any_sequence_or_byte_buffer_and_require_their_subject(
 
     result(map_handle.set_style_json(EMPTY_STYLE))
     result(
-        map_handle.add_custom_geometry_source(
-            "custom", mln.CustomGeometrySourceOptions(fetch_tile=lambda *_: None)
+        map_handle.add_custom_mvt_vector_source(
+            "custom", mln.CustomMvtVectorSourceOptions(fetch_tile=lambda *_: None)
         )
     )
     tile = mln.CanonicalTileId(z=0, x=0, y=0)
-    features = b'{"type":"FeatureCollection","features":[]}'
     # A parameter copies a buffer that is not bytes before native reads it.
     result(
-        map_handle.set_custom_geometry_source_tile_data(
-            "custom", tile, memoryview(bytearray(features))
+        map_handle.set_custom_mvt_vector_source_tile_data(
+            "custom", tile, memoryview(bytearray(b"\x1a\x00"))
         )
     )
     with pytest.raises(TypeError, match="not str"):

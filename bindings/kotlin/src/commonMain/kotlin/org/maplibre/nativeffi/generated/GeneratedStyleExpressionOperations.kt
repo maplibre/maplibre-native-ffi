@@ -15,7 +15,7 @@ public abstract class GeneratedStyleExpressionOperations internal constructor() 
    * See `mln_style_expression_evaluate` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
    */
-  public fun evaluate(inputs: StyleExpressionInputs? = null): ByteArray =
+  public fun evaluate(inputs: StyleExpressionInputs? = null): String =
     nativeCall(this, binding) {
       val nativeInputs = inputs?.let { writeStyleExpressionInputs(it) } ?: 0L
       val textLength = allocate(w(4, 8), w(4, 8))
@@ -37,7 +37,7 @@ public abstract class GeneratedStyleExpressionOperations internal constructor() 
         textCapacity = written + 1
         textStorage = allocate(textCapacity, 1)
       }
-      readBytes(textStorage, readSize(textLength))
+      readBytes(textStorage, readSize(textLength)).decodeToString()
     }
 
   /**

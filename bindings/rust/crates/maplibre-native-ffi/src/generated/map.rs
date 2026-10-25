@@ -165,7 +165,7 @@ impl MapHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn add_style_layer_json(
         &self,
-        layer_json: &[u8],
+        layer_json: &str,
         before_layer_id: &str,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
@@ -189,7 +189,7 @@ impl MapHandle {
     pub fn add_style_source_json(
         &self,
         source_id: &str,
-        source_json: &[u8],
+        source_json: &str,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
@@ -658,7 +658,7 @@ impl MapHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn camera_for_geometry(
         &self,
-        geometry: &[u8],
+        geometry: &str,
         fit_options: Option<&CameraFitOptions>,
     ) -> Result<NativeFuture<CameraOptions>> {
         let mut call = self.inner.call();
@@ -813,7 +813,7 @@ impl MapHandle {
     pub fn get_feature_state(
         &self,
         selector: &FeatureStateSelector,
-    ) -> Result<NativeFuture<Vec<u8>>> {
+    ) -> Result<NativeFuture<String>> {
         let mut call = self.inner.call();
         let selector = call.reference(&selector)?;
         call.complete(
@@ -830,7 +830,7 @@ impl MapHandle {
     ///
     /// See `mln_map_get_global_state` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn get_global_state(&self) -> Result<NativeFuture<Vec<u8>>> {
+    pub fn get_global_state(&self) -> Result<NativeFuture<String>> {
         let call = self.inner.call();
         call.complete(
             |map, completion, out_diagnostic| unsafe {
@@ -867,7 +867,7 @@ impl MapHandle {
     ///
     /// See `mln_map_get_loaded_style_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn get_loaded_style_json(&self) -> Result<NativeFuture<Vec<u8>>> {
+    pub fn get_loaded_style_json(&self) -> Result<NativeFuture<String>> {
         let call = self.inner.call();
         call.complete(
             |map, completion, out_diagnostic| unsafe {
@@ -925,7 +925,7 @@ impl MapHandle {
     ///
     /// See `mln_map_get_style_layer_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn get_style_layer_json(&self, layer_id: &str) -> Result<NativeFuture<Option<Vec<u8>>>> {
+    pub fn get_style_layer_json(&self, layer_id: &str) -> Result<NativeFuture<Option<String>>> {
         let mut call = self.inner.call();
         let layer_id = call.input(&layer_id)?;
         call.complete(
@@ -944,7 +944,7 @@ impl MapHandle {
         &self,
         layer_id: &str,
         property_name: &str,
-    ) -> Result<NativeFuture<Option<Vec<u8>>>> {
+    ) -> Result<NativeFuture<Option<String>>> {
         let mut call = self.inner.call();
         let layer_id = call.input(&layer_id)?;
         let property_name = call.input(&property_name)?;
@@ -969,7 +969,7 @@ impl MapHandle {
     pub fn get_style_light_property(
         &self,
         property_name: &str,
-    ) -> Result<NativeFuture<Option<Vec<u8>>>> {
+    ) -> Result<NativeFuture<Option<String>>> {
         let mut call = self.inner.call();
         let property_name = call.input(&property_name)?;
         call.complete(
@@ -1316,7 +1316,7 @@ impl MapHandle {
         &self,
         source_id: &str,
         tile_id: CanonicalTileId,
-        data: &[u8],
+        data: &str,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
@@ -1447,7 +1447,7 @@ impl MapHandle {
     pub fn set_feature_state(
         &self,
         selector: &FeatureStateSelector,
-        state: &[u8],
+        state: &str,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let selector = call.reference(&selector)?;
@@ -1535,7 +1535,7 @@ impl MapHandle {
     pub fn set_global_state_property(
         &self,
         property_name: &str,
-        value: &[u8],
+        value: &str,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let property_name = call.input(&property_name)?;
@@ -1662,7 +1662,7 @@ impl MapHandle {
     ///
     /// See `mln_map_set_style_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn set_style_json(&self, json: &[u8]) -> Result<NativeFuture<CommandCompletion>> {
+    pub fn set_style_json(&self, json: &str) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let json = call.input(&json)?;
         call.command(|map, completion, out_diagnostic| unsafe {
@@ -1678,7 +1678,7 @@ impl MapHandle {
         &self,
         layer_id: &str,
         property_name: &str,
-        value: &[u8],
+        value: &str,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let layer_id = call.input(&layer_id)?;
@@ -1702,7 +1702,7 @@ impl MapHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn set_style_light_json(
         &self,
-        light_json: &[u8],
+        light_json: &str,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let light_json = call.input(&light_json)?;
@@ -1719,7 +1719,7 @@ impl MapHandle {
     pub fn set_style_light_property(
         &self,
         property_name: &str,
-        value: &[u8],
+        value: &str,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let property_name = call.input(&property_name)?;
@@ -1987,7 +1987,7 @@ impl MapHandleDiscarding<'_> {
     ///
     /// See `mln_map_add_style_layer_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn add_style_layer_json(&self, layer_json: &[u8], before_layer_id: &str) -> Result<()> {
+    pub fn add_style_layer_json(&self, layer_json: &str, before_layer_id: &str) -> Result<()> {
         let mut call = self.0.inner.call();
         let layer_json = call.input(&layer_json)?;
         let before_layer_id = call.input(&before_layer_id)?;
@@ -2006,7 +2006,7 @@ impl MapHandleDiscarding<'_> {
     ///
     /// See `mln_map_add_style_source_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn add_style_source_json(&self, source_id: &str, source_json: &[u8]) -> Result<()> {
+    pub fn add_style_source_json(&self, source_id: &str, source_json: &str) -> Result<()> {
         let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
         let source_json = call.input(&source_json)?;
@@ -2270,7 +2270,7 @@ impl MapHandleDiscarding<'_> {
         &self,
         source_id: &str,
         tile_id: CanonicalTileId,
-        data: &[u8],
+        data: &str,
     ) -> Result<()> {
         let mut call = self.0.inner.call();
         let source_id = call.input(&source_id)?;
@@ -2392,7 +2392,7 @@ impl MapHandleDiscarding<'_> {
     ///
     /// See `mln_map_set_feature_state` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn set_feature_state(&self, selector: &FeatureStateSelector, state: &[u8]) -> Result<()> {
+    pub fn set_feature_state(&self, selector: &FeatureStateSelector, state: &str) -> Result<()> {
         let mut call = self.0.inner.call();
         let selector = call.reference(&selector)?;
         let state = call.input(&state)?;
@@ -2469,7 +2469,7 @@ impl MapHandleDiscarding<'_> {
     ///
     /// See `mln_map_set_global_state_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_global_state_property(&self, property_name: &str, value: &[u8]) -> Result<()> {
+    pub fn set_global_state_property(&self, property_name: &str, value: &str) -> Result<()> {
         let mut call = self.0.inner.call();
         let property_name = call.input(&property_name)?;
         let value = call.input(&value)?;
@@ -2585,7 +2585,7 @@ impl MapHandleDiscarding<'_> {
     ///
     /// See `mln_map_set_style_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn set_style_json(&self, json: &[u8]) -> Result<()> {
+    pub fn set_style_json(&self, json: &str) -> Result<()> {
         let mut call = self.0.inner.call();
         let json = call.input(&json)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
@@ -2601,7 +2601,7 @@ impl MapHandleDiscarding<'_> {
         &self,
         layer_id: &str,
         property_name: &str,
-        value: &[u8],
+        value: &str,
     ) -> Result<()> {
         let mut call = self.0.inner.call();
         let layer_id = call.input(&layer_id)?;
@@ -2623,7 +2623,7 @@ impl MapHandleDiscarding<'_> {
     ///
     /// See `mln_map_set_style_light_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_style_light_json(&self, light_json: &[u8]) -> Result<()> {
+    pub fn set_style_light_json(&self, light_json: &str) -> Result<()> {
         let mut call = self.0.inner.call();
         let light_json = call.input(&light_json)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
@@ -2636,7 +2636,7 @@ impl MapHandleDiscarding<'_> {
     ///
     /// See `mln_map_set_style_light_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_style_light_property(&self, property_name: &str, value: &[u8]) -> Result<()> {
+    pub fn set_style_light_property(&self, property_name: &str, value: &str) -> Result<()> {
         let mut call = self.0.inner.call();
         let property_name = call.input(&property_name)?;
         let value = call.input(&value)?;

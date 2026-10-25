@@ -7,9 +7,17 @@ import 'support/fixture.dart';
 import 'support/graphics.dart';
 import 'support/render.dart';
 
-const _redStyleJson =
-    '{"version":8,"sources":{},"layers":[{"id":"background",'
-    '"type":"background","paint":{"background-color":"#ff0000"}}]}';
+const _redStyle = {
+  'version': 8,
+  'sources': <String, Object?>{},
+  'layers': [
+    {
+      'id': 'background',
+      'type': 'background',
+      'paint': {'background-color': '#ff0000'},
+    },
+  ],
+};
 
 final _extent = LogicalExtent(
   width: renderSize,
@@ -39,7 +47,7 @@ final Object _openglFrameSkip = buildExposesCoreWorkerFrames
 
 void main() {
   test('an owned texture renders a frame that reads back as pixels', () async {
-    final map = await openRenderMap(_redStyleJson);
+    final map = await openRenderMap(_redStyle);
     final worker = await WorkerSession.attach(map);
 
     final result = await worker.renderFrame();
@@ -48,7 +56,7 @@ void main() {
   }, skip: _wglSkip);
 
   test('an attach with default options completes on its own', () async {
-    final map = await openRenderMap(emptyStyleJson);
+    final map = await openRenderMap(emptyStyle);
     // Nothing services driver work, so only a core-worker default completes.
     final attachment = TestGraphics.open().attachOwnedTexture(
       map,
@@ -62,7 +70,7 @@ void main() {
   test(
     'a disposed attached session lets its map release before its graphics go',
     () async {
-      final map = await openRenderMap(emptyStyleJson);
+      final map = await openRenderMap(emptyStyle);
       final graphics = TestGraphics.open();
       final attachment = graphics.attachOwnedTexture(
         map,
@@ -86,7 +94,7 @@ void main() {
   test(
     'closing an attached session completes once its graphics may go',
     () async {
-      final map = await openRenderMap(emptyStyleJson);
+      final map = await openRenderMap(emptyStyle);
       final graphics = TestGraphics.open();
       final attachment = graphics.attachOwnedTexture(
         map,
@@ -103,7 +111,7 @@ void main() {
   );
 
   test('a drain before any demand returns no results', () async {
-    final map = await openRenderMap(_redStyleJson);
+    final map = await openRenderMap(_redStyle);
     final worker = await WorkerSession.attach(map);
     // Native reports the drain as not ready, which reads as no results.
     expect(worker.session.drainFrameResults(), isEmpty);
@@ -112,7 +120,7 @@ void main() {
   test(
     'a frame view expires with its scope and holds off release inside it',
     () async {
-      final map = await openRenderMap(emptyStyleJson);
+      final map = await openRenderMap(emptyStyle);
       final worker = await WorkerSession.attach(map);
       await worker.renderFrame();
       final session = worker.session;

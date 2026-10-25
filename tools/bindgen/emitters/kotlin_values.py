@@ -99,6 +99,11 @@ def doc(bound, native: str, indent: str = "") -> str:
     return docs.block_comment(bound.doc(native), indent)
 
 
+def is_text(value):
+    """Whether a buffer is a Kotlin `String`: UTF-8 text and JSON."""
+    return value.encoding in {"utf8", "json"}
+
+
 def name(native):
     return pascal(native.removeprefix("mln_"))
 
@@ -289,7 +294,7 @@ class Values:
         elif value.kind == "reference":
             result = self.public(replace(value.element, nullable=False))
         elif value.kind == "buffer":
-            result = "String" if value.encoding == "utf8" else "ByteArray"
+            result = "String" if is_text(value) else "ByteArray"
         else:
             result = self.scalar(value)[0]
         return result + ("?" if value.nullable else "")
@@ -331,7 +336,7 @@ class Values:
         if value.kind == "array":
             return "emptyList()"
         if value.kind == "buffer":
-            return '""' if value.encoding == "utf8" else "byteArrayOf()"
+            return '""' if is_text(value) else "byteArrayOf()"
         if value.kind == "enum":
             constant = zero_constant(value)
             return f"{name(value.native)}.{constant}" if constant else None
@@ -618,11 +623,7 @@ class Values:
                 return f"{expression}?.let {{ cString(it) }} ?: 0L"
             return f"cString({expression})"
         if value.kind == "buffer":
-            data = (
-                f"{expression}.encodeToByteArray()"
-                if value.encoding == "utf8"
-                else expression
-            )
+            data = f"{expression}.encodeToByteArray()" if is_text(value) else expression
             if value.nullable:
                 data = data.replace(expression, "it", 1)
                 return f"{expression}?.let {{ bytes({data}) }} ?: 0L"
@@ -631,7 +632,7 @@ class Values:
 
     def length(self, value, expression):
         """The element or byte count of an input array or buffer, as a carrier."""
-        if value.kind == "buffer" and value.encoding == "utf8":
+        if value.kind == "buffer" and is_text(value):
             expression += ".encodeToByteArray()"
         if value.nullable:
             return f"({expression}?.size ?: 0).toLong()"
@@ -828,7 +829,7 @@ class Values:
                 else f"readCString(readAddress({address}))"
             )
         if value.kind == "buffer" and value.buffer_form == "view":
-            text = value.encoding == "utf8"
+            text = is_text(value)
             if value.nullable:
                 return f"readView{'String' if text else ''}OrNull({address})"
             return f"readView{'String' if text else ''}({address})"
@@ -893,7 +894,7 @@ class Values:
             pointer = f"readAddress({address})"
             if value.kind == "buffer":
                 result = f"readBytes({pointer}, {count})"
-                if value.encoding == "utf8":
+                if is_text(value):
                     result += ".decodeToString()"
                 return result
             element = value.element

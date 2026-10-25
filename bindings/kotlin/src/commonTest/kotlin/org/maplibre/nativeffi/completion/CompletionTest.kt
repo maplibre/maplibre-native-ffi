@@ -84,7 +84,7 @@ class CompletionTest {
         )
         .await()
       val seenAtCompletion = CompletableDeferred<List<RuntimeEventType>>()
-      val style = map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray())
+      val style = map.setStyleJson(EMPTY_STYLE_JSON)
       // The handler runs inside native's completion, after the callbacks for the command's events.
       style.invokeOnCompletion {
         seenAtCompletion.complete(generateSequence { events.tryReceive().getOrNull() }.toList())

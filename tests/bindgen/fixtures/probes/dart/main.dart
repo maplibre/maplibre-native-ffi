@@ -34,12 +34,12 @@ void main() {
     'absent fields',
   );
 
-  // Caller-sized text that fits the runtime's first storage, and text that
-  // does not, which the runtime fetches again with enough storage.
-  check(utf8.decode(probeZerosJson(0)) == '[]', 'empty text');
-  check(utf8.decode(probeZerosJson(3)) == '[0,0,0]', 'short text');
+  // Caller-sized JSON that fits the runtime's first storage, and JSON that
+  // does not, which the runtime fetches again with enough storage, decoded.
+  check(jsonEncode(probeZerosJson(0)) == '[]', 'empty text');
+  check(jsonEncode(probeZerosJson(3)) == '[0,0,0]', 'short text');
   check(
-    utf8.decode(probeZerosJson(300)) == '[${List.filled(300, 0).join(',')}]',
+    jsonEncode(probeZerosJson(300)) == jsonEncode(List.filled(300, 0)),
     'long text',
   );
 

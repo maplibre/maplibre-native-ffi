@@ -1217,7 +1217,7 @@ internal fun readGeojsonSourceOptions(source: Long): GeojsonSourceOptions {
     maxZoom = if ((fields and 2u) != 0u) readF64(source + 16) else null,
     tolerance = if ((fields and 4u) != 0u) readF64(source + 24) else null,
     clusterMaxZoom = if ((fields and 8u) != 0u) readF64(source + 32) else null,
-    clusterProperties = readView(source + 40),
+    clusterProperties = readViewString(source + 40),
     buffer = if ((fields and 16u) != 0u) readU32(source + w(48, 56)) else null,
     clusterRadius = if ((fields and 32u) != 0u) readU32(source + w(52, 60)) else null,
     clusterMinPoints = if ((fields and 64u) != 0u) readU32(source + w(56, 64)) else null,
@@ -1376,7 +1376,7 @@ internal fun readRenderedFeatureQueryOptions(source: Long): RenderedFeatureQuery
           readViewString(item)
         }
       else null,
-    filter = readView(source + w(16, 24)),
+    filter = readViewString(source + w(16, 24)),
   )
 }
 
@@ -1406,7 +1406,7 @@ internal fun readSourceFeatureQueryOptions(source: Long): SourceFeatureQueryOpti
           readViewString(item)
         }
       else null,
-    filter = readView(source + w(16, 24)),
+    filter = readViewString(source + w(16, 24)),
   )
 }
 
@@ -1416,9 +1416,9 @@ internal fun readStyleExpressionInputs(source: Long): StyleExpressionInputs {
     zoom = if ((fields and 1u) != 0u) readF64(source + 8) else null,
     colorRampParameter = if ((fields and 2u) != 0u) readF64(source + 16) else null,
     elevation = if ((fields and 4u) != 0u) readF64(source + 24) else null,
-    feature = readView(source + 32),
-    featureState = readView(source + w(40, 48)),
-    globalState = readView(source + w(48, 64)),
+    feature = readViewString(source + 32),
+    featureState = readViewString(source + w(40, 48)),
+    globalState = readViewString(source + w(48, 64)),
     canonicalTileId = if ((fields and 8u) != 0u) readCanonicalTileId(source + w(56, 80)) else null,
     availableImages =
       readArray(
@@ -1645,15 +1645,15 @@ internal fun readRenderSessionSnapshot(source: Long): RenderSessionSnapshot =
 
 internal fun readRenderedFeature(source: Long): RenderedFeature =
   RenderedFeature(
-    feature = readView(source),
+    feature = readViewString(source),
     layerId = readViewString(source + w(8, 16)),
     sourceId = readViewString(source + w(16, 32)),
     sourceLayerId = readViewString(source + w(24, 48)),
-    state = readView(source + w(32, 64)),
+    state = readViewString(source + w(32, 64)),
   )
 
 internal fun readSourceFeature(source: Long): SourceFeature =
-  SourceFeature(feature = readView(source), sourceLayerId = readViewString(source + w(8, 16)))
+  SourceFeature(feature = readViewString(source), sourceLayerId = readViewString(source + w(8, 16)))
 
 internal fun readTextureReadbackResult(source: Long): TextureReadbackResult =
   TextureReadbackResult(data = readView(source), info = readTextureImageInfo(source + w(8, 16)))
@@ -2257,7 +2257,7 @@ internal fun readOfflineTilePyramidRegionDefinition(
 internal fun readOfflineGeometryRegionDefinition(source: Long): OfflineGeometryRegionDefinition =
   OfflineGeometryRegionDefinition(
     styleUrl = readViewString(source),
-    geometry = readView(source + w(8, 16)),
+    geometry = readViewString(source + w(8, 16)),
     minZoom = readF64(source + w(16, 32)),
     maxZoom = readF64(source + w(24, 40)),
     pixelRatio = readF32(source + w(32, 48)),

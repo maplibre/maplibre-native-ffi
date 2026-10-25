@@ -214,11 +214,11 @@ impl RenderSessionHandle {
     pub fn query_feature_extensions(
         &self,
         source_id: &str,
-        feature: &[u8],
+        feature: &str,
         extension: &str,
         extension_field: &str,
-        arguments: &[u8],
-    ) -> Result<NativeFuture<Vec<u8>>> {
+        arguments: &str,
+    ) -> Result<NativeFuture<String>> {
         let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
         let feature = call.input(&feature)?;

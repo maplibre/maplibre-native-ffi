@@ -40,7 +40,7 @@ final class MapState {
   /// when it is nil.
   init(
     viewport: Viewport,
-    styleJSON: Data? = nil
+    styleJSON: String? = nil
   ) async throws {
     precondition(
       !viewport.isEmpty,

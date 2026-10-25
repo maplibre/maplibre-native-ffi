@@ -27,7 +27,7 @@ public extension MapHandle {
   /// See `mln_map_camera_for_geometry` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   func cameraForGeometry(
-    _ bindingArg0: Data,
+    _ bindingArg0: String,
     fitOptions bindingArg1: CameraFitOptions? = nil
   ) async throws -> CameraOptions {
     try await nativeStart(copying: CameraOptions

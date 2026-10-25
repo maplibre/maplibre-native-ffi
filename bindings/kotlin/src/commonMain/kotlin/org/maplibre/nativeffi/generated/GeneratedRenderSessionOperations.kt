@@ -168,12 +168,12 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    */
   public fun queryFeatureExtensions(
     sourceId: String,
-    feature: ByteArray,
+    feature: String,
     extension: String,
     extensionField: String,
-    arguments: ByteArray,
-  ): Deferred<ByteArray> =
-    nativeSubmit(this, binding, { result -> readView(CompletionBridge.value(result)) }) {
+    arguments: String,
+  ): Deferred<String> =
+    nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) {
       check(
         C.mln_render_session_query_feature_extensions(
           handle,

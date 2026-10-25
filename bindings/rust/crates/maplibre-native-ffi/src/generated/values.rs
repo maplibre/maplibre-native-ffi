@@ -1176,7 +1176,7 @@ pub struct GeojsonSourceOptions {
     /// Cluster aggregation expressions keyed by property name, as a JSON object
     /// whose members follow the MapLibre Style Spec clusterProperties form, or
     /// empty for none. The UTF-8 bytes are borrowed for the call.
-    pub cluster_properties: Vec<u8>,
+    pub cluster_properties: String,
     /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
     pub buffer: Option<u32>,
     /// Cluster radius in pixels within \[0, 4095\]. Defaults to 50.
@@ -2445,7 +2445,7 @@ pub struct OfflineGeometryRegionDefinition {
     /// Style URL. Copied during region creation.
     pub style_url: String,
     /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
-    pub geometry: Vec<u8>,
+    pub geometry: String,
     pub min_zoom: f64,
     /// Maximum zoom. Positive infinity lets each tile source use its own
     /// maximum zoom.
@@ -3576,11 +3576,11 @@ pub enum RenderSessionState: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RenderedFeature {
-    pub feature: Vec<u8>,
+    pub feature: String,
     pub layer_id: String,
     pub source_id: String,
     pub source_layer_id: String,
-    pub state: Vec<u8>,
+    pub state: String,
 }
 impl FromNative<sys::mln_rendered_feature> for RenderedFeature {
     unsafe fn from_native(raw: sys::mln_rendered_feature) -> Result<Self> {
@@ -3603,7 +3603,7 @@ pub struct RenderedFeatureQueryOptions {
     /// Optional style layer IDs. When absent, all rendered layers are queried.
     pub layer_ids: Option<Vec<String>>,
     /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
-    pub filter: Vec<u8>,
+    pub filter: String,
 }
 impl Default for RenderedFeatureQueryOptions {
     fn default() -> Self {
@@ -4668,7 +4668,7 @@ impl FromNative<sys::mln_screen_point> for ScreenPoint {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SourceFeature {
-    pub feature: Vec<u8>,
+    pub feature: String,
     pub source_layer_id: String,
 }
 impl FromNative<sys::mln_source_feature> for SourceFeature {
@@ -4690,7 +4690,7 @@ pub struct SourceFeatureQueryOptions {
     /// GeoJSON.
     pub source_layer_ids: Option<Vec<String>>,
     /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
-    pub filter: Vec<u8>,
+    pub filter: String,
 }
 impl Default for SourceFeatureQueryOptions {
     fn default() -> Self {
@@ -4780,11 +4780,11 @@ pub struct StyleExpressionInputs {
     /// The value of the elevation expression outside a color-relief layer.
     pub elevation: Option<f64>,
     /// One UTF-8 GeoJSON Feature that feature data expressions read.
-    pub feature: Vec<u8>,
+    pub feature: String,
     /// A UTF-8 JSON object that the feature-state expression reads.
-    pub feature_state: Vec<u8>,
+    pub feature_state: String,
     /// A UTF-8 JSON object that the global-state expression reads.
-    pub global_state: Vec<u8>,
+    pub global_state: String,
     /// The tile that holds the feature, which the within and distance
     /// expressions need to place its geometry.
     pub canonical_tile_id: Option<CanonicalTileId>,

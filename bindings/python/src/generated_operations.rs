@@ -590,9 +590,10 @@ fn generated_copy_mln_geojson_source_options(
             || generated_value(py, value.cluster_max_zoom),
         )?,
     )?;
-    dict.set_item("cluster_properties", unsafe {
-        generated_bytes(py, value.cluster_properties)
-    }?)?;
+    dict.set_item(
+        "cluster_properties",
+        generated_json(py, value.cluster_properties)?,
+    )?;
     dict.set_item(
         "buffer",
         generated_optional(
@@ -1077,7 +1078,7 @@ fn generated_copy_mln_offline_geometry_region_definition(
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("style_url", generated_text(py, value.style_url)?)?;
-    dict.set_item("geometry", unsafe { generated_bytes(py, value.geometry) }?)?;
+    dict.set_item("geometry", generated_json(py, value.geometry)?)?;
     dict.set_item("min_zoom", generated_value(py, value.min_zoom)?)?;
     dict.set_item("max_zoom", generated_value(py, value.max_zoom)?)?;
     dict.set_item("pixel_ratio", generated_value(py, value.pixel_ratio)?)?;
@@ -1516,14 +1517,14 @@ fn generated_copy_mln_rendered_feature(
     value: &sys::mln_rendered_feature,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("feature", unsafe { generated_bytes(py, value.feature) }?)?;
+    dict.set_item("feature", generated_json(py, value.feature)?)?;
     dict.set_item("layer_id", generated_text(py, value.layer_id)?)?;
     dict.set_item("source_id", generated_text(py, value.source_id)?)?;
     dict.set_item(
         "source_layer_id",
         generated_text(py, value.source_layer_id)?,
     )?;
-    dict.set_item("state", unsafe { generated_bytes(py, value.state) }?)?;
+    dict.set_item("state", generated_json(py, value.state)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1546,7 +1547,7 @@ fn generated_copy_mln_rendered_feature_query_options(
             },
         )?,
     )?;
-    dict.set_item("filter", unsafe { generated_bytes(py, value.filter) }?)?;
+    dict.set_item("filter", generated_json(py, value.filter)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1917,7 +1918,7 @@ fn generated_copy_mln_source_feature(
     value: &sys::mln_source_feature,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("feature", unsafe { generated_bytes(py, value.feature) }?)?;
+    dict.set_item("feature", generated_json(py, value.feature)?)?;
     dict.set_item(
         "source_layer_id",
         generated_text(py, value.source_layer_id)?,
@@ -1946,7 +1947,7 @@ fn generated_copy_mln_source_feature_query_options(
             },
         )?,
     )?;
-    dict.set_item("filter", unsafe { generated_bytes(py, value.filter) }?)?;
+    dict.set_item("filter", generated_json(py, value.filter)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1995,13 +1996,9 @@ fn generated_copy_mln_style_expression_inputs(
             || generated_value(py, value.elevation),
         )?,
     )?;
-    dict.set_item("feature", unsafe { generated_bytes(py, value.feature) }?)?;
-    dict.set_item("feature_state", unsafe {
-        generated_bytes(py, value.feature_state)
-    }?)?;
-    dict.set_item("global_state", unsafe {
-        generated_bytes(py, value.global_state)
-    }?)?;
+    dict.set_item("feature", generated_json(py, value.feature)?)?;
+    dict.set_item("feature_state", generated_json(py, value.feature_state)?)?;
+    dict.set_item("global_state", generated_json(py, value.global_state)?)?;
     dict.set_item(
         "canonical_tile_id",
         generated_optional(
@@ -2971,7 +2968,7 @@ fn generated_input_mln_geojson_source_options<'py>(
         raw.cluster_max_zoom = field.extract::<f64>()?;
         raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
     }
-    raw.cluster_properties = storage.buffer(value.getattr("cluster_properties")?, false)?;
+    raw.cluster_properties = storage.json(value.getattr("cluster_properties")?, true)?;
     if let Some(field) = generated_present(value, "buffer")? {
         raw.buffer = field.extract::<u32>()?;
         raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_BUFFER;
@@ -3339,7 +3336,7 @@ fn generated_input_mln_offline_geometry_region_definition<'py>(
 ) -> PyResult<sys::mln_offline_geometry_region_definition> {
     let mut raw: sys::mln_offline_geometry_region_definition = unsafe { std::mem::zeroed() };
     raw.style_url = storage.buffer(value.getattr("style_url")?, true)?;
-    raw.geometry = storage.buffer(value.getattr("geometry")?, false)?;
+    raw.geometry = storage.json(value.getattr("geometry")?, true)?;
     raw.min_zoom = value.getattr("min_zoom")?.extract::<f64>()?;
     raw.max_zoom = value.getattr("max_zoom")?.extract::<f64>()?;
     raw.pixel_ratio = value.getattr("pixel_ratio")?.extract::<f32>()?;
@@ -3635,7 +3632,7 @@ fn generated_input_mln_rendered_feature_query_options<'py>(
         };
         raw.fields |= sys::MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
     }
-    raw.filter = storage.buffer(value.getattr("filter")?, false)?;
+    raw.filter = storage.json(value.getattr("filter")?, true)?;
     Ok(raw)
 }
 
@@ -3874,7 +3871,7 @@ fn generated_input_mln_source_feature_query_options<'py>(
         };
         raw.fields |= sys::MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
     }
-    raw.filter = storage.buffer(value.getattr("filter")?, false)?;
+    raw.filter = storage.json(value.getattr("filter")?, true)?;
     Ok(raw)
 }
 
@@ -3901,9 +3898,9 @@ fn generated_input_mln_style_expression_inputs<'py>(
         raw.elevation = field.extract::<f64>()?;
         raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_ELEVATION;
     }
-    raw.feature = storage.buffer(value.getattr("feature")?, false)?;
-    raw.feature_state = storage.buffer(value.getattr("feature_state")?, false)?;
-    raw.global_state = storage.buffer(value.getattr("global_state")?, false)?;
+    raw.feature = storage.json(value.getattr("feature")?, true)?;
+    raw.feature_state = storage.json(value.getattr("feature_state")?, true)?;
+    raw.global_state = storage.json(value.getattr("global_state")?, true)?;
     if let Some(field) = generated_present(value, "canonical_tile_id")? {
         raw.canonical_tile_id = generated_input_mln_canonical_tile_id(&field, storage)?;
         raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID;
@@ -5001,7 +4998,7 @@ impl MapHandle {
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let layer_json_value = storage.buffer(layer_json.clone(), false)?;
+        let layer_json_value = storage.json(layer_json.clone(), false)?;
         let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
         let handle = self.input();
         unsafe {
@@ -5025,7 +5022,7 @@ impl MapHandle {
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let layer_json_value = storage.buffer(layer_json.clone(), false)?;
+        let layer_json_value = storage.json(layer_json.clone(), false)?;
         let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
         let handle = self.input();
         unsafe {
@@ -5050,7 +5047,7 @@ impl MapHandle {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let source_json_value = storage.buffer(source_json.clone(), false)?;
+        let source_json_value = storage.json(source_json.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
@@ -5074,7 +5071,7 @@ impl MapHandle {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let source_json_value = storage.buffer(source_json.clone(), false)?;
+        let source_json_value = storage.json(source_json.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
@@ -5538,7 +5535,7 @@ impl MapHandle {
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let geometry_value = storage.buffer(geometry.clone(), false)?;
+        let geometry_value = storage.json(geometry.clone(), false)?;
         let fit_options = fit_options.unwrap_or_else(|| py.None().into_bound(py));
         let fit_options_value = generated_maybe(&fit_options, |fit_options| {
             generated_input_mln_camera_fit_options(&fit_options, storage)
@@ -5757,7 +5754,7 @@ impl MapHandle {
         let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_buffer_view>(result)?;
-            unsafe { generated_bytes(py, value) }
+            generated_json(py, value)
         };
         unsafe {
             call.complete(
@@ -5774,7 +5771,7 @@ impl MapHandle {
         let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_buffer_view>(result)?;
-            unsafe { generated_bytes(py, value) }
+            generated_json(py, value)
         };
         unsafe {
             call.complete(
@@ -5822,7 +5819,7 @@ impl MapHandle {
         let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_buffer_view>(result)?;
-            unsafe { generated_bytes(py, value) }
+            generated_json(py, value)
         };
         unsafe {
             call.complete(
@@ -5905,9 +5902,7 @@ impl MapHandle {
                 return Ok(py.None());
             }
             let value = completion_value::<sys::mln_buffer_view>(result)?;
-            generated_optional(py, !value.data.is_null(), || unsafe {
-                generated_bytes(py, value)
-            })
+            generated_optional(py, !value.data.is_null(), || generated_json(py, value))
         };
         unsafe {
             call.complete(
@@ -5940,9 +5935,7 @@ impl MapHandle {
                 return Ok(py.None());
             }
             let value = completion_value::<sys::mln_buffer_view>(result)?;
-            generated_optional(py, !value.data.is_null(), || unsafe {
-                generated_bytes(py, value)
-            })
+            generated_optional(py, !value.data.is_null(), || generated_json(py, value))
         };
         unsafe {
             call.complete(
@@ -5974,9 +5967,7 @@ impl MapHandle {
                 return Ok(py.None());
             }
             let value = completion_value::<sys::mln_buffer_view>(result)?;
-            generated_optional(py, !value.data.is_null(), || unsafe {
-                generated_bytes(py, value)
-            })
+            generated_optional(py, !value.data.is_null(), || generated_json(py, value))
         };
         unsafe {
             call.complete(
@@ -6587,7 +6578,7 @@ impl MapHandle {
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let tile_id_value = generated_input_mln_canonical_tile_id(&tile_id.clone(), storage)?;
-        let data_value = storage.buffer(data.clone(), false)?;
+        let data_value = storage.json(data.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
@@ -6614,7 +6605,7 @@ impl MapHandle {
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let tile_id_value = generated_input_mln_canonical_tile_id(&tile_id.clone(), storage)?;
-        let data_value = storage.buffer(data.clone(), false)?;
+        let data_value = storage.json(data.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
@@ -6858,7 +6849,7 @@ impl MapHandle {
         let storage = &mut call.storage;
         let selector_value =
             generated_input_mln_feature_state_selector(&selector.clone(), storage)?;
-        let input_state_value = storage.buffer(input_state.clone(), false)?;
+        let input_state_value = storage.json(input_state.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
@@ -6883,7 +6874,7 @@ impl MapHandle {
         let storage = &mut call.storage;
         let selector_value =
             generated_input_mln_feature_state_selector(&selector.clone(), storage)?;
-        let input_state_value = storage.buffer(input_state.clone(), false)?;
+        let input_state_value = storage.json(input_state.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
@@ -7083,7 +7074,7 @@ impl MapHandle {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let property_name_value = storage.buffer(property_name.clone(), true)?;
-        let value_value = storage.buffer(value.clone(), false)?;
+        let value_value = storage.json(value.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
@@ -7107,7 +7098,7 @@ impl MapHandle {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let property_name_value = storage.buffer(property_name.clone(), true)?;
-        let value_value = storage.buffer(value.clone(), false)?;
+        let value_value = storage.json(value.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
@@ -7395,7 +7386,7 @@ impl MapHandle {
     fn set_style_json(&self, py: Python<'_>, json: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let json_value = storage.buffer(json.clone(), false)?;
+        let json_value = storage.json(json.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
@@ -7411,7 +7402,7 @@ impl MapHandle {
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let json_value = storage.buffer(json.clone(), false)?;
+        let json_value = storage.json(json.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
@@ -7431,7 +7422,7 @@ impl MapHandle {
         let storage = &mut call.storage;
         let layer_id_value = storage.buffer(layer_id.clone(), true)?;
         let property_name_value = storage.buffer(property_name.clone(), true)?;
-        let value_value = storage.buffer(value.clone(), false)?;
+        let value_value = storage.json(value.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
@@ -7458,7 +7449,7 @@ impl MapHandle {
         let storage = &mut call.storage;
         let layer_id_value = storage.buffer(layer_id.clone(), true)?;
         let property_name_value = storage.buffer(property_name.clone(), true)?;
-        let value_value = storage.buffer(value.clone(), false)?;
+        let value_value = storage.json(value.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
@@ -7481,7 +7472,7 @@ impl MapHandle {
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let light_json_value = storage.buffer(light_json.clone(), false)?;
+        let light_json_value = storage.json(light_json.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
@@ -7497,7 +7488,7 @@ impl MapHandle {
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let light_json_value = storage.buffer(light_json.clone(), false)?;
+        let light_json_value = storage.json(light_json.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
@@ -7515,7 +7506,7 @@ impl MapHandle {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let property_name_value = storage.buffer(property_name.clone(), true)?;
-        let value_value = storage.buffer(value.clone(), false)?;
+        let value_value = storage.json(value.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
@@ -7539,7 +7530,7 @@ impl MapHandle {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let property_name_value = storage.buffer(property_name.clone(), true)?;
-        let value_value = storage.buffer(value.clone(), false)?;
+        let value_value = storage.json(value.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
@@ -8199,14 +8190,14 @@ impl RenderSessionHandle {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let feature_value = storage.buffer(feature.clone(), false)?;
+        let feature_value = storage.json(feature.clone(), false)?;
         let extension_value = storage.buffer(extension.clone(), true)?;
         let extension_field_value = storage.buffer(extension_field.clone(), true)?;
-        let arguments_value = storage.buffer(arguments.clone(), false)?;
+        let arguments_value = storage.json(arguments.clone(), false)?;
         let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_buffer_view>(result)?;
-            unsafe { generated_bytes(py, value) }
+            generated_json(py, value)
         };
         unsafe {
             call.complete(
@@ -9323,7 +9314,13 @@ impl StyleExpressionHandle {
                 )
             })
         }?;
-        Ok(PyBytes::new(py, &out_json).into_any().unbind())
+        generated_json(
+            py,
+            sys::mln_buffer_view {
+                data: out_json.as_ptr().cast(),
+                size: out_json.len(),
+            },
+        )
     }
     #[pyo3(signature = ())]
     fn get_info(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -9478,7 +9475,7 @@ fn geojson_source_data_create(
 ) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py);
     let storage = &mut call.storage;
-    let data_value = storage.buffer(data.clone(), false)?;
+    let data_value = storage.json(data.clone(), false)?;
     let options = options.unwrap_or_else(|| py.None().into_bound(py));
     let options_value = generated_maybe(&options, |options| {
         generated_input_mln_geojson_source_options(&options, storage)
@@ -9660,7 +9657,7 @@ fn style_expression_create(
 ) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py);
     let storage = &mut call.storage;
-    let expression_value = storage.buffer(expression.clone(), false)?;
+    let expression_value = storage.json(expression.clone(), false)?;
     let options = options.unwrap_or_else(|| py.None().into_bound(py));
     let options_value = generated_maybe(&options, |options| {
         generated_input_mln_style_expression_options(&options, storage)

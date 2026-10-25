@@ -8,25 +8,96 @@ import 'package:test/test.dart';
 
 import 'support/fixture.dart';
 
-const _featureCollection = '{"type":"FeatureCollection","features":[]}';
+const _featureCollection = {
+  'type': 'FeatureCollection',
+  'features': <Object?>[],
+};
 
 void main() {
   test('caller-sized text returns a result longer than its first storage', () {
-    final zoom = styleExpressionCreate(
-      utf8.encode('["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]'),
-    );
+    final zoom = styleExpressionCreate([
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      0,
+      0,
+      10,
+      100,
+    ]);
     addTearDown(zoom.close);
-    expect(
-      utf8.decode(zoom.evaluate(inputs: StyleExpressionInputs(zoom: 5))),
-      '50.0',
-    );
+    expect(zoom.evaluate(inputs: StyleExpressionInputs(zoom: 5)), 50.0);
 
     // The result outgrows the runtime's first storage, so the call runs
     // again.
-    final text = '"${'a' * 1000}"';
-    final long = styleExpressionCreate(utf8.encode(text));
+    final text = 'a' * 1000;
+    final long = styleExpressionCreate(text);
     addTearDown(long.close);
-    expect(utf8.decode(long.evaluate()), text);
+    expect(long.evaluate(), text);
+  });
+
+  test('JSON crosses as jsonEncode and jsonDecode values', () async {
+    final fixture = await openRuntime();
+    final map = await fixture.openStyledMap({
+      'version': 8,
+      'sources': <String, Object?>{},
+      'layers': [
+        {'id': 'fill', 'type': 'background'},
+      ],
+    });
+
+    // A value goes in as jsonEncode writes it and comes back as jsonDecode
+    // reads it, so a style-spec string needs no inner quotes.
+    await expectCommitted(map.setGlobalStateProperty('mode', 'dark'));
+    expect(await map.getGlobalState(), {'mode': 'dark'});
+    await expectCommitted(
+      map.setStyleLayerProperty('fill', 'background-opacity', 0.5),
+    );
+    expect(await map.getStyleLayerProperty('fill', 'background-opacity'), 0.5);
+    // A parameter that is null is JSON null, which restores the default, and
+    // a property without a value comes back absent as null.
+    await expectCommitted(
+      map.setStyleLayerProperty('fill', 'background-opacity', null),
+    );
+    expect(
+      await map.getStyleLayerProperty('fill', 'background-opacity'),
+      isNull,
+    );
+
+    // A record member that is null is absent, an empty view.
+    final expression = styleExpressionCreate(['get', 'name']);
+    addTearDown(expression.close);
+    final inputs = StyleExpressionInputs(
+      feature: {
+        'type': 'Feature',
+        'properties': {'name': 'a'},
+        'geometry': {
+          'type': 'Point',
+          'coordinates': [0, 0],
+        },
+      },
+    );
+    expect(inputs.featureState, isNull);
+    expect(expression.evaluate(inputs: inputs), 'a');
+    // A value with JSON members compares them by content.
+    expect(
+      inputs,
+      StyleExpressionInputs(
+        feature: {
+          'type': 'Feature',
+          'properties': {'name': 'a'},
+          'geometry': {
+            'type': 'Point',
+            'coordinates': [0, 0],
+          },
+        },
+      ),
+    );
+
+    // A value that jsonEncode rejects throws before native code runs.
+    expect(
+      () => styleExpressionCreate(Object()),
+      throwsA(isA<JsonUnsupportedObjectError>()),
+    );
   });
 
   test(
@@ -81,15 +152,18 @@ void main() {
         handle.complete(
           ResourceResponse(
             status: ResourceResponseStatus.ok,
-            bytes: jsonBytes(emptyStyleJson),
+            bytes: jsonBytes(emptyStyle),
           ),
         );
       }),
     );
-    final map = await fixture.openStyledMap(
-      '{"version":8,"sources":{},"layers":['
-      '{"id":"a\\u0000b","type":"background"}]}',
-    );
+    final map = await fixture.openStyledMap({
+      'version': 8,
+      'sources': <String, Object?>{},
+      'layers': [
+        {'id': 'a\u0000b', 'type': 'background'},
+      ],
+    });
     expect((await map.getStyleLayer('a\u0000b'))?.type, 'background');
     expect(await map.getStyleLayer('a'), isNull);
     expect((await map.listStyleLayers()).map((layer) => layer.id), [
@@ -126,7 +200,7 @@ void main() {
     // rather than truncated into a valid one.
     expect(
       () => geojsonSourceDataCreate(
-        jsonBytes(_featureCollection),
+        _featureCollection,
         options: GeojsonSourceOptions(buffer: 4294967296),
       ),
       throwsA(
@@ -186,46 +260,25 @@ void main() {
   );
 
   test('byte-backed values own their storage and compare by content', () {
-    final clusterProperties = Uint8List.fromList([1, 2, 3]);
-    final geometry = Uint8List.fromList([4, 5, 6]);
-    final options = GeojsonSourceOptions(clusterProperties: clusterProperties);
-    final definition = OfflineGeometryRegionDefinition(
-      styleUrl: 'custom://style.json',
-      geometry: geometry,
-      minZoom: 0,
-      maxZoom: 10,
-      pixelRatio: 1,
+    final pixels = Uint8List.fromList([1, 2, 3, 4]);
+    final image = PremultipliedRgba8Image(
+      width: 1,
+      height: 1,
+      stride: 4,
+      pixels: pixels,
     );
 
-    clusterProperties[0] = 9;
-    geometry[0] = 9;
+    pixels[0] = 9;
 
-    expect(
-      options,
-      GeojsonSourceOptions(clusterProperties: Uint8List.fromList([1, 2, 3])),
+    final same = PremultipliedRgba8Image(
+      width: 1,
+      height: 1,
+      stride: 4,
+      pixels: Uint8List.fromList([1, 2, 3, 4]),
     );
-    expect(
-      definition,
-      OfflineGeometryRegionDefinition(
-        styleUrl: 'custom://style.json',
-        geometry: Uint8List.fromList([4, 5, 6]),
-        minZoom: 0,
-        maxZoom: 10,
-        pixelRatio: 1,
-      ),
-    );
-    expect(
-      definition.hashCode,
-      OfflineGeometryRegionDefinition(
-        styleUrl: 'custom://style.json',
-        geometry: Uint8List.fromList([4, 5, 6]),
-        minZoom: 0,
-        maxZoom: 10,
-        pixelRatio: 1,
-      ).hashCode,
-    );
-    expect(() => options.clusterProperties[0] = 9, throwsUnsupportedError);
-    expect(() => definition.geometry[0] = 9, throwsUnsupportedError);
+    expect(image, same);
+    expect(image.hashCode, same.hashCode);
+    expect(() => image.pixels[0] = 9, throwsUnsupportedError);
   });
 
   test('copyWith replaces only the members it is given', () {

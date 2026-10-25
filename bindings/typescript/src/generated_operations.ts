@@ -229,7 +229,7 @@ export function freeCameraOptionsDefault(): FreeCameraOptions {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export function geojsonSourceDataCreate(
-  data: Uint8Array,
+  data: unknown,
   options?: GeojsonSourceOptions,
 ): GeojsonSourceDataHandle {
   const handle = native.mln_geojson_source_data_create(data, options);
@@ -588,7 +588,7 @@ export function sourceFeatureQueryOptionsDefault(): SourceFeatureQueryOptions {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
  */
 export function styleExpressionCreate(
-  expression: string,
+  expression: unknown,
   options?: StyleExpressionOptions,
 ): StyleExpressionHandle {
   const handle = native.mln_style_expression_create(expression, options);
@@ -1051,7 +1051,7 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
   addStyleLayerJson(
-    layerJson: string,
+    layerJson: unknown,
     beforeLayerId: string,
   ): Promise<CommandCompletion> {
     return command((completion) =>
@@ -1072,7 +1072,7 @@ export class MapHandle extends Owner {
    */
   addStyleSourceJson(
     sourceId: string,
-    sourceJson: string,
+    sourceJson: unknown,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_add_style_source_json(
@@ -1398,7 +1398,7 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   cameraForGeometry(
-    geometry: string,
+    geometry: unknown,
     fitOptions?: CameraFitOptions,
   ): Promise<CameraOptions> {
     return query<CameraOptions>((completion) =>
@@ -1547,8 +1547,8 @@ export class MapHandle extends Owner {
    * See `mln_map_get_feature_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  getFeatureState(selector: FeatureStateSelector): Promise<string> {
-    return query<string>((completion) =>
+  getFeatureState(selector: FeatureStateSelector): Promise<unknown> {
+    return query<unknown>((completion) =>
       native.mln_map_get_feature_state(this.id, selector, completion),
     );
   }
@@ -1560,8 +1560,8 @@ export class MapHandle extends Owner {
    * See `mln_map_get_global_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  getGlobalState(): Promise<string> {
-    return query<string>((completion) =>
+  getGlobalState(): Promise<unknown> {
+    return query<unknown>((completion) =>
       native.mln_map_get_global_state(this.id, completion),
     );
   }
@@ -1588,8 +1588,8 @@ export class MapHandle extends Owner {
    * See `mln_map_get_loaded_style_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  getLoadedStyleJson(): Promise<string> {
-    return query<string>((completion) =>
+  getLoadedStyleJson(): Promise<unknown> {
+    return query<unknown>((completion) =>
       native.mln_map_get_loaded_style_json(this.id, completion),
     );
   }
@@ -1634,8 +1634,8 @@ export class MapHandle extends Owner {
    * See `mln_map_get_style_layer_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  getStyleLayerJson(layerId: string): Promise<string | undefined> {
-    return query<string | undefined>((completion) =>
+  getStyleLayerJson(layerId: string): Promise<unknown> {
+    return query<unknown>((completion) =>
       native.mln_map_get_style_layer_json(this.id, layerId, completion),
     );
   }
@@ -1649,8 +1649,8 @@ export class MapHandle extends Owner {
   getStyleLayerProperty(
     layerId: string,
     propertyName: string,
-  ): Promise<string | undefined> {
-    return query<string | undefined>((completion) =>
+  ): Promise<unknown> {
+    return query<unknown>((completion) =>
       native.mln_map_get_style_layer_property(
         this.id,
         layerId,
@@ -1666,8 +1666,8 @@ export class MapHandle extends Owner {
    * See `mln_map_get_style_light_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  getStyleLightProperty(propertyName: string): Promise<string | undefined> {
-    return query<string | undefined>((completion) =>
+  getStyleLightProperty(propertyName: string): Promise<unknown> {
+    return query<unknown>((completion) =>
       native.mln_map_get_style_light_property(
         this.id,
         propertyName,
@@ -1953,7 +1953,7 @@ export class MapHandle extends Owner {
   setCustomGeometrySourceTileData(
     sourceId: string,
     tileId: CanonicalTileId,
-    data: string,
+    data: unknown,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_custom_geometry_source_tile_data(
@@ -2064,7 +2064,7 @@ export class MapHandle extends Owner {
    */
   setFeatureState(
     selector: FeatureStateSelector,
-    state: string,
+    state: unknown,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_feature_state(this.id, selector, state, completion),
@@ -2148,7 +2148,7 @@ export class MapHandle extends Owner {
    */
   setGlobalStateProperty(
     propertyName: string,
-    value: string,
+    value: unknown,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_global_state_property(
@@ -2268,7 +2268,7 @@ export class MapHandle extends Owner {
    * See `mln_map_set_style_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  setStyleJson(json: string): Promise<CommandCompletion> {
+  setStyleJson(json: unknown): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_style_json(this.id, json, completion),
     );
@@ -2283,7 +2283,7 @@ export class MapHandle extends Owner {
   setStyleLayerProperty(
     layerId: string,
     propertyName: string,
-    value: string,
+    value: unknown,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_style_layer_property(
@@ -2302,7 +2302,7 @@ export class MapHandle extends Owner {
    * See `mln_map_set_style_light_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  setStyleLightJson(lightJson: string): Promise<CommandCompletion> {
+  setStyleLightJson(lightJson: unknown): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_style_light_json(this.id, lightJson, completion),
     );
@@ -2316,7 +2316,7 @@ export class MapHandle extends Owner {
    */
   setStyleLightProperty(
     propertyName: string,
-    value: string,
+    value: unknown,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_style_light_property(
@@ -2558,7 +2558,7 @@ export class MapHandleDiscarding {
    * See `mln_map_add_style_layer_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  addStyleLayerJson(layerJson: string, beforeLayerId: string): void {
+  addStyleLayerJson(layerJson: unknown, beforeLayerId: string): void {
     native.mln_map_add_style_layer_json(
       this.#owner.id,
       layerJson,
@@ -2573,7 +2573,7 @@ export class MapHandleDiscarding {
    * See `mln_map_add_style_source_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  addStyleSourceJson(sourceId: string, sourceJson: string): void {
+  addStyleSourceJson(sourceId: string, sourceJson: unknown): void {
     native.mln_map_add_style_source_json(
       this.#owner.id,
       sourceId,
@@ -2800,7 +2800,7 @@ export class MapHandleDiscarding {
   setCustomGeometrySourceTileData(
     sourceId: string,
     tileId: CanonicalTileId,
-    data: string,
+    data: unknown,
   ): void {
     native.mln_map_set_custom_geometry_source_tile_data(
       this.#owner.id,
@@ -2897,7 +2897,7 @@ export class MapHandleDiscarding {
    * See `mln_map_set_feature_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  setFeatureState(selector: FeatureStateSelector, state: string): void {
+  setFeatureState(selector: FeatureStateSelector, state: unknown): void {
     native.mln_map_set_feature_state(
       this.#owner.id,
       selector,
@@ -2967,7 +2967,7 @@ export class MapHandleDiscarding {
    * See `mln_map_set_global_state_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  setGlobalStateProperty(propertyName: string, value: string): void {
+  setGlobalStateProperty(propertyName: string, value: unknown): void {
     native.mln_map_set_global_state_property(
       this.#owner.id,
       propertyName,
@@ -3077,7 +3077,7 @@ export class MapHandleDiscarding {
    * See `mln_map_set_style_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  setStyleJson(json: string): void {
+  setStyleJson(json: unknown): void {
     native.mln_map_set_style_json(this.#owner.id, json, undefined);
   }
 
@@ -3090,7 +3090,7 @@ export class MapHandleDiscarding {
   setStyleLayerProperty(
     layerId: string,
     propertyName: string,
-    value: string,
+    value: unknown,
   ): void {
     native.mln_map_set_style_layer_property(
       this.#owner.id,
@@ -3107,7 +3107,7 @@ export class MapHandleDiscarding {
    * See `mln_map_set_style_light_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  setStyleLightJson(lightJson: string): void {
+  setStyleLightJson(lightJson: unknown): void {
     native.mln_map_set_style_light_json(this.#owner.id, lightJson, undefined);
   }
 
@@ -3117,7 +3117,7 @@ export class MapHandleDiscarding {
    * See `mln_map_set_style_light_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  setStyleLightProperty(propertyName: string, value: string): void {
+  setStyleLightProperty(propertyName: string, value: unknown): void {
     native.mln_map_set_style_light_property(
       this.#owner.id,
       propertyName,
@@ -3530,12 +3530,12 @@ export class RenderSessionHandle extends Owner {
    */
   queryFeatureExtensions(
     sourceId: string,
-    feature: string,
+    feature: unknown,
     extension: string,
     extensionField: string,
-    argumentsValue: string,
-  ): Promise<string> {
-    return query<string>((completion) =>
+    argumentsValue: unknown,
+  ): Promise<unknown> {
+    return query<unknown>((completion) =>
       native.mln_render_session_query_feature_extensions(
         this.id,
         sourceId,
@@ -4536,7 +4536,7 @@ export class StyleExpressionHandle extends Owner {
    * See `mln_style_expression_evaluate` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
    */
-  evaluate(inputs?: StyleExpressionInputs): string {
+  evaluate(inputs?: StyleExpressionInputs): unknown {
     return native.mln_style_expression_evaluate(this.id, inputs);
   }
 

@@ -3,10 +3,10 @@ import MaplibreNativeFFI
 import QuartzCore
 
 /// A style with only a background layer, so the smoke run needs no network.
-private let smokeStyleJSON = Data(##"""
+private let smokeStyleJSON = ##"""
 {"version":8,"sources":{},"layers":[{"id":"background","type":"background",
 "paint":{"background-color":"#2a6f97"}}]}
-"""##.utf8)
+"""##
 
 /// Renders through the same render loop the window uses, with a Metal layer
 /// that no window shows, until one frame reaches the layer, then shuts down.

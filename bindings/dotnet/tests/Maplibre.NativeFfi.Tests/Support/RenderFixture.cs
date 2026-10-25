@@ -20,10 +20,9 @@ internal sealed class RenderFixture : IDisposable
     internal const uint Height = 16;
 
     /// <summary>A style that paints every pixel opaque red.</summary>
-    internal static byte[] RedStyle =>
-        """
-            {"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#ff0000"}}]}
-            """u8.ToArray();
+    internal const string RedStyle = """
+        {"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#ff0000"}}]}
+        """;
 
     private readonly SemaphoreSlim wake = new(0);
     private ulong token;

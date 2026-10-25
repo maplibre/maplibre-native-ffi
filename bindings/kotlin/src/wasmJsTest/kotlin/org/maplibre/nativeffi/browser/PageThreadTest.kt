@@ -107,8 +107,7 @@ class PageThreadTest {
         assertNotEquals(first.runtime.id, runtime.id)
         // Each runtime runs its maps on an executor thread of its own, so the page only waits for
         // the posted results, and nothing services either runtime from the page.
-        val styles =
-          listOf(first, this).map { it.map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray()) }
+        val styles = listOf(first, this).map { it.map.setStyleJson(EMPTY_STYLE_JSON) }
         styles.forEach { it.awaitWithin("a style command") }
         first.awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
         awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)

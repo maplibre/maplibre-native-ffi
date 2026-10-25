@@ -49,10 +49,10 @@ public extension MapHandle {
   /// See `mln_map_get_feature_state` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   func getFeatureState(selector bindingArg0: FeatureStateSelector) async throws
-    -> Data
+    -> String
   {
     try await nativeStart(convert: { result in
-      try NativeCompletion.data(result)
+      try NativeCompletion.string(result)
     }) { raw, arena, completion, diagnostic in try mln_map_get_feature_state(
       raw,
       arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -65,9 +65,9 @@ public extension MapHandle {
   ///
   /// See `mln_map_get_loaded_style_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  func getLoadedStyleJson() async throws -> Data {
+  func getLoadedStyleJson() async throws -> String {
     try await nativeStart(convert: { result in
-      try NativeCompletion.data(result)
+      try NativeCompletion.string(result)
     }) { raw, _, completion, diagnostic in mln_map_get_loaded_style_json(
       raw,
       completion,
@@ -210,7 +210,7 @@ public extension MapHandle {
   @discardableResult
   func setFeatureState(
     selector bindingArg0: FeatureStateSelector,
-    state bindingArg1: Data
+    state bindingArg1: String
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
       try mln_map_set_feature_state(
@@ -228,7 +228,7 @@ public extension MapHandle {
   /// See `mln_map_set_style_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   @discardableResult
-  func setStyleJson(_ bindingArg0: Data) async throws -> CommandCompletion {
+  func setStyleJson(_ bindingArg0: String) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_style_json(
         raw,
@@ -313,7 +313,7 @@ public extension MapHandleDiscarding {
 
   func setFeatureState(
     selector bindingArg0: FeatureStateSelector,
-    state bindingArg1: Data
+    state bindingArg1: String
   ) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in try mln_map_set_feature_state(
@@ -325,7 +325,7 @@ public extension MapHandleDiscarding {
       ) }
   }
 
-  func setStyleJson(_ bindingArg0: Data) throws {
+  func setStyleJson(_ bindingArg0: String) throws {
     try owner.nativeInvoke { raw, arena, diagnostic in mln_map_set_style_json(
       raw,
       arena.view(bindingArg0),

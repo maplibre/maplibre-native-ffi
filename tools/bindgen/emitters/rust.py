@@ -166,6 +166,12 @@ BINDGEN_RESERVED = RUST_KEYWORDS | {
 }
 
 
+def is_text(value) -> bool:
+    """Whether a buffer is text in Rust: UTF-8 text and JSON, which Rust
+    presents as its string type."""
+    return value.encoding in {"utf8", "json"}
+
+
 def identifier(value: str) -> str:
     if value in {"self", "Self", "super", "crate", "_"}:
         return value + "_"
@@ -405,7 +411,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             args.append(local)
             if parameter.name == text.name:
                 prelude.append(f"let mut {local} = Vec::new();")
-                outputs.append(("Vec<u8>", local))
+                outputs.append(("String", f"convert::utf8({local})?"))
         elif parameter.name in lengths:
             # Counts precede the conversions, which shadow their slices.
             prelude.append(f"let {local} = convert::count({lengths[parameter.name]})?;")
@@ -426,7 +432,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             public = value_types.public(element)
             signature.append(
                 f"{local}: &[&str]"
-                if element.kind == "buffer" and element.encoding == "utf8"
+                if element.kind == "buffer" and is_text(element)
                 else f"{local}: &[{public}]"
             )
             if value_plan.length and value_plan.length.isdigit():
@@ -455,7 +461,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             and value_plan.length != "nul"
             and value_plan.buffer_form != "view"
         ):
-            public = "&str" if value_plan.encoding == "utf8" else "&[u8]"
+            public = "&str" if is_text(value_plan) else "&[u8]"
             optional = value_plan.nullable
             signature.append(
                 f"{local}: {'Option<' + public + '>' if optional else public}"
@@ -463,11 +469,10 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             setup.append(f"let {local} = {encode(value_types, value_plan, local)};")
             args.append(local)
         elif value_plan and value_plan.buffer_form == "view":
-            encoding = value_plan.encoding
-            if encoding not in {"utf8", "json", "bytes"}:
+            if value_plan.encoding not in {"utf8", "json", "bytes"}:
                 raise Unsupported(f"parameter {parameter.name} needs buffer encoding")
             optional = value_plan.nullable
-            public = "&str" if encoding == "utf8" else "&[u8]"
+            public = "&str" if is_text(value_plan) else "&[u8]"
             signature.append(
                 f"{local}: {'Option<' + public + '>' if optional else public}"
             )
@@ -478,7 +483,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             pointee
             and ctype(pointee) == "char"
             and pointee.const
-            and value_plan.encoding == "utf8"
+            and is_text(value_plan)
         ):
             signature.append(f"{local}: &str")
             setup.append(f"let {local} = {call_local}.input({local})?;")
@@ -490,7 +495,7 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             and value_plan.element.kind == "buffer"
         ):
             element = value_plan.element
-            public = "&str" if element.encoding == "utf8" else "&[u8]"
+            public = "&str" if is_text(element) else "&[u8]"
             signature.append(
                 f"{local}: {'Option<' + public + '>' if value_plan.nullable else public}"
             )

@@ -165,7 +165,7 @@ impl MapState {
         // is awaited. The commands after it are fire-and-forget, and native
         // logs any that fails.
         let style = if crate::smoke_test() {
-            self.map.set_style_json(SMOKE_STYLE_JSON.as_bytes())
+            self.map.set_style_json(SMOKE_STYLE_JSON)
         } else {
             self.map.set_style_url(STYLE_URL)
         };

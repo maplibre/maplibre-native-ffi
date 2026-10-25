@@ -631,7 +631,10 @@ internal static unsafe class GeneratedValues
             ClusterMaxZoom = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM)
                 ? value.cluster_max_zoom
                 : null,
-            ClusterPropertiesStorage = new(ValueStructs.CopyBufferView(value.cluster_properties)),
+            ClusterProperties = RuntimeStructs.CopyUtf8(
+                (sbyte*)value.cluster_properties.data,
+                value.cluster_properties.size
+            ),
             Buffer = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_BUFFER) ? value.buffer : null,
             ClusterRadius = value.fields.HasFlag(MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS)
                 ? value.cluster_radius
@@ -655,6 +658,10 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
+        Required(
+            value.ClusterProperties,
+            "GeojsonSourceOptions.ClusterProperties must not be null."
+        );
         var native = NativeMethods.mln_geojson_source_options_default();
         native.fields = 0;
         native.size = (uint)sizeof(mln_geojson_source_options);
@@ -678,7 +685,7 @@ internal static unsafe class GeneratedValues
             ref native.cluster_max_zoom,
             MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
         );
-        native.cluster_properties = scope.Buffer(value.ClusterPropertiesStorage.Items);
+        native.cluster_properties = scope.Utf8(value.ClusterProperties);
         native.fields |= Put(value.Buffer, ref native.buffer, MLN_GEOJSON_SOURCE_OPTION_BUFFER);
         native.fields |= Put(
             value.ClusterRadius,
@@ -1212,15 +1219,14 @@ internal static unsafe class GeneratedValues
     internal static OfflineGeometryRegionDefinition CopyOfflineGeometryRegionDefinition(
         mln_offline_geometry_region_definition value
     ) =>
-        default(OfflineGeometryRegionDefinition) with
-        {
-            StyleUrl = RuntimeStructs.CopyUtf8((sbyte*)value.style_url.data, value.style_url.size),
-            GeometryStorage = new(ValueStructs.CopyBufferView(value.geometry)),
-            MinZoom = value.min_zoom,
-            MaxZoom = value.max_zoom,
-            PixelRatio = value.pixel_ratio,
-            IncludeIdeographs = value.include_ideographs != 0,
-        };
+        new(
+            RuntimeStructs.CopyUtf8((sbyte*)value.style_url.data, value.style_url.size),
+            RuntimeStructs.CopyUtf8((sbyte*)value.geometry.data, value.geometry.size),
+            value.min_zoom,
+            value.max_zoom,
+            value.pixel_ratio,
+            value.include_ideographs != 0
+        );
 
     internal static mln_offline_geometry_region_definition NativeOfflineGeometryRegionDefinition(
         OfflineGeometryRegionDefinition value,
@@ -1228,9 +1234,10 @@ internal static unsafe class GeneratedValues
     )
     {
         Required(value.StyleUrl, "OfflineGeometryRegionDefinition.StyleUrl must not be null.");
+        Required(value.Geometry, "OfflineGeometryRegionDefinition.Geometry must not be null.");
         var native = new mln_offline_geometry_region_definition();
         native.style_url = scope.Utf8(value.StyleUrl);
-        native.geometry = scope.Buffer(value.GeometryStorage.Items);
+        native.geometry = scope.Utf8(value.Geometry);
         native.min_zoom = value.MinZoom;
         native.max_zoom = value.MaxZoom;
         native.pixel_ratio = value.PixelRatio;
@@ -1716,17 +1723,13 @@ internal static unsafe class GeneratedValues
         );
 
     internal static RenderedFeature CopyRenderedFeature(mln_rendered_feature value) =>
-        default(RenderedFeature) with
-        {
-            FeatureStorage = new(ValueStructs.CopyBufferView(value.feature)),
-            LayerId = RuntimeStructs.CopyUtf8((sbyte*)value.layer_id.data, value.layer_id.size),
-            SourceId = RuntimeStructs.CopyUtf8((sbyte*)value.source_id.data, value.source_id.size),
-            SourceLayerId = RuntimeStructs.CopyUtf8(
-                (sbyte*)value.source_layer_id.data,
-                value.source_layer_id.size
-            ),
-            StateStorage = new(ValueStructs.CopyBufferView(value.state)),
-        };
+        new(
+            RuntimeStructs.CopyUtf8((sbyte*)value.feature.data, value.feature.size),
+            RuntimeStructs.CopyUtf8((sbyte*)value.layer_id.data, value.layer_id.size),
+            RuntimeStructs.CopyUtf8((sbyte*)value.source_id.data, value.source_id.size),
+            RuntimeStructs.CopyUtf8((sbyte*)value.source_layer_id.data, value.source_layer_id.size),
+            RuntimeStructs.CopyUtf8((sbyte*)value.state.data, value.state.size)
+        );
 
     internal static RenderedFeatureQueryOptions CopyRenderedFeatureQueryOptions(
         mln_rendered_feature_query_options value
@@ -1742,7 +1745,7 @@ internal static unsafe class GeneratedValues
                     )
                     : null
             ),
-            FilterStorage = new(ValueStructs.CopyBufferView(value.filter)),
+            Filter = RuntimeStructs.CopyUtf8((sbyte*)value.filter.data, value.filter.size),
         };
 
     internal static mln_rendered_feature_query_options NativeRenderedFeatureQueryOptions(
@@ -1750,6 +1753,7 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
+        Required(value.Filter, "RenderedFeatureQueryOptions.Filter must not be null.");
         var native = NativeMethods.mln_rendered_feature_query_options_default();
         native.fields = 0;
         native.size = (uint)sizeof(mln_rendered_feature_query_options);
@@ -1762,7 +1766,7 @@ internal static unsafe class GeneratedValues
             );
             native.layer_id_count = checked((nuint)fieldLayerIds.Length);
         }
-        native.filter = scope.Buffer(value.FilterStorage.Items);
+        native.filter = scope.Utf8(value.Filter);
         return native;
     }
 
@@ -2200,14 +2204,10 @@ internal static unsafe class GeneratedValues
     }
 
     internal static SourceFeature CopySourceFeature(mln_source_feature value) =>
-        default(SourceFeature) with
-        {
-            FeatureStorage = new(ValueStructs.CopyBufferView(value.feature)),
-            SourceLayerId = RuntimeStructs.CopyUtf8(
-                (sbyte*)value.source_layer_id.data,
-                value.source_layer_id.size
-            ),
-        };
+        new(
+            RuntimeStructs.CopyUtf8((sbyte*)value.feature.data, value.feature.size),
+            RuntimeStructs.CopyUtf8((sbyte*)value.source_layer_id.data, value.source_layer_id.size)
+        );
 
     internal static SourceFeatureQueryOptions CopySourceFeatureQueryOptions(
         mln_source_feature_query_options value
@@ -2223,7 +2223,7 @@ internal static unsafe class GeneratedValues
                     )
                     : null
             ),
-            FilterStorage = new(ValueStructs.CopyBufferView(value.filter)),
+            Filter = RuntimeStructs.CopyUtf8((sbyte*)value.filter.data, value.filter.size),
         };
 
     internal static mln_source_feature_query_options NativeSourceFeatureQueryOptions(
@@ -2231,6 +2231,7 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
+        Required(value.Filter, "SourceFeatureQueryOptions.Filter must not be null.");
         var native = NativeMethods.mln_source_feature_query_options_default();
         native.fields = 0;
         native.size = (uint)sizeof(mln_source_feature_query_options);
@@ -2243,7 +2244,7 @@ internal static unsafe class GeneratedValues
             );
             native.source_layer_id_count = checked((nuint)fieldSourceLayerIds.Length);
         }
-        native.filter = scope.Buffer(value.FilterStorage.Items);
+        native.filter = scope.Utf8(value.Filter);
         return native;
     }
 
@@ -2264,9 +2265,15 @@ internal static unsafe class GeneratedValues
             Elevation = value.fields.HasFlag(MLN_STYLE_EXPRESSION_INPUT_ELEVATION)
                 ? value.elevation
                 : null,
-            FeatureStorage = new(ValueStructs.CopyBufferView(value.feature)),
-            FeatureStateStorage = new(ValueStructs.CopyBufferView(value.feature_state)),
-            GlobalStateStorage = new(ValueStructs.CopyBufferView(value.global_state)),
+            Feature = RuntimeStructs.CopyUtf8((sbyte*)value.feature.data, value.feature.size),
+            FeatureState = RuntimeStructs.CopyUtf8(
+                (sbyte*)value.feature_state.data,
+                value.feature_state.size
+            ),
+            GlobalState = RuntimeStructs.CopyUtf8(
+                (sbyte*)value.global_state.data,
+                value.global_state.size
+            ),
             CanonicalTileId = value.fields.HasFlag(MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID)
                 ? CopyCanonicalTileId(value.canonical_tile_id)
                 : null,
@@ -2284,6 +2291,9 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
+        Required(value.Feature, "StyleExpressionInputs.Feature must not be null.");
+        Required(value.FeatureState, "StyleExpressionInputs.FeatureState must not be null.");
+        Required(value.GlobalState, "StyleExpressionInputs.GlobalState must not be null.");
         var native = NativeMethods.mln_style_expression_inputs_default();
         native.fields = 0;
         native.size = (uint)sizeof(mln_style_expression_inputs);
@@ -2298,9 +2308,9 @@ internal static unsafe class GeneratedValues
             ref native.elevation,
             MLN_STYLE_EXPRESSION_INPUT_ELEVATION
         );
-        native.feature = scope.Buffer(value.FeatureStorage.Items);
-        native.feature_state = scope.Buffer(value.FeatureStateStorage.Items);
-        native.global_state = scope.Buffer(value.GlobalStateStorage.Items);
+        native.feature = scope.Utf8(value.Feature);
+        native.feature_state = scope.Utf8(value.FeatureState);
+        native.global_state = scope.Utf8(value.GlobalState);
         native.fields |= Put(
             value.CanonicalTileId,
             ref native.canonical_tile_id,

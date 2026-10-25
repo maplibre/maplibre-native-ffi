@@ -22,7 +22,25 @@ napi_value mln_ts_decode_buffer_view(
   );
 }
 
-napi_value mln_ts_decode_buffer_view_optional(
+napi_value mln_ts_decode_buffer_view_json(
+  napi_env env, const mln_completion_result* result
+) {
+  if (result->value == NULL || result->value_count == 0)
+    return mln_ts_missing_value(env);
+  if (result->value_size < sizeof(mln_buffer_view)) {
+    napi_throw_range_error(env, NULL, "native completion stride is too small");
+    return NULL;
+  }
+  const char* value = (const char*)result->value;
+  size_t stride = result->value_size;
+  (void)stride;
+  return mln_ts_json(
+    env, (*(const mln_buffer_view*)value).data,
+    (*(const mln_buffer_view*)value).size
+  );
+}
+
+napi_value mln_ts_decode_buffer_view_json_optional(
   napi_env env, const mln_completion_result* result
 ) {
   if (result->value == NULL || result->value_count == 0)
@@ -37,7 +55,7 @@ napi_value mln_ts_decode_buffer_view_optional(
   return (
     (*(const mln_buffer_view*)value).data == NULL
       ? mln_ts_undefined(env)
-      : mln_ts_text(
+      : mln_ts_json(
           env, (*(const mln_buffer_view*)value).data,
           (*(const mln_buffer_view*)value).size
         )
@@ -1018,7 +1036,7 @@ napi_value mln_ts_read_geojson_source_options(
   }
   if (!mln_ts_set(
         env, result, "clusterProperties",
-        mln_ts_text(
+        mln_ts_json(
           env, (source->cluster_properties).data,
           (source->cluster_properties).size
         )
@@ -1734,7 +1752,7 @@ napi_value mln_ts_read_offline_geometry_region_definition(
     return NULL;
   if (!mln_ts_set(
         env, result, "geometry",
-        mln_ts_text(env, (source->geometry).data, (source->geometry).size)
+        mln_ts_json(env, (source->geometry).data, (source->geometry).size)
       ))
     return NULL;
   if (!mln_ts_set(
@@ -2465,7 +2483,7 @@ napi_value mln_ts_read_rendered_feature(
   if (result == NULL) return NULL;
   if (!mln_ts_set(
         env, result, "feature",
-        mln_ts_text(env, (source->feature).data, (source->feature).size)
+        mln_ts_json(env, (source->feature).data, (source->feature).size)
       ))
     return NULL;
   if (!mln_ts_set(
@@ -2487,7 +2505,7 @@ napi_value mln_ts_read_rendered_feature(
     return NULL;
   if (!mln_ts_set(
         env, result, "state",
-        mln_ts_text(env, (source->state).data, (source->state).size)
+        mln_ts_json(env, (source->state).data, (source->state).size)
       ))
     return NULL;
   return result;
@@ -2508,7 +2526,7 @@ napi_value mln_ts_read_rendered_feature_query_options(
   }
   if (!mln_ts_set(
         env, result, "filter",
-        mln_ts_text(env, (source->filter).data, (source->filter).size)
+        mln_ts_json(env, (source->filter).data, (source->filter).size)
       ))
     return NULL;
   return result;
@@ -3062,7 +3080,7 @@ napi_value mln_ts_read_source_feature(
   if (result == NULL) return NULL;
   if (!mln_ts_set(
         env, result, "feature",
-        mln_ts_text(env, (source->feature).data, (source->feature).size)
+        mln_ts_json(env, (source->feature).data, (source->feature).size)
       ))
     return NULL;
   if (!mln_ts_set(
@@ -3092,7 +3110,7 @@ napi_value mln_ts_read_source_feature_query_options(
   }
   if (!mln_ts_set(
         env, result, "filter",
-        mln_ts_text(env, (source->filter).data, (source->filter).size)
+        mln_ts_json(env, (source->filter).data, (source->filter).size)
       ))
     return NULL;
   return result;
@@ -3167,19 +3185,19 @@ napi_value mln_ts_read_style_expression_inputs(
   }
   if (!mln_ts_set(
         env, result, "feature",
-        mln_ts_text(env, (source->feature).data, (source->feature).size)
+        mln_ts_json(env, (source->feature).data, (source->feature).size)
       ))
     return NULL;
   if (!mln_ts_set(
         env, result, "featureState",
-        mln_ts_text(
+        mln_ts_json(
           env, (source->feature_state).data, (source->feature_state).size
         )
       ))
     return NULL;
   if (!mln_ts_set(
         env, result, "globalState",
-        mln_ts_text(
+        mln_ts_json(
           env, (source->global_state).data, (source->global_state).size
         )
       ))
@@ -4867,10 +4885,8 @@ bool mln_ts_write_geojson_source_options(
   }
   if (!mln_ts_member(call, value, "clusterProperties", &member)) return false;
   mln_ts_path(child, sizeof child, path, "clusterProperties");
-  if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_text_view(call, member, &out->cluster_properties, child))
-      return false;
-  }
+  if (!mln_ts_read_json_view(call, member, &out->cluster_properties, child))
+    return false;
   if (!mln_ts_member(call, value, "buffer", &member)) return false;
   mln_ts_path(child, sizeof child, path, "buffer");
   if (!mln_ts_is_absent(call, member)) {
@@ -5830,7 +5846,7 @@ bool mln_ts_write_offline_geometry_region_definition(
     return false;
   if (!mln_ts_member(call, value, "geometry", &member)) return false;
   mln_ts_path(child, sizeof child, path, "geometry");
-  if (!mln_ts_read_text_view(call, member, &out->geometry, child)) return false;
+  if (!mln_ts_read_json_view(call, member, &out->geometry, child)) return false;
   if (!mln_ts_member(call, value, "minZoom", &member)) return false;
   mln_ts_path(child, sizeof child, path, "minZoom");
   if (!mln_ts_is_absent(call, member)) {
@@ -6493,9 +6509,7 @@ bool mln_ts_write_rendered_feature_query_options(
   }
   if (!mln_ts_member(call, value, "filter", &member)) return false;
   mln_ts_path(child, sizeof child, path, "filter");
-  if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_text_view(call, member, &out->filter, child)) return false;
-  }
+  if (!mln_ts_read_json_view(call, member, &out->filter, child)) return false;
   return true;
 }
 
@@ -6825,9 +6839,7 @@ bool mln_ts_write_source_feature_query_options(
   }
   if (!mln_ts_member(call, value, "filter", &member)) return false;
   mln_ts_path(child, sizeof child, path, "filter");
-  if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_text_view(call, member, &out->filter, child)) return false;
-  }
+  if (!mln_ts_read_json_view(call, member, &out->filter, child)) return false;
   return true;
 }
 
@@ -6870,22 +6882,15 @@ bool mln_ts_write_style_expression_inputs(
   }
   if (!mln_ts_member(call, value, "feature", &member)) return false;
   mln_ts_path(child, sizeof child, path, "feature");
-  if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_text_view(call, member, &out->feature, child))
-      return false;
-  }
+  if (!mln_ts_read_json_view(call, member, &out->feature, child)) return false;
   if (!mln_ts_member(call, value, "featureState", &member)) return false;
   mln_ts_path(child, sizeof child, path, "featureState");
-  if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_text_view(call, member, &out->feature_state, child))
-      return false;
-  }
+  if (!mln_ts_read_json_view(call, member, &out->feature_state, child))
+    return false;
   if (!mln_ts_member(call, value, "globalState", &member)) return false;
   mln_ts_path(child, sizeof child, path, "globalState");
-  if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_text_view(call, member, &out->global_state, child))
-      return false;
-  }
+  if (!mln_ts_read_json_view(call, member, &out->global_state, child))
+    return false;
   if (!mln_ts_member(call, value, "canonicalTileId", &member)) return false;
   mln_ts_path(child, sizeof child, path, "canonicalTileId");
   if (!mln_ts_is_absent(call, member)) {
@@ -7515,7 +7520,9 @@ bool mln_ts_write_wgl_context_descriptor(
 const mln_ts_decoder mln_ts_decoders[] = {
   [MLN_TS_NO_DECODER] = NULL,
   [MLN_TS_DECODE_BUFFER_VIEW] = mln_ts_decode_buffer_view,
-  [MLN_TS_DECODE_BUFFER_VIEW_OPTIONAL] = mln_ts_decode_buffer_view_optional,
+  [MLN_TS_DECODE_BUFFER_VIEW_JSON] = mln_ts_decode_buffer_view_json,
+  [MLN_TS_DECODE_BUFFER_VIEW_JSON_OPTIONAL] =
+    mln_ts_decode_buffer_view_json_optional,
   [MLN_TS_DECODE_CAMERA_OPTIONS] = mln_ts_decode_camera_options,
   [MLN_TS_DECODE_CAMERA_QUERY_RESULT] = mln_ts_decode_camera_query_result,
   [MLN_TS_DECODE_LAT_LNG_BOUNDS] = mln_ts_decode_lat_lng_bounds,

@@ -465,7 +465,7 @@ def lower_function(
             values.check(result, "out")
             lowered.decoder = natives.decoder(result)
             ts = values.ts(result)
-            if result.nullable:
+            if result.nullable and ts != "unknown":
                 ts += " | undefined"
             lowered.shape, lowered.returns = "query", f"Promise<{ts}>"
         decoder = natives.decoder_id(lowered.decoder)
@@ -535,10 +535,11 @@ def lower_function(
             lowered.shape = "owned"
             lowered.returns = owner_class(lowered.owned.handle)
     elif text:
+        json = text.value.encoding == "json"
         body.append(
-            f"call->result = mln_ts_text(env, arg_{text.name}, arg_{text.result_length});"
+            f"call->result = {'mln_ts_json' if json else 'mln_ts_text'}(env, arg_{text.name}, arg_{text.result_length});"
         )
-        lowered.native_result = lowered.returns = "string"
+        lowered.native_result = lowered.returns = "unknown" if json else "string"
     elif len(returned) > 1:
         members = []
         body.append("call->result = mln_ts_object(env);")

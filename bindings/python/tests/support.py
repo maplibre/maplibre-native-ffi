@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import sys
 import threading
@@ -17,19 +18,26 @@ import maplibre_native_ffi as mln
 # Emulators, simulators, and software renderers set a larger scale.
 TIMEOUT = 10.0 * float(os.environ.get("MLN_TEST_TIMEOUT_SCALE", "1"))
 
-EMPTY_STYLE = b'{"version":8,"sources":{},"layers":[]}'
-RED_STYLE = (
-    b'{"version":8,"sources":{},"layers":[{"id":"background",'
-    b'"type":"background","paint":{"background-color":"#ff0000"}}]}'
-)
+EMPTY_STYLE = {"version": 8, "sources": {}, "layers": []}
+RED_STYLE = {
+    "version": 8,
+    "sources": {},
+    "layers": [
+        {
+            "id": "background",
+            "type": "background",
+            "paint": {"background-color": "#ff0000"},
+        }
+    ],
+}
 RED_PIXEL = b"\xff\x00\x00\xff"
 
 
-def ok_response(data: bytes = EMPTY_STYLE) -> mln.ResourceResponse:
+def ok_response(style: object = EMPTY_STYLE) -> mln.ResourceResponse:
     return mln.ResourceResponse(
         status=mln.ResourceResponseStatus.OK,
         error_reason=mln.ResourceErrorReason.NONE,
-        bytes=data,
+        bytes=json.dumps(style).encode(),
         error_message="",
         must_revalidate=False,
         etag="",

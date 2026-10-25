@@ -196,6 +196,9 @@ class Values:
             )
             if plan.empty_variant:
                 result += " | None"
+        elif plan.kind == "buffer" and plan.encoding == "json":
+            # Any value admits None, so a JSON value is never also optional.
+            return "Any"
         elif plan.kind == "buffer":
             result = (
                 "str"
@@ -294,6 +297,8 @@ class Values:
             body = (
                 f"generated_text(py, {argument})?"
                 if plan.encoding == "utf8"
+                else f"generated_json(py, {argument})?"
+                if plan.encoding == "json"
                 else f"unsafe {{ generated_bytes(py, {argument}) }}?"
             )
             if optional(plan):
@@ -369,7 +374,12 @@ class Values:
             return self.facade_copy(plan.element, expr)
         return expr
 
-    def input(self, plan: ValuePlan, expr: str, *, scope: str = "raw") -> str:
+    def input(
+        self, plan: ValuePlan, expr: str, *, scope: str = "raw", member: bool = False
+    ) -> str:
+        """Converts the Python value `expr` to C. A JSON value serializes
+        through `json.dumps`, except that None in a record member, `member`,
+        is absent and converts to an empty view."""
         if plan.kind == "native_pointer":
             pointer = f"{expr}.extract::<usize>()?"
             if (
@@ -383,6 +393,10 @@ class Values:
             return f"{expr}.extract::<{scalar_type(plan)}>()?"
         if plan.kind == "enum":
             return f"{expr}.extract::<{enum_type(plan)}>()?"
+        if plan.kind == "buffer" and plan.encoding == "json":
+            if plan.ctype.pointee:
+                self.fail(plan, "JSON requires a view")
+            return f"storage.json({expr}, {str(member).lower()})?"
         if plan.kind == "buffer":
             if plan.length == "nul":
                 converted = f"storage.c_string({expr})?"
@@ -470,7 +484,7 @@ class Values:
                 )
                 continue
             statements = [
-                f"raw.{rust_field(field.name)} = {self.input(field.value, 'field')};"
+                f"raw.{rust_field(field.name)} = {self.input(field.value, 'field', member=True)};"
             ]
             if field.presence and field.presence.mask:
                 statements.append(

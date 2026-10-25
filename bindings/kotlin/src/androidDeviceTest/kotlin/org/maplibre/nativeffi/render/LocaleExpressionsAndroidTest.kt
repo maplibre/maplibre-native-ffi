@@ -74,8 +74,7 @@ class LocaleExpressionsAndroidTest {
         "0.25",
         map
           .getStyleLayerProperty("background", "background-opacity")
-          .awaitWithin("the layer property")
-          ?.decodeToString(),
+          .awaitWithin("the layer property"),
       )
     }
   }

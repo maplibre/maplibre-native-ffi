@@ -9,13 +9,13 @@ public extension StyleExpressionHandle {
   /// See `mln_style_expression_evaluate` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
   func evaluate(inputs bindingArg0: StyleExpressionInputs? = nil) throws
-    -> Data
+    -> String
   {
-    var bindingText = Data()
+    var bindingText = ""
     return try nativeInvoke { raw, arena, diagnostic in
       let bindingInput0 = try bindingArg0
         .map { try arena.store($0.nativeValue(arena: arena)) }
-      return NativeString
+      return try NativeString
         .callerSized(&bindingText) { bindingTextStorage, bindingTextCapacity, bindingTextLength in
           mln_style_expression_evaluate(
             raw,

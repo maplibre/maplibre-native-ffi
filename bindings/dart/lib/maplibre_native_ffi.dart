@@ -22,6 +22,16 @@
 /// code releases the context of a call that it accepts, and the binding calls
 /// the release for a call that native code does not accept.
 ///
+/// A JSON value, typed `Object?`, is any value that `jsonEncode` takes, so
+/// `setStyleLayerProperty('roads', 'line-color', 'red')` needs no inner
+/// quotes. A JSON parameter is always a value: `null` is JSON null, such as the
+/// null that restores a layer property's default. In a record member, `null` is
+/// absent, which native code reads as empty, as for a filter, an expression
+/// input, or cluster properties, where JSON null means nothing. A value that
+/// `jsonEncode` rejects throws its error before the call reaches native code.
+/// Returned JSON is the value that `jsonDecode` reads, and absent JSON is
+/// `null`, as JSON null is. A value compares its JSON members by content.
+///
 /// On Android, the app's host code must call `mln_android_init` with a
 /// `JNIEnv*` and a `Context` before Dart creates a runtime, for example from a
 /// JNI function that the Flutter activity calls in `onCreate`. The binding has

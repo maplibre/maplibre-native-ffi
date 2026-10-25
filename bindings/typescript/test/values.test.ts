@@ -15,9 +15,10 @@ import {
   Status,
   styleExpressionCreate,
 } from "../src/index.ts";
-import { openRuntime, utf8 } from "./support/fixture.ts";
+import { openRuntime } from "./support/fixture.ts";
 import { bounded, callbackArrival, test } from "./support/harness.ts";
 import { capabilities } from "./support/host-capabilities.ts";
+import { backgroundStyle } from "./support/styles.ts";
 
 test("host strings use views and native-lent strings decode", async () => {
   // A path crosses as a view with an explicit length, and native code rejects
@@ -33,13 +34,11 @@ test("host strings use views and native-lent strings decode", async () => {
   // A layer ID crosses as a view with an explicit length, so an ID with an
   // embedded NUL names that layer and not the prefix before the NUL.
   const fixture = await openRuntime();
-  const map = await fixture.openStyledMap(
-    JSON.stringify({
-      version: 8,
-      sources: {},
-      layers: [{ id: "a\u0000b", type: "background" }],
-    }),
-  );
+  const map = await fixture.openStyledMap({
+    version: 8,
+    sources: {},
+    layers: [{ id: "a\u0000b", type: "background" }],
+  });
   assert.equal((await map.getStyleLayer("a\u0000b"))?.type, "background");
   assert.equal(await map.getStyleLayer("a"), undefined);
   assert.deepEqual(
@@ -63,21 +62,87 @@ test("presence fields keep a present zero apart from an absent one", async () =>
 
 test(
   "bytes that a later option getter detaches are read as they were passed",
-  () => {
-    // The options convert after the data, and their getter frees the data's
-    // buffer. Native code must still read the bytes that were passed.
-    const bytes = utf8('{"type":"FeatureCollection","features":[]}');
-    const data = geojsonSourceDataCreate(bytes, {
-      get minZoom() {
-        capabilities.bufferTransfer!(bytes.buffer as ArrayBuffer, 16);
-        return 0;
-      },
-    });
-    assert.equal(bytes.byteLength, 0);
-    data.close();
+  async () => {
+    // The options convert after the image, and their getter frees the
+    // image's buffer. Native code must still read the bytes that were passed.
+    const fixture = await openRuntime();
+    const map = await fixture.openStyledMap();
+    const pixels = new Uint8Array([1, 2, 3, 4]);
+    await bounded(
+      map.setStyleImage(
+        "pixel",
+        { width: 1, height: 1, stride: 4, pixels },
+        {
+          get sdf() {
+            capabilities.bufferTransfer!(pixels.buffer as ArrayBuffer, 16);
+            return false;
+          },
+        },
+      ),
+      "a command",
+    );
+    assert.equal(pixels.byteLength, 0);
+    const image = await bounded(map.getStyleImage("pixel"), "the image");
+    assert.deepEqual(image?.pixels, new Uint8Array([1, 2, 3, 4]));
   },
   { needs: ["bufferTransfer"] },
 );
+
+test("JSON crosses as JSON.stringify and JSON.parse values", async () => {
+  const fixture = await openRuntime();
+  const map = await fixture.openStyledMap(backgroundStyle("#00ff00"));
+
+  // A value goes in as JSON.stringify writes it and comes back parsed, so a
+  // style-spec string needs no inner quotes.
+  await bounded(map.setGlobalStateProperty("mode", "dark"), "a command");
+  assert.deepEqual(await map.getGlobalState(), { mode: "dark" });
+  await bounded(
+    map.setStyleLayerProperty("background", "background-opacity", 0.5),
+    "a command",
+  );
+  assert.equal(
+    await map.getStyleLayerProperty("background", "background-opacity"),
+    0.5,
+  );
+  // null is JSON null, which restores the default, and a property without a
+  // value comes back absent as undefined.
+  await bounded(
+    map.setStyleLayerProperty("background", "background-opacity", null),
+    "a command",
+  );
+  assert.equal(
+    await map.getStyleLayerProperty("background", "background-opacity"),
+    undefined,
+  );
+
+  // A record member that is undefined is absent, an empty view.
+  const expression = styleExpressionCreate(["get", "name"]);
+  try {
+    assert.equal(
+      expression.evaluate({
+        feature: {
+          type: "Feature",
+          properties: { name: "a" },
+          geometry: { type: "Point", coordinates: [0, 0] },
+        },
+        featureState: undefined,
+      }),
+      "a",
+    );
+  } finally {
+    expression.close();
+  }
+
+  // A value that JSON.stringify rejects throws its error before native code
+  // runs, and one that it skips throws a TypeError.
+  assert.throws(() => styleExpressionCreate(1n), TypeError);
+  assert.throws(
+    () => styleExpressionCreate(() => 0),
+    (error) =>
+      error instanceof TypeError &&
+      error.message === "expression: expected a JSON value",
+  );
+});
 
 test("integer narrowing is checked and 64-bit carriers round-trip", async () => {
   // A value outside a 32-bit field's range is rejected before it crosses,
@@ -85,7 +150,7 @@ test("integer narrowing is checked and 64-bit carriers round-trip", async () => 
   assert.throws(
     () =>
       geojsonSourceDataCreate(
-        utf8('{"type":"FeatureCollection","features":[]}'),
+        { type: "FeatureCollection", features: [] },
         { buffer: 2 ** 32 },
       ),
     (error) =>
@@ -184,17 +249,23 @@ test("a synchronous call fills a caller-sized output array in input order", asyn
 });
 
 test("caller-sized text returns a result longer than its first storage", () => {
-  const zoom = styleExpressionCreate(
-    '["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]',
-  );
+  const zoom = styleExpressionCreate([
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    0,
+    0,
+    10,
+    100,
+  ]);
   try {
-    assert.equal(zoom.evaluate({ zoom: 5 }), "50.0");
+    assert.equal(zoom.evaluate({ zoom: 5 }), 50);
   } finally {
     zoom.close();
   }
 
   // The result outgrows the addon's first storage, so the call runs again.
-  const text = `"${"a".repeat(1000)}"`;
+  const text = "a".repeat(1000);
   const long = styleExpressionCreate(text);
   try {
     assert.equal(long.evaluate(), text);

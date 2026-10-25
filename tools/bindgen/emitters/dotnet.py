@@ -27,7 +27,14 @@ from tools.bindgen.semantic import (
 )
 
 from . import dotnet_native
-from .dotnet_values import Unsupported, Values, member, raw_handle, typed_mask
+from .dotnet_values import (
+    TEXT_ENCODINGS,
+    Unsupported,
+    Values,
+    member,
+    raw_handle,
+    typed_mask,
+)
 
 # The platform analyzer's name for each platform that the package serves.
 PLATFORMS = {
@@ -276,8 +283,8 @@ def completion_query(
     nullable = result.nullable
     if value.buffer_form == "view" and value.encoding in {"utf8", "json", "bytes"}:
         encoding = value.encoding
-        public = "string" if encoding == "utf8" else "byte[]"
-        copy = "CopyUtf8View" if encoding == "utf8" else "CopyBufferView"
+        public = "string" if encoding in TEXT_ENCODINGS else "byte[]"
+        copy = "CopyUtf8View" if encoding in TEXT_ENCODINGS else "CopyBufferView"
         copy = f"ValueStructs.{copy}"
         if shape == "array":
             return (
@@ -530,8 +537,8 @@ def emit_operation(
             args.append(name)
             outputs.append(
                 (
-                    "byte[]",
-                    f"new ReadOnlySpan<byte>({name}, checked((int){text_length})).ToArray()",
+                    "string",
+                    f"RuntimeStructs.CopyUtf8({name}, {text_length})",
                 )
             )
             continue
@@ -545,7 +552,7 @@ def emit_operation(
             counted = input_plans[counts[parameter.name]]
             size = (
                 f"buffer{pascal(counts[parameter.name])}.size"
-                if counted.encoding in {"utf8", "json"}
+                if counted.encoding in TEXT_ENCODINGS
                 and (
                     counted.kind == "buffer"
                     or counted.element
@@ -624,10 +631,10 @@ def emit_operation(
                 pins.append((f"pinned{pascal(name)}", name))
                 args.append(f"({raw})pinned{pascal(name)}")
                 continue
-            public = "string" if value_plan.encoding == "utf8" else "byte[]"
+            public = "string" if value_plan.encoding in TEXT_ENCODINGS else "byte[]"
             parameters.append(f"{public} {name}")
             scoped = True
-            encoder = "Utf8" if value_plan.encoding == "utf8" else "Buffer"
+            encoder = "Utf8" if value_plan.encoding in TEXT_ENCODINGS else "Buffer"
             prologue.append(f"var buffer{pascal(name)} = scope.{encoder}({name});")
             args.append(f"({raw})buffer{pascal(name)}.data")
         elif (

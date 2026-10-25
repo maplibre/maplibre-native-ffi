@@ -160,7 +160,7 @@ func installProvider(
 
     try request.complete(response: ResourceResponse(
       status: .ok,
-      bytes: emptyStyle
+      bytes: Data(emptyStyle.utf8)
     ))
     #expect(try await fixture.awaitEvent("the style answered later") {
       $0.type == .mapStyleLoaded

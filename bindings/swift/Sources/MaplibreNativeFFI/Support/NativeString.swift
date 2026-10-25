@@ -14,15 +14,15 @@ enum NativeString {
     return Data(bytes: data, count: size)
   }
 
-  /// Makes a call that writes text into storage the caller sizes, and copies
-  /// the text into `text`. A call reports the text's length whether or not
-  /// it fit, and reports the same text for the same inputs, so a call that
-  /// did not fit is made again with enough storage.
+  /// Makes a call that writes UTF-8 text into storage the caller sizes, and
+  /// copies the text into `text`. A call reports the text's length whether or
+  /// not it fit, and reports the same text for the same inputs, so a call
+  /// that did not fit is made again with enough storage.
   static func callerSized(
-    _ text: inout Data,
+    _ text: inout String,
     _ call: (UnsafeMutablePointer<CChar>, Int, UnsafeMutablePointer<Int>) throws
       -> mln_status
-  ) rethrows -> mln_status {
+  ) throws -> mln_status {
     var storage = [CChar](repeating: 0, count: 256)
     while true {
       var length = 0
@@ -31,7 +31,9 @@ enum NativeString {
       }
       guard status == MLN_STATUS_OK else { return status }
       if length < storage.count {
-        text = storage.withUnsafeBytes { Data($0.prefix(length)) }
+        text = try storage.withUnsafeBytes {
+          try copyUTF8(data: $0.baseAddress, size: length)
+        }
         return status
       }
       storage = [CChar](repeating: 0, count: length + 1)

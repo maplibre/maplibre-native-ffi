@@ -98,7 +98,7 @@ export interface NativeOperations {
   mln_frame_demand_default(): FrameDemand;
   mln_free_camera_options_default(): FreeCameraOptions;
   mln_geojson_source_data_create(
-    data: Uint8Array,
+    data: unknown,
     options: GeojsonSourceOptions | undefined,
   ): bigint;
   mln_geojson_source_data_release(
@@ -158,14 +158,14 @@ export interface NativeOperations {
   ): void;
   mln_map_add_style_layer_json(
     map: bigint,
-    layerJson: string,
+    layerJson: unknown,
     beforeLayerId: string,
     completion: number | undefined,
   ): void;
   mln_map_add_style_source_json(
     map: bigint,
     sourceId: string,
-    sourceJson: string,
+    sourceJson: unknown,
     completion: number | undefined,
   ): void;
   mln_map_apply_camera_delta(
@@ -233,7 +233,7 @@ export interface NativeOperations {
   ): void;
   mln_map_camera_for_geometry(
     map: bigint,
-    geometry: string,
+    geometry: unknown,
     fitOptions: CameraFitOptions | undefined,
     completion: number,
   ): void;
@@ -421,7 +421,7 @@ export interface NativeOperations {
     map: bigint,
     sourceId: string,
     tileId: CanonicalTileId | undefined,
-    data: string,
+    data: unknown,
     completion: number | undefined,
   ): void;
   mln_map_set_custom_geometry_source_tile_error(
@@ -458,7 +458,7 @@ export interface NativeOperations {
   mln_map_set_feature_state(
     map: bigint,
     selector: FeatureStateSelector,
-    state: string,
+    state: unknown,
     completion: number | undefined,
   ): void;
   mln_map_set_free_camera_options(
@@ -487,7 +487,7 @@ export interface NativeOperations {
   mln_map_set_global_state_property(
     map: bigint,
     propertyName: string,
-    value: string,
+    value: unknown,
     completion: number | undefined,
   ): void;
   mln_map_set_image_source_coordinates(
@@ -527,25 +527,25 @@ export interface NativeOperations {
   ): void;
   mln_map_set_style_json(
     map: bigint,
-    json: string,
+    json: unknown,
     completion: number | undefined,
   ): void;
   mln_map_set_style_layer_property(
     map: bigint,
     layerId: string,
     propertyName: string,
-    value: string,
+    value: unknown,
     completion: number | undefined,
   ): void;
   mln_map_set_style_light_json(
     map: bigint,
-    lightJson: string,
+    lightJson: unknown,
     completion: number | undefined,
   ): void;
   mln_map_set_style_light_property(
     map: bigint,
     propertyName: string,
-    value: string,
+    value: unknown,
     completion: number | undefined,
   ): void;
   mln_map_set_style_source_volatile(
@@ -618,10 +618,10 @@ export interface NativeOperations {
   mln_render_session_query_feature_extensions(
     session: bigint,
     sourceId: string,
-    feature: string,
+    feature: unknown,
     extension: string,
     extensionField: string,
-    argumentsValue: string,
+    argumentsValue: unknown,
     completion: number,
   ): void;
   mln_render_session_query_rendered_features(
@@ -820,13 +820,13 @@ export interface NativeOperations {
   ): void;
   mln_source_feature_query_options_default(): SourceFeatureQueryOptions;
   mln_style_expression_create(
-    expression: string,
+    expression: unknown,
     options: StyleExpressionOptions | undefined,
   ): bigint;
   mln_style_expression_evaluate(
     expression: bigint,
     inputs: StyleExpressionInputs | undefined,
-  ): string;
+  ): unknown;
   mln_style_expression_get_info(expression: bigint): StyleExpressionInfo;
   mln_style_expression_inputs_default(): StyleExpressionInputs;
   mln_style_expression_options_default(): StyleExpressionOptions;

@@ -320,6 +320,15 @@ fn generated_text(py: Python<'_>, view: sys::mln_buffer_view) -> PyResult<Py<PyA
     generated_value(py, copied_string_view(view)?)
 }
 
+/// Parses a JSON view with `json.loads`; an empty view is absent, `None`.
+fn generated_json(py: Python<'_>, view: sys::mln_buffer_view) -> PyResult<Py<PyAny>> {
+    if view.size == 0 {
+        return Ok(py.None());
+    }
+    let text = copied_string_view(view)?;
+    Ok(py.import("json")?.call_method1("loads", (text,))?.unbind())
+}
+
 /// Copies a byte view into Python bytes.
 ///
 /// # Safety

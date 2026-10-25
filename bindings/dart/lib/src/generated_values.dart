@@ -2473,16 +2473,14 @@ final class GeojsonSourceOptions extends _Value {
     this.maxZoom,
     this.tolerance,
     this.clusterMaxZoom,
-    Uint8List? clusterProperties,
+    this.clusterProperties,
     this.buffer,
     this.clusterRadius,
     this.clusterMinPoints,
     this.lineMetrics,
     this.cluster,
     this.synchronousTiling,
-  }) : clusterProperties = Uint8List.fromList(
-         clusterProperties ?? geojsonSourceOptionsDefault().clusterProperties,
-       ).asUnmodifiableView();
+  });
 
   /// Minimum tiling zoom. Defaults to 0.
   final double? minZoom;
@@ -2499,7 +2497,7 @@ final class GeojsonSourceOptions extends _Value {
   /// Cluster aggregation expressions keyed by property name, as a JSON object
   /// whose members follow the MapLibre Style Spec clusterProperties form, or
   /// empty for none. The UTF-8 bytes are borrowed for the call.
-  final Uint8List clusterProperties;
+  final Object? clusterProperties;
 
   /// Tile buffer in pixels within \[0, 512\]. Defaults to 128.
   final int? buffer;
@@ -2526,7 +2524,7 @@ final class GeojsonSourceOptions extends _Value {
     double? maxZoom,
     double? tolerance,
     double? clusterMaxZoom,
-    Uint8List? clusterProperties,
+    Object? clusterProperties,
     int? buffer,
     int? clusterRadius,
     int? clusterMinPoints,
@@ -4668,22 +4666,19 @@ final class RenderedQueryGeometryLineString extends RenderedQueryGeometry {
 /// See `mln_rendered_feature_query_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 final class RenderedFeatureQueryOptions extends _Value {
-  RenderedFeatureQueryOptions({List<String>? layerIds, Uint8List? filter})
-    : layerIds = layerIds == null ? null : List.unmodifiable(layerIds),
-      filter = Uint8List.fromList(
-        filter ?? renderedFeatureQueryOptionsDefault().filter,
-      ).asUnmodifiableView();
+  RenderedFeatureQueryOptions({List<String>? layerIds, this.filter})
+    : layerIds = layerIds == null ? null : List.unmodifiable(layerIds);
 
   /// Optional style layer IDs. When absent, all rendered layers are queried.
   final List<String>? layerIds;
 
   /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
-  final Uint8List filter;
+  final Object? filter;
 
   /// A copy of this value with the given members replaced.
   RenderedFeatureQueryOptions copyWith({
     List<String>? layerIds,
-    Uint8List? filter,
+    Object? filter,
   }) => RenderedFeatureQueryOptions(
     layerIds: layerIds ?? this.layerIds,
     filter: filter ?? this.filter,
@@ -4701,21 +4696,18 @@ final class RenderedFeatureQueryOptions extends _Value {
 /// See `mln_rendered_feature` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 final class RenderedFeature extends _Value {
-  RenderedFeature({
-    Uint8List? feature,
+  const RenderedFeature({
+    this.feature,
     this.layerId = '',
     this.sourceId = '',
     this.sourceLayerId = '',
-    Uint8List? state,
-  }) : feature = Uint8List.fromList(
-         feature ?? const <int>[],
-       ).asUnmodifiableView(),
-       state = Uint8List.fromList(state ?? const <int>[]).asUnmodifiableView();
-  final Uint8List feature;
+    this.state,
+  });
+  final Object? feature;
   final String layerId;
   final String sourceId;
   final String sourceLayerId;
-  final Uint8List state;
+  final Object? state;
 
   @override
   List<Object?> get _members => [
@@ -4740,24 +4732,21 @@ final class RenderedFeature extends _Value {
 /// See `mln_source_feature_query_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 final class SourceFeatureQueryOptions extends _Value {
-  SourceFeatureQueryOptions({List<String>? sourceLayerIds, Uint8List? filter})
+  SourceFeatureQueryOptions({List<String>? sourceLayerIds, this.filter})
     : sourceLayerIds = sourceLayerIds == null
           ? null
-          : List.unmodifiable(sourceLayerIds),
-      filter = Uint8List.fromList(
-        filter ?? sourceFeatureQueryOptionsDefault().filter,
-      ).asUnmodifiableView();
+          : List.unmodifiable(sourceLayerIds);
 
   /// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
   final List<String>? sourceLayerIds;
 
   /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
-  final Uint8List filter;
+  final Object? filter;
 
   /// A copy of this value with the given members replaced.
   SourceFeatureQueryOptions copyWith({
     List<String>? sourceLayerIds,
-    Uint8List? filter,
+    Object? filter,
   }) => SourceFeatureQueryOptions(
     sourceLayerIds: sourceLayerIds ?? this.sourceLayerIds,
     filter: filter ?? this.filter,
@@ -4777,11 +4766,8 @@ final class SourceFeatureQueryOptions extends _Value {
 /// See `mln_source_feature` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 final class SourceFeature extends _Value {
-  SourceFeature({Uint8List? feature, this.sourceLayerId = ''})
-    : feature = Uint8List.fromList(
-        feature ?? const <int>[],
-      ).asUnmodifiableView();
-  final Uint8List feature;
+  const SourceFeature({this.feature, this.sourceLayerId = ''});
+  final Object? feature;
   final String sourceLayerId;
 
   @override
@@ -5072,22 +5058,20 @@ final class OfflineTilePyramidRegionDefinition extends _Value {
 /// See `mln_offline_geometry_region_definition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class OfflineGeometryRegionDefinition extends _Value {
-  OfflineGeometryRegionDefinition({
+  const OfflineGeometryRegionDefinition({
     this.styleUrl = '',
-    Uint8List? geometry,
+    this.geometry,
     this.minZoom = 0,
     this.maxZoom = 0,
     this.pixelRatio = 0,
     this.includeIdeographs = false,
-  }) : geometry = Uint8List.fromList(
-         geometry ?? const <int>[],
-       ).asUnmodifiableView();
+  });
 
   /// Style URL. Copied during region creation.
   final String styleUrl;
 
   /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
-  final Uint8List geometry;
+  final Object? geometry;
   final double minZoom;
 
   /// Maximum zoom. Positive infinity lets each tile source use its own maximum
@@ -5099,7 +5083,7 @@ final class OfflineGeometryRegionDefinition extends _Value {
   /// A copy of this value with the given members replaced.
   OfflineGeometryRegionDefinition copyWith({
     String? styleUrl,
-    Uint8List? geometry,
+    Object? geometry,
     double? minZoom,
     double? maxZoom,
     double? pixelRatio,
@@ -5763,21 +5747,12 @@ final class StyleExpressionInputs extends _Value {
     this.zoom,
     this.colorRampParameter,
     this.elevation,
-    Uint8List? feature,
-    Uint8List? featureState,
-    Uint8List? globalState,
+    this.feature,
+    this.featureState,
+    this.globalState,
     this.canonicalTileId,
     List<String>? availableImages,
-  }) : feature = Uint8List.fromList(
-         feature ?? styleExpressionInputsDefault().feature,
-       ).asUnmodifiableView(),
-       featureState = Uint8List.fromList(
-         featureState ?? styleExpressionInputsDefault().featureState,
-       ).asUnmodifiableView(),
-       globalState = Uint8List.fromList(
-         globalState ?? styleExpressionInputsDefault().globalState,
-       ).asUnmodifiableView(),
-       availableImages = List.unmodifiable(
+  }) : availableImages = List.unmodifiable(
          availableImages ?? styleExpressionInputsDefault().availableImages,
        );
 
@@ -5792,13 +5767,13 @@ final class StyleExpressionInputs extends _Value {
   final double? elevation;
 
   /// One UTF-8 GeoJSON Feature that feature data expressions read.
-  final Uint8List feature;
+  final Object? feature;
 
   /// A UTF-8 JSON object that the feature-state expression reads.
-  final Uint8List featureState;
+  final Object? featureState;
 
   /// A UTF-8 JSON object that the global-state expression reads.
-  final Uint8List globalState;
+  final Object? globalState;
 
   /// The tile that holds the feature, which the within and distance expressions
   /// need to place its geometry.
@@ -5813,9 +5788,9 @@ final class StyleExpressionInputs extends _Value {
     double? zoom,
     double? colorRampParameter,
     double? elevation,
-    Uint8List? feature,
-    Uint8List? featureState,
-    Uint8List? globalState,
+    Object? feature,
+    Object? featureState,
+    Object? globalState,
     CanonicalTileId? canonicalTileId,
     List<String>? availableImages,
   }) => StyleExpressionInputs(

@@ -56,7 +56,7 @@ private struct OwnedTextureSession {
 /// Attaches an owned-texture session to a map showing `style` and runs `body`
 /// once the attach completes, closing the session afterwards.
 private func withOwnedTextureSession<Result>(
-  style: Data = emptyStyle,
+  style: String = emptyStyle,
   ringDepth: UInt32 = RenderSessionAttachOptions.default
     .requestedTextureRingDepth,
   _ body: (OwnedTextureSession) async throws -> Result
@@ -71,7 +71,7 @@ private func withOwnedTextureSession<Result>(
 /// share group, so it joins the fixture's context and a host render thread
 /// drives it.
 private func attachOwnedTextureSession(
-  style: Data = emptyStyle,
+  style: String = emptyStyle,
   ringDepth: UInt32 = RenderSessionAttachOptions.default
     .requestedTextureRingDepth
 ) async throws -> OwnedTextureSession {

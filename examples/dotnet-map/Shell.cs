@@ -14,10 +14,9 @@ internal static class Shell
 
     private static readonly TimeSpan SmokeDeadline = TimeSpan.FromSeconds(60);
 
-    private static byte[] SmokeStyle =>
-        """
-            {"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#2a6f97"}}]}
-            """u8.ToArray();
+    private const string SmokeStyle = """
+        {"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#2a6f97"}}]}
+        """;
 
     /// <summary>
     /// Runs the example until its window closes. A smoke run instead renders an inline style in a

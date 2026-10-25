@@ -524,7 +524,7 @@ export interface GeojsonSourceOptions {
    * whose members follow the MapLibre Style Spec clusterProperties form, or
    * empty for none. The UTF-8 bytes are borrowed for the call.
    */
-  clusterProperties?: string;
+  clusterProperties?: unknown;
   /**
    * Tile buffer in pixels within &#91;0, 512&#93;. Defaults to 128.
    */
@@ -1176,7 +1176,7 @@ export interface OfflineGeometryRegionDefinition {
   /**
    * UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
    */
-  geometry: string;
+  geometry: unknown;
   minZoom?: number;
   /**
    * Maximum zoom. Positive infinity lets each tile source use its own maximum
@@ -1948,11 +1948,11 @@ export type RenderSessionState =
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 export interface RenderedFeature {
-  readonly feature: string;
+  readonly feature: unknown;
   readonly layerId: string;
   readonly sourceId: string;
   readonly sourceLayerId: string;
-  readonly state: string;
+  readonly state: unknown;
 }
 
 /**
@@ -1969,7 +1969,7 @@ export interface RenderedFeatureQueryOptions {
   /**
    * UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
    */
-  filter?: string;
+  filter?: unknown;
 }
 
 /**
@@ -2550,7 +2550,7 @@ export interface ScreenPoint {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 export interface SourceFeature {
-  readonly feature: string;
+  readonly feature: unknown;
   readonly sourceLayerId: string;
 }
 
@@ -2568,7 +2568,7 @@ export interface SourceFeatureQueryOptions {
   /**
    * UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
    */
-  filter?: string;
+  filter?: unknown;
 }
 
 /**
@@ -2663,15 +2663,15 @@ export interface StyleExpressionInputs {
   /**
    * One UTF-8 GeoJSON Feature that feature data expressions read.
    */
-  feature?: string;
+  feature?: unknown;
   /**
    * A UTF-8 JSON object that the feature-state expression reads.
    */
-  featureState?: string;
+  featureState?: unknown;
   /**
    * A UTF-8 JSON object that the global-state expression reads.
    */
-  globalState?: string;
+  globalState?: unknown;
   /**
    * The tile that holds the feature, which the within and distance expressions
    * need to place its geometry.

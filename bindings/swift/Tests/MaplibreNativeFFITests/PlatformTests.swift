@@ -13,7 +13,7 @@ import Testing
       try Maplibre.logSetCallback(handler: LogHandler { _, _, _, _ in true })
       let runtime = try MapFixture.makeRuntime()
       try await runtime.setResourceProvider(denyingProvider(
-        routes: ["custom://exit.json": emptyStyle]
+        routes: ["custom://exit.json": Data(emptyStyle.utf8)]
       ))
       let map = try await MapFixture.makeMap(on: runtime)
       try await map.setStyleUrl("custom://exit.json")

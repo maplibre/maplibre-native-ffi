@@ -119,6 +119,9 @@ NativeStringView nativeStringView(String value, Allocator allocator) {
   return NativeStringView(view.ref);
 }
 
+Object? _decodeJson(Uint8List bytes) =>
+    bytes.isEmpty ? null : jsonDecode(utf8.decode(bytes));
+
 Uint8List _copyBufferView(raw.mln_buffer_view view) => view.size == 0
     ? Uint8List(0)
     : Uint8List.fromList(view.data.cast<Uint8>().asTypedList(view.size));

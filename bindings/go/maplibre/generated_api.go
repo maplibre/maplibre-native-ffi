@@ -2281,7 +2281,7 @@ type GeojsonSourceOptions struct {
 	// Cluster aggregation expressions keyed by property name, as a JSON object
 	// whose members follow the MapLibre Style Spec clusterProperties form, or empty
 	// for none. The UTF-8 bytes are borrowed for the call.
-	ClusterProperties []byte
+	ClusterProperties string
 	// Tile buffer in pixels within [0, 512]. Defaults to 128.
 	Buffer *uint32
 	// Cluster radius in pixels within [0, 4095]. Defaults to 50.
@@ -2303,7 +2303,7 @@ func copyGeojsonSourceOptions(raw C.mln_geojson_source_options) GeojsonSourceOpt
 	result.MaxZoom = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM != 0, func() float64 { return float64(raw.max_zoom) })
 	result.Tolerance = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE != 0, func() float64 { return float64(raw.tolerance) })
 	result.ClusterMaxZoom = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM != 0, func() float64 { return float64(raw.cluster_max_zoom) })
-	result.ClusterProperties = bindingBytes(raw.cluster_properties.data, uint64(raw.cluster_properties.size))
+	result.ClusterProperties = bindingString(raw.cluster_properties.data, uint64(raw.cluster_properties.size))
 	result.Buffer = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_BUFFER != 0, func() uint32 { return uint32(raw.buffer) })
 	result.ClusterRadius = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS != 0, func() uint32 { return uint32(raw.cluster_radius) })
 	result.ClusterMinPoints = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS != 0, func() uint32 { return uint32(raw.cluster_min_points) })
@@ -2321,7 +2321,7 @@ func nativeGeojsonSourceOptions(input GeojsonSourceOptions, arena *bindingArena)
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, input.MaxZoom, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE, &raw.tolerance, input.Tolerance, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM, &raw.cluster_max_zoom, input.ClusterMaxZoom, arena, bindingNumber[float64, C.double])
-	raw.cluster_properties = C.mln_buffer_view{data: arena.bytes(input.ClusterProperties), size: C.size_t(len(input.ClusterProperties))}
+	raw.cluster_properties = C.mln_buffer_view{data: arena.bytes([]byte(input.ClusterProperties)), size: C.size_t(len(input.ClusterProperties))}
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_BUFFER, &raw.buffer, input.Buffer, arena, bindingNumber[uint32, C.uint32_t])
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS, &raw.cluster_radius, input.ClusterRadius, arena, bindingNumber[uint32, C.uint32_t])
 	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS, &raw.cluster_min_points, input.ClusterMinPoints, arena, bindingNumber[uint32, C.uint32_t])
@@ -3076,7 +3076,7 @@ type OfflineGeometryRegionDefinition struct {
 	// Style URL. Copied during region creation.
 	StyleUrl string
 	// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
-	Geometry []byte
+	Geometry string
 	MinZoom  float64
 	// Maximum zoom. Positive infinity lets each tile source use its own maximum
 	// zoom.
@@ -3088,7 +3088,7 @@ type OfflineGeometryRegionDefinition struct {
 func copyOfflineGeometryRegionDefinition(raw C.mln_offline_geometry_region_definition) OfflineGeometryRegionDefinition {
 	var result OfflineGeometryRegionDefinition
 	result.StyleUrl = bindingString(raw.style_url.data, uint64(raw.style_url.size))
-	result.Geometry = bindingBytes(raw.geometry.data, uint64(raw.geometry.size))
+	result.Geometry = bindingString(raw.geometry.data, uint64(raw.geometry.size))
 	result.MinZoom = float64(raw.min_zoom)
 	result.MaxZoom = float64(raw.max_zoom)
 	result.PixelRatio = float32(raw.pixel_ratio)
@@ -3099,7 +3099,7 @@ func copyOfflineGeometryRegionDefinition(raw C.mln_offline_geometry_region_defin
 func nativeOfflineGeometryRegionDefinition(input OfflineGeometryRegionDefinition, arena *bindingArena) C.mln_offline_geometry_region_definition {
 	raw := C.mln_offline_geometry_region_definition{}
 	raw.style_url = C.mln_buffer_view{data: arena.bytes([]byte(input.StyleUrl)), size: C.size_t(len(input.StyleUrl))}
-	raw.geometry = C.mln_buffer_view{data: arena.bytes(input.Geometry), size: C.size_t(len(input.Geometry))}
+	raw.geometry = C.mln_buffer_view{data: arena.bytes([]byte(input.Geometry)), size: C.size_t(len(input.Geometry))}
 	raw.min_zoom = C.double(input.MinZoom)
 	raw.max_zoom = C.double(input.MaxZoom)
 	raw.pixel_ratio = C.float(input.PixelRatio)
@@ -3850,20 +3850,20 @@ func copyRenderSessionSnapshot(raw C.mln_render_session_snapshot) RenderSessionS
 // See mln_rendered_feature in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
 type RenderedFeature struct {
-	Feature       []byte
+	Feature       string
 	LayerId       string
 	SourceId      string
 	SourceLayerId string
-	State         []byte
+	State         string
 }
 
 func copyRenderedFeature(raw C.mln_rendered_feature) RenderedFeature {
 	var result RenderedFeature
-	result.Feature = bindingBytes(raw.feature.data, uint64(raw.feature.size))
+	result.Feature = bindingString(raw.feature.data, uint64(raw.feature.size))
 	result.LayerId = bindingString(raw.layer_id.data, uint64(raw.layer_id.size))
 	result.SourceId = bindingString(raw.source_id.data, uint64(raw.source_id.size))
 	result.SourceLayerId = bindingString(raw.source_layer_id.data, uint64(raw.source_layer_id.size))
-	result.State = bindingBytes(raw.state.data, uint64(raw.state.size))
+	result.State = bindingString(raw.state.data, uint64(raw.state.size))
 	return result
 }
 
@@ -3876,7 +3876,7 @@ type RenderedFeatureQueryOptions struct {
 	// Optional style layer IDs. When absent, all rendered layers are queried.
 	LayerIds []string
 	// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
-	Filter []byte
+	Filter string
 }
 
 func copyRenderedFeatureQueryOptions(raw C.mln_rendered_feature_query_options) RenderedFeatureQueryOptions {
@@ -3892,7 +3892,7 @@ func copyRenderedFeatureQueryOptions(raw C.mln_rendered_feature_query_options) R
 			return result
 		}()
 	}
-	result.Filter = bindingBytes(raw.filter.data, uint64(raw.filter.size))
+	result.Filter = bindingString(raw.filter.data, uint64(raw.filter.size))
 	return result
 }
 
@@ -3911,7 +3911,7 @@ func nativeRenderedFeatureQueryOptions(input RenderedFeatureQueryOptions, arena 
 		}
 		raw.fields |= C.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
 	}
-	raw.filter = C.mln_buffer_view{data: arena.bytes(input.Filter), size: C.size_t(len(input.Filter))}
+	raw.filter = C.mln_buffer_view{data: arena.bytes([]byte(input.Filter)), size: C.size_t(len(input.Filter))}
 	return raw
 }
 
@@ -4456,13 +4456,13 @@ func nativeScreenPoint(input ScreenPoint, arena *bindingArena) C.mln_screen_poin
 // See mln_source_feature in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
 type SourceFeature struct {
-	Feature       []byte
+	Feature       string
 	SourceLayerId string
 }
 
 func copySourceFeature(raw C.mln_source_feature) SourceFeature {
 	var result SourceFeature
-	result.Feature = bindingBytes(raw.feature.data, uint64(raw.feature.size))
+	result.Feature = bindingString(raw.feature.data, uint64(raw.feature.size))
 	result.SourceLayerId = bindingString(raw.source_layer_id.data, uint64(raw.source_layer_id.size))
 	return result
 }
@@ -4476,7 +4476,7 @@ type SourceFeatureQueryOptions struct {
 	// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
 	SourceLayerIds []string
 	// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
-	Filter []byte
+	Filter string
 }
 
 func copySourceFeatureQueryOptions(raw C.mln_source_feature_query_options) SourceFeatureQueryOptions {
@@ -4492,7 +4492,7 @@ func copySourceFeatureQueryOptions(raw C.mln_source_feature_query_options) Sourc
 			return result
 		}()
 	}
-	result.Filter = bindingBytes(raw.filter.data, uint64(raw.filter.size))
+	result.Filter = bindingString(raw.filter.data, uint64(raw.filter.size))
 	return result
 }
 
@@ -4511,7 +4511,7 @@ func nativeSourceFeatureQueryOptions(input SourceFeatureQueryOptions, arena *bin
 		}
 		raw.fields |= C.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
 	}
-	raw.filter = C.mln_buffer_view{data: arena.bytes(input.Filter), size: C.size_t(len(input.Filter))}
+	raw.filter = C.mln_buffer_view{data: arena.bytes([]byte(input.Filter)), size: C.size_t(len(input.Filter))}
 	return raw
 }
 
@@ -4552,11 +4552,11 @@ type StyleExpressionInputs struct {
 	// The value of the elevation expression outside a color-relief layer.
 	Elevation *float64
 	// One UTF-8 GeoJSON Feature that feature data expressions read.
-	Feature []byte
+	Feature string
 	// A UTF-8 JSON object that the feature-state expression reads.
-	FeatureState []byte
+	FeatureState string
 	// A UTF-8 JSON object that the global-state expression reads.
-	GlobalState []byte
+	GlobalState string
 	// The tile that holds the feature, which the within and distance expressions
 	// need to place its geometry.
 	CanonicalTileId *CanonicalTileId
@@ -4570,9 +4570,9 @@ func copyStyleExpressionInputs(raw C.mln_style_expression_inputs) StyleExpressio
 	result.Zoom = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_ZOOM != 0, func() float64 { return float64(raw.zoom) })
 	result.ColorRampParameter = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER != 0, func() float64 { return float64(raw.color_ramp_parameter) })
 	result.Elevation = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_ELEVATION != 0, func() float64 { return float64(raw.elevation) })
-	result.Feature = bindingBytes(raw.feature.data, uint64(raw.feature.size))
-	result.FeatureState = bindingBytes(raw.feature_state.data, uint64(raw.feature_state.size))
-	result.GlobalState = bindingBytes(raw.global_state.data, uint64(raw.global_state.size))
+	result.Feature = bindingString(raw.feature.data, uint64(raw.feature.size))
+	result.FeatureState = bindingString(raw.feature_state.data, uint64(raw.feature_state.size))
+	result.GlobalState = bindingString(raw.global_state.data, uint64(raw.global_state.size))
 	result.CanonicalTileId = bindingPresent(raw.fields&C.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID != 0, func() CanonicalTileId { return copyCanonicalTileId(raw.canonical_tile_id) })
 	result.AvailableImages = func() []string {
 		length := bindingLength(uint64(raw.available_image_count))
@@ -4593,9 +4593,9 @@ func nativeStyleExpressionInputs(input StyleExpressionInputs, arena *bindingAren
 	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_INPUT_ZOOM, &raw.zoom, input.Zoom, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER, &raw.color_ramp_parameter, input.ColorRampParameter, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_INPUT_ELEVATION, &raw.elevation, input.Elevation, arena, bindingNumber[float64, C.double])
-	raw.feature = C.mln_buffer_view{data: arena.bytes(input.Feature), size: C.size_t(len(input.Feature))}
-	raw.feature_state = C.mln_buffer_view{data: arena.bytes(input.FeatureState), size: C.size_t(len(input.FeatureState))}
-	raw.global_state = C.mln_buffer_view{data: arena.bytes(input.GlobalState), size: C.size_t(len(input.GlobalState))}
+	raw.feature = C.mln_buffer_view{data: arena.bytes([]byte(input.Feature)), size: C.size_t(len(input.Feature))}
+	raw.feature_state = C.mln_buffer_view{data: arena.bytes([]byte(input.FeatureState)), size: C.size_t(len(input.FeatureState))}
+	raw.global_state = C.mln_buffer_view{data: arena.bytes([]byte(input.GlobalState)), size: C.size_t(len(input.GlobalState))}
 	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID, &raw.canonical_tile_id, input.CanonicalTileId, arena, nativeCanonicalTileId)
 	{
 		raw.available_images = (*C.mln_buffer_view)(arena.array(len(input.AvailableImages), unsafe.Sizeof(*raw.available_images)))
@@ -6190,7 +6190,7 @@ func CVersion() uint32 {
 //
 // See mln_geojson_source_data_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func GeojsonSourceDataCreate(data []byte, options *GeojsonSourceOptions) (*GeojsonSourceDataHandle, error) {
+func GeojsonSourceDataCreate(data string, options *GeojsonSourceOptions) (*GeojsonSourceDataHandle, error) {
 	var outData C.mln_geojson_source_data
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_geojson_source_data_create(bindingView(data, arena), bindingStoreOptional(options, arena, nativeGeojsonSourceOptions), &outData, diagnostic))
@@ -6355,7 +6355,7 @@ func (receiver *MapHandle) AddImageSourceUrl(sourceId string, coordinates []LatL
 //
 // See mln_map_add_style_layer_json in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) AddStyleLayerJson(layerJson []byte, beforeLayerId string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddStyleLayerJson(layerJson string, beforeLayerId string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_style_layer_json(C.mln_map(raw), bindingView(layerJson, arena), bindingView(beforeLayerId, arena), completion, diagnostic))
 	}, completionCommand)
@@ -6366,7 +6366,7 @@ func (receiver *MapHandle) AddStyleLayerJson(layerJson []byte, beforeLayerId str
 //
 // See mln_map_add_style_source_json in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) AddStyleSourceJson(sourceId string, sourceJson []byte) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddStyleSourceJson(sourceId string, sourceJson string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_style_source_json(C.mln_map(raw), bindingView(sourceId, arena), bindingView(sourceJson, arena), completion, diagnostic))
 	}, completionCommand)
@@ -6534,7 +6534,7 @@ func (receiver *MapHandle) BeginCommandGroup() (*Future[CommandCompletion], erro
 //
 // See mln_map_camera_for_geometry in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
-func (receiver *MapHandle) CameraForGeometry(geometry []byte, fitOptions *CameraFitOptions) (*Future[CameraOptions], error) {
+func (receiver *MapHandle) CameraForGeometry(geometry string, fitOptions *CameraFitOptions) (*Future[CameraOptions], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_camera_for_geometry(C.mln_map(raw), bindingView(geometry, arena), bindingStoreOptional(fitOptions, arena, nativeCameraFitOptions), completion, diagnostic))
 	}, completionOf(copyCameraOptions))
@@ -6619,10 +6619,10 @@ func (receiver *MapHandle) GetCamera() (*Future[CameraQueryResult], error) {
 //
 // See mln_map_get_feature_state in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *MapHandle) GetFeatureState(selector FeatureStateSelector) (*Future[[]byte], error) {
+func (receiver *MapHandle) GetFeatureState(selector FeatureStateSelector) (*Future[string], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_feature_state(C.mln_map(raw), bindingStore(nativeFeatureStateSelector(selector, arena), arena), completion, diagnostic))
-	}, completionOf(copyViewBytes))
+	}, completionOf(copyViewText))
 }
 
 // GetGlobalState queries the global-state JSON object, including style
@@ -6631,10 +6631,10 @@ func (receiver *MapHandle) GetFeatureState(selector FeatureStateSelector) (*Futu
 //
 // See mln_map_get_global_state in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetGlobalState() (*Future[[]byte], error) {
+func (receiver *MapHandle) GetGlobalState() (*Future[string], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_global_state(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(copyViewBytes))
+	}, completionOf(copyViewText))
 }
 
 // GetImageSourceCoordinates copies image source coordinates.
@@ -6652,10 +6652,10 @@ func (receiver *MapHandle) GetImageSourceCoordinates(sourceId string) (*Future[[
 //
 // See mln_map_get_loaded_style_json in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *MapHandle) GetLoadedStyleJson() (*Future[[]byte], error) {
+func (receiver *MapHandle) GetLoadedStyleJson() (*Future[string], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_loaded_style_json(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(copyViewBytes))
+	}, completionOf(copyViewText))
 }
 
 // Snapshot copies the map's latest published snapshot.
@@ -6697,10 +6697,10 @@ func (receiver *MapHandle) GetStyleLayer(layerId string) (*Future[*StyleLayerInf
 //
 // See mln_map_get_style_layer_json in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetStyleLayerJson(layerId string) (*Future[*[]byte], error) {
+func (receiver *MapHandle) GetStyleLayerJson(layerId string) (*Future[*string], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_layer_json(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewBytes)))
+	}, completionNullable(completionOf(copyViewText)))
 }
 
 // GetStyleLayerProperty serializes one layer property as a style-spec JSON
@@ -6708,10 +6708,10 @@ func (receiver *MapHandle) GetStyleLayerJson(layerId string) (*Future[*[]byte], 
 //
 // See mln_map_get_style_layer_property in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetStyleLayerProperty(layerId string, propertyName string) (*Future[*[]byte], error) {
+func (receiver *MapHandle) GetStyleLayerProperty(layerId string, propertyName string) (*Future[*string], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_layer_property(C.mln_map(raw), bindingView(layerId, arena), bindingView(propertyName, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewBytes)))
+	}, completionNullable(completionOf(copyViewText)))
 }
 
 // GetStyleLightProperty serializes one style light property as a style-spec
@@ -6719,10 +6719,10 @@ func (receiver *MapHandle) GetStyleLayerProperty(layerId string, propertyName st
 //
 // See mln_map_get_style_light_property in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetStyleLightProperty(propertyName string) (*Future[*[]byte], error) {
+func (receiver *MapHandle) GetStyleLightProperty(propertyName string) (*Future[*string], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_light_property(C.mln_map(raw), bindingView(propertyName, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewBytes)))
+	}, completionNullable(completionOf(copyViewText)))
 }
 
 // GetStyleSource copies the complete metadata of one style source.
@@ -7098,7 +7098,7 @@ func (receiver *MapHandle) SetBounds(options BoundOptions) (*Future[CommandCompl
 //
 // See mln_map_set_custom_geometry_source_tile_data in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetCustomGeometrySourceTileData(sourceId string, tileId CanonicalTileId, data []byte) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetCustomGeometrySourceTileData(sourceId string, tileId CanonicalTileId, data string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_custom_geometry_source_tile_data(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(data, arena), completion, diagnostic))
 	}, completionCommand)
@@ -7161,7 +7161,7 @@ func (receiver *MapHandle) SetEventMask(mask RuntimeEventFlag) (*Future[CommandC
 //
 // See mln_map_set_feature_state in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *MapHandle) SetFeatureState(selector FeatureStateSelector, state []byte) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetFeatureState(selector FeatureStateSelector, state string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_feature_state(C.mln_map(raw), bindingStore(nativeFeatureStateSelector(selector, arena), arena), bindingView(state, arena), completion, diagnostic))
 	}, completionCommand)
@@ -7213,7 +7213,7 @@ func (receiver *MapHandle) SetGeojsonSourceUrl(sourceId string, url string) (*Fu
 //
 // See mln_map_set_global_state_property in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetGlobalStateProperty(propertyName string, value []byte) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetGlobalStateProperty(propertyName string, value string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_global_state_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
 	}, completionCommand)
@@ -7283,7 +7283,7 @@ func (receiver *MapHandle) SetStyleImage(imageId string, image PremultipliedRgba
 //
 // See mln_map_set_style_json in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *MapHandle) SetStyleJson(json []byte) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetStyleJson(json string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_json(C.mln_map(raw), bindingView(json, arena), completion, diagnostic))
 	}, completionCommand)
@@ -7294,7 +7294,7 @@ func (receiver *MapHandle) SetStyleJson(json []byte) (*Future[CommandCompletion]
 //
 // See mln_map_set_style_layer_property in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetStyleLayerProperty(layerId string, propertyName string, value []byte) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetStyleLayerProperty(layerId string, propertyName string, value string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_layer_property(C.mln_map(raw), bindingView(layerId, arena), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
 	}, completionCommand)
@@ -7304,7 +7304,7 @@ func (receiver *MapHandle) SetStyleLayerProperty(layerId string, propertyName st
 //
 // See mln_map_set_style_light_json in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetStyleLightJson(lightJson []byte) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetStyleLightJson(lightJson string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_light_json(C.mln_map(raw), bindingView(lightJson, arena), completion, diagnostic))
 	}, completionCommand)
@@ -7315,7 +7315,7 @@ func (receiver *MapHandle) SetStyleLightJson(lightJson []byte) (*Future[CommandC
 //
 // See mln_map_set_style_light_property in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetStyleLightProperty(propertyName string, value []byte) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetStyleLightProperty(propertyName string, value string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_light_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
 	}, completionCommand)
@@ -7582,10 +7582,10 @@ func (receiver *RenderSessionHandle) Snapshot() (RenderSessionSnapshot, error) {
 //
 // See mln_render_session_query_feature_extensions in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-func (receiver *RenderSessionHandle) QueryFeatureExtensions(sourceId string, feature []byte, extension string, extensionField string, arguments []byte) (*Future[[]byte], error) {
+func (receiver *RenderSessionHandle) QueryFeatureExtensions(sourceId string, feature string, extension string, extensionField string, arguments string) (*Future[string], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_query_feature_extensions(C.mln_render_session(raw), bindingView(sourceId, arena), bindingView(feature, arena), bindingView(extension, arena), bindingView(extensionField, arena), bindingView(arguments, arena), completion, diagnostic))
-	}, completionOf(copyViewBytes))
+	}, completionOf(copyViewText))
 }
 
 // QueryRenderedFeatures starts a rendered-feature query against the session's
@@ -8085,7 +8085,7 @@ func (receiver *RuntimeHandle) UpdateOfflineRegionMetadata(regionId int64, metad
 //
 // See mln_style_expression_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
-func StyleExpressionCreate(expression []byte, options *StyleExpressionOptions) (*StyleExpressionHandle, error) {
+func StyleExpressionCreate(expression string, options *StyleExpressionOptions) (*StyleExpressionHandle, error) {
 	var outExpression C.mln_style_expression
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_style_expression_create(bindingView(expression, arena), bindingStoreOptional(options, arena, nativeStyleExpressionOptions), &outExpression, diagnostic))
@@ -8099,14 +8099,14 @@ func StyleExpressionCreate(expression []byte, options *StyleExpressionOptions) (
 //
 // See mln_style_expression_evaluate in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
-func (receiver *StyleExpressionHandle) Evaluate(inputs *StyleExpressionInputs) ([]byte, error) {
-	var outJson []byte
+func (receiver *StyleExpressionHandle) Evaluate(inputs *StyleExpressionInputs) (string, error) {
+	var outJson string
 	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		nativeInputs := bindingStoreOptional(inputs, arena, nativeStyleExpressionInputs)
 		return int32(bindingCallerSizedText(&outJson, func(outJson *C.char, jsonCapacity C.size_t, outJsonLength *C.size_t) int32 {
 			return int32(C.mln_style_expression_evaluate(C.mln_style_expression(raw), nativeInputs, outJson, jsonCapacity, outJsonLength, diagnostic))
 		}))
-	}, func(arena *bindingArena) []byte {
+	}, func(arena *bindingArena) string {
 		return outJson
 	})
 }
@@ -8220,14 +8220,14 @@ func (view MapHandleDiscarding) AddImageSourceUrl(sourceId string, coordinates [
 	})
 }
 
-func (view MapHandleDiscarding) AddStyleLayerJson(layerJson []byte, beforeLayerId string) error {
+func (view MapHandleDiscarding) AddStyleLayerJson(layerJson string, beforeLayerId string) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_style_layer_json(C.mln_map(raw), bindingView(layerJson, arena), bindingView(beforeLayerId, arena), completion, diagnostic))
 	})
 }
 
-func (view MapHandleDiscarding) AddStyleSourceJson(sourceId string, sourceJson []byte) error {
+func (view MapHandleDiscarding) AddStyleSourceJson(sourceId string, sourceJson string) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_style_source_json(C.mln_map(raw), bindingView(sourceId, arena), bindingView(sourceJson, arena), completion, diagnostic))
@@ -8353,7 +8353,7 @@ func (view MapHandleDiscarding) SetBounds(options BoundOptions) error {
 	})
 }
 
-func (view MapHandleDiscarding) SetCustomGeometrySourceTileData(sourceId string, tileId CanonicalTileId, data []byte) error {
+func (view MapHandleDiscarding) SetCustomGeometrySourceTileData(sourceId string, tileId CanonicalTileId, data string) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_custom_geometry_source_tile_data(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(data, arena), completion, diagnostic))
@@ -8395,7 +8395,7 @@ func (view MapHandleDiscarding) SetEventMask(mask RuntimeEventFlag) error {
 	})
 }
 
-func (view MapHandleDiscarding) SetFeatureState(selector FeatureStateSelector, state []byte) error {
+func (view MapHandleDiscarding) SetFeatureState(selector FeatureStateSelector, state string) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_feature_state(C.mln_map(raw), bindingStore(nativeFeatureStateSelector(selector, arena), arena), bindingView(state, arena), completion, diagnostic))
@@ -8430,7 +8430,7 @@ func (view MapHandleDiscarding) SetGeojsonSourceUrl(sourceId string, url string)
 	})
 }
 
-func (view MapHandleDiscarding) SetGlobalStateProperty(propertyName string, value []byte) error {
+func (view MapHandleDiscarding) SetGlobalStateProperty(propertyName string, value string) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_global_state_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
@@ -8479,28 +8479,28 @@ func (view MapHandleDiscarding) SetStyleImage(imageId string, image Premultiplie
 	})
 }
 
-func (view MapHandleDiscarding) SetStyleJson(json []byte) error {
+func (view MapHandleDiscarding) SetStyleJson(json string) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_json(C.mln_map(raw), bindingView(json, arena), completion, diagnostic))
 	})
 }
 
-func (view MapHandleDiscarding) SetStyleLayerProperty(layerId string, propertyName string, value []byte) error {
+func (view MapHandleDiscarding) SetStyleLayerProperty(layerId string, propertyName string, value string) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_layer_property(C.mln_map(raw), bindingView(layerId, arena), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
 	})
 }
 
-func (view MapHandleDiscarding) SetStyleLightJson(lightJson []byte) error {
+func (view MapHandleDiscarding) SetStyleLightJson(lightJson string) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_light_json(C.mln_map(raw), bindingView(lightJson, arena), completion, diagnostic))
 	})
 }
 
-func (view MapHandleDiscarding) SetStyleLightProperty(propertyName string, value []byte) error {
+func (view MapHandleDiscarding) SetStyleLightProperty(propertyName string, value string) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_light_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))

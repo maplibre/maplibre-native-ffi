@@ -14,7 +14,7 @@ func TestClosingTwiceIsSafe(t *testing.T) {
 	if _, err := f.m.Close(); !errors.Is(err, StatusInvalidState) {
 		t.Fatalf("second map close: %v, want native invalid state", err)
 	}
-	_, err := f.m.SetStyleJson([]byte(emptyStyle))
+	_, err := f.m.SetStyleJson(emptyStyle)
 	var closed *Error
 	if !errors.As(err, &closed) || closed.Status != StatusInvalidState || closed.Diagnostic == "" {
 		t.Fatalf("SetStyleJson after close = %v, want native invalid state", err)
@@ -63,7 +63,7 @@ func TestDisposeAndReleaseCloseOnce(t *testing.T) {
 	checkHandleMembers(t, f.m, "MapHandle", true)
 	checkHandleMembers(t, f.runtime, "RuntimeHandle", true)
 
-	data, err := GeojsonSourceDataCreate([]byte(`{"type":"FeatureCollection","features":[]}`), nil)
+	data, err := GeojsonSourceDataCreate(`{"type":"FeatureCollection","features":[]}`, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestRefusedCloseLeavesTheHandleUsable(t *testing.T) {
 // after close, so a host can route events that it drains later.
 func TestHandleIdNamesItsEventsAndOutlivesClose(t *testing.T) {
 	f := newFixture(t)
-	await(t, submitted(f.m.SetStyleJson([]byte(emptyStyle))))
+	await(t, submitted(f.m.SetStyleJson(emptyStyle)))
 	event := f.awaitEvent(t, "the style load", isStyleLoaded)
 	id := f.m.Id()
 	if event.Source != id {
@@ -134,7 +134,7 @@ func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 			t.Fatalf("input %#v: (%v, %v), want nil and StatusInvalidArgument", input, future, err)
 		}
 	}
-	data, err := GeojsonSourceDataCreate([]byte(`{"type":"FeatureCollection","features":[]}`), nil)
+	data, err := GeojsonSourceDataCreate(`{"type":"FeatureCollection","features":[]}`, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestChildKeepsItsParentAlive(t *testing.T) {
 	if parent.Value() == nil {
 		t.Fatal("the runtime became unreachable while its map is live")
 	}
-	await(t, submitted(m.SetStyleJson([]byte(emptyStyle))))
+	await(t, submitted(m.SetStyleJson(emptyStyle)))
 
 	// Closing the map leaves nothing that holds the runtime.
 	await(t, submitted(m.Close()))

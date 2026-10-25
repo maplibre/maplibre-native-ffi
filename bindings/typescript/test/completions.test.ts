@@ -79,13 +79,10 @@ test("discarded commands are fenced and synchronous rejection throws", async () 
   // A discarded command returns once native accepts it, and a later
   // completion on the same map follows it.
   map.discarding.setDebugOptions(MapDebugFlag.tileBorders);
-  map.discarding.addStyleSourceJson(
-    "discarded",
-    JSON.stringify({
-      type: "geojson",
-      data: { type: "FeatureCollection", features: [] },
-    }),
-  );
+  map.discarding.addStyleSourceJson("discarded", {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  });
   const source = await bounded(
     map.getStyleSource("discarded"),
     "the discarded source",

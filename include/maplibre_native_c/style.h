@@ -867,7 +867,7 @@ MLN_API mln_status mln_map_add_geojson_source_url(
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_geojson_source_data_create(
-  mln_buffer_view data MLN_BINDING("encoding=bytes"),
+  mln_buffer_view data MLN_BINDING("encoding=json"),
   const mln_geojson_source_options* options MLN_BINDING("nullable=true"),
   mln_geojson_source_data* out_data MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic

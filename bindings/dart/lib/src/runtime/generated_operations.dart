@@ -898,9 +898,10 @@ Pointer<raw.mln_geojson_source_options> _writeGeojsonSourceOptions(
     result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
     result.ref.cluster_max_zoom = value.clusterMaxZoom!;
   }
-  result.ref.cluster_properties = nativeBufferView(
+  result.ref.cluster_properties = _nativeJsonView(
     value.clusterProperties,
     arena,
+    member: true,
   );
   if (value.buffer != null) {
     result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_BUFFER;
@@ -953,7 +954,7 @@ GeojsonSourceOptions _readGeojsonSourceOptions(
       (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM) != 0
       ? source.cluster_max_zoom
       : null,
-  clusterProperties: _copyBufferView(source.cluster_properties),
+  clusterProperties: _decodeJsonView(source.cluster_properties),
   buffer: (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_BUFFER) != 0
       ? source.buffer
       : null,
@@ -2192,7 +2193,7 @@ _writeRenderedFeatureQueryOptions(
       ).value;
     }
   }
-  result.ref.filter = nativeBufferView(value.filter, arena);
+  result.ref.filter = _nativeJsonView(value.filter, arena, member: true);
   return result;
 }
 
@@ -2208,16 +2209,16 @@ RenderedFeatureQueryOptions _readRenderedFeatureQueryOptions(
           ),
         )
       : null,
-  filter: _copyBufferView(source.filter),
+  filter: _decodeJsonView(source.filter),
 );
 
 RenderedFeature _readRenderedFeature(raw.mln_rendered_feature source) =>
     RenderedFeature(
-      feature: _copyBufferView(source.feature),
+      feature: _decodeJsonView(source.feature),
       layerId: utf8.decode(_copyBufferView(source.layer_id)),
       sourceId: utf8.decode(_copyBufferView(source.source_id)),
       sourceLayerId: utf8.decode(_copyBufferView(source.source_layer_id)),
-      state: _copyBufferView(source.state),
+      state: _decodeJsonView(source.state),
     );
 
 Pointer<raw.mln_source_feature_query_options> _writeSourceFeatureQueryOptions(
@@ -2240,7 +2241,7 @@ Pointer<raw.mln_source_feature_query_options> _writeSourceFeatureQueryOptions(
       ).value;
     }
   }
-  result.ref.filter = nativeBufferView(value.filter, arena);
+  result.ref.filter = _nativeJsonView(value.filter, arena, member: true);
   return result;
 }
 
@@ -2258,12 +2259,12 @@ SourceFeatureQueryOptions _readSourceFeatureQueryOptions(
           ),
         )
       : null,
-  filter: _copyBufferView(source.filter),
+  filter: _decodeJsonView(source.filter),
 );
 
 SourceFeature _readSourceFeature(raw.mln_source_feature source) =>
     SourceFeature(
-      feature: _copyBufferView(source.feature),
+      feature: _decodeJsonView(source.feature),
       sourceLayerId: utf8.decode(_copyBufferView(source.source_layer_id)),
     );
 
@@ -2424,7 +2425,7 @@ _writeOfflineGeometryRegionDefinition(
 }) {
   final result = into ?? arena<raw.mln_offline_geometry_region_definition>();
   result.ref.style_url = nativeStringView(value.styleUrl, arena).value;
-  result.ref.geometry = nativeBufferView(value.geometry, arena);
+  result.ref.geometry = _nativeJsonView(value.geometry, arena, member: true);
   result.ref.min_zoom = value.minZoom;
   result.ref.max_zoom = value.maxZoom;
   result.ref.pixel_ratio = value.pixelRatio;
@@ -2436,7 +2437,7 @@ OfflineGeometryRegionDefinition _readOfflineGeometryRegionDefinition(
   raw.mln_offline_geometry_region_definition source,
 ) => OfflineGeometryRegionDefinition(
   styleUrl: utf8.decode(_copyBufferView(source.style_url)),
-  geometry: _copyBufferView(source.geometry),
+  geometry: _decodeJsonView(source.geometry),
   minZoom: source.min_zoom,
   maxZoom: source.max_zoom,
   pixelRatio: source.pixel_ratio,
@@ -2899,9 +2900,17 @@ Pointer<raw.mln_style_expression_inputs> _writeStyleExpressionInputs(
     result.ref.fields |= raw.MLN_STYLE_EXPRESSION_INPUT_ELEVATION;
     result.ref.elevation = value.elevation!;
   }
-  result.ref.feature = nativeBufferView(value.feature, arena);
-  result.ref.feature_state = nativeBufferView(value.featureState, arena);
-  result.ref.global_state = nativeBufferView(value.globalState, arena);
+  result.ref.feature = _nativeJsonView(value.feature, arena, member: true);
+  result.ref.feature_state = _nativeJsonView(
+    value.featureState,
+    arena,
+    member: true,
+  );
+  result.ref.global_state = _nativeJsonView(
+    value.globalState,
+    arena,
+    member: true,
+  );
   if (value.canonicalTileId != null) {
     result.ref.fields |= raw.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID;
     result.ref.canonical_tile_id = _writeCanonicalTileId(
@@ -2935,9 +2944,9 @@ StyleExpressionInputs _readStyleExpressionInputs(
   elevation: (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_ELEVATION) != 0
       ? source.elevation
       : null,
-  feature: _copyBufferView(source.feature),
-  featureState: _copyBufferView(source.feature_state),
-  globalState: _copyBufferView(source.global_state),
+  feature: _decodeJsonView(source.feature),
+  featureState: _decodeJsonView(source.feature_state),
+  globalState: _decodeJsonView(source.global_state),
   canonicalTileId:
       (source.fields & raw.MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID) != 0
       ? _readCanonicalTileId(source.canonical_tile_id)
@@ -2973,6 +2982,10 @@ final _resultLatLng = _CompletionValue(
 final _resultLatLngBounds = _CompletionValue(
   sizeOf<raw.mln_lat_lng_bounds>(),
   (element) => _readLatLngBounds(element.cast<raw.mln_lat_lng_bounds>().ref),
+);
+final _resultObjectOrNull = _CompletionValue(
+  sizeOf<raw.mln_buffer_view>(),
+  (element) => _decodeJsonView(element.cast<raw.mln_buffer_view>().ref),
 );
 final _resultOfflineRegionInfo = _CompletionValue(
   sizeOf<raw.mln_offline_region_info>(),
@@ -3025,16 +3038,6 @@ final _resultTextureReadbackResult = _CompletionValue(
   (element) => _readTextureReadbackResult(
     element.cast<raw.mln_texture_readback_result>().ref,
   ),
-);
-final _resultUint8List = _CompletionValue(
-  sizeOf<raw.mln_buffer_view>(),
-  (element) => _copyBufferView(element.cast<raw.mln_buffer_view>().ref),
-);
-final _resultUint8ListOrNull = _CompletionValue(
-  sizeOf<raw.mln_buffer_view>(),
-  (element) => element.cast<raw.mln_buffer_view>().ref.data == nullptr
-      ? null
-      : _copyBufferView(element.cast<raw.mln_buffer_view>().ref),
 );
 
 /// Returns empty animation options initialized for this C API version.
@@ -3153,14 +3156,14 @@ FreeCameraOptions freeCameraOptionsDefault() {
 /// See `mln_geojson_source_data_create` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 GeojsonSourceDataHandle geojsonSourceDataCreate(
-  Uint8List data, {
+  Object? data, {
   GeojsonSourceOptions? options,
 }) => withNativeArena((arena) {
   ensureAbiVersion();
   final outData = arena<Uint64>();
   _check(
     raw.mln_geojson_source_data_create(
-      nativeBufferView(data, arena),
+      _nativeJsonView(data, arena),
       options == null ? nullptr : _writeGeojsonSourceOptions(options, arena),
       outData,
       nativeDiagnostic,
@@ -3565,14 +3568,14 @@ SourceFeatureQueryOptions sourceFeatureQueryOptionsDefault() {
 /// See `mln_style_expression_create` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 StyleExpressionHandle styleExpressionCreate(
-  Uint8List expression, {
+  Object? expression, {
   StyleExpressionOptions? options,
 }) => withNativeArena((arena) {
   ensureAbiVersion();
   final outExpression = arena<Uint64>();
   _check(
     raw.mln_style_expression_create(
-      nativeBufferView(expression, arena),
+      _nativeJsonView(expression, arena),
       options == null ? nullptr : _writeStyleExpressionOptions(options, arena),
       outExpression,
       nativeDiagnostic,
@@ -3982,20 +3985,20 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     );
   });
-  void addStyleLayerJson(Uint8List layerJson, String beforeLayerId) => _discard(
+  void addStyleLayerJson(Object? layerJson, String beforeLayerId) => _discard(
     (arena, completion) => raw.mln_map_add_style_layer_json(
       _handle.raw,
-      nativeBufferView(layerJson, arena),
+      _nativeJsonView(layerJson, arena),
       nativeStringView(beforeLayerId, arena).value,
       completion,
       nativeDiagnostic,
     ),
   );
-  void addStyleSourceJson(String sourceId, Uint8List sourceJson) => _discard(
+  void addStyleSourceJson(String sourceId, Object? sourceJson) => _discard(
     (arena, completion) => raw.mln_map_add_style_source_json(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
-      nativeBufferView(sourceJson, arena),
+      _nativeJsonView(sourceJson, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -4144,13 +4147,13 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
   void setCustomGeometrySourceTileData(
     String sourceId,
     CanonicalTileId tileId,
-    Uint8List data,
+    Object? data,
   ) => _discard(
     (arena, completion) => raw.mln_map_set_custom_geometry_source_tile_data(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
       _writeCanonicalTileId(tileId, arena).ref,
-      nativeBufferView(data, arena),
+      _nativeJsonView(data, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -4213,12 +4216,12 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void setFeatureState(FeatureStateSelector selector, Uint8List state) =>
+  void setFeatureState(FeatureStateSelector selector, Object? state) =>
       _discard(
         (arena, completion) => raw.mln_map_set_feature_state(
           _handle.raw,
           _writeFeatureStateSelector(selector, arena),
-          nativeBufferView(state, arena),
+          _nativeJsonView(state, arena),
           completion,
           nativeDiagnostic,
         ),
@@ -4261,11 +4264,11 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void setGlobalStateProperty(String propertyName, Uint8List value) => _discard(
+  void setGlobalStateProperty(String propertyName, Object? value) => _discard(
     (arena, completion) => raw.mln_map_set_global_state_property(
       _handle.raw,
       nativeStringView(propertyName, arena).value,
-      nativeBufferView(value, arena),
+      _nativeJsonView(value, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -4340,10 +4343,10 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void setStyleJson(Uint8List json) => _discard(
+  void setStyleJson(Object? json) => _discard(
     (arena, completion) => raw.mln_map_set_style_json(
       _handle.raw,
-      nativeBufferView(json, arena),
+      _nativeJsonView(json, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -4351,30 +4354,30 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
   void setStyleLayerProperty(
     String layerId,
     String propertyName,
-    Uint8List value,
+    Object? value,
   ) => _discard(
     (arena, completion) => raw.mln_map_set_style_layer_property(
       _handle.raw,
       nativeStringView(layerId, arena).value,
       nativeStringView(propertyName, arena).value,
-      nativeBufferView(value, arena),
+      _nativeJsonView(value, arena),
       completion,
       nativeDiagnostic,
     ),
   );
-  void setStyleLightJson(Uint8List lightJson) => _discard(
+  void setStyleLightJson(Object? lightJson) => _discard(
     (arena, completion) => raw.mln_map_set_style_light_json(
       _handle.raw,
-      nativeBufferView(lightJson, arena),
+      _nativeJsonView(lightJson, arena),
       completion,
       nativeDiagnostic,
     ),
   );
-  void setStyleLightProperty(String propertyName, Uint8List value) => _discard(
+  void setStyleLightProperty(String propertyName, Object? value) => _discard(
     (arena, completion) => raw.mln_map_set_style_light_property(
       _handle.raw,
       nativeStringView(propertyName, arena).value,
-      nativeBufferView(value, arena),
+      _nativeJsonView(value, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -4606,12 +4609,12 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// See `mln_map_add_style_layer_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addStyleLayerJson(
-    Uint8List layerJson,
+    Object? layerJson,
     String beforeLayerId,
   ) => _command(
     (arena, completion) => raw.mln_map_add_style_layer_json(
       _handle.raw,
-      nativeBufferView(layerJson, arena),
+      _nativeJsonView(layerJson, arena),
       nativeStringView(beforeLayerId, arena).value,
       completion,
       nativeDiagnostic,
@@ -4624,12 +4627,12 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addStyleSourceJson(
     String sourceId,
-    Uint8List sourceJson,
+    Object? sourceJson,
   ) => _command(
     (arena, completion) => raw.mln_map_add_style_source_json(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
-      nativeBufferView(sourceJson, arena),
+      _nativeJsonView(sourceJson, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -4985,13 +4988,13 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// See `mln_map_camera_for_geometry` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CameraOptions> cameraForGeometry(
-    Uint8List geometry, {
+    Object? geometry, {
     CameraFitOptions? fitOptions,
   }) => _query(
     _resultCameraOptions,
     (arena, completion) => raw.mln_map_camera_for_geometry(
       _handle.raw,
-      nativeBufferView(geometry, arena),
+      _nativeJsonView(geometry, arena),
       fitOptions == null ? nullptr : _writeCameraFitOptions(fitOptions, arena),
       completion,
       nativeDiagnostic,
@@ -5111,8 +5114,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_get_feature_state` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<Uint8List> getFeatureState(FeatureStateSelector selector) => _query(
-    _resultUint8List,
+  Future<Object?> getFeatureState(FeatureStateSelector selector) => _query(
+    _resultObjectOrNull,
     (arena, completion) => raw.mln_map_get_feature_state(
       _handle.raw,
       _writeFeatureStateSelector(selector, arena),
@@ -5126,8 +5129,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_get_global_state` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<Uint8List> getGlobalState() => _query(
-    _resultUint8List,
+  Future<Object?> getGlobalState() => _query(
+    _resultObjectOrNull,
     (arena, completion) =>
         raw.mln_map_get_global_state(_handle.raw, completion, nativeDiagnostic),
   );
@@ -5150,8 +5153,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_get_loaded_style_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<Uint8List> getLoadedStyleJson() => _query(
-    _resultUint8List,
+  Future<Object?> getLoadedStyleJson() => _query(
+    _resultObjectOrNull,
     (arena, completion) => raw.mln_map_get_loaded_style_json(
       _handle.raw,
       completion,
@@ -5204,8 +5207,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_get_style_layer_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<Uint8List?> getStyleLayerJson(String layerId) => _queryOptional(
-    _resultUint8ListOrNull,
+  Future<Object?> getStyleLayerJson(String layerId) => _queryOptional(
+    _resultObjectOrNull,
     (arena, completion) => raw.mln_map_get_style_layer_json(
       _handle.raw,
       nativeStringView(layerId, arena).value,
@@ -5218,34 +5221,31 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_get_style_layer_property` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<Uint8List?> getStyleLayerProperty(
-    String layerId,
-    String propertyName,
-  ) => _queryOptional(
-    _resultUint8ListOrNull,
-    (arena, completion) => raw.mln_map_get_style_layer_property(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      nativeStringView(propertyName, arena).value,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Serializes one style light property as a style-spec JSON value.
-  ///
-  /// See `mln_map_get_style_light_property` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<Uint8List?> getStyleLightProperty(String propertyName) =>
+  Future<Object?> getStyleLayerProperty(String layerId, String propertyName) =>
       _queryOptional(
-        _resultUint8ListOrNull,
-        (arena, completion) => raw.mln_map_get_style_light_property(
+        _resultObjectOrNull,
+        (arena, completion) => raw.mln_map_get_style_layer_property(
           _handle.raw,
+          nativeStringView(layerId, arena).value,
           nativeStringView(propertyName, arena).value,
           completion,
           nativeDiagnostic,
         ),
       );
+
+  /// Serializes one style light property as a style-spec JSON value.
+  ///
+  /// See `mln_map_get_style_light_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  Future<Object?> getStyleLightProperty(String propertyName) => _queryOptional(
+    _resultObjectOrNull,
+    (arena, completion) => raw.mln_map_get_style_light_property(
+      _handle.raw,
+      nativeStringView(propertyName, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
 
   /// Copies the complete metadata of one style source.
   ///
@@ -5525,13 +5525,13 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   Future<CommandCompletion> setCustomGeometrySourceTileData(
     String sourceId,
     CanonicalTileId tileId,
-    Uint8List data,
+    Object? data,
   ) => _command(
     (arena, completion) => raw.mln_map_set_custom_geometry_source_tile_data(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
       _writeCanonicalTileId(tileId, arena).ref,
-      nativeBufferView(data, arena),
+      _nativeJsonView(data, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -5626,12 +5626,12 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<CommandCompletion> setFeatureState(
     FeatureStateSelector selector,
-    Uint8List state,
+    Object? state,
   ) => _command(
     (arena, completion) => raw.mln_map_set_feature_state(
       _handle.raw,
       _writeFeatureStateSelector(selector, arena),
-      nativeBufferView(state, arena),
+      _nativeJsonView(state, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -5706,12 +5706,12 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setGlobalStateProperty(
     String propertyName,
-    Uint8List value,
+    Object? value,
   ) => _command(
     (arena, completion) => raw.mln_map_set_global_state_property(
       _handle.raw,
       nativeStringView(propertyName, arena).value,
-      nativeBufferView(value, arena),
+      _nativeJsonView(value, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -5823,10 +5823,10 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_set_style_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<CommandCompletion> setStyleJson(Uint8List json) => _command(
+  Future<CommandCompletion> setStyleJson(Object? json) => _command(
     (arena, completion) => raw.mln_map_set_style_json(
       _handle.raw,
-      nativeBufferView(json, arena),
+      _nativeJsonView(json, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -5839,13 +5839,13 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   Future<CommandCompletion> setStyleLayerProperty(
     String layerId,
     String propertyName,
-    Uint8List value,
+    Object? value,
   ) => _command(
     (arena, completion) => raw.mln_map_set_style_layer_property(
       _handle.raw,
       nativeStringView(layerId, arena).value,
       nativeStringView(propertyName, arena).value,
-      nativeBufferView(value, arena),
+      _nativeJsonView(value, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -5855,10 +5855,10 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_set_style_light_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setStyleLightJson(Uint8List lightJson) => _command(
+  Future<CommandCompletion> setStyleLightJson(Object? lightJson) => _command(
     (arena, completion) => raw.mln_map_set_style_light_json(
       _handle.raw,
-      nativeBufferView(lightJson, arena),
+      _nativeJsonView(lightJson, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -5870,12 +5870,12 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setStyleLightProperty(
     String propertyName,
-    Uint8List value,
+    Object? value,
   ) => _command(
     (arena, completion) => raw.mln_map_set_style_light_property(
       _handle.raw,
       nativeStringView(propertyName, arena).value,
-      nativeBufferView(value, arena),
+      _nativeJsonView(value, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -6434,21 +6434,21 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// See `mln_render_session_query_feature_extensions` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-  Future<Uint8List> queryFeatureExtensions(
+  Future<Object?> queryFeatureExtensions(
     String sourceId,
-    Uint8List feature,
+    Object? feature,
     String extensionValue,
     String extensionField,
-    Uint8List arguments,
+    Object? arguments,
   ) => _query(
-    _resultUint8List,
+    _resultObjectOrNull,
     (arena, completion) => raw.mln_render_session_query_feature_extensions(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
-      nativeBufferView(feature, arena),
+      _nativeJsonView(feature, arena),
       nativeStringView(extensionValue, arena).value,
       nativeStringView(extensionField, arena).value,
-      nativeBufferView(arguments, arena),
+      _nativeJsonView(arguments, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -7342,28 +7342,27 @@ final class StyleExpressionHandle implements Finalizable {
   ///
   /// See `mln_style_expression_evaluate` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-  Uint8List evaluate({StyleExpressionInputs? inputs}) =>
-      withNativeArena((arena) {
-        final text = _CallerSizedText();
-        final nativeInputs = inputs == null
-            ? nullptr
-            : _writeStyleExpressionInputs(inputs, arena);
-        _check(
-          text.call(
-            arena,
-            (textStorage, textCapacity, textLength) =>
-                raw.mln_style_expression_evaluate(
-                  _handle.raw,
-                  nativeInputs,
-                  textStorage,
-                  textCapacity,
-                  textLength,
-                  nativeDiagnostic,
-                ),
-          ),
-        );
-        return text.text;
-      });
+  Object? evaluate({StyleExpressionInputs? inputs}) => withNativeArena((arena) {
+    final text = _CallerSizedText();
+    final nativeInputs = inputs == null
+        ? nullptr
+        : _writeStyleExpressionInputs(inputs, arena);
+    _check(
+      text.call(
+        arena,
+        (textStorage, textCapacity, textLength) =>
+            raw.mln_style_expression_evaluate(
+              _handle.raw,
+              nativeInputs,
+              textStorage,
+              textCapacity,
+              textLength,
+              nativeDiagnostic,
+            ),
+      ),
+    );
+    return _decodeJson(text.text);
+  });
 
   /// Copies what a parsed expression depends on into out_info.
   ///

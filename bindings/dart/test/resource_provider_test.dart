@@ -30,10 +30,17 @@ void main() {
               status: ResourceResponseStatus.ok,
               bytes: jsonBytes(
                 request.kind == ResourceKind.style
-                    ? '{"version":8,"sources":{"routed":{"type":"vector",'
-                          '"url":"$sourceUrl"}},"layers":[]}'
-                    : '{"tilejson":"3.0.0",'
-                          '"tiles":["custom://unrouted/{z}/{x}/{y}.pbf"]}',
+                    ? {
+                        'version': 8,
+                        'sources': {
+                          'routed': {'type': 'vector', 'url': sourceUrl},
+                        },
+                        'layers': <Object?>[],
+                      }
+                    : {
+                        'tilejson': '3.0.0',
+                        'tiles': ['custom://unrouted/{z}/{x}/{y}.pbf'],
+                      },
               ),
             ),
           );

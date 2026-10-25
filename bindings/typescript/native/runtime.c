@@ -298,6 +298,42 @@ bool mln_ts_read_text(
   return true;
 }
 
+// Calls JSON[name](argument) on the realm's global JSON object.
+static napi_value call_json(
+  napi_env env, const char* name, napi_value argument
+) {
+  napi_value global = NULL;
+  napi_value json = NULL;
+  napi_value function = NULL;
+  napi_value result = NULL;
+  if (
+    napi_get_global(env, &global) != napi_ok ||
+    napi_get_named_property(env, global, "JSON", &json) != napi_ok ||
+    napi_get_named_property(env, json, name, &function) != napi_ok ||
+    napi_call_function(env, json, function, 1, &argument, &result) != napi_ok
+  ) {
+    return NULL;
+  }
+  return result;
+}
+
+bool mln_ts_read_json_view(
+  mln_ts_call* call, napi_value value, mln_buffer_view* out, const char* path
+) {
+  if (type_of(call, value) == napi_undefined) {
+    return true;
+  }
+  napi_value text = call_json(call->env, "stringify", value);
+  if (text == NULL) {
+    // JSON.stringify threw, as for a bigint or a cycle.
+    return false;
+  }
+  if (type_of(call, text) != napi_string) {
+    return fail_type(call, path, "a JSON value");
+  }
+  return mln_ts_read_text_view(call, text, out, path);
+}
+
 bool mln_ts_read_bytes_view(
   mln_ts_call* call, napi_value value, mln_buffer_view* out, const char* path
 ) {
@@ -438,6 +474,14 @@ napi_value mln_ts_text(napi_env env, const void* data, size_t size) {
   napi_value result = NULL;
   napi_create_string_utf8(env, size == 0 ? "" : data, size, &result);
   return result;
+}
+
+napi_value mln_ts_json(napi_env env, const void* data, size_t size) {
+  if (size == 0) {
+    return mln_ts_undefined(env);
+  }
+  napi_value text = mln_ts_text(env, data, size);
+  return text == NULL ? NULL : call_json(env, "parse", text);
 }
 
 napi_value mln_ts_bytes(napi_env env, const void* data, size_t size) {

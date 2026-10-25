@@ -46,7 +46,7 @@ func newRuntimeMapState(v viewport, smoke bool) (*runtimeMapState, error) {
 	// that fails.
 	var loaded *maplibre.Future[maplibre.CommandCompletion]
 	if smoke {
-		loaded, err = mapHandle.SetStyleJson([]byte(smokeStyle))
+		loaded, err = mapHandle.SetStyleJson(smokeStyle)
 	} else {
 		loaded, err = mapHandle.SetStyleUrl("https://tiles.openfreemap.org/styles/bright")
 	}

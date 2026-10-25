@@ -40,6 +40,20 @@ impl<'py> GeneratedInputStorage<'py> {
         Ok(view)
     }
 
+    /// Serializes a value with `json.dumps`. A record member that is None,
+    /// `member`, is absent and converts to an empty view; a parameter that is
+    /// None is JSON null.
+    fn json(&mut self, value: Bound<'py, PyAny>, member: bool) -> PyResult<sys::mln_buffer_view> {
+        if member && value.is_none() {
+            return Ok(sys::mln_buffer_view {
+                data: ptr::null(),
+                size: 0,
+            });
+        }
+        let text = value.py().import("json")?.call_method1("dumps", (value,))?;
+        self.buffer(text, true)
+    }
+
     fn c_string(&mut self, value: Bound<'py, PyAny>) -> PyResult<*const c_char> {
         self.storage
             .c_string(value.extract::<&str>()?)

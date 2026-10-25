@@ -24,6 +24,9 @@ PLATFORMS = {
     "tvos": "os(tvOS)",
 }
 
+# JSON is text, so it takes and returns a String as UTF-8 text does.
+TEXT_ENCODINGS = frozenset({"utf8", "json"})
+
 SCALARS = {
     "double": "Double",
     "float": "Float",
@@ -346,7 +349,7 @@ def operation(
                 and plan.result.buffer_form == "view"
                 and encoding in ("utf8", "json", "bytes")
             ):
-                text = encoding == "utf8"
+                text = encoding in TEXT_ENCODINGS
                 result = "String" if text else "Data"
                 conversion = (
                     f"try NativeCompletion.{'string' if text else 'data'}(result)"
@@ -423,13 +426,11 @@ def operation(
         output_plans = {parameter.name: parameter.value for parameter in plan.outputs}
         capture, storage, types = [], [], []
         if text:
-            storage.append("  var bindingText = Data()")
-            types.append("Data")
+            storage.append('  var bindingText = ""')
+            types.append("String")
             capture.append("bindingText")
             fit = f"NativeString.callerSized(&bindingText) {{ bindingTextStorage, bindingTextCapacity, bindingTextLength in {call} }}"
-            call = "\n".join(
-                [*hoisted, f"return {'try ' if 'try ' in call else ''}{fit}"]
-            )
+            call = "\n".join([*hoisted, f"return try {fit}"])
         for index, output in enumerate(outputs):
             value = output_plans[output.name]
             output_plan = next(p for p in plan.outputs if p.name == output.name)

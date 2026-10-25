@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
-import 'dart:typed_data';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 
@@ -31,7 +30,11 @@ Future<void> closeRuntimes() async {
   print('CLOSED_ALL_HANDLES');
 }
 
-Uint8List _json(String value) => Uint8List.fromList(utf8.encode(value));
+const _emptyStyle = {
+  'version': 8,
+  'sources': <String, Object?>{},
+  'layers': <Object?>[],
+};
 
 /// Leaves a runtime and a map with a loaded style open, for the isolate's
 /// shutdown to finalize.
@@ -39,7 +42,7 @@ Future<void> abandonHandles() async {
   final runtime = runtimeCreate(runtimeOptionsDefault());
   final NewMap(:map, :ready) = runtime.createMap(mapOptionsDefault());
   await ready;
-  await map.setStyleJson(_json('{"version":8,"sources":{},"layers":[]}'));
+  await map.setStyleJson(_emptyStyle);
   print('ABANDONED_HANDLES');
 }
 
@@ -53,12 +56,17 @@ Future<void> abandonSession() async {
     MapOptions(initialExtent: extent),
   );
   await ready;
-  await map.setStyleJson(
-    _json(
-      '{"version":8,"sources":{},"layers":[{"id":"background",'
-      '"type":"background","paint":{"background-color":"#ff0000"}}]}',
-    ),
-  );
+  await map.setStyleJson({
+    'version': 8,
+    'sources': <String, Object?>{},
+    'layers': [
+      {
+        'id': 'background',
+        'type': 'background',
+        'paint': {'background-color': '#ff0000'},
+      },
+    ],
+  });
   var frames = Completer<void>();
   final attachment = TestGraphics.create().attachOwnedTexture(
     map,
@@ -111,7 +119,7 @@ Future<void> exitWithLiveCallbacks() async {
         request.complete(
           ResourceResponse(
             status: ResourceResponseStatus.ok,
-            bytes: _json('{"version":8,"sources":{},"layers":[]}'),
+            bytes: utf8.encode(jsonEncode(_emptyStyle)),
           ),
         );
         waiting.close();

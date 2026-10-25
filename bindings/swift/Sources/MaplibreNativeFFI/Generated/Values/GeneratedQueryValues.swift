@@ -8,21 +8,21 @@ import Foundation
 /// See `mln_rendered_feature` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct RenderedFeature: Equatable, Hashable, Sendable {
-  public var feature: Data
+  public var feature: String
   public var layerId: String
   public var sourceId: String
   public var sourceLayerId: String
-  public var state: Data
+  public var state: String
   public static var `default`: Self {
     Self()
   }
 
   public init(
-    feature: Data = Data(),
+    feature: String = "",
     layerId: String = "",
     sourceId: String = "",
     sourceLayerId: String = "",
-    state: Data = Data()
+    state: String = ""
   ) {
     self.feature = feature
     self.layerId = layerId
@@ -35,7 +35,7 @@ public struct RenderedFeature: Equatable, Hashable, Sendable {
     raw: mln_rendered_feature,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    feature = try NativeString.copyData(
+    feature = try NativeString.copyUTF8(
       data: raw.feature.data,
       size: raw.feature.size
     )
@@ -51,7 +51,7 @@ public struct RenderedFeature: Equatable, Hashable, Sendable {
       data: raw.source_layer_id.data,
       size: raw.source_layer_id.size
     )
-    state = try NativeString.copyData(
+    state = try NativeString.copyUTF8(
       data: raw.state.data,
       size: raw.state.size
     )
@@ -66,14 +66,14 @@ public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
   /// Optional style layer IDs. When absent, all rendered layers are queried.
   public var layerIds: [String]?
   /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
-  public var filter: Data
+  public var filter: String
   public static var `default`: Self {
     try! Self(raw: nativeDefault(mln_rendered_feature_query_options_default))
   }
 
   public init(
     layerIds: [String]? = RenderedFeatureQueryOptions.default.layerIds,
-    filter: Data = RenderedFeatureQueryOptions.default.filter
+    filter: String = RenderedFeatureQueryOptions.default.filter
   ) {
     self.layerIds = layerIds
     self.filter = filter
@@ -88,7 +88,7 @@ public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
         raw.layer_ids,
         count: Int(raw.layer_id_count)
       ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) } : nil
-    filter = try NativeString.copyData(
+    filter = try NativeString.copyUTF8(
       data: raw.filter.data,
       size: raw.filter.size
     )
@@ -274,13 +274,13 @@ public struct ScreenLineString: Equatable, Hashable, Sendable {
 /// See `mln_source_feature` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct SourceFeature: Equatable, Hashable, Sendable {
-  public var feature: Data
+  public var feature: String
   public var sourceLayerId: String
   public static var `default`: Self {
     Self()
   }
 
-  public init(feature: Data = Data(), sourceLayerId: String = "") {
+  public init(feature: String = "", sourceLayerId: String = "") {
     self.feature = feature
     self.sourceLayerId = sourceLayerId
   }
@@ -289,7 +289,7 @@ public struct SourceFeature: Equatable, Hashable, Sendable {
     raw: mln_source_feature,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    feature = try NativeString.copyData(
+    feature = try NativeString.copyUTF8(
       data: raw.feature.data,
       size: raw.feature.size
     )
@@ -308,7 +308,7 @@ public struct SourceFeatureQueryOptions: Equatable, Hashable, Sendable {
   /// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
   public var sourceLayerIds: [String]?
   /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
-  public var filter: Data
+  public var filter: String
   public static var `default`: Self {
     try! Self(raw: nativeDefault(mln_source_feature_query_options_default))
   }
@@ -316,7 +316,7 @@ public struct SourceFeatureQueryOptions: Equatable, Hashable, Sendable {
   public init(
     sourceLayerIds: [String]? = SourceFeatureQueryOptions.default
       .sourceLayerIds,
-    filter: Data = SourceFeatureQueryOptions.default.filter
+    filter: String = SourceFeatureQueryOptions.default.filter
   ) {
     self.sourceLayerIds = sourceLayerIds
     self.filter = filter
@@ -332,7 +332,7 @@ public struct SourceFeatureQueryOptions: Equatable, Hashable, Sendable {
         raw.source_layer_ids,
         count: Int(raw.source_layer_id_count)
       ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) } : nil
-    filter = try NativeString.copyData(
+    filter = try NativeString.copyUTF8(
       data: raw.filter.data,
       size: raw.filter.size
     )

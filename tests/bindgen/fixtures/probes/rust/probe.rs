@@ -26,11 +26,11 @@ pub fn run() {
 
     // Caller-sized text that fits the runtime's first storage, and text that
     // does not, which the runtime fetches again with enough storage.
-    assert_eq!(probe_zeros_json(0).unwrap(), b"[]");
-    assert_eq!(probe_zeros_json(3).unwrap(), b"[0,0,0]");
+    assert_eq!(probe_zeros_json(0).unwrap(), "[]");
+    assert_eq!(probe_zeros_json(3).unwrap(), "[0,0,0]");
     let long = probe_zeros_json(300).unwrap();
     assert_eq!(long.len(), 601);
-    assert!(long.starts_with(b"[0,0,") && long.ends_with(b",0]"));
+    assert!(long.starts_with("[0,0,") && long.ends_with(",0]"));
 
     // Fields named after Rust keywords and runtime locals keep their values
     // through both conversions.

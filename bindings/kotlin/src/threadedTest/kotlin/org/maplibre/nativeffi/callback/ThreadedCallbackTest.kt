@@ -42,9 +42,7 @@ class ThreadedCallbackTest {
       withMap {
         // A style whose center has the wrong JSON type logs a parser warning.
         map
-          .setStyleJson(
-            """{"version":8,"center":false,"sources":{},"layers":[]}""".encodeToByteArray(),
-          )
+          .setStyleJson("""{"version":8,"center":false,"sources":{},"layers":[]}""")
           .awaitWithin("the style command")
         assertEquals(LogEvent.PARSE_STYLE, parsed.awaitWithin("the log callback's record"))
       }

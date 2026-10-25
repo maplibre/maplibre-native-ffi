@@ -61,7 +61,7 @@ test(
   "a provider answers the requests its routes match after its callback returns",
   async () => {
     const origin = await capabilities.httpOrigin!({
-      "/style.json": emptyStyle(),
+      "/style.json": JSON.stringify(emptyStyle()),
     });
     teardown(() => origin.close());
     const claimed = "custom://claimed-style.json";
@@ -157,7 +157,7 @@ test(
   "a transform answers its request after its callback returns",
   async () => {
     const origin = await capabilities.httpOrigin!({
-      "/style.json": emptyStyle(),
+      "/style.json": JSON.stringify(emptyStyle()),
     });
     teardown(() => origin.close());
     const requested = "custom://requested/style.json";
@@ -202,7 +202,7 @@ test(
   "a style URL reaches a local origin with a rule-transformed header without a pump",
   async () => {
     const origin = await capabilities.httpOrigin!({
-      "/style.json": emptyStyle(),
+      "/style.json": JSON.stringify(emptyStyle()),
     });
     teardown(() => origin.close());
     const fixture = await openRuntime({ provider: nothingClaimed });

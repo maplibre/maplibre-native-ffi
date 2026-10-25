@@ -438,7 +438,7 @@ impl Fixture {
 
     /// Loads a style document and waits until it has loaded.
     pub fn load_style(&self, style_json: &str) {
-        let loaded = self.map().set_style_json(style_json.as_bytes()).unwrap();
+        let loaded = self.map().set_style_json(style_json).unwrap();
         self.await_event_type(RuntimeEventType::MapStyleLoaded);
         wait_for(Ok(loaded));
     }

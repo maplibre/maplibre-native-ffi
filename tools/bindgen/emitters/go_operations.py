@@ -5,7 +5,7 @@ from dataclasses import replace
 from ..model import ModelError
 from ..semantic import output_member
 from .go import GO_KEYWORDS, documented_operation, name, native_call
-from .go_values import Values, public
+from .go_values import Values, is_text, public
 
 # Members every handle owner declares, which no operation may take.
 OWNER_MEMBERS = {"Close", "Dispose", "Id", "IsClosed", "String"}
@@ -53,7 +53,7 @@ def argument(values, value, expr):
         if value.ctype.pointee:
             if value.nullable:
                 return f"({values.c_type(value)})(func() unsafe.Pointer {{ if {expr} == nil {{ return nil }}; p := arena.bytes([]byte(*{expr})); if p == nil {{ p = arena.allocate(1) }}; return p }}())"
-            data = f"[]byte({expr})" if value.encoding == "utf8" else expr
+            data = f"[]byte({expr})" if is_text(value) else expr
             return f"({values.c_type(value)})(arena.bytes({data}))"
         if value.nullable:
             return f"func() C.mln_buffer_view {{ if {expr} == nil {{ return C.mln_buffer_view{{}} }}; v := bindingView(*{expr}, arena); if v.data == nil {{ v.data = arena.allocate(1) }}; return v }}()"
@@ -93,7 +93,7 @@ def copier(values, value):
     if value.kind == "record":
         return f"copy{public(value.native)}"
     if value.kind == "buffer" and not value.ctype.pointee and value.length != "nul":
-        text = "Text" if value.encoding == "utf8" else "Bytes"
+        text = "Text" if is_text(value) else "Bytes"
         if not value.nullable:
             return f"copyView{text}"
     return f"func(raw C.{value.native}) {values.type(value)} {{ return {values.copy(value, 'raw')} }}"
@@ -227,7 +227,7 @@ def operation(plan, values, *, discard=False, dispose=False):
             arguments[p.name] = local
             continue
         if p is text:
-            setup.append(f"var {local} []byte")
+            setup.append(f"var {local} string")
             arguments[p.name] = local
             outputs.append((p, p.value, local))
             continue
@@ -275,7 +275,7 @@ def operation(plan, values, *, discard=False, dispose=False):
     output_types, conversions, adoptions = [], [], []
     for p, value, local in outputs:
         if p is text:
-            output_types.append("[]byte")
+            output_types.append("string")
             conversions.append(local)
             continue
         output_types.append(values.type(value))

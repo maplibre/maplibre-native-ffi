@@ -3,14 +3,14 @@ import Foundation
 import Testing
 
 /// A style with no sources, so a load finishes without a request.
-let emptyStyle = Data(#"{"version":8,"sources":{},"layers":[]}"#.utf8)
+let emptyStyle = #"{"version":8,"sources":{},"layers":[]}"#
 
 /// A style that paints every pixel red, so a readback shows that a frame
 /// rendered.
-let redStyle = Data(##"""
+let redStyle = ##"""
 {"version":8,"sources":{},"layers":[{"id":"background",
 "type":"background","paint":{"background-color":"#ff0000"}}]}
-"""##.utf8)
+"""##
 
 /// A resource provider that answers the URLs in `routes` and fails every other
 /// request as not found, so no test reaches the network.

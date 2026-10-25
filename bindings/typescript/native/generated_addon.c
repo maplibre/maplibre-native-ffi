@@ -359,8 +359,7 @@ static napi_value mln_ts_export_mln_geojson_source_data_create(
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 2)) return NULL;
-  if (!mln_ts_read_bytes_view(call, call->argv[0], &arg_data, "data"))
-    goto done;
+  if (!mln_ts_read_json_view(call, call->argv[0], &arg_data, "data")) goto done;
   if (!mln_ts_is_absent(call, call->argv[1])) {
     arg_options = mln_geojson_source_options_default();
     if (!mln_ts_read_record(call, call->argv[1], "options")) goto done;
@@ -882,7 +881,7 @@ static napi_value mln_ts_export_mln_map_add_style_layer_json(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  if (!mln_ts_read_text_view(call, call->argv[1], &arg_layer_json, "layerJson"))
+  if (!mln_ts_read_json_view(call, call->argv[1], &arg_layer_json, "layerJson"))
     goto done;
   if (!mln_ts_read_text_view(
         call, call->argv[2], &arg_before_layer_id, "beforeLayerId"
@@ -924,7 +923,7 @@ static napi_value mln_ts_export_mln_map_add_style_source_json(
   }
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
-  if (!mln_ts_read_text_view(
+  if (!mln_ts_read_json_view(
         call, call->argv[2], &arg_source_json, "sourceJson"
       ))
     goto done;
@@ -1470,7 +1469,7 @@ static napi_value mln_ts_export_mln_map_camera_for_geometry(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  if (!mln_ts_read_text_view(call, call->argv[1], &arg_geometry, "geometry"))
+  if (!mln_ts_read_json_view(call, call->argv[1], &arg_geometry, "geometry"))
     goto done;
   if (!mln_ts_is_absent(call, call->argv[2])) {
     arg_fit_options = mln_camera_fit_options_default();
@@ -1806,8 +1805,8 @@ static napi_value mln_ts_export_mln_map_get_feature_state(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_DECODE_BUFFER_VIEW, &arg_completion,
-        &present_completion
+        call, call->argv[2], false, MLN_TS_DECODE_BUFFER_VIEW_JSON,
+        &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -1837,8 +1836,8 @@ static napi_value mln_ts_export_mln_map_get_global_state(
     arg_map = (mln_map)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, MLN_TS_DECODE_BUFFER_VIEW, &arg_completion,
-        &present_completion
+        call, call->argv[1], false, MLN_TS_DECODE_BUFFER_VIEW_JSON,
+        &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -1900,8 +1899,8 @@ static napi_value mln_ts_export_mln_map_get_loaded_style_json(
     arg_map = (mln_map)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, MLN_TS_DECODE_BUFFER_VIEW, &arg_completion,
-        &present_completion
+        call, call->argv[1], false, MLN_TS_DECODE_BUFFER_VIEW_JSON,
+        &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -2029,7 +2028,7 @@ static napi_value mln_ts_export_mln_map_get_style_layer_json(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_layer_id, "layerId"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_DECODE_BUFFER_VIEW_OPTIONAL,
+        call, call->argv[2], false, MLN_TS_DECODE_BUFFER_VIEW_JSON_OPTIONAL,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -2068,7 +2067,7 @@ static napi_value mln_ts_export_mln_map_get_style_layer_property(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[3], false, MLN_TS_DECODE_BUFFER_VIEW_OPTIONAL,
+        call, call->argv[3], false, MLN_TS_DECODE_BUFFER_VIEW_JSON_OPTIONAL,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -2104,7 +2103,7 @@ static napi_value mln_ts_export_mln_map_get_style_light_property(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, MLN_TS_DECODE_BUFFER_VIEW_OPTIONAL,
+        call, call->argv[2], false, MLN_TS_DECODE_BUFFER_VIEW_JSON_OPTIONAL,
         &arg_completion, &present_completion
       ))
     goto done;
@@ -3227,7 +3226,7 @@ static napi_value mln_ts_export_mln_map_set_custom_geometry_source_tile_data(
         ))
       goto done;
   }
-  if (!mln_ts_read_text_view(call, call->argv[3], &arg_data, "data")) goto done;
+  if (!mln_ts_read_json_view(call, call->argv[3], &arg_data, "data")) goto done;
   if (!mln_ts_read_completion(
         call, call->argv[4], true, MLN_TS_NO_DECODER, &arg_completion,
         &present_completion
@@ -3488,7 +3487,7 @@ static napi_value mln_ts_export_mln_map_set_feature_state(
         call, call->argv[1], &arg_selector, "selector"
       ))
     goto done;
-  if (!mln_ts_read_text_view(call, call->argv[2], &arg_state, "state"))
+  if (!mln_ts_read_json_view(call, call->argv[2], &arg_state, "state"))
     goto done;
   if (!mln_ts_read_completion(
         call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
@@ -3678,7 +3677,7 @@ static napi_value mln_ts_export_mln_map_set_global_state_property(
         call, call->argv[1], &arg_property_name, "propertyName"
       ))
     goto done;
-  if (!mln_ts_read_text_view(call, call->argv[2], &arg_value, "value"))
+  if (!mln_ts_read_json_view(call, call->argv[2], &arg_value, "value"))
     goto done;
   if (!mln_ts_read_completion(
         call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
@@ -3963,7 +3962,7 @@ static napi_value mln_ts_export_mln_map_set_style_json(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  if (!mln_ts_read_text_view(call, call->argv[1], &arg_json, "json")) goto done;
+  if (!mln_ts_read_json_view(call, call->argv[1], &arg_json, "json")) goto done;
   if (!mln_ts_read_completion(
         call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
         &present_completion
@@ -4003,7 +4002,7 @@ static napi_value mln_ts_export_mln_map_set_style_layer_property(
         call, call->argv[2], &arg_property_name, "propertyName"
       ))
     goto done;
-  if (!mln_ts_read_text_view(call, call->argv[3], &arg_value, "value"))
+  if (!mln_ts_read_json_view(call, call->argv[3], &arg_value, "value"))
     goto done;
   if (!mln_ts_read_completion(
         call, call->argv[4], true, MLN_TS_NO_DECODER, &arg_completion,
@@ -4038,7 +4037,7 @@ static napi_value mln_ts_export_mln_map_set_style_light_json(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  if (!mln_ts_read_text_view(call, call->argv[1], &arg_light_json, "lightJson"))
+  if (!mln_ts_read_json_view(call, call->argv[1], &arg_light_json, "lightJson"))
     goto done;
   if (!mln_ts_read_completion(
         call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
@@ -4077,7 +4076,7 @@ static napi_value mln_ts_export_mln_map_set_style_light_property(
         call, call->argv[1], &arg_property_name, "propertyName"
       ))
     goto done;
-  if (!mln_ts_read_text_view(call, call->argv[2], &arg_value, "value"))
+  if (!mln_ts_read_json_view(call, call->argv[2], &arg_value, "value"))
     goto done;
   if (!mln_ts_read_completion(
         call, call->argv[3], true, MLN_TS_NO_DECODER, &arg_completion,
@@ -4886,7 +4885,7 @@ static napi_value mln_ts_export_mln_render_session_query_feature_extensions(
   }
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
-  if (!mln_ts_read_text_view(call, call->argv[2], &arg_feature, "feature"))
+  if (!mln_ts_read_json_view(call, call->argv[2], &arg_feature, "feature"))
     goto done;
   if (!mln_ts_read_text_view(call, call->argv[3], &arg_extension, "extension"))
     goto done;
@@ -4894,13 +4893,13 @@ static napi_value mln_ts_export_mln_render_session_query_feature_extensions(
         call, call->argv[4], &arg_extension_field, "extensionField"
       ))
     goto done;
-  if (!mln_ts_read_text_view(
+  if (!mln_ts_read_json_view(
         call, call->argv[5], &arg_arguments, "argumentsValue"
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[6], false, MLN_TS_DECODE_BUFFER_VIEW, &arg_completion,
-        &present_completion
+        call, call->argv[6], false, MLN_TS_DECODE_BUFFER_VIEW_JSON,
+        &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -6594,7 +6593,7 @@ static napi_value mln_ts_export_mln_style_expression_create(
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 2)) return NULL;
-  if (!mln_ts_read_text_view(
+  if (!mln_ts_read_json_view(
         call, call->argv[0], &arg_expression, "expression"
       ))
     goto done;
@@ -6662,7 +6661,7 @@ static napi_value mln_ts_export_mln_style_expression_evaluate(
     if (arg_out_json == NULL) goto done;
   }
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_text(env, arg_out_json, arg_out_json_length);
+  call->result = mln_ts_json(env, arg_out_json, arg_out_json_length);
 done:
   return mln_ts_end(call);
 }

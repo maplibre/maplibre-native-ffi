@@ -23,7 +23,8 @@
 enum {
   MLN_TS_NO_DECODER,
   MLN_TS_DECODE_BUFFER_VIEW,
-  MLN_TS_DECODE_BUFFER_VIEW_OPTIONAL,
+  MLN_TS_DECODE_BUFFER_VIEW_JSON,
+  MLN_TS_DECODE_BUFFER_VIEW_JSON_OPTIONAL,
   MLN_TS_DECODE_CAMERA_OPTIONS,
   MLN_TS_DECODE_CAMERA_QUERY_RESULT,
   MLN_TS_DECODE_LAT_LNG_BOUNDS,
@@ -46,7 +47,10 @@ enum {
 napi_value mln_ts_decode_buffer_view(
   napi_env env, const mln_completion_result* result
 );
-napi_value mln_ts_decode_buffer_view_optional(
+napi_value mln_ts_decode_buffer_view_json(
+  napi_env env, const mln_completion_result* result
+);
+napi_value mln_ts_decode_buffer_view_json_optional(
   napi_env env, const mln_completion_result* result
 );
 napi_value mln_ts_decode_camera_options(

@@ -182,7 +182,7 @@ internal class MapFixture(val runtimeFixture: RuntimeFixture, val map: MapHandle
 
   /** Loads [json] and waits for the map to report the loaded style. */
   suspend fun loadStyle(json: String = EMPTY_STYLE_JSON) {
-    map.setStyleJson(json.encodeToByteArray()).awaitWithin("the style command")
+    map.setStyleJson(json).awaitWithin("the style command")
     awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
   }
 }

@@ -39,14 +39,15 @@ fn host_strings_use_views_and_native_lent_strings_decode() {
         BACKGROUND_STYLE_JSON,
     )));
 
-    // A style document is an explicit-length view: the bytes after its end
-    // would make it invalid JSON if native read past the length.
+    // A style document is JSON text in an explicit-length view: the bytes
+    // after its end would make it invalid JSON if native read past the length,
+    // and the loaded style decodes back to the same text.
     let padded = format!("{BACKGROUND_STYLE_JSON}, trailing bytes");
-    let document = &padded.as_bytes()[..BACKGROUND_STYLE_JSON.len()];
+    let document = &padded[..BACKGROUND_STYLE_JSON.len()];
     wait_for(fixture.map().set_style_json(document));
     assert_eq!(
         wait_for(fixture.map().get_loaded_style_json()),
-        BACKGROUND_STYLE_JSON.as_bytes()
+        BACKGROUND_STYLE_JSON
     );
 
     // A style URL crosses as a view, and the native-lent provider request
@@ -207,7 +208,7 @@ fn synchronous_calls_fill_caller_sized_outputs_in_input_order() {
 #[test]
 fn caller_sized_text_returns_results_longer_than_its_first_storage() {
     let zoom = style_expression_create(
-        br#"["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"#,
+        r#"["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"#,
         None,
     )
     .unwrap();
@@ -215,12 +216,12 @@ fn caller_sized_text_returns_results_longer_than_its_first_storage() {
         zoom: Some(5.0),
         ..Default::default()
     };
-    assert_eq!(zoom.evaluate(Some(&inputs)).unwrap(), b"50.0");
+    assert_eq!(zoom.evaluate(Some(&inputs)).unwrap(), "50.0");
     zoom.release().unwrap();
 
     // The result outgrows the runtime's first storage, so the call runs again.
     let text = format!("\"{}\"", "a".repeat(1000));
-    let long = style_expression_create(text.as_bytes(), None).unwrap();
-    assert_eq!(long.evaluate(None).unwrap(), text.into_bytes());
+    let long = style_expression_create(&text, None).unwrap();
+    assert_eq!(long.evaluate(None).unwrap(), text);
     long.release().unwrap();
 }

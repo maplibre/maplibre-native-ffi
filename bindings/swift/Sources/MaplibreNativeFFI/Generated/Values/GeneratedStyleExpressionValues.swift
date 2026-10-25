@@ -43,11 +43,11 @@ public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
   /// The value of the elevation expression outside a color-relief layer.
   public var elevation: Double?
   /// One UTF-8 GeoJSON Feature that feature data expressions read.
-  public var feature: Data
+  public var feature: String
   /// A UTF-8 JSON object that the feature-state expression reads.
-  public var featureState: Data
+  public var featureState: String
   /// A UTF-8 JSON object that the global-state expression reads.
-  public var globalState: Data
+  public var globalState: String
   /// The tile that holds the feature, which the within and distance expressions
   /// need to place its geometry.
   public var canonicalTileId: CanonicalTileId?
@@ -63,9 +63,9 @@ public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
     colorRampParameter: Double? = StyleExpressionInputs.default
       .colorRampParameter,
     elevation: Double? = StyleExpressionInputs.default.elevation,
-    feature: Data = StyleExpressionInputs.default.feature,
-    featureState: Data = StyleExpressionInputs.default.featureState,
-    globalState: Data = StyleExpressionInputs.default.globalState,
+    feature: String = StyleExpressionInputs.default.feature,
+    featureState: String = StyleExpressionInputs.default.featureState,
+    globalState: String = StyleExpressionInputs.default.globalState,
     canonicalTileId: CanonicalTileId? = StyleExpressionInputs.default
       .canonicalTileId,
     availableImages: [String] = StyleExpressionInputs.default.availableImages
@@ -91,15 +91,15 @@ public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
       .rawValue != 0 ? raw.color_ramp_parameter : nil
     elevation = raw.fields & MLN_STYLE_EXPRESSION_INPUT_ELEVATION
       .rawValue != 0 ? raw.elevation : nil
-    feature = try NativeString.copyData(
+    feature = try NativeString.copyUTF8(
       data: raw.feature.data,
       size: raw.feature.size
     )
-    featureState = try NativeString.copyData(
+    featureState = try NativeString.copyUTF8(
       data: raw.feature_state.data,
       size: raw.feature_state.size
     )
-    globalState = try NativeString.copyData(
+    globalState = try NativeString.copyUTF8(
       data: raw.global_state.data,
       size: raw.global_state.size
     )

@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from ..semantic import output_member
-from .kotlin_values import Unsupported, identifier, name, owner_name
+from .kotlin_values import Unsupported, identifier, is_text, name, owner_name
 
 EXECUTIONS = {
     "command",
@@ -156,7 +156,7 @@ def signature(plan, values):
         else plan.result
     )
     if plan.caller_sized_text:
-        result_type, result = "ByteArray", None
+        result_type, result = "String", None
     elif plan.drain:
         result = plan.drain.view.value.unwrapped
         values.check(result)
@@ -211,11 +211,11 @@ def counted_inputs(plan):
 
 
 def encoded_text(plan):
-    """The UTF-8 inputs with a separate length, which a call encodes once into a local."""
+    """The text and JSON inputs with a separate length, which a call encodes once into a local."""
     return [
         p
         for p in counted_inputs(plan).values()
-        if p.value.kind == "buffer" and p.value.encoding == "utf8"
+        if p.value.kind == "buffer" and is_text(p.value)
     ]
 
 
@@ -486,7 +486,7 @@ def caller_sized_text(plan, values, native, text):
             ]
         )
         + " }",
-        f"readBytes(textStorage, {written})",
+        f"readBytes(textStorage, {written}).decodeToString()",
     ]
     helper = call_helper(plan)
     body = encodings(plan) + "; ".join(setup)

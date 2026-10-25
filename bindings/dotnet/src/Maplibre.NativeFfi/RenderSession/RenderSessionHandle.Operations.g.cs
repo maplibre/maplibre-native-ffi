@@ -326,12 +326,12 @@ public sealed unsafe partial class RenderSessionHandle
     /// See <c>mln_render_session_query_feature_extensions</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<byte[]> QueryFeatureExtensionsAsync(
+    public Task<string> QueryFeatureExtensionsAsync(
         string sourceId,
-        byte[] feature,
+        string feature,
         string extension,
         string extensionField,
-        byte[] arguments
+        string arguments
     )
     {
         using var scope = new NativeCallScope(this);
@@ -339,16 +339,16 @@ public sealed unsafe partial class RenderSessionHandle
         var nativeStatus = NativeMethods.mln_render_session_query_feature_extensions(
             Handle,
             scope.Utf8(sourceId),
-            scope.Buffer(feature),
+            scope.Utf8(feature),
             scope.Utf8(extension),
             scope.Utf8(extensionField),
-            scope.Buffer(arguments),
-            NativeCompletion.Start<byte[]>(
+            scope.Utf8(arguments),
+            NativeCompletion.Start<string>(
                 &nativeCompletion,
                 static nativeResult =>
-                    NativeCompletion.Single<mln_buffer_view, byte[]>(
+                    NativeCompletion.Single<mln_buffer_view, string>(
                         nativeResult,
-                        ValueStructs.CopyBufferView
+                        ValueStructs.CopyUtf8View
                     ),
                 out var nativePending
             ),

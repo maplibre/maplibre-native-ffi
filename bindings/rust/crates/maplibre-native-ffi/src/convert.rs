@@ -294,6 +294,13 @@ pub(crate) fn caller_sized_text(
     }
 }
 
+/// The text that [`caller_sized_text`] copied, which must be UTF-8.
+pub(crate) fn utf8(text: Vec<u8>) -> Result<String> {
+    String::from_utf8(text).map_err(|error| {
+        Error::invalid_argument(format!("native text was not valid UTF-8: {error}"))
+    })
+}
+
 fn length(count: impl TryInto<usize>) -> Result<usize> {
     count
         .try_into()

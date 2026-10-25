@@ -149,7 +149,7 @@ pub fn free_camera_options_default() -> FreeCameraOptions {
 /// See `mln_geojson_source_data_create` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub fn geojson_source_data_create(
-    data: &[u8],
+    data: &str,
     options: Option<&GeojsonSourceOptions>,
 ) -> Result<GeojsonSourceDataHandle> {
     let mut call = Call::global();
@@ -562,7 +562,7 @@ pub fn source_feature_query_options_default() -> SourceFeatureQueryOptions {
 /// See `mln_style_expression_create` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 pub fn style_expression_create(
-    expression: &[u8],
+    expression: &str,
     options: Option<&StyleExpressionOptions>,
 ) -> Result<StyleExpressionHandle> {
     let mut call = Call::global();

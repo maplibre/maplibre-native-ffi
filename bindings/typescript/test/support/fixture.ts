@@ -80,7 +80,7 @@ export function styleRoute(url: string): ResourceRoute {
 export function styleResponse(style = emptyStyle()): ResourceResponse {
   return {
     status: ResourceResponseStatus.ok,
-    bytes: utf8(style),
+    bytes: utf8(JSON.stringify(style)),
     errorMessage: "",
     etag: "",
   };
@@ -150,7 +150,7 @@ export interface RuntimeFixture {
   /** Creates a map that a teardown closes. */
   openMap(options?: MapOptions): Promise<MapHandle>;
   /** Creates a map and commits `style` to it. */
-  openStyledMap(style?: string, options?: MapOptions): Promise<MapHandle>;
+  openStyledMap(style?: unknown, options?: MapOptions): Promise<MapHandle>;
 }
 
 export const extent = { width: 64, height: 64, scaleFactor: 1 };

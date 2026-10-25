@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Pointer;
@@ -17,7 +18,7 @@ public sealed class ResourceProviderTests
         new()
         {
             Status = ResourceResponseStatus.Ok,
-            Bytes = [.. NativeFixture.EmptyStyle],
+            Bytes = [.. Encoding.UTF8.GetBytes(NativeFixture.EmptyStyle)],
             ErrorMessage = "",
             Etag = "",
         };

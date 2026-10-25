@@ -7,6 +7,11 @@ from ..semantic import enum_member_prefix
 from .go import doc, name, native_identifier
 
 
+def is_text(value):
+    """Whether a buffer is a Go string: UTF-8 text and JSON."""
+    return value.encoding in {"utf8", "json"}
+
+
 def public(native):
     return name(native.removeprefix("mln_"))
 
@@ -125,7 +130,7 @@ class Values:
         elif value.kind == "native_pointer":
             result = "uintptr"
         elif value.kind == "buffer":
-            result = "string" if value.encoding == "utf8" else "[]byte"
+            result = "string" if is_text(value) else "[]byte"
         elif value.kind == "array":
             result = "[]" + self.type(value.element)
         elif value.kind == "reference":
@@ -202,7 +207,7 @@ class Values:
             else:
                 pointer, size = f"{expr}.data", f"{expr}.size"
             copy = f"bindingBytes({pointer}, uint64({size}))"
-            if value.encoding == "utf8":
+            if is_text(value):
                 copy = f"bindingString({pointer}, uint64({size}))"
             return (
                 f"func() {self.type(value)} {{ if {pointer} == nil {{ return nil }}; value := {copy}; return &value }}()"
@@ -272,7 +277,7 @@ class Values:
                 else "{ " + alloc + " }"
             )
         if value.kind == "buffer":
-            data = f"[]byte({expr})" if value.encoding == "utf8" else expr
+            data = f"[]byte({expr})" if is_text(value) else expr
             inner = f"arena.bytes({data})"
             if value.length == "nul":
                 inner = f"arena.cstring({expr})"

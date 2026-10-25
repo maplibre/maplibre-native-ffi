@@ -11,6 +11,9 @@ from ..model import Api, ModelError
 from ..names import camel, pascal
 from ..semantic import BoundApi, FieldPlan, ValuePlan, enum_member_prefix
 
+# JSON is text, so it takes and returns a string as UTF-8 text does.
+TEXT_ENCODINGS = frozenset({"utf8", "json"})
+
 SCALARS = {
     "bool": "bool",
     "_Bool": "bool",
@@ -227,7 +230,7 @@ class Values:
             base = self.public_type(plan.element)
             return base if not plan.nullable or base.endswith("?") else base + "?"
         if plan.kind == "buffer":
-            base = "string" if plan.encoding == "utf8" else "byte[]"
+            base = "string" if plan.encoding in TEXT_ENCODINGS else "byte[]"
             return base + ("?" if plan.nullable else "")
         if plan.kind == "array" and plan.element:
             return self.public_type(plan.element) + "[]"
@@ -327,7 +330,7 @@ class Values:
                     raise Unsupported("counted buffer requires a count expression")
                 copied = (
                     f"RuntimeStructs.CopyUtf8((sbyte*){expression}, (nuint)({length}))"
-                    if plan.encoding == "utf8"
+                    if plan.encoding in TEXT_ENCODINGS
                     else f"NativeCallScope.CopyArray<byte>((byte*){expression}, (nuint)({length}))"
                 )
                 return (
@@ -337,7 +340,7 @@ class Values:
                 )
             copy = (
                 f"RuntimeStructs.CopyUtf8((sbyte*){expression}.data, {expression}.size)"
-                if plan.encoding == "utf8"
+                if plan.encoding in TEXT_ENCODINGS
                 else f"ValueStructs.CopyBufferView({expression})"
             )
             return (
@@ -376,7 +379,7 @@ class Values:
                     if plan.nullable
                     else f"scope.CString({expression})"
                 )
-            method = "Utf8" if plan.encoding == "utf8" else "Buffer"
+            method = "Utf8" if plan.encoding in TEXT_ENCODINGS else "Buffer"
             return (
                 f"{expression} is null ? default : scope.{method}({expression})"
                 if plan.nullable
@@ -874,7 +877,7 @@ class Values:
             and field.value.length != "nul"
         ):
             local = "buffer" + pascal(field.name)
-            method = "Utf8" if field.value.encoding == "utf8" else "Buffer"
+            method = "Utf8" if field.value.encoding in TEXT_ENCODINGS else "Buffer"
             count = next(
                 item for item in plan.fields if item.name == field.value.length
             )

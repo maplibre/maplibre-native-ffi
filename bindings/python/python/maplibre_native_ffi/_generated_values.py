@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Buffer, Sequence
 from dataclasses import dataclass, field
 from enum import IntFlag
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from ._enum import UnknownIntEnum
 from ._operation import _wrap_response
@@ -1452,7 +1452,7 @@ class GeojsonSourceOptions:
     cluster_max_zoom: float | None = None
     """Highest zoom that clusters points. Defaults to 17."""
 
-    cluster_properties: bytes = field(
+    cluster_properties: Any = field(
         default_factory=lambda: GeojsonSourceOptions.default().cluster_properties
     )
     """Cluster aggregation expressions keyed by property name, as a JSON object
@@ -2192,7 +2192,7 @@ class OfflineGeometryRegionDefinition:
     style_url: str
     """Style URL. Copied during region creation."""
 
-    geometry: bytes
+    geometry: Any
     """UTF-8 GeoJSON Geometry bytes. Borrowed during region creation."""
 
     min_zoom: float
@@ -3027,7 +3027,7 @@ class RenderedFeature:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
     """
 
-    feature: bytes
+    feature: Any
 
     layer_id: str
 
@@ -3035,7 +3035,7 @@ class RenderedFeature:
 
     source_layer_id: str
 
-    state: bytes
+    state: Any
 
     @classmethod
     def _from_native(cls, raw):
@@ -3059,7 +3059,7 @@ class RenderedFeatureQueryOptions:
     layer_ids: Sequence[str] | None = None
     """Optional style layer IDs. When absent, all rendered layers are queried."""
 
-    filter: bytes = field(
+    filter: Any = field(
         default_factory=lambda: RenderedFeatureQueryOptions.default().filter
     )
     """UTF-8 MapLibre style-spec filter JSON, or empty for no filter."""
@@ -3652,7 +3652,7 @@ class SourceFeature:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
     """
 
-    feature: bytes
+    feature: Any
 
     source_layer_id: str
 
@@ -3674,7 +3674,7 @@ class SourceFeatureQueryOptions:
     GeoJSON.
     """
 
-    filter: bytes = field(
+    filter: Any = field(
         default_factory=lambda: SourceFeatureQueryOptions.default().filter
     )
     """UTF-8 MapLibre style-spec filter JSON, or empty for no filter."""
@@ -3739,17 +3739,17 @@ class StyleExpressionInputs:
     elevation: float | None = None
     """The value of the elevation expression outside a color-relief layer."""
 
-    feature: bytes = field(
+    feature: Any = field(
         default_factory=lambda: StyleExpressionInputs.default().feature
     )
     """One UTF-8 GeoJSON Feature that feature data expressions read."""
 
-    feature_state: bytes = field(
+    feature_state: Any = field(
         default_factory=lambda: StyleExpressionInputs.default().feature_state
     )
     """A UTF-8 JSON object that the feature-state expression reads."""
 
-    global_state: bytes = field(
+    global_state: Any = field(
         default_factory=lambda: StyleExpressionInputs.default().global_state
     )
     """A UTF-8 JSON object that the global-state expression reads."""

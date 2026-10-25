@@ -1328,7 +1328,7 @@ public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
   /// Style URL. Copied during region creation.
   public var styleUrl: String
   /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
-  public var geometry: Data
+  public var geometry: String
   public var minZoom: Double
   /// Maximum zoom. Positive infinity lets each tile source use its own maximum
   /// zoom.
@@ -1341,7 +1341,7 @@ public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
 
   public init(
     styleUrl: String = "",
-    geometry: Data = Data(),
+    geometry: String = "",
     minZoom: Double = 0,
     maxZoom: Double = 0,
     pixelRatio: Float = 0,
@@ -1363,7 +1363,7 @@ public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
       data: raw.style_url.data,
       size: raw.style_url.size
     )
-    geometry = try NativeString.copyData(
+    geometry = try NativeString.copyUTF8(
       data: raw.geometry.data,
       size: raw.geometry.size
     )

@@ -7,6 +7,8 @@ JavaScript object from a borrowed C record. A completion decoder reads the
 value of a drained completion, and the payload reader converts the copied
 arguments of each other drained delivery. Converters check only the shape that
 the binding owns: the JavaScript type, the integer range, and NUL termination.
+A JSON value converts through the realm's `JSON.stringify` and `JSON.parse`,
+with `undefined` for an empty view.
 
 A registration that a delivery queue carries names the realm's queue and a
 token in place of its callbacks; a wake posts its token to the realm through
@@ -102,11 +104,10 @@ class NativeValues:
             ]
         if value.kind == "buffer":
             if value.buffer_form == "view":
-                reader = (
-                    "mln_ts_read_bytes_view"
-                    if value.encoding == "bytes"
-                    else "mln_ts_read_text_view"
-                )
+                reader = {
+                    "bytes": "mln_ts_read_bytes_view",
+                    "json": "mln_ts_read_json_view",
+                }.get(value.encoding, "mln_ts_read_text_view")
                 return [f"if (!{reader}(call, {js}, &{target}, {path})) {fail};"]
             return [
                 f"{{ const char* text = NULL; if (!mln_ts_read_text(call, {js}, &text, {path})) {fail}; {target} = text; }}"
@@ -306,7 +307,9 @@ class NativeValues:
                 )
             if field.presence and field.presence.mask:
                 body.append(f"out->{field.presence.mask} |= {field.presence.bit};")
-            if self.values.omittable(value, field):
+            # A JSON reader takes undefined as absent itself, and null as JSON.
+            json = field.value.kind == "buffer" and field.value.encoding == "json"
+            if self.values.omittable(value, field) and not json:
                 lines.append("  if (!mln_ts_is_absent(call, member)) {")
                 lines += [f"    {line}" for line in body]
                 lines.append("  }")
@@ -424,7 +427,9 @@ class NativeValues:
             return f"mln_ts_i64(env, (int64_t)({source}))"
         if value.kind == "buffer":
             if value.buffer_form == "view":
-                convert = "mln_ts_bytes" if value.encoding == "bytes" else "mln_ts_text"
+                convert = {"bytes": "mln_ts_bytes", "json": "mln_ts_json"}.get(
+                    value.encoding, "mln_ts_text"
+                )
                 expression = f"{convert}(env, ({source}).data, ({source}).size)"
                 if value.nullable:
                     return f"(({source}).data == NULL ? mln_ts_undefined(env) : {expression})"
@@ -608,8 +613,14 @@ class NativeValues:
             ctype = self.values.carrier(element).c
         else:
             raise Unsupported(f"{element.native}: completion value needs a decoder")
-        name = f"mln_ts_decode_{stem(element.native)}" + (
-            "_list" if result.kind == "array" else ""
+        name = (
+            f"mln_ts_decode_{stem(element.native)}"
+            + (
+                "_json"
+                if element.kind == "buffer" and element.encoding == "json"
+                else ""
+            )
+            + ("_list" if result.kind == "array" else "")
         )
         if result.nullable:
             name += "_optional"

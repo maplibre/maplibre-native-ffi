@@ -138,7 +138,7 @@ public extension MapHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addStyleLayerJson(
-    _ bindingArg0: Data,
+    _ bindingArg0: String,
     beforeLayerId bindingArg1: String
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -159,7 +159,7 @@ public extension MapHandle {
   @discardableResult
   func addStyleSourceJson(
     _ bindingArg0: String,
-    sourceJson bindingArg1: Data
+    sourceJson bindingArg1: String
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_add_style_source_json(
@@ -177,9 +177,9 @@ public extension MapHandle {
   ///
   /// See `mln_map_get_global_state` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func getGlobalState() async throws -> Data {
+  func getGlobalState() async throws -> String {
     try await nativeStart(convert: { result in
-      try NativeCompletion.data(result)
+      try NativeCompletion.string(result)
     }) { raw, _, completion, diagnostic in mln_map_get_global_state(
       raw,
       completion,
@@ -258,14 +258,14 @@ public extension MapHandle {
   ///
   /// See `mln_map_get_style_layer_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func getStyleLayerJson(_ bindingArg0: String) async throws -> Data? {
+  func getStyleLayerJson(_ bindingArg0: String) async throws -> String? {
     try await nativeStart(convert: { result in
       if result.pointee
         .value_count == 0
       {
         return nil
       }; return try NativeCompletion
-        .data(result)
+        .string(result)
     }) { raw, arena, completion, diagnostic in mln_map_get_style_layer_json(
       raw,
       arena.view(bindingArg0),
@@ -281,14 +281,14 @@ public extension MapHandle {
   func getStyleLayerProperty(
     _ bindingArg0: String,
     propertyName bindingArg1: String
-  ) async throws -> Data? {
+  ) async throws -> String? {
     try await nativeStart(convert: { result in
       if result.pointee
         .value_count == 0
       {
         return nil
       }; return try NativeCompletion
-        .data(result)
+        .string(result)
     }) { raw, arena, completion, diagnostic in
       mln_map_get_style_layer_property(
         raw,
@@ -304,14 +304,14 @@ public extension MapHandle {
   ///
   /// See `mln_map_get_style_light_property` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func getStyleLightProperty(_ bindingArg0: String) async throws -> Data? {
+  func getStyleLightProperty(_ bindingArg0: String) async throws -> String? {
     try await nativeStart(convert: { result in
       if result.pointee
         .value_count == 0
       {
         return nil
       }; return try NativeCompletion
-        .data(result)
+        .string(result)
     }) { raw, arena, completion, diagnostic in
       mln_map_get_style_light_property(
         raw,
@@ -535,7 +535,7 @@ public extension MapHandle {
   func setCustomGeometrySourceTileData(
     _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId,
-    data bindingArg2: Data
+    data bindingArg2: String
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_custom_geometry_source_tile_data(
@@ -682,7 +682,7 @@ public extension MapHandle {
   @discardableResult
   func setGlobalStateProperty(
     _ bindingArg0: String,
-    value bindingArg1: Data
+    value bindingArg1: String
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_global_state_property(
@@ -786,7 +786,7 @@ public extension MapHandle {
   func setStyleLayerProperty(
     _ bindingArg0: String,
     propertyName bindingArg1: String,
-    value bindingArg2: Data
+    value bindingArg2: String
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_style_layer_property(
@@ -805,7 +805,7 @@ public extension MapHandle {
   /// See `mln_map_set_style_light_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
-  func setStyleLightJson(_ bindingArg0: Data) async throws
+  func setStyleLightJson(_ bindingArg0: String) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -825,7 +825,7 @@ public extension MapHandle {
   @discardableResult
   func setStyleLightProperty(
     _ bindingArg0: String,
-    value bindingArg1: Data
+    value bindingArg1: String
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_style_light_property(
@@ -984,7 +984,7 @@ public extension MapHandleDiscarding {
   }
 
   func addStyleLayerJson(
-    _ bindingArg0: Data,
+    _ bindingArg0: String,
     beforeLayerId bindingArg1: String
   ) throws {
     try owner
@@ -999,7 +999,7 @@ public extension MapHandleDiscarding {
 
   func addStyleSourceJson(
     _ bindingArg0: String,
-    sourceJson bindingArg1: Data
+    sourceJson bindingArg1: String
   ) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in mln_map_add_style_source_json(
@@ -1105,7 +1105,7 @@ public extension MapHandleDiscarding {
   func setCustomGeometrySourceTileData(
     _ bindingArg0: String,
     tileId bindingArg1: CanonicalTileId,
-    data bindingArg2: Data
+    data bindingArg2: String
   ) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in
@@ -1220,7 +1220,7 @@ public extension MapHandleDiscarding {
 
   func setGlobalStateProperty(
     _ bindingArg0: String,
-    value bindingArg1: Data
+    value bindingArg1: String
   ) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in
@@ -1299,7 +1299,7 @@ public extension MapHandleDiscarding {
   func setStyleLayerProperty(
     _ bindingArg0: String,
     propertyName bindingArg1: String,
-    value bindingArg2: Data
+    value bindingArg2: String
   ) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in
@@ -1314,7 +1314,7 @@ public extension MapHandleDiscarding {
       }
   }
 
-  func setStyleLightJson(_ bindingArg0: Data) throws {
+  func setStyleLightJson(_ bindingArg0: String) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in mln_map_set_style_light_json(
         raw,
@@ -1326,7 +1326,7 @@ public extension MapHandleDiscarding {
 
   func setStyleLightProperty(
     _ bindingArg0: String,
-    value bindingArg1: Data
+    value bindingArg1: String
   ) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in

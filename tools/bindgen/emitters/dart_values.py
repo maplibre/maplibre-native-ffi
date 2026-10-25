@@ -283,6 +283,9 @@ class Values:
             name = self.public(replace(value.element, nullable=False))
         elif value.kind == "array":
             name = f"List<{self.public(value.element)}>"
+        elif value.encoding == "json":
+            # Any JSON value, which admits null.
+            return "Object?"
         else:
             name = "String" if value.encoding == "utf8" else "Uint8List"
         return name + "?" if value.nullable else name
@@ -333,7 +336,14 @@ class Values:
             )
         return f"{array}[index] = {self.native(value, expression)};"
 
-    def native(self, value, expression):
+    def native(self, value, expression, member=False):
+        """The native form of `expression`. A JSON value serializes through
+        `jsonEncode`, except that null in a record member, `member`, is absent
+        and converts to an empty view."""
+        if value.kind == "buffer" and value.encoding == "json":
+            if value.buffer_form != "view":
+                raise Unsupported(f"{value.native}: JSON outside a view")
+            return f"_nativeJsonView({expression}, arena{', member: true' if member else ''})"
         if value.registration:
             return f"{self.prepared(value, expression)}.ref"
         if value.kind == "handle":
@@ -457,6 +467,10 @@ class Values:
             result = f"{public_name(value.native)}.fromRawValue({expression})"
         elif value.kind == "record":
             result = f"_read{public_name(value.native)}({expression})"
+        elif value.kind == "buffer" and value.encoding == "json":
+            if value.buffer_form != "view":
+                raise Unsupported(f"{value.native}: JSON outside a view")
+            result = f"_decodeJsonView({expression})"
         elif value.kind == "buffer":
             if value.buffer_form == "view":
                 result = f"_copyBufferView({expression})"
@@ -667,11 +681,11 @@ class Values:
                 ]
             elif field.presence and field.presence.mask:
                 writes.append(
-                    f"    if ({expression} != null) {{ {self.set_present(field.presence.mask, field.presence.bit)} result.ref.{field.name} = {self.native(field.value, expression + '!')}; }}"
+                    f"    if ({expression} != null) {{ {self.set_present(field.presence.mask, field.presence.bit)} result.ref.{field.name} = {self.native(field.value, expression + '!', member=True)}; }}"
                 )
             else:
                 writes.append(
-                    f"    result.ref.{field.name} = {self.native(field.value, expression)};"
+                    f"    result.ref.{field.name} = {self.native(field.value, expression, member=True)};"
                 )
         return fields, args, initializers, writes
 
@@ -956,7 +970,7 @@ class Values:
                 + f"  final {typ} {name};"
             )
             writes.append(
-                f"  result.ref.{field.name} = {self.native(field.value, 'value.' + name)};"
+                f"  result.ref.{field.name} = {self.native(field.value, 'value.' + name, member=True)};"
             )
             reads.append(
                 f"    {name}: {self.copy(field.value, 'source.' + field.name)},"
@@ -1261,7 +1275,7 @@ class Values:
                     )
                 else:
                     write.append(
-                        f"  {native_field} = {self.native(field.value, expression)};"
+                        f"  {native_field} = {self.native(field.value, expression, member=True)};"
                     )
                 if capture is None:
                     capture = self.copy(

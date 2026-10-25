@@ -40,7 +40,7 @@ final class RenderLoop {
     mode: RenderTargetMode,
     graphics: MetalGraphicsContext,
     viewport: Viewport,
-    styleJSON: Data? = nil
+    styleJSON: String? = nil
   ) async throws -> RenderLoop {
     // The wakes exist before the loop does, so a relay forwards them.
     let relay = WakeRelay()

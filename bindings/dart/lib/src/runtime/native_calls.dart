@@ -256,6 +256,26 @@ int _nativeInteger(int value, int minimum, int maximum) {
   return value;
 }
 
+/// Serializes a JSON value with `jsonEncode` into a view in arena. A record
+/// member that is null, [member], is absent and converts to an empty view; a
+/// parameter that is null is JSON null.
+raw.mln_buffer_view _nativeJsonView(
+  Object? value,
+  Allocator arena, {
+  bool member = false,
+}) {
+  if (member && value == null) return arena<raw.mln_buffer_view>().ref;
+  return nativeStringView(jsonEncode(value), arena).value;
+}
+
+/// Parses UTF-8 JSON with `jsonDecode`; empty text is absent, null.
+Object? _decodeJson(Uint8List bytes) =>
+    bytes.isEmpty ? null : jsonDecode(utf8.decode(bytes));
+
+/// Parses a JSON view with `jsonDecode`; an empty view is absent, null.
+Object? _decodeJsonView(raw.mln_buffer_view view) =>
+    _decodeJson(_copyBufferView(view));
+
 Uint8List _copyBufferView(raw.mln_buffer_view view) {
   if (view.size == 0) return Uint8List(0);
   if (view.data == nullptr) {

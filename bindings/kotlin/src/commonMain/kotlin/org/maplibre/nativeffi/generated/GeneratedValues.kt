@@ -2478,7 +2478,7 @@ public data class GeojsonSourceOptions(
    * the MapLibre Style Spec clusterProperties form, or empty for none. The UTF-8 bytes are borrowed
    * for the call.
    */
-  public val clusterProperties: ByteArray = GeojsonSourceOptions.default.clusterProperties,
+  public val clusterProperties: String = GeojsonSourceOptions.default.clusterProperties,
   /** Tile buffer in pixels within &#91;0, 512&#93;. Defaults to 128. */
   public val buffer: UInt? = null,
   /** Cluster radius in pixels within &#91;0, 4095&#93;. Defaults to 50. */
@@ -2492,27 +2492,6 @@ public data class GeojsonSourceOptions(
   /** Tiles the data for the next render update instead of in the background. Defaults to false. */
   public val synchronousTiling: Boolean? = null,
 ) {
-  private fun contentFields(): Array<Any?> =
-    arrayOf(
-      minZoom,
-      maxZoom,
-      tolerance,
-      clusterMaxZoom,
-      clusterProperties,
-      buffer,
-      clusterRadius,
-      clusterMinPoints,
-      lineMetrics,
-      cluster,
-      synchronousTiling,
-    )
-
-  override fun equals(other: Any?): Boolean =
-    this === other ||
-      other is GeojsonSourceOptions && contentFields().contentDeepEquals(other.contentFields())
-
-  override fun hashCode(): Int = contentFields().contentDeepHashCode()
-
   public companion object {
     internal val default: GeojsonSourceOptions by lazy {
       GeneratedApi.geojsonSourceOptionsDefault()
@@ -3008,17 +2987,8 @@ public data class RenderedFeatureQueryOptions(
   /** Optional style layer IDs. When absent, all rendered layers are queried. */
   public val layerIds: List<String>? = null,
   /** UTF-8 MapLibre style-spec filter JSON, or empty for no filter. */
-  public val filter: ByteArray = RenderedFeatureQueryOptions.default.filter,
+  public val filter: String = RenderedFeatureQueryOptions.default.filter,
 ) {
-  private fun contentFields(): Array<Any?> = arrayOf(layerIds, filter)
-
-  override fun equals(other: Any?): Boolean =
-    this === other ||
-      other is RenderedFeatureQueryOptions &&
-        contentFields().contentDeepEquals(other.contentFields())
-
-  override fun hashCode(): Int = contentFields().contentDeepHashCode()
-
   public companion object {
     internal val default: RenderedFeatureQueryOptions by lazy {
       GeneratedApi.renderedFeatureQueryOptionsDefault()
@@ -3074,16 +3044,8 @@ public data class SourceFeatureQueryOptions(
   /** Optional source-layer IDs. Required by vector sources; ignored by GeoJSON. */
   public val sourceLayerIds: List<String>? = null,
   /** UTF-8 MapLibre style-spec filter JSON, or empty for no filter. */
-  public val filter: ByteArray = SourceFeatureQueryOptions.default.filter,
+  public val filter: String = SourceFeatureQueryOptions.default.filter,
 ) {
-  private fun contentFields(): Array<Any?> = arrayOf(sourceLayerIds, filter)
-
-  override fun equals(other: Any?): Boolean =
-    this === other ||
-      other is SourceFeatureQueryOptions && contentFields().contentDeepEquals(other.contentFields())
-
-  override fun hashCode(): Int = contentFields().contentDeepHashCode()
-
   public companion object {
     internal val default: SourceFeatureQueryOptions by lazy {
       GeneratedApi.sourceFeatureQueryOptionsDefault()
@@ -3143,11 +3105,11 @@ public data class StyleExpressionInputs(
   /** The value of the elevation expression outside a color-relief layer. */
   public val elevation: Double? = null,
   /** One UTF-8 GeoJSON Feature that feature data expressions read. */
-  public val feature: ByteArray = StyleExpressionInputs.default.feature,
+  public val feature: String = StyleExpressionInputs.default.feature,
   /** A UTF-8 JSON object that the feature-state expression reads. */
-  public val featureState: ByteArray = StyleExpressionInputs.default.featureState,
+  public val featureState: String = StyleExpressionInputs.default.featureState,
   /** A UTF-8 JSON object that the global-state expression reads. */
-  public val globalState: ByteArray = StyleExpressionInputs.default.globalState,
+  public val globalState: String = StyleExpressionInputs.default.globalState,
   /**
    * The tile that holds the feature, which the within and distance expressions need to place its
    * geometry.
@@ -3159,24 +3121,6 @@ public data class StyleExpressionInputs(
    */
   public val availableImages: List<String> = StyleExpressionInputs.default.availableImages,
 ) {
-  private fun contentFields(): Array<Any?> =
-    arrayOf(
-      zoom,
-      colorRampParameter,
-      elevation,
-      feature,
-      featureState,
-      globalState,
-      canonicalTileId,
-      availableImages,
-    )
-
-  override fun equals(other: Any?): Boolean =
-    this === other ||
-      other is StyleExpressionInputs && contentFields().contentDeepEquals(other.contentFields())
-
-  override fun hashCode(): Int = contentFields().contentDeepHashCode()
-
   public companion object {
     internal val default: StyleExpressionInputs by lazy {
       GeneratedApi.styleExpressionInputsDefault()
@@ -3816,21 +3760,12 @@ public data class RenderedQueryGeometry(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 public data class RenderedFeature(
-  public val feature: ByteArray,
+  public val feature: String,
   public val layerId: String,
   public val sourceId: String,
   public val sourceLayerId: String,
-  public val state: ByteArray,
-) {
-  private fun contentFields(): Array<Any?> =
-    arrayOf(feature, layerId, sourceId, sourceLayerId, state)
-
-  override fun equals(other: Any?): Boolean =
-    this === other ||
-      other is RenderedFeature && contentFields().contentDeepEquals(other.contentFields())
-
-  override fun hashCode(): Int = contentFields().contentDeepHashCode()
-}
+  public val state: String,
+)
 
 /**
  * One source-feature query hit borrowed for a completion callback.
@@ -3839,17 +3774,9 @@ public data class RenderedFeature(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 public data class SourceFeature(
-  public val feature: ByteArray,
+  public val feature: String,
   public val sourceLayerId: String,
-) {
-  private fun contentFields(): Array<Any?> = arrayOf(feature, sourceLayerId)
-
-  override fun equals(other: Any?): Boolean =
-    this === other ||
-      other is SourceFeature && contentFields().contentDeepEquals(other.contentFields())
-
-  override fun hashCode(): Int = contentFields().contentDeepHashCode()
-}
+)
 
 /**
  * CPU image readback metadata for a texture target frame.
@@ -3953,23 +3880,13 @@ public data class OfflineGeometryRegionDefinition(
   /** Style URL. Copied during region creation. */
   public val styleUrl: String = "",
   /** UTF-8 GeoJSON Geometry bytes. Borrowed during region creation. */
-  public val geometry: ByteArray = byteArrayOf(),
+  public val geometry: String = "",
   public val minZoom: Double = 0.0,
   /** Maximum zoom. Positive infinity lets each tile source use its own maximum zoom. */
   public val maxZoom: Double = 0.0,
   public val pixelRatio: Float = 0f,
   public val includeIdeographs: Boolean = false,
-) {
-  private fun contentFields(): Array<Any?> =
-    arrayOf(styleUrl, geometry, minZoom, maxZoom, pixelRatio, includeIdeographs)
-
-  override fun equals(other: Any?): Boolean =
-    this === other ||
-      other is OfflineGeometryRegionDefinition &&
-        contentFields().contentDeepEquals(other.contentFields())
-
-  override fun hashCode(): Int = contentFields().contentDeepHashCode()
-}
+)
 
 /**
  * Offline region definition data.

@@ -1,6 +1,6 @@
 """Retained callback descriptors and scoped responses."""
 
-from .rust import Unsupported, doc, identifier, native_call, native_identifier
+from .rust import Unsupported, doc, identifier, is_text, native_call, native_identifier
 from .rust_dynamic_values import decode, encode
 
 
@@ -334,7 +334,7 @@ def lent_text(value):
     host borrows rather than copies."""
     return (
         value.kind == "buffer"
-        and value.encoding == "utf8"
+        and is_text(value)
         and not value.nullable
         and (value.length == "nul" or value.buffer_form == "view")
     )
@@ -392,7 +392,7 @@ def response_declaration(values, value):
                 )
                 args.append(local)
             elif parameter.value.kind == "buffer":
-                public = "&str" if parameter.value.encoding == "utf8" else "&[u8]"
+                public = "&str" if is_text(parameter.value) else "&[u8]"
                 signature.append(f"{local}: {public}")
                 if (
                     parameter.value.buffer_form == "view"

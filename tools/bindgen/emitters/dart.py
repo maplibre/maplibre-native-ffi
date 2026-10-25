@@ -190,7 +190,11 @@ def lower_function(
         if parameter.name in text_arguments:
             if parameter.name == text.name:
                 setup.append("final text = _CallerSizedText();")
-                returns.append(("Uint8List", "text.text"))
+                returns.append(
+                    ("Object?", "_decodeJson(text.text)")
+                    if text.value.encoding == "json"
+                    else ("Uint8List", "text.text")
+                )
             args.append(text_arguments[parameter.name])
             continue
         if parameter.name in counts:
@@ -279,7 +283,9 @@ def lower_function(
         value = inputs[parameter.name].value
         values.check(value)
         typ = values.public(value)
-        if typ.endswith("?"):
+        # A JSON parameter is always a value, which null is too.
+        json = value.kind == "buffer" and value.encoding == "json"
+        if typ.endswith("?") and not json:
             optional.append(f"{typ} {local}")
         else:
             signature.append(f"{typ} {local}")

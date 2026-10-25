@@ -85,9 +85,7 @@ object LogProcessExitProbe {
 
 /** Loads a style whose invalid center emits a native parser warning, and waits for the record. */
 private suspend fun warnFromStyle(map: MapHandle, received: CountDownLatch) {
-  map
-    .setStyleJson("""{"version":8,"center":false,"sources":{},"layers":[]}""".encodeToByteArray())
-    .await()
+  map.setStyleJson("""{"version":8,"center":false,"sources":{},"layers":[]}""").await()
   check(received.await(10, TimeUnit.SECONDS)) { "Native parser warning never reached Java" }
 }
 

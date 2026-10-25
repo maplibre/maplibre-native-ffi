@@ -37,12 +37,7 @@ public sealed record GeojsonSourceOptions
     /// whose members follow the MapLibre Style Spec clusterProperties form, or
     /// empty for none. The UTF-8 bytes are borrowed for the call.
     /// </summary>
-    public ImmutableArray<byte> ClusterProperties
-    {
-        get => ClusterPropertiesStorage.AsImmutable();
-        init => ClusterPropertiesStorage = ValueArray.From(value);
-    }
-    internal ValueArray<byte> ClusterPropertiesStorage { get; init; }
+    public required string ClusterProperties { get; init; }
 
     /// <summary>
     /// Tile buffer in pixels within [0, 512]. Defaults to 128.

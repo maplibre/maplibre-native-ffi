@@ -28,7 +28,7 @@ import org.maplibre.nativeffi.smallMapOptions
 class HandleLifecycleTest {
   @Test
   fun closingAHandleTwiceIsSafeAndLaterUseIsRefused() = runSuspendTest {
-    val data = GeneratedApi.geojsonSourceDataCreate(POINT_JSON.encodeToByteArray())
+    val data = GeneratedApi.geojsonSourceDataCreate(POINT_JSON)
     data.close()
     data.close()
 
@@ -42,7 +42,7 @@ class HandleLifecycleTest {
 
   @Test
   fun aHandleNamesItsIdAndWhetherItIsClosed() {
-    val data = GeneratedApi.geojsonSourceDataCreate(POINT_JSON.encodeToByteArray())
+    val data = GeneratedApi.geojsonSourceDataCreate(POINT_JSON)
     val id = "0x" + data.id.toString(16)
     assertFalse(data.isClosed)
     assertEquals("GeojsonSourceDataHandle(id=$id, closed=false)", data.toString())
@@ -151,7 +151,7 @@ class HandleLifecycleTest {
     RuntimeFixture.use {
       val (map, ready) = runtime.createMap(smallMapOptions())
       ready.awaitWithin("the map")
-      map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray()).await()
+      map.setStyleJson(EMPTY_STYLE_JSON).await()
       val event = awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
       assertEquals(map.id, event.source)
       map.release().awaitWithin("the map release")
@@ -168,7 +168,7 @@ class HandleLifecycleTest {
       // runtime is still reachable through its map.
       assertTrue(awaitCollected(unreferencedObject()), "the collector never ran")
       assertFalse(runtime.isCleared, "a live map let its runtime be collected")
-      map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray()).await()
+      map.setStyleJson(EMPTY_STYLE_JSON).await()
     } finally {
       map.release().awaitWithin("the map release")
       (runtime.value as RuntimeHandle?)?.release()?.awaitWithin("the runtime release")

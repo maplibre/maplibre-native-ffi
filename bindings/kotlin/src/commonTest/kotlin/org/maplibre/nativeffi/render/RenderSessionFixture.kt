@@ -91,7 +91,7 @@ internal class RenderSessionFixture(
 
   /** Loads [json] as the map's style, servicing the session while the command runs. */
   suspend fun setStyle(json: String) {
-    complete(mapFixture.map.setStyleJson(json.encodeToByteArray()), "the style")
+    complete(mapFixture.map.setStyleJson(json), "the style")
   }
 
   /** Renders the still image [still] owes a static map, and waits for it to complete. */

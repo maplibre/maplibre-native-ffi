@@ -15,6 +15,15 @@ threads in registration order for each future; a callback can submit another
 operation and wait for its result. Use ``asyncio.wrap_future`` to await a
 binding future from an asyncio task.
 
+A JSON value, annotated ``Any``, is any value that ``json.dumps`` takes, so
+``set_style_layer_property("roads", "line-color", "red")`` needs no inner
+quotes. A JSON parameter is always a value: ``None`` is JSON null, such as the
+null that restores a layer property's default. In a record member, ``None`` is
+absent, which native reads as empty, as for a filter, an expression input, or
+cluster properties, where JSON null means nothing. A value that ``json.dumps``
+rejects raises its error before the call reaches native. Returned JSON is the
+value that ``json.loads`` reads, and absent JSON is ``None``, as JSON null is.
+
 Event, log, wake, transform, and provider callbacks run on native threads,
 with the interpreter attached, while native waits for them to return. Hand
 work that touches thread-bound state, such as an asyncio loop or a Tk or Qt

@@ -24,12 +24,7 @@ public sealed record RenderedFeatureQueryOptions
     /// <summary>
     /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
     /// </summary>
-    public ImmutableArray<byte> Filter
-    {
-        get => FilterStorage.AsImmutable();
-        init => FilterStorage = ValueArray.From(value);
-    }
-    internal ValueArray<byte> FilterStorage { get; init; }
+    public required string Filter { get; init; }
     public static RenderedFeatureQueryOptions Default
     {
         get

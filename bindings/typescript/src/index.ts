@@ -25,6 +25,17 @@
  * is a `bigint`, so it keeps its full range. `JSON.stringify` throws a
  * `TypeError` on a `bigint` unless a replacer converts it.
  *
+ * A JSON value is any value that `JSON.stringify` takes, typed `unknown`, so
+ * `setStyleLayerProperty("roads", "line-color", "red")` needs no inner quotes.
+ * In a parameter or a record member, `undefined` is absent, which native code
+ * reads as empty, and `null` is JSON null, such as the null that restores a
+ * layer property's default. A value that `JSON.stringify` rejects throws its
+ * error before the call reaches native code, and one that it skips, such as a
+ * function, throws a `TypeError`. Returned JSON is the value that `JSON.parse`
+ * reads, and absent JSON is `undefined`. `JSON.parse` reads every number as a
+ * `number`, so an integer above 2^53, such as some feature IDs, loses
+ * precision.
+ *
  * A realm runs on one thread, so it can drive a caller-driven render session:
  * make its context current on the JavaScript thread and call
  * `serviceDriverWork()` when the driver-work wake arrives. A realm loads one

@@ -15,9 +15,14 @@ import 'package:test/test.dart';
 /// How long any single wait lasts before its test fails.
 const waitDeadline = Duration(seconds: 10);
 
-const emptyStyleJson = '{"version":8,"sources":{},"layers":[]}';
+const emptyStyle = {
+  'version': 8,
+  'sources': <String, Object?>{},
+  'layers': <Object?>[],
+};
 
-Uint8List jsonBytes(String value) => Uint8List.fromList(utf8.encode(value));
+/// The UTF-8 bytes of a JSON value, as a resource response carries them.
+Uint8List jsonBytes(Object? value) => utf8.encode(jsonEncode(value));
 
 /// A flag that a callback or wake sets, and that a test awaits with a
 /// deadline instead of polling.
@@ -99,10 +104,10 @@ final class RuntimeFixture {
     return map;
   }
 
-  /// Creates a map and loads [styleJson] into it.
-  Future<MapHandle> openStyledMap([String styleJson = emptyStyleJson]) async {
+  /// Creates a map and loads [style] into it.
+  Future<MapHandle> openStyledMap([Object? style = emptyStyle]) async {
     final map = await openMap();
-    await expectCommitted(map.setStyleJson(jsonBytes(styleJson)));
+    await expectCommitted(map.setStyleJson(style));
     return map;
   }
 }
@@ -152,7 +157,7 @@ ResourceRoute styleRoute(String url) =>
 
 ResourceResponse get emptyStyleResponse => ResourceResponse(
   status: ResourceResponseStatus.ok,
-  bytes: jsonBytes(emptyStyleJson),
+  bytes: jsonBytes(emptyStyle),
 );
 
 /// Closes a fixture owner that a test may already have released.

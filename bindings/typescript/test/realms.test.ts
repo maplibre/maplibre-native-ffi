@@ -71,13 +71,11 @@ test(
       await terminateRealm(worker, `termination ${iteration}`);
 
       await bounded(
-        map.setStyleJson(
-          JSON.stringify({
-            version: 8,
-            sources: {},
-            layers: [{ id: `layer-${iteration}`, type: "background" }],
-          }),
-        ),
+        map.setStyleJson({
+          version: 8,
+          sources: {},
+          layers: [{ id: `layer-${iteration}`, type: "background" }],
+        }),
         "a command",
       );
       await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded, map.id);

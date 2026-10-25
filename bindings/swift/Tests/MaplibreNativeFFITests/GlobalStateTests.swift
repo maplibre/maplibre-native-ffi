@@ -20,7 +20,7 @@ struct GlobalStateTests {
     try await withMapFixture { fixture in
       // MapLibre logs the parse failure of a malformed document.
       _ = try? await fixture.map
-        .setStyleJson(Data(#"{"version":8,"#.utf8))
+        .setStyleJson(#"{"version":8,"#)
       await awaitCondition("a logged parse failure") {
         records.value.contains(.error)
       }
@@ -54,7 +54,7 @@ struct GlobalStateTests {
     try await withMapFixture { fixture in
       // MapLibre logs the parse failure of a malformed document.
       _ = try? await fixture.map
-        .setStyleJson(Data(#"{"version":8,"#.utf8))
+        .setStyleJson(#"{"version":8,"#)
       await awaitCondition("the thrown error's report") {
         capture.text.contains(report)
       }

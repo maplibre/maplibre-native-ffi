@@ -74,7 +74,7 @@ func isLoadingFailure(url string) func(RuntimeEvent) bool {
 // fails. A submission rejected up front never roots it.
 func TestCallbackRootsFollowTheNativeRegistration(t *testing.T) {
 	f := newFixture(t)
-	await(t, submitted(f.m.SetStyleJson([]byte(emptyStyle))))
+	await(t, submitted(f.m.SetStyleJson(emptyStyle)))
 	options := CustomGeometrySourceOptions{FetchTile: func(CanonicalTileId) {}}
 
 	await(t, submitted(f.m.AddCustomGeometrySource("removed", options)))

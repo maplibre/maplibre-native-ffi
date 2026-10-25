@@ -23,12 +23,11 @@ private func expectDescription(
   try await withMapFixture { fixture in
     try await fixture.map.setStyleJson(emptyStyle)
     let data = try Maplibre.geojsonSourceDataCreate(
-      Data(#"{"type":"FeatureCollection","features":[]}"#.utf8)
+      #"{"type":"FeatureCollection","features":[]}"#
     )
     let other = try Maplibre
       .geojsonSourceDataCreate(
-        Data(#"{"type":"FeatureCollection","features":[]}"#
-          .utf8)
+        #"{"type":"FeatureCollection","features":[]}"#
       )
     #expect(Set([data, data, other]).count == 2)
     #expect(data.id != 0)

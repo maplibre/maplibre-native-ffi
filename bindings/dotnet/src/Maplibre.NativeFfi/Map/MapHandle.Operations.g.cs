@@ -247,13 +247,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_add_style_layer_json</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> AddStyleLayerJsonAsync(byte[] layerJson, string beforeLayerId)
+    public Task<CommandCompletion> AddStyleLayerJsonAsync(string layerJson, string beforeLayerId)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_add_style_layer_json(
             Handle,
-            scope.Buffer(layerJson),
+            scope.Utf8(layerJson),
             scope.Utf8(beforeLayerId),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -268,14 +268,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_add_style_source_json</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> AddStyleSourceJsonAsync(string sourceId, byte[] sourceJson)
+    public Task<CommandCompletion> AddStyleSourceJsonAsync(string sourceId, string sourceJson)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_add_style_source_json(
             Handle,
             scope.Utf8(sourceId),
-            scope.Buffer(sourceJson),
+            scope.Utf8(sourceJson),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -604,7 +604,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
     /// </remarks>
     public Task<CameraOptions> CameraForGeometryAsync(
-        byte[] geometry,
+        string geometry,
         CameraFitOptions? fitOptions = null
     )
     {
@@ -615,7 +615,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_camera_for_geometry(
             Handle,
-            scope.Buffer(geometry),
+            scope.Utf8(geometry),
             fitOptions is null ? null : &nativeFitOptions,
             NativeCompletion.Start<CameraOptions>(
                 &nativeCompletion,
@@ -818,7 +818,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_feature_state</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<byte[]> GetFeatureStateAsync(FeatureStateSelector selector)
+    public Task<string> GetFeatureStateAsync(FeatureStateSelector selector)
     {
         using var scope = new NativeCallScope(this);
         var nativeSelector = NativeFeatureStateSelector(selector, scope);
@@ -826,12 +826,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeStatus = NativeMethods.mln_map_get_feature_state(
             Handle,
             &nativeSelector,
-            NativeCompletion.Start<byte[]>(
+            NativeCompletion.Start<string>(
                 &nativeCompletion,
                 static nativeResult =>
-                    NativeCompletion.Single<mln_buffer_view, byte[]>(
+                    NativeCompletion.Single<mln_buffer_view, string>(
                         nativeResult,
-                        ValueStructs.CopyBufferView
+                        ValueStructs.CopyUtf8View
                     ),
                 out var nativePending
             ),
@@ -849,18 +849,18 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_global_state</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<byte[]> GetGlobalStateAsync()
+    public Task<string> GetGlobalStateAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_global_state(
             Handle,
-            NativeCompletion.Start<byte[]>(
+            NativeCompletion.Start<string>(
                 &nativeCompletion,
                 static nativeResult =>
-                    NativeCompletion.Single<mln_buffer_view, byte[]>(
+                    NativeCompletion.Single<mln_buffer_view, string>(
                         nativeResult,
-                        ValueStructs.CopyBufferView
+                        ValueStructs.CopyUtf8View
                     ),
                 out var nativePending
             ),
@@ -901,18 +901,18 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_loaded_style_json</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<byte[]> GetLoadedStyleJsonAsync()
+    public Task<string> GetLoadedStyleJsonAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_loaded_style_json(
             Handle,
-            NativeCompletion.Start<byte[]>(
+            NativeCompletion.Start<string>(
                 &nativeCompletion,
                 static nativeResult =>
-                    NativeCompletion.Single<mln_buffer_view, byte[]>(
+                    NativeCompletion.Single<mln_buffer_view, string>(
                         nativeResult,
-                        ValueStructs.CopyBufferView
+                        ValueStructs.CopyUtf8View
                     ),
                 out var nativePending
             ),
@@ -999,19 +999,19 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_style_layer_json</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<byte[]?> GetStyleLayerJsonAsync(string layerId)
+    public Task<string?> GetStyleLayerJsonAsync(string layerId)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_style_layer_json(
             Handle,
             scope.Utf8(layerId),
-            NativeCompletion.Start<byte[]?>(
+            NativeCompletion.Start<string?>(
                 &nativeCompletion,
                 static nativeResult =>
-                    NativeCompletion.Optional<mln_buffer_view, byte[]>(
+                    NativeCompletion.Optional<mln_buffer_view, string>(
                         nativeResult,
-                        ValueStructs.CopyBufferView
+                        ValueStructs.CopyUtf8View
                     ),
                 out var nativePending
             ),
@@ -1027,7 +1027,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_style_layer_property</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<byte[]?> GetStyleLayerPropertyAsync(string layerId, string propertyName)
+    public Task<string?> GetStyleLayerPropertyAsync(string layerId, string propertyName)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -1035,12 +1035,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(layerId),
             scope.Utf8(propertyName),
-            NativeCompletion.Start<byte[]?>(
+            NativeCompletion.Start<string?>(
                 &nativeCompletion,
                 static nativeResult =>
-                    NativeCompletion.Optional<mln_buffer_view, byte[]>(
+                    NativeCompletion.Optional<mln_buffer_view, string>(
                         nativeResult,
-                        ValueStructs.CopyBufferView
+                        ValueStructs.CopyUtf8View
                     ),
                 out var nativePending
             ),
@@ -1056,19 +1056,19 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_style_light_property</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<byte[]?> GetStyleLightPropertyAsync(string propertyName)
+    public Task<string?> GetStyleLightPropertyAsync(string propertyName)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_style_light_property(
             Handle,
             scope.Utf8(propertyName),
-            NativeCompletion.Start<byte[]?>(
+            NativeCompletion.Start<string?>(
                 &nativeCompletion,
                 static nativeResult =>
-                    NativeCompletion.Optional<mln_buffer_view, byte[]>(
+                    NativeCompletion.Optional<mln_buffer_view, string>(
                         nativeResult,
-                        ValueStructs.CopyBufferView
+                        ValueStructs.CopyUtf8View
                     ),
                 out var nativePending
             ),
@@ -1561,7 +1561,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     public Task<CommandCompletion> SetCustomGeometrySourceTileDataAsync(
         string sourceId,
         CanonicalTileId tileId,
-        byte[] data
+        string data
     )
     {
         using var scope = new NativeCallScope(this);
@@ -1570,7 +1570,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(sourceId),
             NativeCanonicalTileId(tileId),
-            scope.Buffer(data),
+            scope.Utf8(data),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -1705,7 +1705,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_feature_state</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetFeatureStateAsync(FeatureStateSelector selector, byte[] state)
+    public Task<CommandCompletion> SetFeatureStateAsync(FeatureStateSelector selector, string state)
     {
         using var scope = new NativeCallScope(this);
         var nativeSelector = NativeFeatureStateSelector(selector, scope);
@@ -1713,7 +1713,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeStatus = NativeMethods.mln_map_set_feature_state(
             Handle,
             &nativeSelector,
-            scope.Buffer(state),
+            scope.Utf8(state),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -1817,14 +1817,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_global_state_property</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetGlobalStatePropertyAsync(string propertyName, byte[] value)
+    public Task<CommandCompletion> SetGlobalStatePropertyAsync(string propertyName, string value)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_global_state_property(
             Handle,
             scope.Utf8(propertyName),
-            scope.Buffer(value),
+            scope.Utf8(value),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -1983,13 +1983,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_style_json</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetStyleJsonAsync(byte[] json)
+    public Task<CommandCompletion> SetStyleJsonAsync(string json)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_style_json(
             Handle,
-            scope.Buffer(json),
+            scope.Utf8(json),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -2006,7 +2006,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     public Task<CommandCompletion> SetStyleLayerPropertyAsync(
         string layerId,
         string propertyName,
-        byte[] value
+        string value
     )
     {
         using var scope = new NativeCallScope(this);
@@ -2015,7 +2015,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(layerId),
             scope.Utf8(propertyName),
-            scope.Buffer(value),
+            scope.Utf8(value),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -2029,13 +2029,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_style_light_json</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetStyleLightJsonAsync(byte[] lightJson)
+    public Task<CommandCompletion> SetStyleLightJsonAsync(string lightJson)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_style_light_json(
             Handle,
-            scope.Buffer(lightJson),
+            scope.Utf8(lightJson),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -2050,14 +2050,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_style_light_property</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetStyleLightPropertyAsync(string propertyName, byte[] value)
+    public Task<CommandCompletion> SetStyleLightPropertyAsync(string propertyName, string value)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_style_light_property(
             Handle,
             scope.Utf8(propertyName),
-            scope.Buffer(value),
+            scope.Utf8(value),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -2330,14 +2330,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void AddStyleLayerJson(byte[] layerJson, string beforeLayerId)
+        public void AddStyleLayerJson(string layerJson, string beforeLayerId)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_add_style_layer_json(
                     receiverHandle,
-                    scope.Buffer(layerJson),
+                    scope.Utf8(layerJson),
                     scope.Utf8(beforeLayerId),
                     null,
                     Diagnostic
@@ -2346,7 +2346,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void AddStyleSourceJson(string sourceId, byte[] sourceJson)
+        public void AddStyleSourceJson(string sourceId, string sourceJson)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
@@ -2354,7 +2354,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 NativeMethods.mln_map_add_style_source_json(
                     receiverHandle,
                     scope.Utf8(sourceId),
-                    scope.Buffer(sourceJson),
+                    scope.Utf8(sourceJson),
                     null,
                     Diagnostic
                 )
@@ -2587,7 +2587,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         public void SetCustomGeometrySourceTileData(
             string sourceId,
             CanonicalTileId tileId,
-            byte[] data
+            string data
         )
         {
             var receiverHandle = owner.Handle;
@@ -2597,7 +2597,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                     receiverHandle,
                     scope.Utf8(sourceId),
                     NativeCanonicalTileId(tileId),
-                    scope.Buffer(data),
+                    scope.Utf8(data),
                     null,
                     Diagnostic
                 )
@@ -2696,7 +2696,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void SetFeatureState(FeatureStateSelector selector, byte[] state)
+        public void SetFeatureState(FeatureStateSelector selector, string state)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
@@ -2705,7 +2705,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 NativeMethods.mln_map_set_feature_state(
                     receiverHandle,
                     &nativeSelector,
-                    scope.Buffer(state),
+                    scope.Utf8(state),
                     null,
                     Diagnostic
                 )
@@ -2777,7 +2777,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void SetGlobalStateProperty(string propertyName, byte[] value)
+        public void SetGlobalStateProperty(string propertyName, string value)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
@@ -2785,7 +2785,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 NativeMethods.mln_map_set_global_state_property(
                     receiverHandle,
                     scope.Utf8(propertyName),
-                    scope.Buffer(value),
+                    scope.Utf8(value),
                     null,
                     Diagnostic
                 )
@@ -2902,14 +2902,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void SetStyleJson(byte[] json)
+        public void SetStyleJson(string json)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_style_json(
                     receiverHandle,
-                    scope.Buffer(json),
+                    scope.Utf8(json),
                     null,
                     Diagnostic
                 )
@@ -2917,7 +2917,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void SetStyleLayerProperty(string layerId, string propertyName, byte[] value)
+        public void SetStyleLayerProperty(string layerId, string propertyName, string value)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
@@ -2926,7 +2926,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                     receiverHandle,
                     scope.Utf8(layerId),
                     scope.Utf8(propertyName),
-                    scope.Buffer(value),
+                    scope.Utf8(value),
                     null,
                     Diagnostic
                 )
@@ -2934,14 +2934,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void SetStyleLightJson(byte[] lightJson)
+        public void SetStyleLightJson(string lightJson)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_style_light_json(
                     receiverHandle,
-                    scope.Buffer(lightJson),
+                    scope.Utf8(lightJson),
                     null,
                     Diagnostic
                 )
@@ -2949,7 +2949,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void SetStyleLightProperty(string propertyName, byte[] value)
+        public void SetStyleLightProperty(string propertyName, string value)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
@@ -2957,7 +2957,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 NativeMethods.mln_map_set_style_light_property(
                     receiverHandle,
                     scope.Utf8(propertyName),
-                    scope.Buffer(value),
+                    scope.Utf8(value),
                     null,
                     Diagnostic
                 )

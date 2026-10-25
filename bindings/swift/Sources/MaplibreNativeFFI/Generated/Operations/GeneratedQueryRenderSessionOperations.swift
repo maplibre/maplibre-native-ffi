@@ -12,13 +12,13 @@ public extension RenderSessionHandle {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
   func queryFeatureExtensions(
     sourceId bindingArg0: String,
-    feature bindingArg1: Data,
+    feature bindingArg1: String,
     extension bindingArg2: String,
     extensionField bindingArg3: String,
-    arguments bindingArg4: Data
-  ) async throws -> Data {
+    arguments bindingArg4: String
+  ) async throws -> String {
     try await nativeStart(convert: { result in
-      try NativeCompletion.data(result)
+      try NativeCompletion.string(result)
     }) { raw, arena, completion, diagnostic in
       mln_render_session_query_feature_extensions(
         raw,

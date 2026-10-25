@@ -176,7 +176,7 @@ void main() {
         eventMask: RuntimeEventFlag.all,
       ),
     );
-    await expectCommitted(map.setStyleJson(jsonBytes(emptyStyleJson)));
+    await expectCommitted(map.setStyleJson(emptyStyle));
 
     // A static map with no render session never produces the image, so the
     // request stays owed. A future cannot be cancelled in Dart; a waiter
