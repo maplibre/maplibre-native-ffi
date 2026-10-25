@@ -9,6 +9,15 @@
 
 namespace mln::c_api {
 
+// A zeroed struct with its size set, which is every option struct's default.
+// Value-initializing first leaves no member out of a designated initializer.
+template <typename Struct>
+auto sized() noexcept -> Struct {
+  auto value = Struct{};
+  value.size = sizeof(Struct);
+  return value;
+}
+
 // Runs native work and reports its diagnostic through out_diagnostic. Native
 // code records the message in the calling thread's scratch buffer, which is
 // cleared on entry and copied out before return. Native cleanup calls this

@@ -9,16 +9,12 @@
 
 auto mln_style_expression_options_default(void) noexcept
   -> mln_style_expression_options {
-  return mln_style_expression_options{
-    .size = sizeof(mln_style_expression_options)
-  };
+  return mln::c_api::sized<mln_style_expression_options>();
 }
 
 auto mln_style_expression_inputs_default(void) noexcept
   -> mln_style_expression_inputs {
-  return mln_style_expression_inputs{
-    .size = sizeof(mln_style_expression_inputs)
-  };
+  return mln::c_api::sized<mln_style_expression_inputs>();
 }
 
 auto mln_style_expression_create(

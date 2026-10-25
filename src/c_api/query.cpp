@@ -8,16 +8,12 @@
 
 auto mln_rendered_feature_query_options_default(void) noexcept
   -> mln_rendered_feature_query_options {
-  return mln_rendered_feature_query_options{
-    .size = sizeof(mln_rendered_feature_query_options)
-  };
+  return mln::c_api::sized<mln_rendered_feature_query_options>();
 }
 
 auto mln_source_feature_query_options_default(void) noexcept
   -> mln_source_feature_query_options {
-  return mln_source_feature_query_options{
-    .size = sizeof(mln_source_feature_query_options)
-  };
+  return mln::c_api::sized<mln_source_feature_query_options>();
 }
 
 auto mln_render_session_query_rendered_features(

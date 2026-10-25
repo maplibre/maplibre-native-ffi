@@ -24,7 +24,7 @@ auto mln_logical_extent_default(void) noexcept -> mln_logical_extent {
 }
 
 auto mln_map_options_default(void) noexcept -> mln_map_options {
-  return mln_map_options{.size = sizeof(mln_map_options)};
+  return mln::c_api::sized<mln_map_options>();
 }
 
 auto mln_runtime_create_map(

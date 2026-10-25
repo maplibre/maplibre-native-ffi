@@ -5,17 +5,15 @@
 #include "render/render_session_common.hpp"
 
 auto mln_frame_demand_default() noexcept -> mln_frame_demand {
-  return mln_frame_demand{.size = sizeof(mln_frame_demand)};
+  return mln::c_api::sized<mln_frame_demand>();
 }
 auto mln_render_session_attach_options_default() noexcept
   -> mln_render_session_attach_options {
-  return mln_render_session_attach_options{
-    .size = sizeof(mln_render_session_attach_options)
-  };
+  return mln::c_api::sized<mln_render_session_attach_options>();
 }
 
 auto mln_gpu_sync_default() noexcept -> mln_gpu_sync {
-  return mln_gpu_sync{.size = sizeof(mln_gpu_sync)};
+  return mln::c_api::sized<mln_gpu_sync>();
 }
 
 auto mln_render_session_get_capabilities(

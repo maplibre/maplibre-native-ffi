@@ -10,58 +10,42 @@
 
 auto mln_metal_owned_texture_descriptor_default(void) noexcept
   -> mln_metal_owned_texture_descriptor {
-  return mln_metal_owned_texture_descriptor{
-    .size = sizeof(mln_metal_owned_texture_descriptor)
-  };
+  return mln::c_api::sized<mln_metal_owned_texture_descriptor>();
 }
 
 auto mln_metal_borrowed_texture_descriptor_default(void) noexcept
   -> mln_metal_borrowed_texture_descriptor {
-  return mln_metal_borrowed_texture_descriptor{
-    .size = sizeof(mln_metal_borrowed_texture_descriptor)
-  };
+  return mln::c_api::sized<mln_metal_borrowed_texture_descriptor>();
 }
 
 auto mln_vulkan_owned_texture_descriptor_default(void) noexcept
   -> mln_vulkan_owned_texture_descriptor {
-  return mln_vulkan_owned_texture_descriptor{
-    .size = sizeof(mln_vulkan_owned_texture_descriptor)
-  };
+  return mln::c_api::sized<mln_vulkan_owned_texture_descriptor>();
 }
 
 auto mln_vulkan_borrowed_texture_descriptor_default(void) noexcept
   -> mln_vulkan_borrowed_texture_descriptor {
-  return mln_vulkan_borrowed_texture_descriptor{
-    .size = sizeof(mln_vulkan_borrowed_texture_descriptor)
-  };
+  return mln::c_api::sized<mln_vulkan_borrowed_texture_descriptor>();
 }
 
 auto mln_opengl_owned_texture_descriptor_default(void) noexcept
   -> mln_opengl_owned_texture_descriptor {
-  return mln_opengl_owned_texture_descriptor{
-    .size = sizeof(mln_opengl_owned_texture_descriptor)
-  };
+  return mln::c_api::sized<mln_opengl_owned_texture_descriptor>();
 }
 
 auto mln_opengl_borrowed_texture_descriptor_default(void) noexcept
   -> mln_opengl_borrowed_texture_descriptor {
-  return mln_opengl_borrowed_texture_descriptor{
-    .size = sizeof(mln_opengl_borrowed_texture_descriptor)
-  };
+  return mln::c_api::sized<mln_opengl_borrowed_texture_descriptor>();
 }
 
 auto mln_webgpu_owned_texture_descriptor_default(void) noexcept
   -> mln_webgpu_owned_texture_descriptor {
-  return mln_webgpu_owned_texture_descriptor{
-    .size = sizeof(mln_webgpu_owned_texture_descriptor)
-  };
+  return mln::c_api::sized<mln_webgpu_owned_texture_descriptor>();
 }
 
 auto mln_webgpu_borrowed_texture_descriptor_default(void) noexcept
   -> mln_webgpu_borrowed_texture_descriptor {
-  return mln_webgpu_borrowed_texture_descriptor{
-    .size = sizeof(mln_webgpu_borrowed_texture_descriptor)
-  };
+  return mln::c_api::sized<mln_webgpu_borrowed_texture_descriptor>();
 }
 
 auto mln_supported_render_backend_mask(void) noexcept -> uint32_t {
