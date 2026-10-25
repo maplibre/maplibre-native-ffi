@@ -65,7 +65,9 @@ internal sealed class NativeFixture : IAsyncDisposable
         var pendingEvents = new ConcurrentQueue<RuntimeEvent>();
         try
         {
-            await runtime.SetEventHandlerAsync(
+            // Both commands run before the runtime creates the map, so its first events and
+            // requests reach them without waiting for completion.
+            runtime.Discarding.SetEventHandler(
                 new RuntimeEventHandler(batch =>
                 {
                     foreach (var item in batch.Events)
@@ -73,7 +75,7 @@ internal sealed class NativeFixture : IAsyncDisposable
                     events.Release();
                 })
             );
-            await runtime.SetResourceProviderAsync(provider ?? DenyingProvider);
+            runtime.Discarding.SetResourceProvider(provider ?? DenyingProvider);
             var map = runtime.CreateMap(options ?? SmallMap);
             try
             {

@@ -28,6 +28,7 @@ import org.maplibre.nativeffi.internal.call.nativeUnit
 import org.maplibre.nativeffi.internal.callback.NativeRoots
 import org.maplibre.nativeffi.internal.memory.readAddress
 import org.maplibre.nativeffi.runSuspendTest
+import org.maplibre.nativeffi.runtime.awaitCommitted
 import org.maplibre.nativeffi.runtime.awaitFailed
 import org.maplibre.nativeffi.withMap
 
@@ -82,7 +83,7 @@ class CompletionTest {
         .setEventHandler(
           RuntimeEventHandler { batch -> batch.events.forEach { events.trySend(it.type) } },
         )
-        .await()
+        .awaitCommitted()
       val seenAtCompletion = CompletableDeferred<List<RuntimeEventType>>()
       val style = map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray())
       // The handler runs inside native's completion, after the callbacks for the command's events.

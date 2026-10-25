@@ -18,56 +18,44 @@ impl RuntimeHandle {
     ///
     /// See `mln_runtime_clear_event_handler` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn clear_event_handler(&self) -> Result<NativeFuture<()>> {
+    pub fn clear_event_handler(&self) -> Result<NativeFuture<CommandCompletion>> {
         let call = self.inner.call();
-        call.complete(
-            |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_clear_event_handler(runtime, completion, out_diagnostic)
-            },
-            completion::unit,
-        )
+        call.command(|runtime, completion, out_diagnostic| unsafe {
+            sys::mln_runtime_clear_event_handler(runtime, completion, out_diagnostic)
+        })
     }
 
     /// Clears the runtime-scoped outgoing HTTP header transform.
     ///
     /// See `mln_runtime_clear_http_header_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn clear_http_header_transform(&self) -> Result<NativeFuture<()>> {
+    pub fn clear_http_header_transform(&self) -> Result<NativeFuture<CommandCompletion>> {
         let call = self.inner.call();
-        call.complete(
-            |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_clear_http_header_transform(runtime, completion, out_diagnostic)
-            },
-            completion::unit,
-        )
+        call.command(|runtime, completion, out_diagnostic| unsafe {
+            sys::mln_runtime_clear_http_header_transform(runtime, completion, out_diagnostic)
+        })
     }
 
     /// Clears the runtime-scoped network resource provider.
     ///
     /// See `mln_runtime_clear_resource_provider` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn clear_resource_provider(&self) -> Result<NativeFuture<()>> {
+    pub fn clear_resource_provider(&self) -> Result<NativeFuture<CommandCompletion>> {
         let call = self.inner.call();
-        call.complete(
-            |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_clear_resource_provider(runtime, completion, out_diagnostic)
-            },
-            completion::unit,
-        )
+        call.command(|runtime, completion, out_diagnostic| unsafe {
+            sys::mln_runtime_clear_resource_provider(runtime, completion, out_diagnostic)
+        })
     }
 
     /// Clears the runtime-scoped URL transform for network resources.
     ///
     /// See `mln_runtime_clear_resource_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn clear_resource_transform(&self) -> Result<NativeFuture<()>> {
+    pub fn clear_resource_transform(&self) -> Result<NativeFuture<CommandCompletion>> {
         let call = self.inner.call();
-        call.complete(
-            |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_clear_resource_transform(runtime, completion, out_diagnostic)
-            },
-            completion::unit,
-        )
+        call.command(|runtime, completion, out_diagnostic| unsafe {
+            sys::mln_runtime_clear_resource_transform(runtime, completion, out_diagnostic)
+        })
     }
 
     /// Starts creation of a map on the runtime.
@@ -304,15 +292,15 @@ impl RuntimeHandle {
     ///
     /// See `mln_runtime_set_event_handler` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn set_event_handler(&self, handler: RuntimeEventHandler) -> Result<NativeFuture<()>> {
+    pub fn set_event_handler(
+        &self,
+        handler: RuntimeEventHandler,
+    ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let handler = call.reference(&handler)?;
-        call.complete(
-            |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_set_event_handler(runtime, handler, completion, out_diagnostic)
-            },
-            completion::unit,
-        )
+        call.command(|runtime, completion, out_diagnostic| unsafe {
+            sys::mln_runtime_set_event_handler(runtime, handler, completion, out_diagnostic)
+        })
     }
 
     /// Selects which runtime-scoped event types this runtime queues.
@@ -334,20 +322,17 @@ impl RuntimeHandle {
     pub fn set_http_header_transform(
         &self,
         transform: HttpHeaderTransform,
-    ) -> Result<NativeFuture<()>> {
+    ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let transform = call.reference(&transform)?;
-        call.complete(
-            |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_set_http_header_transform(
-                    runtime,
-                    transform,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )
+        call.command(|runtime, completion, out_diagnostic| unsafe {
+            sys::mln_runtime_set_http_header_transform(
+                runtime,
+                transform,
+                completion,
+                out_diagnostic,
+            )
+        })
     }
 
     /// Starts a change to this runtime's maximum ambient cache size.
@@ -421,20 +406,15 @@ impl RuntimeHandle {
     ///
     /// See `mln_runtime_set_resource_provider` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn set_resource_provider(&self, provider: ResourceProvider) -> Result<NativeFuture<()>> {
+    pub fn set_resource_provider(
+        &self,
+        provider: ResourceProvider,
+    ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let provider = call.reference(&provider)?;
-        call.complete(
-            |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_set_resource_provider(
-                    runtime,
-                    provider,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )
+        call.command(|runtime, completion, out_diagnostic| unsafe {
+            sys::mln_runtime_set_resource_provider(runtime, provider, completion, out_diagnostic)
+        })
     }
 
     /// Registers or updates a runtime-scoped URL transform for network
@@ -442,20 +422,15 @@ impl RuntimeHandle {
     ///
     /// See `mln_runtime_set_resource_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn set_resource_transform(&self, transform: ResourceTransform) -> Result<NativeFuture<()>> {
+    pub fn set_resource_transform(
+        &self,
+        transform: ResourceTransform,
+    ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let transform = call.reference(&transform)?;
-        call.complete(
-            |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_set_resource_transform(
-                    runtime,
-                    transform,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )
+        call.command(|runtime, completion, out_diagnostic| unsafe {
+            sys::mln_runtime_set_resource_transform(runtime, transform, completion, out_diagnostic)
+        })
     }
 
     /// Starts updating opaque binary metadata for an offline region.
@@ -483,5 +458,114 @@ impl RuntimeHandle {
             },
             completion::value::<sys::mln_offline_region_info, _>,
         )
+    }
+}
+
+/// Submits [`RuntimeHandle`] commands without a completion. Each call returns
+/// the same acceptance status as its completing form, and native logs a
+/// command that later fails as a warning through the log handler.
+pub struct RuntimeHandleDiscarding<'a>(&'a RuntimeHandle);
+impl RuntimeHandle {
+    pub fn discarding(&self) -> RuntimeHandleDiscarding<'_> {
+        RuntimeHandleDiscarding(self)
+    }
+}
+impl RuntimeHandleDiscarding<'_> {
+    /// Stops event delivery and retires the previous handler.
+    ///
+    /// See `mln_runtime_clear_event_handler` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn clear_event_handler(&self) -> Result<()> {
+        let call = self.0.inner.call();
+        call.discard(|runtime, completion, out_diagnostic| unsafe {
+            sys::mln_runtime_clear_event_handler(runtime, completion, out_diagnostic)
+        })
+    }
+
+    /// Clears the runtime-scoped outgoing HTTP header transform.
+    ///
+    /// See `mln_runtime_clear_http_header_transform` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn clear_http_header_transform(&self) -> Result<()> {
+        let call = self.0.inner.call();
+        call.discard(|runtime, completion, out_diagnostic| unsafe {
+            sys::mln_runtime_clear_http_header_transform(runtime, completion, out_diagnostic)
+        })
+    }
+
+    /// Clears the runtime-scoped network resource provider.
+    ///
+    /// See `mln_runtime_clear_resource_provider` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn clear_resource_provider(&self) -> Result<()> {
+        let call = self.0.inner.call();
+        call.discard(|runtime, completion, out_diagnostic| unsafe {
+            sys::mln_runtime_clear_resource_provider(runtime, completion, out_diagnostic)
+        })
+    }
+
+    /// Clears the runtime-scoped URL transform for network resources.
+    ///
+    /// See `mln_runtime_clear_resource_transform` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn clear_resource_transform(&self) -> Result<()> {
+        let call = self.0.inner.call();
+        call.discard(|runtime, completion, out_diagnostic| unsafe {
+            sys::mln_runtime_clear_resource_transform(runtime, completion, out_diagnostic)
+        })
+    }
+
+    /// Selects how runtime and map events reach the host.
+    ///
+    /// See `mln_runtime_set_event_handler` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn set_event_handler(&self, handler: RuntimeEventHandler) -> Result<()> {
+        let mut call = self.0.inner.call();
+        let handler = call.reference(&handler)?;
+        call.discard(|runtime, completion, out_diagnostic| unsafe {
+            sys::mln_runtime_set_event_handler(runtime, handler, completion, out_diagnostic)
+        })
+    }
+
+    /// Registers or replaces the runtime-scoped outgoing HTTP header transform.
+    ///
+    /// See `mln_runtime_set_http_header_transform` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn set_http_header_transform(&self, transform: HttpHeaderTransform) -> Result<()> {
+        let mut call = self.0.inner.call();
+        let transform = call.reference(&transform)?;
+        call.discard(|runtime, completion, out_diagnostic| unsafe {
+            sys::mln_runtime_set_http_header_transform(
+                runtime,
+                transform,
+                completion,
+                out_diagnostic,
+            )
+        })
+    }
+
+    /// Registers or replaces a runtime-scoped network resource provider.
+    ///
+    /// See `mln_runtime_set_resource_provider` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn set_resource_provider(&self, provider: ResourceProvider) -> Result<()> {
+        let mut call = self.0.inner.call();
+        let provider = call.reference(&provider)?;
+        call.discard(|runtime, completion, out_diagnostic| unsafe {
+            sys::mln_runtime_set_resource_provider(runtime, provider, completion, out_diagnostic)
+        })
+    }
+
+    /// Registers or updates a runtime-scoped URL transform for network
+    /// resources.
+    ///
+    /// See `mln_runtime_set_resource_transform` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn set_resource_transform(&self, transform: ResourceTransform) -> Result<()> {
+        let mut call = self.0.inner.call();
+        let transform = call.reference(&transform)?;
+        call.discard(|runtime, completion, out_diagnostic| unsafe {
+            sys::mln_runtime_set_resource_transform(runtime, transform, completion, out_diagnostic)
+        })
     }
 }

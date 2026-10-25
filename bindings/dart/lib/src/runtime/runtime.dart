@@ -127,19 +127,21 @@ Future<CommandCompletion> _startCommand(NativeCompletionStart start) =>
       ),
     );
 
-/// The generations that a committed map command published. A command's
-/// future fails with [MaplibreException] instead when native reports it
-/// failed or cancelled.
+/// The generations that a committed command published. A command's future
+/// fails with [MaplibreException] instead when native reports it failed or
+/// cancelled.
 final class CommandCompletion {
   const CommandCompletion({
     required this.generation,
     required this.renderUpdateGeneration,
   });
 
-  /// The map snapshot generation that the command published.
+  /// The map snapshot generation that a map command published, or zero for a
+  /// runtime command.
   final int generation;
 
-  /// The first map render update that includes the command.
+  /// The first map render update that includes the command, or zero when
+  /// [generation] is zero.
   final int renderUpdateGeneration;
 
   @override

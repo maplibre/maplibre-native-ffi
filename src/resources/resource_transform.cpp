@@ -84,6 +84,10 @@ auto complete_resource_transform_request(
     return MLN_STATUS_INVALID_STATE;
   }
   finished(replacement);
+  // The answer consumes the handle.
+  static_cast<void>(
+    handle_table<ResourceTransformRequestObject>().remove(request)
+  );
   return MLN_STATUS_OK;
 }
 

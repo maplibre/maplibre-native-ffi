@@ -5,7 +5,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True, slots=True)
 class CommandCompletion:
-    """The generations that a committed map command published.
+    """The generations that a committed command published, which are zero
+    unless it is a map command.
 
     A command future raises ``MaplibreError`` instead when the command fails
     or is cancelled.

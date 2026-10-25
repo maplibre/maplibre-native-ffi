@@ -119,15 +119,13 @@ class Harness:
         self._pending: list[mln.RuntimeEvent] = []
         self._maps: list[mln.MapHandle] = []
         self.runtime = mln.runtime_create(mln.RuntimeOptions.default())
-        result(
-            self.runtime.set_event_handler(
-                mln.RuntimeEventHandler(self._receive_events)
-            )
+        # Both commands run before the runtime creates a map, so its first
+        # events and requests reach them without waiting for completion.
+        self.runtime.discarding.set_event_handler(
+            mln.RuntimeEventHandler(self._receive_events)
         )
-        result(
-            self.runtime.set_resource_provider(
-                mln.ResourceProvider(callback=self._provide)
-            )
+        self.runtime.discarding.set_resource_provider(
+            mln.ResourceProvider(callback=self._provide)
         )
 
     def _receive_events(self, batch: mln.EventBatchView) -> None:

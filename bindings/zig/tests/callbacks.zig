@@ -279,7 +279,7 @@ test "a scoped response rejects use after its callback and from another thread" 
     defer fixture.destroy();
     try fixture.setProvider(.{ .callback = passThrough });
     var probe = HeaderProbe{};
-    try support.resolve(try fixture.runtime.setHttpHeaderTransform(testing.allocator, .init(&probe, HeaderProbe.transform, null), null));
+    try support.expectCommitted(try fixture.runtime.setHttpHeaderTransform(testing.allocator, .init(&probe, HeaderProbe.transform, null), null));
 
     try support.expectCommitted(try fixture.map.setStyleUrl("http://127.0.0.1:1/style.json", null));
     var failed = try fixture.waitForEvent(.map_loading_failed);
@@ -290,7 +290,7 @@ test "a scoped response rejects use after its callback and from another thread" 
     var diagnostic: maplibre.Diagnostic = .{};
     try testing.expectError(error.InvalidState, (probe.saved.?).setHeader("X-Test", "late", &diagnostic));
     try testing.expectEqual(null, diagnostic.status);
-    try support.resolve(try fixture.runtime.clearHttpHeaderTransform(null));
+    try support.expectCommitted(try fixture.runtime.clearHttpHeaderTransform(null));
 }
 
 const TransformProbe = struct {
@@ -306,13 +306,10 @@ const TransformProbe = struct {
         self.taken.add();
     }
 
-    fn answer(request: maplibre.ResourceTransformRequest, result: *?anyerror) void {
+    fn answer(request: *maplibre.ResourceTransformRequest, result: *?anyerror) void {
         request.complete("unsupported://rewritten.json", null) catch |err| {
             result.* = err;
-            return;
         };
-        var owned = request;
-        owned.release();
     }
 };
 
@@ -325,17 +322,21 @@ test "a transform request is answered from another thread after its callback" {
     defer fixture.destroy();
     try fixture.setProvider(.{ .callback = passThrough });
     var probe = TransformProbe{};
-    try support.resolve(try fixture.runtime.setResourceTransform(.init(&probe, TransformProbe.transform, null), null));
+    try support.expectCommitted(try fixture.runtime.setResourceTransform(.init(&probe, TransformProbe.transform, null), null));
 
     try support.expectCommitted(try fixture.map.setStyleUrl("unsupported://original.json", null));
     try probe.taken.waitFor(1);
+    var request = probe.saved.?;
     var answered: ?anyerror = null;
-    const thread = try std.Thread.spawn(.{}, TransformProbe.answer, .{ probe.saved.?, &answered });
+    const thread = try std.Thread.spawn(.{}, TransformProbe.answer, .{ &request, &answered });
     thread.join();
     try testing.expectEqual(@as(?anyerror, null), answered);
+    // The accepted answer consumed the request, so native refuses a second one.
+    try testing.expect(request.isClosed());
+    try testing.expectError(error.InvalidState, request.complete("unsupported://rewritten.json", null));
     var failed = try fixture.waitForEvent(.map_loading_failed);
     failed.deinit();
-    try support.resolve(try fixture.runtime.clearResourceTransform(null));
+    try support.expectCommitted(try fixture.runtime.clearResourceTransform(null));
 }
 
 const routed_style_url = "custom://routed/style.json";
@@ -401,7 +402,7 @@ test "a provider receives only the requests its routes match" {
     routed.routes = routes;
     const registered = try fixture.runtime.setResourceProvider(testing.allocator, routed, null);
     _ = scratch.reset(.free_all);
-    try support.resolve(registered);
+    try support.expectCommitted(registered);
 
     try support.expectCommitted(try fixture.map.setStyleUrl("custom://outside.json", null));
     var failed = try fixture.waitForEvent(.map_loading_failed);

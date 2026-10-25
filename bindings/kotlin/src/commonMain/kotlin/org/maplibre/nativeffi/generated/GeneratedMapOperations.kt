@@ -1731,11 +1731,11 @@ public abstract class GeneratedMapOperations internal constructor() {
 
 /** The commands of a [MapHandle] that drop their completions. */
 @JvmInline
-public value class MapDiscarding internal constructor(private val owner: GeneratedMapOperations) {
-  private val binding
+public value class MapDiscarding internal constructor(internal val owner: GeneratedMapOperations) {
+  internal val binding
     get() = owner.binding
 
-  private val bindingCallbacks
+  internal val bindingCallbacks
     get() = owner.bindingCallbacks
 
   /** [MapHandle.addCustomGeometrySource] without its completion. */

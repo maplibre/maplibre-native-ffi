@@ -193,7 +193,8 @@ pub const Fixture = struct {
         runtime_options.value.asset_path = options.asset_path;
         self.runtime = try maplibre.runtimeCreate(runtime_options.value, null);
         errdefer closeRuntimeHandle(&self.runtime) catch self.runtime.deinit();
-        try resolve(try self.runtime.setEventHandler(.init(self, receiveEvents, null), null));
+        // A handler accepted before createMap receives the map's first events.
+        try self.runtime.discarding().setEventHandler(.init(self, receiveEvents, null), null);
         try self.setProvider(denying_provider);
         var map_options = maplibre.mapOptionsDefault();
         map_options.initial_extent = options.extent;
@@ -263,11 +264,11 @@ pub const Fixture = struct {
     /// Waits for a runtime command, which follows every submission to the
     /// runtime's worker accepted so far.
     pub fn fence(self: *Fixture) !void {
-        try resolve(try self.runtime.clearResourceTransform(null));
+        try expectCommitted(try self.runtime.clearResourceTransform(null));
     }
 
     pub fn setProvider(self: *Fixture, provider: maplibre.ResourceProvider) !void {
-        try resolve(try self.runtime.setResourceProvider(testing.allocator, provider, null));
+        try expectCommitted(try self.runtime.setResourceProvider(testing.allocator, provider, null));
     }
 
     pub fn loadStyle(self: *Fixture) !void {

@@ -195,7 +195,7 @@ void accepted_completions_hold_runtime_release() {
         mln::core::create_completion_operation(
           &descriptor,
           mln::core::valueless_completion<
-            &mln_runtime_clear_resource_transform>(),
+            &mln_runtime_set_maximum_ambient_cache_size>(),
           pair
         )
       );

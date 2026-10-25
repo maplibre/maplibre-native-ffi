@@ -143,7 +143,7 @@ def test_a_registered_callback_does_not_keep_its_receiver_alive() -> None:
 
     callback = weakref.ref(receive_events)
     runtime = mln.runtime_create(mln.RuntimeOptions.default())
-    result(runtime.set_event_handler(mln.RuntimeEventHandler(receive_events)))
+    runtime.discarding.set_event_handler(mln.RuntimeEventHandler(receive_events))
     receiver["runtime"] = runtime
     owner = weakref.ref(runtime)
     map_handle = ready_map(runtime)
@@ -302,11 +302,12 @@ def test_a_transform_request_is_answered_from_another_thread_after_its_callback(
 
     def answer() -> None:
         request.complete("unsupported://rewritten.json")
-        request.close()
 
     worker = threading.Thread(target=answer)
     worker.start()
     worker.join(TIMEOUT)
+    # The answer consumed the request, so a second answer fails.
+    assert request.is_closed
     with pytest.raises(
         mln.MaplibreError, check=lambda error: error.status == mln.Status.INVALID_STATE
     ):

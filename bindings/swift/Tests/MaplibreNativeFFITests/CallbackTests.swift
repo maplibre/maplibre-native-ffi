@@ -216,7 +216,7 @@ func installProvider(
 }
 
 /// A transform owns the request its callback receives, and another thread
-/// answers it after the callback returns.
+/// answers it after the callback returns, which consumes the request.
 @Test func aTransformRequestIsAnsweredLater() async throws {
   try await withMapFixture { fixture in
     // The provider passes the style through to the online source, which
@@ -240,14 +240,16 @@ func installProvider(
     let answered = LockedBox<Error?>(nil)
     let done = DispatchSemaphore(value: 0)
     Thread {
-      do {
-        try request.complete(url: "unsupported://rewritten.json")
-        request.close()
-      } catch { answered.update { $0 = error } }
+      do { try request.complete(url: "unsupported://rewritten.json") }
+      catch { answered.update { $0 = error } }
       done.signal()
     }.start()
     #expect(isSignalled(done))
     #expect(answered.value == nil)
+    #expect(request.isClosed)
+    await expectMaplibreError(.invalidState) {
+      try request.complete(url: "unsupported://again.json")
+    }
     // The online source cannot load the rewritten scheme.
     #expect(try await fixture.awaitEvent("the rewritten request to fail") {
       $0.type == .mapLoadingFailed

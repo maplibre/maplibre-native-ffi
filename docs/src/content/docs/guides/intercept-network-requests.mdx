@@ -28,8 +28,8 @@ glyphs from origins that the host does not control.
 
 <Code code={region(transformSnippet, "match")} lang="c" title="resource-transform.c" />
 
-Complete the request with the replacement URL, then release it. A host can also
-answer later, from any thread.
+Complete the request with the replacement URL, which consumes it, or release it
+to keep the URL. A host can also answer later, from any thread.
 
 <Code code={region(transformSnippet, "rewrite")} lang="c" title="resource-transform.c" />
 

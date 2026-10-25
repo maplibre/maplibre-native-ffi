@@ -6573,6 +6573,12 @@ func (receiver *RenderSessionHandle) Discarding() RenderSessionHandleDiscarding 
 	return RenderSessionHandleDiscarding{receiver}
 }
 
+type RuntimeHandleDiscarding struct{ owner *RuntimeHandle }
+
+func (receiver *RuntimeHandle) Discarding() RuntimeHandleDiscarding {
+	return RuntimeHandleDiscarding{receiver}
+}
+
 // Discard consumes an acquired frame without consumer GPU synchronization, so
 // it quarantines the frame's slot of the texture ring.
 //
@@ -8493,17 +8499,18 @@ func (receiver *ResourceRequestHandle) SetCancelCallback(handler ResourceRequest
 	})
 }
 
-// Complete answers a resource transform request with a replacement URL.
+// Complete answers a resource transform request with a replacement URL and
+// consumes its handle.
 //
 // See mln_resource_transform_request_complete in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *ResourceTransformRequestHandle) Complete(url string) error {
-	return bindingDo(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingDo(bindingAnswering(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_resource_transform_request_complete(C.mln_resource_transform_request(raw), bindingView(url, arena), diagnostic))
 	})
 }
 
-// Close releases a resource transform request.
+// Close releases a resource transform request without answering it.
 //
 // See mln_resource_transform_request_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
@@ -8519,10 +8526,10 @@ func (receiver *ResourceTransformRequestHandle) Close() error {
 //
 // See mln_runtime_clear_event_handler in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *RuntimeHandle) ClearEventHandler() (*Future[struct{}], error) {
+func (receiver *RuntimeHandle) ClearEventHandler() (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_clear_event_handler(C.mln_runtime(raw), completion, diagnostic))
-	}, completionUnit)
+	}, completionCommand)
 }
 
 // ClearHttpHeaderTransform clears the runtime-scoped outgoing HTTP header
@@ -8530,20 +8537,20 @@ func (receiver *RuntimeHandle) ClearEventHandler() (*Future[struct{}], error) {
 //
 // See mln_runtime_clear_http_header_transform in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *RuntimeHandle) ClearHttpHeaderTransform() (*Future[struct{}], error) {
+func (receiver *RuntimeHandle) ClearHttpHeaderTransform() (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_clear_http_header_transform(C.mln_runtime(raw), completion, diagnostic))
-	}, completionUnit)
+	}, completionCommand)
 }
 
 // ClearResourceProvider clears the runtime-scoped network resource provider.
 //
 // See mln_runtime_clear_resource_provider in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *RuntimeHandle) ClearResourceProvider() (*Future[struct{}], error) {
+func (receiver *RuntimeHandle) ClearResourceProvider() (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_clear_resource_provider(C.mln_runtime(raw), completion, diagnostic))
-	}, completionUnit)
+	}, completionCommand)
 }
 
 // ClearResourceTransform clears the runtime-scoped URL transform for network
@@ -8551,10 +8558,10 @@ func (receiver *RuntimeHandle) ClearResourceProvider() (*Future[struct{}], error
 //
 // See mln_runtime_clear_resource_transform in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *RuntimeHandle) ClearResourceTransform() (*Future[struct{}], error) {
+func (receiver *RuntimeHandle) ClearResourceTransform() (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_clear_resource_transform(C.mln_runtime(raw), completion, diagnostic))
-	}, completionUnit)
+	}, completionCommand)
 }
 
 // RuntimeCreate creates a runtime.
@@ -8703,10 +8710,10 @@ func (receiver *RuntimeHandle) RunAmbientCacheOperation(operation AmbientCacheOp
 //
 // See mln_runtime_set_event_handler in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *RuntimeHandle) SetEventHandler(handler RuntimeEventHandler) (*Future[struct{}], error) {
+func (receiver *RuntimeHandle) SetEventHandler(handler RuntimeEventHandler) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_event_handler(C.mln_runtime(raw), bindingStore(nativeRuntimeEventHandler(handler, arena), arena), completion, diagnostic))
-	}, completionUnit)
+	}, completionCommand)
 }
 
 // SetEventMask selects which runtime-scoped event types this runtime queues.
@@ -8724,10 +8731,10 @@ func (receiver *RuntimeHandle) SetEventMask(mask RuntimeEventMask) error {
 //
 // See mln_runtime_set_http_header_transform in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *RuntimeHandle) SetHttpHeaderTransform(transform HttpHeaderTransform) (*Future[struct{}], error) {
+func (receiver *RuntimeHandle) SetHttpHeaderTransform(transform HttpHeaderTransform) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_http_header_transform(C.mln_runtime(raw), bindingStore(nativeHttpHeaderTransform(transform, arena), arena), completion, diagnostic))
-	}, completionUnit)
+	}, completionCommand)
 }
 
 // SetMaximumAmbientCacheSize starts a change to this runtime's maximum ambient
@@ -8767,10 +8774,10 @@ func (receiver *RuntimeHandle) SetOfflineRegionObserved(regionId int64, observed
 //
 // See mln_runtime_set_resource_provider in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *RuntimeHandle) SetResourceProvider(provider ResourceProvider) (*Future[struct{}], error) {
+func (receiver *RuntimeHandle) SetResourceProvider(provider ResourceProvider) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_resource_provider(C.mln_runtime(raw), bindingStore(nativeResourceProvider(provider, arena), arena), completion, diagnostic))
-	}, completionUnit)
+	}, completionCommand)
 }
 
 // SetResourceTransform registers or updates a runtime-scoped URL transform for
@@ -8778,10 +8785,10 @@ func (receiver *RuntimeHandle) SetResourceProvider(provider ResourceProvider) (*
 //
 // See mln_runtime_set_resource_transform in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *RuntimeHandle) SetResourceTransform(transform ResourceTransform) (*Future[struct{}], error) {
+func (receiver *RuntimeHandle) SetResourceTransform(transform ResourceTransform) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_resource_transform(C.mln_runtime(raw), bindingStore(nativeResourceTransform(transform, arena), arena), completion, diagnostic))
-	}, completionUnit)
+	}, completionCommand)
 }
 
 // UpdateOfflineRegionMetadata starts updating opaque binary metadata for an
@@ -9267,6 +9274,62 @@ func (view RenderSessionHandleDiscarding) Resize(extent LogicalExtent) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_resize(C.mln_render_session(raw), nativeLogicalExtent(extent, arena), completion, diagnostic))
+	})
+}
+
+func (view RuntimeHandleDiscarding) ClearEventHandler() error {
+	receiver := view.owner
+	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_clear_event_handler(C.mln_runtime(raw), completion, diagnostic))
+	})
+}
+
+func (view RuntimeHandleDiscarding) ClearHttpHeaderTransform() error {
+	receiver := view.owner
+	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_clear_http_header_transform(C.mln_runtime(raw), completion, diagnostic))
+	})
+}
+
+func (view RuntimeHandleDiscarding) ClearResourceProvider() error {
+	receiver := view.owner
+	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_clear_resource_provider(C.mln_runtime(raw), completion, diagnostic))
+	})
+}
+
+func (view RuntimeHandleDiscarding) ClearResourceTransform() error {
+	receiver := view.owner
+	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_clear_resource_transform(C.mln_runtime(raw), completion, diagnostic))
+	})
+}
+
+func (view RuntimeHandleDiscarding) SetEventHandler(handler RuntimeEventHandler) error {
+	receiver := view.owner
+	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_set_event_handler(C.mln_runtime(raw), bindingStore(nativeRuntimeEventHandler(handler, arena), arena), completion, diagnostic))
+	})
+}
+
+func (view RuntimeHandleDiscarding) SetHttpHeaderTransform(transform HttpHeaderTransform) error {
+	receiver := view.owner
+	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_set_http_header_transform(C.mln_runtime(raw), bindingStore(nativeHttpHeaderTransform(transform, arena), arena), completion, diagnostic))
+	})
+}
+
+func (view RuntimeHandleDiscarding) SetResourceProvider(provider ResourceProvider) error {
+	receiver := view.owner
+	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_set_resource_provider(C.mln_runtime(raw), bindingStore(nativeResourceProvider(provider, arena), arena), completion, diagnostic))
+	})
+}
+
+func (view RuntimeHandleDiscarding) SetResourceTransform(transform ResourceTransform) error {
+	receiver := view.owner
+	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_set_resource_transform(C.mln_runtime(raw), bindingStore(nativeResourceTransform(transform, arena), arena), completion, diagnostic))
 	})
 }
 

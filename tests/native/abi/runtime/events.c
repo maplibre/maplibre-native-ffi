@@ -56,6 +56,20 @@ static void options_reject_unknown_event_mask_bits(void) {
 
 // Clearing one bit leaves every other type arriving, which separates
 // suppression from a broken producer.
+// The fixture runtime sets its handler with a discarded command just before
+// this case creates the map. The handler still receives the camera event that
+// the map's construction raises.
+static void a_handler_accepted_before_a_map_receives_its_first_events(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_runtime_event event;
+  TEST_ASSERT_TRUE(mln_test_await_event(
+    runtime, MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE, map, &event, NULL, 0
+  ));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void clearing_one_type_leaves_the_others_arriving(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -368,6 +382,7 @@ static void callback_event_state_retires_after_its_last_event(void) {
 }
 
 MLN_TEST_GROUP {
+  RUN_TEST(a_handler_accepted_before_a_map_receives_its_first_events);
   RUN_TEST(callback_event_state_retires_after_its_last_event);
   RUN_TEST(events_and_their_completion_share_fifo_order);
   RUN_TEST(event_masks_change_from_any_thread_and_keep_foreign_bits);

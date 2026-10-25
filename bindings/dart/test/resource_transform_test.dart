@@ -34,7 +34,6 @@ void main() {
     await expectCommitted(map.setStyleUrl(styleUrl));
     final request = await within(handed.future, 'the transform');
     request.complete('unsupported://rewritten-style.json');
-    request.close();
     // Native loading cannot fetch the rewritten scheme.
     await fixture.awaitEventType(RuntimeEventType.mapLoadingFailed);
     await fixture.runtime.clearResourceTransform();

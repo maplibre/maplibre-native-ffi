@@ -368,12 +368,14 @@ impl Fixture {
         let pending_events = Arc::new(Mutex::new(Vec::new()));
         let received = Arc::clone(&pending_events);
         let signal = Arc::clone(&events);
-        wait_for(
-            runtime.set_event_handler(RuntimeEventHandler::new(move |batch| {
+        // A handler accepted before create_map receives the map's first events.
+        runtime
+            .discarding()
+            .set_event_handler(RuntimeEventHandler::new(move |batch| {
                 received.lock().unwrap().extend(batch.events);
                 signal.raise();
-            })),
-        );
+            }))
+            .unwrap();
         wait_for(runtime.set_resource_provider(denying_provider()));
         let (map, ready) = runtime.create_map(&map_options).unwrap();
         wait_for(Ok(ready));

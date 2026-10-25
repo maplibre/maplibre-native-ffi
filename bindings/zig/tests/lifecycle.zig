@@ -130,7 +130,7 @@ test "a child map keeps its disposed runtime's callbacks alive" {
     var options = try maplibre.runtimeOptionsDefault(testing.allocator);
     defer options.deinit();
     var runtime = try maplibre.runtimeCreate(options.value, null);
-    try support.resolve(try runtime.setEventHandler(.init(&handler_releases, ignoreEvents, countRelease), null));
+    try support.expectCommitted(try runtime.setEventHandler(.init(&handler_releases, ignoreEvents, countRelease), null));
     const created = try runtime.createMap(maplibre.mapOptionsDefault(), null);
     var map = created.map;
     try support.resolve(created.ready);

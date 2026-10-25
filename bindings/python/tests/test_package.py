@@ -19,7 +19,7 @@ def test_the_package_loads_the_extension_of_its_runtime() -> None:
     (runtime,) = (name for name in RUNTIMES if name in sys.modules)
     assert _native is sys.modules[f"{runtime}._native"]
     with mln.runtime_create() as handle:
-        assert result(handle.clear_resource_transform()) is None
+        result(handle.clear_resource_transform())
 
 
 def _run_the_runtime_lookup() -> None:

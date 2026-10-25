@@ -15,9 +15,9 @@ import org.maplibre.nativeffi.generated.Status
  */
 public data class CommandCompletion(
   public val disposition: CommandDisposition,
-  /** State generation that the command published. */
+  /** Map snapshot generation that a map command published, or zero for a runtime command. */
   public val generation: ULong,
-  /** The first map render update that includes the command. */
+  /** The first map render update that includes the command, or zero when [generation] is zero. */
   public val renderUpdateGeneration: ULong,
   public val status: Status,
   public val diagnostic: String,

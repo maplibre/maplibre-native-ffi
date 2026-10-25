@@ -4144,6 +4144,7 @@ final class GeojsonSourceDataHandle implements Finalizable {
   GeojsonSourceDataHandle._(_NativeGeojsonSourceData handle)
     : _state = NativeHandleState(handle, 'GeojsonSourceDataHandle');
   final NativeHandleState<_NativeGeojsonSourceData> _state;
+  // ignore: unused_element
   _NativeGeojsonSourceData get _handle => _state.handle;
 
   /// The native handle id.
@@ -7265,6 +7266,7 @@ final class ResourceTransformRequestHandle implements Finalizable {
   ResourceTransformRequestHandle._(_NativeResourceTransformRequest handle)
     : _state = NativeHandleState(handle, 'ResourceTransformRequestHandle');
   final NativeHandleState<_NativeResourceTransformRequest> _state;
+  // ignore: unused_element
   _NativeResourceTransformRequest get _handle => _state.handle;
 
   /// The native handle id.
@@ -7278,21 +7280,22 @@ final class ResourceTransformRequestHandle implements Finalizable {
   String toString() =>
       'ResourceTransformRequestHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
 
-  /// Answers a resource transform request with a replacement URL.
+  /// Answers a resource transform request with a replacement URL and consumes
+  /// its handle.
   ///
   /// See `mln_resource_transform_request_complete` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  void complete(String url) => withNativeArena((arena) {
-    _check(
-      raw.mln_resource_transform_request_complete(
-        _handle.raw,
+  void complete(String url) => _state.answer(
+    (handle) => withNativeArena(
+      (arena) => raw.mln_resource_transform_request_complete(
+        handle.raw,
         nativeStringView(url, arena).value,
         nativeDiagnostic,
       ),
-    );
-  });
+    ),
+  );
 
-  /// Releases a resource transform request.
+  /// Releases a resource transform request without answering it.
   ///
   /// See `mln_resource_transform_request_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -7300,6 +7303,93 @@ final class ResourceTransformRequestHandle implements Finalizable {
     raw.mln_resource_transform_request_release(handle.raw);
     return nativeStatusOk;
   });
+}
+
+extension type RuntimeHandleDiscarding._(RuntimeHandle _owner) {
+  _NativeRuntime get _handle => _owner._handle;
+  _CallbackRoots get _callbackRoots => _owner._callbackRoots;
+  void clearEventHandler() => _discard(
+    (arena, completion) => raw.mln_runtime_clear_event_handler(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+  void clearHttpHeaderTransform() => _discard(
+    (arena, completion) => raw.mln_runtime_clear_http_header_transform(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+  void clearResourceProvider() => _discard(
+    (arena, completion) => raw.mln_runtime_clear_resource_provider(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+  void clearResourceTransform() => _discard(
+    (arena, completion) => raw.mln_runtime_clear_resource_transform(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+  void setEventHandler(RuntimeEventHandler handler) =>
+      _discard((arena, completion) {
+        final registrations = _NativeRegistrations(_callbackRoots);
+        return registrations.run(
+          () => raw.mln_runtime_set_event_handler(
+            _handle.raw,
+            registrations.add(
+              _prepareRuntimeEventHandler(handler, registrations.roots),
+            ),
+            completion,
+            nativeDiagnostic,
+          ),
+        );
+      });
+  void setHttpHeaderTransform(HttpHeaderTransform transform) =>
+      _discard((arena, completion) {
+        final registrations = _NativeRegistrations(_callbackRoots);
+        return registrations.run(
+          () => raw.mln_runtime_set_http_header_transform(
+            _handle.raw,
+            registrations.add(_prepareHttpHeaderTransform(transform)),
+            completion,
+            nativeDiagnostic,
+          ),
+        );
+      });
+  void setResourceProvider(ResourceProvider provider) =>
+      _discard((arena, completion) {
+        final registrations = _NativeRegistrations(_callbackRoots);
+        return registrations.run(
+          () => raw.mln_runtime_set_resource_provider(
+            _handle.raw,
+            registrations.add(
+              _prepareResourceProvider(provider, registrations.roots),
+            ),
+            completion,
+            nativeDiagnostic,
+          ),
+        );
+      });
+  void setResourceTransform(ResourceTransform transform) =>
+      _discard((arena, completion) {
+        final registrations = _NativeRegistrations(_callbackRoots);
+        return registrations.run(
+          () => raw.mln_runtime_set_resource_transform(
+            _handle.raw,
+            registrations.add(
+              _prepareResourceTransform(transform, registrations.roots),
+            ),
+            completion,
+            nativeDiagnostic,
+          ),
+        );
+      });
 }
 
 /// Issued `mln_runtime` handle id.
@@ -7319,6 +7409,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   final _callbackRoots = _CallbackRoots();
   final NativeHandleState<_NativeRuntime> _state;
   _NativeRuntime get _handle => _state.handle;
+  RuntimeHandleDiscarding get discarding => RuntimeHandleDiscarding._(this);
 
   /// The native handle id, which runtime events report as their source.
   ///
@@ -7338,7 +7429,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_clear_event_handler` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  Future<void> clearEventHandler() => _run(
+  Future<CommandCompletion> clearEventHandler() => _command(
     (arena, completion) => raw.mln_runtime_clear_event_handler(
       _handle.raw,
       completion,
@@ -7350,7 +7441,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_clear_http_header_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  Future<void> clearHttpHeaderTransform() => _run(
+  Future<CommandCompletion> clearHttpHeaderTransform() => _command(
     (arena, completion) => raw.mln_runtime_clear_http_header_transform(
       _handle.raw,
       completion,
@@ -7362,7 +7453,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_clear_resource_provider` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  Future<void> clearResourceProvider() => _run(
+  Future<CommandCompletion> clearResourceProvider() => _command(
     (arena, completion) => raw.mln_runtime_clear_resource_provider(
       _handle.raw,
       completion,
@@ -7374,7 +7465,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_clear_resource_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  Future<void> clearResourceTransform() => _run(
+  Future<CommandCompletion> clearResourceTransform() => _command(
     (arena, completion) => raw.mln_runtime_clear_resource_transform(
       _handle.raw,
       completion,
@@ -7555,8 +7646,8 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_set_event_handler` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  Future<void> setEventHandler(RuntimeEventHandler handler) =>
-      _run((arena, completion) {
+  Future<CommandCompletion> setEventHandler(RuntimeEventHandler handler) =>
+      _command((arena, completion) {
         final registrations = _NativeRegistrations(_callbackRoots);
         return registrations.run(
           () => raw.mln_runtime_set_event_handler(
@@ -7586,18 +7677,19 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_set_http_header_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  Future<void> setHttpHeaderTransform(HttpHeaderTransform transform) =>
-      _run((arena, completion) {
-        final registrations = _NativeRegistrations(_callbackRoots);
-        return registrations.run(
-          () => raw.mln_runtime_set_http_header_transform(
-            _handle.raw,
-            registrations.add(_prepareHttpHeaderTransform(transform)),
-            completion,
-            nativeDiagnostic,
-          ),
-        );
-      });
+  Future<CommandCompletion> setHttpHeaderTransform(
+    HttpHeaderTransform transform,
+  ) => _command((arena, completion) {
+    final registrations = _NativeRegistrations(_callbackRoots);
+    return registrations.run(
+      () => raw.mln_runtime_set_http_header_transform(
+        _handle.raw,
+        registrations.add(_prepareHttpHeaderTransform(transform)),
+        completion,
+        nativeDiagnostic,
+      ),
+    );
+  });
 
   /// Starts a change to this runtime's maximum ambient cache size.
   ///
@@ -7647,8 +7739,8 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_set_resource_provider` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  Future<void> setResourceProvider(ResourceProvider provider) =>
-      _run((arena, completion) {
+  Future<CommandCompletion> setResourceProvider(ResourceProvider provider) =>
+      _command((arena, completion) {
         final registrations = _NativeRegistrations(_callbackRoots);
         return registrations.run(
           () => raw.mln_runtime_set_resource_provider(
@@ -7666,8 +7758,8 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_set_resource_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  Future<void> setResourceTransform(ResourceTransform transform) =>
-      _run((arena, completion) {
+  Future<CommandCompletion> setResourceTransform(ResourceTransform transform) =>
+      _command((arena, completion) {
         final registrations = _NativeRegistrations(_callbackRoots);
         return registrations.run(
           () => raw.mln_runtime_set_resource_transform(

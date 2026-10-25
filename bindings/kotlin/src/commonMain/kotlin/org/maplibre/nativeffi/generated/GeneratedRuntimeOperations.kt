@@ -1,6 +1,7 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 package org.maplibre.nativeffi.generated
 
+import kotlin.jvm.JvmInline
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.c.C
@@ -8,6 +9,7 @@ import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
+import org.maplibre.nativeffi.runtime.CommandCompletion
 
 public abstract class GeneratedRuntimeOperations internal constructor() {
   internal abstract val binding: HandleState
@@ -19,8 +21,8 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * See `mln_runtime_clear_event_handler` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun clearEventHandler(): Deferred<Unit> =
-    nativeUnit(this, binding) {
+  public fun clearEventHandler(): Deferred<CommandCompletion> =
+    nativeCommand(this, binding) {
       check(C.mln_runtime_clear_event_handler(handle, completion, diagnostic))
     }
 
@@ -30,8 +32,8 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * See `mln_runtime_clear_http_header_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun clearHttpHeaderTransform(): Deferred<Unit> =
-    nativeUnit(this, binding) {
+  public fun clearHttpHeaderTransform(): Deferred<CommandCompletion> =
+    nativeCommand(this, binding) {
       check(C.mln_runtime_clear_http_header_transform(handle, completion, diagnostic))
     }
 
@@ -41,8 +43,8 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * See `mln_runtime_clear_resource_provider` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun clearResourceProvider(): Deferred<Unit> =
-    nativeUnit(this, binding) {
+  public fun clearResourceProvider(): Deferred<CommandCompletion> =
+    nativeCommand(this, binding) {
       check(C.mln_runtime_clear_resource_provider(handle, completion, diagnostic))
     }
 
@@ -52,8 +54,8 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * See `mln_runtime_clear_resource_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun clearResourceTransform(): Deferred<Unit> =
-    nativeUnit(this, binding) {
+  public fun clearResourceTransform(): Deferred<CommandCompletion> =
+    nativeCommand(this, binding) {
       check(C.mln_runtime_clear_resource_transform(handle, completion, diagnostic))
     }
 
@@ -264,8 +266,8 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * See `mln_runtime_set_event_handler` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun setEventHandler(handler: RuntimeEventHandler): Deferred<Unit> =
-    nativeUnit(this, binding, bindingCallbacks) {
+  public fun setEventHandler(handler: RuntimeEventHandler): Deferred<CommandCompletion> =
+    nativeCommand(this, binding, bindingCallbacks) {
       check(
         C.mln_runtime_set_event_handler(
           handle,
@@ -347,8 +349,8 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * See `mln_runtime_set_resource_provider` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun setResourceProvider(provider: ResourceProvider): Deferred<Unit> =
-    nativeUnit(this, binding, bindingCallbacks) {
+  public fun setResourceProvider(provider: ResourceProvider): Deferred<CommandCompletion> =
+    nativeCommand(this, binding, bindingCallbacks) {
       check(
         C.mln_runtime_set_resource_provider(
           handle,
@@ -365,8 +367,8 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * See `mln_runtime_set_resource_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun setResourceTransform(transform: ResourceTransform): Deferred<Unit> =
-    nativeUnit(this, binding, bindingCallbacks) {
+  public fun setResourceTransform(transform: ResourceTransform): Deferred<CommandCompletion> =
+    nativeCommand(this, binding, bindingCallbacks) {
       check(
         C.mln_runtime_set_resource_transform(
           handle,
@@ -398,6 +400,87 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
           regionId,
           bytes(metadata),
           metadata.size.toLong(),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
+  /**
+   * This handle's commands without their completions. A discarding call returns once native accepts
+   * the command, and native logs a command that fails as a warning.
+   */
+  public val discarding: RuntimeDiscarding
+    get() = RuntimeDiscarding(this)
+}
+
+/** The commands of a [RuntimeHandle] that drop their completions. */
+@JvmInline
+public value class RuntimeDiscarding
+internal constructor(internal val owner: GeneratedRuntimeOperations) {
+  internal val binding
+    get() = owner.binding
+
+  internal val bindingCallbacks
+    get() = owner.bindingCallbacks
+
+  /** [RuntimeHandle.clearEventHandler] without its completion. */
+  public fun clearEventHandler(): Unit =
+    nativeDiscard(owner, binding) {
+      check(C.mln_runtime_clear_event_handler(handle, completion, diagnostic))
+    }
+
+  /** [RuntimeHandle.clearHttpHeaderTransform] without its completion. */
+  public fun clearHttpHeaderTransform(): Unit =
+    nativeDiscard(owner, binding) {
+      check(C.mln_runtime_clear_http_header_transform(handle, completion, diagnostic))
+    }
+
+  /** [RuntimeHandle.clearResourceProvider] without its completion. */
+  public fun clearResourceProvider(): Unit =
+    nativeDiscard(owner, binding) {
+      check(C.mln_runtime_clear_resource_provider(handle, completion, diagnostic))
+    }
+
+  /** [RuntimeHandle.clearResourceTransform] without its completion. */
+  public fun clearResourceTransform(): Unit =
+    nativeDiscard(owner, binding) {
+      check(C.mln_runtime_clear_resource_transform(handle, completion, diagnostic))
+    }
+
+  /** [RuntimeHandle.setEventHandler] without its completion. */
+  public fun setEventHandler(handler: RuntimeEventHandler): Unit =
+    nativeDiscard(owner, binding, bindingCallbacks) {
+      check(
+        C.mln_runtime_set_event_handler(
+          handle,
+          writeRuntimeEventHandler(handler),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
+  /** [RuntimeHandle.setResourceProvider] without its completion. */
+  public fun setResourceProvider(provider: ResourceProvider): Unit =
+    nativeDiscard(owner, binding, bindingCallbacks) {
+      check(
+        C.mln_runtime_set_resource_provider(
+          handle,
+          writeResourceProvider(provider),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
+  /** [RuntimeHandle.setResourceTransform] without its completion. */
+  public fun setResourceTransform(transform: ResourceTransform): Unit =
+    nativeDiscard(owner, binding, bindingCallbacks) {
+      check(
+        C.mln_runtime_set_resource_transform(
+          handle,
+          writeResourceTransform(transform),
           completion,
           diagnostic,
         ),

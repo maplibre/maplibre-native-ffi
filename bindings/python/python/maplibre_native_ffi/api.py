@@ -3,6 +3,7 @@
 from ._generated_operations import (
     MapHandleDiscarding,
     RenderSessionHandleDiscarding,
+    RuntimeHandleDiscarding,
     android_init,
     c_version,
     geojson_source_data_create,
@@ -370,6 +371,7 @@ __all__ = [
     "RuntimeEventTileActionVariant",
     "RuntimeEventType",
     "RuntimeHandle",
+    "RuntimeHandleDiscarding",
     "RuntimeOptions",
     "ScreenBox",
     "ScreenLineString",

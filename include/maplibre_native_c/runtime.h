@@ -698,9 +698,9 @@ MLN_API mln_http_header_rule mln_http_header_rule_default(void) MLN_NOEXCEPT;
  *
  * MapLibre waits for the answer before it schedules the request. The host
  * answers through request, inline or later from any thread:
- * mln_resource_transform_request_complete() replaces the URL, and releasing
- * request without completing it keeps the URL. The callback owns request and
- * releases it exactly once, after answering or to keep the URL.
+ * mln_resource_transform_request_complete() replaces the URL and consumes
+ * request, and releasing request without completing it keeps the URL. The
+ * callback owns request until one of the two consumes it.
  *
  * The callback runs on a MapLibre network thread. It must be thread-safe and
  * return promptly, and must not wait for runtime work. url is borrowed for the
@@ -1133,7 +1133,7 @@ MLN_API mln_status mln_runtime_create(
  *   runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_BINDING("execution=operation")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_set_resource_provider(
   mln_runtime runtime, const mln_resource_provider* provider,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -1156,7 +1156,7 @@ MLN_API mln_status mln_runtime_set_resource_provider(
  * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_BINDING("execution=operation")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_clear_resource_provider(
   mln_runtime runtime, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
@@ -1325,7 +1325,7 @@ MLN_API void mln_resource_request_release(
  *   runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_BINDING("execution=operation")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_set_resource_transform(
   mln_runtime runtime, const mln_resource_transform* transform,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -1348,39 +1348,42 @@ MLN_API mln_status mln_runtime_set_resource_transform(
  * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_BINDING("execution=operation")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_clear_resource_transform(
   mln_runtime runtime, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
- * Answers a resource transform request with a replacement URL.
+ * Answers a resource transform request with a replacement URL and consumes its
+ * handle.
  *
  * Call from any thread, inline in the transform callback or later. The C API
- * copies url before returning. A request takes one answer, and the caller still
- * releases it afterward. A request that MapLibre cancelled while it waited
- * accepts the answer and discards it.
+ * copies url before returning. MLN_STATUS_OK consumes the handle, as
+ * mln_resource_transform_request_release() would, so the caller does not
+ * release it; any other status leaves the handle with the caller. A request
+ * that MapLibre cancelled while it waited accepts the answer and discards it.
  *
  * Returns:
  * - MLN_STATUS_OK when the answer was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when request is an invalid handle, url is
  *   empty, or url has null data with a nonzero size or contains embedded NUL.
- * - MLN_STATUS_INVALID_STATE when request has been released or already
- *   answered.
+ * - MLN_STATUS_INVALID_STATE when request has been released or consumed.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
+MLN_BINDING("consumes=success")
 MLN_API mln_status mln_resource_transform_request_complete(
   mln_resource_transform_request request, mln_buffer_view url,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
- * Releases a resource transform request.
+ * Releases a resource transform request without answering it.
  *
- * Release each request exactly once. A request released without an answer
- * keeps its URL. Passing MLN_HANDLE_NULL is a no-op, as is passing a handle
- * this call already released.
+ * A request released without an answer keeps its URL. Release a request that
+ * mln_resource_transform_request_complete() did not consume. Passing
+ * MLN_HANDLE_NULL is a no-op, as is passing a handle this call already
+ * released.
  */
 MLN_API void mln_resource_transform_request_release(
   mln_resource_transform_request request
@@ -1423,7 +1426,7 @@ MLN_API void mln_resource_transform_request_release(
  * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_BINDING("execution=operation")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_set_http_header_transform(
   mln_runtime runtime, const mln_http_header_transform* transform,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -1444,7 +1447,7 @@ MLN_API mln_status mln_runtime_set_http_header_transform(
  * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_BINDING("execution=operation")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_clear_http_header_transform(
   mln_runtime runtime, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
@@ -1608,9 +1611,11 @@ MLN_API mln_status mln_runtime_dispose(
  *
  * MLN_STATUS_OK transfers the handler's user_data to the runtime. A rejected
  * call leaves it with the caller. Events queued before replacement stay on
- * their original queue. Before a handler is set, events are dropped. Set a
- * handler before creating maps or observing offline regions to receive their
- * first events.
+ * their original queue. Before a handler is set, events are dropped. The
+ * command runs in order with map creation and offline region observation, so
+ * a handler whose command is accepted before mln_runtime_create_map() or
+ * mln_runtime_set_offline_region_observed() receives that map's or region's
+ * first events; the host need not wait for the completion.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
@@ -1619,7 +1624,7 @@ MLN_API mln_status mln_runtime_dispose(
  * - MLN_STATUS_INVALID_STATE when runtime or the handler's queue is released.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_BINDING("execution=operation")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_set_event_handler(
   mln_runtime runtime, const mln_runtime_event_handler* handler,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -1634,7 +1639,7 @@ MLN_API mln_status mln_runtime_set_event_handler(
  * - MLN_STATUS_INVALID_STATE when runtime is released.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_BINDING("execution=operation")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_clear_event_handler(
   mln_runtime runtime, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
@@ -1642,6 +1647,10 @@ MLN_API mln_status mln_runtime_clear_event_handler(
 
 /**
  * Selects which runtime-scoped event types this runtime queues.
+ *
+ * The mask applies at once, where mln_map_set_event_mask() is an ordered
+ * command: a map snapshot reports the map's mask, so the map orders its change
+ * with the commands that snapshot observes, and a runtime has no snapshot.
  *
  * A runtime queues an offline event when this mask selects its type. Region
  * status, response error, and tile count limit events also require the region

@@ -54,7 +54,7 @@ typedef struct mln_completion_result {
   /**
    * Map snapshot generation published after a map command ran, whether it
    * committed or failed; zero when the command never ran or the function is
-   * not a command.
+   * not a map command.
    */
   uint64_t generation;
   /**
@@ -90,9 +90,9 @@ typedef void (*mln_completion_callback)(
  *
  * A command, which the header marks MLN_BINDING("execution=command"), also
  * accepts a null completion, which discards its outcome and runs no callback.
- * The command otherwise behaves as it
- * would with a completion. It returns the same status and diagnostic, runs in
- * acceptance order, publishes its snapshot generation, and queues its events.
+ * The command otherwise behaves as it would with a completion. It returns the
+ * same status and diagnostic, runs in acceptance order, and queues its events;
+ * a map command also publishes its snapshot generation.
  * A discarded command that fails logs its status and diagnostic as a warning
  * through the log handler. Queries, operations, and lifecycle functions require
  * a completion, except mln_render_session_dispose(), which accepts null to
@@ -100,11 +100,12 @@ typedef void (*mln_completion_callback)(
  *
  * A later completion fences discarded commands. The completion of a later
  * command or query on the same map follows every earlier discarded command,
- * and a map snapshot read after it observes them. A render session barrier
- * fences only the session's applied extent after a discarded resize; the
- * resize completion fences both the session and the map. A snapshot generation
- * alone does not, because other work also publishes
- * generations.
+ * and a map snapshot read after it observes them. The completion of a later
+ * command on the same runtime, such as a registration change, follows every
+ * earlier discarded command of that runtime and its maps. A render session
+ * barrier fences only the session's applied extent after a discarded resize;
+ * the resize completion fences both the session and the map. A snapshot
+ * generation alone does not, because other work also publishes generations.
  *
  * The completion thread is unspecified and may be the submitting thread. It
  * can differ from the thread that ran the command. The completion may call

@@ -9218,12 +9218,16 @@ impl ResourceTransformRequestHandle {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let url_value = storage.buffer(url.clone(), true)?;
-        let handle = self.input();
+        let Some(mut reservation) = self.reserve(false)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
         unsafe {
             call.status(|diagnostic| {
                 sys::mln_resource_transform_request_complete(handle, url_value, diagnostic)
             })
         }?;
+        reservation.commit();
         Ok(py.None())
     }
     #[pyo3(signature = ())]
@@ -9256,56 +9260,80 @@ impl RuntimeHandle {
     fn clear_event_handler(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
-        let convert = py_none;
         unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_runtime_clear_event_handler(handle, completion, diagnostic)
-                },
-                convert,
-            )
+            call.command(|completion, diagnostic| {
+                sys::mln_runtime_clear_event_handler(handle, completion, diagnostic)
+            })
+        }
+    }
+    #[pyo3(signature = ())]
+    fn _discard_clear_event_handler(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_runtime_clear_event_handler(handle, completion, diagnostic)
+            })
         }
     }
     #[pyo3(signature = ())]
     fn clear_http_header_transform(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
-        let convert = py_none;
         unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_runtime_clear_http_header_transform(handle, completion, diagnostic)
-                },
-                convert,
-            )
+            call.command(|completion, diagnostic| {
+                sys::mln_runtime_clear_http_header_transform(handle, completion, diagnostic)
+            })
+        }
+    }
+    #[pyo3(signature = ())]
+    fn _discard_clear_http_header_transform(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_runtime_clear_http_header_transform(handle, completion, diagnostic)
+            })
         }
     }
     #[pyo3(signature = ())]
     fn clear_resource_provider(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
-        let convert = py_none;
         unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_runtime_clear_resource_provider(handle, completion, diagnostic)
-                },
-                convert,
-            )
+            call.command(|completion, diagnostic| {
+                sys::mln_runtime_clear_resource_provider(handle, completion, diagnostic)
+            })
+        }
+    }
+    #[pyo3(signature = ())]
+    fn _discard_clear_resource_provider(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_runtime_clear_resource_provider(handle, completion, diagnostic)
+            })
         }
     }
     #[pyo3(signature = ())]
     fn clear_resource_transform(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
-        let convert = py_none;
         unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_runtime_clear_resource_transform(handle, completion, diagnostic)
-                },
-                convert,
-            )
+            call.command(|completion, diagnostic| {
+                sys::mln_runtime_clear_resource_transform(handle, completion, diagnostic)
+            })
+        }
+    }
+    #[pyo3(signature = ())]
+    fn _discard_clear_resource_transform(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_runtime_clear_resource_transform(handle, completion, diagnostic)
+            })
         }
     }
     #[pyo3(signature = (options=None))]
@@ -9559,19 +9587,29 @@ impl RuntimeHandle {
         let storage = &mut call.storage;
         let handler_value = generated_input_mln_runtime_event_handler(&handler.clone(), storage)?;
         let handle = self.input();
-        let convert = py_none;
         let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_runtime_set_event_handler(
-                        handle,
-                        &handler_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
+            call.command(|completion, diagnostic| {
+                sys::mln_runtime_set_event_handler(handle, &handler_value, completion, diagnostic)
+            })
+        }?;
+        let callback_roots = call.accept_callbacks();
+        self.state().retain_callback_roots(callback_roots);
+        Ok(future)
+    }
+    #[pyo3(signature = (handler))]
+    fn _discard_set_event_handler(
+        &self,
+        py: Python<'_>,
+        handler: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let handler_value = generated_input_mln_runtime_event_handler(&handler.clone(), storage)?;
+        let handle = self.input();
+        let future = unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_runtime_set_event_handler(handle, &handler_value, completion, diagnostic)
+            })
         }?;
         let callback_roots = call.accept_callbacks();
         self.state().retain_callback_roots(callback_roots);
@@ -9601,19 +9639,40 @@ impl RuntimeHandle {
         let transform_value =
             generated_input_mln_http_header_transform(&transform.clone(), storage)?;
         let handle = self.input();
-        let convert = py_none;
         let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_runtime_set_http_header_transform(
-                        handle,
-                        &transform_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
+            call.command(|completion, diagnostic| {
+                sys::mln_runtime_set_http_header_transform(
+                    handle,
+                    &transform_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }?;
+        let callback_roots = call.accept_callbacks();
+        self.state().retain_callback_roots(callback_roots);
+        Ok(future)
+    }
+    #[pyo3(signature = (transform))]
+    fn _discard_set_http_header_transform(
+        &self,
+        py: Python<'_>,
+        transform: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let transform_value =
+            generated_input_mln_http_header_transform(&transform.clone(), storage)?;
+        let handle = self.input();
+        let future = unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_runtime_set_http_header_transform(
+                    handle,
+                    &transform_value,
+                    completion,
+                    diagnostic,
+                )
+            })
         }?;
         let callback_roots = call.accept_callbacks();
         self.state().retain_callback_roots(callback_roots);
@@ -9691,19 +9750,39 @@ impl RuntimeHandle {
         let storage = &mut call.storage;
         let provider_value = generated_input_mln_resource_provider(&provider.clone(), storage)?;
         let handle = self.input();
-        let convert = py_none;
         let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_runtime_set_resource_provider(
-                        handle,
-                        &provider_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
+            call.command(|completion, diagnostic| {
+                sys::mln_runtime_set_resource_provider(
+                    handle,
+                    &provider_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }?;
+        let callback_roots = call.accept_callbacks();
+        self.state().retain_callback_roots(callback_roots);
+        Ok(future)
+    }
+    #[pyo3(signature = (provider))]
+    fn _discard_set_resource_provider(
+        &self,
+        py: Python<'_>,
+        provider: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let provider_value = generated_input_mln_resource_provider(&provider.clone(), storage)?;
+        let handle = self.input();
+        let future = unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_runtime_set_resource_provider(
+                    handle,
+                    &provider_value,
+                    completion,
+                    diagnostic,
+                )
+            })
         }?;
         let callback_roots = call.accept_callbacks();
         self.state().retain_callback_roots(callback_roots);
@@ -9719,19 +9798,39 @@ impl RuntimeHandle {
         let storage = &mut call.storage;
         let transform_value = generated_input_mln_resource_transform(&transform.clone(), storage)?;
         let handle = self.input();
-        let convert = py_none;
         let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_runtime_set_resource_transform(
-                        handle,
-                        &transform_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
+            call.command(|completion, diagnostic| {
+                sys::mln_runtime_set_resource_transform(
+                    handle,
+                    &transform_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }?;
+        let callback_roots = call.accept_callbacks();
+        self.state().retain_callback_roots(callback_roots);
+        Ok(future)
+    }
+    #[pyo3(signature = (transform))]
+    fn _discard_set_resource_transform(
+        &self,
+        py: Python<'_>,
+        transform: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let transform_value = generated_input_mln_resource_transform(&transform.clone(), storage)?;
+        let handle = self.input();
+        let future = unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_runtime_set_resource_transform(
+                    handle,
+                    &transform_value,
+                    completion,
+                    diagnostic,
+                )
+            })
         }?;
         let callback_roots = call.accept_callbacks();
         self.state().retain_callback_roots(callback_roots);

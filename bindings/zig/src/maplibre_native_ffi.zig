@@ -1388,15 +1388,17 @@ pub const ResourceTransformRequest = struct {
     pub const isClosed = methods.isClosed;
     pub const format = methods.format;
     pub const deinit = methods.deinit;
-    /// Answers a resource transform request with a replacement URL.
+    /// Answers a resource transform request with a replacement URL and consumes its
+    /// handle.
     ///
     /// See `mln_resource_transform_request_complete` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn complete(self: ResourceTransformRequest, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        return call.invoke("mln_resource_transform_request_complete", .handle, self, null, diagnostic, .{url});
+    pub fn complete(self: *ResourceTransformRequest, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        try call.invoke("mln_resource_transform_request_complete", .handle, self.*, null, diagnostic, .{url});
+        self.closed = true;
     }
 
-    /// Releases a resource transform request.
+    /// Releases a resource transform request without answering it.
     ///
     /// See `mln_resource_transform_request_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1427,36 +1429,40 @@ pub const Runtime = struct {
     pub const isClosed = methods.isClosed;
     pub const format = methods.format;
     pub const deinit = methods.deinit;
+    /// Submits this handle's commands without a future; native logs a failed one as a warning.
+    pub fn discarding(self: Runtime) RuntimeDiscarding {
+        return .{ .receiver = self };
+    }
     /// Stops event delivery and retires the previous handler.
     ///
     /// See `mln_runtime_clear_event_handler` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn clearEventHandler(self: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_runtime_clear_event_handler", .handle, self, call.unit, null, diagnostic, .{});
+    pub fn clearEventHandler(self: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_runtime_clear_event_handler", .handle, self, call.command, null, diagnostic, .{});
     }
 
     /// Clears the runtime-scoped outgoing HTTP header transform.
     ///
     /// See `mln_runtime_clear_http_header_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn clearHttpHeaderTransform(self: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_runtime_clear_http_header_transform", .handle, self, call.unit, null, diagnostic, .{});
+    pub fn clearHttpHeaderTransform(self: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_runtime_clear_http_header_transform", .handle, self, call.command, null, diagnostic, .{});
     }
 
     /// Clears the runtime-scoped network resource provider.
     ///
     /// See `mln_runtime_clear_resource_provider` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn clearResourceProvider(self: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_runtime_clear_resource_provider", .handle, self, call.unit, null, diagnostic, .{});
+    pub fn clearResourceProvider(self: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_runtime_clear_resource_provider", .handle, self, call.command, null, diagnostic, .{});
     }
 
     /// Clears the runtime-scoped URL transform for network resources.
     ///
     /// See `mln_runtime_clear_resource_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn clearResourceTransform(self: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_runtime_clear_resource_transform", .handle, self, call.unit, null, diagnostic, .{});
+    pub fn clearResourceTransform(self: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_runtime_clear_resource_transform", .handle, self, call.command, null, diagnostic, .{});
     }
 
     /// Starts creation of a map on the runtime.
@@ -1564,8 +1570,8 @@ pub const Runtime = struct {
     ///
     /// See `mln_runtime_set_event_handler` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn setEventHandler(self: Runtime, handler: RuntimeEventHandler, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_runtime_set_event_handler", .handle, self, call.unit, null, diagnostic, .{handler});
+    pub fn setEventHandler(self: Runtime, handler: RuntimeEventHandler, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_runtime_set_event_handler", .handle, self, call.command, null, diagnostic, .{handler});
     }
 
     /// Selects which runtime-scoped event types this runtime queues.
@@ -1580,8 +1586,8 @@ pub const Runtime = struct {
     ///
     /// See `mln_runtime_set_http_header_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn setHttpHeaderTransform(self: Runtime, allocator: std.mem.Allocator, transform: HttpHeaderTransform, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_runtime_set_http_header_transform", .handle, self, call.unit, allocator, diagnostic, .{transform});
+    pub fn setHttpHeaderTransform(self: Runtime, allocator: std.mem.Allocator, transform: HttpHeaderTransform, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_runtime_set_http_header_transform", .handle, self, call.command, allocator, diagnostic, .{transform});
     }
 
     /// Starts a change to this runtime's maximum ambient cache size.
@@ -1612,16 +1618,16 @@ pub const Runtime = struct {
     ///
     /// See `mln_runtime_set_resource_provider` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn setResourceProvider(self: Runtime, allocator: std.mem.Allocator, provider: ResourceProvider, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_runtime_set_resource_provider", .handle, self, call.unit, allocator, diagnostic, .{provider});
+    pub fn setResourceProvider(self: Runtime, allocator: std.mem.Allocator, provider: ResourceProvider, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_runtime_set_resource_provider", .handle, self, call.command, allocator, diagnostic, .{provider});
     }
 
     /// Registers or updates a runtime-scoped URL transform for network resources.
     ///
     /// See `mln_runtime_set_resource_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn setResourceTransform(self: Runtime, transform: ResourceTransform, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_runtime_set_resource_transform", .handle, self, call.unit, null, diagnostic, .{transform});
+    pub fn setResourceTransform(self: Runtime, transform: ResourceTransform, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_runtime_set_resource_transform", .handle, self, call.command, null, diagnostic, .{transform});
     }
 
     /// Starts updating opaque binary metadata for an offline region.
@@ -7458,5 +7464,48 @@ pub const RenderSessionDiscarding = struct {
     pub fn resize(self: RenderSessionDiscarding, extent: LogicalExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const session = self.receiver;
         return call.discard("mln_render_session_resize", .handle, session, null, diagnostic, .{extent});
+    }
+};
+
+pub const RuntimeDiscarding = struct {
+    receiver: Runtime,
+    pub fn clearEventHandler(self: RuntimeDiscarding, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const runtime = self.receiver;
+        return call.discard("mln_runtime_clear_event_handler", .handle, runtime, null, diagnostic, .{});
+    }
+
+    pub fn clearHttpHeaderTransform(self: RuntimeDiscarding, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const runtime = self.receiver;
+        return call.discard("mln_runtime_clear_http_header_transform", .handle, runtime, null, diagnostic, .{});
+    }
+
+    pub fn clearResourceProvider(self: RuntimeDiscarding, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const runtime = self.receiver;
+        return call.discard("mln_runtime_clear_resource_provider", .handle, runtime, null, diagnostic, .{});
+    }
+
+    pub fn clearResourceTransform(self: RuntimeDiscarding, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const runtime = self.receiver;
+        return call.discard("mln_runtime_clear_resource_transform", .handle, runtime, null, diagnostic, .{});
+    }
+
+    pub fn setEventHandler(self: RuntimeDiscarding, handler: RuntimeEventHandler, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const runtime = self.receiver;
+        return call.discard("mln_runtime_set_event_handler", .handle, runtime, null, diagnostic, .{handler});
+    }
+
+    pub fn setHttpHeaderTransform(self: RuntimeDiscarding, allocator: std.mem.Allocator, transform: HttpHeaderTransform, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const runtime = self.receiver;
+        return call.discard("mln_runtime_set_http_header_transform", .handle, runtime, allocator, diagnostic, .{transform});
+    }
+
+    pub fn setResourceProvider(self: RuntimeDiscarding, allocator: std.mem.Allocator, provider: ResourceProvider, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const runtime = self.receiver;
+        return call.discard("mln_runtime_set_resource_provider", .handle, runtime, allocator, diagnostic, .{provider});
+    }
+
+    pub fn setResourceTransform(self: RuntimeDiscarding, transform: ResourceTransform, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const runtime = self.receiver;
+        return call.discard("mln_runtime_set_resource_transform", .handle, runtime, null, diagnostic, .{transform});
     }
 };

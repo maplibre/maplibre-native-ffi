@@ -612,7 +612,6 @@ def render_owner(native, handle, bodies, bound, roots):
             "  @override\n  final _callbackRoots = _CallbackRoots();"
         )
     fields.append(f"  final NativeHandleState<{native_type}> _state;")
-    fields.append(f"  {native_type} get _handle => _state.handle;")
     commands = [
         p
         for p in bound.operations
@@ -620,6 +619,15 @@ def render_owner(native, handle, bodies, bound, roots):
         and p.completion.discardable
         and any(i.name == p.receiver and i.value.native == native for i in p.inputs)
     ]
+    # Calls that consume their receiver reach it through _state, so an owner
+    # whose every call does may use _handle only as another call's input.
+    unused = not commands and not any(
+        re.search(r"\b_handle\b", body) for body in bodies
+    )
+    fields.append(
+        ("  // ignore: unused_element\n" if unused else "")
+        + f"  {native_type} get _handle => _state.handle;"
+    )
     if commands:
         fields.append(
             f"  {public}Discarding get discarding => {public}Discarding._(this);"

@@ -182,7 +182,6 @@ test(
     const request = await callbackArrival(transformed, "the transform");
     assert.deepEqual(urls, [requested]);
     request.complete(`${origin.url}/style.json`);
-    request.close();
     await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded, map.id);
     assert.deepEqual(
       (await origin.requests()).map((entry) => entry.path),

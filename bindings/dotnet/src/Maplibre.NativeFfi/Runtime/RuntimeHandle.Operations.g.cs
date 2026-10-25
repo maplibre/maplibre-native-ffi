@@ -63,13 +63,13 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_clear_event_handler</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task ClearEventHandlerAsync()
+    public Task<CommandCompletion> ClearEventHandlerAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_clear_event_handler(
             Handle,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -82,13 +82,13 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_clear_http_header_transform</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task ClearHttpHeaderTransformAsync()
+    public Task<CommandCompletion> ClearHttpHeaderTransformAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_clear_http_header_transform(
             Handle,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -101,13 +101,13 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_clear_resource_provider</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task ClearResourceProviderAsync()
+    public Task<CommandCompletion> ClearResourceProviderAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_clear_resource_provider(
             Handle,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -120,13 +120,13 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_clear_resource_transform</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task ClearResourceTransformAsync()
+    public Task<CommandCompletion> ClearResourceTransformAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_clear_resource_transform(
             Handle,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -431,7 +431,7 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_set_event_handler</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetEventHandlerAsync(RuntimeEventHandler handler)
+    public Task<CommandCompletion> SetEventHandlerAsync(RuntimeEventHandler handler)
     {
         using var scope = new NativeCallScope(this);
         var nativeHandler = NativeRuntimeEventHandler(handler, scope);
@@ -439,7 +439,7 @@ public sealed unsafe partial class RuntimeHandle
         var nativeStatus = NativeMethods.mln_runtime_set_event_handler(
             Handle,
             &nativeHandler,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -465,7 +465,7 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_set_http_header_transform</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetHttpHeaderTransformAsync(HttpHeaderTransform transform)
+    public Task<CommandCompletion> SetHttpHeaderTransformAsync(HttpHeaderTransform transform)
     {
         using var scope = new NativeCallScope(this);
         var nativeTransform = NativeHttpHeaderTransform(transform, scope);
@@ -473,7 +473,7 @@ public sealed unsafe partial class RuntimeHandle
         var nativeStatus = NativeMethods.mln_runtime_set_http_header_transform(
             Handle,
             &nativeTransform,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -548,7 +548,7 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_set_resource_provider</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetResourceProviderAsync(ResourceProvider provider)
+    public Task<CommandCompletion> SetResourceProviderAsync(ResourceProvider provider)
     {
         using var scope = new NativeCallScope(this);
         var nativeProvider = NativeResourceProvider(provider, scope);
@@ -556,7 +556,7 @@ public sealed unsafe partial class RuntimeHandle
         var nativeStatus = NativeMethods.mln_runtime_set_resource_provider(
             Handle,
             &nativeProvider,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -570,7 +570,7 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_set_resource_transform</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task SetResourceTransformAsync(ResourceTransform transform)
+    public Task<CommandCompletion> SetResourceTransformAsync(ResourceTransform transform)
     {
         using var scope = new NativeCallScope(this);
         var nativeTransform = NativeResourceTransform(transform, scope);
@@ -578,7 +578,7 @@ public sealed unsafe partial class RuntimeHandle
         var nativeStatus = NativeMethods.mln_runtime_set_resource_transform(
             Handle,
             &nativeTransform,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -617,6 +617,132 @@ public sealed unsafe partial class RuntimeHandle
                 Diagnostic
             );
             return scope.Accepted(nativePending.Submitted(nativeStatus));
+        }
+    }
+
+    /// <summary>
+    /// Submits each command without a completion. Native logs a failure as
+    /// a warning, and the caller sees none.
+    /// </summary>
+    public DiscardingCommands Discarding => new(this);
+
+    /// <summary>
+    /// The commands of a handle, each submitted without a completion.
+    /// Native logs a failure as a warning, and the caller sees none.
+    /// </summary>
+    public readonly struct DiscardingCommands
+    {
+        private readonly RuntimeHandle owner;
+
+        internal DiscardingCommands(RuntimeHandle owner)
+        {
+            this.owner = owner;
+        }
+
+        public void ClearEventHandler()
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner);
+            Check(NativeMethods.mln_runtime_clear_event_handler(receiverHandle, null, Diagnostic));
+            scope.Accept();
+        }
+
+        public void ClearHttpHeaderTransform()
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner);
+            Check(
+                NativeMethods.mln_runtime_clear_http_header_transform(
+                    receiverHandle,
+                    null,
+                    Diagnostic
+                )
+            );
+            scope.Accept();
+        }
+
+        public void ClearResourceProvider()
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner);
+            Check(
+                NativeMethods.mln_runtime_clear_resource_provider(receiverHandle, null, Diagnostic)
+            );
+            scope.Accept();
+        }
+
+        public void ClearResourceTransform()
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner);
+            Check(
+                NativeMethods.mln_runtime_clear_resource_transform(receiverHandle, null, Diagnostic)
+            );
+            scope.Accept();
+        }
+
+        public void SetEventHandler(RuntimeEventHandler handler)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner);
+            var nativeHandler = NativeRuntimeEventHandler(handler, scope);
+            Check(
+                NativeMethods.mln_runtime_set_event_handler(
+                    receiverHandle,
+                    &nativeHandler,
+                    null,
+                    Diagnostic
+                )
+            );
+            scope.Accept();
+        }
+
+        public void SetHttpHeaderTransform(HttpHeaderTransform transform)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner);
+            var nativeTransform = NativeHttpHeaderTransform(transform, scope);
+            Check(
+                NativeMethods.mln_runtime_set_http_header_transform(
+                    receiverHandle,
+                    &nativeTransform,
+                    null,
+                    Diagnostic
+                )
+            );
+            scope.Accept();
+        }
+
+        public void SetResourceProvider(ResourceProvider provider)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner);
+            var nativeProvider = NativeResourceProvider(provider, scope);
+            Check(
+                NativeMethods.mln_runtime_set_resource_provider(
+                    receiverHandle,
+                    &nativeProvider,
+                    null,
+                    Diagnostic
+                )
+            );
+            scope.Accept();
+        }
+
+        public void SetResourceTransform(ResourceTransform transform)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner);
+            var nativeTransform = NativeResourceTransform(transform, scope);
+            Check(
+                NativeMethods.mln_runtime_set_resource_transform(
+                    receiverHandle,
+                    &nativeTransform,
+                    null,
+                    Diagnostic
+                )
+            );
+            scope.Accept();
         }
     }
 }

@@ -71,11 +71,13 @@ final class MapFixture: Sendable {
     let runtime = try makeRuntime()
     let events = EventCopies()
     do {
-      try await runtime
+      // Both commands run before the runtime creates the map, so its first
+      // events and requests reach them without waiting for completion.
+      try runtime.discarding
         .setEventHandler(RuntimeEventHandler(callback: { batch in
           events.receive(batch)
         }))
-      try await runtime
+      try runtime.discarding
         .setResourceProvider(denyingProvider(routes: routes))
       let map = try await makeMap(on: runtime, extent: extent)
       return MapFixture(runtime: runtime, map: map, events: events)

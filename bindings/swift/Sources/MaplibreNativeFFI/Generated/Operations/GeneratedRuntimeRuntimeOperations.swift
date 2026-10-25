@@ -8,8 +8,9 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_clear_event_handler` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func clearEventHandler() async throws {
-    try await nativeUnit { raw, _, completion, diagnostic in
+  @discardableResult
+  func clearEventHandler() async throws -> CommandCompletion {
+    try await nativeCommand { raw, _, completion, diagnostic in
       mln_runtime_clear_event_handler(
         raw,
         completion,
@@ -22,8 +23,9 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_clear_http_header_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func clearHttpHeaderTransform() async throws {
-    try await nativeUnit { raw, _, completion, diagnostic in
+  @discardableResult
+  func clearHttpHeaderTransform() async throws -> CommandCompletion {
+    try await nativeCommand { raw, _, completion, diagnostic in
       mln_runtime_clear_http_header_transform(
         raw,
         completion,
@@ -36,8 +38,9 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_clear_resource_provider` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func clearResourceProvider() async throws {
-    try await nativeUnit { raw, _, completion, diagnostic in
+  @discardableResult
+  func clearResourceProvider() async throws -> CommandCompletion {
+    try await nativeCommand { raw, _, completion, diagnostic in
       mln_runtime_clear_resource_provider(
         raw,
         completion,
@@ -50,8 +53,9 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_clear_resource_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func clearResourceTransform() async throws {
-    try await nativeUnit { raw, _, completion, diagnostic in
+  @discardableResult
+  func clearResourceTransform() async throws -> CommandCompletion {
+    try await nativeCommand { raw, _, completion, diagnostic in
       mln_runtime_clear_resource_transform(
         raw,
         completion,
@@ -119,8 +123,11 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_set_event_handler` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func setEventHandler(_ bindingArg0: RuntimeEventHandler) async throws {
-    try await nativeUnit { raw, arena, completion, diagnostic in
+  @discardableResult
+  func setEventHandler(_ bindingArg0: RuntimeEventHandler) async throws
+    -> CommandCompletion
+  {
+    try await nativeCommand { raw, arena, completion, diagnostic in
       try mln_runtime_set_event_handler(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -146,8 +153,11 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_set_http_header_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func setHttpHeaderTransform(_ bindingArg0: HttpHeaderTransform) async throws {
-    try await nativeUnit { raw, arena, completion, diagnostic in
+  @discardableResult
+  func setHttpHeaderTransform(_ bindingArg0: HttpHeaderTransform) async throws
+    -> CommandCompletion
+  {
+    try await nativeCommand { raw, arena, completion, diagnostic in
       try mln_runtime_set_http_header_transform(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -176,8 +186,11 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_set_resource_provider` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func setResourceProvider(_ bindingArg0: ResourceProvider) async throws {
-    try await nativeUnit { raw, arena, completion, diagnostic in
+  @discardableResult
+  func setResourceProvider(_ bindingArg0: ResourceProvider) async throws
+    -> CommandCompletion
+  {
+    try await nativeCommand { raw, arena, completion, diagnostic in
       try mln_runtime_set_resource_provider(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -191,8 +204,11 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_set_resource_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func setResourceTransform(_ bindingArg0: ResourceTransform) async throws {
-    try await nativeUnit { raw, arena, completion, diagnostic in
+  @discardableResult
+  func setResourceTransform(_ bindingArg0: ResourceTransform) async throws
+    -> CommandCompletion
+  {
+    try await nativeCommand { raw, arena, completion, diagnostic in
       try mln_runtime_set_resource_transform(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -200,5 +216,95 @@ public extension RuntimeHandle {
         diagnostic
       )
     }
+  }
+}
+
+public extension RuntimeHandleDiscarding {
+  func clearEventHandler() throws {
+    try owner
+      .nativeInvoke { raw, _, diagnostic in mln_runtime_clear_event_handler(
+        raw,
+        nil,
+        diagnostic
+      ) }
+  }
+
+  func clearHttpHeaderTransform() throws {
+    try owner
+      .nativeInvoke { raw, _, diagnostic in
+        mln_runtime_clear_http_header_transform(
+          raw,
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func clearResourceProvider() throws {
+    try owner
+      .nativeInvoke { raw, _, diagnostic in mln_runtime_clear_resource_provider(
+        raw,
+        nil,
+        diagnostic
+      ) }
+  }
+
+  func clearResourceTransform() throws {
+    try owner
+      .nativeInvoke { raw, _, diagnostic in
+        mln_runtime_clear_resource_transform(
+          raw,
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setEventHandler(_ bindingArg0: RuntimeEventHandler) throws {
+    try owner
+      .nativeInvoke { raw, arena, diagnostic in
+        try mln_runtime_set_event_handler(
+          raw,
+          arena.store(bindingArg0.nativeValue(arena: arena)),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setHttpHeaderTransform(_ bindingArg0: HttpHeaderTransform) throws {
+    try owner
+      .nativeInvoke { raw, arena, diagnostic in
+        try mln_runtime_set_http_header_transform(
+          raw,
+          arena.store(bindingArg0.nativeValue(arena: arena)),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setResourceProvider(_ bindingArg0: ResourceProvider) throws {
+    try owner
+      .nativeInvoke { raw, arena, diagnostic in
+        try mln_runtime_set_resource_provider(
+          raw,
+          arena.store(bindingArg0.nativeValue(arena: arena)),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func setResourceTransform(_ bindingArg0: ResourceTransform) throws {
+    try owner
+      .nativeInvoke { raw, arena, diagnostic in
+        try mln_runtime_set_resource_transform(
+          raw,
+          arena.store(bindingArg0.nativeValue(arena: arena)),
+          nil,
+          diagnostic
+        )
+      }
   }
 }

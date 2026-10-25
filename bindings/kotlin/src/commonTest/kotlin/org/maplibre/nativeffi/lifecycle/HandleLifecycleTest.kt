@@ -21,6 +21,7 @@ import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.runSuspendTest
+import org.maplibre.nativeffi.runtime.assertCommitted
 import org.maplibre.nativeffi.runtime.awaitCommitted
 import org.maplibre.nativeffi.runtime.use
 import org.maplibre.nativeffi.smallMapOptions
@@ -93,7 +94,9 @@ class HandleLifecycleTest {
     // stays usable.
     assertFailsWithStatus(Status.INVALID_STATE) { runtime.release() }
     runtime.getEventMask()
-    runtime.clearResourceTransform().awaitWithin("a command on the refused runtime")
+    assertCommitted(
+      runtime.clearResourceTransform().awaitWithin("a command on the refused runtime"),
+    )
 
     map.release().awaitWithin("the map release")
     runtime.release().awaitWithin("the retried runtime release")

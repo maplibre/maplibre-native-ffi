@@ -106,7 +106,7 @@ def test_a_refused_close_leaves_the_handle_usable(
         harness.runtime.close()
     assert raised.value.status == mln.Status.INVALID_STATE
 
-    assert result(harness.runtime.clear_resource_transform()) is None
+    result(harness.runtime.clear_resource_transform())
     result(map_handle.close())
     result(harness.runtime.close())
     with pytest.raises(

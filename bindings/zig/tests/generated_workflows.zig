@@ -22,8 +22,7 @@ const ProviderProbe = struct {
         _ = self.calls.fetchAdd(1, .seq_cst);
         var owned = handle;
         defer owned.deinit();
-        var cleared = try self.runtime.clearResourceTransform(null);
-        cleared.deinit();
+        try self.runtime.discarding().clearResourceTransform(null);
     }
     fn release(self: *@This()) void {
         _ = self.releases.fetchAdd(1, .seq_cst);
@@ -40,7 +39,7 @@ test "a provider can deinit its request inside its callback" {
     _ = try support.resolve(try fixture.map.setStyleUrl("binding-test://style", null));
     var failed = try fixture.waitForEvent(.map_loading_failed);
     failed.deinit();
-    try support.resolve(try fixture.runtime.clearResourceProvider(null));
+    try support.expectCommitted(try fixture.runtime.clearResourceProvider(null));
     try testing.expectEqual(@as(usize, 1), probe.calls.load(.seq_cst));
     try testing.expectEqual(@as(usize, 1), probe.releases.load(.seq_cst));
 }

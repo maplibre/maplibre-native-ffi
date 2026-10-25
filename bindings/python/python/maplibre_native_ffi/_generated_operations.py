@@ -1718,7 +1718,8 @@ class _ResourceTransformRequestHandleOperations(GeneratedOperations):
     _native: _native._ResourceTransformRequestHandle
 
     def complete(self, url: str) -> None:
-        """Answers a resource transform request with a replacement URL.
+        """Answers a resource transform request with a replacement URL and
+        consumes its handle.
 
         See `mln_resource_transform_request_complete` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1726,7 +1727,7 @@ class _ResourceTransformRequestHandleOperations(GeneratedOperations):
         return self._native.complete(url)
 
     def close(self) -> None:
-        """Releases a resource transform request.
+        """Releases a resource transform request without answering it.
 
         See `mln_resource_transform_request_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1737,7 +1738,7 @@ class _ResourceTransformRequestHandleOperations(GeneratedOperations):
 class _RuntimeHandleOperations(GeneratedOperations):
     _native: _native._RuntimeHandle
 
-    def clear_event_handler(self) -> Future[None]:
+    def clear_event_handler(self) -> Future[CommandCompletion]:
         """Stops event delivery and retires the previous handler.
 
         See `mln_runtime_clear_event_handler` in the
@@ -1745,7 +1746,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.clear_event_handler()
 
-    def clear_http_header_transform(self) -> Future[None]:
+    def clear_http_header_transform(self) -> Future[CommandCompletion]:
         """Clears the runtime-scoped outgoing HTTP header transform.
 
         See `mln_runtime_clear_http_header_transform` in the
@@ -1753,7 +1754,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.clear_http_header_transform()
 
-    def clear_resource_provider(self) -> Future[None]:
+    def clear_resource_provider(self) -> Future[CommandCompletion]:
         """Clears the runtime-scoped network resource provider.
 
         See `mln_runtime_clear_resource_provider` in the
@@ -1761,7 +1762,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.clear_resource_provider()
 
-    def clear_resource_transform(self) -> Future[None]:
+    def clear_resource_transform(self) -> Future[CommandCompletion]:
         """Clears the runtime-scoped URL transform for network resources.
 
         See `mln_runtime_clear_resource_transform` in the
@@ -1883,7 +1884,9 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.run_ambient_cache_operation(operation)
 
-    def set_event_handler(self, handler: RuntimeEventHandler) -> Future[None]:
+    def set_event_handler(
+        self, handler: RuntimeEventHandler
+    ) -> Future[CommandCompletion]:
         """Selects how runtime and map events reach the host.
 
         See `mln_runtime_set_event_handler` in the
@@ -1899,7 +1902,9 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.set_event_mask(mask)
 
-    def set_http_header_transform(self, transform: HttpHeaderTransform) -> Future[None]:
+    def set_http_header_transform(
+        self, transform: HttpHeaderTransform
+    ) -> Future[CommandCompletion]:
         """Registers or replaces the runtime-scoped outgoing HTTP header
         transform.
 
@@ -1936,7 +1941,9 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.set_offline_region_observed(region_id, observed)
 
-    def set_resource_provider(self, provider: ResourceProvider) -> Future[None]:
+    def set_resource_provider(
+        self, provider: ResourceProvider
+    ) -> Future[CommandCompletion]:
         """Registers or replaces a runtime-scoped network resource provider.
 
         See `mln_runtime_set_resource_provider` in the
@@ -1944,7 +1951,9 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.set_resource_provider(provider)
 
-    def set_resource_transform(self, transform: ResourceTransform) -> Future[None]:
+    def set_resource_transform(
+        self, transform: ResourceTransform
+    ) -> Future[CommandCompletion]:
         """Registers or updates a runtime-scoped URL transform for network
         resources.
 
@@ -1965,6 +1974,10 @@ class _RuntimeHandleOperations(GeneratedOperations):
             self._native.update_offline_region_metadata(region_id, metadata),
             lambda value: OfflineRegionInfo._from_native(value),
         )
+
+    @property
+    def discarding(self) -> RuntimeHandleDiscarding:
+        return RuntimeHandleDiscarding(self)
 
 
 class _StyleExpressionHandleOperations(GeneratedOperations):
@@ -2704,3 +2717,77 @@ class RenderSessionHandleDiscarding:
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
         """
         return self._native._discard_resize(extent)
+
+
+class RuntimeHandleDiscarding:
+    __slots__ = ("_native",)
+    _native: _native._RuntimeHandle
+
+    def __init__(self, owner: _RuntimeHandleOperations):
+        self._native = owner._native
+
+    def clear_event_handler(self) -> None:
+        """Stops event delivery and retires the previous handler.
+
+        See `mln_runtime_clear_event_handler` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+        """
+        return self._native._discard_clear_event_handler()
+
+    def clear_http_header_transform(self) -> None:
+        """Clears the runtime-scoped outgoing HTTP header transform.
+
+        See `mln_runtime_clear_http_header_transform` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+        """
+        return self._native._discard_clear_http_header_transform()
+
+    def clear_resource_provider(self) -> None:
+        """Clears the runtime-scoped network resource provider.
+
+        See `mln_runtime_clear_resource_provider` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+        """
+        return self._native._discard_clear_resource_provider()
+
+    def clear_resource_transform(self) -> None:
+        """Clears the runtime-scoped URL transform for network resources.
+
+        See `mln_runtime_clear_resource_transform` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+        """
+        return self._native._discard_clear_resource_transform()
+
+    def set_event_handler(self, handler: RuntimeEventHandler) -> None:
+        """Selects how runtime and map events reach the host.
+
+        See `mln_runtime_set_event_handler` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+        """
+        return self._native._discard_set_event_handler(handler)
+
+    def set_http_header_transform(self, transform: HttpHeaderTransform) -> None:
+        """Registers or replaces the runtime-scoped outgoing HTTP header
+        transform.
+
+        See `mln_runtime_set_http_header_transform` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+        """
+        return self._native._discard_set_http_header_transform(transform)
+
+    def set_resource_provider(self, provider: ResourceProvider) -> None:
+        """Registers or replaces a runtime-scoped network resource provider.
+
+        See `mln_runtime_set_resource_provider` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+        """
+        return self._native._discard_set_resource_provider(provider)
+
+    def set_resource_transform(self, transform: ResourceTransform) -> None:
+        """Registers or updates a runtime-scoped URL transform for network
+        resources.
+
+        See `mln_runtime_set_resource_transform` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+        """
+        return self._native._discard_set_resource_transform(transform)

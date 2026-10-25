@@ -32,6 +32,7 @@ import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.generated.UrlMatchFlags
 import org.maplibre.nativeffi.interceptUncaught
 import org.maplibre.nativeffi.runSuspendTest
+import org.maplibre.nativeffi.runtime.assertCommitted
 import org.maplibre.nativeffi.serve
 import org.maplibre.nativeffi.withMap
 
@@ -59,7 +60,7 @@ class ResourceCallbackTest {
 
       // Provider removal waits for the callback to return. Closing the unanswered request then
       // releases its cancel registration, which reaches Kotlin before the root count is read.
-      runtime.clearResourceProvider().awaitWithin("provider removal")
+      assertCommitted(runtime.clearResourceProvider().awaitWithin("provider removal"))
       request.close()
       awaitDeliveries()
       assertEquals(0, request.bindingCallbacks.rootCountForTesting())
@@ -155,15 +156,17 @@ class ResourceCallbackTest {
     // waits for the transform's answer. The test answers on its own thread, after the callback
     // returned on MapLibre's: another thread on a threaded target, and a later task on the page.
     withMap(provider = denyingProvider(routes = NETWORK_URLS)) {
-      runtime.setResourceTransform(transform).awaitWithin("the transform")
+      assertCommitted(runtime.setResourceTransform(transform).awaitWithin("the transform"))
       map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
       val request = received.awaitWithin("the transform callback")
       request.complete(REWRITTEN_URL)
-      request.close()
+      // The accepted answer consumed the handle, so native refuses a second answer on the stale
+      // handle.
+      assertTrue(request.binding.isReleased)
       assertFailsWithStatus(Status.INVALID_STATE) { request.complete(REWRITTEN_URL) }
       // The online source cannot load the rewritten scheme.
       awaitMapEvent(RuntimeEventType.MAP_LOADING_FAILED)
-      runtime.clearResourceTransform().awaitWithin("the transform clear")
+      assertCommitted(runtime.clearResourceTransform().awaitWithin("the transform clear"))
     }
   }
 
@@ -190,7 +193,7 @@ class ResourceCallbackTest {
     withMap {
       val installing = runtime.setResourceProvider(provider)
       routes.clear()
-      installing.awaitWithin("the routed provider")
+      assertCommitted(installing.awaitWithin("the routed provider"))
 
       // The style and the source it names are different kinds, and the URL-only route claims
       // both.

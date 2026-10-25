@@ -941,32 +941,39 @@ auto replace_registration(
   }
 }
 
+// A registration change is a runtime command: a null completion discards its
+// outcome, and a discarded failure is logged. A runtime has no snapshot, so
+// the completion reports no generation.
 template <typename Mutation>
 auto execute_resource_configuration_command(
-  ValuelessCompletion valueless, const std::shared_ptr<Completion>& completion,
-  Mutation&& mutation
+  const std::shared_ptr<Completion>& completion, Mutation&& mutation
 ) noexcept -> void {
   try {
     std::invoke(std::forward<Mutation>(mutation));
-    valueless.complete(completion);
+    complete_command(
+      completion, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, {}, {}
+    );
   } catch (const std::exception& exception) {
-    valueless.complete(completion, MLN_STATUS_NATIVE_ERROR, exception.what());
+    complete_command(
+      completion, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, {},
+      exception.what()
+    );
   } catch (...) {
-    valueless.complete(
-      completion, MLN_STATUS_NATIVE_ERROR,
+    complete_command(
+      completion, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, {},
       "resource configuration command failed"
     );
   }
 }
 
-template <auto Function, typename Mutation>
+template <typename Mutation>
 auto submit_resource_configuration_command(
   const std::shared_ptr<RuntimeObject>& runtime,
   const mln_completion* descriptor, Mutation&& mutation
 ) -> mln_status {
   auto completion = std::shared_ptr<Completion>{};
   if (
-    const auto made = make_completion(descriptor, completion);
+    const auto made = make_command_completion(descriptor, completion);
     made != MLN_STATUS_OK
   ) {
     return made;
@@ -974,9 +981,7 @@ auto submit_resource_configuration_command(
   return submit_runtime_command(
     runtime,
     [completion, mutation = std::forward<Mutation>(mutation)]() mutable {
-      execute_resource_configuration_command(
-        valueless_completion<Function>(), completion, std::move(mutation)
-      );
+      execute_resource_configuration_command(completion, std::move(mutation));
     },
     completion
   );
@@ -1071,14 +1076,13 @@ auto set_resource_transform(
   );
   auto transfer = RegistrationTransfer{*context};
   const auto state = live->resource_transform_state;
-  const auto status =
-    submit_resource_configuration_command<&mln_runtime_set_resource_transform>(
-      live, completion, [state, registration]() -> void {
-        replace_registration(
-          *state, &ResourceTransformState::registration, registration
-        );
-      }
-    );
+  const auto status = submit_resource_configuration_command(
+    live, completion, [state, registration]() -> void {
+      replace_registration(
+        *state, &ResourceTransformState::registration, registration
+      );
+    }
+  );
   if (status == MLN_STATUS_OK) {
     static_cast<void>(queued.release());
     transfer.accept();
@@ -1093,12 +1097,13 @@ auto clear_resource_transform(
   if (live == nullptr) return recorded_handle_fault_status();
 
   const auto state = live->resource_transform_state;
-  return submit_resource_configuration_command<
-    &mln_runtime_clear_resource_transform>(live, completion, [state]() -> void {
-    replace_registration(
-      *state, &ResourceTransformState::registration, nullptr
-    );
-  });
+  return submit_resource_configuration_command(
+    live, completion, [state]() -> void {
+      replace_registration(
+        *state, &ResourceTransformState::registration, nullptr
+      );
+    }
+  );
 }
 
 auto set_http_header_transform(
@@ -1173,8 +1178,7 @@ auto set_http_header_transform(
   );
   auto transfer = RegistrationTransfer{*context};
   const auto state = live->http_header_transform_state;
-  const auto status = submit_resource_configuration_command<
-    &mln_runtime_set_http_header_transform>(
+  const auto status = submit_resource_configuration_command(
     live, completion, [state, registration]() -> void {
       replace_registration(
         *state, &HttpHeaderTransformState::registration, registration
@@ -1407,8 +1411,7 @@ auto clear_http_header_transform(
   if (live == nullptr) return recorded_handle_fault_status();
 
   const auto state = live->http_header_transform_state;
-  return submit_resource_configuration_command<
-    &mln_runtime_clear_http_header_transform>(
+  return submit_resource_configuration_command(
     live, completion, [state]() -> void {
       replace_registration(
         *state, &HttpHeaderTransformState::registration, nullptr
@@ -2276,12 +2279,11 @@ auto set_resource_provider(
   };
   auto transfer = RegistrationTransfer{*context};
   const auto state = live->resource_provider_state;
-  const auto status =
-    submit_resource_configuration_command<&mln_runtime_set_resource_provider>(
-      live, completion, [state, copied]() -> void {
-        replace_registration(*state, &ResourceProviderState::provider, copied);
-      }
-    );
+  const auto status = submit_resource_configuration_command(
+    live, completion, [state, copied]() -> void {
+      replace_registration(*state, &ResourceProviderState::provider, copied);
+    }
+  );
   if (status == MLN_STATUS_OK) {
     static_cast<void>(registration.release());
     transfer.accept();
@@ -2296,12 +2298,13 @@ auto clear_resource_provider(
   if (live == nullptr) return recorded_handle_fault_status();
 
   const auto state = live->resource_provider_state;
-  return submit_resource_configuration_command<
-    &mln_runtime_clear_resource_provider>(live, completion, [state]() -> void {
-    replace_registration(
-      *state, &ResourceProviderState::provider, ResourceProvider{}
-    );
-  });
+  return submit_resource_configuration_command(
+    live, completion, [state]() -> void {
+      replace_registration(
+        *state, &ResourceProviderState::provider, ResourceProvider{}
+      );
+    }
+  );
 }
 
 namespace {
@@ -2472,17 +2475,15 @@ auto set_runtime_event_handler(
       .queued = queued.get(),
     });
   auto transfer = RegistrationTransfer{*context};
-  const auto status =
-    submit_resource_configuration_command<&mln_runtime_set_event_handler>(
-      live, completion, [live, registration]() {
-        auto previous = std::shared_ptr<RuntimeEventRegistration>{};
-        {
-          const auto lock = std::scoped_lock{live->offline_event_state->mutex};
-          previous =
-            std::exchange(live->event_state->registration, registration);
-        }
+  const auto status = submit_resource_configuration_command(
+    live, completion, [live, registration]() {
+      auto previous = std::shared_ptr<RuntimeEventRegistration>{};
+      {
+        const auto lock = std::scoped_lock{live->offline_event_state->mutex};
+        previous = std::exchange(live->event_state->registration, registration);
       }
-    );
+    }
+  );
   if (status == MLN_STATUS_OK) {
     static_cast<void>(queued.release());
     transfer.accept();
@@ -2495,8 +2496,7 @@ auto clear_runtime_event_handler(
 ) -> mln_status {
   const auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  return submit_resource_configuration_command<
-    &mln_runtime_clear_event_handler>(live, completion, [live]() {
+  return submit_resource_configuration_command(live, completion, [live]() {
     auto previous = std::shared_ptr<RuntimeEventRegistration>{};
     {
       const auto lock = std::scoped_lock{live->offline_event_state->mutex};

@@ -48,11 +48,14 @@ func exitWithLiveHandles(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.runtime = runtime
-	await(t, submitted(runtime.SetEventHandler(RuntimeEventHandler{Callback: func(batch EventBatchView) {
+	// A handler accepted before CreateMap receives the map's first events.
+	if err := runtime.Discarding().SetEventHandler(RuntimeEventHandler{Callback: func(batch EventBatchView) {
 		for _, event := range batch.Events {
 			f.pendingEvents <- event
 		}
-	}})))
+	}}); err != nil {
+		t.Fatal(err)
+	}
 	f.m = createMap(t, runtime, DefaultMapOptions())
 	f.serveStyle(t, "custom://style.json")
 	if _, err := f.m.SetStyleUrl("custom://style.json"); err != nil {

@@ -8,6 +8,7 @@ import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.internal.delivery.HostDelivery
 import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
+import org.maplibre.nativeffi.runtime.CommandCompletion
 
 /**
  * Process-global log callback or queue state. This is the Kotlin/Wasm queue form: the page receives
@@ -91,8 +92,21 @@ public fun GeneratedApi.logSetCallback(handler: QueuedLogHandler): Unit =
  */
 public fun GeneratedRuntimeOperations.setHttpHeaderTransform(
   transform: HttpHeaderTransformRules,
-): Deferred<Unit> =
-  nativeUnit(this, binding, bindingCallbacks) {
+): Deferred<CommandCompletion> =
+  nativeCommand(this, binding, bindingCallbacks) {
+    check(
+      C.mln_runtime_set_http_header_transform(
+        handle,
+        writeHttpHeaderTransformRules(transform),
+        completion,
+        diagnostic,
+      ),
+    )
+  }
+
+/** [RuntimeHandle.setHttpHeaderTransform] without its completion. */
+public fun RuntimeDiscarding.setHttpHeaderTransform(transform: HttpHeaderTransformRules): Unit =
+  nativeDiscard(owner, binding, bindingCallbacks) {
     check(
       C.mln_runtime_set_http_header_transform(
         handle,

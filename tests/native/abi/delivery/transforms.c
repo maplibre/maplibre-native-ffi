@@ -193,15 +193,13 @@ static void the_host_answers_a_drained_transform(void) {
     request, (mln_buffer_view){.data = rewritten, .size = strlen(rewritten)},
     NULL
   ));
+  // The answer consumed the handle, so a second answer finds it gone and a
+  // release does nothing.
   MLN_TEST_INVALID_STATE(mln_resource_transform_request_complete(
     request, (mln_buffer_view){.data = rewritten, .size = strlen(rewritten)},
     NULL
   ));
   mln_resource_transform_request_release(request);
-  MLN_TEST_INVALID_STATE(mln_resource_transform_request_complete(
-    request, (mln_buffer_view){.data = rewritten, .size = strlen(rewritten)},
-    NULL
-  ));
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
   TEST_ASSERT_EQUAL_INT(
     1, mln_test_http_server_requests(server, "/rewritten.json")
@@ -458,7 +456,6 @@ static void header_rules_match_the_rewritten_url(void) {
     request, (mln_buffer_view){.data = rewritten, .size = strlen(rewritten)},
     NULL
   ));
-  mln_resource_transform_request_release(request);
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
   char value[64];
   TEST_ASSERT_TRUE(mln_test_http_server_request_header(

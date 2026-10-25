@@ -86,14 +86,12 @@ void mln_test_configure_events(mln_runtime runtime, mln_wake wake) {
   }
   atomic_flag_clear_explicit(&event_queues_lock, memory_order_release);
   TEST_ASSERT_LESS_THAN_size_t(128, slot);
-  mln_test_completion completion = mln_test_completion_default(0);
   const mln_runtime_event_handler handler = {
     .size = sizeof(handler), .queue = queue
   };
-  MLN_TEST_OK(mln_runtime_set_event_handler(
-    runtime, &handler, &completion.descriptor, NULL
-  ));
-  MLN_TEST_OK(mln_test_completion_settle(&completion));
+  // Discarded: a handler accepted before a map's creation receives the map's
+  // first events, so no case waits for this command.
+  MLN_TEST_OK(mln_runtime_set_event_handler(runtime, &handler, NULL, NULL));
 }
 
 static void release_event_queue(mln_runtime runtime) {

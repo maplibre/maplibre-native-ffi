@@ -10,18 +10,18 @@ public abstract class GeneratedResourceTransformRequestOperations internal const
   internal abstract val binding: HandleState
 
   /**
-   * Answers a resource transform request with a replacement URL.
+   * Answers a resource transform request with a replacement URL and consumes its handle.
    *
    * See `mln_resource_transform_request_complete` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   public fun complete(url: String): Unit =
-    nativeCall(this, binding) {
+    nativeAnswer(this, binding) {
       check(C.mln_resource_transform_request_complete(handle, view(url), diagnostic))
     }
 
   /**
-   * Releases a resource transform request.
+   * Releases a resource transform request without answering it.
    *
    * See `mln_resource_transform_request_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

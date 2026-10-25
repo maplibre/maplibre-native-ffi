@@ -62,7 +62,7 @@ internal sealed class RenderFixture : IDisposable
             if (backend is TestGraphicsBackend.Egl or TestGraphicsBackend.Wgl)
                 Graphics.MakeCurrent();
             Runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-            Complete(Runtime.SetResourceProviderAsync(NativeFixture.DenyingProvider));
+            Runtime.Discarding.SetResourceProvider(NativeFixture.DenyingProvider);
             Map = Runtime.CreateMap(
                 MapOptions.Default with
                 {

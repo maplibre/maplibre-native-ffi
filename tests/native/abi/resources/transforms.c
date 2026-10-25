@@ -232,6 +232,7 @@ static void rewrite_a_to_b(
         NULL
       )
     );
+    return;
   }
   mln_resource_transform_request_release(request);
 }

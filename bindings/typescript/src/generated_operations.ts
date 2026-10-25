@@ -4194,7 +4194,7 @@ export class ResourceTransformRequestHandle extends Owner {
   declare [Symbol.dispose]: () => void;
 
   /**
-   * Releases a resource transform request.
+   * Releases a resource transform request without answering it.
    *
    * See `mln_resource_transform_request_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4206,13 +4206,16 @@ export class ResourceTransformRequestHandle extends Owner {
   }
 
   /**
-   * Answers a resource transform request with a replacement URL.
+   * Answers a resource transform request with a replacement URL and consumes
+   * its handle.
    *
    * See `mln_resource_transform_request_complete` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   complete(url: string): void {
-    native.mln_resource_transform_request_complete(this.id, url);
+    answerSync(this, (handle, token) =>
+      native.mln_resource_transform_request_complete(handle, token, url),
+    );
   }
 }
 defineDisposers(ResourceTransformRequestHandle, undefined, "close");
@@ -4239,6 +4242,11 @@ export class RuntimeHandle extends Owner {
    * still match this handle.
    */
   declare readonly id: bigint;
+
+  /** The commands of this owner that discard their outcomes. */
+  get discarding(): RuntimeHandleDiscarding {
+    return new RuntimeHandleDiscarding(ADOPT, this);
+  }
   /**
    * Calls `close()`, for `await using`.
    * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
@@ -4256,8 +4264,8 @@ export class RuntimeHandle extends Owner {
    * See `mln_runtime_clear_event_handler` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  clearEventHandler(): Promise<void> {
-    return run((completion) =>
+  clearEventHandler(): Promise<CommandCompletion> {
+    return command((completion) =>
       native.mln_runtime_clear_event_handler(this.id, completion),
     );
   }
@@ -4268,8 +4276,8 @@ export class RuntimeHandle extends Owner {
    * See `mln_runtime_clear_http_header_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  clearHttpHeaderTransform(): Promise<void> {
-    return run((completion) =>
+  clearHttpHeaderTransform(): Promise<CommandCompletion> {
+    return command((completion) =>
       native.mln_runtime_clear_http_header_transform(this.id, completion),
     );
   }
@@ -4280,8 +4288,8 @@ export class RuntimeHandle extends Owner {
    * See `mln_runtime_clear_resource_provider` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  clearResourceProvider(): Promise<void> {
-    return run((completion) =>
+  clearResourceProvider(): Promise<CommandCompletion> {
+    return command((completion) =>
       native.mln_runtime_clear_resource_provider(this.id, completion),
     );
   }
@@ -4292,8 +4300,8 @@ export class RuntimeHandle extends Owner {
    * See `mln_runtime_clear_resource_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  clearResourceTransform(): Promise<void> {
-    return run((completion) =>
+  clearResourceTransform(): Promise<CommandCompletion> {
+    return command((completion) =>
       native.mln_runtime_clear_resource_transform(this.id, completion),
     );
   }
@@ -4490,9 +4498,9 @@ export class RuntimeHandle extends Owner {
    * See `mln_runtime_set_event_handler` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  setEventHandler(handler?: RuntimeEventHandler): Promise<void> {
+  setEventHandler(handler?: RuntimeEventHandler): Promise<CommandCompletion> {
     return withRegistrations((registrations) =>
-      run((completion) => {
+      command((completion) => {
         native.mln_runtime_set_event_handler(this.id, handler, completion);
         registrations.commit(rootsOf(this));
       }),
@@ -4515,9 +4523,11 @@ export class RuntimeHandle extends Owner {
    * See `mln_runtime_set_http_header_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  setHttpHeaderTransform(transform: HttpHeaderTransform): Promise<void> {
+  setHttpHeaderTransform(
+    transform: HttpHeaderTransform,
+  ): Promise<CommandCompletion> {
     return withRegistrations((registrations) =>
-      run((completion) => {
+      command((completion) => {
         native.mln_runtime_set_http_header_transform(
           this.id,
           transform,
@@ -4587,9 +4597,9 @@ export class RuntimeHandle extends Owner {
    * See `mln_runtime_set_resource_provider` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  setResourceProvider(provider: ResourceProvider): Promise<void> {
+  setResourceProvider(provider: ResourceProvider): Promise<CommandCompletion> {
     return withRegistrations((registrations) =>
-      run((completion) => {
+      command((completion) => {
         native.mln_runtime_set_resource_provider(this.id, provider, completion);
         registrations.commit(rootsOf(this));
       }),
@@ -4602,9 +4612,11 @@ export class RuntimeHandle extends Owner {
    * See `mln_runtime_set_resource_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  setResourceTransform(transform: ResourceTransform): Promise<void> {
+  setResourceTransform(
+    transform: ResourceTransform,
+  ): Promise<CommandCompletion> {
     return withRegistrations((registrations) =>
-      run((completion) => {
+      command((completion) => {
         native.mln_runtime_set_resource_transform(
           this.id,
           transform,
@@ -4636,6 +4648,129 @@ export class RuntimeHandle extends Owner {
   }
 }
 defineDisposers(RuntimeHandle, "close", "dispose");
+
+/**
+ * The commands of a {@link RuntimeHandle} that discard their outcomes:
+ * each returns once native code accepts it and allocates no completion.
+ * A later completion on the same map fences them.
+ */
+export class RuntimeHandleDiscarding {
+  readonly #owner: RuntimeHandle;
+
+  /**
+   * Created by the API, which passes a key that only it holds.
+   *
+   * @internal
+   */
+  constructor(key: AdoptKey, owner: RuntimeHandle) {
+    checkKey(key);
+    this.#owner = owner;
+  }
+
+  /**
+   * Stops event delivery and retires the previous handler.
+   *
+   * See `mln_runtime_clear_event_handler` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  clearEventHandler(): void {
+    native.mln_runtime_clear_event_handler(this.#owner.id, undefined);
+  }
+
+  /**
+   * Clears the runtime-scoped outgoing HTTP header transform.
+   *
+   * See `mln_runtime_clear_http_header_transform` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  clearHttpHeaderTransform(): void {
+    native.mln_runtime_clear_http_header_transform(this.#owner.id, undefined);
+  }
+
+  /**
+   * Clears the runtime-scoped network resource provider.
+   *
+   * See `mln_runtime_clear_resource_provider` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  clearResourceProvider(): void {
+    native.mln_runtime_clear_resource_provider(this.#owner.id, undefined);
+  }
+
+  /**
+   * Clears the runtime-scoped URL transform for network resources.
+   *
+   * See `mln_runtime_clear_resource_transform` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  clearResourceTransform(): void {
+    native.mln_runtime_clear_resource_transform(this.#owner.id, undefined);
+  }
+
+  /**
+   * Selects how runtime and map events reach the host.
+   *
+   * See `mln_runtime_set_event_handler` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  setEventHandler(handler?: RuntimeEventHandler): void {
+    withRegistrations((registrations) => {
+      native.mln_runtime_set_event_handler(this.#owner.id, handler, undefined);
+      registrations.commit(rootsOf(this.#owner));
+    });
+  }
+
+  /**
+   * Registers or replaces the runtime-scoped outgoing HTTP header transform.
+   *
+   * See `mln_runtime_set_http_header_transform` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  setHttpHeaderTransform(transform: HttpHeaderTransform): void {
+    withRegistrations((registrations) => {
+      native.mln_runtime_set_http_header_transform(
+        this.#owner.id,
+        transform,
+        undefined,
+      );
+      registrations.commit(rootsOf(this.#owner));
+    });
+  }
+
+  /**
+   * Registers or replaces a runtime-scoped network resource provider.
+   *
+   * See `mln_runtime_set_resource_provider` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  setResourceProvider(provider: ResourceProvider): void {
+    withRegistrations((registrations) => {
+      native.mln_runtime_set_resource_provider(
+        this.#owner.id,
+        provider,
+        undefined,
+      );
+      registrations.commit(rootsOf(this.#owner));
+    });
+  }
+
+  /**
+   * Registers or updates a runtime-scoped URL transform for network resources.
+   *
+   * See `mln_runtime_set_resource_transform` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  setResourceTransform(transform: ResourceTransform): void {
+    withRegistrations((registrations) => {
+      native.mln_runtime_set_resource_transform(
+        this.#owner.id,
+        transform,
+        undefined,
+      );
+      registrations.commit(rootsOf(this.#owner));
+    });
+  }
+}
 
 /**
  * A parsed style expression, immutable and independent of any map.

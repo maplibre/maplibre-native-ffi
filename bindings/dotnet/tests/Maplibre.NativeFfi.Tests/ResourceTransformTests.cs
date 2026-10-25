@@ -81,11 +81,13 @@ public sealed class ResourceTransformTests
         await fixture.Map.SetStyleUrlAsync(styleUrl);
         var request = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
 
-        await Task.Run(() =>
-        {
-            request.Complete("unsupported://rewritten.json");
-            request.Dispose();
-        });
+        await Task.Run(() => request.Complete("unsupported://rewritten.json"), TestWaits.Token);
+        // The answer consumed the request, so a second answer fails.
+        Assert.True(request.IsClosed);
+        var error = Assert.Throws<MaplibreException>(() =>
+            request.Complete("unsupported://again.json")
+        );
+        Assert.Equal(Status.InvalidState, error.Status);
         // The online source cannot load the rewritten scheme.
         await fixture.WaitForMapEventAsync(RuntimeEventType.MapLoadingFailed);
         await fixture.Runtime.ClearResourceTransformAsync();

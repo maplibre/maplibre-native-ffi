@@ -14,20 +14,22 @@ native_owner! {
 }
 
 impl ResourceTransformRequestHandle {
-    /// Answers a resource transform request with a replacement URL.
+    /// Answers a resource transform request with a replacement URL and consumes
+    /// its handle.
     ///
     /// See `mln_resource_transform_request_complete` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn complete(&self, url: &str) -> Result<()> {
-        let mut call = self.inner.call();
-        let url = call.input(&url)?;
-        call.status(|request, out_diagnostic| unsafe {
-            sys::mln_resource_transform_request_complete(request, url, out_diagnostic)
-        })?;
-        Ok(())
+        self.inner.close(|request| {
+            let mut call = Call::new(request, None);
+            let url = call.input(&url)?;
+            call.status(|request, out_diagnostic| unsafe {
+                sys::mln_resource_transform_request_complete(request, url, out_diagnostic)
+            })
+        })
     }
 
-    /// Releases a resource transform request.
+    /// Releases a resource transform request without answering it.
     ///
     /// See `mln_resource_transform_request_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

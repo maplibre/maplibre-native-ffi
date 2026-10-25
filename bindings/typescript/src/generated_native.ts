@@ -79,7 +79,7 @@ import type {
 } from "./generated_values.ts";
 
 /** The digest of the C headers that this facade and its addon came from. */
-export const ABI_DIGEST = "65b6a643054275b6";
+export const ABI_DIGEST = "b00d5cac21f937e4";
 
 /** The index of each completion decoder in the addon's decoder table. */
 export const Decoder = {
@@ -762,23 +762,30 @@ export interface NativeOperations {
     handler: ResourceRequestCancelHandler,
   ): boolean;
   mln_resource_route_default(): ResourceRoute;
-  mln_resource_transform_request_complete(request: bigint, url: string): void;
+  mln_resource_transform_request_complete(
+    request: bigint,
+    token: object | undefined,
+    url: string,
+  ): void;
   mln_resource_transform_request_release(
     request: bigint,
     token: object | undefined,
   ): void;
-  mln_runtime_clear_event_handler(runtime: bigint, completion: number): void;
+  mln_runtime_clear_event_handler(
+    runtime: bigint,
+    completion: number | undefined,
+  ): void;
   mln_runtime_clear_http_header_transform(
     runtime: bigint,
-    completion: number,
+    completion: number | undefined,
   ): void;
   mln_runtime_clear_resource_provider(
     runtime: bigint,
-    completion: number,
+    completion: number | undefined,
   ): void;
   mln_runtime_clear_resource_transform(
     runtime: bigint,
-    completion: number,
+    completion: number | undefined,
   ): void;
   mln_runtime_create(options: RuntimeOptions | undefined): bigint;
   mln_runtime_create_map(
@@ -834,13 +841,13 @@ export interface NativeOperations {
   mln_runtime_set_event_handler(
     runtime: bigint,
     handler: RuntimeEventHandler | undefined,
-    completion: number,
+    completion: number | undefined,
   ): void;
   mln_runtime_set_event_mask(runtime: bigint, mask: RuntimeEventMask): void;
   mln_runtime_set_http_header_transform(
     runtime: bigint,
     transform: HttpHeaderTransform,
-    completion: number,
+    completion: number | undefined,
   ): void;
   mln_runtime_set_maximum_ambient_cache_size(
     runtime: bigint,
@@ -862,12 +869,12 @@ export interface NativeOperations {
   mln_runtime_set_resource_provider(
     runtime: bigint,
     provider: ResourceProvider,
-    completion: number,
+    completion: number | undefined,
   ): void;
   mln_runtime_set_resource_transform(
     runtime: bigint,
     transform: ResourceTransform,
-    completion: number,
+    completion: number | undefined,
   ): void;
   mln_runtime_update_offline_region_metadata(
     runtime: bigint,

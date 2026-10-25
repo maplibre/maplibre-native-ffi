@@ -4,21 +4,27 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension ResourceTransformRequestHandle {
-  /// Answers a resource transform request with a replacement URL.
+  /// Answers a resource transform request with a replacement URL and consumes
+  /// its handle.
   ///
   /// See `mln_resource_transform_request_complete` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func complete(url bindingArg0: String) throws {
-    try nativeInvoke { raw, arena, diagnostic in
-      mln_resource_transform_request_complete(
+  func complete(url: String) throws {
+    let arena = NativeInputArena()
+    defer { withExtendedLifetime(arena) {} }
+    try handle.closeOnce(idempotent: false) { live in
+      var raw = live.raw
+      try checkStatus { diagnostic in mln_resource_transform_request_complete(
         raw,
-        arena.view(bindingArg0),
+        arena.view(url),
         diagnostic
-      )
+      ) }
     }
   }
+}
 
-  /// Releases a resource transform request.
+public extension ResourceTransformRequestHandle {
+  /// Releases a resource transform request without answering it.
   ///
   /// See `mln_resource_transform_request_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

@@ -1510,6 +1510,10 @@ MLN_API mln_status mln_map_get_style_url(
 /**
  * Selects which map-originated event types this map queues.
  *
+ * The mask is an ordered command because mln_map_get_snapshot() reports it, as
+ * it reports the effect of every other command; mln_runtime_set_event_mask(),
+ * which no snapshot reports, applies at once.
+ *
  * This call accepts only bits in MLN_RUNTIME_EVENT_MASK_ALL. It reads the bits
  * in MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS and ignores runtime-scoped bits, so
  * MLN_RUNTIME_EVENT_MASK_ALL selects every map-originated type.

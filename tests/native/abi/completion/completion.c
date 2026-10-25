@@ -171,7 +171,9 @@ static void queries_operations_and_lifecycle_require_a_completion(void) {
   MLN_TEST_INVALID(mln_map_get_camera(map, NULL, NULL));
   MLN_TEST_INVALID(mln_map_get_loaded_style_json(map, NULL, NULL));
   MLN_TEST_INVALID(mln_map_request_still_image(map, NULL, NULL));
-  MLN_TEST_INVALID(mln_runtime_clear_resource_provider(runtime, NULL, NULL));
+  MLN_TEST_INVALID(
+    mln_runtime_set_maximum_ambient_cache_size(runtime, 0, NULL, NULL)
+  );
   mln_map created = MLN_HANDLE_NULL;
   MLN_TEST_INVALID(mln_runtime_create_map(runtime, NULL, &created, NULL, NULL));
   MLN_TEST_INVALID(mln_map_release(map, NULL, NULL));

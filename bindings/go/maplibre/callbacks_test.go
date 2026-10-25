@@ -410,11 +410,15 @@ func TestTransformRequestAnsweredAfterItsCallback(t *testing.T) {
 	request := receive(t, requests, "the transform's request")
 	answered := make(chan error, 1)
 	go func() {
-		err := request.Complete(base + "/rewritten.json")
-		answered <- errors.Join(err, request.Close())
+		answered <- request.Complete(base + "/rewritten.json")
 	}()
 	if err := receive(t, answered, "the answer"); err != nil {
-		t.Fatal(err)
+		t.Fatalf("Complete: %v", err)
+	}
+	// The accepted completion consumed the handle, so native refuses a second
+	// one.
+	if err := request.Complete(base + "/rewritten.json"); !errors.Is(err, StatusInvalidState) {
+		t.Fatalf("a second Complete = %v, want StatusInvalidState", err)
 	}
 	f.awaitEvent(t, "the style load from the answer", isStyleLoaded)
 }

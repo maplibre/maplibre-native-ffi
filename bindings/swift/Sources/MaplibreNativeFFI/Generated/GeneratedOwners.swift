@@ -530,3 +530,10 @@ public extension RenderSessionHandle {
     RenderSessionHandleDiscarding(owner: self)
   }
 }
+
+public struct RuntimeHandleDiscarding { let owner: RuntimeHandle }
+public extension RuntimeHandle {
+  var discarding: RuntimeHandleDiscarding {
+    RuntimeHandleDiscarding(owner: self)
+  }
+}

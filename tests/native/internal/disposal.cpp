@@ -240,7 +240,8 @@ auto submit_pending_operation(
   auto pending = mln::core::CompletionOperation{};
   const auto created = mln::core::create_completion_operation(
     &completion,
-    mln::core::valueless_completion<&mln_runtime_clear_resource_transform>(),
+    mln::core::valueless_completion<
+      &mln_runtime_set_maximum_ambient_cache_size>(),
     pending
   );
   if (created != MLN_STATUS_OK) return created;

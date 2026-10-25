@@ -61,7 +61,8 @@ public sealed unsafe partial class ResourceTransformRequestHandle
     }
 
     /// <summary>
-    /// Answers a resource transform request with a replacement URL.
+    /// Answers a resource transform request with a replacement URL and consumes
+    /// its handle.
     /// </summary>
     /// <remarks>
     /// See <c>mln_resource_transform_request_complete</c> in the <see
@@ -69,14 +70,12 @@ public sealed unsafe partial class ResourceTransformRequestHandle
     /// </remarks>
     public void Complete(string url)
     {
-        using var scope = new NativeCallScope(this);
-        Check(
-            NativeMethods.mln_resource_transform_request_complete(
-                Handle,
-                scope.Utf8(url),
-                Diagnostic
-            )
+        using var scope = new NativeCallScope();
+        var nativeUrl = scope.Utf8(url);
+        state.Release(
+            (live, diagnostic) =>
+                NativeMethods.mln_resource_transform_request_complete(live, nativeUrl, diagnostic),
+            idempotent: false
         );
-        scope.Accept();
     }
 }

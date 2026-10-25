@@ -483,8 +483,8 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
 /** The commands of a [RenderSessionHandle] that drop their completions. */
 @JvmInline
 public value class RenderSessionDiscarding
-internal constructor(private val owner: GeneratedRenderSessionOperations) {
-  private val binding
+internal constructor(internal val owner: GeneratedRenderSessionOperations) {
+  internal val binding
     get() = owner.binding
 
   /** [RenderSessionHandle.resize] without its completion. */

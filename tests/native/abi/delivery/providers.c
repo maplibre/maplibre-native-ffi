@@ -547,7 +547,6 @@ static void transform_to(
   MLN_TEST_OK(mln_resource_transform_request_complete(
     request, (mln_buffer_view){.data = target, .size = strlen(target)}, NULL
   ));
-  mln_resource_transform_request_release(request);
 }
 
 // The host can decline after taking a queued request. The resource transform

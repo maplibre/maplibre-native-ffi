@@ -27,14 +27,17 @@ static void add_api_key(
 
   // #region rewrite
   char rewritten[2048];
-  if (build_keyed_url(url, api_key, rewritten, sizeof(rewritten))) {
-    // The call copies the URL before rewritten leaves scope.
+  // The call copies the URL before rewritten leaves scope, and an accepted
+  // answer consumes the request. Otherwise releasing it keeps the URL.
+  if (
+    !build_keyed_url(url, api_key, rewritten, sizeof(rewritten)) ||
     mln_resource_transform_request_complete(
       request, (mln_buffer_view){.data = rewritten, .size = strlen(rewritten)},
       NULL
-    );
+    ) != MLN_STATUS_OK
+  ) {
+    mln_resource_transform_request_release(request);
   }
-  mln_resource_transform_request_release(request);
   // #endregion rewrite
 }
 

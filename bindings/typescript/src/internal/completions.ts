@@ -10,13 +10,19 @@ import { MaplibreError } from "./errors.ts";
 import { addCompletion, removeCompletion } from "./realm.ts";
 
 /**
- * The generations that a committed map command published. A failed or
- * cancelled command rejects with a {@link MaplibreError} instead.
+ * The generations that a committed command published. A failed or cancelled
+ * command rejects with a {@link MaplibreError} instead.
  */
 export interface CommandCompletion {
-  /** The map snapshot generation that the command published. */
+  /**
+   * The map snapshot generation that a map command published, or zero for a
+   * runtime command.
+   */
   readonly generation: bigint;
-  /** The first map render update that includes the command. */
+  /**
+   * The first map render update that includes the command, or zero when
+   * `generation` is zero.
+   */
   readonly renderUpdateGeneration: bigint;
 }
 
@@ -80,8 +86,8 @@ export function run(start: Start): Promise<void> {
 }
 
 /**
- * A map command, which resolves once it commits. A failed or cancelled
- * command rejects with the generation that it published.
+ * A map or runtime command, which resolves once it commits. A failed or
+ * cancelled command rejects with the generation that it published.
  */
 export function command(start: Start): Promise<CommandCompletion> {
   return rejected(() =>

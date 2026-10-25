@@ -113,6 +113,9 @@ def lowered(api: Api | BoundApi):
     native = Native(bound)
     bodies = {}
     split = {lowering: {} for lowering in SPLIT}
+    # The discarding forms of split commands, which extend each split source
+    # set's discarding view.
+    values.split_discards = {lowering: {} for lowering in SPLIT}
     for value in bound.public_values.values():
         if value.kind == "enum":
             values.check(value)
@@ -136,9 +139,18 @@ def lowered(api: Api | BoundApi):
                 values.split = lowering
                 source = operation(plan, values, native)
                 (split[lowering] if lowering else bodies)[function.name] = source
+                if (
+                    lowering
+                    and plan.receiver
+                    and plan.completion
+                    and plan.completion.discardable
+                ):
+                    values.split_discards[lowering][function.name] = operation(
+                        plan, values, native, discard=True
+                    )
         except Unsupported as error:
             bodies.pop(function.name, None)
-            for lowered_split in split.values():
+            for lowered_split in (*split.values(), *values.split_discards.values()):
                 lowered_split.pop(function.name, None)
             unsupported[function.name] = f"{function.location}: {error}"
         finally:
@@ -223,7 +235,13 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                 + "}\n"
             )
             commands = [p for p in plans if p.completion and p.completion.discardable]
-            if commands:
+            split_commands = any(
+                p.name in discards
+                for p in bound.operations
+                if p.receiver and receiver_value(p).native == receiver
+                for discards in values.split_discards.values()
+            )
+            if commands or split_commands:
                 view = f"{family}Discarding"
                 owner = owner_name(bound.handles[receiver])
                 source = source.removesuffix("}\n") + (
@@ -233,11 +251,11 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                     "   */\n"
                     f"  public val discarding: {view} get() = {view}(this)\n}}\n\n"
                     f"/** The commands of a [{owner}] that drop their completions. */\n"
-                    f"@JvmInline\npublic value class {view} internal constructor(private val owner: {class_name}) {{\n"
-                    f"  private val binding get() = owner.binding\n"
+                    f"@JvmInline\npublic value class {view} internal constructor(internal val owner: {class_name}) {{\n"
+                    f"  internal val binding get() = owner.binding\n"
                     + (
-                        "  private val bindingCallbacks get() = owner.bindingCallbacks\n"
-                        if any(p.registrations for p in commands)
+                        "  internal val bindingCallbacks get() = owner.bindingCallbacks\n"
+                        if any(p.registrations for p in commands) or split_commands
                         else ""
                     )
                     + "\n".join(
@@ -273,6 +291,16 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                 operation_doc(bound, plan)
                 + extension(split[lowering][function.name], receiver)
             )
+            if function.name in values.split_discards[lowering]:
+                family = value_name(receiver_value(plan).native)
+                owner = owner_name(bound.handles[receiver_value(plan).native])
+                extensions.append(
+                    f"/** [{owner}.{method_name(plan)}] without its completion. */\n"
+                    + extension(
+                        values.split_discards[lowering][function.name],
+                        f"{family}Discarding",
+                    )
+                )
         declarations = kotlin_callbacks.split_declarations(values, lowering)
         codecs = values.split_codecs(lowering)
         outputs[f"{directory}/generated/{file}.kt"] = (

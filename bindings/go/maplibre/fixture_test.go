@@ -133,11 +133,14 @@ func newRuntimeFixture(t *testing.T) *fixture {
 		t.Fatalf("RuntimeCreate: %v", err)
 	}
 	f.runtime = runtime
-	await(t, submitted(runtime.SetEventHandler(RuntimeEventHandler{Callback: func(batch EventBatchView) {
+	// A handler accepted before CreateMap receives the map's first events.
+	if err := runtime.Discarding().SetEventHandler(RuntimeEventHandler{Callback: func(batch EventBatchView) {
 		for _, event := range batch.Events {
 			f.pendingEvents <- event
 		}
-	}})))
+	}}); err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(func() {
 		future, err := f.runtime.Close()
 		if !errors.Is(err, StatusInvalidState) {

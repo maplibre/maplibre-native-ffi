@@ -283,22 +283,6 @@ struct CompletionResult<&mln_render_session_set_webgpu_surface_target> {
   static constexpr bool has_value = false;
 };
 template <>
-struct CompletionResult<&mln_runtime_clear_event_handler> {
-  static constexpr bool has_value = false;
-};
-template <>
-struct CompletionResult<&mln_runtime_clear_http_header_transform> {
-  static constexpr bool has_value = false;
-};
-template <>
-struct CompletionResult<&mln_runtime_clear_resource_provider> {
-  static constexpr bool has_value = false;
-};
-template <>
-struct CompletionResult<&mln_runtime_clear_resource_transform> {
-  static constexpr bool has_value = false;
-};
-template <>
 struct CompletionResult<&mln_runtime_create_map> {
   static constexpr bool has_value = false;
 };
@@ -354,14 +338,6 @@ struct CompletionResult<&mln_runtime_run_ambient_cache_operation> {
   static constexpr bool has_value = false;
 };
 template <>
-struct CompletionResult<&mln_runtime_set_event_handler> {
-  static constexpr bool has_value = false;
-};
-template <>
-struct CompletionResult<&mln_runtime_set_http_header_transform> {
-  static constexpr bool has_value = false;
-};
-template <>
 struct CompletionResult<&mln_runtime_set_maximum_ambient_cache_size> {
   static constexpr bool has_value = false;
 };
@@ -371,14 +347,6 @@ struct CompletionResult<&mln_runtime_set_offline_region_download_state> {
 };
 template <>
 struct CompletionResult<&mln_runtime_set_offline_region_observed> {
-  static constexpr bool has_value = false;
-};
-template <>
-struct CompletionResult<&mln_runtime_set_resource_provider> {
-  static constexpr bool has_value = false;
-};
-template <>
-struct CompletionResult<&mln_runtime_set_resource_transform> {
   static constexpr bool has_value = false;
 };
 template <>

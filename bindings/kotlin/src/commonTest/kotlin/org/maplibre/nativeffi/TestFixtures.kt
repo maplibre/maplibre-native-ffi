@@ -34,6 +34,7 @@ import org.maplibre.nativeffi.generated.RuntimeOptions
 import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.generated.UrlMatchFlags
 import org.maplibre.nativeffi.runtime.AsyncReleasable
+import org.maplibre.nativeffi.runtime.assertCommitted
 
 /** How long one test may run before it fails instead of hanging the suite. */
 internal val TEST_TIMEOUT: Duration = 60.seconds
@@ -160,12 +161,14 @@ private constructor(val runtime: RuntimeHandle, private val events: Channel<Runt
       val runtime = GeneratedApi.runtimeCreate(options)
       val fixture = RuntimeFixture(runtime, events)
       return runThenRelease(listOf(runtime)) {
-        runtime
-          .setEventHandler(
-            RuntimeEventHandler { batch -> batch.events.forEach { events.trySend(it) } },
-          )
-          .awaitWithin("the event handler")
-        runtime.setResourceProvider(provider).awaitWithin("the resource provider")
+        assertCommitted(
+          runtime
+            .setEventHandler(
+              RuntimeEventHandler { batch -> batch.events.forEach { events.trySend(it) } },
+            )
+            .awaitWithin("the event handler"),
+        )
+        assertCommitted(runtime.setResourceProvider(provider).awaitWithin("the resource provider"))
         fixture.block()
       }
     }

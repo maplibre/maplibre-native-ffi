@@ -120,7 +120,7 @@ auto drain_completions(mln_delivery_queue queue) -> QueuedCompletions {
 // Resolves completion with a success that carries no value, as a runtime
 // resource configuration command's does.
 void succeed(const std::shared_ptr<mln::core::Completion>& completion) {
-  mln::core::valueless_completion<&mln_runtime_clear_resource_transform>()
+  mln::core::valueless_completion<&mln_runtime_set_maximum_ambient_cache_size>()
     .complete(completion);
 }
 
@@ -194,7 +194,8 @@ void a_delivery_that_throws_after_the_sink_reports_once() {
   auto completion = created(descriptor_for(probe));
   completion->accept();
   completion->resolve([](const mln::core::CompletionSink& sink) {
-    mln::core::valueless_completion<&mln_runtime_clear_resource_transform>()
+    mln::core::valueless_completion<
+      &mln_runtime_set_maximum_ambient_cache_size>()
       .deliver(sink);
     throw std::runtime_error{"delivery failed after the sink"};
   });

@@ -5792,17 +5792,19 @@ static napi_value mln_ts_export_mln_resource_transform_request_complete(
   mln_buffer_view arg_url = {0};
   mln_diagnostic diagnostic;
   mln_status status;
-  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  if (!mln_ts_begin(call, env, info, 3)) return NULL;
   {
     uint64_t number = 0;
     if (!mln_ts_read_u64(call, call->argv[0], &number, "request")) goto done;
     arg_request = (mln_resource_transform_request)number;
   }
-  if (!mln_ts_read_text_view(call, call->argv[1], &arg_url, "url")) goto done;
+  if (!mln_ts_read_owner(call, call->argv[1])) goto done;
+  if (!mln_ts_read_text_view(call, call->argv[2], &arg_url, "url")) goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status =
     mln_resource_transform_request_complete(arg_request, arg_url, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_consume(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5844,7 +5846,7 @@ static napi_value mln_ts_export_mln_runtime_clear_event_handler(
     arg_runtime = (mln_runtime)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, &arg_completion, &present_completion
+        call, call->argv[1], true, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5874,7 +5876,7 @@ static napi_value mln_ts_export_mln_runtime_clear_http_header_transform(
     arg_runtime = (mln_runtime)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, &arg_completion, &present_completion
+        call, call->argv[1], true, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5904,7 +5906,7 @@ static napi_value mln_ts_export_mln_runtime_clear_resource_provider(
     arg_runtime = (mln_runtime)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, &arg_completion, &present_completion
+        call, call->argv[1], true, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5934,7 +5936,7 @@ static napi_value mln_ts_export_mln_runtime_clear_resource_transform(
     arg_runtime = (mln_runtime)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, &arg_completion, &present_completion
+        call, call->argv[1], true, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -6432,7 +6434,7 @@ static napi_value mln_ts_export_mln_runtime_set_event_handler(
       goto done;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, &arg_completion, &present_completion
+        call, call->argv[2], true, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -6500,7 +6502,7 @@ static napi_value mln_ts_export_mln_runtime_set_http_header_transform(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, &arg_completion, &present_completion
+        call, call->argv[2], true, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -6667,7 +6669,7 @@ static napi_value mln_ts_export_mln_runtime_set_resource_provider(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, &arg_completion, &present_completion
+        call, call->argv[2], true, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -6707,7 +6709,7 @@ static napi_value mln_ts_export_mln_runtime_set_resource_transform(
       ))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, &arg_completion, &present_completion
+        call, call->argv[2], true, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
