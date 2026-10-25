@@ -2,13 +2,11 @@
 // map's life, and closing the two in order.
 
 #include <maplibre_native_c.h>
-#include <string.h>
 
 mln_status open_runtime(const char* cache_path, mln_runtime* out_runtime) {
   // #region runtime
   mln_runtime_options options = mln_runtime_options_default();
-  options.cache_path =
-    (mln_buffer_view){.data = cache_path, .size = strlen(cache_path)};
+  options.cache_path = mln_buffer_view_from_cstr(cache_path);
   return mln_runtime_create(&options, out_runtime, NULL);
   // #endregion runtime
 }

@@ -123,8 +123,7 @@ static void observe_end(
     MLN_STATUS_OK) {
     for (size_t index = 0; index < view.event_count; index += 1) {
       const mln_runtime_event* event =
-        (const mln_runtime_event*)((const char*)view.events +
-                                   (index * view.event_size));
+        MLN_STRIDED_AT(mln_runtime_event, view.events, view.event_size, index);
       if (
         event->type == MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE &&
         event->generation == end->generation

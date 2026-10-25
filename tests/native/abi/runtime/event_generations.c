@@ -103,8 +103,9 @@ static void recorder_drain(void) {
       break;
     }
     for (size_t index = 0; index < view.event_count; index += 1) {
-      record_event((const mln_runtime_event*)((const char*)view.events +
-                                              (index * view.event_size)));
+      record_event(
+        MLN_STRIDED_AT(mln_runtime_event, view.events, view.event_size, index)
+      );
     }
     mln_delivery_batch_release(batch);
   }
@@ -117,8 +118,9 @@ static void record_callback_events(
   (void)user_data;
   recorder_lock();
   for (size_t index = 0; index < events->event_count; index += 1) {
-    record_event((const mln_runtime_event*)((const char*)events->events +
-                                            (index * events->event_size)));
+    record_event(MLN_STRIDED_AT(
+      mln_runtime_event, events->events, events->event_size, index
+    ));
   }
   recorder_unlock();
 }

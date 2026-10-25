@@ -32,8 +32,7 @@ static void add_api_key(
   if (
     !build_keyed_url(url, api_key, rewritten, sizeof(rewritten)) ||
     mln_resource_transform_request_complete(
-      request, (mln_buffer_view){.data = rewritten, .size = strlen(rewritten)},
-      NULL
+      request, mln_buffer_view_from_cstr(rewritten), NULL
     ) != MLN_STATUS_OK
   ) {
     mln_resource_transform_request_release(request);

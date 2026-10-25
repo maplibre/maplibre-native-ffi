@@ -48,9 +48,9 @@ static bool frame_arrived(void* context) {
   }
   const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
   for (size_t index = 0; index < view.result_count; index += 1) {
-    const mln_render_frame_result* result =
-      (const mln_render_frame_result*)((const char*)view.results +
-                                       (index * view.result_size));
+    const mln_render_frame_result* result = MLN_STRIDED_AT(
+      mln_render_frame_result, view.results, view.result_size, index
+    );
     if (result->token == wait->token) {
       wait->found = true;
       wait->disposition = result->disposition;
@@ -242,8 +242,7 @@ mln_test_feature_list mln_test_style_query_source(
     mln_source_feature_query_options_default();
   mln_buffer_view layer = {0};
   if (source_layer != NULL) {
-    layer =
-      (mln_buffer_view){.data = source_layer, .size = strlen(source_layer)};
+    layer = mln_buffer_view_from_cstr(source_layer);
     options.fields = MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
     options.source_layer_ids = &layer;
     options.source_layer_id_count = 1;
@@ -258,8 +257,7 @@ mln_test_feature_list mln_test_style_query_source_with(
   mln_completion completion;
   feature_probe* probe = new_feature_probe(copy_source_features, &completion);
   const mln_status status = mln_render_session_query_source_features(
-    fixture->session,
-    (mln_buffer_view){.data = source_id, .size = strlen(source_id)}, options,
+    fixture->session, mln_buffer_view_from_cstr(source_id), options,
     &completion, MLN_TEST_DIAGNOSTIC
   );
   if (status != MLN_STATUS_OK) {
@@ -366,8 +364,7 @@ static void copy_list(void* user_data, const mln_completion_result* result) {
     // Elements lie value_size bytes apart, as a binding built against an
     // older header steps through them.
     const mln_style_layer_info* entry =
-      (const void*)((const unsigned char*)result->value +
-                    index * result->value_size);
+      MLN_STRIDED_AT(void, result->value, result->value_size, index);
     fits &= copy_text(entry->id, copy->id, sizeof(copy->id));
     fits &= copy_text(entry->type, copy->type, sizeof(copy->type));
     fits &=

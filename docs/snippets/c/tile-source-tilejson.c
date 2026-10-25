@@ -1,11 +1,6 @@
 // A vector tile source loaded from a TileJSON URL, drawn by a line layer.
 
 #include <maplibre_native_c.h>
-#include <string.h>
-
-static mln_buffer_view view(const char* text) {
-  return (mln_buffer_view){.data = text, .size = strlen(text)};
-}
 
 // An empty before-layer ID puts the layer on top of the style.
 static mln_status add_layer(mln_map map, const mln_completion* completion) {
@@ -15,7 +10,8 @@ static mln_status add_layer(mln_map map, const mln_completion* completion) {
     "\"source-layer\":\"transportation\"}";
   // #endregion layer
   return mln_map_add_style_layer_json(
-    map, view(layer), view(""), completion, NULL
+    map, mln_buffer_view_from_cstr(layer), mln_buffer_view_from_cstr(""),
+    completion, NULL
   );
 }
 
@@ -28,7 +24,8 @@ mln_status add_basemap(
     "{\"type\":\"vector\",\"url\":\"https://tiles.example.com/planet/"
     "tiles.json\"}";
   const mln_status status = mln_map_add_style_source_json(
-    map, view("basemap"), view(source), source_completion, NULL
+    map, mln_buffer_view_from_cstr("basemap"),
+    mln_buffer_view_from_cstr(source), source_completion, NULL
   );
   if (status != MLN_STATUS_OK) {
     return status;

@@ -2,11 +2,6 @@
 // style draws.
 
 #include <maplibre_native_c.h>
-#include <string.h>
-
-static mln_buffer_view view(const char* text) {
-  return (mln_buffer_view){.data = text, .size = strlen(text)};
-}
 
 static void read_features(
   void* user_data, const mln_completion_result* result
@@ -24,7 +19,7 @@ static void read_features(
 
 mln_status list_source_features(mln_render_session session) {
   // #region options
-  const mln_buffer_view source_layers[] = {view("poi")};
+  const mln_buffer_view source_layers[] = {mln_buffer_view_from_cstr("poi")};
   mln_source_feature_query_options options =
     mln_source_feature_query_options_default();
   options.fields = MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
@@ -38,7 +33,7 @@ mln_status list_source_features(mln_render_session session) {
     .callback = read_features,
   };
   return mln_render_session_query_source_features(
-    session, view("places"), &options, &completion, NULL
+    session, mln_buffer_view_from_cstr("places"), &options, &completion, NULL
   );
   // #endregion query
 }

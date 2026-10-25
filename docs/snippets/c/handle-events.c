@@ -37,8 +37,8 @@ void receive_events(void* user_data, const mln_event_batch_view* events) {
   // #region drain
   const mln_event_batch_view view = *events;
   for (size_t index = 0; index < view.event_count; index++) {
-    const char* bytes = (const char*)view.events + index * view.event_size;
-    const mln_runtime_event* event = (const mln_runtime_event*)bytes;
+    const mln_runtime_event* event =
+      MLN_STRIDED_AT(mln_runtime_event, view.events, view.event_size, index);
 
     // #region match
     // One runtime serves every map under it, and they share this handler.

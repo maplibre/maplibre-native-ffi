@@ -79,9 +79,9 @@ static void finish_source_probe(const source_probe* probe) {
 static source_copy read_source(mln_map map, const char* id) {
   source_probe probe = {.status = MLN_STATUS_INVALID_STATE};
   const mln_completion completion = source_completion(&probe);
-  MLN_TEST_OK(
-    mln_map_get_style_source(map, mln_test_view_of(id), &completion, NULL)
-  );
+  MLN_TEST_OK(mln_map_get_style_source(
+    map, mln_buffer_view_from_cstr(id), &completion, NULL
+  ));
   finish_source_probe(&probe);
   TEST_ASSERT_LESS_OR_EQUAL_size_t(1, probe.count);
   return probe.sources[0];
@@ -100,8 +100,8 @@ static bool source_exists(mln_map map, const char* id) {
 
 static void add_source_json(mln_map map, const char* id, const char* json) {
   MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
-    map, mln_test_view_of(id), mln_test_view_of(json), &completion.descriptor,
-    NULL
+    map, mln_buffer_view_from_cstr(id), mln_buffer_view_from_cstr(json),
+    &completion.descriptor, NULL
   ));
 }
 
@@ -314,7 +314,7 @@ static void read_corners(mln_map map, const char* id, mln_lat_lng out[4]) {
   mln_test_completion completion =
     mln_test_completion_default(4 * sizeof(mln_lat_lng));
   MLN_TEST_OK(mln_map_get_image_source_coordinates(
-    map, mln_test_view_of(id), &completion.descriptor, NULL
+    map, mln_buffer_view_from_cstr(id), &completion.descriptor, NULL
   ));
   MLN_TEST_OK(mln_test_completion_finish(&completion));
   TEST_ASSERT_EQUAL_size_t(4, mln_test_completion_value_count(&completion));

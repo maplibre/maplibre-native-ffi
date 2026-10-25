@@ -119,8 +119,9 @@ static inline const mln_delivery* mln_test_delivery_at(
   const mln_delivery_batch_view* view, size_t index
 ) {
   TEST_ASSERT_TRUE(index < view->delivery_count);
-  return (const mln_delivery*)((const unsigned char*)view->deliveries +
-                               index * view->delivery_size);
+  return MLN_STRIDED_AT(
+    mln_delivery, view->deliveries, view->delivery_size, index
+  );
 }
 
 // Waits for one batch that holds exactly one delivery and returns it.

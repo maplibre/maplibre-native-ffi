@@ -31,7 +31,7 @@ auto prepare(const char* json, const mln_geojson_source_options* options)
   -> mln_geojson_source_data {
   auto data = mln_geojson_source_data{MLN_HANDLE_NULL};
   MLN_TEST_OK(mln_geojson_source_data_create(
-    mln_test_view_of(json), options, &data, MLN_TEST_DIAGNOSTIC
+    mln_buffer_view_from_cstr(json), options, &data, MLN_TEST_DIAGNOSTIC
   ));
   return data;
 }

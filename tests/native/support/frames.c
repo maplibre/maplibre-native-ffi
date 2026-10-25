@@ -153,8 +153,9 @@ const mln_render_frame_result* mln_test_render_view_result(
   const mln_render_frame_batch_view* view, size_t index
 ) {
   TEST_ASSERT_LESS_THAN_size_t(view->result_count, index);
-  return (const mln_render_frame_result*)((const char*)view->results +
-                                          (index * view->result_size));
+  return MLN_STRIDED_AT(
+    mln_render_frame_result, view->results, view->result_size, index
+  );
 }
 
 mln_render_frame_result mln_test_render_batch_result(

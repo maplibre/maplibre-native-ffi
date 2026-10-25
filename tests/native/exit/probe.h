@@ -257,10 +257,7 @@ static inline mln_map probe_create_map(mln_runtime runtime) {
   probe_require(probe_latch_wait(&latch), "creating a map");
   probe_require(
     mln_map_set_style_url(
-      map,
-      (mln_buffer_view){
-        .data = "custom://style.json", .size = sizeof("custom://style.json") - 1
-      },
+      map, mln_buffer_view_from_cstr("custom://style.json"),
       &probe_discarding_completion, NULL
     ),
     "setting the style"

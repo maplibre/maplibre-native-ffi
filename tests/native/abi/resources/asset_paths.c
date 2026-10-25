@@ -66,8 +66,7 @@ static void an_asset_style_resolves_under_the_runtime_asset_path(void) {
   *separator = '\0';
 
   mln_runtime_options options = mln_runtime_options_default();
-  options.asset_path =
-    (mln_buffer_view){.data = directory, .size = strlen(directory)};
+  options.asset_path = mln_buffer_view_from_cstr(directory);
   mln_runtime runtime = mln_test_create_runtime_with_options(options);
   mln_map map = mln_test_create_map(runtime);
   const size_t url_size = strlen(url);

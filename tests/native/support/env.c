@@ -565,9 +565,9 @@ size_t mln_test_drain_counting(mln_runtime runtime, uint32_t type) {
       return total;
     }
     for (size_t index = 0; index < batch.event_count; index += 1) {
-      const mln_runtime_event* event =
-        (const mln_runtime_event*)((const char*)batch.events +
-                                   (index * batch.event_size));
+      const mln_runtime_event* event = MLN_STRIDED_AT(
+        mln_runtime_event, batch.events, batch.event_size, index
+      );
       if (type == 0 || event->type == type) {
         total += 1;
       }
@@ -597,9 +597,9 @@ static bool drain_until_match(void* context) {
       return matched;
     }
     for (size_t index = 0; index < batch.event_count && !matched; index += 1) {
-      const mln_runtime_event* event =
-        (const mln_runtime_event*)((const char*)batch.events +
-                                   (index * batch.event_size));
+      const mln_runtime_event* event = MLN_STRIDED_AT(
+        mln_runtime_event, batch.events, batch.event_size, index
+      );
       matched = search->match(event, search->context);
     }
   }
@@ -631,9 +631,9 @@ size_t mln_test_drain_counting_matching(
       return total;
     }
     for (size_t index = 0; index < batch.event_count; index += 1) {
-      const mln_runtime_event* event =
-        (const mln_runtime_event*)((const char*)batch.events +
-                                   (index * batch.event_size));
+      const mln_runtime_event* event = MLN_STRIDED_AT(
+        mln_runtime_event, batch.events, batch.event_size, index
+      );
       if (match(event, context)) {
         total += 1;
       }

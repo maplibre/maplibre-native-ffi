@@ -7,8 +7,7 @@
 
 static app_error create_runtime(map_state* state) {
   mln_runtime_options options = mln_runtime_options_default();
-  options.cache_path =
-    (mln_buffer_view){.data = ":memory:", .size = sizeof(":memory:") - 1};
+  options.cache_path = mln_buffer_view_from_cstr(":memory:");
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status =
     mln_runtime_create(&options, &state->runtime, &diagnostic);
@@ -59,19 +58,13 @@ static mln_status load_style(
   const mln_completion completion = diagnostics_completion("style load failed");
   if (smoke) {
     return mln_map_set_style_json(
-      state->map,
-      (mln_buffer_view){
-        .data = smoke_style_json, .size = sizeof(smoke_style_json) - 1
-      },
-      &completion, diagnostic
+      state->map, mln_buffer_view_from_cstr(smoke_style_json), &completion,
+      diagnostic
     );
   }
   return mln_map_set_style_url(
     state->map,
-    (mln_buffer_view){
-      .data = "https://tiles.openfreemap.org/styles/bright",
-      .size = sizeof("https://tiles.openfreemap.org/styles/bright") - 1
-    },
+    mln_buffer_view_from_cstr("https://tiles.openfreemap.org/styles/bright"),
     &completion, diagnostic
   );
 }

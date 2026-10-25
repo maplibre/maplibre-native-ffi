@@ -152,8 +152,7 @@ mln_resource_response mln_test_error_response(
     .size = sizeof(mln_resource_response),
     .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
     .error_reason = reason,
-    .error_message =
-      (mln_buffer_view){.data = message, .size = strlen(message)},
+    .error_message = mln_buffer_view_from_cstr(message),
   };
 }
 

@@ -11,8 +11,7 @@ static mln_style_expression create_typed(
 ) {
   mln_style_expression expression = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_style_expression_create(
-    mln_test_buffer_view(json, strlen(json)), options, &expression,
-    MLN_TEST_DIAGNOSTIC
+    mln_buffer_view_from_cstr(json), options, &expression, MLN_TEST_DIAGNOSTIC
   ));
   return expression;
 }
@@ -26,8 +25,7 @@ static mln_status create_status(
 ) {
   mln_style_expression expression = MLN_HANDLE_NULL;
   const mln_status status = mln_style_expression_create(
-    mln_test_buffer_view(json, strlen(json)), options, &expression,
-    MLN_TEST_DIAGNOSTIC
+    mln_buffer_view_from_cstr(json), options, &expression, MLN_TEST_DIAGNOSTIC
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, expression);
   return status;
@@ -68,7 +66,7 @@ static mln_status evaluate_status(
 static mln_style_expression_inputs feature_inputs(const char* feature) {
   mln_style_expression_inputs inputs = mln_style_expression_inputs_default();
   inputs.fields = MLN_STYLE_EXPRESSION_INPUT_FEATURE;
-  inputs.feature = mln_test_buffer_view(feature, strlen(feature));
+  inputs.feature = mln_buffer_view_from_cstr(feature);
   return inputs;
 }
 

@@ -190,14 +190,12 @@ static void the_host_answers_a_drained_transform(void) {
     request, MLN_BUFFER_LITERAL("custom://before\0after"), NULL
   ));
   MLN_TEST_OK(mln_resource_transform_request_complete(
-    request, (mln_buffer_view){.data = rewritten, .size = strlen(rewritten)},
-    NULL
+    request, mln_buffer_view_from_cstr(rewritten), NULL
   ));
   // The answer consumed the handle, so a second answer finds it gone and a
   // release does nothing.
   MLN_TEST_INVALID_STATE(mln_resource_transform_request_complete(
-    request, (mln_buffer_view){.data = rewritten, .size = strlen(rewritten)},
-    NULL
+    request, mln_buffer_view_from_cstr(rewritten), NULL
   ));
   mln_resource_transform_request_release(request);
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
@@ -453,8 +451,7 @@ static void header_rules_match_the_rewritten_url(void) {
   MLN_TEST_OK(mln_delivery_batch_take(batch, 0, NULL));
   mln_delivery_batch_release(batch);
   MLN_TEST_OK(mln_resource_transform_request_complete(
-    request, (mln_buffer_view){.data = rewritten, .size = strlen(rewritten)},
-    NULL
+    request, mln_buffer_view_from_cstr(rewritten), NULL
   ));
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
   char value[64];

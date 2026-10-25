@@ -9,15 +9,15 @@ static mln_feature_state_selector selector_for(
 ) {
   mln_feature_state_selector selector = {
     .size = sizeof(mln_feature_state_selector),
-    .source_id = mln_test_view_of(source_id),
+    .source_id = mln_buffer_view_from_cstr(source_id),
   };
   if (source_layer_id != NULL) {
     selector.fields |= MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
-    selector.source_layer_id = mln_test_view_of(source_layer_id);
+    selector.source_layer_id = mln_buffer_view_from_cstr(source_layer_id);
   }
   if (feature_id != NULL) {
     selector.fields |= MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
-    selector.feature_id = mln_test_view_of(feature_id);
+    selector.feature_id = mln_buffer_view_from_cstr(feature_id);
   }
   return selector;
 }
@@ -26,7 +26,7 @@ static void set_state(
   mln_map map, mln_feature_state_selector selector, const char* state
 ) {
   MLN_TEST_AWAIT_OK(mln_map_set_feature_state(
-    map, &selector, mln_test_view_of(state), &completion.descriptor,
+    map, &selector, mln_buffer_view_from_cstr(state), &completion.descriptor,
     MLN_TEST_DIAGNOSTIC
   ));
 }

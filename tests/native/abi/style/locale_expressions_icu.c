@@ -52,7 +52,7 @@ static bool selects(const locale_map* map, const char* filter) {
   mln_source_feature_query_options query =
     mln_source_feature_query_options_default();
   query.fields = MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
-  query.filter = mln_test_view_of(filter);
+  query.filter = mln_buffer_view_from_cstr(filter);
   const mln_test_feature_list list =
     mln_test_style_query_source_with(&map->fixture, "point", &query);
   MLN_TEST_OK(list.status);

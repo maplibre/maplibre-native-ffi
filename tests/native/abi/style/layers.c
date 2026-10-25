@@ -9,7 +9,7 @@
 
 static void add_source(mln_map map, const char* id) {
   MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
-    map, mln_test_view_of(id),
+    map, mln_buffer_view_from_cstr(id),
     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE), &completion.descriptor,
     NULL
   ));
@@ -17,14 +17,14 @@ static void add_source(mln_map map, const char* id) {
 
 static void add_layer(mln_map map, const char* json, const char* before) {
   MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
-    map, mln_test_view_of(json), mln_test_view_of(before),
+    map, mln_buffer_view_from_cstr(json), mln_buffer_view_from_cstr(before),
     &completion.descriptor, NULL
   ));
 }
 
 static void add_dem_source(mln_map map, const char* id) {
   MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
-    map, mln_test_view_of(id),
+    map, mln_buffer_view_from_cstr(id),
     MLN_BUFFER_LITERAL(
       "{\"type\":\"raster-dem\",\"tiles\":[\"fixture://dem/{z}/{x}/{y}.png\"]}"
     ),
@@ -88,9 +88,9 @@ static layer_probe take_layer_result(
     .callback = copy_layer_result,
     .user_data = &probe,
   };
-  MLN_TEST_OK(
-    mln_map_get_style_layer(map, mln_test_view_of(id), &completion, NULL)
-  );
+  MLN_TEST_OK(mln_map_get_style_layer(
+    map, mln_buffer_view_from_cstr(id), &completion, NULL
+  ));
   MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_TRUE(atomic_load(&probe.done));
   MLN_TEST_OK(probe.status);
@@ -169,7 +169,7 @@ static mln_status read_layer_property(
 ) {
   mln_test_completion completion = mln_test_completion_buffer_view();
   MLN_TEST_OK(mln_map_get_style_layer_property(
-    map, mln_test_view_of(layer), mln_test_view_of(name),
+    map, mln_buffer_view_from_cstr(layer), mln_buffer_view_from_cstr(name),
     &completion.descriptor, NULL
   ));
   return mln_test_style_finish_text(&completion, out, capacity, NULL);
@@ -180,7 +180,7 @@ static mln_status read_layer_filter(
 ) {
   mln_test_completion completion = mln_test_completion_buffer_view();
   MLN_TEST_OK(mln_map_get_style_layer_property(
-    map, mln_test_view_of(layer), MLN_BUFFER_LITERAL("filter"),
+    map, mln_buffer_view_from_cstr(layer), MLN_BUFFER_LITERAL("filter"),
     &completion.descriptor, NULL
   ));
   return mln_test_style_finish_text(&completion, out, capacity, NULL);
@@ -267,7 +267,7 @@ static mln_status read_layer_json(
 ) {
   mln_test_completion completion = mln_test_completion_buffer_view();
   MLN_TEST_OK(mln_map_get_style_layer_json(
-    map, mln_test_view_of(layer), &completion.descriptor, NULL
+    map, mln_buffer_view_from_cstr(layer), &completion.descriptor, NULL
   ));
   return mln_test_style_finish_text(&completion, out, capacity, found);
 }
@@ -287,13 +287,15 @@ static void root_properties_match_serialization_and_null_resets_zoom(void) {
   static const char* zoom_names[] = {"minzoom", "maxzoom"};
   for (size_t index = 0; index < 2; index += 1) {
     MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
-      map, MLN_BUFFER_LITERAL("dots"), mln_test_view_of(zoom_names[index]),
-      MLN_BUFFER_LITERAL("4.5"), &completion.descriptor, NULL
+      map, MLN_BUFFER_LITERAL("dots"),
+      mln_buffer_view_from_cstr(zoom_names[index]), MLN_BUFFER_LITERAL("4.5"),
+      &completion.descriptor, NULL
     ));
     EXPECT_LAYER_PROPERTY("4.5", map, "dots", zoom_names[index]);
     MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
-      map, MLN_BUFFER_LITERAL("dots"), mln_test_view_of(zoom_names[index]),
-      MLN_BUFFER_LITERAL("null"), &completion.descriptor, NULL
+      map, MLN_BUFFER_LITERAL("dots"),
+      mln_buffer_view_from_cstr(zoom_names[index]), MLN_BUFFER_LITERAL("null"),
+      &completion.descriptor, NULL
     ));
     EXPECT_LAYER_PROPERTY("", map, "dots", zoom_names[index]);
   }
@@ -355,7 +357,7 @@ static void layer_json_serializes_the_current_layer(void) {
 
 static void move_layer(mln_map map, const char* layer, const char* before) {
   MLN_TEST_AWAIT_OK(mln_map_move_style_layer(
-    map, mln_test_view_of(layer), mln_test_view_of(before),
+    map, mln_buffer_view_from_cstr(layer), mln_buffer_view_from_cstr(before),
     &completion.descriptor, NULL
   ));
 }

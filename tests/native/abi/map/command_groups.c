@@ -21,7 +21,7 @@ static mln_map create_loaded_map(mln_runtime runtime) {
 
 static void add_background_layer(mln_map map, const char* layer_json) {
   MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
-    map, mln_test_view_of(layer_json), (mln_buffer_view){0},
+    map, mln_buffer_view_from_cstr(layer_json), (mln_buffer_view){0},
     &completion.descriptor, NULL
   ));
 }
@@ -30,7 +30,7 @@ static bool layer_exists(mln_map map, const char* id) {
   mln_test_completion completion =
     mln_test_completion_default(sizeof(mln_style_layer_info));
   MLN_TEST_OK(mln_map_get_style_layer(
-    map, mln_test_view_of(id), &completion.descriptor, NULL
+    map, mln_buffer_view_from_cstr(id), &completion.descriptor, NULL
   ));
   mln_style_layer_info result;
   bool found = false;

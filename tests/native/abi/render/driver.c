@@ -264,9 +264,9 @@ static void drain_tokens(maintenance_probe* probe) {
       probe->drain_failed = true;
       break;
     }
-    const mln_render_frame_result* result =
-      (const mln_render_frame_result*)((const char*)view.results +
-                                       (index * view.result_size));
+    const mln_render_frame_result* result = MLN_STRIDED_AT(
+      mln_render_frame_result, view.results, view.result_size, index
+    );
     probe->tokens[probe->token_count] = result->token;
     probe->token_count += 1;
   }
@@ -896,9 +896,9 @@ static void drain_inside_frame_wake(void* context) {
       const mln_render_frame_batch_view view =
         mln_test_render_batch_view(batch);
       for (size_t index = 0; index < view.result_count; index += 1) {
-        const mln_render_frame_result* result =
-          (const mln_render_frame_result*)((const char*)view.results +
-                                           (index * view.result_size));
+        const mln_render_frame_result* result = MLN_STRIDED_AT(
+          mln_render_frame_result, view.results, view.result_size, index
+        );
         if (
           result->token == host->token &&
           result->disposition == MLN_RENDER_RESULT_RENDERED

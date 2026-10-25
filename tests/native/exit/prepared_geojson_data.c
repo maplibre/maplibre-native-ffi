@@ -5,7 +5,6 @@
 // so no harness teardown gives a starting thread time to finish.
 
 #include <stdio.h>
-#include <string.h>
 
 #include "maplibre_native_c.h"
 
@@ -20,8 +19,7 @@ int main(void) {
     mln_geojson_source_data data = MLN_HANDLE_NULL;
     mln_diagnostic diagnostic = {.size = sizeof(mln_diagnostic)};
     const mln_status status = mln_geojson_source_data_create(
-      (mln_buffer_view){.data = json, .size = strlen(json)}, NULL, &data,
-      &diagnostic
+      mln_buffer_view_from_cstr(json), NULL, &data, &diagnostic
     );
     if (status != MLN_STATUS_OK) {
       (void)fprintf(stderr, "preparation failed: %s\n", diagnostic.message);

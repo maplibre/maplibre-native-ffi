@@ -39,9 +39,9 @@ static void drain_frame_results(mln_render_session session, bool* pending) {
   )
     return;
   for (size_t index = 0; index < view.result_count; index++) {
-    const char* bytes = (const char*)view.results + index * view.result_size;
-    const mln_render_frame_result* result =
-      (const mln_render_frame_result*)bytes;
+    const mln_render_frame_result* result = MLN_STRIDED_AT(
+      mln_render_frame_result, view.results, view.result_size, index
+    );
     (void)result;
     *pending = true;
   }

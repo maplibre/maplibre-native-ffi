@@ -250,7 +250,7 @@ static void add_source(
 
 static void draw_source(const custom_kind* kind, mln_map map) {
   MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
-    map, mln_test_view_of(kind->layer_json), MLN_BUFFER_LITERAL(""),
+    map, mln_buffer_view_from_cstr(kind->layer_json), MLN_BUFFER_LITERAL(""),
     &completion.descriptor, NULL
   ));
 }
@@ -308,7 +308,7 @@ static void an_explicit_removal_releases_once(void) {
 
     mln_test_completion removal = mln_test_completion_default(0);
     MLN_TEST_OK(mln_map_remove_style_source(
-      map, mln_test_view_of(kind->source_id), &removal.descriptor, NULL
+      map, mln_buffer_view_from_cstr(kind->source_id), &removal.descriptor, NULL
     ));
     MLN_TEST_OK(mln_test_completion_finish(&removal));
     TEST_ASSERT_EQUAL_UINT32(
@@ -650,9 +650,9 @@ static void a_failed_tile_is_reported_and_invalidation_refetches_it(void) {
 static uint32_t source_type(mln_map map, const char* id) {
   mln_test_completion info =
     mln_test_completion_default(sizeof(mln_style_source_info));
-  MLN_TEST_OK(
-    mln_map_get_style_source(map, mln_test_view_of(id), &info.descriptor, NULL)
-  );
+  MLN_TEST_OK(mln_map_get_style_source(
+    map, mln_buffer_view_from_cstr(id), &info.descriptor, NULL
+  ));
   mln_style_source_info result = {0};
   MLN_TEST_OK(mln_test_completion_finish_value(&info, &result, sizeof(result)));
   return result.type;
@@ -842,7 +842,7 @@ static void custom_sources_take_and_validate_every_option(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(
       MLN_STATUS_INVALID_ARGUMENT,
       mln_map_add_custom_geometry_source(
-        map, mln_test_view_of(id), &geometry, &completion.descriptor,
+        map, mln_buffer_view_from_cstr(id), &geometry, &completion.descriptor,
         MLN_TEST_DIAGNOSTIC
       ),
       geometry_option_cases[index].label

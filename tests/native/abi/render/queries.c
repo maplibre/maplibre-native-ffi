@@ -176,8 +176,9 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
     const rendered_row* row = &rows[index];
     mln_rendered_feature_query_options options =
       mln_rendered_feature_query_options_default();
-    const mln_buffer_view layer =
-      row->layer == NULL ? (mln_buffer_view){0} : mln_test_view_of(row->layer);
+    const mln_buffer_view layer = row->layer == NULL
+                                    ? (mln_buffer_view){0}
+                                    : mln_buffer_view_from_cstr(row->layer);
     if (row->layer != NULL) {
       options.fields = MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
       options.layer_ids = &layer;
@@ -185,7 +186,7 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
     }
     if (row->filter != NULL) {
       options.fields |= MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
-      options.filter = mln_test_view_of(row->filter);
+      options.filter = mln_buffer_view_from_cstr(row->filter);
     }
     const mln_test_feature_list list =
       mln_test_style_query_rendered_with(&fixture, &row->geometry, &options);
@@ -483,7 +484,7 @@ static void source_queries_read_the_named_source_layers(void) {
       mln_source_feature_query_options_default();
     mln_buffer_view layers[2] = {0};
     for (size_t layer = 0; layer < row->layer_count; layer += 1) {
-      layers[layer] = mln_test_view_of(row->layers[layer]);
+      layers[layer] = mln_buffer_view_from_cstr(row->layers[layer]);
     }
     if (row->layer_count != 0) {
       query.fields = MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
@@ -492,7 +493,7 @@ static void source_queries_read_the_named_source_layers(void) {
     }
     if (row->filter != NULL) {
       query.fields |= MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
-      query.filter = mln_test_view_of(row->filter);
+      query.filter = mln_buffer_view_from_cstr(row->filter);
     }
     const mln_test_feature_list list =
       mln_test_style_query_source_with(&fixture, "tiles", &query);
@@ -539,12 +540,13 @@ static mln_status query_extension(
   const char* field, const char* arguments, char* out, size_t capacity
 ) {
   const mln_buffer_view argument_view =
-    arguments == NULL ? (mln_buffer_view){0} : mln_test_view_of(arguments);
+    arguments == NULL ? (mln_buffer_view){0}
+                      : mln_buffer_view_from_cstr(arguments);
   mln_test_completion completion = mln_test_completion_buffer_view();
   MLN_TEST_OK(mln_render_session_query_feature_extensions(
     fixture->session, MLN_BUFFER_LITERAL("clustered"),
-    mln_test_view_of(feature), MLN_BUFFER_LITERAL("supercluster"),
-    mln_test_view_of(field), arguments == NULL ? NULL : &argument_view,
+    mln_buffer_view_from_cstr(feature), MLN_BUFFER_LITERAL("supercluster"),
+    mln_buffer_view_from_cstr(field), arguments == NULL ? NULL : &argument_view,
     &completion.descriptor, MLN_TEST_DIAGNOSTIC
   ));
   (void)mln_test_render_fixture_finish_operation(fixture, &completion);

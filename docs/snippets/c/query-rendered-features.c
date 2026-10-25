@@ -2,11 +2,6 @@
 // that outlive the query.
 
 #include <maplibre_native_c.h>
-#include <string.h>
-
-static mln_buffer_view view(const char* text) {
-  return (mln_buffer_view){.data = text, .size = strlen(text)};
-}
 
 static void read_query_result(
   void* user_data, const mln_completion_result* result
@@ -38,7 +33,8 @@ mln_status features_at_screen_point(
 
   // #region layers
   const mln_buffer_view layer_ids[] = {
-    view("poi-labels"), view("building-fill")
+    mln_buffer_view_from_cstr("poi-labels"),
+    mln_buffer_view_from_cstr("building-fill")
   };
   mln_rendered_feature_query_options options =
     mln_rendered_feature_query_options_default();

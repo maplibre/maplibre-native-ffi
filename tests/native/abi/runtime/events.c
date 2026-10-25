@@ -7,8 +7,9 @@ static const uint64_t unknown_mask_bit = UINT64_C(1) << 63U;
 static const mln_runtime_event* batch_event(
   const mln_event_batch_view* batch, size_t index
 ) {
-  return (const mln_runtime_event*)((const char*)batch->events +
-                                    (index * batch->event_size));
+  return MLN_STRIDED_AT(
+    mln_runtime_event, batch->events, batch->event_size, index
+  );
 }
 
 typedef struct foreign_thread_probe {
@@ -111,8 +112,7 @@ static void queued_events_outlive_the_map_that_produced_them(void) {
   size_t map_sourced = 0;
   for (size_t index = 0; index < view.event_count; index += 1) {
     const mln_runtime_event* event =
-      (const mln_runtime_event*)((const char*)view.events +
-                                 (index * view.event_size));
+      MLN_STRIDED_AT(mln_runtime_event, view.events, view.event_size, index);
     if (event->source_type == MLN_RUNTIME_EVENT_SOURCE_MAP) {
       TEST_ASSERT_EQUAL_UINT64(map, event->source);
       map_sourced += 1;
@@ -243,15 +243,14 @@ static bool drain_until_completion(void* context) {
   MLN_TEST_OK(status);
   for (size_t item = 0; item < view.delivery_count; ++item) {
     const mln_delivery* delivery =
-      (const mln_delivery*)((const char*)view.deliveries +
-                            item * view.delivery_size);
+      MLN_STRIDED_AT(mln_delivery, view.deliveries, view.delivery_size, item);
     if (delivery->type == MLN_DELIVERY_TYPE_RUNTIME_EVENTS) {
       const mln_event_batch_view* events =
         delivery->payload.runtime_events.events;
       for (size_t index = 0; index < events->event_count; ++index) {
-        const mln_runtime_event* event =
-          (const mln_runtime_event*)((const char*)events->events +
-                                     index * events->event_size);
+        const mln_runtime_event* event = MLN_STRIDED_AT(
+          mln_runtime_event, events->events, events->event_size, index
+        );
         TEST_ASSERT_FALSE(order->completed);
         TEST_ASSERT_EQUAL_UINT64(order->map, event->source);
         if (event->type == MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) {

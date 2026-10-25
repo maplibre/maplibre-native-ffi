@@ -76,9 +76,9 @@ static void drain_until_all_seen(void* argument) {
       mln_delivery_queue_drain(drain->queue, &batch, &view, NULL);
     if (status != MLN_STATUS_OK) continue;
     for (size_t index = 0; index < view.delivery_count; index += 1) {
-      const mln_delivery* delivery =
-        (const mln_delivery*)((const unsigned char*)view.deliveries +
-                              index * view.delivery_size);
+      const mln_delivery* delivery = MLN_STRIDED_AT(
+        mln_delivery, view.deliveries, view.delivery_size, index
+      );
       const uintptr_t slot = (uintptr_t)delivery->user_data - 1;
       if (slot < concurrent_completions) {
         atomic_fetch_add(&drain->seen[slot], 1);

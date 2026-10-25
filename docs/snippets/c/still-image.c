@@ -172,9 +172,7 @@ void advance_still_image(still_image_job* job) {
       .callback = ignore_completion,
     };
     job->status = mln_map_set_style_url(
-      job->map,
-      (mln_buffer_view){.data = job->style_url, .size = strlen(job->style_url)},
-      &style, NULL
+      job->map, mln_buffer_view_from_cstr(job->style_url), &style, NULL
     );
     if (job->status == MLN_STATUS_OK) {
       const mln_completion still = {
@@ -203,9 +201,9 @@ void advance_still_image(still_image_job* job) {
       ) == MLN_STATUS_OK
     ) {
       for (size_t index = 0; index < view.result_count; ++index) {
-        const mln_render_frame_result* frame =
-          (const mln_render_frame_result*)((const char*)view.results +
-                                           index * view.result_size);
+        const mln_render_frame_result* frame = MLN_STRIDED_AT(
+          mln_render_frame_result, view.results, view.result_size, index
+        );
         if (frame->token == 1) {
           job->frame_pending = false;
           job->rendered = frame->disposition == MLN_RENDER_RESULT_RENDERED;

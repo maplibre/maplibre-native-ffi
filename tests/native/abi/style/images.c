@@ -44,9 +44,9 @@ static image_probe read_image(
     .callback = copy_image,
     .user_data = &probe,
   };
-  MLN_TEST_OK(
-    mln_map_get_style_image(map, mln_test_view_of(id), &completion, NULL)
-  );
+  MLN_TEST_OK(mln_map_get_style_image(
+    map, mln_buffer_view_from_cstr(id), &completion, NULL
+  ));
   MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_TRUE(atomic_load(&probe.done));
   MLN_TEST_OK(probe.status);
@@ -58,7 +58,8 @@ static void set_image(
   const mln_style_image_options* options
 ) {
   MLN_TEST_AWAIT_OK(mln_map_set_style_image(
-    map, mln_test_view_of(id), image, options, &completion.descriptor, NULL
+    map, mln_buffer_view_from_cstr(id), image, options, &completion.descriptor,
+    NULL
   ));
 }
 

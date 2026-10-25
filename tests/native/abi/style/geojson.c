@@ -18,7 +18,7 @@ static mln_geojson_source_data prepare(
 ) {
   mln_geojson_source_data data = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_geojson_source_data_create(
-    mln_test_view_of(json), options, &data, MLN_TEST_DIAGNOSTIC
+    mln_buffer_view_from_cstr(json), options, &data, MLN_TEST_DIAGNOSTIC
   ));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, data);
   return data;
@@ -32,7 +32,7 @@ static void draw_source(mln_map map, const char* source) {
     "{\"id\":\"%s-dots\",\"type\":\"circle\",\"source\":\"%s\"}", source, source
   );
   MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
-    map, mln_test_view_of(layer), MLN_BUFFER_LITERAL(""),
+    map, mln_buffer_view_from_cstr(layer), MLN_BUFFER_LITERAL(""),
     &completion.descriptor, NULL
   ));
 }
@@ -406,7 +406,8 @@ static void one_prepared_handle_serves_many_sources_and_outlives_itself(void) {
   for (size_t index = 0; index < 3; index += 1) {
     mln_test_completion completion = mln_test_completion_default(0);
     MLN_TEST_OK(mln_map_add_geojson_source_data(
-      map, mln_test_view_of(sources[index]), data, &completion.descriptor, NULL
+      map, mln_buffer_view_from_cstr(sources[index]), data,
+      &completion.descriptor, NULL
     ));
     // The last install is still pending when the handle goes away.
     if (index == 2) {
@@ -523,7 +524,7 @@ static void prepared_data_must_match_the_source_options(void) {
     mln_geojson_source_options variant = source;
     if (cases[index].cluster_properties != NULL) {
       variant.cluster_properties =
-        mln_test_view_of(cases[index].cluster_properties);
+        mln_buffer_view_from_cstr(cases[index].cluster_properties);
     }
     data = prepare(points, &variant);
     mln_test_completion completion = mln_test_completion_default(0);

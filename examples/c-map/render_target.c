@@ -189,9 +189,9 @@ app_error render_session_drain_results(
     );
   }
   for (size_t i = 0; i < view.result_count; ++i) {
-    const mln_render_frame_result* result =
-      (const mln_render_frame_result*)((const char*)view.results +
-                                       i * view.result_size);
+    const mln_render_frame_result* result = MLN_STRIDED_AT(
+      mln_render_frame_result, view.results, view.result_size, i
+    );
     switch (result->disposition) {
       case MLN_RENDER_RESULT_RENDERED:
         out_results->rendered = true;

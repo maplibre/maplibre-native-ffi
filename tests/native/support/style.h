@@ -27,10 +27,6 @@ extern "C" {
   "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\"," \
   "\"features\":[]}}"
 
-static inline mln_buffer_view mln_test_view_of(const char* text) {
-  return (mln_buffer_view){.data = text, .size = strlen(text)};
-}
-
 // Runs a command that `expression` submits with `completion.descriptor`,
 // expects the submission to succeed and the command to fail with
 // `terminal_status`, and expects the failure's diagnostic to contain

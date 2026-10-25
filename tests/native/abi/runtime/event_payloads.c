@@ -93,9 +93,9 @@ static void log_drain_quietly(mln_runtime runtime, event_log* log) {
       return;
     }
     for (size_t index = 0; index < batch.event_count; index += 1) {
-      const mln_runtime_event* event =
-        (const mln_runtime_event*)((const char*)batch.events +
-                                   (index * batch.event_size));
+      const mln_runtime_event* event = MLN_STRIDED_AT(
+        mln_runtime_event, batch.events, batch.event_size, index
+      );
       const size_t type_slot = event->type % 64U;
       log->seen_per_type[type_slot] += 1;
       if (log->seen_per_type[type_slot] > MLN_TEST_EVENTS_KEPT_PER_TYPE) {
@@ -606,8 +606,7 @@ static void deny_every_request(
     .size = sizeof(mln_resource_response),
     .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
     .error_reason = MLN_RESOURCE_ERROR_REASON_NOT_FOUND,
-    .error_message =
-      (mln_buffer_view){.data = denied_message, .size = strlen(denied_message)},
+    .error_message = mln_buffer_view_from_cstr(denied_message),
   };
   mln_test_request_answer(handle, &response);
 }
@@ -684,10 +683,7 @@ static void an_observed_offline_download_reports_status_and_errors(void) {
     .size = sizeof(mln_offline_region_definition),
     .type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
     .data.tile_pyramid = {
-      .style_url =
-        (mln_buffer_view){
-          .data = offline_style_url, .size = strlen(offline_style_url)
-        },
+      .style_url = mln_buffer_view_from_cstr(offline_style_url),
       .bounds =
         {
           .southwest = {.latitude = 1.0, .longitude = 2.0},
@@ -798,7 +794,7 @@ static void a_source_reports_the_description_its_tilejson_brings(void) {
     .user_data = &probe,
   };
   MLN_TEST_OK(mln_map_get_style_source(
-    map, mln_test_view_of(tilejson_source_id), &query, NULL
+    map, mln_buffer_view_from_cstr(tilejson_source_id), &query, NULL
   ));
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.done));
   MLN_TEST_OK(probe.status);

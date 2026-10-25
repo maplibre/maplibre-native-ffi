@@ -1,11 +1,6 @@
 // Expanding one supercluster cluster into the source features it contains.
 
 #include <maplibre_native_c.h>
-#include <string.h>
-
-static mln_buffer_view view(const char* text) {
-  return (mln_buffer_view){.data = text, .size = strlen(text)};
-}
 
 static void read_leaves(void* user_data, const mln_completion_result* result) {
   (void)user_data;
@@ -22,7 +17,8 @@ mln_status list_cluster_leaves(
   mln_render_session session, mln_buffer_view cluster
 ) {
   // #region arguments
-  const mln_buffer_view arguments = view("{\"limit\":10,\"offset\":0}");
+  const mln_buffer_view arguments =
+    mln_buffer_view_from_cstr("{\"limit\":10,\"offset\":0}");
   // #endregion arguments
 
   // #region query
@@ -31,8 +27,9 @@ mln_status list_cluster_leaves(
     .callback = read_leaves,
   };
   return mln_render_session_query_feature_extensions(
-    session, view("places"), cluster, view("supercluster"), view("leaves"),
-    &arguments, &completion, NULL
+    session, mln_buffer_view_from_cstr("places"), cluster,
+    mln_buffer_view_from_cstr("supercluster"),
+    mln_buffer_view_from_cstr("leaves"), &arguments, &completion, NULL
   );
   // #endregion query
 }

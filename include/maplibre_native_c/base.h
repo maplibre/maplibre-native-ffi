@@ -23,6 +23,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "binding.h"
 
@@ -217,6 +218,43 @@ MLN_API uint32_t mln_c_version(void) MLN_NOEXCEPT;
  */
 MLN_BINDING("enum=mln_render_backend_flag")
 MLN_API uint32_t mln_supported_render_backend_mask(void) MLN_NOEXCEPT;
+
+// Helpers for C callers. Each binding has its own, so the generator skips
+// these.
+#ifndef MLN_BINDGEN
+
+/**
+ * The C ABI contract version these headers declare.
+ *
+ * A host compares it with mln_c_version() to detect a library built from
+ * headers of another ABI version.
+ */
+#define MLN_C_VERSION 0u
+
+/**
+ * Returns a view of a null-terminated string, excluding the null byte.
+ *
+ * The view borrows text, so text must outlive it. A null text returns an empty
+ * view.
+ */
+static inline mln_buffer_view mln_buffer_view_from_cstr(const char* text) {
+  const mln_buffer_view view = {text, text != NULL ? strlen(text) : 0};
+  return view;
+}
+
+/**
+ * Returns a const type pointer to element index of a borrowed array whose
+ * elements lie stride bytes apart.
+ *
+ * Use it to step through an array whose view reports its own stride, such as
+ * mln_event_batch_view.events by mln_event_batch_view.event_size, rather than
+ * indexing by sizeof(type).
+ */
+#define MLN_STRIDED_AT(type, items, stride, index) \
+  ((const type*)((const unsigned char*)(items) +   \
+                 ((size_t)(index) * (size_t)(stride))))
+
+#endif  // MLN_BINDGEN
 
 #ifdef __cplusplus
 }

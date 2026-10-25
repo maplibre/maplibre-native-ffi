@@ -3,11 +3,6 @@
 
 #include <maplibre_native_c.h>
 #include <stdio.h>
-#include <string.h>
-
-static mln_buffer_view view(const char* text) {
-  return (mln_buffer_view){.data = text, .size = strlen(text)};
-}
 
 mln_status show_earthquakes(
   mln_map map, const char* geojson_url, const mln_completion* source_completion,
@@ -23,8 +18,8 @@ mln_status show_earthquakes(
   // #endregion options
   // #region source
   mln_status status = mln_map_add_geojson_source_url(
-    map, view("earthquakes"), view(geojson_url), &options, source_completion,
-    NULL
+    map, mln_buffer_view_from_cstr("earthquakes"),
+    mln_buffer_view_from_cstr(geojson_url), &options, source_completion, NULL
   );
   if (status != MLN_STATUS_OK) return status;
   // #endregion source
@@ -37,7 +32,8 @@ mln_status show_earthquakes(
 
   // #region add-layer
   return mln_map_add_style_layer_json(
-    map, view(layer), view(""), layer_completion, NULL
+    map, mln_buffer_view_from_cstr(layer), mln_buffer_view_from_cstr(""),
+    layer_completion, NULL
   );
   // #endregion add-layer
 }
@@ -60,12 +56,13 @@ mln_status show_one_point(
 
   // A null options pointer selects the defaults. Clustering is off by default.
   mln_geojson_source_data prepared = MLN_HANDLE_NULL;
-  mln_status status =
-    mln_geojson_source_data_create(view(data), NULL, &prepared, NULL);
+  mln_status status = mln_geojson_source_data_create(
+    mln_buffer_view_from_cstr(data), NULL, &prepared, NULL
+  );
   if (status != MLN_STATUS_OK) return status;
 
   status = mln_map_add_geojson_source_data(
-    map, view("pins"), prepared, completion, NULL
+    map, mln_buffer_view_from_cstr("pins"), prepared, completion, NULL
   );
   mln_geojson_source_data_release(prepared);
   return status;

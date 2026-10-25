@@ -223,7 +223,7 @@ bool mln_test_transferred_webgl_surface_create(
   descriptor.context.ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
   descriptor.context.data.webgl = (mln_webgl_context_descriptor){
     .kind = MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS,
-    .canvas_selector = mln_test_buffer_view(target, strlen(target)),
+    .canvas_selector = mln_buffer_view_from_cstr(target),
   };
   mln_render_session_attach_options options =
     mln_render_session_attach_options_default();

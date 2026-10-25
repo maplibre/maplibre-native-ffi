@@ -126,9 +126,9 @@ static void complete_from_wake(void* user_data) {
   while (mln_delivery_queue_drain(wake->queue, &batch, &view, NULL) ==
          MLN_STATUS_OK) {
     for (size_t index = 0; index < view.delivery_count; index += 1) {
-      const mln_delivery* delivery =
-        (const mln_delivery*)((const unsigned char*)view.deliveries +
-                              index * view.delivery_size);
+      const mln_delivery* delivery = MLN_STRIDED_AT(
+        mln_delivery, view.deliveries, view.delivery_size, index
+      );
       if (delivery->type != MLN_DELIVERY_TYPE_RESOURCE_REQUEST) continue;
       const mln_resource_request handle =
         delivery->payload.resource_request.handle;
@@ -545,7 +545,7 @@ static void transform_to(
   (void)url;
   const char* target = user_data;
   MLN_TEST_OK(mln_resource_transform_request_complete(
-    request, (mln_buffer_view){.data = target, .size = strlen(target)}, NULL
+    request, mln_buffer_view_from_cstr(target), NULL
   ));
 }
 

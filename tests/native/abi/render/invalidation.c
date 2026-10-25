@@ -40,8 +40,8 @@ static void expect_center_pixel(
 
 static void set_property(mln_map map, const char* property, const char* value) {
   MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
-    map, MLN_BUFFER_LITERAL("background"), mln_test_view_of(property),
-    mln_test_view_of(value), &completion.descriptor, NULL
+    map, MLN_BUFFER_LITERAL("background"), mln_buffer_view_from_cstr(property),
+    mln_buffer_view_from_cstr(value), &completion.descriptor, NULL
   ));
 }
 
@@ -54,7 +54,8 @@ static const mln_feature_state_selector point_one = {
 
 static void set_selected(mln_map map, const char* state) {
   MLN_TEST_AWAIT_OK(mln_map_set_feature_state(
-    map, &point_one, mln_test_view_of(state), &completion.descriptor, NULL
+    map, &point_one, mln_buffer_view_from_cstr(state), &completion.descriptor,
+    NULL
   ));
 }
 
@@ -213,7 +214,8 @@ static void each_mutation_reaches_the_pixels_of_an_update_driven_host(void) {
       mln_test_render_fixture_create(map, &fixture), row->label
     );
     MLN_TEST_OK_MESSAGE(
-      mln_test_map_set_style_json(map, mln_test_view_of(row->style)), row->label
+      mln_test_map_set_style_json(map, mln_buffer_view_from_cstr(row->style)),
+      row->label
     );
     if (row->prepare != NULL) {
       row->prepare(map);
