@@ -10,7 +10,7 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="DebugOptions">
-/// Debug overlay mask of <c>mln_map_debug_option</c> values.
+/// Debug overlay mask of <c>mln_map_debug_flag</c> values.
 /// </param>
 /// <param name="FullyLoaded">
 /// True once every requested style and tile resource finished loading.
@@ -31,13 +31,13 @@ namespace Maplibre.NativeFfi;
 /// <c>mln_map_projection_create()</c> converts coordinates for this view.
 /// </param>
 public readonly partial record struct MapSnapshot(
-    MapDebugOption DebugOptions,
+    MapDebugFlag DebugOptions,
     ulong Generation,
     bool FullyLoaded,
     bool RenderingStatsViewEnabled,
     bool GestureInProgress,
     bool TransitionInProgress,
-    RuntimeEventMask EventMask,
+    RuntimeEventFlag EventMask,
     ulong LatestRenderUpdateGeneration,
     MapTileOptions Tile,
     BoundOptions Bounds,

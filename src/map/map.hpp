@@ -71,7 +71,7 @@ struct StyleLayerRecord {
   std::string source_layer;
   double min_zoom = 0;
   double max_zoom = 0;
-  uint32_t visibility = MLN_STYLE_LAYER_VISIBILITY_VISIBLE;
+  mln_style_layer_visibility visibility = MLN_STYLE_LAYER_VISIBILITY_VISIBLE;
 };
 
 // A runtime style image. image shares the style's immutable image data, so the

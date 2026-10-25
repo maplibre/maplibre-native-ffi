@@ -41,7 +41,12 @@ consumer sync that it takes.
 Follow these rules, which keep the ABI open to growth:
 
 - Use fixed-width integers, `size_t`, `float`, `double`, and `bool`. An enum
-  declares a fixed underlying type, `uint32_t` unless its values need another.
+  declares a fixed underlying type, `uint32_t` unless its values need another,
+  and numbers its values without gaps.
+- A member, parameter, or result that holds one enum value has the enum's type.
+  A bitmask enum is named `mln_<x>_flag`, or `mln_<x>_field` for a `fields`
+  mask, and a set of its bits has the type `typedef <underlying> mln_<x>_flags`
+  or `mln_<x>_fields`.
 - A struct passed by pointer begins with `uint32_t size`, and new members go at
   its end. Small value types, such as coordinates and IDs, carry no size and
   never change; a change adds a new type.

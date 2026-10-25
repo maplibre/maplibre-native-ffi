@@ -30,7 +30,7 @@ internal static class Program
                 return 1;
             }
 
-            Maplibre.LogSetAsyncSeverityMask(LogSeverityMask.All);
+            Maplibre.LogSetAsyncSeverityMask(LogSeverityFlag.All);
             Maplibre.LogSetCallback(new LogHandler(PrintNativeLog));
             try
             {
@@ -39,7 +39,7 @@ internal static class Program
             finally
             {
                 Maplibre.LogClearCallback();
-                Maplibre.LogSetAsyncSeverityMask(LogSeverityMask.Default);
+                Maplibre.LogSetAsyncSeverityMask(LogSeverityFlag.Default);
             }
         }
         catch (Exception error)

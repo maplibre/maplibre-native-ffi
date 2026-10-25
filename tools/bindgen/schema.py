@@ -78,14 +78,13 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "accepted_unless",
         "absent_on",
         "view_owner",
-        "enum",
         "blocks",
         "consumes",
         "platforms",
     }
 )
 PARAMETER_KEYS = COMMON_KEYS | frozenset(
-    {"direction", "length", "enum", "kind", "result_length"}
+    {"direction", "length", "kind", "result_length"}
 )
 FIELD_KEYS = COMMON_KEYS | frozenset(
     {
@@ -93,7 +92,6 @@ FIELD_KEYS = COMMON_KEYS | frozenset(
         "mask",
         "bit",
         "tag",
-        "enum",
         "direction",
         "variant",
         "empty_variant",
@@ -114,7 +112,6 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "default_function",
         "user_data",
         "failure",
-        "enum",
         "borrowed_owner",
         "abandon",
         "delivery",
@@ -123,7 +120,7 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
     }
 )
 ENUM_KEYS = frozenset({"kind"})
-VALUE_KEYS = COMMON_KEYS | frozenset({"kind", "length", "enum"})
+VALUE_KEYS = COMMON_KEYS | frozenset({"kind", "length"})
 
 KINDS = {
     "function": frozenset({"native_pointer"}),
@@ -695,10 +692,6 @@ def validate(api: Api) -> None:
                 errors.append(
                     f"{context}: view_owner requires one borrowed output record"
                 )
-        if "enum" in metadata and metadata["enum"] not in {
-            enum.name for enum in api.enums
-        }:
-            errors.append(f"{context}: return enum names an absent enum")
         execution = metadata.get("execution")
         returns_status = is_status(function.return_type)
         if function.diagnostic != returns_status:
@@ -799,10 +792,6 @@ def validate(api: Api) -> None:
             errors.extend(
                 value_metadata_errors(parameter.type, parameter.metadata, pcontext)
             )
-            if "enum" in parameter.metadata and parameter.metadata["enum"] not in {
-                enum.name for enum in api.enums
-            }:
-                errors.append(f"{pcontext}: enum names an absent enum")
             if parameter.metadata.get("direction") == "out":
                 if parameter.type.kind != "pointer":
                     errors.append(f"{pcontext}: output direction requires a pointer")
@@ -911,12 +900,6 @@ def validate(api: Api) -> None:
                 errors.append(
                     f"{fcontext}: kind=delivery_queue requires a callback registration"
                 )
-            # Native can write a value that an older binding's enum lacks.
-            enum_name = field.type.canonical.removeprefix("enum ")
-            if enum_name != field.type.canonical and enum_name.isidentifier():
-                errors.append(
-                    f"{fcontext}: an enum member requires an integer type and enum=<enum>"
-                )
             if "stride" in field.metadata:
                 stride = field_path(record.name, field.metadata["stride"])
                 if (
@@ -929,10 +912,6 @@ def validate(api: Api) -> None:
                     errors.append(
                         f"{fcontext}: stride requires an array pointer and unsigned byte count"
                     )
-            if "enum" in field.metadata and field.metadata["enum"] not in {
-                enum.name for enum in api.enums
-            }:
-                errors.append(f"{fcontext}: enum names an absent enum")
             if "." in field.metadata.get("mask", ""):
                 errors.append(f"{fcontext}: mask must name a sibling field")
             if ("mask" in field.metadata) != ("bit" in field.metadata):
@@ -951,7 +930,7 @@ def validate(api: Api) -> None:
             if "tag" in field.metadata:
                 tag = field_path(record.name, field.metadata["tag"])
                 union = api.records_by_name.get(field.type.declaration or "")
-                domain = tag.metadata.get("enum", tag.type.declaration) if tag else None
+                domain = tag.type.declaration if tag else None
                 variants = (
                     [
                         enum_constants.get(member.metadata.get("variant", ""))
@@ -1125,6 +1104,16 @@ def validate(api: Api) -> None:
                 enum.metadata, ENUM_KEYS, f"{enum.location}: {enum.name}", KINDS["enum"]
             )
         )
+        # A set of flags is not one of the enum's values, so declarations hold
+        # it in an integer typedef that names the enum.
+        flags = api.typedefs_by_name.get(enum.name + "s")
+        if enum.metadata.get("kind") == "bitmask" and (
+            flags is None or flags.type.canonical != enum.underlying_type.canonical
+        ):
+            errors.append(
+                f"{enum.location}: {enum.name}: a bitmask enum requires a "
+                f"{enum.name}s typedef of its underlying type"
+            )
     errors.extend(reference_errors(api))
     errors.extend(versioning_errors(api))
     if errors:
@@ -1416,19 +1405,15 @@ def callback_result_errors(
 ) -> list[str]:
     """Check that a callback can return `value` as its declared result."""
     signature = typedef.type.pointee
-    enum = typedef.metadata.get("enum")
     result = signature.result
     if result is not None and result.canonical in {"bool", "_Bool"}:
         if value in {"true", "false"}:
             return []
         return [f"{context}: {key} of a bool callback must be true or false"]
-    if enum is None and result is not None:
-        named = result.declaration or ""
-        enum = (
-            named
-            if any(owner == named for owner, _ in enum_constants.values())
-            else None
-        )
+    named = result.declaration or "" if result is not None else ""
+    enum = (
+        named if any(owner == named for owner, _ in enum_constants.values()) else None
+    )
     if enum:
         if enum_constants.get(value, (None,))[0] == enum:
             return []

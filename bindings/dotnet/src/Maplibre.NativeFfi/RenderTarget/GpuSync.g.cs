@@ -9,13 +9,10 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_gpu_sync</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Kind">
-/// One <c>mln_gpu_sync_kind</c> value.
-/// </param>
-/// <param name="Object">
+/// <param name="Handle">
 /// Bit pattern of the GLsync pointer.
 /// </param>
-public readonly partial record struct GpuSync(GpuSyncKind Kind, ulong Object)
+public readonly partial record struct GpuSync(GpuSyncKind Kind, ulong Handle)
 {
     public GpuSync()
         : this(default!, default!)

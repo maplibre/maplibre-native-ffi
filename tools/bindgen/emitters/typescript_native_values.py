@@ -80,18 +80,25 @@ class NativeValues:
                 return [
                     f"{{ bool flag = false; if (!mln_ts_read_bool(call, {js}, &flag, {path})) {fail}; {target} = flag; }}"
                 ]
+            # An enum value converts to its C enum or flag set type, which
+            # holds the carrier's range.
+            ctype = (
+                value.ctype.declaration
+                if value.kind == "enum" and value.ctype.declaration
+                else scalar.c
+            )
             if scalar.kind == "int":
                 return [
-                    f"{{ int64_t number = 0; if (!mln_ts_read_int(call, {js}, {scalar.minimum}LL, {scalar.maximum}LL, &number, {path})) {fail}; {target} = ({scalar.c})number; }}"
+                    f"{{ int64_t number = 0; if (!mln_ts_read_int(call, {js}, {scalar.minimum}LL, {scalar.maximum}LL, &number, {path})) {fail}; {target} = ({ctype})number; }}"
                 ]
             if scalar.kind == "double":
                 return [
-                    f"{{ double number = 0; if (!mln_ts_read_double(call, {js}, &number, {path})) {fail}; {target} = ({scalar.c})number; }}"
+                    f"{{ double number = 0; if (!mln_ts_read_double(call, {js}, &number, {path})) {fail}; {target} = ({ctype})number; }}"
                 ]
             reader = "mln_ts_read_u64" if scalar.kind == "u64" else "mln_ts_read_i64"
             carrier = "uint64_t" if scalar.kind == "u64" else "int64_t"
             return [
-                f"{{ {carrier} number = 0; if (!{reader}(call, {js}, &number, {path})) {fail}; {target} = ({scalar.c})number; }}"
+                f"{{ {carrier} number = 0; if (!{reader}(call, {js}, &number, {path})) {fail}; {target} = ({ctype})number; }}"
             ]
         if value.kind == "buffer":
             if value.buffer_form == "view":

@@ -62,7 +62,7 @@ MLN_API mln_map_tile_options mln_map_tile_options_default(void) MLN_NOEXCEPT;
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options carries
- *   a bit outside mln_map_debug_option, or completion is invalid.
+ *   a bit outside mln_map_debug_flag, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  *
@@ -71,8 +71,8 @@ MLN_API mln_map_tile_options mln_map_tile_options_default(void) MLN_NOEXCEPT;
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_debug_options(
-  mln_map map, uint32_t options MLN_BINDING("enum=mln_map_debug_option"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
+  mln_map map, mln_map_debug_flags options, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 /**
  * Submits a rendering-stats visibility command.

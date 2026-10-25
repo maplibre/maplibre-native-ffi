@@ -20,11 +20,11 @@ public extension Maplibre {
   /// See `mln_network_get_status` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   static func networkGetStatus() throws -> NetworkStatus {
-    var value0: UInt32 = 0
+    var value0 = mln_network_status(rawValue: 0)
     return try nativeInvoke { _, _, diagnostic in mln_network_get_status(
       &value0,
       diagnostic
-    ) } result: { NetworkStatus(rawValue: value0) }
+    ) } result: { NetworkStatus(rawValue: value0.rawValue) }
   }
 
   /// Sets MapLibre Native's process-global network status.
@@ -33,7 +33,7 @@ public extension Maplibre {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   static func networkSetStatus(_ bindingArg0: NetworkStatus) throws {
     try nativeInvoke { _, _, diagnostic in mln_network_set_status(
-      bindingArg0.nativeValue(),
+      mln_network_status(rawValue: bindingArg0.rawValue),
       diagnostic
     ) }
   }

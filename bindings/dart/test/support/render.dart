@@ -33,7 +33,7 @@ Future<MapHandle> openRenderMap(String styleJson) async {
         height: renderSize,
         scaleFactor: 1,
       ),
-      eventMask: RuntimeEventMask.all,
+      eventMask: RuntimeEventFlag.all,
     ),
   );
   await expectCommitted(map.setStyleJson(jsonBytes(styleJson)));

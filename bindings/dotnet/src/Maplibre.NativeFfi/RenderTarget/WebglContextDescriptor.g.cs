@@ -9,9 +9,6 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_webgl_context_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Kind">
-/// One <c>mln_webgl_context_kind</c> value.
-/// </param>
 /// <param name="Context">
 /// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
 /// </param>

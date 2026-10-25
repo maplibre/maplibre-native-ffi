@@ -12,13 +12,13 @@
 
 auto mln_resource_route_default(void) noexcept -> mln_resource_route {
   return mln_resource_route{
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL, .flags = 0, .url = {}
+    .kinds = MLN_RESOURCE_KIND_FLAG_ALL, .flags = 0, .url = {}
   };
 }
 
 auto mln_http_header_rule_default(void) noexcept -> mln_http_header_rule {
   return mln_http_header_rule{
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
     .flags = 0,
     .url = {},
     .headers = nullptr,
@@ -165,8 +165,8 @@ auto mln_runtime_clear_http_header_transform(
 }
 
 auto mln_runtime_run_ambient_cache_operation(
-  mln_runtime runtime, uint32_t operation, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
+  mln_runtime runtime, mln_ambient_cache_operation operation,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::run_ambient_cache_operation_start(
@@ -262,8 +262,9 @@ auto mln_runtime_set_offline_region_observed(
 }
 
 auto mln_runtime_set_offline_region_download_state(
-  mln_runtime runtime, mln_offline_region_id region_id, uint32_t state,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
+  mln_runtime runtime, mln_offline_region_id region_id,
+  mln_offline_region_download_state state, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::offline_region_set_download_state_start(

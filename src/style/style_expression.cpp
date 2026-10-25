@@ -36,7 +36,8 @@ auto style_expression_table()
   return mln::core::handle_table<mln::core::StyleExpressionObject>();
 }
 
-auto to_native_type_kind(uint32_t kind) -> std::optional<type::Type> {
+auto to_native_type_kind(mln_style_expression_type_kind kind)
+  -> std::optional<type::Type> {
   switch (kind) {
     case MLN_STYLE_EXPRESSION_TYPE_VALUE:
       return type::Value;

@@ -14,7 +14,7 @@ namespace Maplibre.NativeFfi;
 /// must be finite and positive. scale_factor is fixed for the map's lifetime.
 /// </param>
 /// <param name="MapMode">
-/// One of <c>mln_map_mode</c>. Defaults to <c>MLN_MAP_MODE_CONTINUOUS</c>.
+/// Defaults to <c>MLN_MAP_MODE_CONTINUOUS</c>.
 /// </param>
 /// <param name="FastPforEnabled">
 /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
@@ -22,13 +22,13 @@ namespace Maplibre.NativeFfi;
 /// </param>
 /// <param name="EventMask">
 /// Map-originated event types this map queues, as a bitwise OR of
-/// <c>mln_runtime_event_mask</c> values.
+/// <c>mln_runtime_event_flag</c> values.
 /// </param>
 public readonly partial record struct MapOptions(
     LogicalExtent InitialExtent,
     MapMode MapMode,
     bool FastPforEnabled,
-    RuntimeEventMask EventMask
+    RuntimeEventFlag EventMask
 )
 {
     public MapOptions()

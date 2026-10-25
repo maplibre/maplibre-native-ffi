@@ -34,7 +34,7 @@ internal fun stridedSource(index: Int): ULong = 0xff00_0000_0000_005auL + index.
 /** A generation past 32 bits, so a narrowed carrier would lose it. */
 internal fun stridedGeneration(index: Int): ULong = 0x1_0000_0000uL + index.toULong()
 
-internal fun stridedCode(index: Int): Int = 920 + index
+internal fun stridedCode(index: Int): UInt = 920u + index.toUInt()
 
 internal fun stridedPayloadType(index: Int): Int = 930 + index
 

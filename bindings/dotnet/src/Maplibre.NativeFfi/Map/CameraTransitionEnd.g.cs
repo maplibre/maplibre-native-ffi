@@ -9,9 +9,6 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_camera_transition_end</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Outcome">
-/// One of <c>mln_camera_transition_outcome</c>.
-/// </param>
 /// <param name="Generation">
 /// Generation of the published snapshot that shows the camera where the
 /// transitions left it. The map events of the change that ended them carry this

@@ -38,7 +38,12 @@ public sealed class ResourceTransformTests
         var url = scope.CString("transform-test://é/style.json");
         Assert.Equal(
             mln_status.MLN_STATUS_NATIVE_ERROR,
-            native.callback(native.user_data, 1, url, &response)
+            native.callback(
+                native.user_data,
+                mln_resource_kind.MLN_RESOURCE_KIND_STYLE,
+                url,
+                &response
+            )
         );
         Assert.Equal("transform-test://é/style.json", copied);
         Assert.IsType<MaplibreException>(crossThread);
@@ -82,7 +87,12 @@ public sealed class ResourceTransformTests
         mln_status Invoke(Exception? exception)
         {
             thrown = exception;
-            return native.callback(native.user_data, 1, url, responsePointer);
+            return native.callback(
+                native.user_data,
+                mln_resource_kind.MLN_RESOURCE_KIND_STYLE,
+                url,
+                responsePointer
+            );
         }
 
         Maplibre.CallbackException += record;

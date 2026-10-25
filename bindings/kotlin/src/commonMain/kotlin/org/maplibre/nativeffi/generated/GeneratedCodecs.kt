@@ -11,7 +11,7 @@ import org.maplibre.nativeffi.render.NativePointer
 internal fun NativeArena.putGpuSync(target: Long, value: GpuSync) {
   writeU32(target, 16.toUInt())
   writeU32(target + 4, value.kind.rawValue)
-  writeU64(target + 8, value.`object`)
+  writeU64(target + 8, value.handle)
 }
 
 internal fun NativeArena.writeGpuSync(value: GpuSync): Long =
@@ -1071,7 +1071,7 @@ internal fun readOpenglTextureFrame(source: Long, scope: ViewScope? = null): Ope
     .also { it.bindingScope = scope }
 
 internal fun readGpuSync(source: Long, scope: ViewScope? = null): GpuSync =
-  GpuSync(kind = GpuSyncKind(readU32(source + 4)), `object` = readU64(source + 8)).also {
+  GpuSync(kind = GpuSyncKind(readU32(source + 4)), handle = readU64(source + 8)).also {
     it.bindingScope = scope
   }
 
@@ -1253,8 +1253,8 @@ internal fun readGeojsonSourceOptions(source: Long): GeojsonSourceOptions {
 
 internal fun readHttpHeaderRule(source: Long): HttpHeaderRule =
   HttpHeaderRule(
-    kinds = ResourceKindMask(readU32(source)),
-    flags = UrlMatchFlags(readU32(source + 4)),
+    kinds = ResourceKindFlag(readU32(source)),
+    flags = UrlMatchFlag(readU32(source + 4)),
     url = readViewString(source + 8),
     headers =
       readArray(
@@ -1281,7 +1281,7 @@ internal fun readMapOptions(source: Long): MapOptions =
     initialExtent = readLogicalExtent(source + 8),
     mapMode = MapMode(readU32(source + 24)),
     fastPforEnabled = readBool(source + 28),
-    eventMask = RuntimeEventMask(readU64(source + 32)),
+    eventMask = RuntimeEventFlag(readU64(source + 32)),
   )
 
 internal fun readMapTileOptions(source: Long): MapTileOptions {
@@ -1406,8 +1406,8 @@ internal fun readRenderedFeatureQueryOptions(source: Long): RenderedFeatureQuery
 
 internal fun readResourceRoute(source: Long): ResourceRoute =
   ResourceRoute(
-    kinds = ResourceKindMask(readU32(source)),
-    flags = UrlMatchFlags(readU32(source + 4)),
+    kinds = ResourceKindFlag(readU32(source)),
+    flags = UrlMatchFlag(readU32(source + 4)),
     url = readViewString(source + 8),
   )
 
@@ -1559,13 +1559,13 @@ internal fun readCameraQueryResult(source: Long): CameraQueryResult =
 
 internal fun readMapSnapshot(source: Long): MapSnapshot =
   MapSnapshot(
-    debugOptions = MapDebugOption(readU32(source + 4)),
+    debugOptions = MapDebugFlag(readU32(source + 4)),
     generation = readU64(source + 8),
     fullyLoaded = readBool(source + 16),
     renderingStatsViewEnabled = readBool(source + 17),
     gestureInProgress = readBool(source + 18),
     transitionInProgress = readBool(source + 19),
-    eventMask = RuntimeEventMask(readU64(source + 24)),
+    eventMask = RuntimeEventFlag(readU64(source + 24)),
     latestRenderUpdateGeneration = readU64(source + 32),
     tile = readMapTileOptions(source + 40),
     bounds = readBoundOptions(source + 96),
@@ -2221,23 +2221,23 @@ internal fun readRuntimeEvent(source: Long): RuntimeEvent =
     sourceType = RuntimeEventSourceType(readU32(source + 4)),
     source = readU64(source + 8),
     generation = readU64(source + 16),
-    code = readI32(source + 24),
+    code = readU32(source + 24),
     message = readViewString(source + 32),
     payload =
       readU32(source + 28).let { tag ->
         when (tag) {
           1u -> RuntimeEventPayload.RenderFrame(readRuntimeEventRenderFrame(source + w(40, 48)))
           2u -> RuntimeEventPayload.RenderMap(readRuntimeEventRenderMap(source + w(40, 48)))
-          4u -> RuntimeEventPayload.TileAction(readRuntimeEventTileAction(source + w(40, 48)))
-          5u ->
+          3u -> RuntimeEventPayload.TileAction(readRuntimeEventTileAction(source + w(40, 48)))
+          4u ->
             RuntimeEventPayload.OfflineRegionStatus(
               readRuntimeEventOfflineRegionStatus(source + w(40, 48)),
             )
-          6u ->
+          5u ->
             RuntimeEventPayload.OfflineRegionResponseError(
               readRuntimeEventOfflineRegionResponseError(source + w(40, 48)),
             )
-          7u ->
+          6u ->
             RuntimeEventPayload.OfflineRegionTileCountLimit(
               readRuntimeEventOfflineRegionTileCountLimit(source + w(40, 48)),
             )

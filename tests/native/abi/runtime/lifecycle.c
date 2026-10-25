@@ -66,7 +66,7 @@ static void expect_runtime_calls_reject(
   MLN_TEST_STATUS(expected, mln_runtime_get_event_mask(handle, &mask, NULL));
   MLN_TEST_STATUS(
     expected,
-    mln_runtime_set_event_mask(handle, MLN_RUNTIME_EVENT_MASK_ALL, NULL)
+    mln_runtime_set_event_mask(handle, MLN_RUNTIME_EVENT_FLAG_ALL, NULL)
   );
   MLN_TEST_STATUS(
     expected, mln_runtime_create_map(handle, &map_options, &map, &discard, NULL)

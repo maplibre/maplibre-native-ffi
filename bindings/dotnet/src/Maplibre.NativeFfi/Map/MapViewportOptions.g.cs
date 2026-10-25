@@ -11,19 +11,8 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record MapViewportOptions
 {
-    /// <summary>
-    /// One of <c>mln_north_orientation</c>.
-    /// </summary>
     public NorthOrientation? NorthOrientation { get; init; }
-
-    /// <summary>
-    /// One of <c>mln_constrain_mode</c>.
-    /// </summary>
     public ConstrainMode? ConstrainMode { get; init; }
-
-    /// <summary>
-    /// One of <c>mln_viewport_mode</c>.
-    /// </summary>
     public ViewportMode? ViewportMode { get; init; }
     public EdgeInsets? FrustumOffset { get; init; }
     public static MapViewportOptions Default

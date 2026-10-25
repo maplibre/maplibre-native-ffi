@@ -406,9 +406,9 @@ static void state_events_follow_a_snapshot_that_includes_them(void) {
   mln_map_options options = mln_map_options_default();
   options.initial_extent.width = 64;
   options.initial_extent.height = 64;
-  options.event_mask = MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE |
-                       MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED |
-                       MLN_RUNTIME_EVENT_MASK_MAP_IDLE;
+  options.event_mask = MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_DID_CHANGE |
+                       MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_FINISHED |
+                       MLN_RUNTIME_EVENT_FLAG_MAP_IDLE;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
   atomic_store(&recorder.map, map);
   mln_test_render_fixture fixture = {0};

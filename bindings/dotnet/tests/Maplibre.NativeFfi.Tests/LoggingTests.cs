@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Struct;
 using Xunit;
@@ -60,7 +61,16 @@ public sealed class LoggingTests
         using var scope = new NativeCallScope();
         var handler = GeneratedValues.NativeLogHandler(new LogHandler(callback), scope);
 
-        Assert.Equal(0, handler.callback(handler.user_data, 999, 998, 42, scope.CString("é")));
+        Assert.Equal(
+            0,
+            handler.callback(
+                handler.user_data,
+                (mln_log_severity)999,
+                (mln_log_event)998,
+                42,
+                scope.CString("é")
+            )
+        );
         Assert.Equal((999u, 998u, 42L, "é"), copied);
         _ = Maplibre.CVersion();
     }

@@ -652,7 +652,7 @@ fn generated_copy_mln_geojson_source_options(
 fn generated_copy_mln_gpu_sync(py: Python<'_>, value: &sys::mln_gpu_sync) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("kind", generated_value(py, value.kind)?)?;
-    dict.set_item("object", generated_value(py, value.object)?)?;
+    dict.set_item("handle", generated_value(py, value.handle)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -3022,7 +3022,7 @@ fn generated_input_mln_frame_demand<'py>(
     raw.size = std::mem::size_of::<sys::mln_frame_demand>() as _;
     raw.flags = value
         .getattr("flags")?
-        .extract::<sys::mln_frame_demand_flag>()?;
+        .extract::<sys::mln_frame_demand_flags>()?;
     raw.token = value.getattr("token")?.extract::<u64>()?;
     Ok(raw)
 }
@@ -3117,7 +3117,7 @@ fn generated_input_mln_gpu_sync<'py>(
     let mut raw: sys::mln_gpu_sync = unsafe { sys::mln_gpu_sync_default() };
     raw.size = std::mem::size_of::<sys::mln_gpu_sync>() as _;
     raw.kind = value.getattr("kind")?.extract::<sys::mln_gpu_sync_kind>()?;
-    raw.object = value.getattr("object")?.extract::<u64>()?;
+    raw.handle = value.getattr("handle")?.extract::<u64>()?;
     Ok(raw)
 }
 
@@ -3141,7 +3141,7 @@ fn generated_input_mln_http_header_rule<'py>(
     let mut raw: sys::mln_http_header_rule = unsafe { sys::mln_http_header_rule_default() };
     raw.kinds = value
         .getattr("kinds")?
-        .extract::<sys::mln_resource_kind_mask>()?;
+        .extract::<sys::mln_resource_kind_flags>()?;
     raw.flags = value
         .getattr("flags")?
         .extract::<sys::mln_url_match_flags>()?;
@@ -3278,7 +3278,7 @@ fn generated_input_mln_map_options<'py>(
     raw.fast_pfor_enabled = value.getattr("fast_pfor_enabled")?.extract::<bool>()?;
     raw.event_mask = value
         .getattr("event_mask")?
-        .extract::<sys::mln_runtime_event_mask>()?;
+        .extract::<sys::mln_runtime_event_flags>()?;
     Ok(raw)
 }
 
@@ -3867,7 +3867,7 @@ fn generated_input_mln_resource_route<'py>(
     let mut raw: sys::mln_resource_route = unsafe { sys::mln_resource_route_default() };
     raw.kinds = value
         .getattr("kinds")?
-        .extract::<sys::mln_resource_kind_mask>()?;
+        .extract::<sys::mln_resource_kind_flags>()?;
     raw.flags = value
         .getattr("flags")?
         .extract::<sys::mln_url_match_flags>()?;
@@ -6921,7 +6921,7 @@ impl MapHandle {
     fn set_debug_options(
         &self,
         py: Python<'_>,
-        options: sys::mln_map_debug_option,
+        options: sys::mln_map_debug_flags,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
@@ -6935,7 +6935,7 @@ impl MapHandle {
     fn _discard_set_debug_options(
         &self,
         py: Python<'_>,
-        options: sys::mln_map_debug_option,
+        options: sys::mln_map_debug_flags,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
@@ -6949,7 +6949,7 @@ impl MapHandle {
     fn set_event_mask(
         &self,
         py: Python<'_>,
-        mask: sys::mln_runtime_event_mask,
+        mask: sys::mln_runtime_event_flags,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
@@ -6963,7 +6963,7 @@ impl MapHandle {
     fn _discard_set_event_mask(
         &self,
         py: Python<'_>,
-        mask: sys::mln_runtime_event_mask,
+        mask: sys::mln_runtime_event_flags,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
@@ -8983,7 +8983,7 @@ impl RuntimeHandle {
     fn get_event_mask(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
-        let mut out_mask: sys::mln_runtime_event_mask = unsafe { std::mem::zeroed() };
+        let mut out_mask: sys::mln_runtime_event_flags = unsafe { std::mem::zeroed() };
         unsafe {
             call.status(|diagnostic| {
                 sys::mln_runtime_get_event_mask(handle, &mut out_mask, diagnostic)
@@ -9172,7 +9172,7 @@ impl RuntimeHandle {
     fn set_event_mask(
         &self,
         py: Python<'_>,
-        mask: sys::mln_runtime_event_mask,
+        mask: sys::mln_runtime_event_flags,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
@@ -9652,7 +9652,7 @@ fn log_clear_callback(py: Python<'_>) -> PyResult<Py<PyAny>> {
 #[pyo3(signature = (mask))]
 fn log_set_async_severity_mask(
     py: Python<'_>,
-    mask: sys::mln_log_severity_mask,
+    mask: sys::mln_log_severity_flags,
 ) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py);
     unsafe { call.status(|diagnostic| sys::mln_log_set_async_severity_mask(mask, diagnostic)) }?;

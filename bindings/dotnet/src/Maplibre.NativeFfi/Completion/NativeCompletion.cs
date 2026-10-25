@@ -214,7 +214,7 @@ internal static unsafe class NativeCompletion
             T value;
             try
             {
-                if (result->status != (int)mln_status.MLN_STATUS_OK)
+                if (result->status != mln_status.MLN_STATUS_OK)
                     NativeStatus.Check(
                         result->status,
                         ValueStructs.CopyUtf8View(result->diagnostic),

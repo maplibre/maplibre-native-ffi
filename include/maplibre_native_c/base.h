@@ -110,6 +110,9 @@ typedef enum MLN_BINDING("kind=bitmask") mln_render_backend_flag : uint32_t {
   MLN_RENDER_BACKEND_FLAG_WEBGPU = 1u << 3u,
 } mln_render_backend_flag;
 
+/** A set of mln_render_backend_flag bits. */
+typedef uint32_t mln_render_backend_flags;
+
 /**
  * The null handle, for every handle type.
  *
@@ -223,8 +226,8 @@ MLN_API uint32_t mln_c_version(void) MLN_NOEXCEPT;
  *
  * The return value is a mask of mln_render_backend_flag values.
  */
-MLN_BINDING("enum=mln_render_backend_flag")
-MLN_API uint32_t mln_supported_render_backend_mask(void) MLN_NOEXCEPT;
+MLN_API mln_render_backend_flags
+mln_supported_render_backend_mask(void) MLN_NOEXCEPT;
 
 // Helpers for C callers. Each binding has its own, so the generator skips
 // these.

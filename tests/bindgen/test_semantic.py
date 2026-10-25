@@ -33,7 +33,7 @@ typedef custom_unsigned nested_unsigned;
 typedef int64_t custom_signed;
 typedef size_t custom_count;
 typedef enum flags : uint64_t {{ FLAG_HIGH = 0x100000000ULL }} flags;
-typedef struct values {{ nested_unsigned id; custom_signed offset; custom_count count; uint64_t mask BIND("enum=flags"); }} values;
+typedef struct values {{ nested_unsigned id; custom_signed offset; custom_count count; flags mask; }} values;
 mln_status read_values(values *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """),
                     require_complete=True,
@@ -79,7 +79,7 @@ void release_owner(owner value);
 mln_status begin_view(owner value, void **scope BIND("direction=out;kind=context"), mln_diagnostic *out_diagnostic);
 void end_view(void *scope BIND("kind=context"));
 typedef enum event_tag : int { NONE = 0, NUMBER = -1 } event_tag;
-typedef struct event { int tag BIND("enum=event_tag"); union { double number BIND("variant=NUMBER"); } payload BIND("tag=tag;empty_variant=NONE"); } event;
+typedef struct event { event_tag tag; union { double number BIND("variant=NUMBER"); } payload BIND("tag=tag;empty_variant=NONE"); } event;
 mln_status read_event(event *value BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
@@ -108,7 +108,7 @@ mln_status read_event(event *value BIND("direction=out"), mln_diagnostic *out_di
 typedef enum choice : unsigned { TEXT = 1, NUMBER = 2 } choice;
 typedef struct text { const char *data BIND("length=count"); unsigned count; } text;
 typedef struct value {
-  unsigned tag BIND("enum=choice");
+  choice tag;
   union {
     text text BIND("variant=TEXT");
     double number BIND("variant=NUMBER");
@@ -179,32 +179,34 @@ mln_status read_value(value *out BIND("direction=out"), mln_diagnostic *out_diag
 
     def test_enums_that_only_masks_and_tags_use_stay_private(self):
         source = """
-typedef enum BIND("kind=bitmask") fields : unsigned { CENTER = 1 } fields;
+typedef enum BIND("kind=bitmask") field : unsigned { CENTER = 1 } field;
+typedef unsigned fields;
 typedef enum tag : unsigned { NUMBER = 1 } tag;
 typedef enum shared : unsigned { SHARED_A = 1 } shared;
 typedef struct options {
-  unsigned fields BIND("enum=fields");
+  fields fields;
   double latitude BIND("mask=fields;bit=CENTER");
-  unsigned kind BIND("enum=tag");
+  tag kind;
   union { double number BIND("variant=NUMBER"); } payload BIND("tag=kind");
-  unsigned shared_tag BIND("enum=shared");
+  shared shared_tag;
   union { double other BIND("variant=SHARED_A"); } other BIND("tag=shared_tag");
-  unsigned mode BIND("enum=shared");
+  shared mode;
 } options;
 mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
 """
         api = bind(self.parse(source), require_complete=True)
-        self.assertEqual(api.control_enums, {"fields", "tag"})
-        self.assertNotIn("fields", api.public_values)
+        self.assertEqual(api.control_enums, {"field", "tag"})
+        self.assertNotIn("field", api.public_values)
         self.assertNotIn("tag", api.public_values)
         # A value field that also uses the enum keeps it public.
         self.assertIn("shared", api.public_values)
 
     def test_a_presence_bit_guards_one_member_of_a_record(self):
         source = """
-typedef enum BIND("kind=bitmask") fields : unsigned { CENTER = 1, ZOOM = 2 } fields;
+typedef enum BIND("kind=bitmask") field : unsigned { CENTER = 1, ZOOM = 2 } field;
+typedef unsigned fields;
 typedef struct options {
-  unsigned fields BIND("enum=fields");
+  fields fields;
   double latitude BIND("mask=fields;bit=CENTER");
   double longitude BIND("mask=fields;bit=ZOOM");
 } options;
@@ -436,7 +438,7 @@ mln_status project(
             self.parse("""
 typedef enum flags : unsigned { FIRST = 1, SECOND = 2 } flags;
 mln_status read_flags(
-  unsigned *out BIND("direction=out;enum=flags"), mln_diagnostic *out_diagnostic);
+  flags *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
         )

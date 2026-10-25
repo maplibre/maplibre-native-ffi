@@ -126,7 +126,7 @@ void main() {
     expect(camera.generation, greaterThanOrEqualTo(before.generation));
     expect(
       () => fixture.runtime.setEventMask(
-        const RuntimeEventMask.fromRawValue(1 << 40),
+        const RuntimeEventFlag.fromRawValue(1 << 40),
       ),
       throwsA(
         isA<MaplibreException>()

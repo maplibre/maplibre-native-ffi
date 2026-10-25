@@ -716,10 +716,9 @@ class Binder:
         if metadata.get("kind") == "native_pointer":
             return ValuePlan(kind="native_pointer", **common)
         resolved = typedef.type if typedef else type_
-        enum_name = metadata.get("enum", name)
-        if enum_name in self.enums and resolved.kind != "pointer":
-            enum = self.enums[enum_name]
-            common["native"] = enum_name
+        enum = self.api.enum_for(name)
+        if enum is not None and resolved.kind != "pointer":
+            common["native"] = enum.name
             return ValuePlan(
                 kind="enum",
                 enum_kind=enum.metadata.get("kind", "open"),
@@ -765,7 +764,7 @@ class Binder:
             child_metadata = {
                 key: value
                 for key, value in metadata.items()
-                if key in {"encoding", "ownership", "lifetime", "enum", "tag"}
+                if key in {"encoding", "ownership", "lifetime", "tag"}
             }
             child_name = type_name(pointee)
             if metadata.get("direction") == "out":
@@ -1439,13 +1438,7 @@ class Binder:
         return CallbackPlan(
             name,
             parameters,
-            self.value(
-                function.result,
-                {"enum": typedef.metadata["enum"]}
-                if "enum" in typedef.metadata
-                else {},
-                context + " return",
-            ),
+            self.value(function.result, {}, context + " return"),
             typedef.metadata["failure"],
             contexts[0] if contexts else None,
             typedef.metadata.get("borrowed_owner"),

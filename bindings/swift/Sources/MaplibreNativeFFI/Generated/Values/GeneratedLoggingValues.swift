@@ -98,8 +98,8 @@ public struct LogHandler: Sendable {
 
 private func invokeLogHandlerCallback(
   user_data: UnsafeMutableRawPointer?,
-  severity: UInt32,
-  event: UInt32,
+  severity: mln_log_severity,
+  event: mln_log_event,
   code: Int64,
   message: UnsafePointer<CChar>?
 ) -> Bool {
@@ -107,8 +107,8 @@ private func invokeLogHandlerCallback(
   let box = Unmanaged<GeneratedCallbackBox<LogHandler>>.fromOpaque(user_data)
     .takeUnretainedValue()
   do { return try box.value.callback?(
-    LogSeverity(rawValue: severity),
-    LogEvent(rawValue: event),
+    LogSeverity(rawValue: severity.rawValue),
+    LogEvent(rawValue: event.rawValue),
     code,
     NativeString.copyCString(message)
   ) ?? false } catch {
@@ -145,9 +145,9 @@ public struct LogSeverity: RawRepresentable, CustomStringConvertible,
 
 /// Bitmask values for log severities dispatched asynchronously.
 ///
-/// See `mln_log_severity_mask` in the
+/// See `mln_log_severity_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-public struct LogSeverityMask: OptionSet, NativeOpenValue, Equatable, Hashable,
+public struct LogSeverityFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   Sendable
 {
   public let rawValue: UInt32
@@ -155,9 +155,9 @@ public struct LogSeverityMask: OptionSet, NativeOpenValue, Equatable, Hashable,
     self.rawValue = rawValue
   }
 
-  public static let info: LogSeverityMask = .init(rawValue: 2)
-  public static let warning: LogSeverityMask = .init(rawValue: 4)
-  public static let error: LogSeverityMask = .init(rawValue: 8)
-  public static let `default`: LogSeverityMask = .init(rawValue: 6)
-  public static let all: LogSeverityMask = .init(rawValue: 14)
+  public static let info: LogSeverityFlag = .init(rawValue: 2)
+  public static let warning: LogSeverityFlag = .init(rawValue: 4)
+  public static let error: LogSeverityFlag = .init(rawValue: 8)
+  public static let `default`: LogSeverityFlag = .init(rawValue: 6)
+  public static let all: LogSeverityFlag = .init(rawValue: 14)
 }

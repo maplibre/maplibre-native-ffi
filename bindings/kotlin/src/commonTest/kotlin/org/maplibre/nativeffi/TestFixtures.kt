@@ -32,7 +32,7 @@ import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.generated.RuntimeOptions
 import org.maplibre.nativeffi.generated.Status
-import org.maplibre.nativeffi.generated.UrlMatchFlags
+import org.maplibre.nativeffi.generated.UrlMatchFlag
 import org.maplibre.nativeffi.runtime.AsyncReleasable
 
 /** How long one test may run before it fails instead of hanging the suite. */
@@ -69,7 +69,7 @@ internal suspend fun <T> Deferred<T>.awaitWithin(what: String): T =
  * the list is built on first use, once the module that a browser test loads is there.
  */
 internal val NETWORK_URLS: List<ResourceRoute> by lazy {
-  listOf("http://**", "https://**").map { ResourceRoute(flags = UrlMatchFlags.GLOB, url = it) }
+  listOf("http://**", "https://**").map { ResourceRoute(flags = UrlMatchFlag.GLOB, url = it) }
 }
 
 /**

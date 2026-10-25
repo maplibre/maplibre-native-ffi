@@ -28,10 +28,10 @@ static void call_event_api_from_a_foreign_thread(void* argument) {
     mln_test_drain_event_delivery(probe->runtime, &batch, &view, NULL);
   mln_delivery_batch_release(batch);
   probe->runtime_mask_status = mln_runtime_set_event_mask(
-    probe->runtime, MLN_RUNTIME_EVENT_MASK_ALL, NULL
+    probe->runtime, MLN_RUNTIME_EVENT_FLAG_ALL, NULL
   );
   probe->map_mask_status =
-    mln_test_map_set_event_mask(probe->map, MLN_RUNTIME_EVENT_MASK_ALL);
+    mln_test_map_set_event_mask(probe->map, MLN_RUNTIME_EVENT_FLAG_ALL);
 }
 
 // Map creation rejects a mask the setter rejects, so one value is not accepted
@@ -41,7 +41,7 @@ static void options_reject_unknown_event_mask_bits(void) {
 
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options map_options = mln_map_options_default();
-  map_options.event_mask = MLN_RUNTIME_EVENT_MASK_ALL | unknown;
+  map_options.event_mask = MLN_RUNTIME_EVENT_FLAG_ALL | unknown;
   mln_map bad_map = MLN_HANDLE_NULL;
   MLN_TEST_INVALID(mln_test_map_create_status(runtime, &map_options, &bad_map));
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, bad_map);
@@ -49,7 +49,7 @@ static void options_reject_unknown_event_mask_bits(void) {
   // The same value the setter rejects, so the two agree.
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_INVALID(
-    mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_MASK_ALL | unknown)
+    mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_FLAG_ALL | unknown)
   );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -75,8 +75,8 @@ static void clearing_one_type_leaves_the_others_arriving(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_set_event_mask(
-    map, MLN_RUNTIME_EVENT_MASK_ALL &
-           ~(uint64_t)MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED
+    map, MLN_RUNTIME_EVENT_FLAG_ALL &
+           ~(uint64_t)MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED
   ));
   mln_test_drain_all(runtime);
 
@@ -85,7 +85,7 @@ static void clearing_one_type_leaves_the_others_arriving(void) {
     0, mln_test_drain_counting(runtime, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
   );
 
-  MLN_TEST_OK(mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_MASK_ALL));
+  MLN_TEST_OK(mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_FLAG_ALL));
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
   MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_GREATER_THAN_size_t(
@@ -193,11 +193,11 @@ static void event_masks_change_from_any_thread_and_keep_foreign_bits(void) {
     MLN_TEST_OK(probe.runtime_mask_status);
     MLN_TEST_OK(probe.map_mask_status);
 
-    // Both setters accept MLN_RUNTIME_EVENT_MASK_ALL, and the map reports it
+    // Both setters accept MLN_RUNTIME_EVENT_FLAG_ALL, and the map reports it
     // back whole.
     uint64_t map_mask = 0;
     MLN_TEST_OK(mln_test_map_get_event_mask(map, &map_mask));
-    TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, map_mask);
+    TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_FLAG_ALL, map_mask);
   }
   // The setter reads only its own group's bits but stores the whole value, so
   // a host that reads a mask, sets one bit, and writes it back keeps every
@@ -211,11 +211,11 @@ static void event_masks_change_from_any_thread_and_keep_foreign_bits(void) {
     // reports back unchanged.
     uint64_t runtime_mask = 0;
     MLN_TEST_OK(mln_runtime_set_event_mask(
-      runtime, MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED, NULL
+      runtime, MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED, NULL
     ));
     MLN_TEST_OK(mln_runtime_get_event_mask(runtime, &runtime_mask, NULL));
     TEST_ASSERT_EQUAL_UINT64(
-      MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED, runtime_mask
+      MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED, runtime_mask
     );
 
     MLN_TEST_INVALID(mln_runtime_get_event_mask(runtime, NULL, NULL));
@@ -344,7 +344,7 @@ static void callback_event_state_retires_after_its_last_event(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(
-    mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED)
+    mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED)
   );
   callback_events received = {0};
   mln_runtime_event_handler handler = {

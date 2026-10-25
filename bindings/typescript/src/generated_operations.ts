@@ -23,9 +23,9 @@ import type {
   LatLng,
   LatLngBounds,
   LogHandler,
-  LogSeverityMask,
+  LogSeverityFlag,
   LogicalExtent,
-  MapDebugOption,
+  MapDebugFlag,
   MapOptions,
   MapSnapshot,
   MapTileOptions,
@@ -62,8 +62,8 @@ import type {
   ResourceResponse,
   ResourceRoute,
   ResourceTransform,
+  RuntimeEventFlag,
   RuntimeEventHandler,
-  RuntimeEventMask,
   RuntimeOptions,
   ScreenPoint,
   SourceFeature,
@@ -296,7 +296,7 @@ export function logClearCallback(): void {
  * See `mln_log_set_async_severity_mask` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
-export function logSetAsyncSeverityMask(mask: LogSeverityMask): void {
+export function logSetAsyncSeverityMask(mask: LogSeverityFlag): void {
   native.mln_log_set_async_severity_mask(mask);
 }
 
@@ -2038,7 +2038,7 @@ export class MapHandle extends Owner {
    * See `mln_map_set_debug_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  setDebugOptions(options: MapDebugOption): Promise<CommandCompletion> {
+  setDebugOptions(options: MapDebugFlag): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_debug_options(this.id, options, completion),
     );
@@ -2050,7 +2050,7 @@ export class MapHandle extends Owner {
    * See `mln_map_set_event_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  setEventMask(mask: RuntimeEventMask): Promise<CommandCompletion> {
+  setEventMask(mask: RuntimeEventFlag): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_event_mask(this.id, mask, completion),
     );
@@ -2877,7 +2877,7 @@ export class MapHandleDiscarding {
    * See `mln_map_set_debug_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  setDebugOptions(options: MapDebugOption): void {
+  setDebugOptions(options: MapDebugFlag): void {
     native.mln_map_set_debug_options(this.#owner.id, options, undefined);
   }
 
@@ -2887,7 +2887,7 @@ export class MapHandleDiscarding {
    * See `mln_map_set_event_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  setEventMask(mask: RuntimeEventMask): void {
+  setEventMask(mask: RuntimeEventFlag): void {
     native.mln_map_set_event_mask(this.#owner.id, mask, undefined);
   }
 
@@ -4118,7 +4118,7 @@ export class RuntimeHandle extends Owner {
    * See `mln_runtime_get_event_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  getEventMask(): RuntimeEventMask {
+  getEventMask(): RuntimeEventFlag {
     return native.mln_runtime_get_event_mask(this.id);
   }
 
@@ -4233,7 +4233,7 @@ export class RuntimeHandle extends Owner {
    * See `mln_runtime_set_event_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  setEventMask(mask: RuntimeEventMask): void {
+  setEventMask(mask: RuntimeEventFlag): void {
     native.mln_runtime_set_event_mask(this.id, mask);
   }
 
@@ -4599,8 +4599,8 @@ export class ScopedGpuSync {
     return this.#scope.active(this.#value).kind;
   }
 
-  get object(): GpuSync["object"] {
-    return this.#scope.active(this.#value).object;
+  get handle(): GpuSync["handle"] {
+    return this.#scope.active(this.#value).handle;
   }
 }
 

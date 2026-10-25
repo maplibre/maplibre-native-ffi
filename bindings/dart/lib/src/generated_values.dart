@@ -209,12 +209,12 @@ final class GpuSyncKind extends _Enum {
   static const cpuComplete = GpuSyncKind.fromRawValue(0);
 
   /// GLsync in the shared EGL or WGL context's share group, used only by a
-  /// caller-graphics-thread driver. object is nonzero.
-  static const openglFence = GpuSyncKind.fromRawValue(3);
+  /// caller-graphics-thread driver. handle is nonzero.
+  static const openglFence = GpuSyncKind.fromRawValue(1);
   @override
   String toString() => switch (rawValue) {
     0 => 'GpuSyncKind.cpuComplete',
-    3 => 'GpuSyncKind.openglFence',
+    1 => 'GpuSyncKind.openglFence',
     _ => 'GpuSyncKind($rawValue)',
   };
 }
@@ -285,22 +285,22 @@ final class LogSeverity extends _Enum {
 
 /// Bitmask values for log severities dispatched asynchronously.
 ///
-/// See `mln_log_severity_mask` in the
+/// See `mln_log_severity_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-final class LogSeverityMask extends _Flags<LogSeverityMask> {
-  const LogSeverityMask.fromRawValue(super.rawValue);
-  static const info = LogSeverityMask.fromRawValue(2);
-  static const warning = LogSeverityMask.fromRawValue(4);
-  static const error = LogSeverityMask.fromRawValue(8);
-  static const defaultValue = LogSeverityMask.fromRawValue(6);
-  static const all = LogSeverityMask.fromRawValue(14);
+final class LogSeverityFlag extends _Flags<LogSeverityFlag> {
+  const LogSeverityFlag.fromRawValue(super.rawValue);
+  static const info = LogSeverityFlag.fromRawValue(2);
+  static const warning = LogSeverityFlag.fromRawValue(4);
+  static const error = LogSeverityFlag.fromRawValue(8);
+  static const defaultValue = LogSeverityFlag.fromRawValue(6);
+  static const all = LogSeverityFlag.fromRawValue(14);
 
   /// No flags.
-  static const none = LogSeverityMask.fromRawValue(0);
+  static const none = LogSeverityFlag.fromRawValue(0);
   @override
-  LogSeverityMask _of(int rawValue) => LogSeverityMask.fromRawValue(rawValue);
+  LogSeverityFlag _of(int rawValue) => LogSeverityFlag.fromRawValue(rawValue);
   @override
-  String toString() => _describe('LogSeverityMask', const {
+  String toString() => _describe('LogSeverityFlag', const {
     0: 'none',
     2: 'info',
     4: 'warning',
@@ -312,24 +312,24 @@ final class LogSeverityMask extends _Flags<LogSeverityMask> {
 
 /// Debug overlay mask values for `mln_map_set_debug_options()`.
 ///
-/// See `mln_map_debug_option` in the
+/// See `mln_map_debug_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class MapDebugOption extends _Flags<MapDebugOption> {
-  const MapDebugOption.fromRawValue(super.rawValue);
-  static const tileBorders = MapDebugOption.fromRawValue(2);
-  static const parseStatus = MapDebugOption.fromRawValue(4);
-  static const timestamps = MapDebugOption.fromRawValue(8);
-  static const collision = MapDebugOption.fromRawValue(16);
-  static const overdraw = MapDebugOption.fromRawValue(32);
-  static const stencilClip = MapDebugOption.fromRawValue(64);
-  static const depthBuffer = MapDebugOption.fromRawValue(128);
+final class MapDebugFlag extends _Flags<MapDebugFlag> {
+  const MapDebugFlag.fromRawValue(super.rawValue);
+  static const tileBorders = MapDebugFlag.fromRawValue(2);
+  static const parseStatus = MapDebugFlag.fromRawValue(4);
+  static const timestamps = MapDebugFlag.fromRawValue(8);
+  static const collision = MapDebugFlag.fromRawValue(16);
+  static const overdraw = MapDebugFlag.fromRawValue(32);
+  static const stencilClip = MapDebugFlag.fromRawValue(64);
+  static const depthBuffer = MapDebugFlag.fromRawValue(128);
 
   /// No flags.
-  static const none = MapDebugOption.fromRawValue(0);
+  static const none = MapDebugFlag.fromRawValue(0);
   @override
-  MapDebugOption _of(int rawValue) => MapDebugOption.fromRawValue(rawValue);
+  MapDebugFlag _of(int rawValue) => MapDebugFlag.fromRawValue(rawValue);
   @override
-  String toString() => _describe('MapDebugOption', const {
+  String toString() => _describe('MapDebugFlag', const {
     0: 'none',
     2: 'tileBorders',
     4: 'parseStatus',
@@ -586,16 +586,16 @@ final class RenderResult extends _Enum {
   /// later demand with the same flags renders what this one would have. This
   /// result does not cause a map update, so the host demands again when the
   /// target can be ready, such as after a paced delay.
-  static const targetNotReady = RenderResult.fromRawValue(3);
+  static const targetNotReady = RenderResult.fromRawValue(2);
 
   /// A newer IF_NEEDED demand with the same flags replaced this demand.
-  static const superseded = RenderResult.fromRawValue(4);
+  static const superseded = RenderResult.fromRawValue(3);
   @override
   String toString() => switch (rawValue) {
     0 => 'RenderResult.rendered',
     1 => 'RenderResult.noUpdate',
-    3 => 'RenderResult.targetNotReady',
-    4 => 'RenderResult.superseded',
+    2 => 'RenderResult.targetNotReady',
+    3 => 'RenderResult.superseded',
     _ => 'RenderResult($rawValue)',
   };
 }
@@ -701,28 +701,28 @@ final class ResourceKind extends _Enum {
 
 /// The resource kinds that a route or rule matches, one bit per
 /// `mln_resource_kind` value. Registration requires at least one known bit.
-/// `MLN_RESOURCE_KIND_MASK_ALL` selects every resource kind.
+/// `MLN_RESOURCE_KIND_FLAG_ALL` selects every resource kind.
 ///
-/// See `mln_resource_kind_mask` in the
+/// See `mln_resource_kind_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class ResourceKindMask extends _Flags<ResourceKindMask> {
-  const ResourceKindMask.fromRawValue(super.rawValue);
-  static const unknown = ResourceKindMask.fromRawValue(1);
-  static const style = ResourceKindMask.fromRawValue(2);
-  static const source = ResourceKindMask.fromRawValue(4);
-  static const tile = ResourceKindMask.fromRawValue(8);
-  static const glyphs = ResourceKindMask.fromRawValue(16);
-  static const spriteImage = ResourceKindMask.fromRawValue(32);
-  static const spriteJson = ResourceKindMask.fromRawValue(64);
-  static const image = ResourceKindMask.fromRawValue(128);
-  static const all = ResourceKindMask.fromRawValue(255);
+final class ResourceKindFlag extends _Flags<ResourceKindFlag> {
+  const ResourceKindFlag.fromRawValue(super.rawValue);
+  static const unknown = ResourceKindFlag.fromRawValue(1);
+  static const style = ResourceKindFlag.fromRawValue(2);
+  static const source = ResourceKindFlag.fromRawValue(4);
+  static const tile = ResourceKindFlag.fromRawValue(8);
+  static const glyphs = ResourceKindFlag.fromRawValue(16);
+  static const spriteImage = ResourceKindFlag.fromRawValue(32);
+  static const spriteJson = ResourceKindFlag.fromRawValue(64);
+  static const image = ResourceKindFlag.fromRawValue(128);
+  static const all = ResourceKindFlag.fromRawValue(255);
 
   /// No flags.
-  static const none = ResourceKindMask.fromRawValue(0);
+  static const none = ResourceKindFlag.fromRawValue(0);
   @override
-  ResourceKindMask _of(int rawValue) => ResourceKindMask.fromRawValue(rawValue);
+  ResourceKindFlag _of(int rawValue) => ResourceKindFlag.fromRawValue(rawValue);
   @override
-  String toString() => _describe('ResourceKindMask', const {
+  String toString() => _describe('ResourceKindFlag', const {
     0: 'none',
     1: 'unknown',
     2: 'style',
@@ -808,50 +808,50 @@ final class ResourceUsage extends _Enum {
 
 /// Bit values for the map and runtime event subscription masks.
 ///
-/// See `mln_runtime_event_mask` in the
+/// See `mln_runtime_event_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class RuntimeEventMask extends _Flags<RuntimeEventMask> {
-  const RuntimeEventMask.fromRawValue(super.rawValue);
+final class RuntimeEventFlag extends _Flags<RuntimeEventFlag> {
+  const RuntimeEventFlag.fromRawValue(super.rawValue);
 
   /// Selects no event type.
-  static const none = RuntimeEventMask.fromRawValue(0);
-  static const mapCameraWillChange = RuntimeEventMask.fromRawValue(2);
-  static const mapCameraIsChanging = RuntimeEventMask.fromRawValue(4);
-  static const mapCameraDidChange = RuntimeEventMask.fromRawValue(8);
-  static const mapStyleLoaded = RuntimeEventMask.fromRawValue(16);
-  static const mapLoadingStarted = RuntimeEventMask.fromRawValue(32);
-  static const mapLoadingFinished = RuntimeEventMask.fromRawValue(64);
-  static const mapLoadingFailed = RuntimeEventMask.fromRawValue(128);
-  static const mapIdle = RuntimeEventMask.fromRawValue(256);
-  static const mapRenderError = RuntimeEventMask.fromRawValue(1024);
-  static const mapRenderFrameStarted = RuntimeEventMask.fromRawValue(8192);
-  static const mapRenderFrameFinished = RuntimeEventMask.fromRawValue(16384);
-  static const mapRenderMapStarted = RuntimeEventMask.fromRawValue(32768);
-  static const mapRenderMapFinished = RuntimeEventMask.fromRawValue(65536);
-  static const mapStyleImageMissing = RuntimeEventMask.fromRawValue(131072);
-  static const mapTileAction = RuntimeEventMask.fromRawValue(262144);
-  static const offlineRegionStatusChanged = RuntimeEventMask.fromRawValue(
-    524288,
+  static const none = RuntimeEventFlag.fromRawValue(0);
+  static const mapCameraWillChange = RuntimeEventFlag.fromRawValue(2);
+  static const mapCameraIsChanging = RuntimeEventFlag.fromRawValue(4);
+  static const mapCameraDidChange = RuntimeEventFlag.fromRawValue(8);
+  static const mapStyleLoaded = RuntimeEventFlag.fromRawValue(16);
+  static const mapLoadingStarted = RuntimeEventFlag.fromRawValue(32);
+  static const mapLoadingFinished = RuntimeEventFlag.fromRawValue(64);
+  static const mapLoadingFailed = RuntimeEventFlag.fromRawValue(128);
+  static const mapIdle = RuntimeEventFlag.fromRawValue(256);
+  static const mapRenderError = RuntimeEventFlag.fromRawValue(512);
+  static const mapRenderFrameStarted = RuntimeEventFlag.fromRawValue(1024);
+  static const mapRenderFrameFinished = RuntimeEventFlag.fromRawValue(2048);
+  static const mapRenderMapStarted = RuntimeEventFlag.fromRawValue(4096);
+  static const mapRenderMapFinished = RuntimeEventFlag.fromRawValue(8192);
+  static const mapStyleImageMissing = RuntimeEventFlag.fromRawValue(16384);
+  static const mapTileAction = RuntimeEventFlag.fromRawValue(32768);
+  static const mapSourceChanged = RuntimeEventFlag.fromRawValue(65536);
+  static const offlineRegionStatusChanged = RuntimeEventFlag.fromRawValue(
+    131072,
   );
-  static const offlineRegionResponseError = RuntimeEventMask.fromRawValue(
-    1048576,
+  static const offlineRegionResponseError = RuntimeEventFlag.fromRawValue(
+    262144,
   );
   static const offlineRegionTileCountLimitExceeded =
-      RuntimeEventMask.fromRawValue(2097152);
-  static const mapSourceChanged = RuntimeEventMask.fromRawValue(8388608);
+      RuntimeEventFlag.fromRawValue(524288);
 
   /// Selects every map-originated event type this version defines.
-  static const allMapEvents = RuntimeEventMask.fromRawValue(8906238);
+  static const allMapEvents = RuntimeEventFlag.fromRawValue(131070);
 
   /// Selects every runtime-originated event type this version defines.
-  static const allRuntimeEvents = RuntimeEventMask.fromRawValue(3670016);
+  static const allRuntimeEvents = RuntimeEventFlag.fromRawValue(917504);
 
   /// Selects every event type this version defines.
-  static const all = RuntimeEventMask.fromRawValue(12576254);
+  static const all = RuntimeEventFlag.fromRawValue(1048574);
   @override
-  RuntimeEventMask _of(int rawValue) => RuntimeEventMask.fromRawValue(rawValue);
+  RuntimeEventFlag _of(int rawValue) => RuntimeEventFlag.fromRawValue(rawValue);
   @override
-  String toString() => _describe('RuntimeEventMask', const {
+  String toString() => _describe('RuntimeEventFlag', const {
     0: 'none',
     2: 'mapCameraWillChange',
     4: 'mapCameraIsChanging',
@@ -861,20 +861,20 @@ final class RuntimeEventMask extends _Flags<RuntimeEventMask> {
     64: 'mapLoadingFinished',
     128: 'mapLoadingFailed',
     256: 'mapIdle',
-    1024: 'mapRenderError',
-    8192: 'mapRenderFrameStarted',
-    16384: 'mapRenderFrameFinished',
-    32768: 'mapRenderMapStarted',
-    65536: 'mapRenderMapFinished',
-    131072: 'mapStyleImageMissing',
-    262144: 'mapTileAction',
-    524288: 'offlineRegionStatusChanged',
-    1048576: 'offlineRegionResponseError',
-    2097152: 'offlineRegionTileCountLimitExceeded',
-    8388608: 'mapSourceChanged',
-    8906238: 'allMapEvents',
-    3670016: 'allRuntimeEvents',
-    12576254: 'all',
+    512: 'mapRenderError',
+    1024: 'mapRenderFrameStarted',
+    2048: 'mapRenderFrameFinished',
+    4096: 'mapRenderMapStarted',
+    8192: 'mapRenderMapFinished',
+    16384: 'mapStyleImageMissing',
+    32768: 'mapTileAction',
+    65536: 'mapSourceChanged',
+    131072: 'offlineRegionStatusChanged',
+    262144: 'offlineRegionResponseError',
+    524288: 'offlineRegionTileCountLimitExceeded',
+    131070: 'allMapEvents',
+    917504: 'allRuntimeEvents',
+    1048574: 'all',
   });
 }
 
@@ -908,18 +908,18 @@ final class RuntimeEventType extends _Enum {
   static const mapLoadingFinished = RuntimeEventType.fromRawValue(6);
   static const mapLoadingFailed = RuntimeEventType.fromRawValue(7);
   static const mapIdle = RuntimeEventType.fromRawValue(8);
-  static const mapRenderError = RuntimeEventType.fromRawValue(10);
-  static const mapRenderFrameStarted = RuntimeEventType.fromRawValue(13);
-  static const mapRenderFrameFinished = RuntimeEventType.fromRawValue(14);
-  static const mapRenderMapStarted = RuntimeEventType.fromRawValue(15);
-  static const mapRenderMapFinished = RuntimeEventType.fromRawValue(16);
-  static const mapStyleImageMissing = RuntimeEventType.fromRawValue(17);
-  static const mapTileAction = RuntimeEventType.fromRawValue(18);
-  static const offlineRegionStatusChanged = RuntimeEventType.fromRawValue(19);
-  static const offlineRegionResponseError = RuntimeEventType.fromRawValue(20);
+  static const mapRenderError = RuntimeEventType.fromRawValue(9);
+  static const mapRenderFrameStarted = RuntimeEventType.fromRawValue(10);
+  static const mapRenderFrameFinished = RuntimeEventType.fromRawValue(11);
+  static const mapRenderMapStarted = RuntimeEventType.fromRawValue(12);
+  static const mapRenderMapFinished = RuntimeEventType.fromRawValue(13);
+  static const mapStyleImageMissing = RuntimeEventType.fromRawValue(14);
+  static const mapTileAction = RuntimeEventType.fromRawValue(15);
+  static const mapSourceChanged = RuntimeEventType.fromRawValue(16);
+  static const offlineRegionStatusChanged = RuntimeEventType.fromRawValue(17);
+  static const offlineRegionResponseError = RuntimeEventType.fromRawValue(18);
   static const offlineRegionTileCountLimitExceeded =
-      RuntimeEventType.fromRawValue(21);
-  static const mapSourceChanged = RuntimeEventType.fromRawValue(23);
+      RuntimeEventType.fromRawValue(19);
   @override
   String toString() => switch (rawValue) {
     1 => 'RuntimeEventType.mapCameraWillChange',
@@ -930,17 +930,17 @@ final class RuntimeEventType extends _Enum {
     6 => 'RuntimeEventType.mapLoadingFinished',
     7 => 'RuntimeEventType.mapLoadingFailed',
     8 => 'RuntimeEventType.mapIdle',
-    10 => 'RuntimeEventType.mapRenderError',
-    13 => 'RuntimeEventType.mapRenderFrameStarted',
-    14 => 'RuntimeEventType.mapRenderFrameFinished',
-    15 => 'RuntimeEventType.mapRenderMapStarted',
-    16 => 'RuntimeEventType.mapRenderMapFinished',
-    17 => 'RuntimeEventType.mapStyleImageMissing',
-    18 => 'RuntimeEventType.mapTileAction',
-    19 => 'RuntimeEventType.offlineRegionStatusChanged',
-    20 => 'RuntimeEventType.offlineRegionResponseError',
-    21 => 'RuntimeEventType.offlineRegionTileCountLimitExceeded',
-    23 => 'RuntimeEventType.mapSourceChanged',
+    9 => 'RuntimeEventType.mapRenderError',
+    10 => 'RuntimeEventType.mapRenderFrameStarted',
+    11 => 'RuntimeEventType.mapRenderFrameFinished',
+    12 => 'RuntimeEventType.mapRenderMapStarted',
+    13 => 'RuntimeEventType.mapRenderMapFinished',
+    14 => 'RuntimeEventType.mapStyleImageMissing',
+    15 => 'RuntimeEventType.mapTileAction',
+    16 => 'RuntimeEventType.mapSourceChanged',
+    17 => 'RuntimeEventType.offlineRegionStatusChanged',
+    18 => 'RuntimeEventType.offlineRegionResponseError',
+    19 => 'RuntimeEventType.offlineRegionTileCountLimitExceeded',
     _ => 'RuntimeEventType($rawValue)',
   };
 }
@@ -1202,19 +1202,18 @@ final class TileOperation extends _Enum {
 
 /// How a rule or route compares its url against a request URL.
 ///
-/// See `mln_url_match_flags` in the
+/// See `mln_url_match_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class UrlMatchFlags extends _Flags<UrlMatchFlags> {
-  const UrlMatchFlags.fromRawValue(super.rawValue);
-  static const exact = UrlMatchFlags.fromRawValue(0);
+final class UrlMatchFlag extends _Flags<UrlMatchFlag> {
+  const UrlMatchFlag.fromRawValue(super.rawValue);
+  static const exact = UrlMatchFlag.fromRawValue(0);
 
   /// Reads url as a glob pattern.
-  static const glob = UrlMatchFlags.fromRawValue(1);
+  static const glob = UrlMatchFlag.fromRawValue(1);
   @override
-  UrlMatchFlags _of(int rawValue) => UrlMatchFlags.fromRawValue(rawValue);
+  UrlMatchFlag _of(int rawValue) => UrlMatchFlag.fromRawValue(rawValue);
   @override
-  String toString() =>
-      _describe('UrlMatchFlags', const {0: 'exact', 1: 'glob'});
+  String toString() => _describe('UrlMatchFlag', const {0: 'exact', 1: 'glob'});
 }
 
 /// Viewport orientation modes used by `mln_map_viewport_options`.
@@ -1414,24 +1413,22 @@ final class OpenglTextureFrame extends _Value {
 /// See `mln_gpu_sync` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class GpuSync extends _Value {
-  GpuSync({GpuSyncKind? kind, int? object})
+  GpuSync({GpuSyncKind? kind, int? handle})
     : kind = kind ?? gpuSyncDefault().kind,
-      object = object ?? gpuSyncDefault().object;
-
-  /// One `mln_gpu_sync_kind` value.
+      handle = handle ?? gpuSyncDefault().handle;
   final GpuSyncKind kind;
 
   /// Bit pattern of the GLsync pointer.
-  final int object;
+  final int handle;
 
   /// A copy of this value with the given members replaced.
-  GpuSync copyWith({GpuSyncKind? kind, int? object}) =>
-      GpuSync(kind: kind ?? this.kind, object: object ?? this.object);
+  GpuSync copyWith({GpuSyncKind? kind, int? handle}) =>
+      GpuSync(kind: kind ?? this.kind, handle: handle ?? this.handle);
 
   @override
-  List<Object?> get _members => [kind, object];
+  List<Object?> get _members => [kind, handle];
   @override
-  String toString() => _describe('GpuSync', const ['kind', 'object']);
+  String toString() => _describe('GpuSync', const ['kind', 'handle']);
 }
 
 /// Geographic coordinate in degrees used by map and projection APIs.
@@ -1668,14 +1665,8 @@ final class MapViewportOptions extends _Value {
     this.viewportMode,
     this.frustumOffset,
   });
-
-  /// One of `mln_north_orientation`.
   final NorthOrientation? northOrientation;
-
-  /// One of `mln_constrain_mode`.
   final ConstrainMode? constrainMode;
-
-  /// One of `mln_viewport_mode`.
   final ViewportMode? viewportMode;
   final EdgeInsets? frustumOffset;
 
@@ -1776,8 +1767,6 @@ final class RenderFrameResult extends _Value {
     this.needsRepaint = false,
     required this.view,
   });
-
-  /// One `mln_render_result` value.
   final RenderResult disposition;
   final int token;
 
@@ -1953,8 +1942,6 @@ final class CameraTransitionEnd extends _Value {
     this.outcome = const CameraTransitionOutcome.fromRawValue(0),
     this.generation = 0,
   });
-
-  /// One of `mln_camera_transition_outcome`.
   final CameraTransitionOutcome outcome;
 
   /// Generation of the published snapshot that shows the camera where the
@@ -2615,8 +2602,8 @@ final class HttpHeader extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class HttpHeaderRule extends _Value {
   HttpHeaderRule({
-    ResourceKindMask? kinds,
-    UrlMatchFlags? flags,
+    ResourceKindFlag? kinds,
+    UrlMatchFlag? flags,
     String? url,
     List<HttpHeader>? headers,
   }) : kinds = kinds ?? httpHeaderRuleDefault().kinds,
@@ -2625,10 +2612,8 @@ final class HttpHeaderRule extends _Value {
        headers = List.unmodifiable(headers ?? httpHeaderRuleDefault().headers);
 
   /// The resource kinds to match.
-  final ResourceKindMask kinds;
-
-  /// A bitwise OR of `mln_url_match_flags` values.
-  final UrlMatchFlags flags;
+  final ResourceKindFlag kinds;
+  final UrlMatchFlag flags;
 
   /// The URL or glob pattern to compare.
   final String url;
@@ -2639,8 +2624,8 @@ final class HttpHeaderRule extends _Value {
 
   /// A copy of this value with the given members replaced.
   HttpHeaderRule copyWith({
-    ResourceKindMask? kinds,
-    UrlMatchFlags? flags,
+    ResourceKindFlag? kinds,
+    UrlMatchFlag? flags,
     String? url,
     List<HttpHeader>? headers,
   }) => HttpHeaderRule(
@@ -3231,8 +3216,6 @@ final class WebglContextDescriptor extends _Value {
     this.context = 0,
     required this.canvasSelector,
   });
-
-  /// One `mln_webgl_context_kind` value.
   final WebglContextKind kind;
 
   /// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
@@ -3876,8 +3859,6 @@ final class MapTileOptions extends _Value {
   final double? lodScale;
   final double? lodPitchThreshold;
   final double? lodZoomShift;
-
-  /// One of `mln_tile_lod_mode`.
   final TileLodMode? lodMode;
 
   /// A copy of this value with the given members replaced.
@@ -3923,13 +3904,13 @@ final class MapTileOptions extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class MapSnapshot extends _Value {
   const MapSnapshot({
-    this.debugOptions = MapDebugOption.none,
+    this.debugOptions = MapDebugFlag.none,
     this.generation = 0,
     this.fullyLoaded = false,
     this.renderingStatsViewEnabled = false,
     this.gestureInProgress = false,
     this.transitionInProgress = false,
-    this.eventMask = RuntimeEventMask.none,
+    this.eventMask = RuntimeEventFlag.none,
     this.latestRenderUpdateGeneration = 0,
     required this.tile,
     required this.bounds,
@@ -3937,8 +3918,8 @@ final class MapSnapshot extends _Value {
     required this.view,
   });
 
-  /// Debug overlay mask of `mln_map_debug_option` values.
-  final MapDebugOption debugOptions;
+  /// Debug overlay mask of `mln_map_debug_flag` values.
+  final MapDebugFlag debugOptions;
   final int generation;
 
   /// True once every requested style and tile resource finished loading.
@@ -3950,7 +3931,7 @@ final class MapSnapshot extends _Value {
 
   /// True while a camera command with a duration is still animating.
   final bool transitionInProgress;
-  final RuntimeEventMask eventMask;
+  final RuntimeEventFlag eventMask;
 
   /// Generation of the latest render update the map published. A rendered frame
   /// at or past it draws map state that includes every command this snapshot
@@ -4164,8 +4145,6 @@ final class StyleLayerInfo extends _Value {
 
   /// Highest zoom at which the layer draws; INFINITY with no upper bound.
   final double maxZoom;
-
-  /// One of `mln_style_layer_visibility`.
   final StyleLayerVisibility visibility;
 
   @override
@@ -4210,8 +4189,6 @@ final class StyleSourceTileInfo extends _Value {
 
   /// Highest zoom level the TileJSON provides tiles for.
   final double maxZoom;
-
-  /// One of `mln_style_tile_scheme`.
   final StyleTileScheme scheme;
 
   @override
@@ -4245,8 +4222,6 @@ final class StyleSourceInfo extends _Value {
 
   /// Source ID.
   final String id;
-
-  /// One of `mln_style_source_type`.
   final StyleSourceType type;
 
   /// Whether the source is marked volatile.
@@ -4358,7 +4333,7 @@ final class MapOptions extends _Value {
     LogicalExtent? initialExtent,
     MapMode? mapMode,
     bool? fastPforEnabled,
-    RuntimeEventMask? eventMask,
+    RuntimeEventFlag? eventMask,
   }) : initialExtent = initialExtent ?? mapOptionsDefault().initialExtent,
        mapMode = mapMode ?? mapOptionsDefault().mapMode,
        fastPforEnabled = fastPforEnabled ?? mapOptionsDefault().fastPforEnabled,
@@ -4368,7 +4343,7 @@ final class MapOptions extends _Value {
   /// must be finite and positive. scale_factor is fixed for the map's lifetime.
   final LogicalExtent initialExtent;
 
-  /// One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`.
+  /// Defaults to `MLN_MAP_MODE_CONTINUOUS`.
   final MapMode mapMode;
 
   /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
@@ -4376,15 +4351,15 @@ final class MapOptions extends _Value {
   final bool fastPforEnabled;
 
   /// Map-originated event types this map queues, as a bitwise OR of
-  /// `mln_runtime_event_mask` values.
-  final RuntimeEventMask eventMask;
+  /// `mln_runtime_event_flag` values.
+  final RuntimeEventFlag eventMask;
 
   /// A copy of this value with the given members replaced.
   MapOptions copyWith({
     LogicalExtent? initialExtent,
     MapMode? mapMode,
     bool? fastPforEnabled,
-    RuntimeEventMask? eventMask,
+    RuntimeEventFlag? eventMask,
   }) => MapOptions(
     initialExtent: initialExtent ?? this.initialExtent,
     mapMode: mapMode ?? this.mapMode,
@@ -4435,10 +4410,10 @@ final class StyleImageOptions extends _Value {
   /// Content box used when icon-text-fit applies.
   final ImageContent? content;
 
-  /// One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK.
+  /// Defaults to STRETCH_OR_SHRINK.
   final StyleImageTextFit? textFitWidth;
 
-  /// One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK.
+  /// Defaults to STRETCH_OR_SHRINK.
   final StyleImageTextFit? textFitHeight;
 
   /// Sprite pixel ratio. Defaults to 1.
@@ -4493,8 +4468,6 @@ final class RenderAbandonResult extends _Value {
     this.disposition = const RenderAbandonDisposition.fromRawValue(0),
     this.quarantinedResourceCount = 0,
   });
-
-  /// One `mln_render_abandon_disposition` value.
   final RenderAbandonDisposition disposition;
 
   /// Backend resource groups intentionally retained until process exit.
@@ -4519,15 +4492,11 @@ final class RenderSessionCapabilities extends _Value {
     this.textureRingDepth = 0,
     this.flags = RenderSessionCapabilityFlag.none,
   });
-
-  /// One `mln_render_driver_kind` value.
   final RenderDriverKind driver;
 
   /// Granted texture ring depth: the slot count of a session-owned ring, or the
   /// texture count of a borrowed one. Zero for a surface.
   final int textureRingDepth;
-
-  /// A bitwise OR of `mln_render_session_capability_flag` values.
   final RenderSessionCapabilityFlag flags;
 
   @override
@@ -4555,8 +4524,6 @@ final class RenderSessionSnapshot extends _Value {
     this.acquiredFrameCount = 0,
     this.pendingChanges = false,
   });
-
-  /// One `mln_render_session_state` value.
   final RenderSessionState state;
 
   /// Logical extent applied by the driver.
@@ -4977,24 +4944,22 @@ final class ResourceRequestCancelHandler {
 /// See `mln_resource_route` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class ResourceRoute extends _Value {
-  ResourceRoute({ResourceKindMask? kinds, UrlMatchFlags? flags, String? url})
+  ResourceRoute({ResourceKindFlag? kinds, UrlMatchFlag? flags, String? url})
     : kinds = kinds ?? resourceRouteDefault().kinds,
       flags = flags ?? resourceRouteDefault().flags,
       url = url ?? resourceRouteDefault().url;
 
   /// The resource kinds to match.
-  final ResourceKindMask kinds;
-
-  /// A bitwise OR of `mln_url_match_flags` values.
-  final UrlMatchFlags flags;
+  final ResourceKindFlag kinds;
+  final UrlMatchFlag flags;
 
   /// The URL or glob pattern to compare.
   final String url;
 
   /// A copy of this value with the given members replaced.
   ResourceRoute copyWith({
-    ResourceKindMask? kinds,
-    UrlMatchFlags? flags,
+    ResourceKindFlag? kinds,
+    UrlMatchFlag? flags,
     String? url,
   }) => ResourceRoute(
     kinds: kinds ?? this.kinds,
@@ -5240,8 +5205,6 @@ final class OfflineRegionStatus extends _Value {
     this.requiredResourceCountIsPrecise = false,
     this.complete = false,
   });
-
-  /// One of `mln_offline_region_download_state`.
   final OfflineRegionDownloadState downloadState;
   final int completedResourceCount;
   final int completedResourceSize;
@@ -5335,8 +5298,6 @@ final class RuntimeEventRenderFrame extends _Value {
     this.placementChanged = false,
     this.stats = const RenderingStats(),
   });
-
-  /// One of `mln_render_mode`.
   final RenderMode mode;
 
   /// Whether MapLibre needs another frame after this one.
@@ -5363,8 +5324,6 @@ final class RuntimeEventRenderFrame extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class RuntimeEventRenderMap extends _Value {
   const RuntimeEventRenderMap({this.mode = const RenderMode.fromRawValue(0)});
-
-  /// One of `mln_render_mode`.
   final RenderMode mode;
 
   @override
@@ -5418,8 +5377,6 @@ final class RuntimeEventTileAction extends _Value {
     this.operation = const TileOperation.fromRawValue(0),
     this.tileId = const TileId(),
   });
-
-  /// One of `mln_tile_operation`.
   final TileOperation operation;
   final TileId tileId;
 
@@ -5461,8 +5418,6 @@ final class RuntimeEventOfflineRegionResponseError extends _Value {
     this.reason = const ResourceErrorReason.fromRawValue(0),
   });
   final int regionId;
-
-  /// One of `mln_resource_error_reason`.
   final ResourceErrorReason reason;
 
   @override
@@ -5509,11 +5464,7 @@ final class RuntimeEvent {
     required this.message,
     required this.payload,
   });
-
-  /// One of `mln_runtime_event_type`.
   final RuntimeEventType type;
-
-  /// One of `mln_runtime_event_source_type`.
   final RuntimeEventSourceType sourceType;
 
   /// Source handle selected by source_type: an `mln_runtime` or an `mln_map`.
@@ -5749,8 +5700,6 @@ final class StyleExpressionType extends _Value {
     this.itemKind = const StyleExpressionTypeKind.fromRawValue(0),
     this.itemCount = 0,
   });
-
-  /// One of `mln_style_expression_type_kind`.
   final StyleExpressionTypeKind kind;
 
   /// For an array, its items' kind; ignored for any other kind.

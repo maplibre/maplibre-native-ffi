@@ -375,7 +375,7 @@ NSURL* resourceURL(const Resource& resource) {
   return url;
 }
 
-static std::uint32_t resourceKindToAbi(Resource::Kind kind) {
+static mln_resource_kind resourceKindToAbi(Resource::Kind kind) {
   switch (kind) {
     case Resource::Kind::Style:
       return MLN_RESOURCE_KIND_STYLE;

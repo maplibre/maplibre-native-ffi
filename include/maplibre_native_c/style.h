@@ -110,6 +110,9 @@ typedef enum MLN_BINDING(
   MLN_STYLE_SOURCE_INFO_ATTRIBUTION = 1U << 6U,
 } mln_style_source_info_field;
 
+/** A set of mln_style_source_info_field bits. */
+typedef uint32_t mln_style_source_info_fields;
+
 /** Tile URL coordinate scheme values. */
 typedef enum mln_style_tile_scheme : uint32_t {
   MLN_STYLE_TILE_SCHEME_XYZ = 0,
@@ -184,6 +187,9 @@ typedef enum MLN_BINDING(
   MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 1U << 10U,
 } mln_geojson_source_option_field;
 
+/** A set of mln_geojson_source_option_field bits. */
+typedef uint32_t mln_geojson_source_option_fields;
+
 /** Field mask values for mln_custom_geometry_source_options. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
@@ -197,6 +203,9 @@ typedef enum MLN_BINDING(
   MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP = 1U << 6U,
 } mln_custom_geometry_source_option_field;
 
+/** A set of mln_custom_geometry_source_option_field bits. */
+typedef uint32_t mln_custom_geometry_source_option_fields;
+
 /** Field mask values for mln_custom_mvt_vector_source_options. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
@@ -204,6 +213,9 @@ typedef enum MLN_BINDING(
   MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM = 1U << 0U,
   MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM = 1U << 1U,
 } mln_custom_mvt_vector_source_option_field;
+
+/** A set of mln_custom_mvt_vector_source_option_field bits. */
+typedef uint32_t mln_custom_mvt_vector_source_option_fields;
 
 /** Field mask values for mln_style_image_options. */
 typedef enum MLN_BINDING(
@@ -218,6 +230,9 @@ typedef enum MLN_BINDING(
   MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT = 1U << 6U,
 } mln_style_image_option_field;
 
+/** A set of mln_style_image_option_field bits. */
+typedef uint32_t mln_style_image_option_fields;
+
 /** Field mask values for mln_style_image_info. */
 typedef enum MLN_BINDING("kind=bitmask") mln_style_image_info_field : uint32_t {
   /** The image declares a content box. */
@@ -228,6 +243,9 @@ typedef enum MLN_BINDING("kind=bitmask") mln_style_image_info_field : uint32_t {
   MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT = 1U << 2U,
 } mln_style_image_info_field;
 
+/** A set of mln_style_image_info_field bits. */
+typedef uint32_t mln_style_image_info_fields;
+
 /** Field mask values for mln_style_transition_options. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
@@ -236,6 +254,9 @@ typedef enum MLN_BINDING(
   MLN_STYLE_TRANSITION_OPTION_DELAY = 1U << 1U,
   MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS = 1U << 2U,
 } mln_style_transition_option_field;
+
+/** A set of mln_style_transition_option_field bits. */
+typedef uint32_t mln_style_transition_option_fields;
 
 /**
  * Inline TileJSON metadata of a tile source.
@@ -250,8 +271,7 @@ typedef struct mln_style_source_tile_info {
   double min_zoom;
   /** Highest zoom level the TileJSON provides tiles for. */
   double max_zoom;
-  /** One of mln_style_tile_scheme. */
-  uint32_t scheme MLN_BINDING("enum=mln_style_tile_scheme");
+  mln_style_tile_scheme scheme;
 } mln_style_source_tile_info;
 
 /**
@@ -263,10 +283,9 @@ typedef struct mln_style_source_tile_info {
 typedef struct mln_style_source_info {
   /** Source ID. */
   mln_buffer_view id;
-  /** One of mln_style_source_type. */
-  uint32_t type MLN_BINDING("enum=mln_style_source_type");
+  mln_style_source_type type;
   /** Bitwise combination of mln_style_source_info_field values. */
-  uint32_t fields MLN_BINDING("enum=mln_style_source_info_field");
+  mln_style_source_info_fields fields;
   /** Whether the source is marked volatile. */
   bool is_volatile;
   /** Attribution string, when the source sets one. It may be empty. */
@@ -284,15 +303,11 @@ typedef struct mln_style_source_info {
   uint32_t tile_size
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILE_SIZE");
   /** Vector tile encoding, for a vector source. */
-  uint32_t vector_encoding MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;"
-    "enum=mln_style_vector_tile_encoding"
-  );
+  mln_style_vector_tile_encoding vector_encoding
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING");
   /** DEM raster encoding, when inline TileJSON sets one. */
-  uint32_t raster_encoding MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_SOURCE_INFO_RASTER_ENCODING;"
-    "enum=mln_style_raster_dem_encoding"
-  );
+  mln_style_raster_dem_encoding raster_encoding
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_RASTER_ENCODING");
 } mln_style_source_info;
 
 /**
@@ -313,8 +328,7 @@ typedef struct mln_style_layer_info {
   double min_zoom;
   /** Highest zoom at which the layer draws; INFINITY with no upper bound. */
   double max_zoom;
-  /** One of mln_style_layer_visibility. */
-  uint32_t visibility MLN_BINDING("enum=mln_style_layer_visibility");
+  mln_style_layer_visibility visibility;
 } mln_style_layer_info;
 
 /**
@@ -326,7 +340,7 @@ typedef struct mln_style_layer_info {
  */
 typedef struct mln_geojson_source_options {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_geojson_source_option_field");
+  mln_geojson_source_option_fields fields;
   /** Minimum tiling zoom. Defaults to 0. */
   double min_zoom
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM");
@@ -413,7 +427,7 @@ typedef void (*mln_custom_source_cancel_tile_callback)(
 /** Options for custom geometry sources. */
 typedef struct mln_custom_geometry_source_options {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_custom_geometry_source_option_field");
+  mln_custom_geometry_source_option_fields fields;
   /** Tile fetch callback. Required in callback mode; null in queue mode. */
   mln_custom_source_fetch_tile_callback fetch_tile MLN_BINDING("nullable=true");
   /** Optional best-effort tile cancel callback. Null in queue mode. */
@@ -473,7 +487,7 @@ typedef struct mln_custom_geometry_source_options {
 /** Options for custom MVT vector sources. */
 typedef struct mln_custom_mvt_vector_source_options {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_custom_mvt_vector_source_option_field");
+  mln_custom_mvt_vector_source_option_fields fields;
   /** Tile fetch callback. Required in callback mode; null in queue mode. */
   mln_custom_source_fetch_tile_callback fetch_tile MLN_BINDING("nullable=true");
   /** Optional best-effort tile cancel callback. Null in queue mode. */
@@ -536,7 +550,7 @@ typedef struct mln_premultiplied_rgba8_image {
 /** Options for runtime style images. */
 typedef struct mln_style_image_options {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_style_image_option_field");
+  mln_style_image_option_fields fields;
   /**
    * Horizontally stretchable intervals. Borrowed for the call and copied before
    * return. May be null only when stretch_x_count is 0.
@@ -558,16 +572,12 @@ typedef struct mln_style_image_options {
   /** Content box used when icon-text-fit applies. */
   mln_image_content content
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_CONTENT");
-  /** One of mln_style_image_text_fit. Defaults to STRETCH_OR_SHRINK. */
-  uint32_t text_fit_width MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH;"
-    "enum=mln_style_image_text_fit"
-  );
-  /** One of mln_style_image_text_fit. Defaults to STRETCH_OR_SHRINK. */
-  uint32_t text_fit_height MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;"
-    "enum=mln_style_image_text_fit"
-  );
+  /** Defaults to STRETCH_OR_SHRINK. */
+  mln_style_image_text_fit text_fit_width
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH");
+  /** Defaults to STRETCH_OR_SHRINK. */
+  mln_style_image_text_fit text_fit_height
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT");
   /** Sprite pixel ratio. Defaults to 1. */
   float pixel_ratio
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO");
@@ -587,7 +597,7 @@ typedef struct mln_style_image_info {
   /** Image height in pixels. */
   uint32_t height;
   /** Bitwise combination of mln_style_image_info_field values. */
-  uint32_t fields MLN_BINDING("enum=mln_style_image_info_field");
+  mln_style_image_info_fields fields;
   /**
    * Premultiplied RGBA8 pixels in tightly packed rows of width * 4 bytes, top
    * row first.
@@ -603,15 +613,11 @@ typedef struct mln_style_image_info {
   mln_image_content content
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_INFO_CONTENT");
   /** How the image fits text horizontally, when it sets this. */
-  uint32_t text_fit_width MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH;"
-    "enum=mln_style_image_text_fit"
-  );
+  mln_style_image_text_fit text_fit_width
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH");
   /** How the image fits text vertically, when it sets this. */
-  uint32_t text_fit_height MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT;"
-    "enum=mln_style_image_text_fit"
-  );
+  mln_style_image_text_fit text_fit_height
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT");
   /** Sprite pixel ratio. */
   float pixel_ratio;
   /** Whether the image is a signed distance field icon. */
@@ -631,7 +637,7 @@ typedef struct mln_style_image_info {
  */
 typedef struct mln_style_transition_options {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_style_transition_option_field");
+  mln_style_transition_option_fields fields;
   /**
    * Transition duration in milliseconds. Must be finite, non-negative, and
    * short enough to represent as a duration.

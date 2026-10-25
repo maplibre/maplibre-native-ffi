@@ -3598,8 +3598,8 @@ auto acquired_frame_release(
     set_thread_error("mln_gpu_sync.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (copied.kind == MLN_GPU_SYNC_OPENGL_FENCE && copied.object == 0) {
-    set_thread_error("OpenGL fence must have a nonzero object");
+  if (copied.kind == MLN_GPU_SYNC_OPENGL_FENCE && copied.handle == 0) {
+    set_thread_error("OpenGL fence must have a nonzero handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = handle_table<mln_acquired_frame_object>().lease(frame);
@@ -3619,9 +3619,7 @@ auto acquired_frame_release(
     // unsupported sync before consuming the handle, so the host keeps it.
     if (
       live->session->texture.backend &&
-      !live->session->texture.backend->supports_consumer_sync(
-        static_cast<mln_gpu_sync_kind>(copied.kind)
-      )
+      !live->session->texture.backend->supports_consumer_sync(copied.kind)
     ) {
       set_thread_error("render backend does not support this gpu sync kind");
       return MLN_STATUS_UNSUPPORTED;
@@ -3848,9 +3846,8 @@ auto render_session_resize_start(
       const auto* generations = std::any_cast<CommandGenerations>(&value);
       complete_command(
         state,
-        status != MLN_STATUS_OK
-          ? static_cast<std::uint32_t>(MLN_COMMAND_DISPOSITION_FAILED)
-          : static_cast<std::uint32_t>(MLN_COMMAND_DISPOSITION_COMMITTED),
+        status != MLN_STATUS_OK ? MLN_COMMAND_DISPOSITION_FAILED
+                                : MLN_COMMAND_DISPOSITION_COMMITTED,
         status, generations != nullptr ? *generations : CommandGenerations{},
         std::move(diagnostic)
       );
@@ -3886,8 +3883,7 @@ auto render_session_resize_start(
         const auto& joined =
           *static_cast<std::shared_ptr<DriverMapCompletion>*>(data);
         joined->complete(
-          static_cast<mln_status>(result->status),
-          string_from_view(result->diagnostic),
+          result->status, string_from_view(result->diagnostic),
           CommandGenerations{
             .snapshot = result->generation,
             .render_update = result->render_update_generation,
@@ -4461,8 +4457,12 @@ auto dispose_render_session(
       auto& session = *static_cast<mln_render_session_object*>(task->context);
       if (park_retirement_while_busy(session, *task)) return;
       auto owned = session.disposal_owner;
-      auto result =
-        mln_render_abandon_result{sizeof(mln_render_abandon_result), 0, 0, 0};
+      auto result = mln_render_abandon_result{
+        .size = sizeof(mln_render_abandon_result),
+        .disposition = MLN_RENDER_ABANDON_DISPOSITION_CLEAN,
+        .quarantined_resource_count = 0,
+        .reserved = 0,
+      };
       static_cast<void>(abandon_render_session(
         owned, &result,
         session.disposal_keeps_graphics ? AbandonedGraphics::Keep

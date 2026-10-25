@@ -217,7 +217,7 @@ public struct CameraDelta: Sendable {
     anchor = raw.fields & MLN_CAMERA_DELTA_ANCHOR
       .rawValue != 0 ? ScreenPoint(raw: raw.anchor) : nil
     animation = try AnimationOptions(raw: raw.animation)
-    gesturePhase = GesturePhase(rawValue: raw.gesture_phase)
+    gesturePhase = GesturePhase(rawValue: raw.gesture_phase.rawValue)
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_camera_delta {
@@ -242,7 +242,7 @@ public struct CameraDelta: Sendable {
         .nativeValue()
     }
     raw.animation = try animation.nativeValue(arena: arena)
-    raw.gesture_phase = gesturePhase.rawValue
+    raw.gesture_phase = mln_gesture_phase(rawValue: gesturePhase.rawValue)
     return raw
   }
 }
@@ -422,7 +422,6 @@ public struct CameraQueryResult: Equatable, Hashable, Sendable {
 /// See `mln_camera_transition_end` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraTransitionEnd: Equatable, Hashable, Sendable {
-  /// One of `mln_camera_transition_outcome`.
   public var outcome: CameraTransitionOutcome
   /// Generation of the published snapshot that shows the camera where the
   /// transitions left it. The map events of the change that ended them carry
@@ -442,7 +441,7 @@ public struct CameraTransitionEnd: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_camera_transition_end) {
-    outcome = CameraTransitionOutcome(rawValue: raw.outcome)
+    outcome = CameraTransitionOutcome(rawValue: raw.outcome.rawValue)
     generation = raw.generation
   }
 }
@@ -561,19 +560,19 @@ public struct CameraUpdate: Sendable {
     raw: mln_camera_update,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    mode = CameraUpdateMode(rawValue: raw.mode)
+    mode = CameraUpdateMode(rawValue: raw.mode.rawValue)
     camera = CameraOptions(raw: raw.camera)
     animation = try AnimationOptions(raw: raw.animation)
-    gesturePhase = GesturePhase(rawValue: raw.gesture_phase)
+    gesturePhase = GesturePhase(rawValue: raw.gesture_phase.rawValue)
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_camera_update {
     var raw = mln_camera_update_default()
     raw.size = UInt32(MemoryLayout<mln_camera_update>.size)
-    raw.mode = mode.rawValue
+    raw.mode = mln_camera_update_mode(rawValue: mode.rawValue)
     raw.camera = camera.nativeValue()
     raw.animation = try animation.nativeValue(arena: arena)
-    raw.gesture_phase = gesturePhase.rawValue
+    raw.gesture_phase = mln_gesture_phase(rawValue: gesturePhase.rawValue)
     return raw
   }
 }
@@ -936,9 +935,9 @@ public struct LogicalExtent: Equatable, Hashable, Sendable {
 
 /// Debug overlay mask values for `mln_map_set_debug_options()`.
 ///
-/// See `mln_map_debug_option` in the
+/// See `mln_map_debug_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct MapDebugOption: OptionSet, NativeOpenValue, Equatable, Hashable,
+public struct MapDebugFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   Sendable
 {
   public let rawValue: UInt32
@@ -946,13 +945,13 @@ public struct MapDebugOption: OptionSet, NativeOpenValue, Equatable, Hashable,
     self.rawValue = rawValue
   }
 
-  public static let tileBorders: MapDebugOption = .init(rawValue: 2)
-  public static let parseStatus: MapDebugOption = .init(rawValue: 4)
-  public static let timestamps: MapDebugOption = .init(rawValue: 8)
-  public static let collision: MapDebugOption = .init(rawValue: 16)
-  public static let overdraw: MapDebugOption = .init(rawValue: 32)
-  public static let stencilClip: MapDebugOption = .init(rawValue: 64)
-  public static let depthBuffer: MapDebugOption = .init(rawValue: 128)
+  public static let tileBorders: MapDebugFlag = .init(rawValue: 2)
+  public static let parseStatus: MapDebugFlag = .init(rawValue: 4)
+  public static let timestamps: MapDebugFlag = .init(rawValue: 8)
+  public static let collision: MapDebugFlag = .init(rawValue: 16)
+  public static let overdraw: MapDebugFlag = .init(rawValue: 32)
+  public static let stencilClip: MapDebugFlag = .init(rawValue: 64)
+  public static let depthBuffer: MapDebugFlag = .init(rawValue: 128)
 }
 
 /// Map rendering modes used when creating a map.
@@ -991,14 +990,14 @@ public struct MapOptions: Equatable, Hashable, Sendable {
   /// Initial logical extent. Width and height must be nonzero, and scale_factor
   /// must be finite and positive. scale_factor is fixed for the map's lifetime.
   public var initialExtent: LogicalExtent
-  /// One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`.
+  /// Defaults to `MLN_MAP_MODE_CONTINUOUS`.
   public var mapMode: MapMode
   /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
   /// encodings. Defaults to false.
   public var fastPforEnabled: Bool
   /// Map-originated event types this map queues, as a bitwise OR of
-  /// `mln_runtime_event_mask` values.
-  public var eventMask: RuntimeEventMask
+  /// `mln_runtime_event_flag` values.
+  public var eventMask: RuntimeEventFlag
   public static var `default`: Self {
     Self(raw: nativeDefault(mln_map_options_default))
   }
@@ -1007,7 +1006,7 @@ public struct MapOptions: Equatable, Hashable, Sendable {
     initialExtent: LogicalExtent = MapOptions.default.initialExtent,
     mapMode: MapMode = MapOptions.default.mapMode,
     fastPforEnabled: Bool = MapOptions.default.fastPforEnabled,
-    eventMask: RuntimeEventMask = MapOptions.default.eventMask
+    eventMask: RuntimeEventFlag = MapOptions.default.eventMask
   ) {
     self.initialExtent = initialExtent
     self.mapMode = mapMode
@@ -1017,15 +1016,15 @@ public struct MapOptions: Equatable, Hashable, Sendable {
 
   init(raw: mln_map_options) {
     initialExtent = LogicalExtent(raw: raw.initial_extent)
-    mapMode = MapMode(rawValue: raw.map_mode)
+    mapMode = MapMode(rawValue: raw.map_mode.rawValue)
     fastPforEnabled = raw.fast_pfor_enabled
-    eventMask = RuntimeEventMask(rawValue: raw.event_mask)
+    eventMask = RuntimeEventFlag(rawValue: raw.event_mask)
   }
 
   func nativeValue() -> mln_map_options {
     var raw = mln_map_options_default()
     raw.initial_extent = initialExtent.nativeValue()
-    raw.map_mode = mapMode.rawValue
+    raw.map_mode = mln_map_mode(rawValue: mapMode.rawValue)
     raw.fast_pfor_enabled = fastPforEnabled
     raw.event_mask = eventMask.rawValue
     return raw
@@ -1037,8 +1036,8 @@ public struct MapOptions: Equatable, Hashable, Sendable {
 /// See `mln_map_snapshot` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapSnapshot: Equatable, Hashable, Sendable {
-  /// Debug overlay mask of `mln_map_debug_option` values.
-  public var debugOptions: MapDebugOption
+  /// Debug overlay mask of `mln_map_debug_flag` values.
+  public var debugOptions: MapDebugFlag
   public var generation: UInt64
   /// True once every requested style and tile resource finished loading.
   public var fullyLoaded: Bool
@@ -1047,7 +1046,7 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   public var gestureInProgress: Bool
   /// True while a camera command with a duration is still animating.
   public var transitionInProgress: Bool
-  public var eventMask: RuntimeEventMask
+  public var eventMask: RuntimeEventFlag
   /// Generation of the latest render update the map published. A rendered frame
   /// at or past it draws map state that includes every command this snapshot
   /// observes, though animations and resource loads finish in later frames.
@@ -1063,14 +1062,14 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   }
 
   public init(
-    debugOptions: MapDebugOption = MapSnapshot.default.debugOptions,
+    debugOptions: MapDebugFlag = MapSnapshot.default.debugOptions,
     generation: UInt64 = MapSnapshot.default.generation,
     fullyLoaded: Bool = MapSnapshot.default.fullyLoaded,
     renderingStatsViewEnabled: Bool = MapSnapshot.default
       .renderingStatsViewEnabled,
     gestureInProgress: Bool = MapSnapshot.default.gestureInProgress,
     transitionInProgress: Bool = MapSnapshot.default.transitionInProgress,
-    eventMask: RuntimeEventMask = MapSnapshot.default.eventMask,
+    eventMask: RuntimeEventFlag = MapSnapshot.default.eventMask,
     latestRenderUpdateGeneration: UInt64 = MapSnapshot.default
       .latestRenderUpdateGeneration,
     tile: MapTileOptions = MapSnapshot.default.tile,
@@ -1093,13 +1092,13 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_map_snapshot) {
-    debugOptions = MapDebugOption(rawValue: raw.debug_options)
+    debugOptions = MapDebugFlag(rawValue: raw.debug_options)
     generation = raw.generation
     fullyLoaded = raw.fully_loaded
     renderingStatsViewEnabled = raw.rendering_stats_view_enabled
     gestureInProgress = raw.gesture_in_progress
     transitionInProgress = raw.transition_in_progress
-    eventMask = RuntimeEventMask(rawValue: raw.event_mask)
+    eventMask = RuntimeEventFlag(rawValue: raw.event_mask)
     latestRenderUpdateGeneration = raw.latest_render_update_generation
     tile = MapTileOptions(raw: raw.tile)
     bounds = BoundOptions(raw: raw.bounds)
@@ -1119,7 +1118,6 @@ public struct MapTileOptions: Equatable, Hashable, Sendable {
   public var lodScale: Double?
   public var lodPitchThreshold: Double?
   public var lodZoomShift: Double?
-  /// One of `mln_tile_lod_mode`.
   public var lodMode: TileLodMode?
   public static var `default`: Self {
     Self(raw: nativeDefault(mln_map_tile_options_default))
@@ -1153,7 +1151,7 @@ public struct MapTileOptions: Equatable, Hashable, Sendable {
     lodZoomShift = raw.fields & MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT
       .rawValue != 0 ? raw.lod_zoom_shift : nil
     lodMode = raw.fields & MLN_MAP_TILE_OPTION_LOD_MODE
-      .rawValue != 0 ? TileLodMode(rawValue: raw.lod_mode) : nil
+      .rawValue != 0 ? TileLodMode(rawValue: raw.lod_mode.rawValue) : nil
   }
 
   func nativeValue() -> mln_map_tile_options {
@@ -1180,8 +1178,8 @@ public struct MapTileOptions: Equatable, Hashable, Sendable {
         .lod_zoom_shift = item
     }
     if let item = lodMode {
-      raw.fields |= MLN_MAP_TILE_OPTION_LOD_MODE.rawValue; raw.lod_mode = item
-        .rawValue
+      raw.fields |= MLN_MAP_TILE_OPTION_LOD_MODE.rawValue; raw
+        .lod_mode = mln_tile_lod_mode(rawValue: item.rawValue)
     }
     return raw
   }
@@ -1244,11 +1242,8 @@ public struct MapView: Equatable, Hashable, Sendable {
 /// See `mln_map_viewport_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapViewportOptions: Equatable, Hashable, Sendable {
-  /// One of `mln_north_orientation`.
   public var northOrientation: NorthOrientation?
-  /// One of `mln_constrain_mode`.
   public var constrainMode: ConstrainMode?
-  /// One of `mln_viewport_mode`.
   public var viewportMode: ViewportMode?
   public var frustumOffset: EdgeInsets?
   public static var `default`: Self {
@@ -1270,11 +1265,13 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
 
   init(raw: mln_map_viewport_options) {
     northOrientation = raw.fields & MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION
-      .rawValue != 0 ? NorthOrientation(rawValue: raw.north_orientation) : nil
+      .rawValue != 0 ?
+      NorthOrientation(rawValue: raw.north_orientation.rawValue) : nil
     constrainMode = raw.fields & MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE
-      .rawValue != 0 ? ConstrainMode(rawValue: raw.constrain_mode) : nil
+      .rawValue != 0 ? ConstrainMode(rawValue: raw.constrain_mode.rawValue) :
+      nil
     viewportMode = raw.fields & MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE
-      .rawValue != 0 ? ViewportMode(rawValue: raw.viewport_mode) : nil
+      .rawValue != 0 ? ViewportMode(rawValue: raw.viewport_mode.rawValue) : nil
     frustumOffset = raw.fields & MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET
       .rawValue != 0 ? EdgeInsets(raw: raw.frustum_offset) : nil
   }
@@ -1284,15 +1281,15 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
     raw.fields = 0
     if let item = northOrientation {
       raw.fields |= MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION.rawValue; raw
-        .north_orientation = item.rawValue
+        .north_orientation = mln_north_orientation(rawValue: item.rawValue)
     }
     if let item = constrainMode {
       raw.fields |= MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE.rawValue; raw
-        .constrain_mode = item.rawValue
+        .constrain_mode = mln_constrain_mode(rawValue: item.rawValue)
     }
     if let item = viewportMode {
       raw.fields |= MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE.rawValue; raw
-        .viewport_mode = item.rawValue
+        .viewport_mode = mln_viewport_mode(rawValue: item.rawValue)
     }
     if let item = frustumOffset {
       raw.fields |= MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET.rawValue; raw
@@ -1427,8 +1424,8 @@ public struct OfflineRegionDefinition: Equatable, Hashable, Sendable {
     recordBytes: UnsafeRawBufferPointer? = nil
   ) throws {
     data = try { () throws -> OfflineRegionDefinitionData in
-      switch raw
-        .type
+      switch raw.type
+        .rawValue
       {
       case MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
         .rawValue: return try .tilePyramid(
@@ -1437,7 +1434,7 @@ public struct OfflineRegionDefinition: Equatable, Hashable, Sendable {
         ) case MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
         .rawValue: return try .geometry(OfflineGeometryRegionDefinition(raw: raw
             .data.geometry)) default: return .unknown(
-          raw.type,
+          raw.type.rawValue,
           recordBytes
             .map {
               Data($0
@@ -1456,10 +1453,11 @@ public struct OfflineRegionDefinition: Equatable, Hashable, Sendable {
     raw.size = UInt32(MemoryLayout<mln_offline_region_definition>.size)
     switch data {
     case let .tilePyramid(item): raw
-      .type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID.rawValue; raw.data
+      .type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID; raw.data
       .tile_pyramid = try item.nativeValue(arena: arena)
-    case let .geometry(item): raw.type = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
-      .rawValue; raw.data.geometry = try item.nativeValue(arena: arena)
+    case let .geometry(item): raw
+      .type = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY; raw.data
+      .geometry = try item.nativeValue(arena: arena)
     case .unknown: throw MaplibreError
       .invalidArgument("unknown union variant cannot be submitted")
     }

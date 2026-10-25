@@ -65,7 +65,7 @@ internal unsafe struct mln_camera_delta
     public double pitch;
     public mln_screen_point anchor;
     public mln_animation_options animation;
-    public uint gesture_phase;
+    public mln_gesture_phase gesture_phase;
     public uint reserved;
 }
 
@@ -102,7 +102,7 @@ internal unsafe struct mln_camera_query_result
 internal unsafe struct mln_camera_transition_end
 {
     public uint size;
-    public uint outcome;
+    public mln_camera_transition_outcome outcome;
     public ulong generation;
 }
 
@@ -117,10 +117,10 @@ internal unsafe struct mln_camera_transition_handler
 internal unsafe struct mln_camera_update
 {
     public uint size;
-    public uint mode;
+    public mln_camera_update_mode mode;
     public mln_camera_options camera;
     public mln_animation_options animation;
-    public uint gesture_phase;
+    public mln_gesture_phase gesture_phase;
     public uint reserved;
 }
 
@@ -143,8 +143,8 @@ internal unsafe struct mln_completion
 internal unsafe struct mln_completion_result
 {
     public uint size;
-    public int status;
-    public uint disposition;
+    public mln_status status;
+    public mln_command_disposition disposition;
     public uint value_size;
     public ulong generation;
     public ulong render_update_generation;
@@ -209,7 +209,7 @@ internal unsafe struct mln_egl_context_descriptor
     public void* display;
     public void* config;
     public void* share_context;
-    public uint client_api;
+    public mln_opengl_client_api client_api;
     public void* get_proc_address;
 }
 
@@ -266,8 +266,8 @@ internal unsafe struct mln_geojson_source_options
 internal unsafe struct mln_gpu_sync
 {
     public uint size;
-    public uint kind;
-    public ulong @object;
+    public mln_gpu_sync_kind kind;
+    public ulong handle;
 }
 
 internal unsafe struct mln_http_header
@@ -290,7 +290,7 @@ internal unsafe struct mln_http_header_transform
     public uint size;
     public delegate* unmanaged[Cdecl]<
         void*,
-        uint,
+        mln_resource_kind,
         sbyte*,
         mln_http_header_transform_response*,
         mln_status> callback;
@@ -335,7 +335,13 @@ internal unsafe struct mln_lat_lng_bounds
 internal unsafe struct mln_log_handler
 {
     public uint size;
-    public delegate* unmanaged[Cdecl]<void*, uint, uint, long, sbyte*, byte> callback;
+    public delegate* unmanaged[Cdecl]<
+        void*,
+        mln_log_severity,
+        mln_log_event,
+        long,
+        sbyte*,
+        byte> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
     public MlnDeliveryQueue queue;
@@ -352,7 +358,7 @@ internal unsafe struct mln_map_options
 {
     public uint size;
     public mln_logical_extent initial_extent;
-    public uint map_mode;
+    public mln_map_mode map_mode;
     public byte fast_pfor_enabled;
     public ulong event_mask;
 }
@@ -383,7 +389,7 @@ internal unsafe struct mln_map_tile_options
     public double lod_scale;
     public double lod_pitch_threshold;
     public double lod_zoom_shift;
-    public uint lod_mode;
+    public mln_tile_lod_mode lod_mode;
 }
 
 internal unsafe struct mln_map_view
@@ -399,9 +405,9 @@ internal unsafe struct mln_map_viewport_options
 {
     public uint size;
     public mln_map_viewport_option_field fields;
-    public uint north_orientation;
-    public uint constrain_mode;
-    public uint viewport_mode;
+    public mln_north_orientation north_orientation;
+    public mln_constrain_mode constrain_mode;
+    public mln_viewport_mode viewport_mode;
     public mln_edge_insets frustum_offset;
 }
 
@@ -468,7 +474,7 @@ internal unsafe struct mln_offline_geometry_region_definition
 internal unsafe struct mln_offline_region_definition
 {
     public uint size;
-    public uint type;
+    public mln_offline_region_definition_type type;
     public mln_offline_region_definition_data data;
 }
 
@@ -492,7 +498,7 @@ internal unsafe struct mln_offline_region_info
 
 internal unsafe struct mln_offline_region_status
 {
-    public uint download_state;
+    public mln_offline_region_download_state download_state;
     public ulong completed_resource_count;
     public ulong completed_resource_size;
     public ulong completed_tile_count;
@@ -532,8 +538,8 @@ internal unsafe struct mln_opengl_borrowed_texture_descriptor
 
 internal unsafe struct mln_opengl_context_descriptor
 {
-    public uint platform;
-    public uint ownership;
+    public mln_opengl_context_platform platform;
+    public mln_opengl_context_ownership ownership;
     public mln_opengl_context_descriptor_data data;
 }
 
@@ -625,7 +631,7 @@ internal unsafe struct mln_queue_lock
 internal unsafe struct mln_render_abandon_result
 {
     public uint size;
-    public uint disposition;
+    public mln_render_abandon_disposition disposition;
     public uint quarantined_resource_count;
     public uint reserved;
 }
@@ -641,7 +647,7 @@ internal unsafe struct mln_render_frame_batch_view
 internal unsafe struct mln_render_frame_result
 {
     public uint size;
-    public uint disposition;
+    public mln_render_result disposition;
     public ulong token;
     public ulong map_update_generation;
     public ulong generation;
@@ -653,9 +659,9 @@ internal unsafe struct mln_render_frame_result
 internal unsafe struct mln_render_session_attach_options
 {
     public uint size;
-    public uint driver;
+    public mln_render_driver_kind driver;
     public uint requested_texture_ring_depth;
-    public uint producer_sync_kind;
+    public mln_gpu_sync_kind producer_sync_kind;
     public mln_wake frame_wake;
     public mln_wake driver_work_wake;
     public mln_queue_lock queue_lock;
@@ -664,7 +670,7 @@ internal unsafe struct mln_render_session_attach_options
 internal unsafe struct mln_render_session_capabilities
 {
     public uint size;
-    public uint driver;
+    public mln_render_driver_kind driver;
     public uint texture_ring_depth;
     public uint flags;
 }
@@ -672,7 +678,7 @@ internal unsafe struct mln_render_session_capabilities
 internal unsafe struct mln_render_session_snapshot
 {
     public uint size;
-    public uint state;
+    public mln_render_session_state state;
     public mln_logical_extent extent;
     public ulong generation;
     public ulong map_update_generation;
@@ -704,7 +710,7 @@ internal unsafe struct mln_rendered_feature_query_options
 internal unsafe struct mln_rendered_query_geometry
 {
     public uint size;
-    public uint type;
+    public mln_rendered_query_geometry_type type;
     public mln_rendered_query_geometry_data data;
 }
 
@@ -766,11 +772,11 @@ internal unsafe struct mln_resource_request_info
     public mln_resource_request_field fields;
     public sbyte* requested_url;
     public sbyte* resolved_url;
-    public uint kind;
-    public uint loading_method;
-    public uint priority;
-    public uint usage;
-    public uint storage_policy;
+    public mln_resource_kind kind;
+    public mln_resource_loading_method loading_method;
+    public mln_resource_priority priority;
+    public mln_resource_usage usage;
+    public mln_resource_storage_policy storage_policy;
     public mln_resource_range range;
     public long prior_modified_unix_ms;
     public long prior_expires_unix_ms;
@@ -783,8 +789,8 @@ internal unsafe struct mln_resource_response
 {
     public uint size;
     public mln_resource_response_field fields;
-    public uint status;
-    public uint error_reason;
+    public mln_resource_response_status status;
+    public mln_resource_error_reason error_reason;
     public byte* bytes;
     public nuint byte_count;
     public mln_buffer_view error_message;
@@ -807,7 +813,7 @@ internal unsafe struct mln_resource_transform
     public uint size;
     public delegate* unmanaged[Cdecl]<
         void*,
-        uint,
+        mln_resource_kind,
         sbyte*,
         MlnResourceTransformRequest,
         void> callback;
@@ -818,12 +824,12 @@ internal unsafe struct mln_resource_transform
 
 internal unsafe struct mln_runtime_event
 {
-    public uint type;
-    public uint source_type;
+    public mln_runtime_event_type type;
+    public mln_runtime_event_source_type source_type;
     public ulong source;
     public ulong generation;
-    public int code;
-    public uint payload_type;
+    public uint code;
+    public mln_runtime_event_payload_type payload_type;
     public mln_buffer_view message;
     public mln_runtime_event_payload payload;
 }
@@ -840,7 +846,7 @@ internal unsafe struct mln_runtime_event_handler
 internal unsafe struct mln_runtime_event_offline_region_response_error
 {
     public long region_id;
-    public uint reason;
+    public mln_resource_error_reason reason;
 }
 
 internal unsafe struct mln_runtime_event_offline_region_status
@@ -879,7 +885,7 @@ internal unsafe struct mln_runtime_event_payload
 
 internal unsafe struct mln_runtime_event_render_frame
 {
-    public uint mode;
+    public mln_render_mode mode;
     public byte needs_repaint;
     public byte placement_changed;
     public mln_rendering_stats stats;
@@ -887,12 +893,12 @@ internal unsafe struct mln_runtime_event_render_frame
 
 internal unsafe struct mln_runtime_event_render_map
 {
-    public uint mode;
+    public mln_render_mode mode;
 }
 
 internal unsafe struct mln_runtime_event_tile_action
 {
-    public uint operation;
+    public mln_tile_operation operation;
     public mln_tile_id tile_id;
 }
 
@@ -968,8 +974,8 @@ internal unsafe struct mln_style_expression_options
 
 internal unsafe struct mln_style_expression_type
 {
-    public uint kind;
-    public uint item_kind;
+    public mln_style_expression_type_kind kind;
+    public mln_style_expression_type_kind item_kind;
     public uint item_count;
 }
 
@@ -984,8 +990,8 @@ internal unsafe struct mln_style_image_info
     public mln_image_stretch* stretch_y;
     public nuint stretch_y_count;
     public mln_image_content content;
-    public uint text_fit_width;
-    public uint text_fit_height;
+    public mln_style_image_text_fit text_fit_width;
+    public mln_style_image_text_fit text_fit_height;
     public float pixel_ratio;
     public byte sdf;
 }
@@ -999,8 +1005,8 @@ internal unsafe struct mln_style_image_options
     public mln_image_stretch* stretch_y;
     public nuint stretch_y_count;
     public mln_image_content content;
-    public uint text_fit_width;
-    public uint text_fit_height;
+    public mln_style_image_text_fit text_fit_width;
+    public mln_style_image_text_fit text_fit_height;
     public float pixel_ratio;
     public byte sdf;
 }
@@ -1013,13 +1019,13 @@ internal unsafe struct mln_style_layer_info
     public mln_buffer_view source_layer;
     public double min_zoom;
     public double max_zoom;
-    public uint visibility;
+    public mln_style_layer_visibility visibility;
 }
 
 internal unsafe struct mln_style_source_info
 {
     public mln_buffer_view id;
-    public uint type;
+    public mln_style_source_type type;
     public mln_style_source_info_field fields;
     public byte is_volatile;
     public mln_buffer_view attribution;
@@ -1027,8 +1033,8 @@ internal unsafe struct mln_style_source_info
     public mln_style_source_tile_info tilejson;
     public mln_lat_lng_bounds bounds;
     public uint tile_size;
-    public uint vector_encoding;
-    public uint raster_encoding;
+    public mln_style_vector_tile_encoding vector_encoding;
+    public mln_style_raster_dem_encoding raster_encoding;
 }
 
 internal unsafe struct mln_style_source_tile_info
@@ -1037,7 +1043,7 @@ internal unsafe struct mln_style_source_tile_info
     public nuint tile_url_count;
     public double min_zoom;
     public double max_zoom;
-    public uint scheme;
+    public mln_style_tile_scheme scheme;
 }
 
 internal unsafe struct mln_style_transition_options
@@ -1158,7 +1164,7 @@ internal unsafe struct mln_wake
 
 internal unsafe struct mln_webgl_context_descriptor
 {
-    public uint kind;
+    public mln_webgl_context_kind kind;
     public int context;
     public mln_buffer_view canvas_selector;
 }
@@ -1381,7 +1387,7 @@ internal enum mln_gesture_phase : uint
 internal enum mln_gpu_sync_kind : uint
 {
     MLN_GPU_SYNC_CPU_COMPLETE = 0,
-    MLN_GPU_SYNC_OPENGL_FENCE = 3,
+    MLN_GPU_SYNC_OPENGL_FENCE = 1,
 }
 
 internal enum mln_log_event : uint
@@ -1412,16 +1418,16 @@ internal enum mln_log_severity : uint
     MLN_LOG_SEVERITY_ERROR = 3,
 }
 
-internal enum mln_log_severity_mask : uint
+internal enum mln_log_severity_flag : uint
 {
-    MLN_LOG_SEVERITY_MASK_INFO = 2,
-    MLN_LOG_SEVERITY_MASK_WARNING = 4,
-    MLN_LOG_SEVERITY_MASK_ERROR = 8,
-    MLN_LOG_SEVERITY_MASK_DEFAULT = 6,
-    MLN_LOG_SEVERITY_MASK_ALL = 14,
+    MLN_LOG_SEVERITY_FLAG_INFO = 2,
+    MLN_LOG_SEVERITY_FLAG_WARNING = 4,
+    MLN_LOG_SEVERITY_FLAG_ERROR = 8,
+    MLN_LOG_SEVERITY_FLAG_DEFAULT = 6,
+    MLN_LOG_SEVERITY_FLAG_ALL = 14,
 }
 
-internal enum mln_map_debug_option : uint
+internal enum mln_map_debug_flag : uint
 {
     MLN_MAP_DEBUG_TILE_BORDERS = 2,
     MLN_MAP_DEBUG_PARSE_STATUS = 4,
@@ -1548,8 +1554,8 @@ internal enum mln_render_result : uint
 {
     MLN_RENDER_RESULT_RENDERED = 0,
     MLN_RENDER_RESULT_NO_UPDATE = 1,
-    MLN_RENDER_RESULT_TARGET_NOT_READY = 3,
-    MLN_RENDER_RESULT_SUPERSEDED = 4,
+    MLN_RENDER_RESULT_TARGET_NOT_READY = 2,
+    MLN_RENDER_RESULT_SUPERSEDED = 3,
 }
 
 internal enum mln_render_session_capability_flag : uint
@@ -1612,17 +1618,17 @@ internal enum mln_resource_kind : uint
     MLN_RESOURCE_KIND_IMAGE = 7,
 }
 
-internal enum mln_resource_kind_mask : uint
+internal enum mln_resource_kind_flag : uint
 {
-    MLN_RESOURCE_KIND_MASK_UNKNOWN = 1,
-    MLN_RESOURCE_KIND_MASK_STYLE = 2,
-    MLN_RESOURCE_KIND_MASK_SOURCE = 4,
-    MLN_RESOURCE_KIND_MASK_TILE = 8,
-    MLN_RESOURCE_KIND_MASK_GLYPHS = 16,
-    MLN_RESOURCE_KIND_MASK_SPRITE_IMAGE = 32,
-    MLN_RESOURCE_KIND_MASK_SPRITE_JSON = 64,
-    MLN_RESOURCE_KIND_MASK_IMAGE = 128,
-    MLN_RESOURCE_KIND_MASK_ALL = 255,
+    MLN_RESOURCE_KIND_FLAG_UNKNOWN = 1,
+    MLN_RESOURCE_KIND_FLAG_STYLE = 2,
+    MLN_RESOURCE_KIND_FLAG_SOURCE = 4,
+    MLN_RESOURCE_KIND_FLAG_TILE = 8,
+    MLN_RESOURCE_KIND_FLAG_GLYPHS = 16,
+    MLN_RESOURCE_KIND_FLAG_SPRITE_IMAGE = 32,
+    MLN_RESOURCE_KIND_FLAG_SPRITE_JSON = 64,
+    MLN_RESOURCE_KIND_FLAG_IMAGE = 128,
+    MLN_RESOURCE_KIND_FLAG_ALL = 255,
 }
 
 internal enum mln_resource_loading_method : uint
@@ -1672,31 +1678,31 @@ internal enum mln_resource_usage : uint
     MLN_RESOURCE_USAGE_OFFLINE = 1,
 }
 
-internal enum mln_runtime_event_mask : ulong
+internal enum mln_runtime_event_flag : ulong
 {
-    MLN_RUNTIME_EVENT_MASK_NONE = 0,
-    MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE = 2,
-    MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING = 4,
-    MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE = 8,
-    MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED = 16,
-    MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED = 32,
-    MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED = 64,
-    MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED = 128,
-    MLN_RUNTIME_EVENT_MASK_MAP_IDLE = 256,
-    MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR = 1024,
-    MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED = 8192,
-    MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED = 16384,
-    MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED = 32768,
-    MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED = 65536,
-    MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING = 131072,
-    MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION = 262144,
-    MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED = 524288,
-    MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR = 1048576,
-    MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152,
-    MLN_RUNTIME_EVENT_MASK_MAP_SOURCE_CHANGED = 8388608,
-    MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 8906238,
-    MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS = 3670016,
-    MLN_RUNTIME_EVENT_MASK_ALL = 12576254,
+    MLN_RUNTIME_EVENT_FLAG_NONE = 0,
+    MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_WILL_CHANGE = 2,
+    MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_IS_CHANGING = 4,
+    MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_DID_CHANGE = 8,
+    MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED = 16,
+    MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_STARTED = 32,
+    MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_FINISHED = 64,
+    MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_FAILED = 128,
+    MLN_RUNTIME_EVENT_FLAG_MAP_IDLE = 256,
+    MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_ERROR = 512,
+    MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_FRAME_STARTED = 1024,
+    MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_FRAME_FINISHED = 2048,
+    MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_MAP_STARTED = 4096,
+    MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_MAP_FINISHED = 8192,
+    MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_IMAGE_MISSING = 16384,
+    MLN_RUNTIME_EVENT_FLAG_MAP_TILE_ACTION = 32768,
+    MLN_RUNTIME_EVENT_FLAG_MAP_SOURCE_CHANGED = 65536,
+    MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED = 131072,
+    MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR = 262144,
+    MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 524288,
+    MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS = 131070,
+    MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS = 917504,
+    MLN_RUNTIME_EVENT_FLAG_ALL = 1048574,
 }
 
 internal enum mln_runtime_event_payload_type : uint
@@ -1704,10 +1710,10 @@ internal enum mln_runtime_event_payload_type : uint
     MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0,
     MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME = 1,
     MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP = 2,
-    MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION = 4,
-    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 5,
-    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 6,
-    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 7,
+    MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION = 3,
+    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 4,
+    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 5,
+    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 6,
 }
 
 internal enum mln_runtime_event_source_type : uint
@@ -1726,17 +1732,17 @@ internal enum mln_runtime_event_type : uint
     MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED = 6,
     MLN_RUNTIME_EVENT_MAP_LOADING_FAILED = 7,
     MLN_RUNTIME_EVENT_MAP_IDLE = 8,
-    MLN_RUNTIME_EVENT_MAP_RENDER_ERROR = 10,
-    MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED = 13,
-    MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED = 14,
-    MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED = 15,
-    MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED = 16,
-    MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING = 17,
-    MLN_RUNTIME_EVENT_MAP_TILE_ACTION = 18,
-    MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 19,
-    MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20,
-    MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21,
-    MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED = 23,
+    MLN_RUNTIME_EVENT_MAP_RENDER_ERROR = 9,
+    MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED = 10,
+    MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED = 11,
+    MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED = 12,
+    MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED = 13,
+    MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING = 14,
+    MLN_RUNTIME_EVENT_MAP_TILE_ACTION = 15,
+    MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED = 16,
+    MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 17,
+    MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 18,
+    MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19,
 }
 
 internal enum mln_source_feature_field : uint
@@ -1896,7 +1902,7 @@ internal enum mln_tile_operation : uint
     MLN_TILE_OPERATION_NULL = 8,
 }
 
-internal enum mln_url_match_flags : uint
+internal enum mln_url_match_flag : uint
 {
     MLN_URL_MATCH_EXACT = 0,
     MLN_URL_MATCH_GLOB = 1,

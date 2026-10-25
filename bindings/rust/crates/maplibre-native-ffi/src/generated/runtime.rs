@@ -146,13 +146,13 @@ impl RuntimeHandle {
     ///
     /// See `mln_runtime_get_event_mask` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn get_event_mask(&self) -> Result<RuntimeEventMask> {
+    pub fn get_event_mask(&self) -> Result<RuntimeEventFlag> {
         let mut call = self.inner.call();
-        let mut out_mask: u64 = Default::default();
+        let mut out_mask: sys::mln_runtime_event_flags = Default::default();
         call.status(|runtime, out_diagnostic| unsafe {
             sys::mln_runtime_get_event_mask(runtime, &mut out_mask, out_diagnostic)
         })?;
-        Ok(RuntimeEventMask::from_bits_retain(out_mask))
+        Ok(RuntimeEventFlag::from_bits_retain(out_mask))
     }
 
     /// Starts getting one offline region by ID.
@@ -307,7 +307,7 @@ impl RuntimeHandle {
     ///
     /// See `mln_runtime_set_event_mask` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn set_event_mask(&self, mask: RuntimeEventMask) -> Result<()> {
+    pub fn set_event_mask(&self, mask: RuntimeEventFlag) -> Result<()> {
         let mut call = self.inner.call();
         call.status(|runtime, out_diagnostic| unsafe {
             sys::mln_runtime_set_event_mask(runtime, mask.bits(), out_diagnostic)

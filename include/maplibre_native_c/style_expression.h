@@ -45,10 +45,9 @@ typedef enum mln_style_expression_type_kind : uint32_t {
 
 /** A style expression type. */
 typedef struct mln_style_expression_type {
-  /** One of mln_style_expression_type_kind. */
-  uint32_t kind MLN_BINDING("enum=mln_style_expression_type_kind");
+  mln_style_expression_type_kind kind;
   /** For an array, its items' kind; ignored for any other kind. */
-  uint32_t item_kind MLN_BINDING("enum=mln_style_expression_type_kind");
+  mln_style_expression_type_kind item_kind;
   /** For an array, its fixed length, or zero for any length. */
   uint32_t item_count;
 } mln_style_expression_type;
@@ -61,11 +60,14 @@ typedef enum MLN_BINDING(
   MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE = 1U << 0U,
 } mln_style_expression_option_field;
 
+/** A set of mln_style_expression_option_field bits. */
+typedef uint32_t mln_style_expression_option_fields;
+
 /** Options for parsing a style expression. */
 typedef struct mln_style_expression_options {
   uint32_t size;
   /** Bitwise combination of mln_style_expression_option_field values. */
-  uint32_t fields MLN_BINDING("enum=mln_style_expression_option_field");
+  mln_style_expression_option_fields fields;
   /**
    * The type that the expression must produce. A string type coerces the
    * result to a string, as a string layer property does; every other type
@@ -88,6 +90,9 @@ typedef enum MLN_BINDING(
   MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID = 1U << 6U,
 } mln_style_expression_input_field;
 
+/** A set of mln_style_expression_input_field bits. */
+typedef uint32_t mln_style_expression_input_fields;
+
 /**
  * What one evaluation reads.
  *
@@ -98,7 +103,7 @@ typedef enum MLN_BINDING(
 typedef struct mln_style_expression_inputs {
   uint32_t size;
   /** Bitwise combination of mln_style_expression_input_field values. */
-  uint32_t fields MLN_BINDING("enum=mln_style_expression_input_field");
+  mln_style_expression_input_fields fields;
   /** The value of the zoom expression. */
   double zoom MLN_BINDING("mask=fields;bit=MLN_STYLE_EXPRESSION_INPUT_ZOOM");
   /**

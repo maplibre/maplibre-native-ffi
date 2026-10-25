@@ -12,15 +12,12 @@ namespace Maplibre.NativeFfi;
 /// <param name="Kinds">
 /// The resource kinds to match.
 /// </param>
-/// <param name="Flags">
-/// A bitwise OR of <c>mln_url_match_flags</c> values.
-/// </param>
 /// <param name="Url">
 /// The URL or glob pattern to compare.
 /// </param>
 public readonly partial record struct ResourceRoute(
-    ResourceKindMask Kinds,
-    UrlMatchFlags Flags,
+    ResourceKindFlag Kinds,
+    UrlMatchFlag Flags,
     string Url
 )
 {

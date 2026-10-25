@@ -83,10 +83,8 @@ typedef struct mln_runtime_event_delivery {
 
 /** Copied mln_log_callback arguments; fields mirror the callback parameters. */
 typedef struct mln_log_delivery {
-  /** One of mln_log_severity. */
-  uint32_t severity MLN_BINDING("enum=mln_log_severity");
-  /** One of mln_log_event. */
-  uint32_t event MLN_BINDING("enum=mln_log_event");
+  mln_log_severity severity;
+  mln_log_event event;
   int64_t code;
   /** Null-terminated UTF-8 message, owned by the batch. */
   const char* message MLN_BINDING("lifetime=owner");
@@ -114,8 +112,7 @@ typedef struct mln_resource_request_cancel_delivery {
 
 /** Copied mln_resource_transform_callback arguments. */
 typedef struct mln_resource_transform_delivery {
-  /** One of mln_resource_kind. */
-  uint32_t kind MLN_BINDING("enum=mln_resource_kind");
+  mln_resource_kind kind;
   /** The URL to transform, owned by the batch. */
   const char* url MLN_BINDING("lifetime=owner");
   /**
@@ -171,8 +168,7 @@ typedef union mln_delivery_payload {
  * Step through deliveries by mln_delivery_batch_view.delivery_size.
  */
 typedef struct mln_delivery {
-  /** One of mln_delivery_type. */
-  uint32_t type MLN_BINDING("enum=mln_delivery_type");
+  mln_delivery_type type;
   uint32_t reserved MLN_BINDING("kind=reserved");
   /**
    * Opaque host token from the registration or completion, returned unchanged.

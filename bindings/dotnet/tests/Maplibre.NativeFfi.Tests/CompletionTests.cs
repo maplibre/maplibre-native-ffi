@@ -10,10 +10,10 @@ public sealed class CompletionTests
     public async Task DiscardedCommandsAreFencedAndSynchronousRejectionThrows()
     {
         await using var fixture = await NativeFixture.CreateAsync();
-        fixture.Map.Discarding.SetDebugOptions(MapDebugOption.TileBorders);
+        fixture.Map.Discarding.SetDebugOptions(MapDebugFlag.TileBorders);
         // A later command on the same map completes after the discarded one.
         await fixture.Map.RequestRepaintAsync();
-        Assert.Equal(MapDebugOption.TileBorders, fixture.Map.GetSnapshot().DebugOptions);
+        Assert.Equal(MapDebugFlag.TileBorders, fixture.Map.GetSnapshot().DebugOptions);
         Assert.Throws<MaplibreException>(() =>
             fixture.Map.Discarding.Resize(
                 new LogicalExtent
@@ -71,7 +71,7 @@ public sealed class CompletionTests
         var result = new mln_completion_result
         {
             size = (uint)sizeof(mln_completion_result),
-            status = (int)mln_status.MLN_STATUS_OK,
+            status = mln_status.MLN_STATUS_OK,
             value = value,
             value_count = count,
         };
@@ -88,7 +88,7 @@ public sealed class CompletionTests
         var result = new mln_completion_result
         {
             size = (uint)sizeof(mln_completion_result),
-            status = (int)mln_status.MLN_STATUS_OK,
+            status = mln_status.MLN_STATUS_OK,
             value = wide,
             value_size = 3 * sizeof(double),
             value_count = 2,
@@ -169,8 +169,8 @@ public sealed class CompletionTests
             var result = new mln_completion_result
             {
                 size = (uint)sizeof(mln_completion_result),
-                status = (int)mln_status.MLN_STATUS_CANCELLED,
-                disposition = (uint)mln_command_disposition.MLN_COMMAND_DISPOSITION_CANCELLED,
+                status = mln_status.MLN_STATUS_CANCELLED,
+                disposition = mln_command_disposition.MLN_COMMAND_DISPOSITION_CANCELLED,
                 generation = 9,
                 diagnostic = new mln_buffer_view { data = diagnostic, size = 9 },
             };

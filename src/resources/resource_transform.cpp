@@ -45,8 +45,9 @@ auto take_answer(ResourceTransformRequestObject& object)
 }  // namespace
 
 auto request_resource_transform(
-  mln_resource_transform_callback callback, void* user_data, std::uint32_t kind,
-  const std::string& url, mln::ResourceTransform::FinishedCallback finished
+  mln_resource_transform_callback callback, void* user_data,
+  mln_resource_kind kind, const std::string& url,
+  mln::ResourceTransform::FinishedCallback finished
 ) -> void {
   auto object = std::shared_ptr<ResourceTransformRequestObject>{};
   auto request = mln_resource_transform_request{MLN_HANDLE_NULL};

@@ -80,7 +80,7 @@ struct BlockingTransform {
 };
 
 void blocking_transform(
-  void* user_data, uint32_t kind, const char* url,
+  void* user_data, mln_resource_kind kind, const char* url,
   mln_resource_transform_request request
 ) {
   static_cast<void>(kind);

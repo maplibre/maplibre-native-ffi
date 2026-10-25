@@ -9,7 +9,7 @@ import {
   type RuntimeHandle,
   RuntimeEventType,
   runtimeCreate,
-  UrlMatchFlags,
+  UrlMatchFlag,
 } from "../../src/index.ts";
 import { openRuntime, styleResponse, styleRoute } from "./fixture.ts";
 import { renderExtent, requestFrame, TestSession } from "./graphics.ts";
@@ -35,7 +35,7 @@ export async function routeRequests(
   const tiles: string[] = [];
   const fixture = await openRuntime({
     provider: {
-      routes: [{ flags: UrlMatchFlags.glob, url: `${scheme}://**` }],
+      routes: [{ flags: UrlMatchFlag.glob, url: `${scheme}://**` }],
       callback(request, handle) {
         requests.push(request.requestedUrl ?? "");
         handle.complete(styleResponse());

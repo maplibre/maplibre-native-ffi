@@ -753,7 +753,7 @@ static mln_render_frame_result render_and_settle(
     runtime, MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED, map, &event, NULL, 0
   ));
   MLN_TEST_AWAIT_OK(mln_map_set_event_mask(
-    map, MLN_RUNTIME_EVENT_MASK_ALL, &completion.descriptor, NULL
+    map, MLN_RUNTIME_EVENT_FLAG_ALL, &completion.descriptor, NULL
   ));
   return result;
 }

@@ -584,14 +584,11 @@ def delivery_functions(api: Api) -> set[str]:
 
 def reachable_types(api: Api, functions: Iterable[Function]) -> set[str]:
     """The records, enums, and typedefs that the functions reach, through their
-    parameters, results, record members, callback signatures, and `enum=`."""
+    parameters, results, record members, and callback signatures, along with
+    the bitmask enum of each flag set they reach."""
     typedefs = api.typedefs_by_name
     records = api.records_by_name
     seen: set[str] = set()
-
-    def visit_metadata(metadata: dict[str, str]):
-        if "enum" in metadata:
-            seen.add(metadata["enum"])
 
     def visit(type_: CType | None):
         while type_ is not None and type_.kind in {"pointer", "array"}:
@@ -602,12 +599,13 @@ def reachable_types(api: Api, functions: Iterable[Function]) -> set[str]:
         if not name or name in seen:
             return
         seen.add(name)
+        enum = api.enum_for(name)
+        if enum is not None:
+            seen.add(enum.name)
         if name in typedefs:
             typedef = typedefs[name]
-            visit_metadata(typedef.metadata)
             for parameter in typedef.parameters:
                 visit(parameter.type)
-                visit_metadata(parameter.metadata)
             signature = typedef.type.pointee
             if signature is not None and signature.result is not None:
                 visit(signature.result)
@@ -615,14 +613,11 @@ def reachable_types(api: Api, functions: Iterable[Function]) -> set[str]:
         if name in records:
             for field in records[name].fields:
                 visit(field.type)
-                visit_metadata(field.metadata)
 
     for function in functions:
         visit(function.return_type)
-        visit_metadata(function.metadata)
         for parameter in function.parameters:
             visit(parameter.type)
-            visit_metadata(parameter.metadata)
     return seen
 
 

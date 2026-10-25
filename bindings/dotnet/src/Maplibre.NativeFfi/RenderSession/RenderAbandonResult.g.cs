@@ -2,9 +2,6 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
-/// <param name="Disposition">
-/// One <c>mln_render_abandon_disposition</c> value.
-/// </param>
 /// <param name="QuarantinedResourceCount">
 /// Backend resource groups intentionally retained until process exit.
 /// </param>

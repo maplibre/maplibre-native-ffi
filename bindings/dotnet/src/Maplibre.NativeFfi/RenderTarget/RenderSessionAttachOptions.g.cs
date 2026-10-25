@@ -10,8 +10,7 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Driver">
-/// One <c>mln_render_driver_kind</c> value. Defaults to
-/// <c>MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD</c>.
+/// Defaults to <c>MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD</c>.
 /// </param>
 /// <param name="RequestedTextureRingDepth">
 /// Requested slot count of a session-owned texture ring, from one to

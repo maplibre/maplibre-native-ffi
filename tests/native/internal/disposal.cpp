@@ -593,7 +593,7 @@ void a_view_and_its_own_abandonment_keep_a_session_busy() {
     return mln_acquired_frame_view_begin(fake.frame, &scope, nullptr);
   });
   auto result =
-    mln_render_abandon_result{sizeof(mln_render_abandon_result), 0, 0, 0};
+    mln_render_abandon_result{.size = sizeof(mln_render_abandon_result)};
   MLN_TEST_STATUS(
     MLN_STATUS_BUSY, mln_render_session_abandon(session, &result, nullptr)
   );

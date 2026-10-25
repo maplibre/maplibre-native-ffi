@@ -1,5 +1,3 @@
-#include <cstdint>
-
 #include <mln/storage/network_status.hpp>
 
 #include "resources/network_status.hpp"
@@ -9,7 +7,7 @@
 
 namespace mln::core {
 
-auto network_status_get(std::uint32_t* out_status) -> mln_status {
+auto network_status_get(mln_network_status* out_status) -> mln_status {
   if (out_status == nullptr) {
     set_thread_error("out_status must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -21,7 +19,7 @@ auto network_status_get(std::uint32_t* out_status) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto network_status_set(std::uint32_t status) -> mln_status {
+auto network_status_set(mln_network_status status) -> mln_status {
   switch (status) {
     case MLN_NETWORK_STATUS_ONLINE:
       mln::NetworkStatus::Set(mln::NetworkStatus::Status::Online);

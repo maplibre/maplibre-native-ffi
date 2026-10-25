@@ -19,10 +19,6 @@ public sealed record MapTileOptions
     public double? LodScale { get; init; }
     public double? LodPitchThreshold { get; init; }
     public double? LodZoomShift { get; init; }
-
-    /// <summary>
-    /// One of <c>mln_tile_lod_mode</c>.
-    /// </summary>
     public TileLodMode? LodMode { get; init; }
     public static MapTileOptions Default
     {

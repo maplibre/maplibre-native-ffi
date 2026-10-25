@@ -138,7 +138,9 @@ auto copy(const T& source, Capture capture) -> T {
 
 int main() {
   char message[] = "borrowed";
-  const mln_log_delivery log{1, 2, 3, message};
+  const mln_log_delivery log{
+    MLN_LOG_SEVERITY_INFO, MLN_LOG_EVENT_SHADER, 3, message
+  };
   const auto copied = copy(log, [](auto& arena, const mln_log_delivery& value) {
     return mln::delivery::capture_element(arena, value);
   });
@@ -234,7 +236,9 @@ int main() {
   assert(overflow);
 
   mln_offline_region_info offline{};
-  offline.definition.type = std::numeric_limits<std::uint32_t>::max();
+  offline.definition.type = static_cast<mln_offline_region_definition_type>(
+    std::numeric_limits<std::uint32_t>::max()
+  );
   bool variant = false;
   try { static_cast<void>(copy(&offline, 1)); }
   catch (const std::invalid_argument&) { variant = true; }

@@ -211,7 +211,7 @@ auto from_unix_ms(std::int64_t unix_ms) -> mln::Timestamp {
   );
 }
 
-auto kind_to_abi(mln::Resource::Kind kind) -> std::uint32_t {
+auto kind_to_abi(mln::Resource::Kind kind) -> mln_resource_kind {
   switch (kind) {
     case mln::Resource::Kind::Style:
       return MLN_RESOURCE_KIND_STYLE;
@@ -234,7 +234,7 @@ auto kind_to_abi(mln::Resource::Kind kind) -> std::uint32_t {
 }
 
 auto loading_method_to_abi(mln::Resource::LoadingMethod method)
-  -> std::uint32_t {
+  -> mln_resource_loading_method {
   switch (method) {
     case mln::Resource::LoadingMethod::CacheOnly:
       return MLN_RESOURCE_LOADING_METHOD_CACHE_ONLY;
@@ -247,7 +247,7 @@ auto loading_method_to_abi(mln::Resource::LoadingMethod method)
   }
 }
 
-auto error_reason_from_abi(std::uint32_t reason)
+auto error_reason_from_abi(mln_resource_error_reason reason)
   -> mln::Response::Error::Reason {
   switch (reason) {
     case MLN_RESOURCE_ERROR_REASON_NOT_FOUND:

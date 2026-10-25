@@ -76,13 +76,13 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_get_event_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func getEventMask() throws -> RuntimeEventMask {
-    var value0: UInt64 = 0
+  func getEventMask() throws -> RuntimeEventFlag {
+    var value0: mln_runtime_event_flags = 0
     return try nativeInvoke { raw, _, diagnostic in mln_runtime_get_event_mask(
       raw,
       &value0,
       diagnostic
-    ) } result: { RuntimeEventMask(rawValue: value0) }
+    ) } result: { RuntimeEventFlag(rawValue: value0) }
   }
 
   /// Starts release of a runtime after checking its children.
@@ -112,7 +112,7 @@ public extension RuntimeHandle {
     try await nativeUnit { raw, _, completion, diagnostic in
       mln_runtime_run_ambient_cache_operation(
         raw,
-        bindingArg0.nativeValue(),
+        mln_ambient_cache_operation(rawValue: bindingArg0.rawValue),
         completion,
         diagnostic
       )
@@ -141,10 +141,10 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_set_event_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func setEventMask(_ bindingArg0: RuntimeEventMask) throws {
+  func setEventMask(_ bindingArg0: RuntimeEventFlag) throws {
     try nativeInvoke { raw, _, diagnostic in mln_runtime_set_event_mask(
       raw,
-      bindingArg0.nativeValue(),
+      bindingArg0.rawValue,
       diagnostic
     ) }
   }

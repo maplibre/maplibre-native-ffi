@@ -57,8 +57,8 @@ public sealed class ResourceProviderTests
         ImmutableArray<ResourceRoute> routes =
         [
             // Another kind: claims no style.
-            new ResourceRoute(ResourceKindMask.Tile, UrlMatchFlags.Glob, "unrouted-test://**"),
-            new ResourceRoute { Flags = UrlMatchFlags.Glob, Url = "routed-test://**" },
+            new ResourceRoute(ResourceKindFlag.Tile, UrlMatchFlag.Glob, "unrouted-test://**"),
+            new ResourceRoute { Flags = UrlMatchFlag.Glob, Url = "routed-test://**" },
         ];
         await using var fixture = await NativeFixture.CreateAsync(
             provider: new ResourceProvider

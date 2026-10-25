@@ -228,7 +228,7 @@ pub fn log_clear_callback() -> Result<()> {
 ///
 /// See `mln_log_set_async_severity_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-pub fn log_set_async_severity_mask(mask: LogSeverityMask) -> Result<()> {
+pub fn log_set_async_severity_mask(mask: LogSeverityFlag) -> Result<()> {
     let mut call = Call::global();
     maplibre_core::validate_abi_version()?;
     call.status(|_, out_diagnostic| unsafe {
@@ -371,7 +371,7 @@ pub fn metal_surface_descriptor_default() -> MetalSurfaceDescriptor {
 pub fn network_get_status() -> Result<NetworkStatus> {
     let mut call = Call::global();
     maplibre_core::validate_abi_version()?;
-    let mut out_status: u32 = Default::default();
+    let mut out_status: sys::mln_network_status = Default::default();
     call.status(|_, out_diagnostic| unsafe {
         sys::mln_network_get_status(&mut out_status, out_diagnostic)
     })?;

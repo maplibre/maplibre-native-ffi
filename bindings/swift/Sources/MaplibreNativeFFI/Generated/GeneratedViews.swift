@@ -110,8 +110,8 @@ public final class GpuSyncView {
     get throws { try scope.check(); return snapshot.kind }
   }
 
-  public var object: UInt64 {
-    get throws { try scope.check(); return snapshot.object }
+  public var handle: UInt64 {
+    get throws { try scope.check(); return snapshot.handle }
   }
 }
 

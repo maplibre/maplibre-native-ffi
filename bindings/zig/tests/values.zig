@@ -54,7 +54,7 @@ test "optional fields and masks round-trip through presence bits" {
     try testing.expectEqual(@as(?f64, 5.0), snapshot.view.camera.zoom);
     try testing.expectApproxEqAbs(@as(f64, 30.0), snapshot.view.camera.pitch.?, 1e-9);
 
-    var mask = maplibre.RuntimeEventMask.all;
+    var mask = maplibre.RuntimeEventFlag.all;
     mask.map_tile_action = false;
     mask.offline_region_status_changed = false;
     try fixture.runtime.setEventMask(mask, null);

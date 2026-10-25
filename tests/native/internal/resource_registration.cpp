@@ -70,12 +70,12 @@ auto provider_callback(
   mln_test_request_pass_through(handle);
 }
 void transform_callback(
-  void*, uint32_t, const char*, mln_resource_transform_request request
+  void*, mln_resource_kind, const char*, mln_resource_transform_request request
 ) {
   mln_resource_transform_request_release(request);
 }
 auto header_callback(
-  void*, uint32_t, const char*, mln_http_header_transform_response*
+  void*, mln_resource_kind, const char*, mln_http_header_transform_response*
 ) -> mln_status {
   return MLN_STATUS_OK;
 }

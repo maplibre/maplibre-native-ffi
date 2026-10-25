@@ -67,9 +67,9 @@ import Testing
   }
 
   var source = mln_style_source_info()
-  source.type = 700
+  source.type = mln_style_source_type(rawValue: 700)
   source.fields = MLN_STYLE_SOURCE_INFO_TILEJSON.rawValue
-  source.tilejson.scheme = 701
+  source.tilejson.scheme = mln_style_tile_scheme(rawValue: 701)
   let copied = try StyleSourceInfo(raw: source)
   #expect(copied.type.rawValue == 700)
   #expect(copied.tilejson?.scheme.rawValue == 701)
@@ -86,7 +86,7 @@ import Testing
 /// instead of reading through it.
 @Test func aNativeCopyRejectsANullPointerWithANonzeroSize() {
   var definition = mln_offline_region_definition()
-  definition.type = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY.rawValue
+  definition.type = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
   definition.data.geometry = mln_offline_geometry_region_definition()
   definition.data.geometry.geometry = mln_buffer_view(data: nil, size: 1)
   #expect(throws: MaplibreError.self) {

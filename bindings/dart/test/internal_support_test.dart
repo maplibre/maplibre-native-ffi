@@ -199,15 +199,15 @@ void main() {
       }
 
       final renderMap = (events + eventSize).cast<raw.mln_runtime_event>().ref;
-      renderMap.type = 16;
-      renderMap.source_type = 1;
+      renderMap.type = raw.MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED;
+      renderMap.source_type = raw.MLN_RUNTIME_EVENT_SOURCE_MAP;
       // A map id this build cannot resolve to a wrapper still names one object
       // for the life of the process, so the raw id has to survive the decode:
       // it is the only identity a host can route or correlate the event on.
       renderMap.source = 0xfeed;
       renderMap.code = 0;
-      renderMap.payload_type = 2;
-      renderMap.payload.render_map.mode = 1;
+      renderMap.payload_type = raw.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP;
+      renderMap.payload.render_map.mode = raw.MLN_RENDER_MODE_FULL;
 
       batch.ref.size = sizeOf<raw.mln_event_batch_view>();
       batch.ref.event_size = eventSize;

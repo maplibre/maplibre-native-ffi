@@ -9,9 +9,6 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_render_session_snapshot</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="State">
-/// One <c>mln_render_session_state</c> value.
-/// </param>
 /// <param name="Extent">
 /// Logical extent applied by the driver.
 /// </param>

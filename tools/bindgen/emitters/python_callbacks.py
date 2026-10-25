@@ -9,7 +9,14 @@ the record keeps its value semantics, and the native registration is affine.
 from dataclasses import replace
 
 from .. import async_hosts, docs
-from .python_values import field_name, native_name, public_name, rust_field, scalar_type
+from .python_values import (
+    enum_type,
+    field_name,
+    native_name,
+    public_name,
+    rust_field,
+    scalar_type,
+)
 
 
 def plain_fields(plan):
@@ -33,6 +40,8 @@ def ffi_type(value):
         return "*mut std::ffi::c_void"
     if value.kind == "buffer" and value.ctype.pointee:
         return "*const std::ffi::c_char"
+    if value.kind == "enum":
+        return enum_type(value)
     return "sys::" + value.native
 
 

@@ -259,8 +259,8 @@ static mln_map create_map_without_style_events(mln_runtime runtime) {
   mln_map_options options = mln_map_options_default();
   options.initial_extent.width = 256;
   options.initial_extent.height = 256;
-  options.event_mask = MLN_RUNTIME_EVENT_MASK_ALL &
-                       ~(uint64_t)MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED;
+  options.event_mask = MLN_RUNTIME_EVENT_FLAG_ALL &
+                       ~(uint64_t)MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED;
   return mln_test_create_map_with_options(runtime, &options);
 }
 

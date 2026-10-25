@@ -154,7 +154,7 @@ class RuntimeEventRenderMapVariant:
 @dataclass(frozen=True, slots=True)
 class RuntimeEventTileActionVariant:
     value: RuntimeEventTileAction
-    _tag = 4
+    _tag = 3
 
     @classmethod
     def _from_native(cls, raw):
@@ -164,7 +164,7 @@ class RuntimeEventTileActionVariant:
 @dataclass(frozen=True, slots=True)
 class RuntimeEventOfflineRegionStatusVariant:
     value: RuntimeEventOfflineRegionStatus
-    _tag = 5
+    _tag = 4
 
     @classmethod
     def _from_native(cls, raw):
@@ -174,7 +174,7 @@ class RuntimeEventOfflineRegionStatusVariant:
 @dataclass(frozen=True, slots=True)
 class RuntimeEventOfflineRegionResponseErrorVariant:
     value: RuntimeEventOfflineRegionResponseError
-    _tag = 6
+    _tag = 5
 
     @classmethod
     def _from_native(cls, raw):
@@ -184,7 +184,7 @@ class RuntimeEventOfflineRegionResponseErrorVariant:
 @dataclass(frozen=True, slots=True)
 class RuntimeEventOfflineRegionTileCountLimitVariant:
     value: RuntimeEventOfflineRegionTileCountLimit
-    _tag = 7
+    _tag = 6
 
     @classmethod
     def _from_native(cls, raw):
@@ -292,7 +292,7 @@ class GpuSyncKind(UnknownIntEnum):
     """
 
     CPU_COMPLETE = 0
-    OPENGL_FENCE = 3
+    OPENGL_FENCE = 1
 
 
 class LogEvent(UnknownIntEnum):
@@ -333,10 +333,10 @@ class LogSeverity(UnknownIntEnum):
     ERROR = 3
 
 
-class LogSeverityMask(IntFlag):
+class LogSeverityFlag(IntFlag):
     """Bitmask values for log severities dispatched asynchronously.
 
-    See `mln_log_severity_mask` in the
+    See `mln_log_severity_flag` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
     """
 
@@ -347,10 +347,10 @@ class LogSeverityMask(IntFlag):
     ALL = 14
 
 
-class MapDebugOption(IntFlag):
+class MapDebugFlag(IntFlag):
     """Debug overlay mask values for `mln_map_set_debug_options()`.
 
-    See `mln_map_debug_option` in the
+    See `mln_map_debug_flag` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
@@ -489,8 +489,8 @@ class RenderResult(UnknownIntEnum):
 
     RENDERED = 0
     NO_UPDATE = 1
-    TARGET_NOT_READY = 3
-    SUPERSEDED = 4
+    TARGET_NOT_READY = 2
+    SUPERSEDED = 3
 
 
 class RenderSessionCapabilityFlag(IntFlag):
@@ -541,12 +541,12 @@ class ResourceKind(UnknownIntEnum):
     IMAGE = 7
 
 
-class ResourceKindMask(IntFlag):
+class ResourceKindFlag(IntFlag):
     """The resource kinds that a route or rule matches, one bit per
     `mln_resource_kind` value. Registration requires at least one known bit.
-    `MLN_RESOURCE_KIND_MASK_ALL` selects every resource kind.
+    `MLN_RESOURCE_KIND_FLAG_ALL` selects every resource kind.
 
-    See `mln_resource_kind_mask` in the
+    See `mln_resource_kind_flag` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
@@ -595,10 +595,10 @@ class ResourceUsage(UnknownIntEnum):
     OFFLINE = 1
 
 
-class RuntimeEventMask(IntFlag):
+class RuntimeEventFlag(IntFlag):
     """Bit values for the map and runtime event subscription masks.
 
-    See `mln_runtime_event_mask` in the
+    See `mln_runtime_event_flag` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
@@ -611,20 +611,20 @@ class RuntimeEventMask(IntFlag):
     MAP_LOADING_FINISHED = 64
     MAP_LOADING_FAILED = 128
     MAP_IDLE = 256
-    MAP_RENDER_ERROR = 1024
-    MAP_RENDER_FRAME_STARTED = 8192
-    MAP_RENDER_FRAME_FINISHED = 16384
-    MAP_RENDER_MAP_STARTED = 32768
-    MAP_RENDER_MAP_FINISHED = 65536
-    MAP_STYLE_IMAGE_MISSING = 131072
-    MAP_TILE_ACTION = 262144
-    OFFLINE_REGION_STATUS_CHANGED = 524288
-    OFFLINE_REGION_RESPONSE_ERROR = 1048576
-    OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152
-    MAP_SOURCE_CHANGED = 8388608
-    ALL_MAP_EVENTS = 8906238
-    ALL_RUNTIME_EVENTS = 3670016
-    ALL = 12576254
+    MAP_RENDER_ERROR = 512
+    MAP_RENDER_FRAME_STARTED = 1024
+    MAP_RENDER_FRAME_FINISHED = 2048
+    MAP_RENDER_MAP_STARTED = 4096
+    MAP_RENDER_MAP_FINISHED = 8192
+    MAP_STYLE_IMAGE_MISSING = 16384
+    MAP_TILE_ACTION = 32768
+    MAP_SOURCE_CHANGED = 65536
+    OFFLINE_REGION_STATUS_CHANGED = 131072
+    OFFLINE_REGION_RESPONSE_ERROR = 262144
+    OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 524288
+    ALL_MAP_EVENTS = 131070
+    ALL_RUNTIME_EVENTS = 917504
+    ALL = 1048574
 
 
 class RuntimeEventSourceType(UnknownIntEnum):
@@ -653,17 +653,17 @@ class RuntimeEventType(UnknownIntEnum):
     MAP_LOADING_FINISHED = 6
     MAP_LOADING_FAILED = 7
     MAP_IDLE = 8
-    MAP_RENDER_ERROR = 10
-    MAP_RENDER_FRAME_STARTED = 13
-    MAP_RENDER_FRAME_FINISHED = 14
-    MAP_RENDER_MAP_STARTED = 15
-    MAP_RENDER_MAP_FINISHED = 16
-    MAP_STYLE_IMAGE_MISSING = 17
-    MAP_TILE_ACTION = 18
-    OFFLINE_REGION_STATUS_CHANGED = 19
-    OFFLINE_REGION_RESPONSE_ERROR = 20
-    OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21
-    MAP_SOURCE_CHANGED = 23
+    MAP_RENDER_ERROR = 9
+    MAP_RENDER_FRAME_STARTED = 10
+    MAP_RENDER_FRAME_FINISHED = 11
+    MAP_RENDER_MAP_STARTED = 12
+    MAP_RENDER_MAP_FINISHED = 13
+    MAP_STYLE_IMAGE_MISSING = 14
+    MAP_TILE_ACTION = 15
+    MAP_SOURCE_CHANGED = 16
+    OFFLINE_REGION_STATUS_CHANGED = 17
+    OFFLINE_REGION_RESPONSE_ERROR = 18
+    OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19
 
 
 class Status(UnknownIntEnum):
@@ -810,10 +810,10 @@ class TileOperation(UnknownIntEnum):
     NULL = 8
 
 
-class UrlMatchFlags(IntFlag):
+class UrlMatchFlag(IntFlag):
     """How a rule or route compares its url against a request URL.
 
-    See `mln_url_match_flags` in the
+    See `mln_url_match_flag` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
@@ -1093,7 +1093,6 @@ class CameraTransitionEnd:
     """
 
     outcome: CameraTransitionOutcome
-    """One of `mln_camera_transition_outcome`."""
 
     generation: int
     """Generation of the published snapshot that shows the camera where the
@@ -1507,14 +1506,13 @@ class GpuSync:
     """
 
     kind: GpuSyncKind = field(default_factory=lambda: GpuSync.default().kind)
-    """One `mln_gpu_sync_kind` value."""
 
-    object: int = field(default_factory=lambda: GpuSync.default().object)
+    handle: int = field(default_factory=lambda: GpuSync.default().handle)
     """Bit pattern of the GLsync pointer."""
 
     @classmethod
     def _from_native(cls, raw):
-        return cls(kind=GpuSyncKind(raw["kind"]), object=raw["object"])
+        return cls(kind=GpuSyncKind(raw["kind"]), handle=raw["handle"])
 
     @classmethod
     def default(cls):
@@ -1548,13 +1546,12 @@ class HttpHeaderRule:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    kinds: ResourceKindMask = field(
+    kinds: ResourceKindFlag = field(
         default_factory=lambda: HttpHeaderRule.default().kinds
     )
     """The resource kinds to match."""
 
-    flags: UrlMatchFlags = field(default_factory=lambda: HttpHeaderRule.default().flags)
-    """A bitwise OR of `mln_url_match_flags` values."""
+    flags: UrlMatchFlag = field(default_factory=lambda: HttpHeaderRule.default().flags)
 
     url: str = field(default_factory=lambda: HttpHeaderRule.default().url)
     """The URL or glob pattern to compare."""
@@ -1572,8 +1569,8 @@ class HttpHeaderRule:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            kinds=ResourceKindMask(raw["kinds"]),
-            flags=UrlMatchFlags(raw["flags"]),
+            kinds=ResourceKindFlag(raw["kinds"]),
+            flags=UrlMatchFlag(raw["flags"]),
             url=raw["url"],
             headers=tuple(HttpHeader._from_native(item) for item in raw["headers"]),
         )
@@ -1754,7 +1751,7 @@ class MapOptions:
     """
 
     map_mode: MapMode = field(default_factory=lambda: MapOptions.default().map_mode)
-    """One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`."""
+    """Defaults to `MLN_MAP_MODE_CONTINUOUS`."""
 
     fast_pfor_enabled: bool = field(
         default_factory=lambda: MapOptions.default().fast_pfor_enabled
@@ -1763,11 +1760,11 @@ class MapOptions:
     encodings. Defaults to false.
     """
 
-    event_mask: RuntimeEventMask = field(
+    event_mask: RuntimeEventFlag = field(
         default_factory=lambda: MapOptions.default().event_mask
     )
     """Map-originated event types this map queues, as a bitwise OR of
-    `mln_runtime_event_mask` values.
+    `mln_runtime_event_flag` values.
     """
 
     @classmethod
@@ -1776,7 +1773,7 @@ class MapOptions:
             initial_extent=LogicalExtent._from_native(raw["initial_extent"]),
             map_mode=MapMode(raw["map_mode"]),
             fast_pfor_enabled=raw["fast_pfor_enabled"],
-            event_mask=RuntimeEventMask(raw["event_mask"]),
+            event_mask=RuntimeEventFlag(raw["event_mask"]),
         )
 
     @classmethod
@@ -1794,8 +1791,8 @@ class MapSnapshot:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
-    debug_options: MapDebugOption
-    """Debug overlay mask of `mln_map_debug_option` values."""
+    debug_options: MapDebugFlag
+    """Debug overlay mask of `mln_map_debug_flag` values."""
 
     generation: int
 
@@ -1810,7 +1807,7 @@ class MapSnapshot:
     transition_in_progress: bool
     """True while a camera command with a duration is still animating."""
 
-    event_mask: RuntimeEventMask
+    event_mask: RuntimeEventFlag
 
     latest_render_update_generation: int
     """Generation of the latest render update the map published. A rendered
@@ -1833,13 +1830,13 @@ class MapSnapshot:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            debug_options=MapDebugOption(raw["debug_options"]),
+            debug_options=MapDebugFlag(raw["debug_options"]),
             generation=raw["generation"],
             fully_loaded=raw["fully_loaded"],
             rendering_stats_view_enabled=raw["rendering_stats_view_enabled"],
             gesture_in_progress=raw["gesture_in_progress"],
             transition_in_progress=raw["transition_in_progress"],
-            event_mask=RuntimeEventMask(raw["event_mask"]),
+            event_mask=RuntimeEventFlag(raw["event_mask"]),
             latest_render_update_generation=raw["latest_render_update_generation"],
             tile=MapTileOptions._from_native(raw["tile"]),
             bounds=BoundOptions._from_native(raw["bounds"]),
@@ -1868,7 +1865,6 @@ class MapTileOptions:
     lod_zoom_shift: float | None = None
 
     lod_mode: TileLodMode | None = None
-    """One of `mln_tile_lod_mode`."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -1935,13 +1931,10 @@ class MapViewportOptions:
     """
 
     north_orientation: NorthOrientation | None = None
-    """One of `mln_north_orientation`."""
 
     constrain_mode: ConstrainMode | None = None
-    """One of `mln_constrain_mode`."""
 
     viewport_mode: ViewportMode | None = None
-    """One of `mln_viewport_mode`."""
 
     frustum_offset: EdgeInsets | None = None
 
@@ -2280,7 +2273,6 @@ class OfflineRegionStatus:
     """
 
     download_state: OfflineRegionDownloadState
-    """One of `mln_offline_region_download_state`."""
 
     completed_resource_count: int
 
@@ -2797,7 +2789,6 @@ class NativeQueueLock:
 @dataclass(frozen=True, slots=True)
 class RenderAbandonResult:
     disposition: RenderAbandonDisposition
-    """One `mln_render_abandon_disposition` value."""
 
     quarantined_resource_count: int
     """Backend resource groups intentionally retained until process exit."""
@@ -2820,7 +2811,6 @@ class RenderFrameResult:
     """
 
     disposition: RenderResult
-    """One `mln_render_result` value."""
 
     token: int
 
@@ -2884,9 +2874,7 @@ class RenderSessionAttachOptions:
     driver: RenderDriverKind = field(
         default_factory=lambda: RenderSessionAttachOptions.default().driver
     )
-    """One `mln_render_driver_kind` value. Defaults to
-    `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
-    """
+    """Defaults to `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`."""
 
     requested_texture_ring_depth: int = field(
         default_factory=lambda: (
@@ -2957,7 +2945,6 @@ class RenderSessionCapabilities:
     """
 
     driver: RenderDriverKind
-    """One `mln_render_driver_kind` value."""
 
     texture_ring_depth: int
     """Granted texture ring depth: the slot count of a session-owned ring, or
@@ -2965,7 +2952,6 @@ class RenderSessionCapabilities:
     """
 
     flags: RenderSessionCapabilityFlag
-    """A bitwise OR of `mln_render_session_capability_flag` values."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2985,7 +2971,6 @@ class RenderSessionSnapshot:
     """
 
     state: RenderSessionState
-    """One `mln_render_session_state` value."""
 
     extent: LogicalExtent
     """Logical extent applied by the driver."""
@@ -3317,13 +3302,12 @@ class ResourceRoute:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    kinds: ResourceKindMask = field(
+    kinds: ResourceKindFlag = field(
         default_factory=lambda: ResourceRoute.default().kinds
     )
     """The resource kinds to match."""
 
-    flags: UrlMatchFlags = field(default_factory=lambda: ResourceRoute.default().flags)
-    """A bitwise OR of `mln_url_match_flags` values."""
+    flags: UrlMatchFlag = field(default_factory=lambda: ResourceRoute.default().flags)
 
     url: str = field(default_factory=lambda: ResourceRoute.default().url)
     """The URL or glob pattern to compare."""
@@ -3331,8 +3315,8 @@ class ResourceRoute:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            kinds=ResourceKindMask(raw["kinds"]),
-            flags=UrlMatchFlags(raw["flags"]),
+            kinds=ResourceKindFlag(raw["kinds"]),
+            flags=UrlMatchFlag(raw["flags"]),
             url=raw["url"],
         )
 
@@ -3373,10 +3357,8 @@ class RuntimeEvent:
     """
 
     type: RuntimeEventType
-    """One of `mln_runtime_event_type`."""
 
     source_type: RuntimeEventSourceType
-    """One of `mln_runtime_event_source_type`."""
 
     source: int
     """Source handle selected by source_type: an `mln_runtime` or an `mln_map`."""
@@ -3457,7 +3439,6 @@ class RuntimeEventOfflineRegionResponseError:
     region_id: int
 
     reason: ResourceErrorReason
-    """One of `mln_resource_error_reason`."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3512,7 +3493,6 @@ class RuntimeEventRenderFrame:
     """
 
     mode: RenderMode
-    """One of `mln_render_mode`."""
 
     needs_repaint: bool
     """Whether MapLibre needs another frame after this one."""
@@ -3541,7 +3521,6 @@ class RuntimeEventRenderMap:
     """
 
     mode: RenderMode
-    """One of `mln_render_mode`."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3557,7 +3536,6 @@ class RuntimeEventTileAction:
     """
 
     operation: TileOperation
-    """One of `mln_tile_operation`."""
 
     tile_id: TileId
 
@@ -3830,7 +3808,6 @@ class StyleExpressionType:
     """
 
     kind: StyleExpressionTypeKind
-    """One of `mln_style_expression_type_kind`."""
 
     item_kind: StyleExpressionTypeKind
     """For an array, its items' kind; ignored for any other kind."""
@@ -3929,10 +3906,10 @@ class StyleImageOptions:
     """Content box used when icon-text-fit applies."""
 
     text_fit_width: StyleImageTextFit | None = None
-    """One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK."""
+    """Defaults to STRETCH_OR_SHRINK."""
 
     text_fit_height: StyleImageTextFit | None = None
-    """One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK."""
+    """Defaults to STRETCH_OR_SHRINK."""
 
     pixel_ratio: float | None = None
     """Sprite pixel ratio. Defaults to 1."""
@@ -3988,7 +3965,6 @@ class StyleLayerInfo:
     """Highest zoom at which the layer draws; INFINITY with no upper bound."""
 
     visibility: StyleLayerVisibility
-    """One of `mln_style_layer_visibility`."""
 
     source_id: str | None = None
     """Source ID. Empty for a layer type that takes no source."""
@@ -4022,7 +3998,6 @@ class StyleSourceInfo:
     """Source ID."""
 
     type: StyleSourceType
-    """One of `mln_style_source_type`."""
 
     is_volatile: bool
     """Whether the source is marked volatile."""
@@ -4082,7 +4057,6 @@ class StyleSourceTileInfo:
     """Highest zoom level the TileJSON provides tiles for."""
 
     scheme: StyleTileScheme
-    """One of `mln_style_tile_scheme`."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -4602,7 +4576,6 @@ class WebglContextDescriptor:
     """
 
     kind: WebglContextKind
-    """One `mln_webgl_context_kind` value."""
 
     context: int
     """Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive."""

@@ -471,7 +471,7 @@ struct RenderTextureSlot {
   mln_gpu_sync producer_sync{
     .size = sizeof(mln_gpu_sync),
     .kind = MLN_GPU_SYNC_CPU_COMPLETE,
-    .object = 0,
+    .handle = 0,
   };
   // Recorded by the driver thread when the slot's frame is published. Empty
   // until then, which makes the slot unacquirable.
@@ -832,7 +832,7 @@ struct mln_render_session_object
   // rejects an enabled lock on any other backend.
   bool accepts_queue_lock = false;
   // Selected by an attachment that supports GPU producer synchronization.
-  uint32_t producer_sync_kind = MLN_GPU_SYNC_CPU_COMPLETE;
+  mln_gpu_sync_kind producer_sync_kind = MLN_GPU_SYNC_CPU_COMPLETE;
   bool frame_wake_pending = false;
   bool driver_wake_pending = false;
   bool scheduler_service_queued = false;

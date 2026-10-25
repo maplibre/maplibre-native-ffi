@@ -10,9 +10,6 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_render_frame_result</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Disposition">
-/// One <c>mln_render_result</c> value.
-/// </param>
 /// <param name="MapUpdateGeneration">
 /// Generation of the map render update the demand evaluated. When disposition
 /// is <c>MLN_RENDER_RESULT_RENDERED</c>, the frame drew that update; compare it

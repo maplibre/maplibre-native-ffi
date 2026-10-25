@@ -16,7 +16,7 @@ import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.generated.ResourceRoute
 import org.maplibre.nativeffi.generated.RuntimeEventSourceType
 import org.maplibre.nativeffi.generated.RuntimeEventType
-import org.maplibre.nativeffi.generated.UrlMatchFlags
+import org.maplibre.nativeffi.generated.UrlMatchFlag
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
 
@@ -31,7 +31,7 @@ class AndroidTlsVerificationTest {
     UntrustedTlsServer().use { server ->
       // The provider claims plain HTTP alone, so the HTTPS request reaches the native client.
       val provider =
-        denyingProvider(listOf(ResourceRoute(flags = UrlMatchFlags.GLOB, url = "http://**")))
+        denyingProvider(listOf(ResourceRoute(flags = UrlMatchFlag.GLOB, url = "http://**")))
       withMap(provider = provider) {
         map.setStyleUrl("https://$HOST:${server.port}/style.json").awaitWithin("the style command")
         val failure =

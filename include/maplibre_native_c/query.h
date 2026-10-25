@@ -59,8 +59,7 @@ typedef union mln_rendered_query_geometry_data {
 /** Rendered feature query geometry descriptor. */
 typedef struct mln_rendered_query_geometry {
   uint32_t size;
-  /** One of mln_rendered_query_geometry_type. */
-  uint32_t type MLN_BINDING("enum=mln_rendered_query_geometry_type");
+  mln_rendered_query_geometry_type type;
   mln_rendered_query_geometry_data data MLN_BINDING("tag=type");
 } mln_rendered_query_geometry;
 
@@ -72,10 +71,13 @@ typedef enum MLN_BINDING(
   MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER = 1U << 1U,
 } mln_rendered_feature_query_option_field;
 
+/** A set of mln_rendered_feature_query_option_field bits. */
+typedef uint32_t mln_rendered_feature_query_option_fields;
+
 /** Options for rendered feature queries. */
 typedef struct mln_rendered_feature_query_options {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_rendered_feature_query_option_field");
+  mln_rendered_feature_query_option_fields fields;
   /** Optional style layer IDs. When absent, all rendered layers are queried. */
   const mln_buffer_view* layer_ids MLN_BINDING(
     "length=layer_id_count;mask=fields;"
@@ -96,10 +98,13 @@ typedef enum MLN_BINDING(
   MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER = 1U << 1U,
 } mln_source_feature_query_option_field;
 
+/** A set of mln_source_feature_query_option_field bits. */
+typedef uint32_t mln_source_feature_query_option_fields;
+
 /** Options for source feature queries. */
 typedef struct mln_source_feature_query_options {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_source_feature_query_option_field");
+  mln_source_feature_query_option_fields fields;
   /**
    * Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
    */
@@ -121,6 +126,9 @@ typedef enum MLN_BINDING("kind=bitmask") mln_rendered_feature_field : uint32_t {
   MLN_RENDERED_FEATURE_STATE = 1U << 2U,
 } mln_rendered_feature_field;
 
+/** A set of mln_rendered_feature_field bits. */
+typedef uint32_t mln_rendered_feature_fields;
+
 /**
  * One rendered-feature query hit borrowed for a completion callback.
  *
@@ -132,7 +140,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_rendered_feature_field : uint32_t {
  * has no source_id. state is a UTF-8 JSON object.
  */
 typedef struct mln_rendered_feature {
-  uint32_t fields MLN_BINDING("enum=mln_rendered_feature_field");
+  mln_rendered_feature_fields fields;
   mln_buffer_view feature MLN_BINDING("encoding=json");
   mln_buffer_view layer_id;
   mln_buffer_view source_id
@@ -148,6 +156,9 @@ typedef enum MLN_BINDING("kind=bitmask") mln_source_feature_field : uint32_t {
   MLN_SOURCE_FEATURE_SOURCE_LAYER_ID = 1U << 0U,
 } mln_source_feature_field;
 
+/** A set of mln_source_feature_field bits. */
+typedef uint32_t mln_source_feature_fields;
+
 /**
  * One source-feature query hit borrowed for a completion callback.
  *
@@ -157,7 +168,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_source_feature_field : uint32_t {
  * source without source layers, such as GeoJSON, has none.
  */
 typedef struct mln_source_feature {
-  uint32_t fields MLN_BINDING("enum=mln_source_feature_field");
+  mln_source_feature_fields fields;
   mln_buffer_view feature MLN_BINDING("encoding=json");
   mln_buffer_view source_layer_id
     MLN_BINDING("mask=fields;bit=MLN_SOURCE_FEATURE_SOURCE_LAYER_ID");

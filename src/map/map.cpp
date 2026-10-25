@@ -276,7 +276,7 @@ namespace {
 using mln::core::CallbackSourceRegistry;
 
 auto to_c_camera_change_mode(mln::MapObserver::CameraChangeMode mode)
-  -> int32_t {
+  -> mln_camera_change_mode {
   switch (mode) {
     case mln::MapObserver::CameraChangeMode::Immediate:
       return MLN_CAMERA_CHANGE_MODE_IMMEDIATE;
@@ -287,7 +287,7 @@ auto to_c_camera_change_mode(mln::MapObserver::CameraChangeMode mode)
   return MLN_CAMERA_CHANGE_MODE_IMMEDIATE;
 }
 
-auto to_c_render_mode(mln::MapObserver::RenderMode mode) -> uint32_t {
+auto to_c_render_mode(mln::MapObserver::RenderMode mode) -> mln_render_mode {
   switch (mode) {
     case mln::MapObserver::RenderMode::Partial:
       return MLN_RENDER_MODE_PARTIAL;
@@ -333,7 +333,7 @@ auto render_map_payload(mln::MapObserver::RenderMode mode)
   return payload;
 }
 
-auto to_c_tile_operation(mln::TileOperation operation) -> uint32_t {
+auto to_c_tile_operation(mln::TileOperation operation) -> mln_tile_operation {
   switch (operation) {
     case mln::TileOperation::RequestedFromCache:
       return MLN_TILE_OPERATION_REQUESTED_FROM_CACHE;
@@ -408,7 +408,9 @@ class CameraTransitionEnd final {
     owned_.store(false, std::memory_order_release);
   }
 
-  auto deliver(uint32_t outcome, uint64_t generation) noexcept -> void {
+  auto deliver(
+    mln_camera_transition_outcome outcome, uint64_t generation
+  ) noexcept -> void {
     if (!owned_.exchange(false, std::memory_order_acq_rel)) return;
     if (process_exiting()) return;
     const auto end = mln_camera_transition_end{
@@ -452,10 +454,10 @@ namespace {
 // callbacks, so an event that cannot be queued is dropped rather than thrown.
 // The message is copied inside the guard for the same reason.
 auto queue_map_event(
-  MapEventState& events, uint64_t generation, uint32_t type,
-  uint32_t payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE,
+  MapEventState& events, uint64_t generation, mln_runtime_event_type type,
+  mln_runtime_event_payload_type payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE,
   const mln_runtime_event_payload& payload = zeroed_event_payload(),
-  int32_t code = 0, std::string_view message = {}
+  uint32_t code = 0, std::string_view message = {}
 ) noexcept -> void {
   try {
     if (events.in_transaction()) {
@@ -502,7 +504,7 @@ auto queue_held_map_events(MapEventState& events, uint64_t generation) -> void {
 // map close already reported records nothing.
 auto end_camera_command(
   MapEventState& events, const std::shared_ptr<CameraTransitionEnd>& end,
-  uint32_t outcome
+  mln_camera_transition_outcome outcome
 ) noexcept -> void {
   auto& running = events.running_transition_ends;
   const auto found = std::find(running.begin(), running.end(), end);
@@ -669,7 +671,8 @@ class HeadlessObserver final : public mln::MapObserver {
       return;
     }
     queue_fresh(
-      MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, static_cast<int32_t>(error), message
+      MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, static_cast<uint32_t>(error),
+      message
     );
   }
 
@@ -778,12 +781,14 @@ class HeadlessObserver final : public mln::MapObserver {
   }
 
  private:
-  [[nodiscard]] auto selected(uint32_t type) const noexcept -> bool {
+  [[nodiscard]] auto selected(mln_runtime_event_type type) const noexcept
+    -> bool {
     return mln::core::event_selected(event_state_->mask, type);
   }
 
   auto queue_fresh(
-    uint32_t type, int32_t code = 0, std::string_view message = {}
+    mln_runtime_event_type type, uint32_t code = 0,
+    std::string_view message = {}
   ) noexcept -> void {
     auto& events = *event_state_;
     queue_map_event(
@@ -793,8 +798,10 @@ class HeadlessObserver final : public mln::MapObserver {
   }
 
   auto queue_current(
-    uint32_t type, int32_t code = 0, std::string_view message = {},
-    uint32_t payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE,
+    mln_runtime_event_type type, uint32_t code = 0,
+    std::string_view message = {},
+    mln_runtime_event_payload_type payload_type =
+      MLN_RUNTIME_EVENT_PAYLOAD_NONE,
     const mln_runtime_event_payload& payload = zeroed_event_payload()
   ) noexcept -> void {
     auto& events = *event_state_;
@@ -1242,7 +1249,7 @@ auto validate_map_options(const mln_map_options* options) -> mln_status {
   }
 
   constexpr auto known_mask_bits =
-    static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL);
+    static_cast<uint64_t>(MLN_RUNTIME_EVENT_FLAG_ALL);
   if ((options->event_mask & ~known_mask_bits) != 0U) {
     mln::core::set_thread_error(
       "mln_map_options.event_mask contains unknown bits"
@@ -1271,7 +1278,7 @@ auto validate_map_options(const mln_map_options* options) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto to_native_map_mode(uint32_t mode) -> mln::MapMode {
+auto to_native_map_mode(mln_map_mode mode) -> mln::MapMode {
   switch (mode) {
     case MLN_MAP_MODE_STATIC:
       return mln::MapMode::Static;
@@ -1285,7 +1292,7 @@ auto to_native_map_mode(uint32_t mode) -> mln::MapMode {
   }
 }
 
-auto is_still_map_mode(uint32_t mode) -> bool {
+auto is_still_map_mode(mln_map_mode mode) -> bool {
   return mode == MLN_MAP_MODE_STATIC || mode == MLN_MAP_MODE_TILE;
 }
 
@@ -2198,7 +2205,7 @@ auto from_native_debug_options(mln::MapDebugOptions options) -> uint32_t {
   return static_cast<uint32_t>(options);
 }
 
-auto to_native_north_orientation(uint32_t orientation)
+auto to_native_north_orientation(mln_north_orientation orientation)
   -> mln::NorthOrientation {
   switch (orientation) {
     case MLN_NORTH_ORIENTATION_RIGHT:
@@ -2216,7 +2223,7 @@ auto to_native_north_orientation(uint32_t orientation)
 }
 
 auto from_native_north_orientation(mln::NorthOrientation orientation)
-  -> uint32_t {
+  -> mln_north_orientation {
   switch (orientation) {
     case mln::NorthOrientation::Rightwards:
       return MLN_NORTH_ORIENTATION_RIGHT;
@@ -2231,7 +2238,7 @@ auto from_native_north_orientation(mln::NorthOrientation orientation)
   return MLN_NORTH_ORIENTATION_UP;
 }
 
-auto to_native_constrain_mode(uint32_t mode) -> mln::ConstrainMode {
+auto to_native_constrain_mode(mln_constrain_mode mode) -> mln::ConstrainMode {
   switch (mode) {
     case MLN_CONSTRAIN_MODE_NONE:
       return mln::ConstrainMode::None;
@@ -2247,7 +2254,7 @@ auto to_native_constrain_mode(uint32_t mode) -> mln::ConstrainMode {
   }
 }
 
-auto from_native_constrain_mode(mln::ConstrainMode mode) -> uint32_t {
+auto from_native_constrain_mode(mln::ConstrainMode mode) -> mln_constrain_mode {
   switch (mode) {
     case mln::ConstrainMode::None:
       return MLN_CONSTRAIN_MODE_NONE;
@@ -2262,7 +2269,7 @@ auto from_native_constrain_mode(mln::ConstrainMode mode) -> uint32_t {
   return MLN_CONSTRAIN_MODE_HEIGHT_ONLY;
 }
 
-auto to_native_viewport_mode(uint32_t mode) -> mln::ViewportMode {
+auto to_native_viewport_mode(mln_viewport_mode mode) -> mln::ViewportMode {
   switch (mode) {
     case MLN_VIEWPORT_MODE_FLIPPED_Y:
       return mln::ViewportMode::FlippedY;
@@ -2274,7 +2281,7 @@ auto to_native_viewport_mode(uint32_t mode) -> mln::ViewportMode {
   }
 }
 
-auto from_native_viewport_mode(mln::ViewportMode mode) -> uint32_t {
+auto from_native_viewport_mode(mln::ViewportMode mode) -> mln_viewport_mode {
   switch (mode) {
     case mln::ViewportMode::FlippedY:
       return MLN_VIEWPORT_MODE_FLIPPED_Y;
@@ -2294,7 +2301,7 @@ auto from_native_edge_insets(const mln::EdgeInsets& insets) -> mln_edge_insets {
   };
 }
 
-auto to_native_tile_lod_mode(uint32_t mode) -> mln::TileLodMode {
+auto to_native_tile_lod_mode(mln_tile_lod_mode mode) -> mln::TileLodMode {
   switch (mode) {
     case MLN_TILE_LOD_MODE_DISTANCE:
       return mln::TileLodMode::Distance;
@@ -2306,7 +2313,7 @@ auto to_native_tile_lod_mode(uint32_t mode) -> mln::TileLodMode {
   }
 }
 
-auto from_native_tile_lod_mode(mln::TileLodMode mode) -> uint32_t {
+auto from_native_tile_lod_mode(mln::TileLodMode mode) -> mln_tile_lod_mode {
   switch (mode) {
     case mln::TileLodMode::Distance:
       return MLN_TILE_LOD_MODE_DISTANCE;
@@ -2962,7 +2969,7 @@ auto map_options_default() noexcept -> mln_map_options {
        .scale_factor = default_scale_factor},
     .map_mode = MLN_MAP_MODE_CONTINUOUS,
     .fast_pfor_enabled = false,
-    .event_mask = MLN_RUNTIME_EVENT_MASK_ALL
+    .event_mask = MLN_RUNTIME_EVENT_FLAG_ALL
   };
 }
 
@@ -4203,7 +4210,7 @@ auto map_style_url_start(mln_map map, const mln_completion* completion)
 auto map_set_event_mask(
   mln_map map, uint64_t mask, const mln_completion* completion
 ) -> mln_status {
-  if ((mask & ~static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL)) != 0U) {
+  if ((mask & ~static_cast<uint64_t>(MLN_RUNTIME_EVENT_FLAG_ALL)) != 0U) {
     set_thread_error("mask must be valid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -4236,13 +4243,15 @@ auto submit_camera_command(
 
 // BEGIN and UPDATE mark the gesture before the camera write, so MapLibre
 // applies its gesture rules to that write.
-auto apply_gesture_phase_before(MapObject& live, uint32_t phase) -> void {
+auto apply_gesture_phase_before(MapObject& live, mln_gesture_phase phase)
+  -> void {
   if (phase == MLN_GESTURE_PHASE_BEGIN || phase == MLN_GESTURE_PHASE_UPDATE) {
     live.map->setGestureInProgress(true);
   }
 }
 
-auto apply_gesture_phase_after(MapObject& live, uint32_t phase) -> void {
+auto apply_gesture_phase_after(MapObject& live, mln_gesture_phase phase)
+  -> void {
   if (phase == MLN_GESTURE_PHASE_CANCEL) {
     const auto cancellation = TransitionCancellationScope{
       *live.event_state, {.active = true, .all = true}

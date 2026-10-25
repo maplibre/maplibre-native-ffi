@@ -21,9 +21,9 @@ import type {
   LatLng,
   LatLngBounds,
   LogHandler,
-  LogSeverityMask,
+  LogSeverityFlag,
   LogicalExtent,
-  MapDebugOption,
+  MapDebugFlag,
   MapOptions,
   MapSnapshot,
   MapTileOptions,
@@ -57,8 +57,8 @@ import type {
   ResourceResponse,
   ResourceRoute,
   ResourceTransform,
+  RuntimeEventFlag,
   RuntimeEventHandler,
-  RuntimeEventMask,
   RuntimeOptions,
   ScreenPoint,
   SourceFeatureQueryOptions,
@@ -110,7 +110,7 @@ export interface NativeOperations {
   mln_http_header_rule_default(): HttpHeaderRule;
   mln_lat_lng_for_projected_meters(meters: ProjectedMeters | undefined): LatLng;
   mln_log_clear_callback(): void;
-  mln_log_set_async_severity_mask(mask: LogSeverityMask): void;
+  mln_log_set_async_severity_mask(mask: LogSeverityFlag): void;
   mln_log_set_callback(handler: LogHandler): void;
   mln_logical_extent_default(): LogicalExtent;
   mln_logical_extent_physical_size(extent: LogicalExtent | undefined): {
@@ -447,12 +447,12 @@ export interface NativeOperations {
   ): void;
   mln_map_set_debug_options(
     map: bigint,
-    options: MapDebugOption,
+    options: MapDebugFlag,
     completion: number | undefined,
   ): void;
   mln_map_set_event_mask(
     map: bigint,
-    mask: RuntimeEventMask,
+    mask: RuntimeEventFlag,
     completion: number | undefined,
   ): void;
   mln_map_set_feature_state(
@@ -741,7 +741,7 @@ export interface NativeOperations {
     completion: number,
   ): void;
   mln_runtime_dispose(runtime: bigint, token: object | undefined): void;
-  mln_runtime_get_event_mask(runtime: bigint): RuntimeEventMask;
+  mln_runtime_get_event_mask(runtime: bigint): RuntimeEventFlag;
   mln_runtime_get_offline_region(
     runtime: bigint,
     regionId: bigint,
@@ -779,7 +779,7 @@ export interface NativeOperations {
     handler: RuntimeEventHandler | undefined,
     completion: number | undefined,
   ): void;
-  mln_runtime_set_event_mask(runtime: bigint, mask: RuntimeEventMask): void;
+  mln_runtime_set_event_mask(runtime: bigint, mask: RuntimeEventFlag): void;
   mln_runtime_set_http_header_transform(
     runtime: bigint,
     transform: HttpHeaderTransform,

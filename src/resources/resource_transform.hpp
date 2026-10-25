@@ -13,8 +13,9 @@ namespace mln::core {
 // MapLibre's finished callback once. A request that cannot be issued keeps its
 // URL without reaching the callback.
 auto request_resource_transform(
-  mln_resource_transform_callback callback, void* user_data, std::uint32_t kind,
-  const std::string& url, mln::ResourceTransform::FinishedCallback finished
+  mln_resource_transform_callback callback, void* user_data,
+  mln_resource_kind kind, const std::string& url,
+  mln::ResourceTransform::FinishedCallback finished
 ) -> void;
 
 auto complete_resource_transform_request(

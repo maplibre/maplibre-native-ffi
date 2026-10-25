@@ -20,7 +20,7 @@ private final class HeldCompletion: @unchecked Sendable {
     withUnsafePointer(to: value) { value in
       var result = mln_completion_result()
       result.size = UInt32(MemoryLayout<mln_completion_result>.size)
-      result.status = status.rawValue
+      result.status = mln_status(rawValue: status.rawValue)
       result.value = UnsafeRawPointer(value)
       result.value_count = 1
       descriptor.callback?(descriptor.user_data, &result)
@@ -100,7 +100,7 @@ private struct ConversionFailure: Error {}
   try wide.withUnsafeBytes { bytes in
     var result = mln_completion_result()
     result.size = UInt32(MemoryLayout<mln_completion_result>.size)
-    result.status = MLN_STATUS_OK.rawValue
+    result.status = MLN_STATUS_OK
     result.value = bytes.baseAddress
     result.value_count = 2
     result.value_size = UInt32(3 * MemoryLayout<Double>.size)

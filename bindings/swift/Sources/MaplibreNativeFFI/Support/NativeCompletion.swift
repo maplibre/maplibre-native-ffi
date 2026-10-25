@@ -24,13 +24,13 @@ private final class NativeCompletionState<Value: Sendable>:
     let converted: Result<Value, Error>
     do {
       let raw = native.pointee
-      guard raw.status == MLN_STATUS_OK.rawValue else {
+      guard raw.status == MLN_STATUS_OK else {
         let diagnostic = try NativeString.copyUTF8(
           data: raw.diagnostic.data,
           size: raw.diagnostic.size
         )
         throw MaplibreError(
-          status: Status(rawValue: raw.status),
+          status: Status(rawValue: raw.status.rawValue),
           diagnostic: diagnostic,
           generation: raw.generation
         )

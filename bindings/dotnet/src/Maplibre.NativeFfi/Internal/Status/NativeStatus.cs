@@ -14,10 +14,10 @@ internal static unsafe class NativeStatus
     }
 
     /// <summary>Throws a completion's status, with the generation a failed command published.</summary>
-    internal static void Check(int rawStatus, string diagnostic, ulong generation)
+    internal static void Check(mln_status status, string diagnostic, ulong generation)
     {
-        if (rawStatus != 0)
-            throw new MaplibreException((global::Maplibre.NativeFfi.Status)rawStatus, diagnostic)
+        if (status != mln_status.MLN_STATUS_OK)
+            throw new MaplibreException((global::Maplibre.NativeFfi.Status)status, diagnostic)
             {
                 Generation = generation,
             };

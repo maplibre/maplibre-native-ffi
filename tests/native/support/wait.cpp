@@ -91,7 +91,7 @@ struct CompletionState {
   bool completed = false;
   bool released = false;
   mln_status status = MLN_STATUS_INVALID_STATE;
-  std::uint32_t disposition = MLN_COMMAND_DISPOSITION_COMMITTED;
+  mln_command_disposition disposition = MLN_COMMAND_DISPOSITION_COMMITTED;
   std::uint64_t generation = 0;
   std::uint64_t render_update_generation = 0;
   std::string diagnostic;
@@ -116,7 +116,7 @@ void receive_completion(
   if (probe == nullptr || result == nullptr) return;
   {
     const auto lock = std::scoped_lock{probe->mutex};
-    probe->status = static_cast<mln_status>(result->status);
+    probe->status = result->status;
     probe->disposition = result->disposition;
     probe->generation = result->generation;
     probe->render_update_generation = result->render_update_generation;
@@ -492,7 +492,7 @@ extern "C" auto mln_test_completion_status(mln_test_completion* completion)
 }
 
 extern "C" auto mln_test_completion_disposition(mln_test_completion* completion)
-  -> uint32_t {
+  -> mln_command_disposition {
   auto* probe = state(completion);
   if (probe == nullptr) return MLN_COMMAND_DISPOSITION_CANCELLED;
   const auto lock = std::scoped_lock{probe->mutex};

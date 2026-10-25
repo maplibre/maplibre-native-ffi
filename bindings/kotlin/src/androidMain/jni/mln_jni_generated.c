@@ -347,7 +347,8 @@ static jint mln_log_set_async_severity_mask_jni(
   JNIEnv* env, jclass type, jint mask, jlong out_diagnostic
 ) {
   return (jint)mln_log_set_async_severity_mask(
-    (uint32_t)mask, MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+    (mln_log_severity_flags)mask,
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
 
@@ -1269,7 +1270,7 @@ static jint mln_map_set_debug_options_jni(
   jlong out_diagnostic
 ) {
   return (jint)mln_map_set_debug_options(
-    (mln_map)map, (uint32_t)options,
+    (mln_map)map, (mln_map_debug_flags)options,
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -1280,7 +1281,7 @@ static jint mln_map_set_event_mask_jni(
   jlong out_diagnostic
 ) {
   return (jint)mln_map_set_event_mask(
-    (mln_map)map, (uint64_t)mask,
+    (mln_map)map, (mln_runtime_event_flags)mask,
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -1603,7 +1604,7 @@ static jint mln_network_get_status_jni(
   JNIEnv* env, jclass type, jlong out_status, jlong out_diagnostic
 ) {
   return (jint)mln_network_get_status(
-    MLN_JNI_POINTER(uint32_t*, out_status),
+    MLN_JNI_POINTER(mln_network_status*, out_status),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -1612,7 +1613,7 @@ static jint mln_network_set_status_jni(
   JNIEnv* env, jclass type, jint status, jlong out_diagnostic
 ) {
   return (jint)mln_network_set_status(
-    (uint32_t)status, MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+    (mln_network_status)status, MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
 
@@ -2216,7 +2217,7 @@ static jint mln_runtime_get_event_mask_jni(
   JNIEnv* env, jclass type, jlong runtime, jlong out_mask, jlong out_diagnostic
 ) {
   return (jint)mln_runtime_get_event_mask(
-    (mln_runtime)runtime, MLN_JNI_POINTER(uint64_t*, out_mask),
+    (mln_runtime)runtime, MLN_JNI_POINTER(mln_runtime_event_flags*, out_mask),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -2301,7 +2302,7 @@ static jint mln_runtime_run_ambient_cache_operation_jni(
   jlong out_diagnostic
 ) {
   return (jint)mln_runtime_run_ambient_cache_operation(
-    (mln_runtime)runtime, (uint32_t)operation,
+    (mln_runtime)runtime, (mln_ambient_cache_operation)operation,
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -2323,7 +2324,7 @@ static jint mln_runtime_set_event_mask_jni(
   JNIEnv* env, jclass type, jlong runtime, jlong mask, jlong out_diagnostic
 ) {
   return (jint)mln_runtime_set_event_mask(
-    (mln_runtime)runtime, (uint64_t)mask,
+    (mln_runtime)runtime, (mln_runtime_event_flags)mask,
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -2356,7 +2357,8 @@ static jint mln_runtime_set_offline_region_download_state_jni(
   jlong completion, jlong out_diagnostic
 ) {
   return (jint)mln_runtime_set_offline_region_download_state(
-    (mln_runtime)runtime, (mln_offline_region_id)region_id, (uint32_t)state,
+    (mln_runtime)runtime, (mln_offline_region_id)region_id,
+    (mln_offline_region_download_state)state,
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -3524,7 +3526,7 @@ static void mln_jni_releaseRoot(void* userData) {
 }
 
 static bool mln_jni_logHandlerCallback(
-  void* userData, uint32_t severity, uint32_t event, int64_t code,
+  void* userData, mln_log_severity severity, mln_log_event event, int64_t code,
   const char* message
 ) {
   jvalue arguments[] = {
@@ -3542,7 +3544,7 @@ static bool mln_jni_logHandlerCallback(
 }
 
 static mln_status mln_jni_httpHeaderTransformCallback(
-  void* userData, uint32_t kind, const char* url,
+  void* userData, mln_resource_kind kind, const char* url,
   mln_http_header_transform_response* outResponse
 ) {
   jvalue arguments[] = {
@@ -3637,7 +3639,7 @@ static void mln_jni_resourceProviderCallback(
 }
 
 static void mln_jni_resourceTransformCallback(
-  void* userData, uint32_t kind, const char* url,
+  void* userData, mln_resource_kind kind, const char* url,
   mln_resource_transform_request request
 ) {
   jvalue arguments[] = {

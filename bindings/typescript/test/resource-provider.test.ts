@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import {
   MaplibreError,
   ResourceKind,
-  ResourceKindMask,
+  ResourceKindFlag,
   type ResourceProvider,
   type ResourceRequestHandle,
   type ResourceRequestInfo,
@@ -15,7 +15,7 @@ import {
   type ResourceTransformRequestHandle,
   RuntimeEventType,
   Status,
-  UrlMatchFlags,
+  UrlMatchFlag,
 } from "../src/index.ts";
 import { rootsOf } from "../src/internal/owners.ts";
 import {
@@ -37,7 +37,7 @@ function isStatus(status: number) {
 
 /** A provider whose one route matches nothing, so every request loads. */
 const nothingClaimed: ResourceProvider = {
-  routes: [{ kinds: ResourceKindMask.unknown, url: "none://" }],
+  routes: [{ kinds: ResourceKindFlag.unknown, url: "none://" }],
   callback: (_request, handle) => handle.close(),
 };
 
@@ -73,7 +73,7 @@ test(
     const fixture = await openRuntime({
       provider: {
         // The pattern alone names no kinds, so it matches every one.
-        routes: [{ url: "custom://**", flags: UrlMatchFlags.glob }],
+        routes: [{ url: "custom://**", flags: UrlMatchFlag.glob }],
         callback(request, handle) {
           requests.push(request.requestedUrl ?? "");
           assert.equal(request.kind, ResourceKind.style);
@@ -205,7 +205,7 @@ test(
     await setHeaderTransform(fixture.runtime, {
       rules: [
         {
-          flags: UrlMatchFlags.glob,
+          flags: UrlMatchFlag.glob,
           url: `${origin.url}/**`,
           headers: [{ name: "x-maplibre-test", value: "transformed" }],
         },

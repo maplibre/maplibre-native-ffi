@@ -56,7 +56,7 @@ public struct EglContextDescriptor: Equatable, Hashable, Sendable {
       raw.share_context,
       to: UInt.self
     ))
-    clientApi = OpenglClientApi(rawValue: raw.client_api)
+    clientApi = OpenglClientApi(rawValue: raw.client_api.rawValue)
     getProcAddress = NativePointer(bitPattern: unsafeBitCast(
       raw.get_proc_address,
       to: UInt.self
@@ -68,7 +68,7 @@ public struct EglContextDescriptor: Equatable, Hashable, Sendable {
     raw.display = display.unsafeMutableRawPointer
     raw.config = config.unsafeMutableRawPointer
     raw.share_context = shareContext.unsafeMutableRawPointer
-    raw.client_api = clientApi.rawValue
+    raw.client_api = mln_opengl_client_api(rawValue: clientApi.rawValue)
     raw.get_proc_address = getProcAddress.unsafeMutableRawPointer
     return raw
   }
@@ -79,31 +79,30 @@ public struct EglContextDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_gpu_sync` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct GpuSync: Equatable, Hashable, Sendable {
-  /// One `mln_gpu_sync_kind` value.
   public var kind: GpuSyncKind
   /// Bit pattern of the GLsync pointer.
-  public var object: UInt64
+  public var handle: UInt64
   public static var `default`: Self {
     Self(raw: nativeDefault(mln_gpu_sync_default))
   }
 
   public init(
     kind: GpuSyncKind = GpuSync.default.kind,
-    object: UInt64 = GpuSync.default.object
+    handle: UInt64 = GpuSync.default.handle
   ) {
     self.kind = kind
-    self.object = object
+    self.handle = handle
   }
 
   init(raw: mln_gpu_sync) {
-    kind = GpuSyncKind(rawValue: raw.kind)
-    object = raw.object
+    kind = GpuSyncKind(rawValue: raw.kind.rawValue)
+    handle = raw.handle
   }
 
   func nativeValue() -> mln_gpu_sync {
     var raw = mln_gpu_sync_default()
-    raw.kind = kind.rawValue
-    raw.object = object
+    raw.kind = mln_gpu_sync_kind(rawValue: kind.rawValue)
+    raw.handle = handle
     return raw
   }
 }
@@ -125,12 +124,12 @@ public struct GpuSyncKind: RawRepresentable, CustomStringConvertible,
   /// before the release call.
   public static let cpuComplete: GpuSyncKind = .init(rawValue: 0)
   /// GLsync in the shared EGL or WGL context's share group, used only by a
-  /// caller-graphics-thread driver. object is nonzero.
-  public static let openglFence: GpuSyncKind = .init(rawValue: 3)
+  /// caller-graphics-thread driver. handle is nonzero.
+  public static let openglFence: GpuSyncKind = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
     case 0: return "cpuComplete"
-    case 3: return "openglFence"
+    case 1: return "openglFence"
     default: return "GpuSyncKind(\(rawValue))"
     }
   }
@@ -216,10 +215,10 @@ public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
     raw: mln_opengl_context_descriptor,
     recordBytes: UnsafeRawBufferPointer? = nil
   ) throws {
-    ownership = OpenglContextOwnership(rawValue: raw.ownership)
+    ownership = OpenglContextOwnership(rawValue: raw.ownership.rawValue)
     data = try { () throws -> OpenglContextDescriptorData in
-      switch raw
-        .platform
+      switch raw.platform
+        .rawValue
       {
       case MLN_OPENGL_CONTEXT_PLATFORM_WGL
         .rawValue: return .wgl(WglContextDescriptor(raw: raw.data
@@ -229,7 +228,7 @@ public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
                   .rawValue: return try .webgl(WebglContextDescriptor(raw: raw
             .data
             .webgl)) default: return .unknown(
-          raw.platform,
+          raw.platform.rawValue,
           recordBytes
             .map {
               Data($0
@@ -245,14 +244,14 @@ public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
     -> mln_opengl_context_descriptor
   {
     var raw = mln_opengl_context_descriptor()
-    raw.ownership = ownership.rawValue
+    raw.ownership = mln_opengl_context_ownership(rawValue: ownership.rawValue)
     switch data {
-    case let .wgl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL
-      .rawValue; raw.data.wgl = item.nativeValue()
-    case let .egl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL
-      .rawValue; raw.data.egl = item.nativeValue()
-    case let .webgl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL
-      .rawValue; raw.data.webgl = try item.nativeValue(arena: arena)
+    case let .wgl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL; raw
+      .data.wgl = item.nativeValue()
+    case let .egl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL; raw
+      .data.egl = item.nativeValue()
+    case let .webgl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL; raw
+      .data.webgl = try item.nativeValue(arena: arena)
     case .unknown: throw MaplibreError
       .invalidArgument("unknown union variant cannot be submitted")
     }
@@ -403,8 +402,7 @@ public struct RenderDriverKind: RawRepresentable, CustomStringConvertible,
 /// See `mln_render_session_attach_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct RenderSessionAttachOptions: Sendable {
-  /// One `mln_render_driver_kind` value. Defaults to
-  /// `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
+  /// Defaults to `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
   public var driver: RenderDriverKind
   /// Requested slot count of a session-owned texture ring, from one to
   /// `MLN_TEXTURE_RING_MAX_DEPTH`. Private targets grant one slot regardless of
@@ -452,9 +450,9 @@ public struct RenderSessionAttachOptions: Sendable {
     raw: mln_render_session_attach_options,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    driver = RenderDriverKind(rawValue: raw.driver)
+    driver = RenderDriverKind(rawValue: raw.driver.rawValue)
     requestedTextureRingDepth = raw.requested_texture_ring_depth
-    producerSyncKind = GpuSyncKind(rawValue: raw.producer_sync_kind)
+    producerSyncKind = GpuSyncKind(rawValue: raw.producer_sync_kind.rawValue)
     frameWake = Wake()
     driverWorkWake = Wake()
     queueLock = QueueLock()
@@ -465,9 +463,11 @@ public struct RenderSessionAttachOptions: Sendable {
   {
     var raw = mln_render_session_attach_options_default()
     raw.size = UInt32(MemoryLayout<mln_render_session_attach_options>.size)
-    raw.driver = driver.rawValue
+    raw.driver = mln_render_driver_kind(rawValue: driver.rawValue)
     raw.requested_texture_ring_depth = requestedTextureRingDepth
-    raw.producer_sync_kind = producerSyncKind.rawValue
+    raw
+      .producer_sync_kind = mln_gpu_sync_kind(rawValue: producerSyncKind
+        .rawValue)
     raw.frame_wake = try frameWake.nativeValue(arena: arena)
     raw.driver_work_wake = try driverWorkWake.nativeValue(arena: arena)
     raw.queue_lock = try queueLock.nativeValue(arena: arena)
@@ -480,12 +480,10 @@ public struct RenderSessionAttachOptions: Sendable {
 /// See `mln_render_session_capabilities` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct RenderSessionCapabilities: Equatable, Hashable, Sendable {
-  /// One `mln_render_driver_kind` value.
   public var driver: RenderDriverKind
   /// Granted texture ring depth: the slot count of a session-owned ring, or the
   /// texture count of a borrowed one. Zero for a surface.
   public var textureRingDepth: UInt32
-  /// A bitwise OR of `mln_render_session_capability_flag` values.
   public var flags: RenderSessionCapabilityFlag
   public static var `default`: Self {
     Self(raw: mln_render_session_capabilities())
@@ -503,7 +501,7 @@ public struct RenderSessionCapabilities: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_render_session_capabilities) {
-    driver = RenderDriverKind(rawValue: raw.driver)
+    driver = RenderDriverKind(rawValue: raw.driver.rawValue)
     textureRingDepth = raw.texture_ring_depth
     flags = RenderSessionCapabilityFlag(rawValue: raw.flags)
   }
@@ -622,7 +620,6 @@ public struct VulkanContextDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_webgl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct WebglContextDescriptor: Equatable, Hashable, Sendable {
-  /// One `mln_webgl_context_kind` value.
   public var kind: WebglContextKind
   /// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
   public var context: Int32
@@ -647,7 +644,7 @@ public struct WebglContextDescriptor: Equatable, Hashable, Sendable {
     raw: mln_webgl_context_descriptor,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    kind = WebglContextKind(rawValue: raw.kind)
+    kind = WebglContextKind(rawValue: raw.kind.rawValue)
     context = raw.context
     canvasSelector = try NativeString.copyUTF8(
       data: raw.canvas_selector.data,
@@ -659,7 +656,7 @@ public struct WebglContextDescriptor: Equatable, Hashable, Sendable {
     -> mln_webgl_context_descriptor
   {
     var raw = mln_webgl_context_descriptor()
-    raw.kind = kind.rawValue
+    raw.kind = mln_webgl_context_kind(rawValue: kind.rawValue)
     raw.context = context
     raw.canvas_selector = arena.view(canvasSelector)
     return raw

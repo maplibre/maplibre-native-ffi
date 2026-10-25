@@ -9,7 +9,7 @@
 
 static void restore_log_defaults(void) {
   (void)mln_log_clear_callback(NULL);
-  (void)mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_MASK_DEFAULT, NULL);
+  (void)mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_FLAG_DEFAULT, NULL);
 }
 
 static void restoring_log_state(void (*body)(void)) {
@@ -98,7 +98,7 @@ static void drain_all(mln_delivery_queue queue, seen_deliveries* seen) {
 
 LOG_STATE_CASE(a_queue_handler_copies_each_record) {
   MLN_TEST_OK(
-    mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_MASK_ERROR, NULL)
+    mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_FLAG_ERROR, NULL)
   );
   static mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);

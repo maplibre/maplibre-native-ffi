@@ -56,7 +56,7 @@
 
 struct OfflineRegionData {
   mln_offline_region_id id = 0;
-  uint32_t definition_type = 0;
+  mln_offline_region_definition_type definition_type{};
   std::string style_url;
   mln_lat_lng_bounds bounds{};
   double min_zoom = 0.0;
@@ -73,8 +73,8 @@ namespace {
 // mask constant fails the build here instead of silently queueing nothing.
 #define MLN_ASSERT_EVENT_MASK_BIT(name)                                   \
   static_assert(                                                          \
-    MLN_RUNTIME_EVENT_MASK_##name == 1ULL << MLN_RUNTIME_EVENT_##name,    \
-    "MLN_RUNTIME_EVENT_MASK_" #name " must be the bit for its event type" \
+    MLN_RUNTIME_EVENT_FLAG_##name == 1ULL << MLN_RUNTIME_EVENT_##name,    \
+    "MLN_RUNTIME_EVENT_FLAG_" #name " must be the bit for its event type" \
   )
 
 MLN_ASSERT_EVENT_MASK_BIT(MAP_CAMERA_WILL_CHANGE);
@@ -348,7 +348,8 @@ auto to_native_offline_region_definition(
   }
 }
 
-auto to_c_download_state(mln::OfflineRegionDownloadState state) -> uint32_t {
+auto to_c_download_state(mln::OfflineRegionDownloadState state)
+  -> mln_offline_region_download_state {
   switch (state) {
     case mln::OfflineRegionDownloadState::Inactive:
       return MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE;
@@ -374,7 +375,7 @@ auto to_c_status(const mln::OfflineRegionStatus& status)
   };
 }
 
-auto to_native_download_state(uint32_t state)
+auto to_native_download_state(mln_offline_region_download_state state)
   -> std::optional<mln::OfflineRegionDownloadState> {
   switch (state) {
     case MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE:
@@ -387,7 +388,7 @@ auto to_native_download_state(uint32_t state)
 }
 
 auto to_c_resource_error_reason(mln::Response::Error::Reason reason)
-  -> uint32_t {
+  -> mln_resource_error_reason {
   switch (reason) {
     case mln::Response::Error::Reason::Success:
       return MLN_RESOURCE_ERROR_REASON_NONE;
@@ -524,7 +525,7 @@ auto fill_region_info(
 // different times and a region can be unobserved in between.
 auto region_event_selected(
   const std::shared_ptr<mln::core::OfflineRegionEventState>& state,
-  mln_offline_region_id region_id, uint32_t type
+  mln_offline_region_id region_id, mln_runtime_event_type type
 ) -> bool {
   const std::scoped_lock state_lock(state->mutex);
   auto* runtime = state->runtime;
@@ -539,7 +540,8 @@ auto region_event_selected(
 
 auto push_offline_region_event(
   const std::shared_ptr<mln::core::OfflineRegionEventState>& state,
-  mln_offline_region_id region_id, uint32_t type, uint32_t payload_type,
+  mln_offline_region_id region_id, mln_runtime_event_type type,
+  mln_runtime_event_payload_type payload_type,
   const mln_runtime_event_payload& payload, std::string message = {}
 ) -> void {
   auto registration = std::shared_ptr<mln::core::RuntimeEventRegistration>{};
@@ -891,7 +893,7 @@ auto create_runtime(
      cache_path = std::move(cache_path)]() mutable -> void {
       runtime->event_state = std::make_shared<RuntimeEventState>();
       runtime->event_state->mask.store(
-        MLN_RUNTIME_EVENT_MASK_ALL, std::memory_order_relaxed
+        MLN_RUNTIME_EVENT_FLAG_ALL, std::memory_order_relaxed
       );
       runtime->asset_path = std::move(asset_path);
       runtime->cache_path = std::move(cache_path);
@@ -1017,7 +1019,7 @@ auto delete_header_rules(void* table) noexcept -> void {
 // Queues a copy of the URL with its request handle. A request the queue
 // refuses keeps its URL.
 auto queue_resource_transform(
-  void* registration, uint32_t kind, const char* url,
+  void* registration, mln_resource_kind kind, const char* url,
   mln_resource_transform_request request
 ) noexcept -> void {
   const auto arguments = mln_resource_transform_delivery{
@@ -1564,7 +1566,8 @@ using OfflineDatabase = std::shared_ptr<mln::DatabaseFileSource>;
 }  // namespace
 
 auto run_ambient_cache_operation_start(
-  mln_runtime runtime, uint32_t operation, const mln_completion* completion
+  mln_runtime runtime, mln_ambient_cache_operation operation,
+  const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
@@ -2513,7 +2516,7 @@ auto set_runtime_event_mask(mln_runtime runtime, uint64_t mask) -> mln_status {
     return MLN_STATUS_INVALID_STATE;
   }
   auto control_lease = ControlLease{&live->control};
-  if ((mask & ~static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL)) != 0U) {
+  if ((mask & ~static_cast<uint64_t>(MLN_RUNTIME_EVENT_FLAG_ALL)) != 0U) {
     set_thread_error("mask contains unknown bits");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -2611,7 +2614,7 @@ auto has_resource_transform_for_platform_context(
 }
 
 auto invoke_resource_transform(
-  void* platform_context, uint32_t kind, const std::string& url,
+  void* platform_context, mln_resource_kind kind, const std::string& url,
   mln::ResourceTransform::FinishedCallback finished
 ) -> void {
   const auto state = lease_resource_transform_state(platform_context);
@@ -2635,7 +2638,7 @@ auto invoke_resource_transform(
 }
 
 auto invoke_http_header_transform(
-  void* platform_context, uint32_t kind, const char* url
+  void* platform_context, mln_resource_kind kind, const char* url
 ) noexcept -> HttpHeaders {
   const auto state = lease_http_header_transform_state(platform_context);
   if (state == nullptr) {
@@ -2670,8 +2673,9 @@ auto invoke_http_header_transform(
 namespace {
 
 auto map_event(
-  mln_map map, uint64_t generation, uint32_t type, uint32_t payload_type,
-  const mln_runtime_event_payload& payload, int32_t code
+  mln_map map, uint64_t generation, mln_runtime_event_type type,
+  mln_runtime_event_payload_type payload_type,
+  const mln_runtime_event_payload& payload, uint32_t code
 ) -> mln_runtime_event {
   return mln_runtime_event{
     .type = type,
@@ -2690,8 +2694,9 @@ auto map_event(
 // Producers test their subscription mask before building an event.
 auto push_runtime_map_event_payload(
   const std::shared_ptr<RuntimeEventState>& state, mln_map map,
-  uint64_t generation, uint32_t type, uint32_t payload_type,
-  const mln_runtime_event_payload& payload, int32_t code, std::string message
+  uint64_t generation, mln_runtime_event_type type,
+  mln_runtime_event_payload_type payload_type,
+  const mln_runtime_event_payload& payload, uint32_t code, std::string message
 ) -> void {
   if (state->registration == nullptr) return;
   state->registration->push(

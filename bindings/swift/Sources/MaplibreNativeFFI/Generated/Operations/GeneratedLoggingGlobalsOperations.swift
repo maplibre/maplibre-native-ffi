@@ -16,9 +16,9 @@ public extension Maplibre {
   ///
   /// See `mln_log_set_async_severity_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-  static func logSetAsyncSeverityMask(_ bindingArg0: LogSeverityMask) throws {
+  static func logSetAsyncSeverityMask(_ bindingArg0: LogSeverityFlag) throws {
     try nativeInvoke { _, _, diagnostic in mln_log_set_async_severity_mask(
-      bindingArg0.nativeValue(),
+      bindingArg0.rawValue,
       diagnostic
     ) }
   }

@@ -1077,7 +1077,7 @@ napi_value mln_ts_read_gpu_sync(
       ))
     return NULL;
   if (!mln_ts_set(
-        env, result, "object", mln_ts_u64(env, (uint64_t)(source->object))
+        env, result, "handle", mln_ts_u64(env, (uint64_t)(source->handle))
       ))
     return NULL;
   return result;
@@ -4314,7 +4314,7 @@ bool mln_ts_write_camera_delta(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->gesture_phase = (uint32_t)number;
+      out->gesture_phase = (mln_gesture_phase)number;
     }
   }
   return true;
@@ -4463,7 +4463,7 @@ bool mln_ts_write_camera_update(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->mode = (uint32_t)number;
+      out->mode = (mln_camera_update_mode)number;
     }
   }
   if (!mln_ts_member(call, value, "camera", &member)) return false;
@@ -4487,7 +4487,7 @@ bool mln_ts_write_camera_update(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->gesture_phase = (uint32_t)number;
+      out->gesture_phase = (mln_gesture_phase)number;
     }
   }
   return true;
@@ -4771,7 +4771,7 @@ bool mln_ts_write_egl_context_descriptor(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->client_api = (uint32_t)number;
+      out->client_api = (mln_opengl_client_api)number;
     }
   }
   if (!mln_ts_member(call, value, "getProcAddress", &member)) return false;
@@ -4834,7 +4834,7 @@ bool mln_ts_write_frame_demand(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->flags = (uint32_t)number;
+      out->flags = (mln_frame_demand_flags)number;
     }
   }
   if (!mln_ts_member(call, value, "token", &member)) return false;
@@ -5007,16 +5007,16 @@ bool mln_ts_write_gpu_sync(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->kind = (uint32_t)number;
+      out->kind = (mln_gpu_sync_kind)number;
     }
   }
-  if (!mln_ts_member(call, value, "object", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "object");
+  if (!mln_ts_member(call, value, "handle", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "handle");
   if (!mln_ts_is_absent(call, member)) {
     {
       uint64_t number = 0;
       if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->object = (uint64_t)number;
+      out->handle = (uint64_t)number;
     }
   }
   return true;
@@ -5051,7 +5051,7 @@ bool mln_ts_write_http_header_rule(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->kinds = (uint32_t)number;
+      out->kinds = (mln_resource_kind_flags)number;
     }
   }
   if (!mln_ts_member(call, value, "flags", &member)) return false;
@@ -5061,7 +5061,7 @@ bool mln_ts_write_http_header_rule(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->flags = (uint32_t)number;
+      out->flags = (mln_url_match_flags)number;
     }
   }
   if (!mln_ts_member(call, value, "url", &member)) return false;
@@ -5525,7 +5525,7 @@ bool mln_ts_write_map_options(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->map_mode = (uint32_t)number;
+      out->map_mode = (mln_map_mode)number;
     }
   }
   if (!mln_ts_member(call, value, "fastPforEnabled", &member)) return false;
@@ -5543,7 +5543,7 @@ bool mln_ts_write_map_options(
     {
       uint64_t number = 0;
       if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->event_mask = (uint64_t)number;
+      out->event_mask = (mln_runtime_event_flags)number;
     }
   }
   return true;
@@ -5614,7 +5614,7 @@ bool mln_ts_write_map_tile_options(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->lod_mode = (uint32_t)number;
+      out->lod_mode = (mln_tile_lod_mode)number;
     }
     out->fields |= MLN_MAP_TILE_OPTION_LOD_MODE;
   }
@@ -5678,7 +5678,7 @@ bool mln_ts_write_map_viewport_options(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->north_orientation = (uint32_t)number;
+      out->north_orientation = (mln_north_orientation)number;
     }
     out->fields |= MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
   }
@@ -5689,7 +5689,7 @@ bool mln_ts_write_map_viewport_options(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->constrain_mode = (uint32_t)number;
+      out->constrain_mode = (mln_constrain_mode)number;
     }
     out->fields |= MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;
   }
@@ -5700,7 +5700,7 @@ bool mln_ts_write_map_viewport_options(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->viewport_mode = (uint32_t)number;
+      out->viewport_mode = (mln_viewport_mode)number;
     }
     out->fields |= MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;
   }
@@ -6135,7 +6135,7 @@ bool mln_ts_write_opengl_context_descriptor(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->ownership = (uint32_t)number;
+      out->ownership = (mln_opengl_context_ownership)number;
     }
   }
   if (!mln_ts_member(call, value, "data", &member)) return false;
@@ -6430,7 +6430,7 @@ bool mln_ts_write_render_session_attach_options(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->driver = (uint32_t)number;
+      out->driver = (mln_render_driver_kind)number;
     }
   }
   if (!mln_ts_member(call, value, "requestedTextureRingDepth", &member))
@@ -6451,7 +6451,7 @@ bool mln_ts_write_render_session_attach_options(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->producer_sync_kind = (uint32_t)number;
+      out->producer_sync_kind = (mln_gpu_sync_kind)number;
     }
   }
   if (!mln_ts_member(call, value, "frameWake", &member)) return false;
@@ -6653,7 +6653,7 @@ bool mln_ts_write_resource_response(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->status = (uint32_t)number;
+      out->status = (mln_resource_response_status)number;
     }
   }
   if (!mln_ts_member(call, value, "errorReason", &member)) return false;
@@ -6663,7 +6663,7 @@ bool mln_ts_write_resource_response(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->error_reason = (uint32_t)number;
+      out->error_reason = (mln_resource_error_reason)number;
     }
   }
   if (!mln_ts_member(call, value, "bytes", &member)) return false;
@@ -6746,7 +6746,7 @@ bool mln_ts_write_resource_route(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->kinds = (uint32_t)number;
+      out->kinds = (mln_resource_kind_flags)number;
     }
   }
   if (!mln_ts_member(call, value, "flags", &member)) return false;
@@ -6756,7 +6756,7 @@ bool mln_ts_write_resource_route(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->flags = (uint32_t)number;
+      out->flags = (mln_url_match_flags)number;
     }
   }
   if (!mln_ts_member(call, value, "url", &member)) return false;
@@ -7013,7 +7013,7 @@ bool mln_ts_write_style_expression_type(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->kind = (uint32_t)number;
+      out->kind = (mln_style_expression_type_kind)number;
     }
   }
   if (!mln_ts_member(call, value, "itemKind", &member)) return false;
@@ -7023,7 +7023,7 @@ bool mln_ts_write_style_expression_type(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->item_kind = (uint32_t)number;
+      out->item_kind = (mln_style_expression_type_kind)number;
     }
   }
   if (!mln_ts_member(call, value, "itemCount", &member)) return false;
@@ -7091,7 +7091,7 @@ bool mln_ts_write_style_image_options(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->text_fit_width = (uint32_t)number;
+      out->text_fit_width = (mln_style_image_text_fit)number;
     }
     out->fields |= MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH;
   }
@@ -7102,7 +7102,7 @@ bool mln_ts_write_style_image_options(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->text_fit_height = (uint32_t)number;
+      out->text_fit_height = (mln_style_image_text_fit)number;
     }
     out->fields |= MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
   }
@@ -7519,7 +7519,7 @@ bool mln_ts_write_webgl_context_descriptor(
       int64_t number = 0;
       if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
         return false;
-      out->kind = (uint32_t)number;
+      out->kind = (mln_webgl_context_kind)number;
     }
   }
   if (!mln_ts_member(call, value, "context", &member)) return false;

@@ -39,12 +39,12 @@ public sealed record StyleImageOptions
     public ImageContent? Content { get; init; }
 
     /// <summary>
-    /// One of <c>mln_style_image_text_fit</c>. Defaults to STRETCH_OR_SHRINK.
+    /// Defaults to STRETCH_OR_SHRINK.
     /// </summary>
     public StyleImageTextFit? TextFitWidth { get; init; }
 
     /// <summary>
-    /// One of <c>mln_style_image_text_fit</c>. Defaults to STRETCH_OR_SHRINK.
+    /// Defaults to STRETCH_OR_SHRINK.
     /// </summary>
     public StyleImageTextFit? TextFitHeight { get; init; }
 

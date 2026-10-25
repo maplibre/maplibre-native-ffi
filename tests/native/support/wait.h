@@ -137,7 +137,9 @@ mln_status mln_test_completion_finish_optional(
 );
 bool mln_test_completion_poll(mln_test_completion* completion);
 mln_status mln_test_completion_status(mln_test_completion* completion);
-uint32_t mln_test_completion_disposition(mln_test_completion* completion);
+mln_command_disposition mln_test_completion_disposition(
+  mln_test_completion* completion
+);
 uint64_t mln_test_completion_generation(mln_test_completion* completion);
 uint64_t mln_test_completion_render_update_generation(
   mln_test_completion* completion

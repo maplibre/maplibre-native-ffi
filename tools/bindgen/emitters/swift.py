@@ -198,7 +198,9 @@ def operation(
             value_types.add(value_plan)
             declarations.append(f"{label}: {value_types.public(value_plan)}")
             arguments.append(
-                f"try {local}.nativeValue(arena: arena)"
+                value_types.native(value_plan, local)
+                if value_plan.kind == "enum"
+                else f"try {local}.nativeValue(arena: arena)"
                 if dynamic(value_plan)
                 else f"{local}.nativeValue()"
             )
@@ -488,6 +490,8 @@ def operation(
             raw = SCALARS.get(native(output.type.pointee), native(output.type.pointee))
             if value.kind in {"record", "buffer"}:
                 initial = f"{value.default}()" if value.default else f"{raw}()"
+            elif value.kind == "enum" and value.ctype.canonical.startswith("enum "):
+                initial = f"{raw}(rawValue: 0)"
             else:
                 initial = "false" if raw == "Bool" else "0"
             storage.append(f"  var value{index}: {raw} = {initial}")

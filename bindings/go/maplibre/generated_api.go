@@ -258,7 +258,7 @@ const (
 	// before the release call.
 	GpuSyncKindCpuComplete GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_CPU_COMPLETE)
 	// GLsync in the shared EGL or WGL context's share group, used only by a
-	// caller-graphics-thread driver. object is nonzero.
+	// caller-graphics-thread driver. handle is nonzero.
 	GpuSyncKindOpenglFence GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_OPENGL_FENCE)
 )
 
@@ -266,7 +266,7 @@ func (value GpuSyncKind) String() string {
 	switch value {
 	case 0:
 		return "GpuSyncKindCpuComplete"
-	case 3:
+	case 1:
 		return "GpuSyncKindOpenglFence"
 	}
 	return fmt.Sprintf("GpuSyncKind(%d)", value)
@@ -364,48 +364,48 @@ func (value LogSeverity) String() string {
 	return fmt.Sprintf("LogSeverity(%d)", value)
 }
 
-// LogSeverityMask corresponds to mln_log_severity_mask. Bitmask values for log
+// LogSeverityFlag corresponds to mln_log_severity_flag. Bitmask values for log
 // severities dispatched asynchronously.
 //
-// See mln_log_severity_mask in the C API reference:
+// See mln_log_severity_flag in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html
-type LogSeverityMask uint32
+type LogSeverityFlag uint32
 
 const (
-	LogSeverityMaskInfo    LogSeverityMask = LogSeverityMask(C.MLN_LOG_SEVERITY_MASK_INFO)
-	LogSeverityMaskWarning LogSeverityMask = LogSeverityMask(C.MLN_LOG_SEVERITY_MASK_WARNING)
-	LogSeverityMaskError   LogSeverityMask = LogSeverityMask(C.MLN_LOG_SEVERITY_MASK_ERROR)
-	LogSeverityMaskDefault LogSeverityMask = LogSeverityMask(C.MLN_LOG_SEVERITY_MASK_DEFAULT)
-	LogSeverityMaskAll     LogSeverityMask = LogSeverityMask(C.MLN_LOG_SEVERITY_MASK_ALL)
+	LogSeverityFlagInfo    LogSeverityFlag = LogSeverityFlag(C.MLN_LOG_SEVERITY_FLAG_INFO)
+	LogSeverityFlagWarning LogSeverityFlag = LogSeverityFlag(C.MLN_LOG_SEVERITY_FLAG_WARNING)
+	LogSeverityFlagError   LogSeverityFlag = LogSeverityFlag(C.MLN_LOG_SEVERITY_FLAG_ERROR)
+	LogSeverityFlagDefault LogSeverityFlag = LogSeverityFlag(C.MLN_LOG_SEVERITY_FLAG_DEFAULT)
+	LogSeverityFlagAll     LogSeverityFlag = LogSeverityFlag(C.MLN_LOG_SEVERITY_FLAG_ALL)
 )
 
-func (value LogSeverityMask) Has(flags LogSeverityMask) bool { return value&flags == flags }
+func (value LogSeverityFlag) Has(flags LogSeverityFlag) bool { return value&flags == flags }
 
-func (value LogSeverityMask) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{2, "LogSeverityMaskInfo"}, {4, "LogSeverityMaskWarning"}, {8, "LogSeverityMaskError"}})
+func (value LogSeverityFlag) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{2, "LogSeverityFlagInfo"}, {4, "LogSeverityFlagWarning"}, {8, "LogSeverityFlagError"}})
 }
 
-// MapDebugOption corresponds to mln_map_debug_option. Debug overlay mask values
-// for mln_map_set_debug_options().
+// MapDebugFlag corresponds to mln_map_debug_flag. Debug overlay mask values for
+// mln_map_set_debug_options().
 //
-// See mln_map_debug_option in the C API reference:
+// See mln_map_debug_flag in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type MapDebugOption uint32
+type MapDebugFlag uint32
 
 const (
-	MapDebugOptionTileBorders MapDebugOption = MapDebugOption(C.MLN_MAP_DEBUG_TILE_BORDERS)
-	MapDebugOptionParseStatus MapDebugOption = MapDebugOption(C.MLN_MAP_DEBUG_PARSE_STATUS)
-	MapDebugOptionTimestamps  MapDebugOption = MapDebugOption(C.MLN_MAP_DEBUG_TIMESTAMPS)
-	MapDebugOptionCollision   MapDebugOption = MapDebugOption(C.MLN_MAP_DEBUG_COLLISION)
-	MapDebugOptionOverdraw    MapDebugOption = MapDebugOption(C.MLN_MAP_DEBUG_OVERDRAW)
-	MapDebugOptionStencilClip MapDebugOption = MapDebugOption(C.MLN_MAP_DEBUG_STENCIL_CLIP)
-	MapDebugOptionDepthBuffer MapDebugOption = MapDebugOption(C.MLN_MAP_DEBUG_DEPTH_BUFFER)
+	MapDebugFlagTileBorders MapDebugFlag = MapDebugFlag(C.MLN_MAP_DEBUG_TILE_BORDERS)
+	MapDebugFlagParseStatus MapDebugFlag = MapDebugFlag(C.MLN_MAP_DEBUG_PARSE_STATUS)
+	MapDebugFlagTimestamps  MapDebugFlag = MapDebugFlag(C.MLN_MAP_DEBUG_TIMESTAMPS)
+	MapDebugFlagCollision   MapDebugFlag = MapDebugFlag(C.MLN_MAP_DEBUG_COLLISION)
+	MapDebugFlagOverdraw    MapDebugFlag = MapDebugFlag(C.MLN_MAP_DEBUG_OVERDRAW)
+	MapDebugFlagStencilClip MapDebugFlag = MapDebugFlag(C.MLN_MAP_DEBUG_STENCIL_CLIP)
+	MapDebugFlagDepthBuffer MapDebugFlag = MapDebugFlag(C.MLN_MAP_DEBUG_DEPTH_BUFFER)
 )
 
-func (value MapDebugOption) Has(flags MapDebugOption) bool { return value&flags == flags }
+func (value MapDebugFlag) Has(flags MapDebugFlag) bool { return value&flags == flags }
 
-func (value MapDebugOption) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{2, "MapDebugOptionTileBorders"}, {4, "MapDebugOptionParseStatus"}, {8, "MapDebugOptionTimestamps"}, {16, "MapDebugOptionCollision"}, {32, "MapDebugOptionOverdraw"}, {64, "MapDebugOptionStencilClip"}, {128, "MapDebugOptionDepthBuffer"}})
+func (value MapDebugFlag) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{2, "MapDebugFlagTileBorders"}, {4, "MapDebugFlagParseStatus"}, {8, "MapDebugFlagTimestamps"}, {16, "MapDebugFlagCollision"}, {32, "MapDebugFlagOverdraw"}, {64, "MapDebugFlagStencilClip"}, {128, "MapDebugFlagDepthBuffer"}})
 }
 
 // MapMode corresponds to mln_map_mode. Map rendering modes used when creating a
@@ -696,9 +696,9 @@ func (value RenderResult) String() string {
 		return "RenderResultRendered"
 	case 1:
 		return "RenderResultNoUpdate"
-	case 3:
+	case 2:
 		return "RenderResultTargetNotReady"
-	case 4:
+	case 3:
 		return "RenderResultSuperseded"
 	}
 	return fmt.Sprintf("RenderResult(%d)", value)
@@ -827,31 +827,31 @@ func (value ResourceKind) String() string {
 	return fmt.Sprintf("ResourceKind(%d)", value)
 }
 
-// ResourceKindMask corresponds to mln_resource_kind_mask. The resource kinds
+// ResourceKindFlag corresponds to mln_resource_kind_flag. The resource kinds
 // that a route or rule matches, one bit per mln_resource_kind value.
-// Registration requires at least one known bit. MLN_RESOURCE_KIND_MASK_ALL
+// Registration requires at least one known bit. MLN_RESOURCE_KIND_FLAG_ALL
 // selects every resource kind.
 //
-// See mln_resource_kind_mask in the C API reference:
+// See mln_resource_kind_flag in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type ResourceKindMask uint32
+type ResourceKindFlag uint32
 
 const (
-	ResourceKindMaskUnknown     ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_UNKNOWN)
-	ResourceKindMaskStyle       ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_STYLE)
-	ResourceKindMaskSource      ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_SOURCE)
-	ResourceKindMaskTile        ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_TILE)
-	ResourceKindMaskGlyphs      ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_GLYPHS)
-	ResourceKindMaskSpriteImage ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_SPRITE_IMAGE)
-	ResourceKindMaskSpriteJson  ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_SPRITE_JSON)
-	ResourceKindMaskImage       ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_IMAGE)
-	ResourceKindMaskAll         ResourceKindMask = ResourceKindMask(C.MLN_RESOURCE_KIND_MASK_ALL)
+	ResourceKindFlagUnknown     ResourceKindFlag = ResourceKindFlag(C.MLN_RESOURCE_KIND_FLAG_UNKNOWN)
+	ResourceKindFlagStyle       ResourceKindFlag = ResourceKindFlag(C.MLN_RESOURCE_KIND_FLAG_STYLE)
+	ResourceKindFlagSource      ResourceKindFlag = ResourceKindFlag(C.MLN_RESOURCE_KIND_FLAG_SOURCE)
+	ResourceKindFlagTile        ResourceKindFlag = ResourceKindFlag(C.MLN_RESOURCE_KIND_FLAG_TILE)
+	ResourceKindFlagGlyphs      ResourceKindFlag = ResourceKindFlag(C.MLN_RESOURCE_KIND_FLAG_GLYPHS)
+	ResourceKindFlagSpriteImage ResourceKindFlag = ResourceKindFlag(C.MLN_RESOURCE_KIND_FLAG_SPRITE_IMAGE)
+	ResourceKindFlagSpriteJson  ResourceKindFlag = ResourceKindFlag(C.MLN_RESOURCE_KIND_FLAG_SPRITE_JSON)
+	ResourceKindFlagImage       ResourceKindFlag = ResourceKindFlag(C.MLN_RESOURCE_KIND_FLAG_IMAGE)
+	ResourceKindFlagAll         ResourceKindFlag = ResourceKindFlag(C.MLN_RESOURCE_KIND_FLAG_ALL)
 )
 
-func (value ResourceKindMask) Has(flags ResourceKindMask) bool { return value&flags == flags }
+func (value ResourceKindFlag) Has(flags ResourceKindFlag) bool { return value&flags == flags }
 
-func (value ResourceKindMask) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{1, "ResourceKindMaskUnknown"}, {2, "ResourceKindMaskStyle"}, {4, "ResourceKindMaskSource"}, {8, "ResourceKindMaskTile"}, {16, "ResourceKindMaskGlyphs"}, {32, "ResourceKindMaskSpriteImage"}, {64, "ResourceKindMaskSpriteJson"}, {128, "ResourceKindMaskImage"}})
+func (value ResourceKindFlag) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "ResourceKindFlagUnknown"}, {2, "ResourceKindFlagStyle"}, {4, "ResourceKindFlagSource"}, {8, "ResourceKindFlagTile"}, {16, "ResourceKindFlagGlyphs"}, {32, "ResourceKindFlagSpriteImage"}, {64, "ResourceKindFlagSpriteJson"}, {128, "ResourceKindFlagImage"}})
 }
 
 type ResourceLoadingMethod uint32
@@ -953,47 +953,47 @@ func (value ResourceUsage) String() string {
 	return fmt.Sprintf("ResourceUsage(%d)", value)
 }
 
-// RuntimeEventMask corresponds to mln_runtime_event_mask. Bit values for the
+// RuntimeEventFlag corresponds to mln_runtime_event_flag. Bit values for the
 // map and runtime event subscription masks.
 //
-// See mln_runtime_event_mask in the C API reference:
+// See mln_runtime_event_flag in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type RuntimeEventMask uint64
+type RuntimeEventFlag uint64
 
 const (
 	// Selects no event type.
-	RuntimeEventMaskNone                                RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_NONE)
-	RuntimeEventMaskMapCameraWillChange                 RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE)
-	RuntimeEventMaskMapCameraIsChanging                 RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING)
-	RuntimeEventMaskMapCameraDidChange                  RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE)
-	RuntimeEventMaskMapStyleLoaded                      RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED)
-	RuntimeEventMaskMapLoadingStarted                   RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED)
-	RuntimeEventMaskMapLoadingFinished                  RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED)
-	RuntimeEventMaskMapLoadingFailed                    RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED)
-	RuntimeEventMaskMapIdle                             RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_IDLE)
-	RuntimeEventMaskMapRenderError                      RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR)
-	RuntimeEventMaskMapRenderFrameStarted               RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED)
-	RuntimeEventMaskMapRenderFrameFinished              RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED)
-	RuntimeEventMaskMapRenderMapStarted                 RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED)
-	RuntimeEventMaskMapRenderMapFinished                RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED)
-	RuntimeEventMaskMapStyleImageMissing                RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING)
-	RuntimeEventMaskMapTileAction                       RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION)
-	RuntimeEventMaskOfflineRegionStatusChanged          RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED)
-	RuntimeEventMaskOfflineRegionResponseError          RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR)
-	RuntimeEventMaskOfflineRegionTileCountLimitExceeded RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
-	RuntimeEventMaskMapSourceChanged                    RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_SOURCE_CHANGED)
+	RuntimeEventFlagNone                                RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_NONE)
+	RuntimeEventFlagMapCameraWillChange                 RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_WILL_CHANGE)
+	RuntimeEventFlagMapCameraIsChanging                 RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_IS_CHANGING)
+	RuntimeEventFlagMapCameraDidChange                  RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_DID_CHANGE)
+	RuntimeEventFlagMapStyleLoaded                      RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED)
+	RuntimeEventFlagMapLoadingStarted                   RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_STARTED)
+	RuntimeEventFlagMapLoadingFinished                  RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_FINISHED)
+	RuntimeEventFlagMapLoadingFailed                    RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_FAILED)
+	RuntimeEventFlagMapIdle                             RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_IDLE)
+	RuntimeEventFlagMapRenderError                      RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_ERROR)
+	RuntimeEventFlagMapRenderFrameStarted               RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_FRAME_STARTED)
+	RuntimeEventFlagMapRenderFrameFinished              RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_FRAME_FINISHED)
+	RuntimeEventFlagMapRenderMapStarted                 RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_MAP_STARTED)
+	RuntimeEventFlagMapRenderMapFinished                RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_MAP_FINISHED)
+	RuntimeEventFlagMapStyleImageMissing                RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_IMAGE_MISSING)
+	RuntimeEventFlagMapTileAction                       RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_TILE_ACTION)
+	RuntimeEventFlagMapSourceChanged                    RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_SOURCE_CHANGED)
+	RuntimeEventFlagOfflineRegionStatusChanged          RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED)
+	RuntimeEventFlagOfflineRegionResponseError          RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR)
+	RuntimeEventFlagOfflineRegionTileCountLimitExceeded RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
 	// Selects every map-originated event type this version defines.
-	RuntimeEventMaskAllMapEvents RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS)
+	RuntimeEventFlagAllMapEvents RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS)
 	// Selects every runtime-originated event type this version defines.
-	RuntimeEventMaskAllRuntimeEvents RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS)
+	RuntimeEventFlagAllRuntimeEvents RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS)
 	// Selects every event type this version defines.
-	RuntimeEventMaskAll RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_ALL)
+	RuntimeEventFlagAll RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_ALL)
 )
 
-func (value RuntimeEventMask) Has(flags RuntimeEventMask) bool { return value&flags == flags }
+func (value RuntimeEventFlag) Has(flags RuntimeEventFlag) bool { return value&flags == flags }
 
-func (value RuntimeEventMask) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{2, "RuntimeEventMaskMapCameraWillChange"}, {4, "RuntimeEventMaskMapCameraIsChanging"}, {8, "RuntimeEventMaskMapCameraDidChange"}, {16, "RuntimeEventMaskMapStyleLoaded"}, {32, "RuntimeEventMaskMapLoadingStarted"}, {64, "RuntimeEventMaskMapLoadingFinished"}, {128, "RuntimeEventMaskMapLoadingFailed"}, {256, "RuntimeEventMaskMapIdle"}, {1024, "RuntimeEventMaskMapRenderError"}, {8192, "RuntimeEventMaskMapRenderFrameStarted"}, {16384, "RuntimeEventMaskMapRenderFrameFinished"}, {32768, "RuntimeEventMaskMapRenderMapStarted"}, {65536, "RuntimeEventMaskMapRenderMapFinished"}, {131072, "RuntimeEventMaskMapStyleImageMissing"}, {262144, "RuntimeEventMaskMapTileAction"}, {524288, "RuntimeEventMaskOfflineRegionStatusChanged"}, {1048576, "RuntimeEventMaskOfflineRegionResponseError"}, {2097152, "RuntimeEventMaskOfflineRegionTileCountLimitExceeded"}, {8388608, "RuntimeEventMaskMapSourceChanged"}})
+func (value RuntimeEventFlag) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{2, "RuntimeEventFlagMapCameraWillChange"}, {4, "RuntimeEventFlagMapCameraIsChanging"}, {8, "RuntimeEventFlagMapCameraDidChange"}, {16, "RuntimeEventFlagMapStyleLoaded"}, {32, "RuntimeEventFlagMapLoadingStarted"}, {64, "RuntimeEventFlagMapLoadingFinished"}, {128, "RuntimeEventFlagMapLoadingFailed"}, {256, "RuntimeEventFlagMapIdle"}, {512, "RuntimeEventFlagMapRenderError"}, {1024, "RuntimeEventFlagMapRenderFrameStarted"}, {2048, "RuntimeEventFlagMapRenderFrameFinished"}, {4096, "RuntimeEventFlagMapRenderMapStarted"}, {8192, "RuntimeEventFlagMapRenderMapFinished"}, {16384, "RuntimeEventFlagMapStyleImageMissing"}, {32768, "RuntimeEventFlagMapTileAction"}, {65536, "RuntimeEventFlagMapSourceChanged"}, {131072, "RuntimeEventFlagOfflineRegionStatusChanged"}, {262144, "RuntimeEventFlagOfflineRegionResponseError"}, {524288, "RuntimeEventFlagOfflineRegionTileCountLimitExceeded"}})
 }
 
 // RuntimeEventSourceType corresponds to mln_runtime_event_source_type. Source
@@ -1041,10 +1041,10 @@ const (
 	RuntimeEventTypeMapRenderMapFinished                RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED)
 	RuntimeEventTypeMapStyleImageMissing                RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING)
 	RuntimeEventTypeMapTileAction                       RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_TILE_ACTION)
+	RuntimeEventTypeMapSourceChanged                    RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED)
 	RuntimeEventTypeOfflineRegionStatusChanged          RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED)
 	RuntimeEventTypeOfflineRegionResponseError          RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR)
 	RuntimeEventTypeOfflineRegionTileCountLimitExceeded RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
-	RuntimeEventTypeMapSourceChanged                    RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED)
 )
 
 func (value RuntimeEventType) String() string {
@@ -1065,28 +1065,28 @@ func (value RuntimeEventType) String() string {
 		return "RuntimeEventTypeMapLoadingFailed"
 	case 8:
 		return "RuntimeEventTypeMapIdle"
-	case 10:
+	case 9:
 		return "RuntimeEventTypeMapRenderError"
-	case 13:
+	case 10:
 		return "RuntimeEventTypeMapRenderFrameStarted"
-	case 14:
+	case 11:
 		return "RuntimeEventTypeMapRenderFrameFinished"
-	case 15:
+	case 12:
 		return "RuntimeEventTypeMapRenderMapStarted"
-	case 16:
+	case 13:
 		return "RuntimeEventTypeMapRenderMapFinished"
-	case 17:
+	case 14:
 		return "RuntimeEventTypeMapStyleImageMissing"
-	case 18:
+	case 15:
 		return "RuntimeEventTypeMapTileAction"
-	case 19:
-		return "RuntimeEventTypeOfflineRegionStatusChanged"
-	case 20:
-		return "RuntimeEventTypeOfflineRegionResponseError"
-	case 21:
-		return "RuntimeEventTypeOfflineRegionTileCountLimitExceeded"
-	case 23:
+	case 16:
 		return "RuntimeEventTypeMapSourceChanged"
+	case 17:
+		return "RuntimeEventTypeOfflineRegionStatusChanged"
+	case 18:
+		return "RuntimeEventTypeOfflineRegionResponseError"
+	case 19:
+		return "RuntimeEventTypeOfflineRegionTileCountLimitExceeded"
 	}
 	return fmt.Sprintf("RuntimeEventType(%d)", value)
 }
@@ -1454,23 +1454,23 @@ func (value TileOperation) String() string {
 	return fmt.Sprintf("TileOperation(%d)", value)
 }
 
-// UrlMatchFlags corresponds to mln_url_match_flags. How a rule or route
-// compares its url against a request URL.
+// UrlMatchFlag corresponds to mln_url_match_flag. How a rule or route compares
+// its url against a request URL.
 //
-// See mln_url_match_flags in the C API reference:
+// See mln_url_match_flag in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type UrlMatchFlags uint32
+type UrlMatchFlag uint32
 
 const (
-	UrlMatchFlagsExact UrlMatchFlags = UrlMatchFlags(C.MLN_URL_MATCH_EXACT)
+	UrlMatchFlagExact UrlMatchFlag = UrlMatchFlag(C.MLN_URL_MATCH_EXACT)
 	// Reads url as a glob pattern.
-	UrlMatchFlagsGlob UrlMatchFlags = UrlMatchFlags(C.MLN_URL_MATCH_GLOB)
+	UrlMatchFlagGlob UrlMatchFlag = UrlMatchFlag(C.MLN_URL_MATCH_GLOB)
 )
 
-func (value UrlMatchFlags) Has(flags UrlMatchFlags) bool { return value&flags == flags }
+func (value UrlMatchFlag) Has(flags UrlMatchFlag) bool { return value&flags == flags }
 
-func (value UrlMatchFlags) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{1, "UrlMatchFlagsGlob"}})
+func (value UrlMatchFlag) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "UrlMatchFlagGlob"}})
 }
 
 // ViewportMode corresponds to mln_viewport_mode. Viewport orientation modes
@@ -1782,7 +1782,7 @@ func nativeCameraDelta(input CameraDelta, arena *bindingArena) C.mln_camera_delt
 	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_PITCH, &raw.pitch, input.Pitch, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_ANCHOR, &raw.anchor, input.Anchor, arena, nativeScreenPoint)
 	raw.animation = nativeAnimationOptions(input.Animation, arena)
-	raw.gesture_phase = C.uint32_t(input.GesturePhase)
+	raw.gesture_phase = C.mln_gesture_phase(input.GesturePhase)
 	return raw
 }
 
@@ -1894,7 +1894,6 @@ func copyCameraQueryResult(raw C.mln_camera_query_result) CameraQueryResult {
 // See mln_camera_transition_end in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type CameraTransitionEnd struct {
-	// One of mln_camera_transition_outcome.
 	Outcome CameraTransitionOutcome
 	// Generation of the published snapshot that shows the camera where the
 	// transitions left it. The map events of the change that ended them carry this
@@ -1954,10 +1953,10 @@ func copyCameraUpdate(raw C.mln_camera_update) CameraUpdate {
 func nativeCameraUpdate(input CameraUpdate, arena *bindingArena) C.mln_camera_update {
 	raw := C.mln_camera_update_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.mode = C.uint32_t(input.Mode)
+	raw.mode = C.mln_camera_update_mode(input.Mode)
 	raw.camera = nativeCameraOptions(input.Camera, arena)
 	raw.animation = nativeAnimationOptions(input.Animation, arena)
-	raw.gesture_phase = C.uint32_t(input.GesturePhase)
+	raw.gesture_phase = C.mln_gesture_phase(input.GesturePhase)
 	return raw
 }
 
@@ -2166,7 +2165,7 @@ func nativeEglContextDescriptor(input EglContextDescriptor, arena *bindingArena)
 	raw.display = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Display)))
 	raw.config = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Config)))
 	raw.share_context = unsafe.Pointer(C.binding_address(C.uintptr_t(input.ShareContext)))
-	raw.client_api = C.uint32_t(input.ClientApi)
+	raw.client_api = C.mln_opengl_client_api(input.ClientApi)
 	raw.get_proc_address = unsafe.Pointer(C.binding_address(C.uintptr_t(input.GetProcAddress)))
 	return raw
 }
@@ -2231,7 +2230,7 @@ func copyFrameDemand(raw C.mln_frame_demand) FrameDemand {
 func nativeFrameDemand(input FrameDemand, arena *bindingArena) C.mln_frame_demand {
 	raw := C.mln_frame_demand_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.flags = C.uint32_t(input.Flags)
+	raw.flags = C.mln_frame_demand_flags(input.Flags)
 	raw.token = C.uint64_t(input.Token)
 	return raw
 }
@@ -2348,24 +2347,23 @@ func DefaultGeojsonSourceOptions() GeojsonSourceOptions {
 // See mln_gpu_sync in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type GpuSync struct {
-	// One mln_gpu_sync_kind value.
 	Kind GpuSyncKind
 	// Bit pattern of the GLsync pointer.
-	Object uint64
+	Handle uint64
 }
 
 func copyGpuSync(raw C.mln_gpu_sync) GpuSync {
 	var result GpuSync
 	result.Kind = GpuSyncKind(raw.kind)
-	result.Object = uint64(raw.object)
+	result.Handle = uint64(raw.handle)
 	return result
 }
 
 func nativeGpuSync(input GpuSync, arena *bindingArena) C.mln_gpu_sync {
 	raw := C.mln_gpu_sync_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.kind = C.uint32_t(input.Kind)
-	raw.object = C.uint64_t(input.Object)
+	raw.kind = C.mln_gpu_sync_kind(input.Kind)
+	raw.handle = C.uint64_t(input.Handle)
 	return raw
 }
 
@@ -2402,9 +2400,8 @@ func nativeHttpHeader(input HttpHeader, arena *bindingArena) C.mln_http_header {
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type HttpHeaderRule struct {
 	// The resource kinds to match.
-	Kinds ResourceKindMask
-	// A bitwise OR of mln_url_match_flags values.
-	Flags UrlMatchFlags
+	Kinds ResourceKindFlag
+	Flags UrlMatchFlag
 	// The URL or glob pattern to compare.
 	Url string
 	// The headers to set. Registration validates each one as
@@ -2414,8 +2411,8 @@ type HttpHeaderRule struct {
 
 func copyHttpHeaderRule(raw C.mln_http_header_rule) HttpHeaderRule {
 	var result HttpHeaderRule
-	result.Kinds = ResourceKindMask(raw.kinds)
-	result.Flags = UrlMatchFlags(raw.flags)
+	result.Kinds = ResourceKindFlag(raw.kinds)
+	result.Flags = UrlMatchFlag(raw.flags)
 	result.Url = bindingString(raw.url.data, uint64(raw.url.size))
 	result.Headers = func() []HttpHeader {
 		length := bindingLength(uint64(raw.header_count))
@@ -2431,8 +2428,8 @@ func copyHttpHeaderRule(raw C.mln_http_header_rule) HttpHeaderRule {
 
 func nativeHttpHeaderRule(input HttpHeaderRule, arena *bindingArena) C.mln_http_header_rule {
 	raw := C.mln_http_header_rule_default()
-	raw.kinds = C.uint32_t(input.Kinds)
-	raw.flags = C.uint32_t(input.Flags)
+	raw.kinds = C.mln_resource_kind_flags(input.Kinds)
+	raw.flags = C.mln_url_match_flags(input.Flags)
 	raw.url = C.mln_buffer_view{data: arena.bytes([]byte(input.Url)), size: C.size_t(len(input.Url))}
 	{
 		raw.headers = (*C.mln_http_header)(arena.array(len(input.Headers), unsafe.Sizeof(*raw.headers)))
@@ -2664,14 +2661,14 @@ type MapOptions struct {
 	// Initial logical extent. Width and height must be nonzero, and scale_factor
 	// must be finite and positive. scale_factor is fixed for the map's lifetime.
 	InitialExtent LogicalExtent
-	// One of mln_map_mode. Defaults to MLN_MAP_MODE_CONTINUOUS.
+	// Defaults to MLN_MAP_MODE_CONTINUOUS.
 	MapMode MapMode
 	// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
 	// encodings. Defaults to false.
 	FastPforEnabled bool
 	// Map-originated event types this map queues, as a bitwise OR of
-	// mln_runtime_event_mask values.
-	EventMask RuntimeEventMask
+	// mln_runtime_event_flag values.
+	EventMask RuntimeEventFlag
 }
 
 func copyMapOptions(raw C.mln_map_options) MapOptions {
@@ -2679,7 +2676,7 @@ func copyMapOptions(raw C.mln_map_options) MapOptions {
 	result.InitialExtent = copyLogicalExtent(raw.initial_extent)
 	result.MapMode = MapMode(raw.map_mode)
 	result.FastPforEnabled = bool(raw.fast_pfor_enabled)
-	result.EventMask = RuntimeEventMask(raw.event_mask)
+	result.EventMask = RuntimeEventFlag(raw.event_mask)
 	return result
 }
 
@@ -2687,9 +2684,9 @@ func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options {
 	raw := C.mln_map_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.initial_extent = nativeLogicalExtent(input.InitialExtent, arena)
-	raw.map_mode = C.uint32_t(input.MapMode)
+	raw.map_mode = C.mln_map_mode(input.MapMode)
 	raw.fast_pfor_enabled = C.bool(input.FastPforEnabled)
-	raw.event_mask = C.uint64_t(input.EventMask)
+	raw.event_mask = C.mln_runtime_event_flags(input.EventMask)
 	return raw
 }
 
@@ -2701,8 +2698,8 @@ func DefaultMapOptions() MapOptions { return copyMapOptions(C.mln_map_options_de
 // See mln_map_snapshot in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type MapSnapshot struct {
-	// Debug overlay mask of mln_map_debug_option values.
-	DebugOptions MapDebugOption
+	// Debug overlay mask of mln_map_debug_flag values.
+	DebugOptions MapDebugFlag
 	Generation   uint64
 	// True once every requested style and tile resource finished loading.
 	FullyLoaded               bool
@@ -2711,7 +2708,7 @@ type MapSnapshot struct {
 	GestureInProgress bool
 	// True while a camera command with a duration is still animating.
 	TransitionInProgress bool
-	EventMask            RuntimeEventMask
+	EventMask            RuntimeEventFlag
 	// Generation of the latest render update the map published. A rendered frame at
 	// or past it draws map state that includes every command this snapshot
 	// observes, though animations and resource loads finish in later frames.
@@ -2726,13 +2723,13 @@ type MapSnapshot struct {
 
 func copyMapSnapshot(raw C.mln_map_snapshot) MapSnapshot {
 	var result MapSnapshot
-	result.DebugOptions = MapDebugOption(raw.debug_options)
+	result.DebugOptions = MapDebugFlag(raw.debug_options)
 	result.Generation = uint64(raw.generation)
 	result.FullyLoaded = bool(raw.fully_loaded)
 	result.RenderingStatsViewEnabled = bool(raw.rendering_stats_view_enabled)
 	result.GestureInProgress = bool(raw.gesture_in_progress)
 	result.TransitionInProgress = bool(raw.transition_in_progress)
-	result.EventMask = RuntimeEventMask(raw.event_mask)
+	result.EventMask = RuntimeEventFlag(raw.event_mask)
 	result.LatestRenderUpdateGeneration = uint64(raw.latest_render_update_generation)
 	result.Tile = copyMapTileOptions(raw.tile)
 	result.Bounds = copyBoundOptions(raw.bounds)
@@ -2753,8 +2750,7 @@ type MapTileOptions struct {
 	LodScale          *float64
 	LodPitchThreshold *float64
 	LodZoomShift      *float64
-	// One of mln_tile_lod_mode.
-	LodMode *TileLodMode
+	LodMode           *TileLodMode
 }
 
 func copyMapTileOptions(raw C.mln_map_tile_options) MapTileOptions {
@@ -2777,7 +2773,7 @@ func nativeMapTileOptions(input MapTileOptions, arena *bindingArena) C.mln_map_t
 	bindingMasked(&raw.fields, C.MLN_MAP_TILE_OPTION_LOD_SCALE, &raw.lod_scale, input.LodScale, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD, &raw.lod_pitch_threshold, input.LodPitchThreshold, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT, &raw.lod_zoom_shift, input.LodZoomShift, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_MAP_TILE_OPTION_LOD_MODE, &raw.lod_mode, input.LodMode, arena, bindingNumber[TileLodMode, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_MAP_TILE_OPTION_LOD_MODE, &raw.lod_mode, input.LodMode, arena, bindingNumber[TileLodMode, C.mln_tile_lod_mode])
 	return raw
 }
 
@@ -2830,13 +2826,10 @@ func nativeMapView(input MapView, arena *bindingArena) C.mln_map_view {
 // See mln_map_viewport_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type MapViewportOptions struct {
-	// One of mln_north_orientation.
 	NorthOrientation *NorthOrientation
-	// One of mln_constrain_mode.
-	ConstrainMode *ConstrainMode
-	// One of mln_viewport_mode.
-	ViewportMode  *ViewportMode
-	FrustumOffset *EdgeInsets
+	ConstrainMode    *ConstrainMode
+	ViewportMode     *ViewportMode
+	FrustumOffset    *EdgeInsets
 }
 
 func copyMapViewportOptions(raw C.mln_map_viewport_options) MapViewportOptions {
@@ -2852,9 +2845,9 @@ func nativeMapViewportOptions(input MapViewportOptions, arena *bindingArena) C.m
 	raw := C.mln_map_viewport_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION, &raw.north_orientation, input.NorthOrientation, arena, bindingNumber[NorthOrientation, C.uint32_t])
-	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE, &raw.constrain_mode, input.ConstrainMode, arena, bindingNumber[ConstrainMode, C.uint32_t])
-	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE, &raw.viewport_mode, input.ViewportMode, arena, bindingNumber[ViewportMode, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION, &raw.north_orientation, input.NorthOrientation, arena, bindingNumber[NorthOrientation, C.mln_north_orientation])
+	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE, &raw.constrain_mode, input.ConstrainMode, arena, bindingNumber[ConstrainMode, C.mln_constrain_mode])
+	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE, &raw.viewport_mode, input.ViewportMode, arena, bindingNumber[ViewportMode, C.mln_viewport_mode])
 	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET, &raw.frustum_offset, input.FrustumOffset, arena, nativeEdgeInsets)
 	return raw
 }
@@ -3147,7 +3140,7 @@ func nativeOfflineRegionDefinition(input OfflineRegionDefinition, arena *binding
 	if input.Data == nil {
 		arena.fail("missing union variant")
 	}
-	raw._type = C.uint32_t(input.Data.bindingTag())
+	raw._type = C.mln_offline_region_definition_type(input.Data.bindingTag())
 	switch variant := input.Data.(type) {
 	case OfflineRegionDefinitionDataTilePyramidVariant:
 		*(*C.mln_offline_tile_pyramid_region_definition)(unsafe.Pointer(&raw.data)) = nativeOfflineTilePyramidRegionDefinition(variant.Value, arena)
@@ -3185,7 +3178,6 @@ func copyOfflineRegionInfo(raw C.mln_offline_region_info) OfflineRegionInfo {
 // See mln_offline_region_status in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type OfflineRegionStatus struct {
-	// One of mln_offline_region_download_state.
 	DownloadState                  OfflineRegionDownloadState
 	CompletedResourceCount         uint64
 	CompletedResourceSize          uint64
@@ -3371,11 +3363,11 @@ func copyOpenglContextDescriptor(raw C.mln_opengl_context_descriptor) OpenglCont
 
 func nativeOpenglContextDescriptor(input OpenglContextDescriptor, arena *bindingArena) C.mln_opengl_context_descriptor {
 	raw := C.mln_opengl_context_descriptor{}
-	raw.ownership = C.uint32_t(input.Ownership)
+	raw.ownership = C.mln_opengl_context_ownership(input.Ownership)
 	if input.Data == nil {
 		arena.fail("missing union variant")
 	}
-	raw.platform = C.uint32_t(input.Data.bindingTag())
+	raw.platform = C.mln_opengl_context_platform(input.Data.bindingTag())
 	switch variant := input.Data.(type) {
 	case OpenglContextDescriptorDataWglVariant:
 		*(*C.mln_wgl_context_descriptor)(unsafe.Pointer(&raw.data)) = nativeWglContextDescriptor(variant.Value, arena)
@@ -3685,7 +3677,6 @@ func nativeQueueLock(input QueueLock, arena *bindingArena) C.mln_queue_lock {
 }
 
 type RenderAbandonResult struct {
-	// One mln_render_abandon_disposition value.
 	Disposition RenderAbandonDisposition
 	// Backend resource groups intentionally retained until process exit.
 	QuarantinedResourceCount uint32
@@ -3705,7 +3696,6 @@ func copyRenderAbandonResult(raw C.mln_render_abandon_result) RenderAbandonResul
 // See mln_render_frame_result in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 type RenderFrameResult struct {
-	// One mln_render_result value.
 	Disposition RenderResult
 	Token       uint64
 	// Generation of the map render update the demand evaluated. When disposition is
@@ -3752,8 +3742,7 @@ func copyRenderFrameResult(raw C.mln_render_frame_result) RenderFrameResult {
 // See mln_render_session_attach_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type RenderSessionAttachOptions struct {
-	// One mln_render_driver_kind value. Defaults to
-	// MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
+	// Defaults to MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
 	Driver RenderDriverKind
 	// Requested slot count of a session-owned texture ring, from one to
 	// MLN_TEXTURE_RING_MAX_DEPTH. Private targets grant one slot regardless of this
@@ -3788,9 +3777,9 @@ func copyRenderSessionAttachOptions(raw C.mln_render_session_attach_options) Ren
 func nativeRenderSessionAttachOptions(input RenderSessionAttachOptions, arena *bindingArena) C.mln_render_session_attach_options {
 	raw := C.mln_render_session_attach_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.driver = C.uint32_t(input.Driver)
+	raw.driver = C.mln_render_driver_kind(input.Driver)
 	raw.requested_texture_ring_depth = C.uint32_t(input.RequestedTextureRingDepth)
-	raw.producer_sync_kind = C.uint32_t(input.ProducerSyncKind)
+	raw.producer_sync_kind = C.mln_gpu_sync_kind(input.ProducerSyncKind)
 	raw.frame_wake = nativeWake(input.FrameWake, arena)
 	raw.driver_work_wake = nativeWake(input.DriverWorkWake, arena)
 	raw.queue_lock = nativeQueueLock(input.QueueLock, arena)
@@ -3807,13 +3796,11 @@ func DefaultRenderSessionAttachOptions() RenderSessionAttachOptions {
 // See mln_render_session_capabilities in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type RenderSessionCapabilities struct {
-	// One mln_render_driver_kind value.
 	Driver RenderDriverKind
 	// Granted texture ring depth: the slot count of a session-owned ring, or the
 	// texture count of a borrowed one. Zero for a surface.
 	TextureRingDepth uint32
-	// A bitwise OR of mln_render_session_capability_flag values.
-	Flags RenderSessionCapabilityFlag
+	Flags            RenderSessionCapabilityFlag
 }
 
 func copyRenderSessionCapabilities(raw C.mln_render_session_capabilities) RenderSessionCapabilities {
@@ -3830,7 +3817,6 @@ func copyRenderSessionCapabilities(raw C.mln_render_session_capabilities) Render
 // See mln_render_session_snapshot in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 type RenderSessionSnapshot struct {
-	// One mln_render_session_state value.
 	State RenderSessionState
 	// Logical extent applied by the driver.
 	Extent LogicalExtent
@@ -3955,7 +3941,7 @@ func nativeRenderedQueryGeometry(input RenderedQueryGeometry, arena *bindingAren
 	if input.Data == nil {
 		arena.fail("missing union variant")
 	}
-	raw._type = C.uint32_t(input.Data.bindingTag())
+	raw._type = C.mln_rendered_query_geometry_type(input.Data.bindingTag())
 	switch variant := input.Data.(type) {
 	case RenderedQueryGeometryDataPointVariant:
 		*(*C.mln_screen_point)(unsafe.Pointer(&raw.data)) = nativeScreenPoint(variant.Value, arena)
@@ -4148,8 +4134,8 @@ func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_r
 	raw := C.mln_resource_response{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	raw.status = C.uint32_t(input.Status)
-	raw.error_reason = C.uint32_t(input.ErrorReason)
+	raw.status = C.mln_resource_response_status(input.Status)
+	raw.error_reason = C.mln_resource_error_reason(input.ErrorReason)
 	raw.bytes = (*C.uint8_t)(arena.bytes(input.Bytes))
 	raw.byte_count = bindingCountLike(raw.byte_count, len(input.Bytes))
 	raw.error_message = C.mln_buffer_view{data: arena.bytes([]byte(input.ErrorMessage)), size: C.size_t(len(input.ErrorMessage))}
@@ -4168,25 +4154,24 @@ func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_r
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type ResourceRoute struct {
 	// The resource kinds to match.
-	Kinds ResourceKindMask
-	// A bitwise OR of mln_url_match_flags values.
-	Flags UrlMatchFlags
+	Kinds ResourceKindFlag
+	Flags UrlMatchFlag
 	// The URL or glob pattern to compare.
 	Url string
 }
 
 func copyResourceRoute(raw C.mln_resource_route) ResourceRoute {
 	var result ResourceRoute
-	result.Kinds = ResourceKindMask(raw.kinds)
-	result.Flags = UrlMatchFlags(raw.flags)
+	result.Kinds = ResourceKindFlag(raw.kinds)
+	result.Flags = UrlMatchFlag(raw.flags)
 	result.Url = bindingString(raw.url.data, uint64(raw.url.size))
 	return result
 }
 
 func nativeResourceRoute(input ResourceRoute, arena *bindingArena) C.mln_resource_route {
 	raw := C.mln_resource_route_default()
-	raw.kinds = C.uint32_t(input.Kinds)
-	raw.flags = C.uint32_t(input.Flags)
+	raw.kinds = C.mln_resource_kind_flags(input.Kinds)
+	raw.flags = C.mln_url_match_flags(input.Flags)
 	raw.url = C.mln_buffer_view{data: arena.bytes([]byte(input.Url)), size: C.size_t(len(input.Url))}
 	return raw
 }
@@ -4221,9 +4206,7 @@ func nativeResourceTransform(input ResourceTransform, arena *bindingArena) C.mln
 // See mln_runtime_event in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type RuntimeEvent struct {
-	// One of mln_runtime_event_type.
-	Type RuntimeEventType
-	// One of mln_runtime_event_source_type.
+	Type       RuntimeEventType
 	SourceType RuntimeEventSourceType
 	// Source handle selected by source_type: an mln_runtime or an mln_map.
 	Source uint64
@@ -4232,7 +4215,7 @@ type RuntimeEvent struct {
 	Generation uint64
 	// Secondary event detail whose meaning type selects; see
 	// mln_runtime_event_type.
-	Code int32
+	Code uint32
 	// Borrowed UTF-8 message bytes, empty when this event carries no message.
 	Message string
 	// Typed payload selected by payload_type.
@@ -4245,7 +4228,7 @@ func copyRuntimeEvent(raw C.mln_runtime_event) RuntimeEvent {
 	result.SourceType = RuntimeEventSourceType(raw.source_type)
 	result.Source = uint64(raw.source)
 	result.Generation = uint64(raw.generation)
-	result.Code = int32(raw.code)
+	result.Code = uint32(raw.code)
 	result.Message = bindingString(raw.message.data, uint64(raw.message.size))
 	result.Payload = func() RuntimeEventPayload {
 		switch raw.payload_type {
@@ -4297,8 +4280,7 @@ func nativeRuntimeEventHandler(input RuntimeEventHandler, arena *bindingArena) C
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type RuntimeEventOfflineRegionResponseError struct {
 	RegionId int64
-	// One of mln_resource_error_reason.
-	Reason ResourceErrorReason
+	Reason   ResourceErrorReason
 }
 
 func copyRuntimeEventOfflineRegionResponseError(raw C.mln_runtime_event_offline_region_response_error) RuntimeEventOfflineRegionResponseError {
@@ -4350,7 +4332,6 @@ func copyRuntimeEventOfflineRegionTileCountLimit(raw C.mln_runtime_event_offline
 // See mln_runtime_event_render_frame in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type RuntimeEventRenderFrame struct {
-	// One of mln_render_mode.
 	Mode RenderMode
 	// Whether MapLibre needs another frame after this one.
 	NeedsRepaint bool
@@ -4373,10 +4354,7 @@ func copyRuntimeEventRenderFrame(raw C.mln_runtime_event_render_frame) RuntimeEv
 //
 // See mln_runtime_event_render_map in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type RuntimeEventRenderMap struct {
-	// One of mln_render_mode.
-	Mode RenderMode
-}
+type RuntimeEventRenderMap struct{ Mode RenderMode }
 
 func copyRuntimeEventRenderMap(raw C.mln_runtime_event_render_map) RuntimeEventRenderMap {
 	var result RuntimeEventRenderMap
@@ -4390,7 +4368,6 @@ func copyRuntimeEventRenderMap(raw C.mln_runtime_event_render_map) RuntimeEventR
 // See mln_runtime_event_tile_action in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type RuntimeEventTileAction struct {
-	// One of mln_tile_operation.
 	Operation TileOperation
 	TileId    TileId
 }
@@ -4708,7 +4685,6 @@ func DefaultStyleExpressionOptions() StyleExpressionOptions {
 // See mln_style_expression_type in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
 type StyleExpressionType struct {
-	// One of mln_style_expression_type_kind.
 	Kind StyleExpressionTypeKind
 	// For an array, its items' kind; ignored for any other kind.
 	ItemKind StyleExpressionTypeKind
@@ -4726,8 +4702,8 @@ func copyStyleExpressionType(raw C.mln_style_expression_type) StyleExpressionTyp
 
 func nativeStyleExpressionType(input StyleExpressionType, arena *bindingArena) C.mln_style_expression_type {
 	raw := C.mln_style_expression_type{}
-	raw.kind = C.uint32_t(input.Kind)
-	raw.item_kind = C.uint32_t(input.ItemKind)
+	raw.kind = C.mln_style_expression_type_kind(input.Kind)
+	raw.item_kind = C.mln_style_expression_type_kind(input.ItemKind)
 	raw.item_count = C.uint32_t(input.ItemCount)
 	return raw
 }
@@ -4806,9 +4782,9 @@ type StyleImageOptions struct {
 	StretchY []ImageStretch
 	// Content box used when icon-text-fit applies.
 	Content *ImageContent
-	// One of mln_style_image_text_fit. Defaults to STRETCH_OR_SHRINK.
+	// Defaults to STRETCH_OR_SHRINK.
 	TextFitWidth *StyleImageTextFit
-	// One of mln_style_image_text_fit. Defaults to STRETCH_OR_SHRINK.
+	// Defaults to STRETCH_OR_SHRINK.
 	TextFitHeight *StyleImageTextFit
 	// Sprite pixel ratio. Defaults to 1.
 	PixelRatio *float32
@@ -4875,8 +4851,8 @@ func nativeStyleImageOptions(input StyleImageOptions, arena *bindingArena) C.mln
 		raw.fields |= C.MLN_STYLE_IMAGE_OPTION_STRETCH_Y
 	}
 	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_CONTENT, &raw.content, input.Content, arena, nativeImageContent)
-	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH, &raw.text_fit_width, input.TextFitWidth, arena, bindingNumber[StyleImageTextFit, C.uint32_t])
-	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT, &raw.text_fit_height, input.TextFitHeight, arena, bindingNumber[StyleImageTextFit, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH, &raw.text_fit_width, input.TextFitWidth, arena, bindingNumber[StyleImageTextFit, C.mln_style_image_text_fit])
+	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT, &raw.text_fit_height, input.TextFitHeight, arena, bindingNumber[StyleImageTextFit, C.mln_style_image_text_fit])
 	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO, &raw.pixel_ratio, input.PixelRatio, arena, bindingNumber[float32, C.float])
 	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_SDF, &raw.sdf, input.Sdf, arena, bindingBool[bool, C.bool])
 	return raw
@@ -4903,8 +4879,7 @@ type StyleLayerInfo struct {
 	// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
 	MinZoom float64
 	// Highest zoom at which the layer draws; INFINITY with no upper bound.
-	MaxZoom float64
-	// One of mln_style_layer_visibility.
+	MaxZoom    float64
 	Visibility StyleLayerVisibility
 }
 
@@ -4927,8 +4902,7 @@ func copyStyleLayerInfo(raw C.mln_style_layer_info) StyleLayerInfo {
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleSourceInfo struct {
 	// Source ID.
-	Id string
-	// One of mln_style_source_type.
+	Id   string
 	Type StyleSourceType
 	// Whether the source is marked volatile.
 	IsVolatile bool
@@ -4975,8 +4949,7 @@ type StyleSourceTileInfo struct {
 	MinZoom float64
 	// Highest zoom level the TileJSON provides tiles for.
 	MaxZoom float64
-	// One of mln_style_tile_scheme.
-	Scheme StyleTileScheme
+	Scheme  StyleTileScheme
 }
 
 func copyStyleSourceTileInfo(raw C.mln_style_source_tile_info) StyleSourceTileInfo {
@@ -5473,7 +5446,6 @@ func nativeWake(input Wake, arena *bindingArena) C.mln_wake {
 // See mln_webgl_context_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type WebglContextDescriptor struct {
-	// One mln_webgl_context_kind value.
 	Kind WebglContextKind
 	// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
 	Context int32
@@ -5492,7 +5464,7 @@ func copyWebglContextDescriptor(raw C.mln_webgl_context_descriptor) WebglContext
 
 func nativeWebglContextDescriptor(input WebglContextDescriptor, arena *bindingArena) C.mln_webgl_context_descriptor {
 	raw := C.mln_webgl_context_descriptor{}
-	raw.kind = C.uint32_t(input.Kind)
+	raw.kind = C.mln_webgl_context_kind(input.Kind)
 	raw.context = C.int32_t(input.Context)
 	raw.canvas_selector = C.mln_buffer_view{data: arena.bytes([]byte(input.CanvasSelector)), size: C.size_t(len(input.CanvasSelector))}
 	return raw
@@ -5735,12 +5707,12 @@ func (view GpuSyncView) Kind() (GpuSyncKind, error) {
 	})
 }
 
-func (view GpuSyncView) Object() (uint64, error) {
+func (view GpuSyncView) Handle() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 		view.scope.check()
-		return view.value.Object
+		return view.value.Handle
 	})
 }
 
@@ -6317,9 +6289,9 @@ func LogClearCallback() error {
 //
 // See mln_log_set_async_severity_mask in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html
-func LogSetAsyncSeverityMask(mask LogSeverityMask) error {
+func LogSetAsyncSeverityMask(mask LogSeverityFlag) error {
 	return bindingDo(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_log_set_async_severity_mask(C.uint32_t(mask), diagnostic))
+		return int32(C.mln_log_set_async_severity_mask(C.mln_log_severity_flags(mask), diagnostic))
 	})
 }
 
@@ -7206,9 +7178,9 @@ func (receiver *MapHandle) SetCustomMvtVectorSourceTileError(sourceId string, ti
 //
 // See mln_map_set_debug_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
-func (receiver *MapHandle) SetDebugOptions(options MapDebugOption) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetDebugOptions(options MapDebugFlag) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_debug_options(C.mln_map(raw), C.uint32_t(options), completion, diagnostic))
+		return int32(C.mln_map_set_debug_options(C.mln_map(raw), C.mln_map_debug_flags(options), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -7216,9 +7188,9 @@ func (receiver *MapHandle) SetDebugOptions(options MapDebugOption) (*Future[Comm
 //
 // See mln_map_set_event_mask in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *MapHandle) SetEventMask(mask RuntimeEventMask) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetEventMask(mask RuntimeEventFlag) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_event_mask(C.mln_map(raw), C.uint64_t(mask), completion, diagnostic))
+		return int32(C.mln_map_set_event_mask(C.mln_map(raw), C.mln_runtime_event_flags(mask), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -7452,7 +7424,7 @@ func (receiver *MapHandle) UpdateCamera(update CameraUpdate) (*Future[CommandCom
 // See mln_network_get_status in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func NetworkGetStatus() (NetworkStatus, error) {
-	var outStatus C.uint32_t
+	var outStatus C.mln_network_status
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_network_get_status(&outStatus, diagnostic))
 	}, func(arena *bindingArena) NetworkStatus {
@@ -7466,7 +7438,7 @@ func NetworkGetStatus() (NetworkStatus, error) {
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func NetworkSetStatus(status NetworkStatus) error {
 	return bindingDo(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_network_set_status(C.uint32_t(status), diagnostic))
+		return int32(C.mln_network_set_status(C.mln_network_status(status), diagnostic))
 	})
 }
 
@@ -7967,12 +7939,12 @@ func (receiver *RuntimeHandle) DeleteOfflineRegion(regionId int64) (*Future[stru
 //
 // See mln_runtime_get_event_mask in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *RuntimeHandle) EventMask() (RuntimeEventMask, error) {
-	var outMask C.uint64_t
+func (receiver *RuntimeHandle) EventMask() (RuntimeEventFlag, error) {
+	var outMask C.mln_runtime_event_flags
 	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_get_event_mask(C.mln_runtime(raw), &outMask, diagnostic))
-	}, func(arena *bindingArena) RuntimeEventMask {
-		return RuntimeEventMask(outMask)
+	}, func(arena *bindingArena) RuntimeEventFlag {
+		return RuntimeEventFlag(outMask)
 	})
 }
 
@@ -8046,7 +8018,7 @@ func (receiver *RuntimeHandle) Close() (*Future[struct{}], error) {
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *RuntimeHandle) RunAmbientCacheOperation(operation AmbientCacheOperation) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_run_ambient_cache_operation(C.mln_runtime(raw), C.uint32_t(operation), completion, diagnostic))
+		return int32(C.mln_runtime_run_ambient_cache_operation(C.mln_runtime(raw), C.mln_ambient_cache_operation(operation), completion, diagnostic))
 	}, completionUnit)
 }
 
@@ -8064,9 +8036,9 @@ func (receiver *RuntimeHandle) SetEventHandler(handler RuntimeEventHandler) (*Fu
 //
 // See mln_runtime_set_event_mask in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *RuntimeHandle) SetEventMask(mask RuntimeEventMask) error {
+func (receiver *RuntimeHandle) SetEventMask(mask RuntimeEventFlag) error {
 	return bindingDo(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_set_event_mask(C.mln_runtime(raw), C.uint64_t(mask), diagnostic))
+		return int32(C.mln_runtime_set_event_mask(C.mln_runtime(raw), C.mln_runtime_event_flags(mask), diagnostic))
 	})
 }
 
@@ -8098,7 +8070,7 @@ func (receiver *RuntimeHandle) SetMaximumAmbientCacheSize(size uint64) (*Future[
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 func (receiver *RuntimeHandle) SetOfflineRegionDownloadState(regionId int64, state OfflineRegionDownloadState) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_set_offline_region_download_state(C.mln_runtime(raw), C.mln_offline_region_id(regionId), C.uint32_t(state), completion, diagnostic))
+		return int32(C.mln_runtime_set_offline_region_download_state(C.mln_runtime(raw), C.mln_offline_region_id(regionId), C.mln_offline_region_download_state(state), completion, diagnostic))
 	}, completionUnit)
 }
 
@@ -8446,17 +8418,17 @@ func (view MapHandleDiscarding) SetCustomMvtVectorSourceTileError(sourceId strin
 	})
 }
 
-func (view MapHandleDiscarding) SetDebugOptions(options MapDebugOption) error {
+func (view MapHandleDiscarding) SetDebugOptions(options MapDebugFlag) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_debug_options(C.mln_map(raw), C.uint32_t(options), completion, diagnostic))
+		return int32(C.mln_map_set_debug_options(C.mln_map(raw), C.mln_map_debug_flags(options), completion, diagnostic))
 	})
 }
 
-func (view MapHandleDiscarding) SetEventMask(mask RuntimeEventMask) error {
+func (view MapHandleDiscarding) SetEventMask(mask RuntimeEventFlag) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_event_mask(C.mln_map(raw), C.uint64_t(mask), completion, diagnostic))
+		return int32(C.mln_map_set_event_mask(C.mln_map(raw), C.mln_runtime_event_flags(mask), completion, diagnostic))
 	})
 }
 
@@ -8678,7 +8650,7 @@ func (view RuntimeHandleDiscarding) SetResourceTransform(transform ResourceTrans
 }
 
 //export mlnGo_mln_log_handler_callback
-func mlnGo_mln_log_handler_callback(native_user_data unsafe.Pointer, native_severity C.uint32_t, native_event C.uint32_t, native_code C.int64_t, native_message *C.char) (result C.bool) {
+func mlnGo_mln_log_handler_callback(native_user_data unsafe.Pointer, native_severity C.mln_log_severity, native_event C.mln_log_event, native_code C.int64_t, native_message *C.char) (result C.bool) {
 	result = false
 	defer func() {
 		if failure := recover(); failure != nil {
@@ -8853,7 +8825,7 @@ func mlnGo_mln_runtime_event_handler_callback(native_user_data unsafe.Pointer, n
 }
 
 //export mlnGo_mln_http_header_transform_callback
-func mlnGo_mln_http_header_transform_callback(native_user_data unsafe.Pointer, native_kind C.uint32_t, native_url *C.char, native_out_response *C.mln_http_header_transform_response) (result C.mln_status) {
+func mlnGo_mln_http_header_transform_callback(native_user_data unsafe.Pointer, native_kind C.mln_resource_kind, native_url *C.char, native_out_response *C.mln_http_header_transform_response) (result C.mln_status) {
 	result = C.MLN_STATUS_NATIVE_ERROR
 	defer func() {
 		if failure := recover(); failure != nil {
@@ -8890,7 +8862,7 @@ func mlnGo_mln_resource_provider_callback(native_user_data unsafe.Pointer, nativ
 }
 
 //export mlnGo_mln_resource_transform_callback
-func mlnGo_mln_resource_transform_callback(native_user_data unsafe.Pointer, native_kind C.uint32_t, native_url *C.char, native_request C.mln_resource_transform_request) {
+func mlnGo_mln_resource_transform_callback(native_user_data unsafe.Pointer, native_kind C.mln_resource_kind, native_url *C.char, native_request C.mln_resource_transform_request) {
 	owned_request := adoptResourceTransformRequestHandle(uint64(native_request), nil)
 	defer func() {
 		if failure := recover(); failure != nil {

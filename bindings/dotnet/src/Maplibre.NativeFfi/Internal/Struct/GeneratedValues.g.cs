@@ -125,7 +125,7 @@ internal static unsafe class GeneratedValues
             NativeScreenPoint
         );
         native.animation = NativeAnimationOptions(value.Animation, scope);
-        native.gesture_phase = (uint)value.GesturePhase;
+        native.gesture_phase = (mln_gesture_phase)value.GesturePhase;
         return native;
     }
 
@@ -268,10 +268,10 @@ internal static unsafe class GeneratedValues
         Required(value.Animation, "CameraUpdate.Animation must not be null.");
         var native = NativeMethods.mln_camera_update_default();
         native.size = (uint)sizeof(mln_camera_update);
-        native.mode = (uint)value.Mode;
+        native.mode = (mln_camera_update_mode)value.Mode;
         native.camera = NativeCameraOptions(value.Camera);
         native.animation = NativeAnimationOptions(value.Animation, scope);
-        native.gesture_phase = (uint)value.GesturePhase;
+        native.gesture_phase = (mln_gesture_phase)value.GesturePhase;
         return native;
     }
 
@@ -527,7 +527,7 @@ internal static unsafe class GeneratedValues
         native.display = (void*)value.Display.Address;
         native.config = (void*)value.Config.Address;
         native.share_context = (void*)value.ShareContext.Address;
-        native.client_api = (uint)value.ClientApi;
+        native.client_api = (mln_opengl_client_api)value.ClientApi;
         native.get_proc_address = (void*)value.GetProcAddress.Address;
         return native;
     }
@@ -732,14 +732,14 @@ internal static unsafe class GeneratedValues
     }
 
     internal static GpuSync CopyGpuSync(mln_gpu_sync value) =>
-        new((GpuSyncKind)value.kind, value.@object);
+        new((GpuSyncKind)value.kind, value.handle);
 
     internal static mln_gpu_sync NativeGpuSync(GpuSync value)
     {
         var native = NativeMethods.mln_gpu_sync_default();
         native.size = (uint)sizeof(mln_gpu_sync);
-        native.kind = (uint)value.Kind;
-        native.@object = value.Object;
+        native.kind = (mln_gpu_sync_kind)value.Kind;
+        native.handle = value.Handle;
         return native;
     }
 
@@ -762,8 +762,8 @@ internal static unsafe class GeneratedValues
     internal static HttpHeaderRule CopyHttpHeaderRule(mln_http_header_rule value) =>
         default(HttpHeaderRule) with
         {
-            Kinds = (ResourceKindMask)value.kinds,
-            Flags = (UrlMatchFlags)value.flags,
+            Kinds = (ResourceKindFlag)value.kinds,
+            Flags = (UrlMatchFlag)value.flags,
             Url = RuntimeStructs.CopyUtf8((sbyte*)value.url.data, value.url.size),
             HeadersStorage = new(
                 NativeCallScope.CopyArray<mln_http_header, HttpHeader>(
@@ -795,7 +795,7 @@ internal static unsafe class GeneratedValues
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static mln_status InvokeHttpHeaderTransformCallback(
         void* user_data,
-        uint kind,
+        mln_resource_kind kind,
         sbyte* url,
         mln_http_header_transform_response* out_response
     )
@@ -897,8 +897,8 @@ internal static unsafe class GeneratedValues
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static byte InvokeLogHandlerCallback(
         void* user_data,
-        uint severity,
-        uint @event,
+        mln_log_severity severity,
+        mln_log_event @event,
         long code,
         sbyte* message
     )
@@ -956,7 +956,7 @@ internal static unsafe class GeneratedValues
             CopyLogicalExtent(value.initial_extent),
             (MapMode)value.map_mode,
             value.fast_pfor_enabled != 0,
-            (RuntimeEventMask)value.event_mask
+            (RuntimeEventFlag)value.event_mask
         );
 
     internal static mln_map_options NativeMapOptions(MapOptions value)
@@ -964,7 +964,7 @@ internal static unsafe class GeneratedValues
         var native = NativeMethods.mln_map_options_default();
         native.size = (uint)sizeof(mln_map_options);
         native.initial_extent = NativeLogicalExtent(value.InitialExtent);
-        native.map_mode = (uint)value.MapMode;
+        native.map_mode = (mln_map_mode)value.MapMode;
         native.fast_pfor_enabled = (byte)(value.FastPforEnabled ? 1 : 0);
         native.event_mask = (ulong)value.EventMask;
         return native;
@@ -972,13 +972,13 @@ internal static unsafe class GeneratedValues
 
     internal static MapSnapshot CopyMapSnapshot(mln_map_snapshot value) =>
         new(
-            (MapDebugOption)value.debug_options,
+            (MapDebugFlag)value.debug_options,
             value.generation,
             value.fully_loaded != 0,
             value.rendering_stats_view_enabled != 0,
             value.gesture_in_progress != 0,
             value.transition_in_progress != 0,
-            (RuntimeEventMask)value.event_mask,
+            (RuntimeEventFlag)value.event_mask,
             value.latest_render_update_generation,
             CopyMapTileOptions(value.tile),
             CopyBoundOptions(value.bounds),
@@ -1037,7 +1037,7 @@ internal static unsafe class GeneratedValues
             value.LodMode,
             ref native.lod_mode,
             MLN_MAP_TILE_OPTION_LOD_MODE,
-            static present => (uint)present
+            static present => (mln_tile_lod_mode)present
         );
         return native;
     }
@@ -1090,19 +1090,19 @@ internal static unsafe class GeneratedValues
             value.NorthOrientation,
             ref native.north_orientation,
             MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION,
-            static present => (uint)present
+            static present => (mln_north_orientation)present
         );
         native.fields |= Put(
             value.ConstrainMode,
             ref native.constrain_mode,
             MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE,
-            static present => (uint)present
+            static present => (mln_constrain_mode)present
         );
         native.fields |= Put(
             value.ViewportMode,
             ref native.viewport_mode,
             MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE,
-            static present => (uint)present
+            static present => (mln_viewport_mode)present
         );
         native.fields |= Put(
             value.FrustumOffset,
@@ -1263,11 +1263,11 @@ internal static unsafe class GeneratedValues
     ) =>
         value.type switch
         {
-            (uint)mln_offline_region_definition_type.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID =>
+            mln_offline_region_definition_type.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID =>
                 new OfflineRegionDefinition.TilePyramid(
                     CopyOfflineTilePyramidRegionDefinition(value.data.tile_pyramid)
                 ),
-            (uint)mln_offline_region_definition_type.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY =>
+            mln_offline_region_definition_type.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY =>
                 new OfflineRegionDefinition.Geometry(
                     CopyOfflineGeometryRegionDefinition(value.data.geometry)
                 ),
@@ -1287,7 +1287,7 @@ internal static unsafe class GeneratedValues
         switch (value)
         {
             case OfflineRegionDefinition.TilePyramid selected:
-                native.type = (uint)
+                native.type =
                     mln_offline_region_definition_type.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID;
                 native.data.tile_pyramid = NativeOfflineTilePyramidRegionDefinition(
                     selected.Value,
@@ -1295,7 +1295,7 @@ internal static unsafe class GeneratedValues
                 );
                 break;
             case OfflineRegionDefinition.Geometry selected:
-                native.type = (uint)
+                native.type =
                     mln_offline_region_definition_type.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY;
                 native.data.geometry = NativeOfflineGeometryRegionDefinition(selected.Value, scope);
                 break;
@@ -1415,15 +1415,15 @@ internal static unsafe class GeneratedValues
             (OpenglContextOwnership)value.ownership,
             value.platform switch
             {
-                (uint)mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WGL =>
+                mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WGL =>
                     new OpenglContextDescriptor.DataValue.Wgl(
                         CopyWglContextDescriptor(value.data.wgl)
                     ),
-                (uint)mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_EGL =>
+                mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_EGL =>
                     new OpenglContextDescriptor.DataValue.Egl(
                         CopyEglContextDescriptor(value.data.egl)
                     ),
-                (uint)mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL =>
+                mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL =>
                     new OpenglContextDescriptor.DataValue.Webgl(
                         CopyWebglContextDescriptor(value.data.webgl)
                     ),
@@ -1440,20 +1440,19 @@ internal static unsafe class GeneratedValues
     )
     {
         var native = new mln_opengl_context_descriptor();
-        native.ownership = (uint)value.Ownership;
+        native.ownership = (mln_opengl_context_ownership)value.Ownership;
         switch (value.Data)
         {
             case OpenglContextDescriptor.DataValue.Wgl selected:
-                native.platform = (uint)mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WGL;
+                native.platform = mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WGL;
                 native.data.wgl = NativeWglContextDescriptor(selected.Value);
                 break;
             case OpenglContextDescriptor.DataValue.Egl selected:
-                native.platform = (uint)mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_EGL;
+                native.platform = mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_EGL;
                 native.data.egl = NativeEglContextDescriptor(selected.Value);
                 break;
             case OpenglContextDescriptor.DataValue.Webgl selected:
-                native.platform = (uint)
-                    mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
+                native.platform = mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
                 native.data.webgl = NativeWebglContextDescriptor(selected.Value, scope);
                 break;
             default:
@@ -1704,9 +1703,9 @@ internal static unsafe class GeneratedValues
     {
         var native = NativeMethods.mln_render_session_attach_options_default();
         native.size = (uint)sizeof(mln_render_session_attach_options);
-        native.driver = (uint)value.Driver;
+        native.driver = (mln_render_driver_kind)value.Driver;
         native.requested_texture_ring_depth = value.RequestedTextureRingDepth;
-        native.producer_sync_kind = (uint)value.ProducerSyncKind;
+        native.producer_sync_kind = (mln_gpu_sync_kind)value.ProducerSyncKind;
         native.frame_wake = NativeWake(value.FrameWake, scope);
         native.driver_work_wake = NativeWake(value.DriverWorkWake, scope);
         native.queue_lock = NativeQueueLock(value.QueueLock, scope);
@@ -1815,17 +1814,16 @@ internal static unsafe class GeneratedValues
         switch (value)
         {
             case RenderedQueryGeometry.Point selected:
-                native.type = (uint)
+                native.type =
                     mln_rendered_query_geometry_type.MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT;
                 native.data.point = NativeScreenPoint(selected.Value);
                 break;
             case RenderedQueryGeometry.Box selected:
-                native.type = (uint)
-                    mln_rendered_query_geometry_type.MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX;
+                native.type = mln_rendered_query_geometry_type.MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX;
                 native.data.box = NativeScreenBox(selected.Value);
                 break;
             case RenderedQueryGeometry.LineString selected:
-                native.type = (uint)
+                native.type =
                     mln_rendered_query_geometry_type.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING;
                 native.data.line_string = NativeScreenLineString(selected.Value, scope);
                 break;
@@ -1966,8 +1964,8 @@ internal static unsafe class GeneratedValues
         var native = new mln_resource_response();
         native.fields = 0;
         native.size = (uint)sizeof(mln_resource_response);
-        native.status = (uint)value.Status;
-        native.error_reason = (uint)value.ErrorReason;
+        native.status = (mln_resource_response_status)value.Status;
+        native.error_reason = (mln_resource_error_reason)value.ErrorReason;
         var bufferBytes = scope.Buffer(value.BytesStorage.Items);
         native.bytes = (byte*)bufferBytes.data;
         native.byte_count = checked((nuint)bufferBytes.size);
@@ -1994,8 +1992,8 @@ internal static unsafe class GeneratedValues
 
     internal static ResourceRoute CopyResourceRoute(mln_resource_route value) =>
         new(
-            (ResourceKindMask)value.kinds,
-            (UrlMatchFlags)value.flags,
+            (ResourceKindFlag)value.kinds,
+            (UrlMatchFlag)value.flags,
             RuntimeStructs.CopyUtf8((sbyte*)value.url.data, value.url.size)
         );
 
@@ -2015,7 +2013,7 @@ internal static unsafe class GeneratedValues
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokeResourceTransformCallback(
         void* user_data,
-        uint kind,
+        mln_resource_kind kind,
         sbyte* url,
         MlnResourceTransformRequest request
     )
@@ -2067,38 +2065,35 @@ internal static unsafe class GeneratedValues
             RuntimeStructs.CopyUtf8((sbyte*)value.message.data, value.message.size),
             value.payload_type switch
             {
-                (uint)mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME =>
+                mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME =>
                     new RuntimeEvent.PayloadValue.RenderFrame(
                         CopyRuntimeEventRenderFrame(value.payload.render_frame)
                     ),
-                (uint)mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP =>
+                mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP =>
                     new RuntimeEvent.PayloadValue.RenderMap(
                         CopyRuntimeEventRenderMap(value.payload.render_map)
                     ),
-                (uint)mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION =>
+                mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION =>
                     new RuntimeEvent.PayloadValue.TileAction(
                         CopyRuntimeEventTileAction(value.payload.tile_action)
                     ),
-                (uint)
-                    mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS =>
+                mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS =>
                     new RuntimeEvent.PayloadValue.OfflineRegionStatus(
                         CopyRuntimeEventOfflineRegionStatus(value.payload.offline_region_status)
                     ),
-                (uint)
-                    mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR =>
+                mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR =>
                     new RuntimeEvent.PayloadValue.OfflineRegionResponseError(
                         CopyRuntimeEventOfflineRegionResponseError(
                             value.payload.offline_region_response_error
                         )
                     ),
-                (uint)
-                    mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT =>
+                mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT =>
                     new RuntimeEvent.PayloadValue.OfflineRegionTileCountLimit(
                         CopyRuntimeEventOfflineRegionTileCountLimit(
                             value.payload.offline_region_tile_count_limit
                         )
                     ),
-                (uint)mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_NONE =>
+                mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_NONE =>
                     new RuntimeEvent.PayloadValue.None(),
                 _ => new RuntimeEvent.PayloadValue.Unknown(
                     (uint)value.payload_type,
@@ -2432,8 +2427,8 @@ internal static unsafe class GeneratedValues
     internal static mln_style_expression_type NativeStyleExpressionType(StyleExpressionType value)
     {
         var native = new mln_style_expression_type();
-        native.kind = (uint)value.Kind;
-        native.item_kind = (uint)value.ItemKind;
+        native.kind = (mln_style_expression_type_kind)value.Kind;
+        native.item_kind = (mln_style_expression_type_kind)value.ItemKind;
         native.item_count = value.ItemCount;
         return native;
     }
@@ -2543,13 +2538,13 @@ internal static unsafe class GeneratedValues
             value.TextFitWidth,
             ref native.text_fit_width,
             MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH,
-            static present => (uint)present
+            static present => (mln_style_image_text_fit)present
         );
         native.fields |= Put(
             value.TextFitHeight,
             ref native.text_fit_height,
             MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT,
-            static present => (uint)present
+            static present => (mln_style_image_text_fit)present
         );
         native.fields |= Put(
             value.PixelRatio,
@@ -2899,7 +2894,7 @@ internal static unsafe class GeneratedValues
     {
         Required(value.CanvasSelector, "WebglContextDescriptor.CanvasSelector must not be null.");
         var native = new mln_webgl_context_descriptor();
-        native.kind = (uint)value.Kind;
+        native.kind = (mln_webgl_context_kind)value.Kind;
         native.context = value.Context;
         native.canvas_selector = scope.Utf8(value.CanvasSelector);
         return native;

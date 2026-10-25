@@ -113,7 +113,7 @@ auto string_from_view(mln_buffer_view string) -> std::string {
   return std::string{static_cast<const char*>(string.data), string.size};
 }
 
-auto to_c_source_type(mln::style::SourceType type) -> uint32_t {
+auto to_c_source_type(mln::style::SourceType type) -> mln_style_source_type {
   switch (type) {
     case mln::style::SourceType::Vector:
       return MLN_STYLE_SOURCE_TYPE_VECTOR;
@@ -138,7 +138,7 @@ auto to_c_source_type(mln::style::SourceType type) -> uint32_t {
   return MLN_STYLE_SOURCE_TYPE_UNKNOWN;
 }
 
-auto to_c_tile_scheme(mln::Tileset::Scheme scheme) -> uint32_t {
+auto to_c_tile_scheme(mln::Tileset::Scheme scheme) -> mln_style_tile_scheme {
   switch (scheme) {
     case mln::Tileset::Scheme::XYZ:
       return MLN_STYLE_TILE_SCHEME_XYZ;
@@ -149,7 +149,8 @@ auto to_c_tile_scheme(mln::Tileset::Scheme scheme) -> uint32_t {
   return MLN_STYLE_TILE_SCHEME_XYZ;
 }
 
-auto to_c_vector_encoding(mln::Tileset::VectorEncoding encoding) -> uint32_t {
+auto to_c_vector_encoding(mln::Tileset::VectorEncoding encoding)
+  -> mln_style_vector_tile_encoding {
   switch (encoding) {
     case mln::Tileset::VectorEncoding::Mapbox:
       return MLN_STYLE_VECTOR_TILE_ENCODING_MVT;
@@ -160,7 +161,8 @@ auto to_c_vector_encoding(mln::Tileset::VectorEncoding encoding) -> uint32_t {
   return MLN_STYLE_VECTOR_TILE_ENCODING_MVT;
 }
 
-auto to_c_raster_encoding(mln::Tileset::RasterEncoding encoding) -> uint32_t {
+auto to_c_raster_encoding(mln::Tileset::RasterEncoding encoding)
+  -> mln_style_raster_dem_encoding {
   switch (encoding) {
     case mln::Tileset::RasterEncoding::Mapbox:
       return MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX;
@@ -555,7 +557,7 @@ auto to_native_image_stretches(const mln_image_stretch* stretches, size_t count)
   return native;
 }
 
-auto to_native_text_fit(uint32_t value) -> mln::style::TextFit {
+auto to_native_text_fit(mln_style_image_text_fit value) -> mln::style::TextFit {
   switch (value) {
     case MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY:
       return mln::style::TextFit::stretchOnly;
@@ -566,7 +568,8 @@ auto to_native_text_fit(uint32_t value) -> mln::style::TextFit {
   }
 }
 
-auto from_native_text_fit(mln::style::TextFit value) -> uint32_t {
+auto from_native_text_fit(mln::style::TextFit value)
+  -> mln_style_image_text_fit {
   switch (value) {
     case mln::style::TextFit::stretchOnly:
       return MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY;
@@ -1675,7 +1678,8 @@ auto style_image_info(const StyleImageRecord& record) noexcept
   const auto& pixels = image.getImage();
   const auto& content = image.getContent();
   const auto text_fit = [](const std::optional<mln::style::TextFit>& value) {
-    return value ? from_native_text_fit(*value) : 0U;
+    return value ? from_native_text_fit(*value)
+                 : MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK;
   };
   return mln_style_image_info{
     .width = pixels.size.width,

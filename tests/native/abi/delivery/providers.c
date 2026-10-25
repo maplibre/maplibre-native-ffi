@@ -358,9 +358,9 @@ static void invalid_routes_are_rejected(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_resource_route routes[] = {
-    {.kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    {.kinds = MLN_RESOURCE_KIND_FLAG_ALL,
      .url = MLN_BUFFER_LITERAL("custom://first")},
-    {.kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    {.kinds = MLN_RESOURCE_KIND_FLAG_ALL,
      .flags = 1U << 31U,
      .url = MLN_BUFFER_LITERAL("**")},
   };
@@ -375,7 +375,7 @@ static void invalid_routes_are_rejected(void) {
   zero_kinds.url = (mln_buffer_view)MLN_BUFFER_LITERAL("**");
   MLN_TEST_INVALID(submit_routes(runtime, &zero_kinds, 1, NULL));
   const mln_resource_route null_url = {
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
     .url = (mln_buffer_view){.data = NULL, .size = 1}
   };
   MLN_TEST_INVALID(submit_routes(runtime, &null_url, 1, NULL));
@@ -386,7 +386,7 @@ static void invalid_routes_are_rejected(void) {
   static char long_url[4097];
   memset(long_url, '?', sizeof(long_url));
   mln_resource_route long_route = {
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
     .flags = MLN_URL_MATCH_GLOB,
     .url = {.data = long_url, .size = 4096},
   };
@@ -405,7 +405,7 @@ static void invalid_routes_are_rejected(void) {
   }
   memset(escapes_and_run + 4095 * 2, '*', 8192);
   const mln_resource_route boundary_route = {
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
     .flags = MLN_URL_MATCH_GLOB,
     .url = {.data = escapes_and_run, .size = sizeof(escapes_and_run)},
   };
@@ -454,10 +454,10 @@ static void routes_filter_a_callback_provider(void) {
   atomic_store(&calls, 0);
   const mln_resource_route routes[] = {
     // Another kind: claims nothing here.
-    {.kinds = MLN_RESOURCE_KIND_MASK_TILE,
+    {.kinds = MLN_RESOURCE_KIND_FLAG_TILE,
      .flags = MLN_URL_MATCH_GLOB,
      .url = MLN_BUFFER_LITERAL("**")},
-    {.kinds = MLN_RESOURCE_KIND_MASK_STYLE,
+    {.kinds = MLN_RESOURCE_KIND_FLAG_STYLE,
      .flags = MLN_URL_MATCH_GLOB,
      .url = MLN_BUFFER_LITERAL("http://127.0.0.1:*/routed/**")},
   };
@@ -502,7 +502,7 @@ static void routes_filter_a_queue_provider(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   const mln_resource_route route = {
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
     .flags = MLN_URL_MATCH_GLOB,
     .url = MLN_BUFFER_LITERAL("custom://routed/**"),
   };

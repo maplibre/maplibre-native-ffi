@@ -34,6 +34,12 @@ SCALARS = {
 }
 
 
+def enum_type(plan: ValuePlan) -> str:
+    """The sys type of an enum value: its C enum, or the typedef that holds a
+    set of a bitmask enum's flags."""
+    return "sys::" + (plan.ctype.declaration or plan.native)
+
+
 def scalar_type(plan: ValuePlan) -> str:
     canonical = {
         "unsigned char": "u8",
@@ -381,7 +387,7 @@ class Values:
         if plan.kind == "scalar":
             return f"{expr}.extract::<{scalar_type(plan)}>()?"
         if plan.kind == "enum":
-            return f"{expr}.extract::<sys::{plan.native}>()?"
+            return f"{expr}.extract::<{enum_type(plan)}>()?"
         if plan.kind == "buffer":
             if plan.length == "nul":
                 converted = f"storage.c_string({expr})?"

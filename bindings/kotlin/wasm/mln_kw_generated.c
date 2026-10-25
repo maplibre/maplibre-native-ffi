@@ -233,7 +233,7 @@ int32_t mln_kw_mln_log_set_async_severity_mask(
   int32_t mask, uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_log_set_async_severity_mask(
-    (uint32_t)mask, (mln_diagnostic*)out_diagnostic
+    (mln_log_severity_flags)mask, (mln_diagnostic*)out_diagnostic
   );
 }
 
@@ -1050,8 +1050,8 @@ int32_t mln_kw_mln_map_set_debug_options(
   int64_t map, int32_t options, uintptr_t completion, uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_map_set_debug_options(
-    (mln_map)map, (uint32_t)options, (const mln_completion*)completion,
-    (mln_diagnostic*)out_diagnostic
+    (mln_map)map, (mln_map_debug_flags)options,
+    (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
 
@@ -1059,8 +1059,8 @@ int32_t mln_kw_mln_map_set_event_mask(
   int64_t map, int64_t mask, uintptr_t completion, uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_map_set_event_mask(
-    (mln_map)map, (uint64_t)mask, (const mln_completion*)completion,
-    (mln_diagnostic*)out_diagnostic
+    (mln_map)map, (mln_runtime_event_flags)mask,
+    (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
 
@@ -1315,7 +1315,7 @@ int32_t mln_kw_mln_network_get_status(
   uintptr_t out_status, uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_network_get_status(
-    (uint32_t*)out_status, (mln_diagnostic*)out_diagnostic
+    (mln_network_status*)out_status, (mln_diagnostic*)out_diagnostic
   );
 }
 
@@ -1323,7 +1323,7 @@ int32_t mln_kw_mln_network_set_status(
   int32_t status, uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_network_set_status(
-    (uint32_t)status, (mln_diagnostic*)out_diagnostic
+    (mln_network_status)status, (mln_diagnostic*)out_diagnostic
   );
 }
 
@@ -1813,7 +1813,8 @@ int32_t mln_kw_mln_runtime_get_event_mask(
   int64_t runtime, uintptr_t out_mask, uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_runtime_get_event_mask(
-    (mln_runtime)runtime, (uint64_t*)out_mask, (mln_diagnostic*)out_diagnostic
+    (mln_runtime)runtime, (mln_runtime_event_flags*)out_mask,
+    (mln_diagnostic*)out_diagnostic
   );
 }
 
@@ -1885,7 +1886,7 @@ int32_t mln_kw_mln_runtime_run_ambient_cache_operation(
   uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_runtime_run_ambient_cache_operation(
-    (mln_runtime)runtime, (uint32_t)operation,
+    (mln_runtime)runtime, (mln_ambient_cache_operation)operation,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
@@ -1904,7 +1905,8 @@ int32_t mln_kw_mln_runtime_set_event_mask(
   int64_t runtime, int64_t mask, uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_runtime_set_event_mask(
-    (mln_runtime)runtime, (uint64_t)mask, (mln_diagnostic*)out_diagnostic
+    (mln_runtime)runtime, (mln_runtime_event_flags)mask,
+    (mln_diagnostic*)out_diagnostic
   );
 }
 
@@ -1932,8 +1934,9 @@ int32_t mln_kw_mln_runtime_set_offline_region_download_state(
   uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_runtime_set_offline_region_download_state(
-    (mln_runtime)runtime, (mln_offline_region_id)region_id, (uint32_t)state,
-    (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
+    (mln_runtime)runtime, (mln_offline_region_id)region_id,
+    (mln_offline_region_download_state)state, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
   );
 }
 

@@ -618,9 +618,13 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
     content = raw.fields & MLN_STYLE_IMAGE_INFO_CONTENT
       .rawValue != 0 ? ImageContent(raw: raw.content) : nil
     textFitWidth = raw.fields & MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH
-      .rawValue != 0 ? StyleImageTextFit(rawValue: raw.text_fit_width) : nil
+      .rawValue != 0 ? StyleImageTextFit(
+        rawValue: raw.text_fit_width.rawValue
+      ) :
+      nil
     textFitHeight = raw.fields & MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT
-      .rawValue != 0 ? StyleImageTextFit(rawValue: raw.text_fit_height) : nil
+      .rawValue != 0 ?
+      StyleImageTextFit(rawValue: raw.text_fit_height.rawValue) : nil
     pixelRatio = raw.pixel_ratio
     sdf = raw.sdf
   }
@@ -639,9 +643,9 @@ public struct StyleImageOptions: Equatable, Hashable, Sendable {
   public var stretchY: [ImageStretch]?
   /// Content box used when icon-text-fit applies.
   public var content: ImageContent?
-  /// One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK.
+  /// Defaults to STRETCH_OR_SHRINK.
   public var textFitWidth: StyleImageTextFit?
-  /// One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK.
+  /// Defaults to STRETCH_OR_SHRINK.
   public var textFitHeight: StyleImageTextFit?
   /// Sprite pixel ratio. Defaults to 1.
   public var pixelRatio: Float?
@@ -686,9 +690,13 @@ public struct StyleImageOptions: Equatable, Hashable, Sendable {
     content = raw.fields & MLN_STYLE_IMAGE_OPTION_CONTENT
       .rawValue != 0 ? ImageContent(raw: raw.content) : nil
     textFitWidth = raw.fields & MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH
-      .rawValue != 0 ? StyleImageTextFit(rawValue: raw.text_fit_width) : nil
+      .rawValue != 0 ? StyleImageTextFit(
+        rawValue: raw.text_fit_width.rawValue
+      ) :
+      nil
     textFitHeight = raw.fields & MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT
-      .rawValue != 0 ? StyleImageTextFit(rawValue: raw.text_fit_height) : nil
+      .rawValue != 0 ?
+      StyleImageTextFit(rawValue: raw.text_fit_height.rawValue) : nil
     pixelRatio = raw.fields & MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO
       .rawValue != 0 ? raw.pixel_ratio : nil
     sdf = raw.fields & MLN_STYLE_IMAGE_OPTION_SDF.rawValue != 0 ? raw.sdf : nil
@@ -714,11 +722,11 @@ public struct StyleImageOptions: Equatable, Hashable, Sendable {
     }
     if let item = textFitWidth {
       raw.fields |= MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH.rawValue; raw
-        .text_fit_width = item.rawValue
+        .text_fit_width = mln_style_image_text_fit(rawValue: item.rawValue)
     }
     if let item = textFitHeight {
       raw.fields |= MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT.rawValue; raw
-        .text_fit_height = item.rawValue
+        .text_fit_height = mln_style_image_text_fit(rawValue: item.rawValue)
     }
     if let item = pixelRatio {
       raw.fields |= MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO.rawValue; raw
@@ -773,7 +781,6 @@ public struct StyleLayerInfo: Equatable, Hashable, Sendable {
   public var minZoom: Double
   /// Highest zoom at which the layer draws; INFINITY with no upper bound.
   public var maxZoom: Double
-  /// One of `mln_style_layer_visibility`.
   public var visibility: StyleLayerVisibility
   public static var `default`: Self {
     Self()
@@ -813,7 +820,7 @@ public struct StyleLayerInfo: Equatable, Hashable, Sendable {
     )
     minZoom = raw.min_zoom
     maxZoom = raw.max_zoom
-    visibility = StyleLayerVisibility(rawValue: raw.visibility)
+    visibility = StyleLayerVisibility(rawValue: raw.visibility.rawValue)
   }
 }
 
@@ -870,7 +877,6 @@ public struct StyleRasterDemEncoding: RawRepresentable, CustomStringConvertible,
 public struct StyleSourceInfo: Equatable, Hashable, Sendable {
   /// Source ID.
   public var id: String
-  /// One of `mln_style_source_type`.
   public var type: StyleSourceType
   /// Whether the source is marked volatile.
   public var isVolatile: Bool
@@ -921,7 +927,7 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
     id = try NativeString.copyUTF8(data: raw.id.data, size: raw.id.size)
-    type = StyleSourceType(rawValue: raw.type)
+    type = StyleSourceType(rawValue: raw.type.rawValue)
     isVolatile = raw.is_volatile
     attribution = raw.fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION
       .rawValue != 0 ? try NativeString.copyUTF8(
@@ -940,11 +946,11 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
     tileSize = raw.fields & MLN_STYLE_SOURCE_INFO_TILE_SIZE.rawValue != 0 ? raw
       .tile_size : nil
     vectorEncoding = raw.fields & MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING
-      .rawValue != 0 ? StyleVectorTileEncoding(rawValue: raw.vector_encoding) :
-      nil
+      .rawValue != 0 ?
+      StyleVectorTileEncoding(rawValue: raw.vector_encoding.rawValue) : nil
     rasterEncoding = raw.fields & MLN_STYLE_SOURCE_INFO_RASTER_ENCODING
-      .rawValue != 0 ? StyleRasterDemEncoding(rawValue: raw.raster_encoding) :
-      nil
+      .rawValue != 0 ?
+      StyleRasterDemEncoding(rawValue: raw.raster_encoding.rawValue) : nil
   }
 }
 
@@ -959,7 +965,6 @@ public struct StyleSourceTileInfo: Equatable, Hashable, Sendable {
   public var minZoom: Double
   /// Highest zoom level the TileJSON provides tiles for.
   public var maxZoom: Double
-  /// One of `mln_style_tile_scheme`.
   public var scheme: StyleTileScheme
   public static var `default`: Self {
     Self()
@@ -987,7 +992,7 @@ public struct StyleSourceTileInfo: Equatable, Hashable, Sendable {
     ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) }
     minZoom = raw.min_zoom
     maxZoom = raw.max_zoom
-    scheme = StyleTileScheme(rawValue: raw.scheme)
+    scheme = StyleTileScheme(rawValue: raw.scheme.rawValue)
   }
 }
 

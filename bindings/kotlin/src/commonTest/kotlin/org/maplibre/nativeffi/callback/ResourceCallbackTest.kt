@@ -18,7 +18,7 @@ import org.maplibre.nativeffi.deny
 import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.error.CallbackException
 import org.maplibre.nativeffi.generated.ResourceKind
-import org.maplibre.nativeffi.generated.ResourceKindMask
+import org.maplibre.nativeffi.generated.ResourceKindFlag
 import org.maplibre.nativeffi.generated.ResourceProvider
 import org.maplibre.nativeffi.generated.ResourceRequestCancelHandler
 import org.maplibre.nativeffi.generated.ResourceRequestHandle
@@ -29,7 +29,7 @@ import org.maplibre.nativeffi.generated.ResourceTransform
 import org.maplibre.nativeffi.generated.ResourceTransformRequestHandle
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.Status
-import org.maplibre.nativeffi.generated.UrlMatchFlags
+import org.maplibre.nativeffi.generated.UrlMatchFlag
 import org.maplibre.nativeffi.interceptUncaught
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.serve
@@ -176,9 +176,9 @@ class ResourceCallbackTest {
     val routes =
       mutableListOf(
         // Every URL, but only tiles, which this map never requests.
-        ResourceRoute(kinds = ResourceKindMask.TILE, flags = UrlMatchFlags.GLOB, url = "**"),
+        ResourceRoute(kinds = ResourceKindFlag.TILE, flags = UrlMatchFlag.GLOB, url = "**"),
         // Every kind under one prefix.
-        ResourceRoute(flags = UrlMatchFlags.GLOB, url = "custom://routed/**"),
+        ResourceRoute(flags = UrlMatchFlag.GLOB, url = "custom://routed/**"),
       )
     val provider =
       ResourceProvider(routes) { request, handle ->

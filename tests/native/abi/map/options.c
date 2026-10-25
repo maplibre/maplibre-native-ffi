@@ -271,8 +271,8 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
   );
   TEST_ASSERT_BITS_HIGH(MLN_BOUND_OPTION_UNBOUNDED, snapshot.bounds.fields);
 
-  const uint64_t camera_events = MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE |
-                                 MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED;
+  const uint64_t camera_events = MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_DID_CHANGE |
+                                 MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED;
   COMMIT(
     "event mask",
     mln_map_set_event_mask(map, camera_events, &completion.descriptor, NULL)

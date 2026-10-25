@@ -66,7 +66,7 @@ struct Done {
   };
   static void callback(void* context, const mln_completion_result* result) {
     auto& self = *static_cast<Done*>(context);
-    check(static_cast<mln_status>(result->status));
+    check(result->status);
     self.at = Clock::now();
   }
   static void release(void* context) {

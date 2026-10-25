@@ -480,14 +480,14 @@ struct OrderedBarrier {
 
 void record_maintenance(void* context, const mln_completion_result* result) {
   auto& order = *static_cast<OrderedBarrier*>(context);
-  order.maintenance_status = static_cast<mln_status>(result->status);
+  order.maintenance_status = result->status;
   order.maintenance_done.store(true);
 }
 
 void record_barrier(void* context, const mln_completion_result* result) {
   auto& order = *static_cast<OrderedBarrier*>(context);
   order.maintenance_first = order.maintenance_done.load();
-  order.barrier_status = static_cast<mln_status>(result->status);
+  order.barrier_status = result->status;
   order.barrier_done.store(true);
   mln_test_pulse();
 }
@@ -1143,9 +1143,9 @@ void release_with_a_gpu_wait(
   void* user_data, const mln_completion_result* result
 ) {
   auto& racing = *static_cast<RacingRelease*>(user_data);
-  racing.completion_status = static_cast<mln_status>(result->status);
+  racing.completion_status = result->status;
   auto sync = mln_gpu_sync_default();
-  sync.kind = UINT32_MAX;
+  sync.kind = static_cast<mln_gpu_sync_kind>(UINT32_MAX);
   racing.release_status =
     mln_acquired_frame_release(racing.frame, &sync, nullptr);
   if (racing.release_status == MLN_STATUS_OK) racing.frame = MLN_HANDLE_NULL;
@@ -1308,7 +1308,7 @@ void a_failed_release_of_the_last_slot_ends_a_waiting_demand() {
   MLN_TEST_OK(request_waiting(fixture, 173));
   fence_driver(fixture);
   const auto fenced = mln_gpu_sync{
-    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_OPENGL_FENCE, .object = 1
+    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_OPENGL_FENCE, .handle = 1
   };
   MLN_TEST_OK(mln_acquired_frame_release(first, &fenced, nullptr));
   MLN_TEST_OK(mln_acquired_frame_release(second, &fenced, nullptr));
@@ -1359,7 +1359,7 @@ void a_quarantined_ring_ends_a_demand_in_driver_order() {
   auto blocker = DriverBlocker{};
   block_driver(fixture, blocker);
   const auto fenced = mln_gpu_sync{
-    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_OPENGL_FENCE, .object = 1
+    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_OPENGL_FENCE, .handle = 1
   };
   MLN_TEST_OK(mln_acquired_frame_release(first, &fenced, nullptr));
   MLN_TEST_OK(mln_acquired_frame_release(second, &fenced, nullptr));

@@ -238,12 +238,12 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_get_event_mask</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public RuntimeEventMask GetEventMask()
+    public RuntimeEventFlag GetEventMask()
     {
         using var call = Enter(this);
         ulong outMask = default;
         Check(NativeMethods.mln_runtime_get_event_mask(Handle, &outMask, Diagnostic));
-        return (RuntimeEventMask)outMask;
+        return (RuntimeEventFlag)outMask;
     }
 
     /// <summary>
@@ -417,7 +417,7 @@ public sealed unsafe partial class RuntimeHandle
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_run_ambient_cache_operation(
             Handle,
-            (uint)operation,
+            (mln_ambient_cache_operation)operation,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -452,7 +452,7 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_set_event_mask</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public void SetEventMask(RuntimeEventMask mask)
+    public void SetEventMask(RuntimeEventFlag mask)
     {
         using var call = Enter(this);
         Check(NativeMethods.mln_runtime_set_event_mask(Handle, (ulong)mask, Diagnostic));
@@ -513,7 +513,7 @@ public sealed unsafe partial class RuntimeHandle
         var nativeStatus = NativeMethods.mln_runtime_set_offline_region_download_state(
             Handle,
             regionId,
-            (uint)state,
+            (mln_offline_region_download_state)state,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );

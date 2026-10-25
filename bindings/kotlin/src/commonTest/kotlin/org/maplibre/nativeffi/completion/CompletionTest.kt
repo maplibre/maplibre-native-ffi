@@ -18,7 +18,7 @@ import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.generated.LogicalExtent
-import org.maplibre.nativeffi.generated.MapDebugOption
+import org.maplibre.nativeffi.generated.MapDebugFlag
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.RuntimeEventHandler
 import org.maplibre.nativeffi.generated.RuntimeEventType
@@ -36,10 +36,10 @@ class CompletionTest {
   @Test
   fun aDiscardedCommandIsFencedAndSynchronousRejectionThrows() = runSuspendTest {
     withMap {
-      map.discarding.setDebugOptions(MapDebugOption.TILE_BORDERS)
+      map.discarding.setDebugOptions(MapDebugFlag.TILE_BORDERS)
       // A later command on the same map completes after the discarded one.
       map.requestRepaint().await()
-      assertEquals(MapDebugOption.TILE_BORDERS, map.getSnapshot().debugOptions)
+      assertEquals(MapDebugFlag.TILE_BORDERS, map.getSnapshot().debugOptions)
       assertFailsWithStatus(Status.INVALID_ARGUMENT) {
         map.discarding.resize(LogicalExtent(0u, 8u, 1.0))
       }

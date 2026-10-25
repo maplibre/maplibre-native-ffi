@@ -28,7 +28,7 @@ public static unsafe partial class Maplibre
     /// See <c>mln_log_set_async_severity_mask</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html">C API reference</see>.
     /// </remarks>
-    public static void LogSetAsyncSeverityMask(LogSeverityMask mask)
+    public static void LogSetAsyncSeverityMask(LogSeverityFlag mask)
     {
         using var call = Enter(null);
         Check(NativeMethods.mln_log_set_async_severity_mask((uint)mask, Diagnostic));

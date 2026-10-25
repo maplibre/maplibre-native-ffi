@@ -35,6 +35,9 @@ typedef enum MLN_BINDING("kind=bitmask") mln_camera_option_field : uint32_t {
   MLN_CAMERA_OPTION_FOV = 1U << 8U,
 } mln_camera_option_field;
 
+/** A set of mln_camera_option_field bits. */
+typedef uint32_t mln_camera_option_fields;
+
 /** Field mask values for mln_animation_options. */
 typedef enum MLN_BINDING("kind=bitmask") mln_animation_option_field : uint32_t {
   MLN_ANIMATION_OPTION_DURATION = 1U << 0U,
@@ -44,6 +47,9 @@ typedef enum MLN_BINDING("kind=bitmask") mln_animation_option_field : uint32_t {
   MLN_ANIMATION_OPTION_TRANSITION_ID = 1U << 4U,
 } mln_animation_option_field;
 
+/** A set of mln_animation_option_field bits. */
+typedef uint32_t mln_animation_option_fields;
+
 /** Field mask values for mln_camera_fit_options. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
@@ -52,6 +58,9 @@ typedef enum MLN_BINDING(
   MLN_CAMERA_FIT_OPTION_BEARING = 1U << 1U,
   MLN_CAMERA_FIT_OPTION_PITCH = 1U << 2U,
 } mln_camera_fit_option_field;
+
+/** A set of mln_camera_fit_option_field bits. */
+typedef uint32_t mln_camera_fit_option_fields;
 
 /** Field mask values for mln_bound_options. */
 typedef enum MLN_BINDING("kind=bitmask") mln_bound_option_field : uint32_t {
@@ -75,6 +84,9 @@ typedef enum MLN_BINDING("kind=bitmask") mln_bound_option_field : uint32_t {
   MLN_BOUND_OPTION_UNBOUNDED = 1U << 5U,
 } mln_bound_option_field;
 
+/** A set of mln_bound_option_field bits. */
+typedef uint32_t mln_bound_option_fields;
+
 /** Field mask values for mln_free_camera_options. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
@@ -83,6 +95,9 @@ typedef enum MLN_BINDING(
   MLN_FREE_CAMERA_OPTION_ORIENTATION = 1U << 1U,
 } mln_free_camera_option_field;
 
+/** A set of mln_free_camera_option_field bits. */
+typedef uint32_t mln_free_camera_option_fields;
+
 /** Field mask values for MapLibre axonometric rendering options. */
 typedef enum MLN_BINDING("kind=bitmask") mln_projection_mode_field : uint32_t {
   MLN_PROJECTION_MODE_AXONOMETRIC = 1U << 0U,
@@ -90,8 +105,11 @@ typedef enum MLN_BINDING("kind=bitmask") mln_projection_mode_field : uint32_t {
   MLN_PROJECTION_MODE_Y_SKEW = 1U << 2U,
 } mln_projection_mode_field;
 
+/** A set of mln_projection_mode_field bits. */
+typedef uint32_t mln_projection_mode_fields;
+
 /** Debug overlay mask values for mln_map_set_debug_options(). */
-typedef enum MLN_BINDING("kind=bitmask") mln_map_debug_option : uint32_t {
+typedef enum MLN_BINDING("kind=bitmask") mln_map_debug_flag : uint32_t {
   MLN_MAP_DEBUG_TILE_BORDERS = 1U << 1U,
   MLN_MAP_DEBUG_PARSE_STATUS = 1U << 2U,
   MLN_MAP_DEBUG_TIMESTAMPS = 1U << 3U,
@@ -99,7 +117,10 @@ typedef enum MLN_BINDING("kind=bitmask") mln_map_debug_option : uint32_t {
   MLN_MAP_DEBUG_OVERDRAW = 1U << 5U,
   MLN_MAP_DEBUG_STENCIL_CLIP = 1U << 6U,
   MLN_MAP_DEBUG_DEPTH_BUFFER = 1U << 7U,
-} mln_map_debug_option;
+} mln_map_debug_flag;
+
+/** A set of mln_map_debug_flag bits. */
+typedef uint32_t mln_map_debug_flags;
 
 /** Map north orientation values used by mln_map_viewport_options. */
 typedef enum mln_north_orientation : uint32_t {
@@ -133,6 +154,9 @@ typedef enum MLN_BINDING(
   MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET = 1U << 3U,
 } mln_map_viewport_option_field;
 
+/** A set of mln_map_viewport_option_field bits. */
+typedef uint32_t mln_map_viewport_option_fields;
+
 /** Tile LOD algorithms used by mln_map_tile_options. */
 typedef enum mln_tile_lod_mode : uint32_t {
   MLN_TILE_LOD_MODE_DEFAULT = 0,
@@ -148,6 +172,9 @@ typedef enum MLN_BINDING("kind=bitmask") mln_map_tile_option_field : uint32_t {
   MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT = 1U << 4U,
   MLN_MAP_TILE_OPTION_LOD_MODE = 1U << 5U,
 } mln_map_tile_option_field;
+
+/** A set of mln_map_tile_option_field bits. */
+typedef uint32_t mln_map_tile_option_fields;
 
 /** Map rendering modes used when creating a map. */
 typedef enum mln_map_mode : uint32_t {
@@ -182,8 +209,8 @@ typedef struct mln_map_options {
    * render session submits it to size the map to its target.
    */
   mln_logical_extent initial_extent;
-  /** One of mln_map_mode. Defaults to MLN_MAP_MODE_CONTINUOUS. */
-  uint32_t map_mode MLN_BINDING("enum=mln_map_mode");
+  /** Defaults to MLN_MAP_MODE_CONTINUOUS. */
+  mln_map_mode map_mode;
   /**
    * Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
    * encodings. Defaults to false.
@@ -197,16 +224,16 @@ typedef struct mln_map_options {
   bool fast_pfor_enabled;
   /**
    * Map-originated event types this map queues, as a bitwise OR of
-   * mln_runtime_event_mask values.
+   * mln_runtime_event_flag values.
    *
-   * This field is always read. MLN_RUNTIME_EVENT_MASK_ALL selects every event
-   * type this library reports, and MLN_RUNTIME_EVENT_MASK_NONE queues none.
-   * Defaults to MLN_RUNTIME_EVENT_MASK_ALL.
+   * This field is always read. MLN_RUNTIME_EVENT_FLAG_ALL selects every event
+   * type this library reports, and MLN_RUNTIME_EVENT_FLAG_NONE queues none.
+   * Defaults to MLN_RUNTIME_EVENT_FLAG_ALL.
    *
    * The mask applies throughout construction, including the camera events that
    * MapLibre reports while it initializes the map's size.
    */
-  uint64_t event_mask MLN_BINDING("enum=mln_runtime_event_mask");
+  mln_runtime_event_flags event_mask;
 } mln_map_options;
 
 /**
@@ -237,7 +264,7 @@ typedef struct mln_lat_lng {
 /** Camera fields used by snapshots and camera updates. */
 typedef struct mln_camera_options {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_camera_option_field");
+  mln_camera_option_fields fields;
   mln_lat_lng center MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_CENTER");
   double center_altitude
     MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_CENTER_ALTITUDE");
@@ -283,8 +310,7 @@ typedef enum mln_camera_transition_outcome : uint32_t {
  */
 typedef struct mln_camera_transition_end {
   uint32_t size;
-  /** One of mln_camera_transition_outcome. */
-  uint32_t outcome MLN_BINDING("enum=mln_camera_transition_outcome");
+  mln_camera_transition_outcome outcome;
   /**
    * Generation of the published snapshot that shows the camera where the
    * transitions left it. The map events of the change that ended them carry
@@ -338,7 +364,7 @@ typedef struct mln_camera_transition_handler {
 
 /** Optional animation controls for camera transitions. */
 typedef struct mln_animation_options {
-  uint32_t fields MLN_BINDING("enum=mln_animation_option_field");
+  mln_animation_option_fields fields;
   /**
    * Duration in milliseconds. Must be finite, non-negative, and short enough
    * to represent as a duration.
@@ -436,6 +462,9 @@ typedef enum MLN_BINDING("kind=bitmask") mln_camera_delta_field : uint32_t {
   MLN_CAMERA_DELTA_ANCHOR = 1U << 4U,
 } mln_camera_delta_field;
 
+/** A set of mln_camera_delta_field bits. */
+typedef uint32_t mln_camera_delta_fields;
+
 /**
  * One atomic relative camera update.
  *
@@ -463,7 +492,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_camera_delta_field : uint32_t {
  */
 typedef struct mln_camera_delta {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_camera_delta_field");
+  mln_camera_delta_fields fields;
   /** Pan in logical map pixels; the content moves by this offset. */
   mln_screen_point offset
     MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_OFFSET");
@@ -480,7 +509,7 @@ typedef struct mln_camera_delta {
   mln_screen_point anchor
     MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_ANCHOR");
   mln_animation_options animation;
-  uint32_t gesture_phase MLN_BINDING("enum=mln_gesture_phase");
+  mln_gesture_phase gesture_phase;
   uint32_t reserved MLN_BINDING("kind=reserved");
 } mln_camera_delta;
 
@@ -491,17 +520,17 @@ typedef struct mln_camera_delta {
  */
 typedef struct mln_camera_update {
   uint32_t size;
-  uint32_t mode MLN_BINDING("enum=mln_camera_update_mode");
+  mln_camera_update_mode mode;
   mln_camera_options camera;
   mln_animation_options animation;
-  uint32_t gesture_phase MLN_BINDING("enum=mln_gesture_phase");
+  mln_gesture_phase gesture_phase;
   uint32_t reserved MLN_BINDING("kind=reserved");
 } mln_camera_update;
 
 /** Optional fitting controls for camera-for-viewport queries. */
 typedef struct mln_camera_fit_options {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_camera_fit_option_field");
+  mln_camera_fit_option_fields fields;
   mln_edge_insets padding
     MLN_BINDING("mask=fields;bit=MLN_CAMERA_FIT_OPTION_PADDING");
   double bearing MLN_BINDING("mask=fields;bit=MLN_CAMERA_FIT_OPTION_BEARING");
@@ -526,7 +555,7 @@ typedef struct mln_quaternion {
 /** Free camera position and orientation in MapLibre Native camera space. */
 typedef struct mln_free_camera_options {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_free_camera_option_field");
+  mln_free_camera_option_fields fields;
   mln_vec3 position
     MLN_BINDING("mask=fields;bit=MLN_FREE_CAMERA_OPTION_POSITION");
   mln_quaternion orientation
@@ -542,10 +571,13 @@ typedef enum MLN_BINDING(
   MLN_FEATURE_STATE_SELECTOR_STATE_KEY = 1U << 2U,
 } mln_feature_state_selector_field;
 
+/** A set of mln_feature_state_selector_field bits. */
+typedef uint32_t mln_feature_state_selector_fields;
+
 /** Feature-state source, feature, and key selector. */
 typedef struct mln_feature_state_selector {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_feature_state_selector_field");
+  mln_feature_state_selector_fields fields;
   /** Source ID. Required and borrowed for the duration of the call. */
   mln_buffer_view source_id;
   /** Optional source layer ID. Required for vector-source disambiguation. */
@@ -572,7 +604,7 @@ typedef struct mln_lat_lng_bounds {
 /** Optional map camera constraint fields. */
 typedef struct mln_bound_options {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_bound_option_field");
+  mln_bound_option_fields fields;
   /** Read when fields contains MLN_BOUND_OPTION_BOUNDS. */
   mln_lat_lng_bounds bounds
     MLN_BINDING("mask=fields;bit=MLN_BOUND_OPTION_BOUNDS");
@@ -624,8 +656,7 @@ typedef union mln_offline_region_definition_data {
 /** Tagged offline region definition. */
 typedef struct mln_offline_region_definition {
   uint32_t size;
-  /** One of mln_offline_region_definition_type. */
-  uint32_t type MLN_BINDING("enum=mln_offline_region_definition_type");
+  mln_offline_region_definition_type type;
   mln_offline_region_definition_data data MLN_BINDING("tag=type");
 } mln_offline_region_definition;
 
@@ -863,8 +894,8 @@ MLN_API mln_status mln_runtime_set_offline_region_observed(
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_set_offline_region_download_state(
   mln_runtime runtime, mln_offline_region_id region_id,
-  uint32_t state MLN_BINDING("enum=mln_offline_region_download_state"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
+  mln_offline_region_download_state state, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -936,7 +967,7 @@ typedef struct mln_projected_meters {
  */
 typedef struct mln_projection_mode {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_projection_mode_field");
+  mln_projection_mode_fields fields;
   /** Enables a non-perspective axonometric render transform. */
   bool axonometric
     MLN_BINDING("mask=fields;bit=MLN_PROJECTION_MODE_AXONOMETRIC");
@@ -949,22 +980,13 @@ typedef struct mln_projection_mode {
 /** Live map viewport and render-transform controls. */
 typedef struct mln_map_viewport_options {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_map_viewport_option_field");
-  /** One of mln_north_orientation. */
-  uint32_t north_orientation MLN_BINDING(
-    "mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;"
-    "enum=mln_north_orientation"
-  );
-  /** One of mln_constrain_mode. */
-  uint32_t constrain_mode MLN_BINDING(
-    "mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;"
-    "enum=mln_constrain_mode"
-  );
-  /** One of mln_viewport_mode. */
-  uint32_t viewport_mode MLN_BINDING(
-    "mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;"
-    "enum=mln_viewport_mode"
-  );
+  mln_map_viewport_option_fields fields;
+  mln_north_orientation north_orientation
+    MLN_BINDING("mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION");
+  mln_constrain_mode constrain_mode
+    MLN_BINDING("mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE");
+  mln_viewport_mode viewport_mode
+    MLN_BINDING("mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE");
   mln_edge_insets frustum_offset
     MLN_BINDING("mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET");
 } mln_map_viewport_options;
@@ -1007,7 +1029,7 @@ typedef struct mln_map_view {
 /** Tile prefetch and LOD tuning controls. */
 typedef struct mln_map_tile_options {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_map_tile_option_field");
+  mln_map_tile_option_fields fields;
   /** Prefetch zoom delta, at most 255. */
   uint32_t prefetch_zoom_delta
     MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA");
@@ -1018,10 +1040,8 @@ typedef struct mln_map_tile_options {
     MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD");
   double lod_zoom_shift
     MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT");
-  /** One of mln_tile_lod_mode. */
-  uint32_t lod_mode MLN_BINDING(
-    "mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_MODE;enum=mln_tile_lod_mode"
-  );
+  mln_tile_lod_mode lod_mode
+    MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_MODE");
 } mln_map_tile_options;
 /**
  * Immutable map state copied from the latest published generation.
@@ -1034,8 +1054,8 @@ typedef struct mln_map_tile_options {
  */
 typedef struct mln_map_snapshot {
   uint32_t size;
-  /** Debug overlay mask of mln_map_debug_option values. */
-  uint32_t debug_options MLN_BINDING("enum=mln_map_debug_option");
+  /** Debug overlay mask of mln_map_debug_flag values. */
+  mln_map_debug_flags debug_options;
   uint64_t generation;
   /** True once every requested style and tile resource finished loading. */
   bool fully_loaded;
@@ -1058,7 +1078,7 @@ typedef struct mln_map_snapshot {
    * never sets it.
    */
   bool transition_in_progress;
-  uint64_t event_mask MLN_BINDING("enum=mln_runtime_event_mask");
+  mln_runtime_event_flags event_mask;
   /**
    * Generation of the latest render update the map published. A rendered
    * frame at or past it draws map state that includes every command this
@@ -1514,9 +1534,9 @@ MLN_API mln_status mln_map_get_style_url(
  * it reports the effect of every other command; mln_runtime_set_event_mask(),
  * which no snapshot reports, applies at once.
  *
- * This call accepts only bits in MLN_RUNTIME_EVENT_MASK_ALL. It reads the bits
- * in MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS and ignores runtime-scoped bits, so
- * MLN_RUNTIME_EVENT_MASK_ALL selects every map-originated type.
+ * This call accepts only bits in MLN_RUNTIME_EVENT_FLAG_ALL. It reads the bits
+ * in MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS and ignores runtime-scoped bits, so
+ * MLN_RUNTIME_EVENT_FLAG_ALL selects every map-originated type.
  * mln_map_get_snapshot() reports the last committed mask.
  *
  * A map that has not been narrowed selects every map-originated event type this
@@ -1526,8 +1546,8 @@ MLN_API mln_status mln_map_get_style_url(
  * Select every event type the host reads. These types carry state a host
  * reaches no other way:
  *
- * - MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED and
- *   MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR carry native failure text.
+ * - MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_FAILED and
+ *   MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_ERROR carry native failure text.
  *
  * Style commands report application failures through their completions
  * regardless of this mask.
@@ -1541,8 +1561,8 @@ MLN_API mln_status mln_map_get_style_url(
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_event_mask(
-  mln_map map, uint64_t mask MLN_BINDING("enum=mln_runtime_event_mask"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
+  mln_map map, mln_runtime_event_flags mask, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

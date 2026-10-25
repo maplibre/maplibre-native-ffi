@@ -238,18 +238,36 @@ void mln_broken_submission(mln_map map, const mln_completion *completion);
 """)
             )
 
-    def test_enum_record_fields_require_an_integer_type(self):
-        with self.assertRaisesRegex(
-            ModelError, "an enum member requires an integer type and enum=<enum>"
-        ):
-            validate(
-                self.parse("""
-typedef enum mln_kind : unsigned { MLN_KIND_ONE = 1 } mln_kind;
+    def test_a_bitmask_enum_requires_a_flag_set_typedef(self):
+        source = """
+typedef enum BIND("kind=bitmask") mln_kind_flag : unsigned { MLN_KIND_FLAG_ONE = 1 } mln_kind_flag;
+typedef unsigned mln_kind_flags;
 typedef struct mln_record {
-  mln_kind kind;
+  mln_kind_flags kinds;
 } mln_record;
-""")
-            )
+"""
+        validate(self.parse(source))
+        for before, after in (
+            ("typedef unsigned mln_kind_flags;", ""),
+            (
+                "typedef unsigned mln_kind_flags;",
+                "typedef unsigned long long mln_kind_flags;",
+            ),
+        ):
+            with (
+                self.subTest(after=after),
+                self.assertRaisesRegex(
+                    ModelError,
+                    "mln_kind_flag: a bitmask enum requires a mln_kind_flags "
+                    "typedef of its underlying type",
+                ),
+            ):
+                source_after = source.replace(before, after)
+                if not after:
+                    source_after = source_after.replace(
+                        "mln_kind_flags kinds", "unsigned kinds"
+                    )
+                validate(self.parse(source_after))
 
     def test_status_functions_report_through_a_final_diagnostic(self):
         api = self.parse("""

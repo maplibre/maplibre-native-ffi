@@ -25,7 +25,7 @@ from tools.bindgen.semantic import (
     output_member,
 )
 
-from .python_values import Values, ok, public_name, rust_field, scalar_type
+from .python_values import Values, enum_type, ok, public_name, rust_field, scalar_type
 
 SCALARS = {
     "double": ("f64", "float"),
@@ -139,7 +139,11 @@ def result_converter(
             Ok(list.into_any().unbind())
         }}"""
     else:
-        native = SCALARS.get(result.native, ("sys::" + result.native, ""))[0]
+        native = (
+            enum_type(result)
+            if result.kind == "enum"
+            else SCALARS.get(result.native, ("sys::" + result.native, ""))[0]
+        )
         copied = values.copy(result, "value")
         converter = f"|py, result| {{ let value = completion_value::<{native}>(result)?; {ok(copied)} }}"
         if result.nullable:
@@ -265,7 +269,7 @@ def operation(
             rust = scalar_type(value)
             arguments[parameter.name] = local
         elif value.kind == "enum":
-            rust = "sys::" + value.native
+            rust = enum_type(value)
             arguments[parameter.name] = local
         else:
             rust = "&Bound<'_, PyAny>"
@@ -403,6 +407,8 @@ def operation(
             native = (
                 scalar_type(element)
                 if element.kind == "scalar"
+                else enum_type(element)
+                if element.kind == "enum"
                 else "sys::" + element.native
             )
             count = arguments[value.length]
@@ -423,7 +429,11 @@ def operation(
             outputs.append((output.name, value))
             continue
         native = (
-            scalar_type(value) if value.kind == "scalar" else "sys::" + value.native
+            scalar_type(value)
+            if value.kind == "scalar"
+            else enum_type(value)
+            if value.kind == "enum"
+            else "sys::" + value.native
         )
         init = (
             f"unsafe {{ sys::{value.default}() }}"

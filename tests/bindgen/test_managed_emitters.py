@@ -207,6 +207,27 @@ mln_status mln_map_ready(mln_map map, bool *ready BIND("direction=out"), mln_dia
 """)
         self.assertEqual(dotnet.emit(api).functions, ("mln_map_ready",))
 
+    def test_dotnet_enum_and_flag_set_parameters_cross_as_their_c_types(self):
+        api = self.parse("""
+typedef enum mln_mode : unsigned { MLN_MODE_A = 1, MLN_MODE_B = 2 } mln_mode;
+typedef enum BIND("kind=bitmask") mln_mark_flag : unsigned long long {
+  MLN_MARK_FLAG_A = 1u << 0u,
+} mln_mark_flag;
+typedef unsigned long long mln_mark_flags;
+mln_status mln_map_set_mode(mln_map map, mln_mode mode, mln_mark_flags marks, mln_diagnostic *out_diagnostic);
+mln_status mln_map_get_mode(mln_map map, mln_mode *out_mode BIND("direction=out"), mln_diagnostic *out_diagnostic);
+mln_status mln_map_get_marks(mln_map map, mln_mark_flags *out_marks BIND("direction=out"), mln_diagnostic *out_diagnostic);
+""")
+        emission = dotnet.emit(api)
+        self.assertEqual(emission.unsupported, {})
+        operations = "".join(emission.files.values())
+        self.assertIn("MapSetMode(ulong map, Mode mode, MarkFlag marks)", operations)
+        self.assertIn("(mln_mode)mode, (ulong)marks", operations)
+        self.assertIn("mln_mode outMode = default;", operations)
+        self.assertIn("return (Mode)outMode;", operations)
+        self.assertIn("ulong outMarks = default;", operations)
+        self.assertIn("return (MarkFlag)outMarks;", operations)
+
     def test_dotnet_scalar_absence_cannot_disappear(self):
         source = """
 typedef struct mln_metric { double value; } mln_metric;
@@ -224,7 +245,7 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
     def test_dotnet_field_enum_cannot_generate_colliding_member_names(self):
         api = self.parse("""
 typedef enum mln_mode : unsigned { MLN_MODE_X = 0, MLN_MODE_x = 1 } mln_mode;
-typedef struct mln_metric { unsigned mode BIND("enum=mln_mode"); } mln_metric;
+typedef struct mln_metric { mln_mode mode; } mln_metric;
 BIND("execution=query;result=mln_metric")
 mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)

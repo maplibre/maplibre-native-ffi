@@ -38,12 +38,12 @@ Pointer<raw.mln_gpu_sync> _writeGpuSync(
   final result = into ?? arena<raw.mln_gpu_sync>();
   result.ref = raw.mln_gpu_sync_default();
   result.ref.kind = value.kind.rawValue;
-  result.ref.object = value.object;
+  result.ref.handle = value.handle;
   return result;
 }
 
 GpuSync _readGpuSync(raw.mln_gpu_sync source) =>
-    GpuSync(kind: GpuSyncKind.fromRawValue(source.kind), object: source.object);
+    GpuSync(kind: GpuSyncKind.fromRawValue(source.kind), handle: source.handle);
 
 Pointer<raw.mln_lat_lng> _writeLatLng(
   LatLng value,
@@ -1025,8 +1025,8 @@ Pointer<raw.mln_http_header_rule> _writeHttpHeaderRule(
 
 HttpHeaderRule _readHttpHeaderRule(raw.mln_http_header_rule source) =>
     HttpHeaderRule(
-      kinds: ResourceKindMask.fromRawValue(source.kinds),
-      flags: UrlMatchFlags.fromRawValue(source.flags),
+      kinds: ResourceKindFlag.fromRawValue(source.kinds),
+      flags: UrlMatchFlag.fromRawValue(source.flags),
       url: utf8.decode(_copyBufferView(source.url)),
       headers: List<HttpHeader>.unmodifiable(
         List.generate(
@@ -1793,13 +1793,13 @@ MapTileOptions _readMapTileOptions(
 );
 
 MapSnapshot _readMapSnapshot(raw.mln_map_snapshot source) => MapSnapshot(
-  debugOptions: MapDebugOption.fromRawValue(source.debug_options),
+  debugOptions: MapDebugFlag.fromRawValue(source.debug_options),
   generation: source.generation,
   fullyLoaded: source.fully_loaded,
   renderingStatsViewEnabled: source.rendering_stats_view_enabled,
   gestureInProgress: source.gesture_in_progress,
   transitionInProgress: source.transition_in_progress,
-  eventMask: RuntimeEventMask.fromRawValue(source.event_mask),
+  eventMask: RuntimeEventFlag.fromRawValue(source.event_mask),
   latestRenderUpdateGeneration: source.latest_render_update_generation,
   tile: _readMapTileOptions(source.tile),
   bounds: _readBoundOptions(source.bounds),
@@ -1992,7 +1992,7 @@ MapOptions _readMapOptions(raw.mln_map_options source) => MapOptions(
   initialExtent: _readLogicalExtent(source.initial_extent),
   mapMode: MapMode.fromRawValue(source.map_mode),
   fastPforEnabled: source.fast_pfor_enabled,
-  eventMask: RuntimeEventMask.fromRawValue(source.event_mask),
+  eventMask: RuntimeEventFlag.fromRawValue(source.event_mask),
 );
 
 Pointer<raw.mln_style_image_options> _writeStyleImageOptions(
@@ -2408,8 +2408,8 @@ Pointer<raw.mln_resource_route> _writeResourceRoute(
 
 ResourceRoute _readResourceRoute(raw.mln_resource_route source) =>
     ResourceRoute(
-      kinds: ResourceKindMask.fromRawValue(source.kinds),
-      flags: UrlMatchFlags.fromRawValue(source.flags),
+      kinds: ResourceKindFlag.fromRawValue(source.kinds),
+      flags: UrlMatchFlag.fromRawValue(source.flags),
       url: utf8.decode(_copyBufferView(source.url)),
     );
 
@@ -2632,20 +2632,20 @@ RuntimeEvent _readRuntimeEvent(
     2 => RuntimeEventPayloadRenderMap(
       _readRuntimeEventRenderMap(source.payload.render_map),
     ),
-    4 => RuntimeEventPayloadTileAction(
+    3 => RuntimeEventPayloadTileAction(
       _readRuntimeEventTileAction(source.payload.tile_action),
     ),
-    5 => RuntimeEventPayloadOfflineRegionStatus(
+    4 => RuntimeEventPayloadOfflineRegionStatus(
       _readRuntimeEventOfflineRegionStatus(
         source.payload.offline_region_status,
       ),
     ),
-    6 => RuntimeEventPayloadOfflineRegionResponseError(
+    5 => RuntimeEventPayloadOfflineRegionResponseError(
       _readRuntimeEventOfflineRegionResponseError(
         source.payload.offline_region_response_error,
       ),
     ),
-    7 => RuntimeEventPayloadOfflineRegionTileCountLimit(
+    6 => RuntimeEventPayloadOfflineRegionTileCountLimit(
       _readRuntimeEventOfflineRegionTileCountLimit(
         source.payload.offline_region_tile_count_limit,
       ),
@@ -3313,7 +3313,7 @@ void logClearCallback() {
 ///
 /// See `mln_log_set_async_severity_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-void logSetAsyncSeverityMask(LogSeverityMask mask) {
+void logSetAsyncSeverityMask(LogSeverityFlag mask) {
   ensureAbiVersion();
   return _check(
     raw.mln_log_set_async_severity_mask(mask.rawValue, nativeDiagnostic),
@@ -4274,7 +4274,7 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void setDebugOptions(MapDebugOption options) => _discard(
+  void setDebugOptions(MapDebugFlag options) => _discard(
     (arena, completion) => raw.mln_map_set_debug_options(
       _handle.raw,
       options.rawValue,
@@ -4282,7 +4282,7 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void setEventMask(RuntimeEventMask mask) => _discard(
+  void setEventMask(RuntimeEventFlag mask) => _discard(
     (arena, completion) => raw.mln_map_set_event_mask(
       _handle.raw,
       mask.rawValue,
@@ -5675,7 +5675,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_set_debug_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  Future<CommandCompletion> setDebugOptions(MapDebugOption options) => _command(
+  Future<CommandCompletion> setDebugOptions(MapDebugFlag options) => _command(
     (arena, completion) => raw.mln_map_set_debug_options(
       _handle.raw,
       options.rawValue,
@@ -5688,7 +5688,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_set_event_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<CommandCompletion> setEventMask(RuntimeEventMask mask) => _command(
+  Future<CommandCompletion> setEventMask(RuntimeEventFlag mask) => _command(
     (arena, completion) => raw.mln_map_set_event_mask(
       _handle.raw,
       mask.rawValue,
@@ -7141,12 +7141,12 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_get_event_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  RuntimeEventMask getEventMask() => withNativeArena((arena) {
+  RuntimeEventFlag getEventMask() => withNativeArena((arena) {
     final outMask = arena<Uint64>();
     _check(
       raw.mln_runtime_get_event_mask(_handle.raw, outMask, nativeDiagnostic),
     );
-    return RuntimeEventMask.fromRawValue(outMask.value);
+    return RuntimeEventFlag.fromRawValue(outMask.value);
   });
 
   /// Starts getting one offline region by ID.
@@ -7267,7 +7267,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_set_event_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  void setEventMask(RuntimeEventMask mask) => _check(
+  void setEventMask(RuntimeEventFlag mask) => _check(
     raw.mln_runtime_set_event_mask(
       _handle.raw,
       mask.rawValue,
@@ -7548,7 +7548,7 @@ final class ScopedGpuSync {
   final GpuSync _value;
   final _NativeViewScope _scope;
   GpuSyncKind get kind => _scope.active(_value).kind;
-  int get object => _scope.active(_value).object;
+  int get handle => _scope.active(_value).handle;
 }
 
 /// A `VulkanTextureFrame` that is readable only while the callback of

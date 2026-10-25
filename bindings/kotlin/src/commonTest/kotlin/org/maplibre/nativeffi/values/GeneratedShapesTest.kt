@@ -21,7 +21,7 @@ import org.maplibre.nativeffi.generated.FeatureStateSelector
 import org.maplibre.nativeffi.generated.FrameDemandFlag
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LatLng
-import org.maplibre.nativeffi.generated.LogSeverityMask
+import org.maplibre.nativeffi.generated.LogSeverityFlag
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.MapOptions
 import org.maplibre.nativeffi.generated.PremultipliedRgba8Image
@@ -31,7 +31,7 @@ import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.Status
 import org.maplibre.nativeffi.generated.StyleExpressionInputs
 import org.maplibre.nativeffi.generated.StyleImageOptions
-import org.maplibre.nativeffi.generated.UrlMatchFlags
+import org.maplibre.nativeffi.generated.UrlMatchFlag
 import org.maplibre.nativeffi.generated.writeRenderedQueryGeometry
 import org.maplibre.nativeffi.internal.memory.NativeArena
 import org.maplibre.nativeffi.internal.memory.readCString
@@ -239,8 +239,8 @@ class GeneratedShapesTest {
       "PRESENT | WAIT_FOR_UPDATE",
       (FrameDemandFlag.PRESENT or FrameDemandFlag.WAIT_FOR_UPDATE).toString(),
     )
-    assertEquals("INFO | WARNING | ERROR", LogSeverityMask.ALL.toString())
-    assertEquals("EXACT", UrlMatchFlags.EXACT.toString())
-    assertEquals("GLOB | 0x10", UrlMatchFlags(0x11u).toString())
+    assertEquals("INFO | WARNING | ERROR", LogSeverityFlag.ALL.toString())
+    assertEquals("EXACT", UrlMatchFlag.EXACT.toString())
+    assertEquals("GLOB | 0x10", UrlMatchFlag(0x11u).toString())
   }
 }

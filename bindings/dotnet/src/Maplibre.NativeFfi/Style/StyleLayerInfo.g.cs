@@ -27,9 +27,6 @@ namespace Maplibre.NativeFfi;
 /// <param name="MaxZoom">
 /// Highest zoom at which the layer draws; INFINITY with no upper bound.
 /// </param>
-/// <param name="Visibility">
-/// One of <c>mln_style_layer_visibility</c>.
-/// </param>
 public readonly partial record struct StyleLayerInfo(
     string Id,
     string Type,

@@ -12,7 +12,7 @@ import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LogEvent
 import org.maplibre.nativeffi.generated.LogHandler
 import org.maplibre.nativeffi.generated.LogSeverity
-import org.maplibre.nativeffi.generated.LogSeverityMask
+import org.maplibre.nativeffi.generated.LogSeverityFlag
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.logSetCallback
 import org.maplibre.nativeffi.libraryProperties
@@ -48,7 +48,7 @@ object LogProcessExitProbe {
     require(callbackState in setOf("installed", "live"))
     val received = CountDownLatch(1)
     Maplibre.loadNativeLibrary()
-    GeneratedApi.logSetAsyncSeverityMask(LogSeverityMask.WARNING)
+    GeneratedApi.logSetAsyncSeverityMask(LogSeverityFlag.WARNING)
     GeneratedApi.logSetCallback(
       LogHandler { severity, event, _, _ ->
         if (event == LogEvent.PARSE_STYLE && severity == LogSeverity.WARNING) {

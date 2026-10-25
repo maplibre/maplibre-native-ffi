@@ -1668,7 +1668,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_debug_options</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetDebugOptionsAsync(MapDebugOption options)
+    public Task<CommandCompletion> SetDebugOptionsAsync(MapDebugFlag options)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -1688,7 +1688,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_set_event_mask</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<CommandCompletion> SetEventMaskAsync(RuntimeEventMask mask)
+    public Task<CommandCompletion> SetEventMaskAsync(RuntimeEventFlag mask)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
@@ -2674,7 +2674,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void SetDebugOptions(MapDebugOption options)
+        public void SetDebugOptions(MapDebugFlag options)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
@@ -2689,7 +2689,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void SetEventMask(RuntimeEventMask mask)
+        public void SetEventMask(RuntimeEventFlag mask)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);

@@ -11,7 +11,7 @@ import {
   MaplibreError,
   type MapHandle,
   type MapOptions,
-  ResourceKindMask,
+  ResourceKindFlag,
   type ResourceProvider,
   type ResourceResponse,
   ResourceResponseStatus,
@@ -73,7 +73,7 @@ export const denyingProvider: ResourceProvider = {
 
 /** A route that claims one style URL. */
 export function styleRoute(url: string): ResourceRoute {
-  return { kinds: ResourceKindMask.style, url };
+  return { kinds: ResourceKindFlag.style, url };
 }
 
 export function styleResponse(style = emptyStyle()): ResourceResponse {

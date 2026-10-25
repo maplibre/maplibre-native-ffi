@@ -22,15 +22,18 @@ typedef enum mln_log_severity : uint32_t {
 } mln_log_severity;
 
 /** Bitmask values for log severities dispatched asynchronously. */
-typedef enum MLN_BINDING("kind=bitmask") mln_log_severity_mask : uint32_t {
-  MLN_LOG_SEVERITY_MASK_INFO = 1U << MLN_LOG_SEVERITY_INFO,
-  MLN_LOG_SEVERITY_MASK_WARNING = 1U << MLN_LOG_SEVERITY_WARNING,
-  MLN_LOG_SEVERITY_MASK_ERROR = 1U << MLN_LOG_SEVERITY_ERROR,
-  MLN_LOG_SEVERITY_MASK_DEFAULT = MLN_LOG_SEVERITY_MASK_INFO |
-    MLN_LOG_SEVERITY_MASK_WARNING,
-  MLN_LOG_SEVERITY_MASK_ALL = MLN_LOG_SEVERITY_MASK_INFO |
-    MLN_LOG_SEVERITY_MASK_WARNING | MLN_LOG_SEVERITY_MASK_ERROR,
-} mln_log_severity_mask;
+typedef enum MLN_BINDING("kind=bitmask") mln_log_severity_flag : uint32_t {
+  MLN_LOG_SEVERITY_FLAG_INFO = 1U << MLN_LOG_SEVERITY_INFO,
+  MLN_LOG_SEVERITY_FLAG_WARNING = 1U << MLN_LOG_SEVERITY_WARNING,
+  MLN_LOG_SEVERITY_FLAG_ERROR = 1U << MLN_LOG_SEVERITY_ERROR,
+  MLN_LOG_SEVERITY_FLAG_DEFAULT = MLN_LOG_SEVERITY_FLAG_INFO |
+    MLN_LOG_SEVERITY_FLAG_WARNING,
+  MLN_LOG_SEVERITY_FLAG_ALL = MLN_LOG_SEVERITY_FLAG_INFO |
+    MLN_LOG_SEVERITY_FLAG_WARNING | MLN_LOG_SEVERITY_FLAG_ERROR,
+} mln_log_severity_flag;
+
+/** A set of mln_log_severity_flag bits. */
+typedef uint32_t mln_log_severity_flags;
 
 /** Log event categories emitted by MapLibre Native. */
 typedef enum mln_log_event : uint32_t {
@@ -67,8 +70,7 @@ MLN_BINDING(
   "failure=false;delivery=MLN_DELIVERY_TYPE_LOG_RECORD;queue_result=true"
 )
 typedef bool (*mln_log_callback)(
-  void* user_data, uint32_t severity MLN_BINDING("enum=mln_log_severity"),
-  uint32_t event MLN_BINDING("enum=mln_log_event"), int64_t code,
+  void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
   const char* message
 );
 
@@ -157,7 +159,7 @@ mln_log_clear_callback(mln_diagnostic* out_diagnostic) MLN_NOEXCEPT;
 /**
  * Controls which log severities MapLibre Native may dispatch asynchronously.
  *
- * MLN_LOG_SEVERITY_MASK_DEFAULT lets info and warning records dispatch
+ * MLN_LOG_SEVERITY_FLAG_DEFAULT lets info and warning records dispatch
  * asynchronously and keeps error records synchronous.
  *
  * A severity outside the mask invokes the log callback synchronously on the
@@ -169,8 +171,7 @@ mln_log_clear_callback(mln_diagnostic* out_diagnostic) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_log_set_async_severity_mask(
-  uint32_t mask MLN_BINDING("enum=mln_log_severity_mask"),
-  mln_diagnostic* out_diagnostic
+  mln_log_severity_flags mask, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

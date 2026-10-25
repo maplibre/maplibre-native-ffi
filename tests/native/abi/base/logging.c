@@ -7,7 +7,7 @@
 
 static void restore_log_defaults(void) {
   (void)mln_log_clear_callback(NULL);
-  (void)mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_MASK_DEFAULT, NULL);
+  (void)mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_FLAG_DEFAULT, NULL);
 }
 
 // Runs body, then restores the defaults whether it passed or failed. A failed
@@ -102,7 +102,7 @@ static const struct {
   uint32_t mask;
   mln_status expected;
 } async_masks[] = {
-  {MLN_LOG_SEVERITY_MASK_ALL, MLN_STATUS_OK},
+  {MLN_LOG_SEVERITY_FLAG_ALL, MLN_STATUS_OK},
   {0, MLN_STATUS_OK},
   // Bit 0 names no severity: the mask bits start at the INFO severity value.
   {UINT32_C(1), MLN_STATUS_INVALID_ARGUMENT},
@@ -376,7 +376,7 @@ static void dump_debug_logs(dump_probe* probe) {
 // passing it on changes nothing about the next one.
 LOG_STATE_CASE(a_synchronous_record_arrives_on_the_logging_thread) {
   MLN_TEST_OK(
-    mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_MASK_ERROR, NULL)
+    mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_FLAG_ERROR, NULL)
   );
   static dump_probe probe;
   dump_debug_logs(&probe);
@@ -392,7 +392,7 @@ LOG_STATE_CASE(a_synchronous_record_arrives_on_the_logging_thread) {
 // which delivers every record in order and none on the thread that logged it.
 LOG_STATE_CASE(an_asynchronous_record_arrives_on_the_log_thread) {
   MLN_TEST_OK(
-    mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_MASK_INFO, NULL)
+    mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_FLAG_INFO, NULL)
   );
   static dump_probe probe;
   dump_debug_logs(&probe);

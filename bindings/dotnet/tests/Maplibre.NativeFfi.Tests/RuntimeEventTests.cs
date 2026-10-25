@@ -39,23 +39,22 @@ public sealed unsafe class RuntimeEventTests
         {
             new mln_runtime_event
             {
-                type = (uint)mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_RENDER_ERROR,
-                source_type = (uint)mln_runtime_event_source_type.MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-                payload_type = (uint)mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_NONE,
+                type = mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_RENDER_ERROR,
+                source_type = mln_runtime_event_source_type.MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
+                payload_type = mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_NONE,
                 message = renderError,
             },
             new mln_runtime_event
             {
-                type = (uint)mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_TILE_ACTION,
-                source_type = (uint)mln_runtime_event_source_type.MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-                payload_type = (uint)
-                    mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
+                type = mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_TILE_ACTION,
+                source_type = mln_runtime_event_source_type.MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
+                payload_type = mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
                 message = sourceId,
                 payload = new mln_runtime_event_payload
                 {
                     tile_action = new mln_runtime_event_tile_action
                     {
-                        operation = (uint)mln_tile_operation.MLN_TILE_OPERATION_END_PARSE,
+                        operation = mln_tile_operation.MLN_TILE_OPERATION_END_PARSE,
                         tile_id = new mln_tile_id
                         {
                             overscaled_z = 4,
@@ -140,17 +139,17 @@ public sealed unsafe class RuntimeEventTests
         {
             new mln_runtime_event
             {
-                type = (uint)mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_LOADING_STARTED,
-                source_type = (uint)mln_runtime_event_source_type.MLN_RUNTIME_EVENT_SOURCE_MAP,
+                type = mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_LOADING_STARTED,
+                source_type = mln_runtime_event_source_type.MLN_RUNTIME_EVENT_SOURCE_MAP,
                 source = ulong.MaxValue,
-                code = int.MinValue,
+                code = uint.MaxValue,
             },
-            new mln_runtime_event { type = uint.MaxValue },
+            new mln_runtime_event { type = (mln_runtime_event_type)uint.MaxValue },
         };
         var copied = EventBatches.Decode(events, EventBatches.Stride);
 
         Assert.Equal(ulong.MaxValue, copied[0].Source);
-        Assert.Equal(int.MinValue, copied[0].Code);
+        Assert.Equal(uint.MaxValue, copied[0].Code);
         Assert.Equal(uint.MaxValue, (uint)copied[1].Type);
     }
 }

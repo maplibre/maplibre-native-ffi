@@ -54,6 +54,9 @@ typedef enum MLN_BINDING(
   MLN_RENDER_SESSION_CAPABILITY_PRESENTATION = 1U << 3U,
 } mln_render_session_capability_flag;
 
+/** A set of mln_render_session_capability_flag bits. */
+typedef uint32_t mln_render_session_capability_flags;
+
 /**
  * Takes or returns the host's lock on the queue that a session shares with it.
  * Native code relies on the lock being held or released when the call returns.
@@ -98,6 +101,51 @@ typedef struct mln_queue_lock {
   "kind=callback_registration;release=release_user_data"
 );
 
+/** Synchronization payload kind for acquired texture frames. */
+typedef enum mln_gpu_sync_kind : uint32_t {
+  /**
+   * The host needs no synchronization object. The work completed, or on WebGPU
+   * was submitted to the device's queue, before the frame became acquirable or
+   * before the release call.
+   *
+   * As producer synchronization of an acquired frame: on Metal, Vulkan, and
+   * OpenGL, the producer's GPU writes to the frame's texture completed before
+   * the frame became acquirable. On OpenGL, a host that samples the texture
+   * from another context of the share group binds it again after acquisition.
+   * On WebGPU, the writes were submitted to the device's queue, which orders
+   * them before any work that the host submits afterwards.
+   *
+   * As consumer synchronization: the host's GPU reads completed before the
+   * release call, or on WebGPU were submitted to the device's queue before it.
+   */
+  MLN_GPU_SYNC_CPU_COMPLETE = 0U,
+  /**
+   * GLsync in the shared EGL or WGL context's share group, used only by a
+   * caller-graphics-thread driver. handle is nonzero.
+   *
+   * A producer fence is a flushed GL_SYNC_GPU_COMMANDS_COMPLETE fence. Before
+   * reading the texture,
+   * the host queues glWaitSync(handle, 0, GL_TIMEOUT_IGNORED) in a context in
+   * that share group and binds the texture again. A CPU read instead waits
+   * with glClientWaitSync. EGL targets use GLsync, not EGLSync.
+   *
+   * The session owns producer fences. The host borrows one until it releases
+   * or discards the acquired frame and must never delete it. A view scope
+   * extends that borrowing.
+   *
+   * The host inserts a consumer fence after its reads and calls glFlush in
+   * that context before releasing the frame. A successful release transfers
+   * the fence to the session, which waits on it before it renders into the
+   * slot again.
+   *
+   * Target loss invalidates frame access and may retain consumer fences until
+   * process exit. Abandon performs no graphics cleanup and may retain producer
+   * and consumer fences until process exit.
+   * The host finishes its GPU reads before destroying borrowed textures.
+   */
+  MLN_GPU_SYNC_OPENGL_FENCE = 1U,
+} mln_gpu_sync_kind;
+
 /**
  * Common attachment policy copied before an attach call returns.
  *
@@ -110,11 +158,8 @@ typedef struct mln_queue_lock {
  */
 typedef struct mln_render_session_attach_options {
   uint32_t size;
-  /**
-   * One mln_render_driver_kind value. Defaults to
-   * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
-   */
-  uint32_t driver MLN_BINDING("enum=mln_render_driver_kind");
+  /** Defaults to MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD. */
+  mln_render_driver_kind driver;
   /**
    * Requested slot count of a session-owned texture ring, from one to
    * MLN_TEXTURE_RING_MAX_DEPTH. Private targets grant one slot regardless of
@@ -129,7 +174,7 @@ typedef struct mln_render_session_attach_options {
    * EGL or WGL texture target and a caller-graphics-thread driver. Other
    * targets support only CPU completion and fail an unsupported request.
    */
-  uint32_t producer_sync_kind MLN_BINDING("enum=mln_gpu_sync_kind");
+  mln_gpu_sync_kind producer_sync_kind;
   /** Wakes the receiver when the frame-result queue becomes nonempty. */
   mln_wake frame_wake;
   /**
@@ -152,61 +197,14 @@ typedef struct mln_render_session_attach_options {
 /** Driver and target capabilities fixed for one attached render session. */
 typedef struct mln_render_session_capabilities {
   uint32_t size;
-  /** One mln_render_driver_kind value. */
-  uint32_t driver MLN_BINDING("enum=mln_render_driver_kind");
+  mln_render_driver_kind driver;
   /**
    * Granted texture ring depth: the slot count of a session-owned ring, or the
    * texture count of a borrowed one. Zero for a surface.
    */
   uint32_t texture_ring_depth;
-  /** A bitwise OR of mln_render_session_capability_flag values. */
-  uint32_t flags MLN_BINDING("enum=mln_render_session_capability_flag");
+  mln_render_session_capability_flags flags;
 } mln_render_session_capabilities;
-
-/** Synchronization payload kind for acquired texture frames. */
-typedef enum mln_gpu_sync_kind : uint32_t {
-  /**
-   * The host needs no synchronization object. The work completed, or on WebGPU
-   * was submitted to the device's queue, before the frame became acquirable or
-   * before the release call.
-   *
-   * As producer synchronization of an acquired frame: on Metal, Vulkan, and
-   * OpenGL, the producer's GPU writes to the frame's texture completed before
-   * the frame became acquirable. On OpenGL, a host that samples the texture
-   * from another context of the share group binds it again after acquisition.
-   * On WebGPU, the writes were submitted to the device's queue, which orders
-   * them before any work that the host submits afterwards.
-   *
-   * As consumer synchronization: the host's GPU reads completed before the
-   * release call, or on WebGPU were submitted to the device's queue before it.
-   */
-  MLN_GPU_SYNC_CPU_COMPLETE = 0U,
-  /**
-   * GLsync in the shared EGL or WGL context's share group, used only by a
-   * caller-graphics-thread driver. object is nonzero.
-   *
-   * A producer fence is a flushed GL_SYNC_GPU_COMMANDS_COMPLETE fence. Before
-   * reading the texture,
-   * the host queues glWaitSync(object, 0, GL_TIMEOUT_IGNORED) in a context in
-   * that share group and binds the texture again. A CPU read instead waits
-   * with glClientWaitSync. EGL targets use GLsync, not EGLSync.
-   *
-   * The session owns producer fences. The host borrows one until it releases
-   * or discards the acquired frame and must never delete it. A view scope
-   * extends that borrowing.
-   *
-   * The host inserts a consumer fence after its reads and calls glFlush in
-   * that context before releasing the frame. A successful release transfers
-   * the fence to the session, which waits on it before it renders into the
-   * slot again.
-   *
-   * Target loss invalidates frame access and may retain consumer fences until
-   * process exit. Abandon performs no graphics cleanup and may retain producer
-   * and consumer fences until process exit.
-   * The host finishes its GPU reads before destroying borrowed textures.
-   */
-  MLN_GPU_SYNC_OPENGL_FENCE = 3U,
-} mln_gpu_sync_kind;
 
 /**
  * Backend synchronization copied by frame access and release calls.
@@ -215,14 +213,13 @@ typedef enum mln_gpu_sync_kind : uint32_t {
  */
 typedef struct mln_gpu_sync {
   uint32_t size;
-  /** One mln_gpu_sync_kind value. */
-  uint32_t kind MLN_BINDING("enum=mln_gpu_sync_kind");
+  mln_gpu_sync_kind kind;
   /**
    * Bit pattern of the GLsync pointer.
    *
    * Zero when kind is MLN_GPU_SYNC_CPU_COMPLETE.
    */
-  uint64_t object;
+  uint64_t handle;
 } mln_gpu_sync;
 
 /** Returns CPU-complete synchronization for this C API version. */
@@ -278,6 +275,9 @@ typedef enum MLN_BINDING(
   /** Browser WebGL context imported into an Emscripten module. */
   MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL = 1u << 2u,
 } mln_opengl_context_provider_flag;
+
+/** A set of mln_opengl_context_provider_flag bits. */
+typedef uint32_t mln_opengl_context_provider_flags;
 
 /** OpenGL platform context provider used by a context descriptor. */
 typedef enum mln_opengl_context_platform : uint32_t {
@@ -367,7 +367,7 @@ typedef struct mln_egl_context_descriptor {
    * ownership. A shared session queries share_context for it, so this is
    * ignored there.
    */
-  uint32_t client_api MLN_BINDING("enum=mln_opengl_client_api");
+  mln_opengl_client_api client_api;
   /** Optional eglGetProcAddress-compatible function for the host loader. */
   void* get_proc_address;
 } mln_egl_context_descriptor;
@@ -385,8 +385,7 @@ typedef enum mln_webgl_context_kind : uint32_t {
 
 /** WebGL context fields shared by OpenGL render targets in the browser. */
 typedef struct mln_webgl_context_descriptor {
-  /** One mln_webgl_context_kind value. */
-  uint32_t kind MLN_BINDING("enum=mln_webgl_context_kind");
+  mln_webgl_context_kind kind;
   /**
    * Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
    */
@@ -411,13 +410,13 @@ typedef union mln_opengl_context_descriptor_data {
 /** OpenGL backend context fields shared by OpenGL render targets. */
 typedef struct mln_opengl_context_descriptor {
   /** WGL, EGL, or WebGL context provider. */
-  uint32_t platform MLN_BINDING("enum=mln_opengl_context_platform");
+  mln_opengl_context_platform platform;
   /**
    * Whether the session shares its driver thread and graphics objects with the
    * host. A private EGL or WGL owned texture and a transferred WebGL canvas are
    * dedicated to their core worker.
    */
-  uint32_t ownership MLN_BINDING("enum=mln_opengl_context_ownership");
+  mln_opengl_context_ownership ownership;
   mln_opengl_context_descriptor_data data MLN_BINDING("tag=platform");
 } mln_opengl_context_descriptor;
 
@@ -450,8 +449,8 @@ MLN_API mln_status mln_logical_extent_physical_size(
 /**
  * Returns OpenGL context providers supported by this build.
  */
-MLN_BINDING("enum=mln_opengl_context_provider_flag")
-MLN_API uint32_t mln_opengl_supported_context_provider_mask(void) MLN_NOEXCEPT;
+MLN_API mln_opengl_context_provider_flags
+mln_opengl_supported_context_provider_mask(void) MLN_NOEXCEPT;
 
 #ifdef __cplusplus
 }

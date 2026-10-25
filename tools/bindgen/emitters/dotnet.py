@@ -647,10 +647,10 @@ def emit_operation(
             parameters.append(f"{owners[value_plan.native]} {name}")
             scoped = True
             args.append(f"scope.Use({name})")
-        elif value_plan and value_plan.kind == "enum" and ctype in PRIMITIVES:
+        elif value_plan and value_plan.kind == "enum":
             values.supported(value_plan)
             parameters.append(f"{public_type(value_plan.native)} {name}")
-            args.append(f"({PRIMITIVES[ctype]}){name}")
+            args.append(values.encode(value_plan, name))
         elif value_plan and value_plan.kind == "scalar" and ctype in PRIMITIVES:
             parameters.append(
                 f"{'ulong' if ctype == 'size_t' else PRIMITIVES[ctype]} {name}"
@@ -744,21 +744,23 @@ def emit_operation(
                 if value_plan.nullable
                 else f"&{local}"
             )
+        elif output_plan and output_plan.kind == "enum":
+            prologue.append(f"{values.native_type(output_plan)} {name} = default;")
+            args.append(f"&{name}")
+            outputs.append(
+                (public_type(output_plan.native), values.copy(output_plan, name))
+            )
         elif (
             output_plan
-            and output_plan.kind in {"scalar", "enum"}
+            and output_plan.kind == "scalar"
             and type_name(parameter.type.pointee) in PRIMITIVES
         ):
             native = PRIMITIVES[type_name(parameter.type.pointee)]
             prologue.append(f"{native} {name} = default;")
             args.append(f"&{name}")
-            if output_plan.kind == "enum":
-                output_type = public_type(output_plan.native)
-                outputs.append((output_type, f"({output_type}){name}"))
-            else:
-                outputs.append(
-                    ("ulong", f"(ulong){name}") if native == "nuint" else (native, name)
-                )
+            outputs.append(
+                ("ulong", f"(ulong){name}") if native == "nuint" else (native, name)
+            )
         elif output_plan and (
             output_plan.kind in {"record", "union"} or output_plan.buffer_form == "view"
         ):

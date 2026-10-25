@@ -153,12 +153,12 @@ public sealed class GeneratedValueTests
         );
 
         Assert.Equal(
-            (uint)mln_rendered_query_geometry_type.MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
+            mln_rendered_query_geometry_type.MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
             box.type
         );
         Assert.Equal(6, box.data.box.max.y);
         Assert.Equal(
-            (uint)mln_rendered_query_geometry_type.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING,
+            mln_rendered_query_geometry_type.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING,
             line.type
         );
         Assert.Equal(2u, line.data.line_string.point_count);
@@ -172,7 +172,7 @@ public sealed class GeneratedValueTests
             new mln_offline_region_definition
             {
                 size = (uint)sizeof(mln_offline_region_definition),
-                type = 999,
+                type = (mln_offline_region_definition_type)999,
             }
         );
 

@@ -3,11 +3,11 @@
 extern void mlnGoCallbackRelease(void*);
 void binding_release(void* p) { mlnGoCallbackRelease(p); }
 extern bool mlnGo_mln_log_handler_callback(
-  void* user_data, uint32_t severity, uint32_t event, int64_t code,
+  void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
   char* message
 );
 bool binding_mln_log_handler_callback(
-  void* user_data, uint32_t severity, uint32_t event, int64_t code,
+  void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
   const char* message
 ) {
   return mlnGo_mln_log_handler_callback(
@@ -95,11 +95,11 @@ void binding_mln_runtime_event_handler_callback(
   );
 }
 extern mln_status mlnGo_mln_http_header_transform_callback(
-  void* user_data, uint32_t kind, char* url,
+  void* user_data, mln_resource_kind kind, char* url,
   mln_http_header_transform_response* out_response
 );
 mln_status binding_mln_http_header_transform_callback(
-  void* user_data, uint32_t kind, const char* url,
+  void* user_data, mln_resource_kind kind, const char* url,
   mln_http_header_transform_response* out_response
 ) {
   return mlnGo_mln_http_header_transform_callback(
@@ -120,11 +120,11 @@ void binding_mln_resource_provider_callback(
   );
 }
 extern void mlnGo_mln_resource_transform_callback(
-  void* user_data, uint32_t kind, char* url,
+  void* user_data, mln_resource_kind kind, char* url,
   mln_resource_transform_request request
 );
 void binding_mln_resource_transform_callback(
-  void* user_data, uint32_t kind, const char* url,
+  void* user_data, mln_resource_kind kind, const char* url,
   mln_resource_transform_request request
 ) {
   mlnGo_mln_resource_transform_callback(

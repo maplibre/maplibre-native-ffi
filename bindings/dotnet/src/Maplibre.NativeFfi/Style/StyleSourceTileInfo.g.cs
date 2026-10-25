@@ -43,9 +43,5 @@ public readonly record struct StyleSourceTileInfo
     /// Highest zoom level the TileJSON provides tiles for.
     /// </summary>
     public double MaxZoom { get; init; }
-
-    /// <summary>
-    /// One of <c>mln_style_tile_scheme</c>.
-    /// </summary>
     public StyleTileScheme Scheme { get; init; }
 }

@@ -9,12 +9,6 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_runtime_event</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Type">
-/// One of <c>mln_runtime_event_type</c>.
-/// </param>
-/// <param name="SourceType">
-/// One of <c>mln_runtime_event_source_type</c>.
-/// </param>
 /// <param name="Source">
 /// Source handle selected by source_type: an <c>mln_runtime</c> or an
 /// <c>mln_map</c>.
@@ -38,7 +32,7 @@ public readonly partial record struct RuntimeEvent(
     RuntimeEventSourceType SourceType,
     ulong Source,
     ulong Generation,
-    int Code,
+    uint Code,
     string Message,
     RuntimeEvent.PayloadValue Payload
 )

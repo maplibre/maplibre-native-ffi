@@ -581,14 +581,14 @@ class OpenGLTextureSessionBackend final
  public:
   OpenGLTextureSessionBackend(
     const mln_opengl_owned_texture_descriptor& descriptor, mln::Size size,
-    std::size_t ring_depth, uint32_t producer_sync_kind
+    std::size_t ring_depth, mln_gpu_sync_kind producer_sync_kind
   )
       : backend_(descriptor, size, ring_depth),
         producer_sync_kind_(producer_sync_kind) {}
 
   OpenGLTextureSessionBackend(
     const OpenGLBorrowedTarget& target, mln::Size size,
-    uint32_t producer_sync_kind
+    mln_gpu_sync_kind producer_sync_kind
   )
       : backend_(target, size), producer_sync_kind_(producer_sync_kind) {}
 
@@ -627,12 +627,11 @@ class OpenGLTextureSessionBackend final
 
   auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status override {
     if (sync.kind == MLN_GPU_SYNC_CPU_COMPLETE) return MLN_STATUS_OK;
-    if (!supports_consumer_sync(static_cast<mln_gpu_sync_kind>(sync.kind)))
-      return MLN_STATUS_UNSUPPORTED;
+    if (!supports_consumer_sync(sync.kind)) return MLN_STATUS_UNSUPPORTED;
     try {
       auto guard = mln::gfx::BackendScope{backend_};
       auto* fence = reinterpret_cast<mln::platform::GLsync>(
-        static_cast<uintptr_t>(sync.object)
+        static_cast<uintptr_t>(sync.handle)
       );
       if (mln::platform::glIsSync(fence) == GL_FALSE) {
         mln::core::set_thread_error(
@@ -736,7 +735,7 @@ class OpenGLTextureSessionBackend final
 
  private:
   OpenGLTextureBackend backend_;
-  uint32_t producer_sync_kind_;
+  mln_gpu_sync_kind producer_sync_kind_;
   mln_gpu_sync producer_sync_{
     sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0
   };
@@ -828,7 +827,7 @@ auto opengl_owned_texture_attach_start(
     };
   const auto capabilities = mln_render_session_capabilities{
     .size = sizeof(mln_render_session_capabilities),
-    .driver = 0,
+    .driver = {},
     .texture_ring_depth = ring_depth,
     .flags = MLN_RENDER_SESSION_CAPABILITY_READBACK |
              (private_target ? 0u
@@ -902,7 +901,7 @@ auto opengl_borrowed_texture_attach_start(
   };
   const auto capabilities = mln_render_session_capabilities{
     .size = sizeof(mln_render_session_capabilities),
-    .driver = 0,
+    .driver = {},
     .texture_ring_depth = static_cast<uint32_t>(descriptor->texture_count),
     .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
              MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC

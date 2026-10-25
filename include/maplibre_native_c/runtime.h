@@ -46,8 +46,7 @@ typedef enum mln_offline_region_download_state : uint32_t {
 
 /** Offline region status snapshot. */
 typedef struct mln_offline_region_status {
-  /** One of mln_offline_region_download_state. */
-  uint32_t download_state MLN_BINDING("enum=mln_offline_region_download_state");
+  mln_offline_region_download_state download_state;
   uint64_t completed_resource_count;
   uint64_t completed_resource_size;
   uint64_t completed_tile_count;
@@ -68,7 +67,7 @@ typedef struct mln_offline_region_status {
  *
  * Each value is also a bit index in the subscription masks: the bit for an
  * event type is 1ULL shifted left by the type value. See
- * mln_runtime_event_mask.
+ * mln_runtime_event_flag.
  *
  * - MAP_CAMERA_WILL_CHANGE: code is an mln_camera_change_mode; payload NONE.
  * - MAP_CAMERA_IS_CHANGING: code is 0; payload NONE.
@@ -104,8 +103,6 @@ typedef struct mln_offline_region_status {
  *   error text; payload OFFLINE_REGION_RESPONSE_ERROR.
  * - OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: code is 0; payload
  *   OFFLINE_REGION_TILE_COUNT_LIMIT.
- *
- * Values 9, 11, 12, and 22 are retired and stay unused.
  */
 typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1,
@@ -116,17 +113,17 @@ typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED = 6,
   MLN_RUNTIME_EVENT_MAP_LOADING_FAILED = 7,
   MLN_RUNTIME_EVENT_MAP_IDLE = 8,
-  MLN_RUNTIME_EVENT_MAP_RENDER_ERROR = 10,
-  MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED = 13,
-  MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED = 14,
-  MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED = 15,
-  MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED = 16,
-  MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING = 17,
-  MLN_RUNTIME_EVENT_MAP_TILE_ACTION = 18,
-  MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 19,
-  MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20,
-  MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21,
-  MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED = 23,
+  MLN_RUNTIME_EVENT_MAP_RENDER_ERROR = 9,
+  MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED = 10,
+  MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED = 11,
+  MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED = 12,
+  MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED = 13,
+  MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING = 14,
+  MLN_RUNTIME_EVENT_MAP_TILE_ACTION = 15,
+  MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED = 16,
+  MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 17,
+  MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 18,
+  MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19,
 } mln_runtime_event_type;
 
 /**
@@ -136,102 +133,97 @@ typedef enum mln_runtime_event_type : uint32_t {
  * so a host can compute a bit from a type value it decoded from an event.
  *
  * mln_map_set_event_mask() reads the bits in
- * MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS and ignores the rest.
+ * MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS and ignores the rest.
  * mln_runtime_set_event_mask() reads the bits in
- * MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS and ignores the rest. Both entry
- * points accept MLN_RUNTIME_EVENT_MASK_ALL and reject bits outside it. A host
+ * MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS and ignores the rest. Both entry
+ * points accept MLN_RUNTIME_EVENT_FLAG_ALL and reject bits outside it. A host
  * that reads a mask, sets one bit, and writes it back keeps every other bit.
  */
-typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_mask : uint64_t {
+typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_flag : uint64_t {
   /** Selects no event type. */
-  MLN_RUNTIME_EVENT_MASK_NONE = 0,
-  MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE = 1ULL
+  MLN_RUNTIME_EVENT_FLAG_NONE = 0,
+  MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_WILL_CHANGE = 1ULL
     << MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE,
-  MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING = 1ULL
+  MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_IS_CHANGING = 1ULL
     << MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING,
-  MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE = 1ULL
+  MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_DID_CHANGE = 1ULL
     << MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE,
-  MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED = 1ULL
+  MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED = 1ULL
     << MLN_RUNTIME_EVENT_MAP_STYLE_LOADED,
-  MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED = 1ULL
+  MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_STARTED = 1ULL
     << MLN_RUNTIME_EVENT_MAP_LOADING_STARTED,
-  MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED = 1ULL
+  MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_FINISHED = 1ULL
     << MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED,
-  MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED = 1ULL
+  MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_FAILED = 1ULL
     << MLN_RUNTIME_EVENT_MAP_LOADING_FAILED,
-  MLN_RUNTIME_EVENT_MASK_MAP_IDLE = 1ULL << MLN_RUNTIME_EVENT_MAP_IDLE,
-  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR = 1ULL
+  MLN_RUNTIME_EVENT_FLAG_MAP_IDLE = 1ULL << MLN_RUNTIME_EVENT_MAP_IDLE,
+  MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_ERROR = 1ULL
     << MLN_RUNTIME_EVENT_MAP_RENDER_ERROR,
-  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED = 1ULL
+  MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_FRAME_STARTED = 1ULL
     << MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED,
-  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED = 1ULL
+  MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_FRAME_FINISHED = 1ULL
     << MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED,
-  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED = 1ULL
+  MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_MAP_STARTED = 1ULL
     << MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED,
-  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED = 1ULL
+  MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_MAP_FINISHED = 1ULL
     << MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED,
-  MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING = 1ULL
+  MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_IMAGE_MISSING = 1ULL
     << MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING,
-  MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION = 1ULL
+  MLN_RUNTIME_EVENT_FLAG_MAP_TILE_ACTION = 1ULL
     << MLN_RUNTIME_EVENT_MAP_TILE_ACTION,
-  MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED = 1ULL
-    << MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED,
-  MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR = 1ULL
-    << MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
-  MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 1ULL
-    << MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
-  MLN_RUNTIME_EVENT_MASK_MAP_SOURCE_CHANGED = 1ULL
+  MLN_RUNTIME_EVENT_FLAG_MAP_SOURCE_CHANGED = 1ULL
     << MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED,
+  MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED = 1ULL
+    << MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED,
+  MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR = 1ULL
+    << MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
+  MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 1ULL
+    << MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
   /** Selects every map-originated event type this version defines. */
-  MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS =
-      MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE |
-    MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING |
-    MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE |
-    MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED |
-    MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED |
-    MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED |
-    MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED |
-    MLN_RUNTIME_EVENT_MASK_MAP_IDLE | MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR |
-    MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED |
-    MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED |
-    MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED |
-    MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED |
-    MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING |
-    MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION |
-    MLN_RUNTIME_EVENT_MASK_MAP_SOURCE_CHANGED,
+  MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS =
+      MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_WILL_CHANGE |
+    MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_IS_CHANGING |
+    MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_DID_CHANGE |
+    MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED |
+    MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_STARTED |
+    MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_FINISHED |
+    MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_FAILED |
+    MLN_RUNTIME_EVENT_FLAG_MAP_IDLE | MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_ERROR |
+    MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_FRAME_STARTED |
+    MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_FRAME_FINISHED |
+    MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_MAP_STARTED |
+    MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_MAP_FINISHED |
+    MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_IMAGE_MISSING |
+    MLN_RUNTIME_EVENT_FLAG_MAP_TILE_ACTION |
+    MLN_RUNTIME_EVENT_FLAG_MAP_SOURCE_CHANGED,
   /** Selects every runtime-originated event type this version defines. */
-  MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS =
-      MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED |
-    MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR |
-    MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
+  MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS =
+      MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED |
+    MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR |
+    MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
   /** Selects every event type this version defines. */
-  MLN_RUNTIME_EVENT_MASK_ALL = MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS |
-    MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS,
-} mln_runtime_event_mask;
+  MLN_RUNTIME_EVENT_FLAG_ALL = MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS |
+    MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS,
+} mln_runtime_event_flag;
 
-/**
- * Source kinds used by mln_runtime_event.source_type.
- *
- * Value 2 is retired and stays unused.
- */
+/** A set of mln_runtime_event_flag bits. */
+typedef uint64_t mln_runtime_event_flags;
+
+/** Source kinds used by mln_runtime_event.source_type. */
 typedef enum mln_runtime_event_source_type : uint32_t {
   MLN_RUNTIME_EVENT_SOURCE_RUNTIME = 0,
   MLN_RUNTIME_EVENT_SOURCE_MAP = 1,
 } mln_runtime_event_source_type;
 
-/**
- * Payload kinds used by mln_runtime_event.payload_type.
- *
- * Values 3, 8, and 9 are retired and stay unused.
- */
+/** Payload kinds used by mln_runtime_event.payload_type. */
 typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0,
   MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME = 1,
   MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP = 2,
-  MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION = 4,
-  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 5,
-  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 6,
-  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 7,
+  MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION = 3,
+  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 4,
+  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 5,
+  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 6,
 } mln_runtime_event_payload_type;
 
 /** Camera change kinds reported by camera will-change and did-change events. */
@@ -334,7 +326,7 @@ typedef enum mln_resource_error_reason : uint32_t {
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_network_get_status(
-  uint32_t* out_status MLN_BINDING("direction=out;enum=mln_network_status"),
+  mln_network_status* out_status MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -351,8 +343,7 @@ MLN_API mln_status mln_network_get_status(
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_network_set_status(
-  uint32_t status MLN_BINDING("enum=mln_network_status"),
-  mln_diagnostic* out_diagnostic
+  mln_network_status status, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /** Options used when creating a runtime. */
@@ -392,8 +383,7 @@ typedef struct mln_rendering_stats {
 
 /** Payload for MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED. */
 typedef struct mln_runtime_event_render_frame {
-  /** One of mln_render_mode. */
-  uint32_t mode MLN_BINDING("enum=mln_render_mode");
+  mln_render_mode mode;
   /** Whether MapLibre needs another frame after this one. */
   bool needs_repaint;
   /** Whether symbol placement changed during this frame. */
@@ -403,8 +393,7 @@ typedef struct mln_runtime_event_render_frame {
 
 /** Payload for MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED. */
 typedef struct mln_runtime_event_render_map {
-  /** One of mln_render_mode. */
-  uint32_t mode MLN_BINDING("enum=mln_render_mode");
+  mln_render_mode mode;
 } mln_runtime_event_render_map;
 
 /** Overscaled tile identity reported in tile observer events. */
@@ -422,8 +411,7 @@ typedef struct mln_tile_id {
  * The event message carries the source ID.
  */
 typedef struct mln_runtime_event_tile_action {
-  /** One of mln_tile_operation. */
-  uint32_t operation MLN_BINDING("enum=mln_tile_operation");
+  mln_tile_operation operation;
   mln_tile_id tile_id;
 } mln_runtime_event_tile_action;
 
@@ -442,8 +430,7 @@ typedef struct mln_runtime_event_offline_region_status {
  */
 typedef struct mln_runtime_event_offline_region_response_error {
   mln_offline_region_id region_id;
-  /** One of mln_resource_error_reason. */
-  uint32_t reason MLN_BINDING("enum=mln_resource_error_reason");
+  mln_resource_error_reason reason;
 } mln_runtime_event_offline_region_response_error;
 
 /** Payload for MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED. */
@@ -493,10 +480,8 @@ typedef union mln_runtime_event_payload {
  * included, keeps its offset across versions.
  */
 typedef struct mln_runtime_event {
-  /** One of mln_runtime_event_type. */
-  uint32_t type MLN_BINDING("enum=mln_runtime_event_type");
-  /** One of mln_runtime_event_source_type. */
-  uint32_t source_type MLN_BINDING("enum=mln_runtime_event_source_type");
+  mln_runtime_event_type type;
+  mln_runtime_event_source_type source_type;
   /**
    * Source handle selected by source_type: an mln_runtime or an mln_map.
    *
@@ -525,9 +510,8 @@ typedef struct mln_runtime_event {
    * Secondary event detail whose meaning type selects; see
    * mln_runtime_event_type.
    */
-  int32_t code;
-  /** One of mln_runtime_event_payload_type. */
-  uint32_t payload_type MLN_BINDING("enum=mln_runtime_event_payload_type");
+  uint32_t code;
+  mln_runtime_event_payload_type payload_type;
   /** Borrowed UTF-8 message bytes, empty when this event carries no message. */
   mln_buffer_view message;
   /** Typed payload selected by payload_type. */
@@ -592,24 +576,27 @@ typedef struct mln_runtime_event_handler {
 /**
  * The resource kinds that a route or rule matches, one bit per
  * mln_resource_kind value.
- * Registration requires at least one known bit. MLN_RESOURCE_KIND_MASK_ALL
+ * Registration requires at least one known bit. MLN_RESOURCE_KIND_FLAG_ALL
  * selects every resource kind.
  */
-typedef enum MLN_BINDING("kind=bitmask") mln_resource_kind_mask : uint32_t {
-  MLN_RESOURCE_KIND_MASK_UNKNOWN = 1U << MLN_RESOURCE_KIND_UNKNOWN,
-  MLN_RESOURCE_KIND_MASK_STYLE = 1U << MLN_RESOURCE_KIND_STYLE,
-  MLN_RESOURCE_KIND_MASK_SOURCE = 1U << MLN_RESOURCE_KIND_SOURCE,
-  MLN_RESOURCE_KIND_MASK_TILE = 1U << MLN_RESOURCE_KIND_TILE,
-  MLN_RESOURCE_KIND_MASK_GLYPHS = 1U << MLN_RESOURCE_KIND_GLYPHS,
-  MLN_RESOURCE_KIND_MASK_SPRITE_IMAGE = 1U << MLN_RESOURCE_KIND_SPRITE_IMAGE,
-  MLN_RESOURCE_KIND_MASK_SPRITE_JSON = 1U << MLN_RESOURCE_KIND_SPRITE_JSON,
-  MLN_RESOURCE_KIND_MASK_IMAGE = 1U << MLN_RESOURCE_KIND_IMAGE,
-  MLN_RESOURCE_KIND_MASK_ALL = MLN_RESOURCE_KIND_MASK_UNKNOWN |
-    MLN_RESOURCE_KIND_MASK_STYLE | MLN_RESOURCE_KIND_MASK_SOURCE |
-    MLN_RESOURCE_KIND_MASK_TILE | MLN_RESOURCE_KIND_MASK_GLYPHS |
-    MLN_RESOURCE_KIND_MASK_SPRITE_IMAGE | MLN_RESOURCE_KIND_MASK_SPRITE_JSON |
-    MLN_RESOURCE_KIND_MASK_IMAGE,
-} mln_resource_kind_mask;
+typedef enum MLN_BINDING("kind=bitmask") mln_resource_kind_flag : uint32_t {
+  MLN_RESOURCE_KIND_FLAG_UNKNOWN = 1U << MLN_RESOURCE_KIND_UNKNOWN,
+  MLN_RESOURCE_KIND_FLAG_STYLE = 1U << MLN_RESOURCE_KIND_STYLE,
+  MLN_RESOURCE_KIND_FLAG_SOURCE = 1U << MLN_RESOURCE_KIND_SOURCE,
+  MLN_RESOURCE_KIND_FLAG_TILE = 1U << MLN_RESOURCE_KIND_TILE,
+  MLN_RESOURCE_KIND_FLAG_GLYPHS = 1U << MLN_RESOURCE_KIND_GLYPHS,
+  MLN_RESOURCE_KIND_FLAG_SPRITE_IMAGE = 1U << MLN_RESOURCE_KIND_SPRITE_IMAGE,
+  MLN_RESOURCE_KIND_FLAG_SPRITE_JSON = 1U << MLN_RESOURCE_KIND_SPRITE_JSON,
+  MLN_RESOURCE_KIND_FLAG_IMAGE = 1U << MLN_RESOURCE_KIND_IMAGE,
+  MLN_RESOURCE_KIND_FLAG_ALL = MLN_RESOURCE_KIND_FLAG_UNKNOWN |
+    MLN_RESOURCE_KIND_FLAG_STYLE | MLN_RESOURCE_KIND_FLAG_SOURCE |
+    MLN_RESOURCE_KIND_FLAG_TILE | MLN_RESOURCE_KIND_FLAG_GLYPHS |
+    MLN_RESOURCE_KIND_FLAG_SPRITE_IMAGE | MLN_RESOURCE_KIND_FLAG_SPRITE_JSON |
+    MLN_RESOURCE_KIND_FLAG_IMAGE,
+} mln_resource_kind_flag;
+
+/** A set of mln_resource_kind_flag bits. */
+typedef uint32_t mln_resource_kind_flags;
 
 // This block uses line comments because its examples contain URL patterns that
 // a block comment cannot carry.
@@ -639,11 +626,14 @@ typedef enum MLN_BINDING("kind=bitmask") mln_resource_kind_mask : uint32_t {
 /// `https://*.example.com/**` matches every subdomain of example.com and never
 /// `https://attacker.example/x.example.com/tile`. Use `**` wherever a pattern
 /// spans path segments, as in `https://tiles.example.com/**` for one host.
-typedef enum MLN_BINDING("kind=bitmask") mln_url_match_flags : uint32_t {
+typedef enum MLN_BINDING("kind=bitmask") mln_url_match_flag : uint32_t {
   MLN_URL_MATCH_EXACT = 0U,
   /** Reads url as a glob pattern. */
   MLN_URL_MATCH_GLOB = 1U << 0U,
-} mln_url_match_flags;
+} mln_url_match_flag;
+
+/** A set of mln_url_match_flag bits. */
+typedef uint32_t mln_url_match_flags;
 
 /**
  * One request pattern that a resource provider claims.
@@ -652,9 +642,8 @@ typedef enum MLN_BINDING("kind=bitmask") mln_url_match_flags : uint32_t {
  */
 typedef struct mln_resource_route {
   /** The resource kinds to match. */
-  uint32_t kinds MLN_BINDING("enum=mln_resource_kind_mask");
-  /** A bitwise OR of mln_url_match_flags values. */
-  uint32_t flags MLN_BINDING("enum=mln_url_match_flags");
+  mln_resource_kind_flags kinds;
+  mln_url_match_flags flags;
   /** The URL or glob pattern to compare. */
   mln_buffer_view url;
 } mln_resource_route;
@@ -676,9 +665,8 @@ typedef struct mln_http_header {
  */
 typedef struct mln_http_header_rule {
   /** The resource kinds to match. */
-  uint32_t kinds MLN_BINDING("enum=mln_resource_kind_mask");
-  /** A bitwise OR of mln_url_match_flags values. */
-  uint32_t flags MLN_BINDING("enum=mln_url_match_flags");
+  mln_resource_kind_flags kinds;
+  mln_url_match_flags flags;
   /** The URL or glob pattern to compare. */
   mln_buffer_view url;
   /**
@@ -712,8 +700,7 @@ MLN_API mln_http_header_rule mln_http_header_rule_default(void) MLN_NOEXCEPT;
  */
 MLN_BINDING("delivery=MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM")
 typedef void (*mln_resource_transform_callback)(
-  void* user_data, uint32_t kind MLN_BINDING("enum=mln_resource_kind"),
-  const char* url,
+  void* user_data, mln_resource_kind kind, const char* url,
   mln_resource_transform_request request MLN_BINDING("ownership=owned")
 );
 
@@ -799,8 +786,7 @@ MLN_API mln_status mln_http_header_transform_response_set_header(
  */
 MLN_BINDING("failure=MLN_STATUS_NATIVE_ERROR")
 typedef mln_status (*mln_http_header_transform_callback)(
-  void* user_data, uint32_t kind MLN_BINDING("enum=mln_resource_kind"),
-  const char* url,
+  void* user_data, mln_resource_kind kind, const char* url,
   mln_http_header_transform_response* out_response MLN_BINDING("direction=out")
 );
 
@@ -853,9 +839,12 @@ typedef enum MLN_BINDING("kind=bitmask") mln_resource_request_field : uint32_t {
   MLN_RESOURCE_REQUEST_PRIOR_EXPIRES = 1U << 2U,
 } mln_resource_request_field;
 
+/** A set of mln_resource_request_field bits. */
+typedef uint32_t mln_resource_request_fields;
+
 typedef struct mln_resource_request_info {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_resource_request_field");
+  mln_resource_request_fields fields;
   /**
    * URL entering the network layer, before tile server normalization.
    *
@@ -878,11 +867,11 @@ typedef struct mln_resource_request_info {
    * scheme before serving it.
    */
   const char* resolved_url MLN_BINDING("nullable=true");
-  uint32_t kind MLN_BINDING("enum=mln_resource_kind");
-  uint32_t loading_method MLN_BINDING("enum=mln_resource_loading_method");
-  uint32_t priority MLN_BINDING("enum=mln_resource_priority");
-  uint32_t usage MLN_BINDING("enum=mln_resource_usage");
-  uint32_t storage_policy MLN_BINDING("enum=mln_resource_storage_policy");
+  mln_resource_kind kind;
+  mln_resource_loading_method loading_method;
+  mln_resource_priority priority;
+  mln_resource_usage usage;
+  mln_resource_storage_policy storage_policy;
   mln_resource_range range
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_REQUEST_RANGE");
   int64_t prior_modified_unix_ms
@@ -907,6 +896,9 @@ typedef enum MLN_BINDING(
   MLN_RESOURCE_RESPONSE_RETRY_AFTER = 1U << 2U,
 } mln_resource_response_field;
 
+/** A set of mln_resource_response_field bits. */
+typedef uint32_t mln_resource_response_fields;
+
 /**
  * A resource provider's answer to one request.
  *
@@ -915,9 +907,9 @@ typedef enum MLN_BINDING(
  */
 typedef struct mln_resource_response {
   uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_resource_response_field");
-  uint32_t status MLN_BINDING("enum=mln_resource_response_status");
-  uint32_t error_reason MLN_BINDING("enum=mln_resource_error_reason");
+  mln_resource_response_fields fields;
+  mln_resource_response_status status;
+  mln_resource_error_reason error_reason;
   /** Response bytes. May be null only when byte_count is 0. */
   const uint8_t* bytes MLN_BINDING("length=byte_count;encoding=bytes");
   size_t byte_count;
@@ -1473,8 +1465,7 @@ MLN_API mln_status mln_runtime_clear_http_header_transform(
  */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_run_ambient_cache_operation(
-  mln_runtime runtime,
-  uint32_t operation MLN_BINDING("enum=mln_ambient_cache_operation"),
+  mln_runtime runtime, mln_ambient_cache_operation operation,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1662,8 +1653,8 @@ MLN_API mln_status mln_runtime_clear_event_handler(
  * declare. A new mask applies to later events and keeps the events already
  * queued.
  *
- * This call accepts only bits in MLN_RUNTIME_EVENT_MASK_ALL. It reads the bits
- * in MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS and ignores map-originated bits.
+ * This call accepts only bits in MLN_RUNTIME_EVENT_FLAG_ALL. It reads the bits
+ * in MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS and ignores map-originated bits.
  * mln_runtime_get_event_mask() reports the value last set, so a host reads it,
  * changes one bit, and writes it back.
  *
@@ -1672,12 +1663,12 @@ MLN_API mln_status mln_runtime_clear_event_handler(
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or mask
- *   holds a bit outside MLN_RUNTIME_EVENT_MASK_ALL.
+ *   holds a bit outside MLN_RUNTIME_EVENT_FLAG_ALL.
  * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
 MLN_API mln_status mln_runtime_set_event_mask(
-  mln_runtime runtime, uint64_t mask MLN_BINDING("enum=mln_runtime_event_mask"),
+  mln_runtime runtime, mln_runtime_event_flags mask,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1685,8 +1676,8 @@ MLN_API mln_status mln_runtime_set_event_mask(
  * Reports which runtime-scoped event types this runtime queues.
  *
  * The value is the mask last set, including bits outside
- * MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS that this runtime ignores. A
- * runtime that has not been narrowed reports MLN_RUNTIME_EVENT_MASK_ALL as this
+ * MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS that this runtime ignores. A
+ * runtime that has not been narrowed reports MLN_RUNTIME_EVENT_FLAG_ALL as this
  * library defines it.
  *
  * Returns:
@@ -1698,7 +1689,7 @@ MLN_API mln_status mln_runtime_set_event_mask(
  */
 MLN_API mln_status mln_runtime_get_event_mask(
   mln_runtime runtime,
-  uint64_t* out_mask MLN_BINDING("direction=out;enum=mln_runtime_event_mask"),
+  mln_runtime_event_flags* out_mask MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

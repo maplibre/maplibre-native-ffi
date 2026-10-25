@@ -19,7 +19,7 @@ void main() {
         [
           // A route with the default kinds claims the style and its source alike.
           ResourceRoute(
-            flags: UrlMatchFlags.glob,
+            flags: UrlMatchFlag.glob,
             url: 'custom://routed-*.json',
           ),
         ],

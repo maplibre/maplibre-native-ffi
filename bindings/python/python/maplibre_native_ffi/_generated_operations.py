@@ -31,8 +31,8 @@ from ._generated_values import (
     LatLngBounds,
     LogHandler,
     LogicalExtent,
-    LogSeverityMask,
-    MapDebugOption,
+    LogSeverityFlag,
+    MapDebugFlag,
     MapOptions,
     MapSnapshot,
     MapTileOptions,
@@ -68,8 +68,8 @@ from ._generated_values import (
     ResourceRequestCancelHandler,
     ResourceResponse,
     ResourceTransform,
+    RuntimeEventFlag,
     RuntimeEventHandler,
-    RuntimeEventMask,
     RuntimeOptions,
     ScreenPoint,
     SourceFeature,
@@ -938,7 +938,7 @@ class _MapHandleOperations(GeneratedOperations):
             source_id, tile_id, message
         )
 
-    def set_debug_options(self, options: MapDebugOption) -> Future[CommandCompletion]:
+    def set_debug_options(self, options: MapDebugFlag) -> Future[CommandCompletion]:
         """Submits a debug-overlay command.
 
         See `mln_map_set_debug_options` in the
@@ -946,7 +946,7 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.set_debug_options(options)
 
-    def set_event_mask(self, mask: RuntimeEventMask) -> Future[CommandCompletion]:
+    def set_event_mask(self, mask: RuntimeEventFlag) -> Future[CommandCompletion]:
         """Selects which map-originated event types this map queues.
 
         See `mln_map_set_event_mask` in the
@@ -1678,13 +1678,13 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.delete_offline_region(region_id)
 
-    def get_event_mask(self) -> RuntimeEventMask:
+    def get_event_mask(self) -> RuntimeEventFlag:
         """Reports which runtime-scoped event types this runtime queues.
 
         See `mln_runtime_get_event_mask` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
-        return RuntimeEventMask(self._native.get_event_mask())
+        return RuntimeEventFlag(self._native.get_event_mask())
 
     def get_offline_region(self, region_id: int) -> Future[OfflineRegionInfo | None]:
         """Starts getting one offline region by ID.
@@ -1770,7 +1770,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.set_event_handler(handler)
 
-    def set_event_mask(self, mask: RuntimeEventMask) -> None:
+    def set_event_mask(self, mask: RuntimeEventFlag) -> None:
         """Selects which runtime-scoped event types this runtime queues.
 
         See `mln_runtime_set_event_mask` in the
@@ -1937,7 +1937,7 @@ def log_clear_callback() -> None:
     return _native.log_clear_callback()
 
 
-def log_set_async_severity_mask(mask: LogSeverityMask) -> None:
+def log_set_async_severity_mask(mask: LogSeverityFlag) -> None:
     """Controls which log severities MapLibre Native may dispatch
     asynchronously.
 
@@ -2353,7 +2353,7 @@ class MapHandleDiscarding:
             source_id, tile_id, message
         )
 
-    def set_debug_options(self, options: MapDebugOption) -> None:
+    def set_debug_options(self, options: MapDebugFlag) -> None:
         """Submits a debug-overlay command.
 
         See `mln_map_set_debug_options` in the
@@ -2361,7 +2361,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_set_debug_options(options)
 
-    def set_event_mask(self, mask: RuntimeEventMask) -> None:
+    def set_event_mask(self, mask: RuntimeEventFlag) -> None:
         """Selects which map-originated event types this map queues.
 
         See `mln_map_set_event_mask` in the

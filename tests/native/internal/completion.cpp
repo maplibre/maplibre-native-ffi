@@ -109,8 +109,7 @@ auto drain_completions(mln_delivery_queue queue) -> QueuedCompletions {
       bytes + (index * view.delivery_size)
     );
     TEST_ASSERT_EQUAL_UINT32(MLN_DELIVERY_TYPE_COMPLETION, delivery->type);
-    drained.status =
-      static_cast<mln_status>(delivery->payload.completion.status);
+    drained.status = delivery->payload.completion.status;
     drained.user_data = delivery->user_data;
   }
   mln_delivery_batch_release(batch);

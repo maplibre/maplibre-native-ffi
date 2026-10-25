@@ -251,6 +251,6 @@ void main() {
           .toString(),
       'FrameDemandFlag.present | FrameDemandFlag.waitForUpdate | 0x100',
     );
-    expect(RuntimeEventMask.all.toString(), 'RuntimeEventMask.all');
+    expect(RuntimeEventFlag.all.toString(), 'RuntimeEventFlag.all');
   });
 }

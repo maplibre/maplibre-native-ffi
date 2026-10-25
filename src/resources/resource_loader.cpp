@@ -120,7 +120,7 @@ auto respond_immediately(
   return request;
 }
 
-auto resource_kind_to_abi(mln::Resource::Kind kind) -> uint32_t {
+auto resource_kind_to_abi(mln::Resource::Kind kind) -> mln_resource_kind {
   switch (kind) {
     case mln::Resource::Kind::Style:
       return MLN_RESOURCE_KIND_STYLE;

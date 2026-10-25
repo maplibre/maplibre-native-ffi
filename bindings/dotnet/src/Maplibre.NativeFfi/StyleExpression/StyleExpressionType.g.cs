@@ -9,9 +9,6 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_style_expression_type</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Kind">
-/// One of <c>mln_style_expression_type_kind</c>.
-/// </param>
 /// <param name="ItemKind">
 /// For an array, its items' kind; ignored for any other kind.
 /// </param>

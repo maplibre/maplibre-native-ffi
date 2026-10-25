@@ -105,7 +105,7 @@ Future<void> exitWithLiveCallbacks() async {
   await runtime.setResourceProvider(
     ResourceProvider(
       routes: [
-        ResourceRoute(kinds: ResourceKindMask.style, url: 'shutdown://style'),
+        ResourceRoute(kinds: ResourceKindFlag.style, url: 'shutdown://style'),
       ],
       callback: (_, request) {
         request.complete(

@@ -17,8 +17,8 @@ public readonly record struct HttpHeaderRule
     }
 
     public HttpHeaderRule(
-        ResourceKindMask Kinds,
-        UrlMatchFlags Flags,
+        ResourceKindFlag Kinds,
+        UrlMatchFlag Flags,
         string Url,
         ImmutableArray<HttpHeader> Headers
     )
@@ -32,12 +32,8 @@ public readonly record struct HttpHeaderRule
     /// <summary>
     /// The resource kinds to match.
     /// </summary>
-    public ResourceKindMask Kinds { get; init; }
-
-    /// <summary>
-    /// A bitwise OR of <c>mln_url_match_flags</c> values.
-    /// </summary>
-    public UrlMatchFlags Flags { get; init; }
+    public ResourceKindFlag Kinds { get; init; }
+    public UrlMatchFlag Flags { get; init; }
 
     /// <summary>
     /// The URL or glob pattern to compare.

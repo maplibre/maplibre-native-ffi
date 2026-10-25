@@ -31,7 +31,7 @@ auto check_pattern(
 ) -> mln_status {
   if (!validate_c_string_view(url, "url"))
     return reject(what, index, "has an invalid url");
-  if (kinds == 0 || (kinds & ~MLN_RESOURCE_KIND_MASK_ALL) != 0) {
+  if (kinds == 0 || (kinds & ~MLN_RESOURCE_KIND_FLAG_ALL) != 0) {
     return reject(what, index, "requires at least one known kind bit");
   }
   if ((flags & ~known_url_match_flags) != 0) {
@@ -127,14 +127,14 @@ UrlPattern::UrlPattern(
       ) {}
 
 auto UrlPattern::matches(
-  std::uint32_t request_kind, std::string_view candidate
+  mln_resource_kind request_kind, std::string_view candidate
 ) const noexcept -> bool {
   return matches_kind(kinds, request_kind) &&
          (glob != nullptr ? glob->matches(candidate) : url == candidate);
 }
 
 auto RouteTable::matches(
-  std::uint32_t kind, std::string_view resolved_url
+  mln_resource_kind kind, std::string_view resolved_url
 ) const noexcept -> bool {
   if (routes.empty()) return true;
   for (const auto& route : routes) {
@@ -215,7 +215,7 @@ auto copy_header_rules(
 }
 
 auto header_rules_callback(
-  void* user_data, std::uint32_t kind, const char* url,
+  void* user_data, mln_resource_kind kind, const char* url,
   mln_http_header_transform_response* out_response
 ) -> mln_status {
   if (user_data == nullptr || url == nullptr || out_response == nullptr) {

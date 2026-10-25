@@ -9,9 +9,6 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_runtime_event_render_frame</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Mode">
-/// One of <c>mln_render_mode</c>.
-/// </param>
 /// <param name="NeedsRepaint">
 /// Whether MapLibre needs another frame after this one.
 /// </param>

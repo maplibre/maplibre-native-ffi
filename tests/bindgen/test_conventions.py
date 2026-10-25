@@ -151,7 +151,7 @@ void use_options(const options *value);
 typedef enum decision : unsigned { PASS = 0, TAKE = 1 } decision;
 typedef unsigned long long request BIND("kind=handle;release=request_close");
 void request_close(request value);
-typedef unsigned (*provider)(void *context, request handle) BIND("enum=decision;failure=PASS");
+typedef decision (*provider)(void *context, request handle) BIND("failure=PASS");
 """
         with self.assertRaisesRegex(
             ModelError, "release names an absent function 'missing'"
@@ -185,13 +185,13 @@ mln_status watch(request value, const watcher *handler, mln_diagnostic *out_diag
     def test_a_callback_failure_must_be_a_result_it_can_return(self):
         source = """
 typedef enum decision : unsigned { PASS = 0, TAKE = 1 } decision;
-typedef unsigned (*provider)(void *context) BIND("enum=decision;failure=PASS");
+typedef decision (*provider)(void *context) BIND("failure=PASS");
 """
         validate(parse(source))
         for before, after, error in (
             ("failure=PASS", "failure=SKIP", "failure must name a value of decision"),
             ("failure=PASS", "failure=contain", "declares the failure it returns"),
-            (";failure=PASS", "", "declares the failure it returns"),
+            (' BIND("failure=PASS")', "", "declares the failure it returns"),
         ):
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):
                 validate(parse(source.replace(before, after)))

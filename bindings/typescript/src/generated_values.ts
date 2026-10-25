@@ -184,9 +184,6 @@ export interface CameraQueryResult {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface CameraTransitionEnd {
-  /**
-   * One of `mln_camera_transition_outcome`.
-   */
   readonly outcome: CameraTransitionOutcome;
   /**
    * Generation of the published snapshot that shows the camera where the
@@ -595,14 +592,11 @@ export type GesturePhase =
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface GpuSync {
-  /**
-   * One `mln_gpu_sync_kind` value.
-   */
   kind?: GpuSyncKind;
   /**
    * Bit pattern of the GLsync pointer.
    */
-  object?: bigint;
+  handle?: bigint;
 }
 
 /**
@@ -620,9 +614,9 @@ export const GpuSyncKind = {
   cpuComplete: 0,
   /**
    * GLsync in the shared EGL or WGL context's share group, used only by a
-   * caller-graphics-thread driver. object is nonzero.
+   * caller-graphics-thread driver. handle is nonzero.
    */
-  openglFence: 3,
+  openglFence: 1,
 } as const;
 /** One of the GpuSyncKind values, or a value this binding does not know. */
 export type GpuSyncKind =
@@ -650,11 +644,8 @@ export interface HttpHeaderRule {
   /**
    * The resource kinds to match.
    */
-  kinds?: ResourceKindMask;
-  /**
-   * A bitwise OR of `mln_url_match_flags` values.
-   */
-  flags?: UrlMatchFlags;
+  kinds?: ResourceKindFlag;
+  flags?: UrlMatchFlag;
   /**
    * The URL or glob pattern to compare.
    */
@@ -791,18 +782,18 @@ export type LogSeverity =
 /**
  * Bitmask values for log severities dispatched asynchronously.
  *
- * See `mln_log_severity_mask` in the
+ * See `mln_log_severity_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
-export const LogSeverityMask = {
+export const LogSeverityFlag = {
   info: 2,
   warning: 4,
   error: 8,
   defaultValue: 6,
   all: 14,
 } as const;
-/** A bitwise OR of LogSeverityMask flags. */
-export type LogSeverityMask = number;
+/** A bitwise OR of LogSeverityFlag flags. */
+export type LogSeverityFlag = number;
 
 /**
  * Logical extent in UI pixels and the device-pixel scale.
@@ -828,10 +819,10 @@ export interface LogicalExtent {
 /**
  * Debug overlay mask values for `mln_map_set_debug_options()`.
  *
- * See `mln_map_debug_option` in the
+ * See `mln_map_debug_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-export const MapDebugOption = {
+export const MapDebugFlag = {
   tileBorders: 2,
   parseStatus: 4,
   timestamps: 8,
@@ -840,8 +831,8 @@ export const MapDebugOption = {
   stencilClip: 64,
   depthBuffer: 128,
 } as const;
-/** A bitwise OR of MapDebugOption flags. */
-export type MapDebugOption = number;
+/** A bitwise OR of MapDebugFlag flags. */
+export type MapDebugFlag = number;
 
 /**
  * Map rendering modes used when creating a map.
@@ -879,7 +870,7 @@ export interface MapOptions {
    */
   initialExtent?: LogicalExtent;
   /**
-   * One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`.
+   * Defaults to `MLN_MAP_MODE_CONTINUOUS`.
    */
   mapMode?: MapMode;
   /**
@@ -889,9 +880,9 @@ export interface MapOptions {
   fastPforEnabled?: boolean;
   /**
    * Map-originated event types this map queues, as a bitwise OR of
-   * `mln_runtime_event_mask` values.
+   * `mln_runtime_event_flag` values.
    */
-  eventMask?: RuntimeEventMask;
+  eventMask?: RuntimeEventFlag;
 }
 
 /**
@@ -902,9 +893,9 @@ export interface MapOptions {
  */
 export interface MapSnapshot {
   /**
-   * Debug overlay mask of `mln_map_debug_option` values.
+   * Debug overlay mask of `mln_map_debug_flag` values.
    */
-  readonly debugOptions: MapDebugOption;
+  readonly debugOptions: MapDebugFlag;
   readonly generation: bigint;
   /**
    * True once every requested style and tile resource finished loading.
@@ -919,7 +910,7 @@ export interface MapSnapshot {
    * True while a camera command with a duration is still animating.
    */
   readonly transitionInProgress: boolean;
-  readonly eventMask: RuntimeEventMask;
+  readonly eventMask: RuntimeEventFlag;
   /**
    * Generation of the latest render update the map published. A rendered frame
    * at or past it draws map state that includes every command this snapshot
@@ -951,9 +942,6 @@ export interface MapTileOptions {
   lodScale?: number;
   lodPitchThreshold?: number;
   lodZoomShift?: number;
-  /**
-   * One of `mln_tile_lod_mode`.
-   */
   lodMode?: TileLodMode;
 }
 
@@ -994,17 +982,8 @@ export interface MapView {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface MapViewportOptions {
-  /**
-   * One of `mln_north_orientation`.
-   */
   northOrientation?: NorthOrientation;
-  /**
-   * One of `mln_constrain_mode`.
-   */
   constrainMode?: ConstrainMode;
-  /**
-   * One of `mln_viewport_mode`.
-   */
   viewportMode?: ViewportMode;
   frustumOffset?: EdgeInsets;
 }
@@ -1268,9 +1247,6 @@ export interface OfflineRegionInfo {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface OfflineRegionStatus {
-  /**
-   * One of `mln_offline_region_download_state`.
-   */
   readonly downloadState: OfflineRegionDownloadState;
   readonly completedResourceCount: bigint;
   readonly completedResourceSize: bigint;
@@ -1682,9 +1658,6 @@ export type RenderAbandonDisposition =
   | (number & {});
 
 export interface RenderAbandonResult {
-  /**
-   * One `mln_render_abandon_disposition` value.
-   */
   readonly disposition: RenderAbandonDisposition;
   /**
    * Backend resource groups intentionally retained until process exit.
@@ -1738,9 +1711,6 @@ export type RenderDriverKind =
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 export interface RenderFrameResult {
-  /**
-   * One `mln_render_result` value.
-   */
   readonly disposition: RenderResult;
   readonly token: bigint;
   /**
@@ -1819,11 +1789,11 @@ export const RenderResult = {
    * result does not cause a map update, so the host demands again when the
    * target can be ready, such as after a paced delay.
    */
-  targetNotReady: 3,
+  targetNotReady: 2,
   /**
    * A newer IF_NEEDED demand with the same flags replaced this demand.
    */
-  superseded: 4,
+  superseded: 3,
 } as const;
 /** One of the RenderResult values, or a value this binding does not know. */
 export type RenderResult =
@@ -1838,8 +1808,7 @@ export type RenderResult =
  */
 export interface RenderSessionAttachOptions {
   /**
-   * One `mln_render_driver_kind` value. Defaults to
-   * `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
+   * Defaults to `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
    */
   driver?: RenderDriverKind;
   /**
@@ -1881,18 +1850,12 @@ export interface RenderSessionAttachOptions {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface RenderSessionCapabilities {
-  /**
-   * One `mln_render_driver_kind` value.
-   */
   readonly driver: RenderDriverKind;
   /**
    * Granted texture ring depth: the slot count of a session-owned ring, or the
    * texture count of a borrowed one. Zero for a surface.
    */
   readonly textureRingDepth: number;
-  /**
-   * A bitwise OR of `mln_render_session_capability_flag` values.
-   */
   readonly flags: RenderSessionCapabilityFlag;
 }
 
@@ -1918,9 +1881,6 @@ export type RenderSessionCapabilityFlag = number;
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 export interface RenderSessionSnapshot {
-  /**
-   * One `mln_render_session_state` value.
-   */
   readonly state: RenderSessionState;
   /**
    * Logical extent applied by the driver.
@@ -2096,12 +2056,12 @@ export type ResourceKind =
 /**
  * The resource kinds that a route or rule matches, one bit per
  * `mln_resource_kind` value. Registration requires at least one known bit.
- * `MLN_RESOURCE_KIND_MASK_ALL` selects every resource kind.
+ * `MLN_RESOURCE_KIND_FLAG_ALL` selects every resource kind.
  *
- * See `mln_resource_kind_mask` in the
+ * See `mln_resource_kind_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-export const ResourceKindMask = {
+export const ResourceKindFlag = {
   unknown: 1,
   style: 2,
   source: 4,
@@ -2112,8 +2072,8 @@ export const ResourceKindMask = {
   image: 128,
   all: 255,
 } as const;
-/** A bitwise OR of ResourceKindMask flags. */
-export type ResourceKindMask = number;
+/** A bitwise OR of ResourceKindFlag flags. */
+export type ResourceKindFlag = number;
 
 export const ResourceLoadingMethod = {
   all: 0,
@@ -2249,11 +2209,8 @@ export interface ResourceRoute {
   /**
    * The resource kinds to match.
    */
-  kinds?: ResourceKindMask;
-  /**
-   * A bitwise OR of `mln_url_match_flags` values.
-   */
-  flags?: UrlMatchFlags;
+  kinds?: ResourceKindFlag;
+  flags?: UrlMatchFlag;
   /**
    * The URL or glob pattern to compare.
    */
@@ -2297,13 +2254,7 @@ export type ResourceUsage =
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface RuntimeEvent {
-  /**
-   * One of `mln_runtime_event_type`.
-   */
   readonly type: RuntimeEventType;
-  /**
-   * One of `mln_runtime_event_source_type`.
-   */
   readonly sourceType: RuntimeEventSourceType;
   /**
    * Source handle selected by source_type: an `mln_runtime` or an `mln_map`.
@@ -2330,20 +2281,12 @@ export interface RuntimeEvent {
 }
 
 /**
- * Runtime and map event delivery. Set either callback or queue.
- *
- * See `mln_runtime_event_handler` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-export type RuntimeEventHandler = (events: readonly RuntimeEvent[]) => void;
-
-/**
  * Bit values for the map and runtime event subscription masks.
  *
- * See `mln_runtime_event_mask` in the
+ * See `mln_runtime_event_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-export const RuntimeEventMask = {
+export const RuntimeEventFlag = {
   /**
    * Selects no event type.
    */
@@ -2356,32 +2299,40 @@ export const RuntimeEventMask = {
   mapLoadingFinished: 64n,
   mapLoadingFailed: 128n,
   mapIdle: 256n,
-  mapRenderError: 1024n,
-  mapRenderFrameStarted: 8192n,
-  mapRenderFrameFinished: 16384n,
-  mapRenderMapStarted: 32768n,
-  mapRenderMapFinished: 65536n,
-  mapStyleImageMissing: 131072n,
-  mapTileAction: 262144n,
-  offlineRegionStatusChanged: 524288n,
-  offlineRegionResponseError: 1048576n,
-  offlineRegionTileCountLimitExceeded: 2097152n,
-  mapSourceChanged: 8388608n,
+  mapRenderError: 512n,
+  mapRenderFrameStarted: 1024n,
+  mapRenderFrameFinished: 2048n,
+  mapRenderMapStarted: 4096n,
+  mapRenderMapFinished: 8192n,
+  mapStyleImageMissing: 16384n,
+  mapTileAction: 32768n,
+  mapSourceChanged: 65536n,
+  offlineRegionStatusChanged: 131072n,
+  offlineRegionResponseError: 262144n,
+  offlineRegionTileCountLimitExceeded: 524288n,
   /**
    * Selects every map-originated event type this version defines.
    */
-  allMapEvents: 8906238n,
+  allMapEvents: 131070n,
   /**
    * Selects every runtime-originated event type this version defines.
    */
-  allRuntimeEvents: 3670016n,
+  allRuntimeEvents: 917504n,
   /**
    * Selects every event type this version defines.
    */
-  all: 12576254n,
+  all: 1048574n,
 } as const;
-/** A bitwise OR of RuntimeEventMask flags. */
-export type RuntimeEventMask = bigint;
+/** A bitwise OR of RuntimeEventFlag flags. */
+export type RuntimeEventFlag = bigint;
+
+/**
+ * Runtime and map event delivery. Set either callback or queue.
+ *
+ * See `mln_runtime_event_handler` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+export type RuntimeEventHandler = (events: readonly RuntimeEvent[]) => void;
 
 /**
  * Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
@@ -2391,9 +2342,6 @@ export type RuntimeEventMask = bigint;
  */
 export interface RuntimeEventOfflineRegionResponseError {
   readonly regionId: bigint;
-  /**
-   * One of `mln_resource_error_reason`.
-   */
   readonly reason: ResourceErrorReason;
 }
 
@@ -2455,9 +2403,6 @@ export type RuntimeEventPayload =
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface RuntimeEventRenderFrame {
-  /**
-   * One of `mln_render_mode`.
-   */
   readonly mode: RenderMode;
   /**
    * Whether MapLibre needs another frame after this one.
@@ -2477,9 +2422,6 @@ export interface RuntimeEventRenderFrame {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface RuntimeEventRenderMap {
-  /**
-   * One of `mln_render_mode`.
-   */
   readonly mode: RenderMode;
 }
 
@@ -2505,9 +2447,6 @@ export type RuntimeEventSourceType =
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface RuntimeEventTileAction {
-  /**
-   * One of `mln_tile_operation`.
-   */
   readonly operation: TileOperation;
   readonly tileId: TileId;
 }
@@ -2527,17 +2466,17 @@ export const RuntimeEventType = {
   mapLoadingFinished: 6,
   mapLoadingFailed: 7,
   mapIdle: 8,
-  mapRenderError: 10,
-  mapRenderFrameStarted: 13,
-  mapRenderFrameFinished: 14,
-  mapRenderMapStarted: 15,
-  mapRenderMapFinished: 16,
-  mapStyleImageMissing: 17,
-  mapTileAction: 18,
-  offlineRegionStatusChanged: 19,
-  offlineRegionResponseError: 20,
-  offlineRegionTileCountLimitExceeded: 21,
-  mapSourceChanged: 23,
+  mapRenderError: 9,
+  mapRenderFrameStarted: 10,
+  mapRenderFrameFinished: 11,
+  mapRenderMapStarted: 12,
+  mapRenderMapFinished: 13,
+  mapStyleImageMissing: 14,
+  mapTileAction: 15,
+  mapSourceChanged: 16,
+  offlineRegionStatusChanged: 17,
+  offlineRegionResponseError: 18,
+  offlineRegionTileCountLimitExceeded: 19,
 } as const;
 /** One of the RuntimeEventType values, or a value this binding does not know. */
 export type RuntimeEventType =
@@ -2761,9 +2700,6 @@ export interface StyleExpressionOptions {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
  */
 export interface StyleExpressionType {
-  /**
-   * One of `mln_style_expression_type_kind`.
-   */
   kind?: StyleExpressionTypeKind;
   /**
    * For an array, its items' kind; ignored for any other kind.
@@ -2880,11 +2816,11 @@ export interface StyleImageOptions {
    */
   content?: ImageContent;
   /**
-   * One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK.
+   * Defaults to STRETCH_OR_SHRINK.
    */
   textFitWidth?: StyleImageTextFit;
   /**
-   * One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK.
+   * Defaults to STRETCH_OR_SHRINK.
    */
   textFitHeight?: StyleImageTextFit;
   /**
@@ -2944,9 +2880,6 @@ export interface StyleLayerInfo {
    * Highest zoom at which the layer draws; INFINITY with no upper bound.
    */
   readonly maxZoom: number;
-  /**
-   * One of `mln_style_layer_visibility`.
-   */
   readonly visibility: StyleLayerVisibility;
 }
 
@@ -2991,9 +2924,6 @@ export interface StyleSourceInfo {
    * Source ID.
    */
   readonly id: string;
-  /**
-   * One of `mln_style_source_type`.
-   */
   readonly type: StyleSourceType;
   /**
    * Whether the source is marked volatile.
@@ -3048,9 +2978,6 @@ export interface StyleSourceTileInfo {
    * Highest zoom level the TileJSON provides tiles for.
    */
   readonly maxZoom: number;
-  /**
-   * One of `mln_style_tile_scheme`.
-   */
   readonly scheme: StyleTileScheme;
 }
 
@@ -3236,18 +3163,18 @@ export interface UnitBezier {
 /**
  * How a rule or route compares its url against a request URL.
  *
- * See `mln_url_match_flags` in the
+ * See `mln_url_match_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-export const UrlMatchFlags = {
+export const UrlMatchFlag = {
   exact: 0,
   /**
    * Reads url as a glob pattern.
    */
   glob: 1,
 } as const;
-/** A bitwise OR of UrlMatchFlags flags. */
-export type UrlMatchFlags = number;
+/** A bitwise OR of UrlMatchFlag flags. */
+export type UrlMatchFlag = number;
 
 /**
  * Three-component vector used by free camera options.
@@ -3522,9 +3449,6 @@ export interface NativeWakeFields {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface WebglContextDescriptor {
-  /**
-   * One `mln_webgl_context_kind` value.
-   */
   kind?: WebglContextKind;
   /**
    * Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.

@@ -30,10 +30,10 @@ public enum RenderResult : uint
     /// result does not cause a map update, so the host demands again when the
     /// target can be ready, such as after a paced delay.
     /// </summary>
-    TargetNotReady = 3,
+    TargetNotReady = 2,
 
     /// <summary>
     /// A newer IF_NEEDED demand with the same flags replaced this demand.
     /// </summary>
-    Superseded = 4,
+    Superseded = 3,
 }

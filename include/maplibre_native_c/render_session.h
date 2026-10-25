@@ -45,9 +45,9 @@ typedef enum mln_render_result : uint32_t {
    * result does not cause a map update, so the host demands again when the
    * target can be ready, such as after a paced delay.
    */
-  MLN_RENDER_RESULT_TARGET_NOT_READY = 3,
+  MLN_RENDER_RESULT_TARGET_NOT_READY = 2,
   /** A newer IF_NEEDED demand with the same flags replaced this demand. */
-  MLN_RENDER_RESULT_SUPERSEDED = 4,
+  MLN_RENDER_RESULT_SUPERSEDED = 3,
 } mln_render_result;
 
 /** Render-session lifecycle visible in snapshots. */
@@ -93,6 +93,9 @@ typedef enum MLN_BINDING("kind=bitmask") mln_frame_demand_flag : uint32_t {
   MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 1U << 2U,
 } mln_frame_demand_flag;
 
+/** A set of mln_frame_demand_flag bits. */
+typedef uint32_t mln_frame_demand_flags;
+
 /** One nonblocking request for a frame. */
 typedef struct mln_frame_demand {
   uint32_t size;
@@ -100,7 +103,7 @@ typedef struct mln_frame_demand {
    * A bitwise OR of mln_frame_demand_flag values. Defaults to
    * MLN_FRAME_DEMAND_IF_NEEDED.
    */
-  uint32_t flags MLN_BINDING("enum=mln_frame_demand_flag");
+  mln_frame_demand_flags flags;
   /** Host identity returned with the terminal frame result. */
   uint64_t token;
 } mln_frame_demand;
@@ -115,8 +118,7 @@ typedef struct mln_frame_demand {
  */
 typedef struct mln_render_frame_result {
   uint32_t size;
-  /** One mln_render_result value. */
-  uint32_t disposition MLN_BINDING("enum=mln_render_result");
+  mln_render_result disposition;
   uint64_t token;
   /**
    * Generation of the map render update the demand evaluated. When disposition
@@ -179,8 +181,7 @@ typedef struct mln_render_frame_batch_view {
 /** Any-thread render-session snapshot. */
 typedef struct mln_render_session_snapshot {
   uint32_t size;
-  /** One mln_render_session_state value. */
-  uint32_t state MLN_BINDING("enum=mln_render_session_state");
+  mln_render_session_state state;
   /** Logical extent applied by the driver. */
   mln_logical_extent extent;
   /**
@@ -216,8 +217,7 @@ typedef enum mln_render_abandon_disposition : uint32_t {
 
 typedef struct mln_render_abandon_result {
   uint32_t size;
-  /** One mln_render_abandon_disposition value. */
-  uint32_t disposition MLN_BINDING("enum=mln_render_abandon_disposition");
+  mln_render_abandon_disposition disposition;
   /** Backend resource groups intentionally retained until process exit. */
   uint32_t quarantined_resource_count;
   uint32_t reserved MLN_BINDING("kind=reserved");
@@ -398,7 +398,7 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  * Returns:
  * - MLN_STATUS_OK when the frame is consumed and its slot retirement queued.
  * - MLN_STATUS_INVALID_ARGUMENT when frame is an invalid handle or
- *   consumer_completion is undersized, or an OpenGL fence has a zero object.
+ *   consumer_completion is undersized, or an OpenGL fence has a zero handle.
  * - MLN_STATUS_INVALID_STATE when frame has been released.
  * - MLN_STATUS_BUSY while a scope from mln_acquired_frame_view_begin() is
  *   active.

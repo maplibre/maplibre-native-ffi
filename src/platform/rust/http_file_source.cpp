@@ -89,7 +89,7 @@ auto isHTTPURL(const std::string& url) -> bool {
   return equalsIgnoringASCIICase("http") || equalsIgnoringASCIICase("https");
 }
 
-auto resourceKindToAbi(mln::Resource::Kind kind) -> std::uint32_t {
+auto resourceKindToAbi(mln::Resource::Kind kind) -> mln_resource_kind {
   switch (kind) {
     case mln::Resource::Kind::Style:
       return MLN_RESOURCE_KIND_STYLE;

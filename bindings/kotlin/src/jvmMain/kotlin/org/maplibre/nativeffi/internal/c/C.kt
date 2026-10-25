@@ -3595,7 +3595,7 @@ internal val mln_geojson_source_options: GroupLayout =
     Ffm.pad(1),
   )
 internal val mln_gpu_sync: GroupLayout =
-  Ffm.struct(JAVA_INT.withName("size"), JAVA_INT.withName("kind"), JAVA_LONG.withName("object"))
+  Ffm.struct(JAVA_INT.withName("size"), JAVA_INT.withName("kind"), JAVA_LONG.withName("handle"))
 internal val mln_http_header_rule: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("kinds"),

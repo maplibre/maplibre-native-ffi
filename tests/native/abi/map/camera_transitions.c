@@ -262,7 +262,7 @@ static void a_rendered_ease_completes_at_its_target(void) {
 static void an_unobserved_animation_publishes_its_final_snapshot(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_map_options_default();
-  options.event_mask = MLN_RUNTIME_EVENT_MASK_NONE;
+  options.event_mask = MLN_RUNTIME_EVENT_FLAG_NONE;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
   MLN_TEST_OK(mln_test_map_set_style_json(map, mln_test_background_style_json));
   mln_test_render_fixture fixture = {0};
@@ -372,7 +372,7 @@ static void an_immediate_command_completes_before_its_completion(void) {
 static void the_handler_runs_whatever_the_event_mask_selects(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_map_options_default();
-  options.event_mask = MLN_RUNTIME_EVENT_MASK_NONE;
+  options.event_mask = MLN_RUNTIME_EVENT_FLAG_NONE;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
 
   mln_test_transition_end probe;

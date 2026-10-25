@@ -87,7 +87,7 @@ mln_status install_provider(
   mln_runtime runtime, asset_store* store, const mln_completion* completion
 ) {
   const mln_resource_route route = {
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
     .flags = MLN_URL_MATCH_GLOB,
     .url = mln_buffer_view_from_cstr("app://**"),
   };

@@ -265,8 +265,8 @@ static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
   mln_gpu_sync producer = mln_gpu_sync_default();
   MLN_TEST_OK(mln_acquired_frame_get_producer_sync(first, &producer, NULL));
   TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_OPENGL_FENCE, producer.kind);
-  TEST_ASSERT_TRUE(is_sync((void*)(uintptr_t)producer.object));
-  wait_sync((void*)(uintptr_t)producer.object, 0, UINT64_MAX);
+  TEST_ASSERT_TRUE(is_sync((void*)(uintptr_t)producer.handle));
+  wait_sync((void*)(uintptr_t)producer.handle, 0, UINT64_MAX);
   uint32_t first_slot = UINT32_MAX;
   TEST_ASSERT_NOT_EQUAL_UINT64(
     0, mln_test_frame_texture_handle(first, &first_slot)
@@ -288,8 +288,8 @@ static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_acquired_frame_release(first, &consumer, MLN_TEST_DIAGNOSTIC)
   );
-  consumer.object = (uint64_t)(uintptr_t)fence_sync(0x9117, 0);
-  TEST_ASSERT_NOT_EQUAL_UINT64(0, consumer.object);
+  consumer.handle = (uint64_t)(uintptr_t)fence_sync(0x9117, 0);
+  TEST_ASSERT_NOT_EQUAL_UINT64(0, consumer.handle);
   flush();
   MLN_TEST_OK(mln_acquired_frame_release(first, &consumer, NULL));
   first = MLN_HANDLE_NULL;
@@ -297,7 +297,7 @@ static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
     MLN_STATUS_OK, &fixture,
     mln_render_session_barrier(fixture.session, &completion.descriptor, NULL)
   );
-  TEST_ASSERT_FALSE(is_sync((void*)(uintptr_t)consumer.object));
+  TEST_ASSERT_FALSE(is_sync((void*)(uintptr_t)consumer.handle));
 
   paint_background_blue(runtime, map);
   TEST_ASSERT_EQUAL_UINT32(
@@ -307,8 +307,8 @@ static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
   MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &second, NULL));
   MLN_TEST_OK(mln_acquired_frame_get_producer_sync(second, &producer, NULL));
   TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_OPENGL_FENCE, producer.kind);
-  TEST_ASSERT_TRUE(is_sync((void*)(uintptr_t)producer.object));
-  wait_sync((void*)(uintptr_t)producer.object, 0, UINT64_MAX);
+  TEST_ASSERT_TRUE(is_sync((void*)(uintptr_t)producer.handle));
+  wait_sync((void*)(uintptr_t)producer.handle, 0, UINT64_MAX);
   uint32_t second_slot = UINT32_MAX;
   TEST_ASSERT_NOT_EQUAL_UINT64(
     0, mln_test_frame_texture_handle(second, &second_slot)
@@ -328,7 +328,7 @@ static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
     MLN_STATUS_OK, &fixture,
     mln_render_session_detach(fixture.session, &completion.descriptor, NULL)
   );
-  TEST_ASSERT_FALSE(is_sync((void*)(uintptr_t)producer.object));
+  TEST_ASSERT_FALSE(is_sync((void*)(uintptr_t)producer.handle));
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

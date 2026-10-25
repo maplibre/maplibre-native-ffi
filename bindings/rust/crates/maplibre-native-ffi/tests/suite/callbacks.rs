@@ -332,13 +332,13 @@ fn a_provider_receives_only_the_requests_its_routes_match() {
             // Another kind: the style request below matches this pattern, so
             // a kind mask lost on the way to native would claim it.
             ResourceRoute {
-                kinds: ResourceKindMask::TILE,
-                flags: UrlMatchFlags::GLOB,
+                kinds: ResourceKindFlag::TILE,
+                flags: UrlMatchFlag::GLOB,
                 url: "**".to_owned(),
             },
             // Only a URL pattern: every kind under it reaches the provider.
             ResourceRoute {
-                flags: UrlMatchFlags::GLOB,
+                flags: UrlMatchFlag::GLOB,
                 url: "custom://routed/**".to_owned(),
                 ..Default::default()
             },

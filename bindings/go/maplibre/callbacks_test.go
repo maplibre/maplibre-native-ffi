@@ -383,11 +383,11 @@ func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {
 	requests := make(chan routed, 8)
 	deny := denyingProvider().Callback
 	allKindsRoute := DefaultResourceRoute()
-	allKindsRoute.Flags = UrlMatchFlagsGlob
+	allKindsRoute.Flags = UrlMatchFlagGlob
 	allKindsRoute.Url = "custom://any/**"
 	routes := []ResourceRoute{
-		{Kinds: ResourceKindMaskTile, Flags: UrlMatchFlagsGlob, Url: "**"},
-		{Kinds: ResourceKindMaskStyle, Url: "custom://routed/style.json"},
+		{Kinds: ResourceKindFlagTile, Flags: UrlMatchFlagGlob, Url: "**"},
+		{Kinds: ResourceKindFlagStyle, Url: "custom://routed/style.json"},
 		allKindsRoute,
 	}
 	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Routes: routes, Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) {

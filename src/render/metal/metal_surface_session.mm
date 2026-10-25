@@ -396,7 +396,7 @@ auto metal_surface_attach_start(
     };
   const auto capabilities = mln_render_session_capabilities{
     .size = sizeof(mln_render_session_capabilities),
-    .driver = 0,
+    .driver = {},
     .texture_ring_depth = 0,
     .flags = MLN_RENDER_SESSION_CAPABILITY_PRESENTATION
   };

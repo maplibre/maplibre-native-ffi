@@ -15,9 +15,9 @@ typedef struct map_observer {
 mln_status select_map_events(mln_map map, const mln_completion* completion) {
   return mln_map_set_event_mask(
     map,
-    MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED |
-      MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED |
-      MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED,
+    MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED |
+      MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_FAILED |
+      MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_FRAME_FINISHED,
     completion, NULL
   );
 }

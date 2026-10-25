@@ -38,11 +38,11 @@ void main() {
     // from one dump could then reach the callback installed for the next.
     // Synchronous records reach the delivery queue before the dump's own
     // completion does, so awaiting a dump fences its records.
-    logSetAsyncSeverityMask(LogSeverityMask.none);
+    logSetAsyncSeverityMask(LogSeverityFlag.none);
     addTearDown(() async {
       final installed = logRegistrationProbeForTesting();
       logClearCallback();
-      logSetAsyncSeverityMask(LogSeverityMask.defaultValue);
+      logSetAsyncSeverityMask(LogSeverityFlag.defaultValue);
       // The next test finds no registration of this one still pending.
       if (installed != null) {
         await within(installed.released, 'the log registration release');

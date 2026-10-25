@@ -371,12 +371,12 @@ static void check_scenario_rows(
   }
 }
 
-// Each type in MLN_RUNTIME_EVENT_MASK_ALL has one row, the table has no other
+// Each type in MLN_RUNTIME_EVENT_FLAG_ALL has one row, the table has no other
 // row, and a row with no scenario says why.
 static void every_event_type_has_one_payload_row(void) {
   size_t types = 0;
   for (uint32_t type = 0; type < 64; type += 1) {
-    if ((MLN_RUNTIME_EVENT_MASK_ALL & (UINT64_C(1) << type)) == 0) {
+    if ((MLN_RUNTIME_EVENT_FLAG_ALL & (UINT64_C(1) << type)) == 0) {
       continue;
     }
     types += 1;
@@ -640,7 +640,7 @@ static void deny_requests(mln_runtime runtime) {
 static void failed_loads_report_their_text(void) {
   mln_runtime runtime = mln_test_create_runtime();
   deny_requests(runtime);
-  mln_map map = create_static_map(runtime, MLN_RUNTIME_EVENT_MASK_ALL);
+  mln_map map = create_static_map(runtime, MLN_RUNTIME_EVENT_FLAG_ALL);
   const scenario_context context = {.runtime = runtime, .map = map};
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
@@ -809,7 +809,7 @@ static void a_source_reports_the_description_its_tilejson_brings(void) {
 // a rendered still image, whose completion fences the check.
 static void a_map_created_with_an_empty_mask_queues_nothing(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = create_static_map(runtime, MLN_RUNTIME_EVENT_MASK_NONE);
+  mln_map map = create_static_map(runtime, MLN_RUNTIME_EVENT_FLAG_NONE);
   MLN_TEST_AWAIT_OK(mln_map_set_style_json(
     map, mln_test_background_style_json, &completion.descriptor, NULL
   ));

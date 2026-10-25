@@ -165,7 +165,7 @@ public extension RuntimeHandle {
       mln_runtime_set_offline_region_download_state(
         raw,
         bindingArg0,
-        bindingArg1.nativeValue(),
+        mln_offline_region_download_state(rawValue: bindingArg1.rawValue),
         completion,
         diagnostic
       )

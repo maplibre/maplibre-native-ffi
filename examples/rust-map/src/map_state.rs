@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use maplibre_native_ffi::{
     AnimationOptions, CameraDelta, CameraOptions, CameraUpdate, CameraUpdateMode, GesturePhase,
-    LatLng, MapHandle, MapMode, MapOptions, NativeFuture, RuntimeEventMask, RuntimeHandle,
+    LatLng, MapHandle, MapMode, MapOptions, NativeFuture, RuntimeEventFlag, RuntimeHandle,
     RuntimeOptions, ScreenPoint,
 };
 
@@ -35,7 +35,7 @@ impl MapState {
         let map_options = MapOptions {
             initial_extent: extent(viewport),
             map_mode: MapMode::Continuous,
-            event_mask: RuntimeEventMask::empty(),
+            event_mask: RuntimeEventFlag::empty(),
             ..MapOptions::default()
         };
         let (map, ready) = match runtime.create_map(&map_options) {

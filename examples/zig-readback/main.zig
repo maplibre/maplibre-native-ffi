@@ -93,7 +93,7 @@ pub fn main(init_args: std.process.Init) !void {
     const output_path = args.next() orelse "map.ppm";
 
     try maplibre.logSetAsyncSeverityMask(.{}, null);
-    defer maplibre.logSetAsyncSeverityMask(maplibre.LogSeverityMask.default, null) catch {};
+    defer maplibre.logSetAsyncSeverityMask(maplibre.LogSeverityFlag.default, null) catch {};
     try logAndValidateRenderBackend();
 
     // Setup calls report into one diagnostic, and a failure prints its details.

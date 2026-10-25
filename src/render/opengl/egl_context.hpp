@@ -13,7 +13,8 @@ namespace mln::core::opengl {
 class EglSharedContext final {
  public:
   EglSharedContext(
-    mln_egl_context_descriptor descriptor, std::uint32_t ownership
+    mln_egl_context_descriptor descriptor,
+    mln_opengl_context_ownership ownership
   );
   EglSharedContext(const EglSharedContext&) = delete;
   auto operator=(const EglSharedContext&) -> EglSharedContext& = delete;
@@ -46,7 +47,7 @@ class EglSharedContext final {
   void destroy();
 
   mln_egl_context_descriptor descriptor_{};
-  std::uint32_t ownership_ = MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED;
+  mln_opengl_context_ownership ownership_ = MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED;
   EGLContext context_ = EGL_NO_CONTEXT;
   EGLSurface pbuffer_surface_ = EGL_NO_SURFACE;
   EGLDisplay previous_display_ = EGL_NO_DISPLAY;

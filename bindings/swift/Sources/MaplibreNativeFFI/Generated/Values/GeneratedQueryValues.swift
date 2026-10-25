@@ -152,8 +152,8 @@ public struct RenderedQueryGeometry: Equatable, Hashable, Sendable {
     recordBytes: UnsafeRawBufferPointer? = nil
   ) throws {
     data = try { () throws -> RenderedQueryGeometryData in
-      switch raw
-        .type
+      switch raw.type
+        .rawValue
       {
       case MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT
         .rawValue: return .point(ScreenPoint(raw: raw.data
@@ -163,7 +163,7 @@ public struct RenderedQueryGeometry: Equatable, Hashable, Sendable {
                   .rawValue: return try .lineString(ScreenLineString(raw: raw
             .data
             .line_string)) default: return .unknown(
-          raw.type,
+          raw.type.rawValue,
           recordBytes
             .map {
               Data($0
@@ -181,12 +181,13 @@ public struct RenderedQueryGeometry: Equatable, Hashable, Sendable {
     var raw = mln_rendered_query_geometry()
     raw.size = UInt32(MemoryLayout<mln_rendered_query_geometry>.size)
     switch data {
-    case let .point(item): raw.type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT
-      .rawValue; raw.data.point = item.nativeValue()
-    case let .box(item): raw.type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX
-      .rawValue; raw.data.box = item.nativeValue()
+    case let .point(item): raw
+      .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT; raw.data.point = item
+      .nativeValue()
+    case let .box(item): raw.type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX; raw
+      .data.box = item.nativeValue()
     case let .lineString(item): raw
-      .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING.rawValue; raw.data
+      .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING; raw.data
       .line_string = try item.nativeValue(arena: arena)
     case .unknown: throw MaplibreError
       .invalidArgument("unknown union variant cannot be submitted")

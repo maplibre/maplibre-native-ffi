@@ -684,7 +684,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_set_debug_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn setDebugOptions(self: Map, options: MapDebugOption, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    pub fn setDebugOptions(self: Map, options: MapDebugFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_debug_options", .handle, self, call.command, null, diagnostic, .{options});
     }
 
@@ -692,7 +692,7 @@ pub const Map = struct {
     ///
     /// See `mln_map_set_event_mask` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn setEventMask(self: Map, mask: RuntimeEventMask, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    pub fn setEventMask(self: Map, mask: RuntimeEventFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_event_mask", .handle, self, call.command, null, diagnostic, .{mask});
     }
 
@@ -1430,8 +1430,8 @@ pub const Runtime = struct {
     ///
     /// See `mln_runtime_get_event_mask` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn getEventMask(self: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!RuntimeEventMask {
-        return call.invoke("mln_runtime_get_event_mask", .handle, self, null, diagnostic, .{call.out(RuntimeEventMask)});
+    pub fn getEventMask(self: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!RuntimeEventFlag {
+        return call.invoke("mln_runtime_get_event_mask", .handle, self, null, diagnostic, .{call.out(RuntimeEventFlag)});
     }
 
     /// Starts getting one offline region by ID.
@@ -1504,7 +1504,7 @@ pub const Runtime = struct {
     ///
     /// See `mln_runtime_set_event_mask` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn setEventMask(self: Runtime, mask: RuntimeEventMask, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn setEventMask(self: Runtime, mask: RuntimeEventFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         return call.invoke("mln_runtime_set_event_mask", .handle, self, null, diagnostic, .{mask});
     }
 
@@ -1854,7 +1854,6 @@ pub const CameraQueryResult = struct {
 /// See `mln_camera_transition_end` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const CameraTransitionEnd = struct {
-    /// One of `mln_camera_transition_outcome`.
     outcome: CameraTransitionOutcome = .completed,
     /// Generation of the published snapshot that shows the camera where the
     /// transitions left it. The map events of the change that ended them carry
@@ -2532,20 +2531,19 @@ pub const GesturePhase = enum(u32) {
 /// See `mln_gpu_sync` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const GpuSync = struct {
-    /// One `mln_gpu_sync_kind` value.
     kind: GpuSyncKind,
     /// Bit pattern of the GLsync pointer.
-    object: u64,
+    handle: u64,
     pub fn toNative(self: GpuSync) c.mln_gpu_sync {
         var raw = c.mln_gpu_sync_default();
         raw.kind = self.kind.toNative();
-        raw.object = self.object;
+        raw.handle = self.handle;
         return raw;
     }
     pub fn fromNative(raw: c.mln_gpu_sync) GpuSync {
         return .{
             .kind = GpuSyncKind.fromNative(raw.kind),
-            .object = raw.object,
+            .handle = raw.handle,
         };
     }
 };
@@ -2560,8 +2558,8 @@ pub const GpuSyncKind = enum(u32) {
     /// acquirable or before the release call.
     cpu_complete = 0,
     /// GLsync in the shared EGL or WGL context's share group, used only by a
-    /// caller-graphics-thread driver. object is nonzero.
-    opengl_fence = 3,
+    /// caller-graphics-thread driver. handle is nonzero.
+    opengl_fence = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -2595,9 +2593,8 @@ pub const HttpHeader = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const HttpHeaderRule = struct {
     /// The resource kinds to match.
-    kinds: ResourceKindMask,
-    /// A bitwise OR of `mln_url_match_flags` values.
-    flags: UrlMatchFlags,
+    kinds: ResourceKindFlag,
+    flags: UrlMatchFlag,
     /// The URL or glob pattern to compare.
     url: []const u8,
     /// The headers to set. Registration validates each one as
@@ -2619,8 +2616,8 @@ pub const HttpHeaderRule = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_http_header_rule) status.Error!HttpHeaderRule {
         return .{
-            .kinds = ResourceKindMask.fromNative(raw.kinds),
-            .flags = UrlMatchFlags.fromNative(raw.flags),
+            .kinds = ResourceKindFlag.fromNative(raw.kinds),
+            .flags = UrlMatchFlag.fromNative(raw.flags),
             .url = try marshal.copyView(allocator, raw.url),
             .headers = blk: {
                 const copied = try allocator.alloc(HttpHeader, raw.header_count);
@@ -2913,9 +2910,9 @@ pub const LogSeverity = enum(u32) {
 
 /// Bitmask values for log severities dispatched asynchronously.
 ///
-/// See `mln_log_severity_mask` in the
+/// See `mln_log_severity_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-pub const LogSeverityMask = struct {
+pub const LogSeverityFlag = struct {
     info: bool = false,
     warning: bool = false,
     @"error": bool = false,
@@ -2924,8 +2921,8 @@ pub const LogSeverityMask = struct {
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
-    pub const default: LogSeverityMask = .{ .info = true, .warning = true };
-    pub const all: LogSeverityMask = .{ .info = true, .warning = true, .@"error" = true };
+    pub const default: LogSeverityFlag = .{ .info = true, .warning = true };
+    pub const all: LogSeverityFlag = .{ .info = true, .warning = true, .@"error" = true };
 };
 
 /// Logical extent in UI pixels and the device-pixel scale.
@@ -2957,9 +2954,9 @@ pub const LogicalExtent = struct {
 
 /// Debug overlay mask values for `mln_map_set_debug_options()`.
 ///
-/// See `mln_map_debug_option` in the
+/// See `mln_map_debug_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const MapDebugOption = struct {
+pub const MapDebugFlag = struct {
     tile_borders: bool = false,
     parse_status: bool = false,
     timestamps: bool = false,
@@ -2999,14 +2996,14 @@ pub const MapOptions = struct {
     /// scale_factor must be finite and positive. scale_factor is fixed for the
     /// map's lifetime.
     initial_extent: LogicalExtent,
-    /// One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`.
+    /// Defaults to `MLN_MAP_MODE_CONTINUOUS`.
     map_mode: MapMode,
     /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
     /// encodings. Defaults to false.
     fast_pfor_enabled: bool,
     /// Map-originated event types this map queues, as a bitwise OR of
-    /// `mln_runtime_event_mask` values.
-    event_mask: RuntimeEventMask,
+    /// `mln_runtime_event_flag` values.
+    event_mask: RuntimeEventFlag,
     pub fn toNative(self: MapOptions) c.mln_map_options {
         var raw = c.mln_map_options_default();
         raw.initial_extent = self.initial_extent.toNative();
@@ -3020,7 +3017,7 @@ pub const MapOptions = struct {
             .initial_extent = LogicalExtent.fromNative(raw.initial_extent),
             .map_mode = MapMode.fromNative(raw.map_mode),
             .fast_pfor_enabled = raw.fast_pfor_enabled,
-            .event_mask = RuntimeEventMask.fromNative(raw.event_mask),
+            .event_mask = RuntimeEventFlag.fromNative(raw.event_mask),
         };
     }
 };
@@ -3030,8 +3027,8 @@ pub const MapOptions = struct {
 /// See `mln_map_snapshot` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const MapSnapshot = struct {
-    /// Debug overlay mask of `mln_map_debug_option` values.
-    debug_options: MapDebugOption = .{},
+    /// Debug overlay mask of `mln_map_debug_flag` values.
+    debug_options: MapDebugFlag = .{},
     generation: u64 = 0,
     /// True once every requested style and tile resource finished loading.
     fully_loaded: bool = false,
@@ -3040,7 +3037,7 @@ pub const MapSnapshot = struct {
     gesture_in_progress: bool = false,
     /// True while a camera command with a duration is still animating.
     transition_in_progress: bool = false,
-    event_mask: RuntimeEventMask = .{},
+    event_mask: RuntimeEventFlag = .{},
     /// Generation of the latest render update the map published. A rendered
     /// frame at or past it draws map state that includes every command this
     /// snapshot observes, though animations and resource loads finish in later
@@ -3054,13 +3051,13 @@ pub const MapSnapshot = struct {
     view: MapView,
     pub fn fromNative(raw: c.mln_map_snapshot) MapSnapshot {
         return .{
-            .debug_options = MapDebugOption.fromNative(raw.debug_options),
+            .debug_options = MapDebugFlag.fromNative(raw.debug_options),
             .generation = raw.generation,
             .fully_loaded = raw.fully_loaded,
             .rendering_stats_view_enabled = raw.rendering_stats_view_enabled,
             .gesture_in_progress = raw.gesture_in_progress,
             .transition_in_progress = raw.transition_in_progress,
-            .event_mask = RuntimeEventMask.fromNative(raw.event_mask),
+            .event_mask = RuntimeEventFlag.fromNative(raw.event_mask),
             .latest_render_update_generation = raw.latest_render_update_generation,
             .tile = MapTileOptions.fromNative(raw.tile),
             .bounds = BoundOptions.fromNative(raw.bounds),
@@ -3081,7 +3078,6 @@ pub const MapTileOptions = struct {
     lod_scale: ?f64 = null,
     lod_pitch_threshold: ?f64 = null,
     lod_zoom_shift: ?f64 = null,
-    /// One of `mln_tile_lod_mode`.
     lod_mode: ?TileLodMode = null,
     pub fn toNative(self: MapTileOptions) c.mln_map_tile_options {
         var raw = c.mln_map_tile_options_default();
@@ -3148,11 +3144,8 @@ pub const MapView = struct {
 /// See `mln_map_viewport_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const MapViewportOptions = struct {
-    /// One of `mln_north_orientation`.
     north_orientation: ?NorthOrientation = null,
-    /// One of `mln_constrain_mode`.
     constrain_mode: ?ConstrainMode = null,
-    /// One of `mln_viewport_mode`.
     viewport_mode: ?ViewportMode = null,
     frustum_offset: ?EdgeInsets = null,
     pub fn toNative(self: MapViewportOptions) c.mln_map_viewport_options {
@@ -3491,7 +3484,6 @@ pub const OfflineRegionInfo = struct {
 /// See `mln_offline_region_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const OfflineRegionStatus = struct {
-    /// One of `mln_offline_region_download_state`.
     download_state: OfflineRegionDownloadState = .inactive,
     completed_resource_count: u64 = 0,
     completed_resource_size: u64 = 0,
@@ -4040,7 +4032,6 @@ pub const RenderAbandonDisposition = enum(u32) {
 };
 
 pub const RenderAbandonResult = struct {
-    /// One `mln_render_abandon_disposition` value.
     disposition: RenderAbandonDisposition = .clean,
     /// Backend resource groups intentionally retained until process exit.
     quarantined_resource_count: u32 = 0,
@@ -4090,7 +4081,6 @@ pub const RenderDriverKind = enum(u32) {
 /// See `mln_render_frame_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub const RenderFrameResult = struct {
-    /// One `mln_render_result` value.
     disposition: RenderResult = .rendered,
     token: u64 = 0,
     /// Generation of the map render update the demand evaluated. When
@@ -4161,9 +4151,9 @@ pub const RenderResult = enum(u32) {
     /// later demand with the same flags renders what this one would have. This
     /// result does not cause a map update, so the host demands again when the
     /// target can be ready, such as after a paced delay.
-    target_not_ready = 3,
+    target_not_ready = 2,
     /// A newer IF_NEEDED demand with the same flags replaced this demand.
-    superseded = 4,
+    superseded = 3,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -4174,8 +4164,7 @@ pub const RenderResult = enum(u32) {
 /// See `mln_render_session_attach_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const RenderSessionAttachOptions = struct {
-    /// One `mln_render_driver_kind` value. Defaults to
-    /// `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
+    /// Defaults to `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
     driver: RenderDriverKind,
     /// Requested slot count of a session-owned texture ring, from one to
     /// `MLN_TEXTURE_RING_MAX_DEPTH`. Private targets grant one slot regardless
@@ -4228,12 +4217,10 @@ pub const RenderSessionAttachOptions = struct {
 /// See `mln_render_session_capabilities` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const RenderSessionCapabilities = struct {
-    /// One `mln_render_driver_kind` value.
     driver: RenderDriverKind = @fromBackingInt(@intCast(0)),
     /// Granted texture ring depth: the slot count of a session-owned ring, or
     /// the texture count of a borrowed one. Zero for a surface.
     texture_ring_depth: u32 = 0,
-    /// A bitwise OR of `mln_render_session_capability_flag` values.
     flags: RenderSessionCapabilityFlag = .{},
     pub fn fromNative(raw: c.mln_render_session_capabilities) RenderSessionCapabilities {
         return .{
@@ -4265,7 +4252,6 @@ pub const RenderSessionCapabilityFlag = struct {
 /// See `mln_render_session_snapshot` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub const RenderSessionSnapshot = struct {
-    /// One `mln_render_session_state` value.
     state: RenderSessionState = @fromBackingInt(@intCast(0)),
     /// Logical extent applied by the driver.
     extent: LogicalExtent,
@@ -4484,11 +4470,11 @@ pub const ResourceKind = enum(u32) {
 
 /// The resource kinds that a route or rule matches, one bit per
 /// `mln_resource_kind` value. Registration requires at least one known bit.
-/// `MLN_RESOURCE_KIND_MASK_ALL` selects every resource kind.
+/// `MLN_RESOURCE_KIND_FLAG_ALL` selects every resource kind.
 ///
-/// See `mln_resource_kind_mask` in the
+/// See `mln_resource_kind_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub const ResourceKindMask = struct {
+pub const ResourceKindFlag = struct {
     unknown: bool = false,
     style: bool = false,
     source: bool = false,
@@ -4502,7 +4488,7 @@ pub const ResourceKindMask = struct {
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
-    pub const all: ResourceKindMask = .{ .unknown = true, .style = true, .source = true, .tile = true, .glyphs = true, .sprite_image = true, .sprite_json = true, .image = true };
+    pub const all: ResourceKindFlag = .{ .unknown = true, .style = true, .source = true, .tile = true, .glyphs = true, .sprite_image = true, .sprite_json = true, .image = true };
 };
 
 pub const ResourceLoadingMethod = enum(u32) {
@@ -4773,9 +4759,8 @@ pub const ResourceResponseStatus = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceRoute = struct {
     /// The resource kinds to match.
-    kinds: ResourceKindMask,
-    /// A bitwise OR of `mln_url_match_flags` values.
-    flags: UrlMatchFlags,
+    kinds: ResourceKindFlag,
+    flags: UrlMatchFlag,
     /// The URL or glob pattern to compare.
     url: []const u8,
     pub fn toNative(self: ResourceRoute) status.Error!c.mln_resource_route {
@@ -4788,8 +4773,8 @@ pub const ResourceRoute = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_route) status.Error!ResourceRoute {
         return .{
-            .kinds = ResourceKindMask.fromNative(raw.kinds),
-            .flags = UrlMatchFlags.fromNative(raw.flags),
+            .kinds = ResourceKindFlag.fromNative(raw.kinds),
+            .flags = UrlMatchFlag.fromNative(raw.flags),
             .url = try marshal.copyView(allocator, raw.url),
         };
     }
@@ -4879,9 +4864,7 @@ pub const ResourceUsage = enum(u32) {
 /// See `mln_runtime_event` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEvent = struct {
-    /// One of `mln_runtime_event_type`.
     type: RuntimeEventType = @fromBackingInt(@intCast(0)),
-    /// One of `mln_runtime_event_source_type`.
     source_type: RuntimeEventSourceType = .runtime,
     /// Source handle selected by source_type: an `mln_runtime` or an `mln_map`.
     source: u64 = 0,
@@ -4890,7 +4873,7 @@ pub const RuntimeEvent = struct {
     generation: u64 = 0,
     /// Secondary event detail whose meaning type selects; see
     /// `mln_runtime_event_type`.
-    code: i32 = 0,
+    code: u32 = 0,
     /// Borrowed UTF-8 message bytes, empty when this event carries no message.
     message: []const u8 = &.{},
     /// Typed payload selected by payload_type.
@@ -4916,6 +4899,41 @@ pub const RuntimeEvent = struct {
             },
         };
     }
+};
+
+/// Bit values for the map and runtime event subscription masks.
+///
+/// See `mln_runtime_event_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const RuntimeEventFlag = struct {
+    map_camera_will_change: bool = false,
+    map_camera_is_changing: bool = false,
+    map_camera_did_change: bool = false,
+    map_style_loaded: bool = false,
+    map_loading_started: bool = false,
+    map_loading_finished: bool = false,
+    map_loading_failed: bool = false,
+    map_idle: bool = false,
+    map_render_error: bool = false,
+    map_render_frame_started: bool = false,
+    map_render_frame_finished: bool = false,
+    map_render_map_started: bool = false,
+    map_render_map_finished: bool = false,
+    map_style_image_missing: bool = false,
+    map_tile_action: bool = false,
+    map_source_changed: bool = false,
+    offline_region_status_changed: bool = false,
+    offline_region_response_error: bool = false,
+    offline_region_tile_count_limit_exceeded: bool = false,
+    unknown_bits: u64 = 0,
+    pub const native_bits = [_]u64{ 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288 };
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+    pub const none: RuntimeEventFlag = .{};
+    pub const all_map_events: RuntimeEventFlag = .{ .map_camera_will_change = true, .map_camera_is_changing = true, .map_camera_did_change = true, .map_style_loaded = true, .map_loading_started = true, .map_loading_finished = true, .map_loading_failed = true, .map_idle = true, .map_render_error = true, .map_render_frame_started = true, .map_render_frame_finished = true, .map_render_map_started = true, .map_render_map_finished = true, .map_style_image_missing = true, .map_tile_action = true, .map_source_changed = true };
+    pub const all_runtime_events: RuntimeEventFlag = .{ .offline_region_status_changed = true, .offline_region_response_error = true, .offline_region_tile_count_limit_exceeded = true };
+    pub const all: RuntimeEventFlag = .{ .map_camera_will_change = true, .map_camera_is_changing = true, .map_camera_did_change = true, .map_style_loaded = true, .map_loading_started = true, .map_loading_finished = true, .map_loading_failed = true, .map_idle = true, .map_render_error = true, .map_render_frame_started = true, .map_render_frame_finished = true, .map_render_map_started = true, .map_render_map_finished = true, .map_style_image_missing = true, .map_tile_action = true, .map_source_changed = true, .offline_region_status_changed = true, .offline_region_response_error = true, .offline_region_tile_count_limit_exceeded = true };
 };
 
 /// Runtime and map event delivery. Set either callback or queue.
@@ -4988,48 +5006,12 @@ pub const RuntimeEventHandler = struct {
     }
 };
 
-/// Bit values for the map and runtime event subscription masks.
-///
-/// See `mln_runtime_event_mask` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub const RuntimeEventMask = struct {
-    map_camera_will_change: bool = false,
-    map_camera_is_changing: bool = false,
-    map_camera_did_change: bool = false,
-    map_style_loaded: bool = false,
-    map_loading_started: bool = false,
-    map_loading_finished: bool = false,
-    map_loading_failed: bool = false,
-    map_idle: bool = false,
-    map_render_error: bool = false,
-    map_render_frame_started: bool = false,
-    map_render_frame_finished: bool = false,
-    map_render_map_started: bool = false,
-    map_render_map_finished: bool = false,
-    map_style_image_missing: bool = false,
-    map_tile_action: bool = false,
-    offline_region_status_changed: bool = false,
-    offline_region_response_error: bool = false,
-    offline_region_tile_count_limit_exceeded: bool = false,
-    map_source_changed: bool = false,
-    unknown_bits: u64 = 0,
-    pub const native_bits = [_]u64{ 2, 4, 8, 16, 32, 64, 128, 256, 1024, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 8388608 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-    pub const none: RuntimeEventMask = .{};
-    pub const all_map_events: RuntimeEventMask = .{ .map_camera_will_change = true, .map_camera_is_changing = true, .map_camera_did_change = true, .map_style_loaded = true, .map_loading_started = true, .map_loading_finished = true, .map_loading_failed = true, .map_idle = true, .map_render_error = true, .map_render_frame_started = true, .map_render_frame_finished = true, .map_render_map_started = true, .map_render_map_finished = true, .map_style_image_missing = true, .map_tile_action = true, .map_source_changed = true };
-    pub const all_runtime_events: RuntimeEventMask = .{ .offline_region_status_changed = true, .offline_region_response_error = true, .offline_region_tile_count_limit_exceeded = true };
-    pub const all: RuntimeEventMask = .{ .map_camera_will_change = true, .map_camera_is_changing = true, .map_camera_did_change = true, .map_style_loaded = true, .map_loading_started = true, .map_loading_finished = true, .map_loading_failed = true, .map_idle = true, .map_render_error = true, .map_render_frame_started = true, .map_render_frame_finished = true, .map_render_map_started = true, .map_render_map_finished = true, .map_style_image_missing = true, .map_tile_action = true, .offline_region_status_changed = true, .offline_region_response_error = true, .offline_region_tile_count_limit_exceeded = true, .map_source_changed = true };
-};
-
 /// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
 ///
 /// See `mln_runtime_event_offline_region_response_error` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventOfflineRegionResponseError = struct {
     region_id: i64 = 0,
-    /// One of `mln_resource_error_reason`.
     reason: ResourceErrorReason = .none,
     pub fn fromNative(raw: c.mln_runtime_event_offline_region_response_error) RuntimeEventOfflineRegionResponseError {
         return .{
@@ -5089,7 +5071,6 @@ pub const RuntimeEventPayload = union(enum) {
 /// See `mln_runtime_event_render_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventRenderFrame = struct {
-    /// One of `mln_render_mode`.
     mode: RenderMode = .partial,
     /// Whether MapLibre needs another frame after this one.
     needs_repaint: bool = false,
@@ -5111,7 +5092,6 @@ pub const RuntimeEventRenderFrame = struct {
 /// See `mln_runtime_event_render_map` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventRenderMap = struct {
-    /// One of `mln_render_mode`.
     mode: RenderMode = .partial,
     pub fn fromNative(raw: c.mln_runtime_event_render_map) RuntimeEventRenderMap {
         return .{
@@ -5137,7 +5117,6 @@ pub const RuntimeEventSourceType = enum(u32) {
 /// See `mln_runtime_event_tile_action` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventTileAction = struct {
-    /// One of `mln_tile_operation`.
     operation: TileOperation = .requested_from_cache,
     tile_id: TileId = .{},
     pub fn fromNative(raw: c.mln_runtime_event_tile_action) RuntimeEventTileAction {
@@ -5161,17 +5140,17 @@ pub const RuntimeEventType = enum(u32) {
     map_loading_finished = 6,
     map_loading_failed = 7,
     map_idle = 8,
-    map_render_error = 10,
-    map_render_frame_started = 13,
-    map_render_frame_finished = 14,
-    map_render_map_started = 15,
-    map_render_map_finished = 16,
-    map_style_image_missing = 17,
-    map_tile_action = 18,
-    offline_region_status_changed = 19,
-    offline_region_response_error = 20,
-    offline_region_tile_count_limit_exceeded = 21,
-    map_source_changed = 23,
+    map_render_error = 9,
+    map_render_frame_started = 10,
+    map_render_frame_finished = 11,
+    map_render_map_started = 12,
+    map_render_map_finished = 13,
+    map_style_image_missing = 14,
+    map_tile_action = 15,
+    map_source_changed = 16,
+    offline_region_status_changed = 17,
+    offline_region_response_error = 18,
+    offline_region_tile_count_limit_exceeded = 19,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -5479,7 +5458,6 @@ pub const StyleExpressionOptions = struct {
 /// See `mln_style_expression_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 pub const StyleExpressionType = struct {
-    /// One of `mln_style_expression_type_kind`.
     kind: StyleExpressionTypeKind = .value,
     /// For an array, its items' kind; ignored for any other kind.
     item_kind: StyleExpressionTypeKind = .value,
@@ -5589,9 +5567,9 @@ pub const StyleImageOptions = struct {
     stretch_y: ?[]const ImageStretch = null,
     /// Content box used when icon-text-fit applies.
     content: ?ImageContent = null,
-    /// One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK.
+    /// Defaults to STRETCH_OR_SHRINK.
     text_fit_width: ?StyleImageTextFit = null,
-    /// One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK.
+    /// Defaults to STRETCH_OR_SHRINK.
     text_fit_height: ?StyleImageTextFit = null,
     /// Sprite pixel ratio. Defaults to 1.
     pixel_ratio: ?f32 = null,
@@ -5678,7 +5656,6 @@ pub const StyleLayerInfo = struct {
     min_zoom: f64 = 0,
     /// Highest zoom at which the layer draws; INFINITY with no upper bound.
     max_zoom: f64 = 0,
-    /// One of `mln_style_layer_visibility`.
     visibility: StyleLayerVisibility = .visible,
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_layer_info) status.Error!StyleLayerInfo {
@@ -5725,7 +5702,6 @@ pub const StyleRasterDemEncoding = enum(u32) {
 pub const StyleSourceInfo = struct {
     /// Source ID.
     id: []const u8 = &.{},
-    /// One of `mln_style_source_type`.
     type: StyleSourceType = .unknown,
     /// Whether the source is marked volatile.
     is_volatile: bool = false,
@@ -5771,7 +5747,6 @@ pub const StyleSourceTileInfo = struct {
     min_zoom: f64 = 0,
     /// Highest zoom level the TileJSON provides tiles for.
     max_zoom: f64 = 0,
-    /// One of `mln_style_tile_scheme`.
     scheme: StyleTileScheme = .xyz,
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_source_tile_info) status.Error!StyleSourceTileInfo {
@@ -5983,9 +5958,9 @@ pub const UnitBezier = struct {
 
 /// How a rule or route compares its url against a request URL.
 ///
-/// See `mln_url_match_flags` in the
+/// See `mln_url_match_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub const UrlMatchFlags = struct {
+pub const UrlMatchFlag = struct {
     /// Reads url as a glob pattern.
     glob: bool = false,
     unknown_bits: u32 = 0,
@@ -5993,7 +5968,7 @@ pub const UrlMatchFlags = struct {
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
-    pub const exact: UrlMatchFlags = .{};
+    pub const exact: UrlMatchFlag = .{};
 };
 
 /// Three-component vector used by free camera options.
@@ -6329,7 +6304,6 @@ pub const Wake = struct {
 /// See `mln_webgl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const WebglContextDescriptor = struct {
-    /// One `mln_webgl_context_kind` value.
     kind: WebglContextKind = .existing,
     /// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
     context: i32 = 0,
@@ -6575,7 +6549,7 @@ pub fn logClearCallback(diagnostic: ?*diagnostics.Diagnostic) status.Error!void 
 ///
 /// See `mln_log_set_async_severity_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-pub fn logSetAsyncSeverityMask(mask: LogSeverityMask, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+pub fn logSetAsyncSeverityMask(mask: LogSeverityFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     return call.invoke("mln_log_set_async_severity_mask", .none, {}, null, diagnostic, .{mask});
 }
 
@@ -7024,12 +6998,12 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_set_custom_mvt_vector_source_tile_error", .handle, map, null, diagnostic, .{ source_id, tile_id, message });
     }
 
-    pub fn setDebugOptions(self: MapDiscarding, options: MapDebugOption, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn setDebugOptions(self: MapDiscarding, options: MapDebugFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_set_debug_options", .handle, map, null, diagnostic, .{options});
     }
 
-    pub fn setEventMask(self: MapDiscarding, mask: RuntimeEventMask, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn setEventMask(self: MapDiscarding, mask: RuntimeEventFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_set_event_mask", .handle, map, null, diagnostic, .{mask});
     }

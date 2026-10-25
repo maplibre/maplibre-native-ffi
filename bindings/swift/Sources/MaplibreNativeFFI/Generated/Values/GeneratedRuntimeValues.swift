@@ -92,9 +92,8 @@ public struct HttpHeader: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct HttpHeaderRule: Equatable, Hashable, Sendable {
   /// The resource kinds to match.
-  public var kinds: ResourceKindMask
-  /// A bitwise OR of `mln_url_match_flags` values.
-  public var flags: UrlMatchFlags
+  public var kinds: ResourceKindFlag
+  public var flags: UrlMatchFlag
   /// The URL or glob pattern to compare.
   public var url: String
   /// The headers to set. Registration validates each one as
@@ -105,8 +104,8 @@ public struct HttpHeaderRule: Equatable, Hashable, Sendable {
   }
 
   public init(
-    kinds: ResourceKindMask = HttpHeaderRule.default.kinds,
-    flags: UrlMatchFlags = HttpHeaderRule.default.flags,
+    kinds: ResourceKindFlag = HttpHeaderRule.default.kinds,
+    flags: UrlMatchFlag = HttpHeaderRule.default.flags,
     url: String = HttpHeaderRule.default.url,
     headers: [HttpHeader] = HttpHeaderRule.default.headers
   ) {
@@ -120,8 +119,8 @@ public struct HttpHeaderRule: Equatable, Hashable, Sendable {
     raw: mln_http_header_rule,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    kinds = ResourceKindMask(rawValue: raw.kinds)
-    flags = UrlMatchFlags(rawValue: raw.flags)
+    kinds = ResourceKindFlag(rawValue: raw.kinds)
+    flags = UrlMatchFlag(rawValue: raw.flags)
     url = try NativeString.copyUTF8(data: raw.url.data, size: raw.url.size)
     headers = try NativeInputArena.copyArray(
       raw.headers,
@@ -180,7 +179,7 @@ public struct HttpHeaderTransform: Sendable {
 
 private func invokeHttpHeaderTransformCallback(
   user_data: UnsafeMutableRawPointer?,
-  kind: UInt32,
+  kind: mln_resource_kind,
   url: UnsafePointer<CChar>?,
   out_response: UnsafeMutablePointer<mln_http_header_transform_response>?
 ) -> mln_status {
@@ -191,7 +190,7 @@ private func invokeHttpHeaderTransformCallback(
   let responseOutResponse = HttpHeaderTransformResponse(pointer: out_response)
   defer { responseOutResponse.expire() }
   do { try box.value.callback?(
-    ResourceKind(rawValue: kind),
+    ResourceKind(rawValue: kind.rawValue),
     NativeString.copyCString(url),
     responseOutResponse
   ); return MLN_STATUS_OK } catch let error as MaplibreError
@@ -278,7 +277,6 @@ public struct OfflineRegionDownloadState: RawRepresentable,
 /// See `mln_offline_region_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct OfflineRegionStatus: Equatable, Hashable, Sendable {
-  /// One of `mln_offline_region_download_state`.
   public var downloadState: OfflineRegionDownloadState
   public var completedResourceCount: UInt64
   public var completedResourceSize: UInt64
@@ -320,7 +318,8 @@ public struct OfflineRegionStatus: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_offline_region_status) {
-    downloadState = OfflineRegionDownloadState(rawValue: raw.download_state)
+    downloadState = OfflineRegionDownloadState(rawValue: raw.download_state
+      .rawValue)
     completedResourceCount = raw.completed_resource_count
     completedResourceSize = raw.completed_resource_size
     completedTileCount = raw.completed_tile_count
@@ -457,11 +456,11 @@ public struct ResourceKind: RawRepresentable, CustomStringConvertible,
 
 /// The resource kinds that a route or rule matches, one bit per
 /// `mln_resource_kind` value. Registration requires at least one known bit.
-/// `MLN_RESOURCE_KIND_MASK_ALL` selects every resource kind.
+/// `MLN_RESOURCE_KIND_FLAG_ALL` selects every resource kind.
 ///
-/// See `mln_resource_kind_mask` in the
+/// See `mln_resource_kind_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct ResourceKindMask: OptionSet, NativeOpenValue, Equatable, Hashable,
+public struct ResourceKindFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   Sendable
 {
   public let rawValue: UInt32
@@ -469,15 +468,15 @@ public struct ResourceKindMask: OptionSet, NativeOpenValue, Equatable, Hashable,
     self.rawValue = rawValue
   }
 
-  public static let unknown: ResourceKindMask = .init(rawValue: 1)
-  public static let style: ResourceKindMask = .init(rawValue: 2)
-  public static let source: ResourceKindMask = .init(rawValue: 4)
-  public static let tile: ResourceKindMask = .init(rawValue: 8)
-  public static let glyphs: ResourceKindMask = .init(rawValue: 16)
-  public static let spriteImage: ResourceKindMask = .init(rawValue: 32)
-  public static let spriteJson: ResourceKindMask = .init(rawValue: 64)
-  public static let image: ResourceKindMask = .init(rawValue: 128)
-  public static let all: ResourceKindMask = .init(rawValue: 255)
+  public static let unknown: ResourceKindFlag = .init(rawValue: 1)
+  public static let style: ResourceKindFlag = .init(rawValue: 2)
+  public static let source: ResourceKindFlag = .init(rawValue: 4)
+  public static let tile: ResourceKindFlag = .init(rawValue: 8)
+  public static let glyphs: ResourceKindFlag = .init(rawValue: 16)
+  public static let spriteImage: ResourceKindFlag = .init(rawValue: 32)
+  public static let spriteJson: ResourceKindFlag = .init(rawValue: 64)
+  public static let image: ResourceKindFlag = .init(rawValue: 128)
+  public static let all: ResourceKindFlag = .init(rawValue: 255)
 }
 
 public struct ResourceLoadingMethod: RawRepresentable, CustomStringConvertible,
@@ -717,11 +716,11 @@ public struct ResourceRequestInfo: Equatable, Hashable, Sendable {
       .copyCString(raw.requested_url)
     resolvedUrl = raw.resolved_url == nil ? nil : try NativeString
       .copyCString(raw.resolved_url)
-    kind = ResourceKind(rawValue: raw.kind)
-    loadingMethod = ResourceLoadingMethod(rawValue: raw.loading_method)
-    priority = ResourcePriority(rawValue: raw.priority)
-    usage = ResourceUsage(rawValue: raw.usage)
-    storagePolicy = ResourceStoragePolicy(rawValue: raw.storage_policy)
+    kind = ResourceKind(rawValue: raw.kind.rawValue)
+    loadingMethod = ResourceLoadingMethod(rawValue: raw.loading_method.rawValue)
+    priority = ResourcePriority(rawValue: raw.priority.rawValue)
+    usage = ResourceUsage(rawValue: raw.usage.rawValue)
+    storagePolicy = ResourceStoragePolicy(rawValue: raw.storage_policy.rawValue)
     range = raw.fields & MLN_RESOURCE_REQUEST_RANGE
       .rawValue != 0 ? ResourceRange(raw: raw.range) : nil
     priorModifiedUnixMs = raw.fields & MLN_RESOURCE_REQUEST_PRIOR_MODIFIED
@@ -782,8 +781,8 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
     raw: mln_resource_response,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    status = ResourceResponseStatus(rawValue: raw.status)
-    errorReason = ResourceErrorReason(rawValue: raw.error_reason)
+    status = ResourceResponseStatus(rawValue: raw.status.rawValue)
+    errorReason = ResourceErrorReason(rawValue: raw.error_reason.rawValue)
     bytes = try NativeString.copyData(
       data: raw.bytes,
       size: Int(raw.byte_count)
@@ -810,8 +809,8 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
     var raw = mln_resource_response()
     raw.fields = 0
     raw.size = UInt32(MemoryLayout<mln_resource_response>.size)
-    raw.status = status.rawValue
-    raw.error_reason = errorReason.rawValue
+    raw.status = mln_resource_response_status(rawValue: status.rawValue)
+    raw.error_reason = mln_resource_error_reason(rawValue: errorReason.rawValue)
     raw.bytes = arena.view(bytes).data?.assumingMemoryBound(to: UInt8.self)
     raw.byte_count = try NativeInputArena.count(bytes.count)
     raw.error_message = errorMessage.map { arena.view($0) } ?? mln_buffer_view()
@@ -866,9 +865,8 @@ public struct ResourceResponseStatus: RawRepresentable, CustomStringConvertible,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceRoute: Equatable, Hashable, Sendable {
   /// The resource kinds to match.
-  public var kinds: ResourceKindMask
-  /// A bitwise OR of `mln_url_match_flags` values.
-  public var flags: UrlMatchFlags
+  public var kinds: ResourceKindFlag
+  public var flags: UrlMatchFlag
   /// The URL or glob pattern to compare.
   public var url: String
   public static var `default`: Self {
@@ -876,8 +874,8 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
   }
 
   public init(
-    kinds: ResourceKindMask = ResourceRoute.default.kinds,
-    flags: UrlMatchFlags = ResourceRoute.default.flags,
+    kinds: ResourceKindFlag = ResourceRoute.default.kinds,
+    flags: UrlMatchFlag = ResourceRoute.default.flags,
     url: String = ResourceRoute.default.url
   ) {
     self.kinds = kinds
@@ -889,8 +887,8 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
     raw: mln_resource_route,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    kinds = ResourceKindMask(rawValue: raw.kinds)
-    flags = UrlMatchFlags(rawValue: raw.flags)
+    kinds = ResourceKindFlag(rawValue: raw.kinds)
+    flags = UrlMatchFlag(rawValue: raw.flags)
     url = try NativeString.copyUTF8(data: raw.url.data, size: raw.url.size)
   }
 
@@ -951,7 +949,7 @@ public struct ResourceTransform: Sendable {
 
 private func invokeResourceTransformCallback(
   user_data: UnsafeMutableRawPointer?,
-  kind: UInt32,
+  kind: mln_resource_kind,
   url: UnsafePointer<CChar>?,
   request: mln_resource_transform_request
 ) {
@@ -962,7 +960,7 @@ private func invokeResourceTransformCallback(
     try? ResourceTransformRequestHandle(adopting: request)
   else { mln_resource_transform_request_release(request); return }
   do { try box.value.callback?(
-    ResourceKind(rawValue: kind),
+    ResourceKind(rawValue: kind.rawValue),
     NativeString.copyCString(url),
     ownedRequest
   ) } catch {
@@ -1007,9 +1005,7 @@ public struct ResourceUsage: RawRepresentable, CustomStringConvertible,
 /// See `mln_runtime_event` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEvent: Equatable, Hashable, Sendable {
-  /// One of `mln_runtime_event_type`.
   public var type: RuntimeEventType
-  /// One of `mln_runtime_event_source_type`.
   public var sourceType: RuntimeEventSourceType
   /// Source handle selected by source_type: an `mln_runtime` or an `mln_map`.
   public var source: UInt64
@@ -1018,7 +1014,7 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
   public var generation: UInt64
   /// Secondary event detail whose meaning type selects; see
   /// `mln_runtime_event_type`.
-  public var code: Int32
+  public var code: UInt32
   /// Borrowed UTF-8 message bytes, empty when this event carries no message.
   public var message: String
   /// Typed payload selected by payload_type.
@@ -1032,7 +1028,7 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
     sourceType: RuntimeEventSourceType = .init(rawValue: 0),
     source: UInt64 = 0,
     generation: UInt64 = 0,
-    code: Int32 = 0,
+    code: UInt32 = 0,
     message: String = "",
     payload: RuntimeEventPayload = .default
   ) {
@@ -1049,8 +1045,8 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
     raw: mln_runtime_event,
     recordBytes: UnsafeRawBufferPointer? = nil
   ) throws {
-    type = RuntimeEventType(rawValue: raw.type)
-    sourceType = RuntimeEventSourceType(rawValue: raw.source_type)
+    type = RuntimeEventType(rawValue: raw.type.rawValue)
+    sourceType = RuntimeEventSourceType(rawValue: raw.source_type.rawValue)
     source = raw.source
     generation = raw.generation
     code = raw.code
@@ -1059,8 +1055,8 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
       size: raw.message.size
     )
     payload = try { () throws -> RuntimeEventPayload in
-      switch raw
-        .payload_type
+      switch raw.payload_type
+        .rawValue
       {
       case MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME
         .rawValue: return .renderFrame(RuntimeEventRenderFrame(raw: raw.payload
@@ -1087,7 +1083,7 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
             .offline_region_tile_count_limit)
         ) case MLN_RUNTIME_EVENT_PAYLOAD_NONE
         .rawValue: return .none default: return .unknown(
-          raw.payload_type,
+          raw.payload_type.rawValue,
           recordBytes
             .map {
               Data($0
@@ -1107,6 +1103,56 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public typealias RuntimeEventCallback = @Sendable (_ events: [RuntimeEvent])
   -> Void
+
+/// Bit values for the map and runtime event subscription masks.
+///
+/// See `mln_runtime_event_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct RuntimeEventFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
+  Sendable
+{
+  public let rawValue: UInt64
+  public init(rawValue: UInt64) {
+    self.rawValue = rawValue
+  }
+
+  /// Selects no event type.
+  public static let none: RuntimeEventFlag = []
+  public static let mapCameraWillChange: RuntimeEventFlag = .init(rawValue: 2)
+  public static let mapCameraIsChanging: RuntimeEventFlag = .init(rawValue: 4)
+  public static let mapCameraDidChange: RuntimeEventFlag = .init(rawValue: 8)
+  public static let mapStyleLoaded: RuntimeEventFlag = .init(rawValue: 16)
+  public static let mapLoadingStarted: RuntimeEventFlag = .init(rawValue: 32)
+  public static let mapLoadingFinished: RuntimeEventFlag = .init(rawValue: 64)
+  public static let mapLoadingFailed: RuntimeEventFlag = .init(rawValue: 128)
+  public static let mapIdle: RuntimeEventFlag = .init(rawValue: 256)
+  public static let mapRenderError: RuntimeEventFlag = .init(rawValue: 512)
+  public static let mapRenderFrameStarted: RuntimeEventFlag =
+    .init(rawValue: 1024)
+  public static let mapRenderFrameFinished: RuntimeEventFlag =
+    .init(rawValue: 2048)
+  public static let mapRenderMapStarted: RuntimeEventFlag =
+    .init(rawValue: 4096)
+  public static let mapRenderMapFinished: RuntimeEventFlag =
+    .init(rawValue: 8192)
+  public static let mapStyleImageMissing: RuntimeEventFlag =
+    .init(rawValue: 16384)
+  public static let mapTileAction: RuntimeEventFlag = .init(rawValue: 32768)
+  public static let mapSourceChanged: RuntimeEventFlag = .init(rawValue: 65536)
+  public static let offlineRegionStatusChanged: RuntimeEventFlag =
+    .init(rawValue: 131_072)
+  public static let offlineRegionResponseError: RuntimeEventFlag =
+    .init(rawValue: 262_144)
+  public static let offlineRegionTileCountLimitExceeded: RuntimeEventFlag =
+    .init(rawValue: 524_288)
+  /// Selects every map-originated event type this version defines.
+  public static let allMapEvents: RuntimeEventFlag = .init(rawValue: 131_070)
+  /// Selects every runtime-originated event type this version defines.
+  public static let allRuntimeEvents: RuntimeEventFlag =
+    .init(rawValue: 917_504)
+  /// Selects every event type this version defines.
+  public static let all: RuntimeEventFlag = .init(rawValue: 1_048_574)
+}
 
 /// Runtime and map event delivery. Set either callback or queue.
 ///
@@ -1159,57 +1205,6 @@ private func invokeRuntimeEventHandlerCallback(
   }
 }
 
-/// Bit values for the map and runtime event subscription masks.
-///
-/// See `mln_runtime_event_mask` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct RuntimeEventMask: OptionSet, NativeOpenValue, Equatable, Hashable,
-  Sendable
-{
-  public let rawValue: UInt64
-  public init(rawValue: UInt64) {
-    self.rawValue = rawValue
-  }
-
-  /// Selects no event type.
-  public static let none: RuntimeEventMask = []
-  public static let mapCameraWillChange: RuntimeEventMask = .init(rawValue: 2)
-  public static let mapCameraIsChanging: RuntimeEventMask = .init(rawValue: 4)
-  public static let mapCameraDidChange: RuntimeEventMask = .init(rawValue: 8)
-  public static let mapStyleLoaded: RuntimeEventMask = .init(rawValue: 16)
-  public static let mapLoadingStarted: RuntimeEventMask = .init(rawValue: 32)
-  public static let mapLoadingFinished: RuntimeEventMask = .init(rawValue: 64)
-  public static let mapLoadingFailed: RuntimeEventMask = .init(rawValue: 128)
-  public static let mapIdle: RuntimeEventMask = .init(rawValue: 256)
-  public static let mapRenderError: RuntimeEventMask = .init(rawValue: 1024)
-  public static let mapRenderFrameStarted: RuntimeEventMask =
-    .init(rawValue: 8192)
-  public static let mapRenderFrameFinished: RuntimeEventMask =
-    .init(rawValue: 16384)
-  public static let mapRenderMapStarted: RuntimeEventMask =
-    .init(rawValue: 32768)
-  public static let mapRenderMapFinished: RuntimeEventMask =
-    .init(rawValue: 65536)
-  public static let mapStyleImageMissing: RuntimeEventMask =
-    .init(rawValue: 131_072)
-  public static let mapTileAction: RuntimeEventMask = .init(rawValue: 262_144)
-  public static let offlineRegionStatusChanged: RuntimeEventMask =
-    .init(rawValue: 524_288)
-  public static let offlineRegionResponseError: RuntimeEventMask =
-    .init(rawValue: 1_048_576)
-  public static let offlineRegionTileCountLimitExceeded: RuntimeEventMask =
-    .init(rawValue: 2_097_152)
-  public static let mapSourceChanged: RuntimeEventMask =
-    .init(rawValue: 8_388_608)
-  /// Selects every map-originated event type this version defines.
-  public static let allMapEvents: RuntimeEventMask = .init(rawValue: 8_906_238)
-  /// Selects every runtime-originated event type this version defines.
-  public static let allRuntimeEvents: RuntimeEventMask =
-    .init(rawValue: 3_670_016)
-  /// Selects every event type this version defines.
-  public static let all: RuntimeEventMask = .init(rawValue: 12_576_254)
-}
-
 /// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
 ///
 /// See `mln_runtime_event_offline_region_response_error` in the
@@ -1218,7 +1213,6 @@ public struct RuntimeEventOfflineRegionResponseError: Equatable, Hashable,
   Sendable
 {
   public var regionId: Int64
-  /// One of `mln_resource_error_reason`.
   public var reason: ResourceErrorReason
   public static var `default`: Self {
     Self(raw: mln_runtime_event_offline_region_response_error())
@@ -1235,7 +1229,7 @@ public struct RuntimeEventOfflineRegionResponseError: Equatable, Hashable,
 
   init(raw: mln_runtime_event_offline_region_response_error) {
     regionId = raw.region_id
-    reason = ResourceErrorReason(rawValue: raw.reason)
+    reason = ResourceErrorReason(rawValue: raw.reason.rawValue)
   }
 }
 
@@ -1314,7 +1308,6 @@ public enum RuntimeEventPayload: Equatable, Hashable, Sendable {
 /// See `mln_runtime_event_render_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventRenderFrame: Equatable, Hashable, Sendable {
-  /// One of `mln_render_mode`.
   public var mode: RenderMode
   /// Whether MapLibre needs another frame after this one.
   public var needsRepaint: Bool
@@ -1338,7 +1331,7 @@ public struct RuntimeEventRenderFrame: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_runtime_event_render_frame) {
-    mode = RenderMode(rawValue: raw.mode)
+    mode = RenderMode(rawValue: raw.mode.rawValue)
     needsRepaint = raw.needs_repaint
     placementChanged = raw.placement_changed
     stats = RenderingStats(raw: raw.stats)
@@ -1350,7 +1343,6 @@ public struct RuntimeEventRenderFrame: Equatable, Hashable, Sendable {
 /// See `mln_runtime_event_render_map` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventRenderMap: Equatable, Hashable, Sendable {
-  /// One of `mln_render_mode`.
   public var mode: RenderMode
   public static var `default`: Self {
     Self(raw: mln_runtime_event_render_map())
@@ -1361,7 +1353,7 @@ public struct RuntimeEventRenderMap: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_runtime_event_render_map) {
-    mode = RenderMode(rawValue: raw.mode)
+    mode = RenderMode(rawValue: raw.mode.rawValue)
   }
 }
 
@@ -1393,7 +1385,6 @@ public struct RuntimeEventSourceType: RawRepresentable, CustomStringConvertible,
 /// See `mln_runtime_event_tile_action` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventTileAction: Equatable, Hashable, Sendable {
-  /// One of `mln_tile_operation`.
   public var operation: TileOperation
   public var tileId: TileId
   public static var `default`: Self {
@@ -1409,7 +1400,7 @@ public struct RuntimeEventTileAction: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_runtime_event_tile_action) {
-    operation = TileOperation(rawValue: raw.operation)
+    operation = TileOperation(rawValue: raw.operation.rawValue)
     tileId = TileId(raw: raw.tile_id)
   }
 }
@@ -1434,22 +1425,22 @@ public struct RuntimeEventType: RawRepresentable, CustomStringConvertible,
   public static let mapLoadingFinished: RuntimeEventType = .init(rawValue: 6)
   public static let mapLoadingFailed: RuntimeEventType = .init(rawValue: 7)
   public static let mapIdle: RuntimeEventType = .init(rawValue: 8)
-  public static let mapRenderError: RuntimeEventType = .init(rawValue: 10)
+  public static let mapRenderError: RuntimeEventType = .init(rawValue: 9)
   public static let mapRenderFrameStarted: RuntimeEventType =
-    .init(rawValue: 13)
+    .init(rawValue: 10)
   public static let mapRenderFrameFinished: RuntimeEventType =
-    .init(rawValue: 14)
-  public static let mapRenderMapStarted: RuntimeEventType = .init(rawValue: 15)
-  public static let mapRenderMapFinished: RuntimeEventType = .init(rawValue: 16)
-  public static let mapStyleImageMissing: RuntimeEventType = .init(rawValue: 17)
-  public static let mapTileAction: RuntimeEventType = .init(rawValue: 18)
+    .init(rawValue: 11)
+  public static let mapRenderMapStarted: RuntimeEventType = .init(rawValue: 12)
+  public static let mapRenderMapFinished: RuntimeEventType = .init(rawValue: 13)
+  public static let mapStyleImageMissing: RuntimeEventType = .init(rawValue: 14)
+  public static let mapTileAction: RuntimeEventType = .init(rawValue: 15)
+  public static let mapSourceChanged: RuntimeEventType = .init(rawValue: 16)
   public static let offlineRegionStatusChanged: RuntimeEventType =
-    .init(rawValue: 19)
+    .init(rawValue: 17)
   public static let offlineRegionResponseError: RuntimeEventType =
-    .init(rawValue: 20)
+    .init(rawValue: 18)
   public static let offlineRegionTileCountLimitExceeded: RuntimeEventType =
-    .init(rawValue: 21)
-  public static let mapSourceChanged: RuntimeEventType = .init(rawValue: 23)
+    .init(rawValue: 19)
   public var description: String {
     switch rawValue {
     case 1: return "mapCameraWillChange"
@@ -1460,17 +1451,17 @@ public struct RuntimeEventType: RawRepresentable, CustomStringConvertible,
     case 6: return "mapLoadingFinished"
     case 7: return "mapLoadingFailed"
     case 8: return "mapIdle"
-    case 10: return "mapRenderError"
-    case 13: return "mapRenderFrameStarted"
-    case 14: return "mapRenderFrameFinished"
-    case 15: return "mapRenderMapStarted"
-    case 16: return "mapRenderMapFinished"
-    case 17: return "mapStyleImageMissing"
-    case 18: return "mapTileAction"
-    case 19: return "offlineRegionStatusChanged"
-    case 20: return "offlineRegionResponseError"
-    case 21: return "offlineRegionTileCountLimitExceeded"
-    case 23: return "mapSourceChanged"
+    case 9: return "mapRenderError"
+    case 10: return "mapRenderFrameStarted"
+    case 11: return "mapRenderFrameFinished"
+    case 12: return "mapRenderMapStarted"
+    case 13: return "mapRenderMapFinished"
+    case 14: return "mapStyleImageMissing"
+    case 15: return "mapTileAction"
+    case 16: return "mapSourceChanged"
+    case 17: return "offlineRegionStatusChanged"
+    case 18: return "offlineRegionResponseError"
+    case 19: return "offlineRegionTileCountLimitExceeded"
     default: return "RuntimeEventType(\(rawValue))"
     }
   }
@@ -1597,9 +1588,9 @@ public struct TileOperation: RawRepresentable, CustomStringConvertible,
 
 /// How a rule or route compares its url against a request URL.
 ///
-/// See `mln_url_match_flags` in the
+/// See `mln_url_match_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct UrlMatchFlags: OptionSet, NativeOpenValue, Equatable, Hashable,
+public struct UrlMatchFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   Sendable
 {
   public let rawValue: UInt32
@@ -1607,7 +1598,7 @@ public struct UrlMatchFlags: OptionSet, NativeOpenValue, Equatable, Hashable,
     self.rawValue = rawValue
   }
 
-  public static let exact: UrlMatchFlags = []
+  public static let exact: UrlMatchFlag = []
   /// Reads url as a glob pattern.
-  public static let glob: UrlMatchFlags = .init(rawValue: 1)
+  public static let glob: UrlMatchFlag = .init(rawValue: 1)
 }

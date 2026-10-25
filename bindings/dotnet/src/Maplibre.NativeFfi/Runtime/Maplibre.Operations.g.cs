@@ -17,7 +17,7 @@ public static unsafe partial class Maplibre
     public static NetworkStatus NetworkGetStatus()
     {
         using var call = Enter(null);
-        uint outStatus = default;
+        mln_network_status outStatus = default;
         Check(NativeMethods.mln_network_get_status(&outStatus, Diagnostic));
         return (NetworkStatus)outStatus;
     }
@@ -32,6 +32,6 @@ public static unsafe partial class Maplibre
     public static void NetworkSetStatus(NetworkStatus status)
     {
         using var call = Enter(null);
-        Check(NativeMethods.mln_network_set_status((uint)status, Diagnostic));
+        Check(NativeMethods.mln_network_set_status((mln_network_status)status, Diagnostic));
     }
 }

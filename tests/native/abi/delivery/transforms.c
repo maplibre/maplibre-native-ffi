@@ -69,7 +69,7 @@ static void rule_registrations_reject_an_invalid_rule(void) {
     .value = MLN_BUFFER_LITERAL("secret-token\r\n")
   };
   const mln_http_header_rule header_rule = {
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
     .url = MLN_BUFFER_LITERAL("custom://headers"),
     .headers = &header,
     .header_count = 1,
@@ -89,7 +89,7 @@ static void rule_registrations_reject_an_invalid_rule(void) {
   TEST_ASSERT_NULL(strstr(diagnostic.message, "secret-token"));
 
   const mln_http_header_rule null_headers = {
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
     .url = MLN_BUFFER_LITERAL("custom://headers"),
     .header_count = 1,
   };
@@ -110,7 +110,7 @@ static void rule_registrations_reject_an_invalid_rule(void) {
   static char long_glob[4097];
   memset(long_glob, '?', sizeof(long_glob));
   const mln_http_header_rule long_header_rule = {
-    .kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    .kinds = MLN_RESOURCE_KIND_FLAG_ALL,
     .flags = MLN_URL_MATCH_GLOB,
     .url = {.data = long_glob, .size = sizeof(long_glob)},
     .headers = &token_header,
@@ -338,17 +338,17 @@ static void the_first_matching_header_rule_supplies_its_headers(void) {
     {.name = copy_view("X-Second"), .value = copy_view("second")},
   };
   mln_http_header_rule rules[] = {
-    {.kinds = MLN_RESOURCE_KIND_MASK_TILE,
+    {.kinds = MLN_RESOURCE_KIND_FLAG_TILE,
      .flags = MLN_URL_MATCH_GLOB,
      .url = copy_view("**"),
      .headers = second,
      .header_count = 2},
-    {.kinds = MLN_RESOURCE_KIND_MASK_STYLE,
+    {.kinds = MLN_RESOURCE_KIND_FLAG_STYLE,
      .flags = MLN_URL_MATCH_GLOB,
      .url = copy_view("http://127.0.0.1:*/**"),
      .headers = first,
      .header_count = 2},
-    {.kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    {.kinds = MLN_RESOURCE_KIND_FLAG_ALL,
      .flags = MLN_URL_MATCH_GLOB,
      .url = copy_view("**"),
      .headers = second,
@@ -426,11 +426,11 @@ static void header_rules_match_the_rewritten_url(void) {
   // The rule for the original URL comes first, so it would decide if header
   // rules compared the URL before rewriting.
   const mln_http_header_rule header_rules[] = {
-    {.kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    {.kinds = MLN_RESOURCE_KIND_FLAG_ALL,
      .url = mln_buffer_view_from_cstr(original),
      .headers = &original_header,
      .header_count = 1},
-    {.kinds = MLN_RESOURCE_KIND_MASK_ALL,
+    {.kinds = MLN_RESOURCE_KIND_FLAG_ALL,
      .url = mln_buffer_view_from_cstr(rewritten),
      .headers = &rewritten_header,
      .header_count = 1},

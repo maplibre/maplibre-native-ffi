@@ -120,8 +120,8 @@ typedef enum mln_command_disposition : uint32_t {
 } mln_command_disposition;
 typedef struct mln_completion_result {
   uint32_t size;
-  int status BIND("enum=mln_status");
-  uint32_t disposition BIND("enum=mln_command_disposition");
+  mln_status status;
+  mln_command_disposition disposition;
   uint32_t value_size;
   uint64_t generation;
   uint64_t render_update_generation;
@@ -176,9 +176,10 @@ typedef struct mln_probe_point {
 typedef enum BIND("kind=bitmask") mln_probe_option_field : uint32_t {
   MLN_PROBE_OPTION_POINT = 1u << 0u,
 } mln_probe_option_field;
+typedef uint32_t mln_probe_option_fields;
 typedef struct mln_probe_options {
   mln_buffer_view title BIND("nullable=true");
-  uint32_t fields BIND("enum=mln_probe_option_field");
+  mln_probe_option_fields fields;
   mln_probe_point point BIND("mask=fields;bit=MLN_PROBE_OPTION_POINT");
   const mln_probe_point* left BIND("length=left_count;nullable=true");
   size_t left_count;
@@ -205,17 +206,18 @@ typedef enum BIND("kind=bitmask") mln_probe_flag : uint32_t {
   MLN_PROBE_FLAG_SOUTH = 2,
   MLN_PROBE_FLAG_ALL = 3,
 } mln_probe_flag;
+typedef uint32_t mln_probe_flags;
 typedef struct mln_probe_extent {
   uint32_t width;
   double scale;
-  uint32_t fit BIND("enum=mln_probe_mode");
+  mln_probe_mode fit;
 } mln_probe_extent;
 typedef struct mln_probe_settings {
   uint32_t size;
   mln_probe_extent extent;
-  uint32_t mode BIND("enum=mln_probe_mode");
-  uint32_t flags BIND("enum=mln_probe_flag");
-  uint32_t heading BIND("enum=mln_probe_flag");
+  mln_probe_mode mode;
+  mln_probe_flags flags;
+  mln_probe_flags heading;
   float ratio;
   int32_t offset;
   bool enabled;
@@ -305,13 +307,14 @@ typedef enum BIND("kind=bitmask") mln_camera_field : uint64_t {
   MLN_CAMERA_CENTER = 1ULL << 40,
   MLN_CAMERA_ZOOM = 2
 } mln_camera_field;
+typedef uint64_t mln_camera_fields;
 typedef struct mln_lat_lng {
   double latitude;
   double longitude;
 } mln_lat_lng;
 typedef struct mln_camera {
   uint32_t abi_size BIND("kind=size");
-  uint64_t fields BIND("enum=mln_camera_field");
+  mln_camera_fields fields;
   mln_lat_lng center BIND("mask=fields;bit=MLN_CAMERA_CENTER");
   double zoom BIND("mask=fields;bit=MLN_CAMERA_ZOOM");
 } mln_camera;
@@ -373,9 +376,10 @@ mln_status mln_map_refresh(
 typedef enum BIND("kind=bitmask") mln_label_field : uint32_t {
   MLN_LABEL_FIELD_TEXT_SIZE = 1
 } mln_label_field;
+typedef uint32_t mln_label_fields;
 typedef struct mln_label {
   uint32_t size;
-  uint32_t fields BIND("enum=mln_label_field");
+  mln_label_fields fields;
   mln_buffer_view text;
   double text_size BIND("mask=fields;bit=MLN_LABEL_FIELD_TEXT_SIZE");
   uint32_t reserved BIND("kind=reserved");
@@ -407,9 +411,10 @@ typedef enum BIND("kind=bitmask") mln_frame_window_field : uint32_t {
   MLN_FRAME_WINDOW_FIELD_SCALE = 1u << 1u,
   MLN_FRAME_WINDOW_FIELD_LOCKED = 1u << 2u,
 } mln_frame_window_field;
+typedef uint32_t mln_frame_window_fields;
 typedef struct mln_frame_window {
   uint32_t size;
-  uint32_t fields BIND("enum=mln_frame_window_field");
+  mln_frame_window_fields fields;
   mln_point view_origin
     BIND("mask=fields;bit=MLN_FRAME_WINDOW_FIELD_VIEW_ORIGIN");
   double scale BIND("mask=fields;bit=MLN_FRAME_WINDOW_FIELD_SCALE");
@@ -432,7 +437,7 @@ typedef union mln_event_payload {
   mln_event_frame frame BIND("variant=MLN_EVENT_FRAME");
 } mln_event_payload;
 typedef struct mln_event {
-  unsigned int kind BIND("enum=mln_event_kind");
+  mln_event_kind kind;
   mln_event_payload payload BIND("tag=kind");
 } mln_event;
 BIND("execution=query;result=mln_event")
@@ -633,7 +638,7 @@ typedef union mln_delivery_payload {
 #endif
 } mln_delivery_payload;
 typedef struct mln_delivery {
-  uint32_t type BIND("enum=mln_delivery_type");
+  mln_delivery_type type;
   uint32_t reserved BIND("kind=reserved");
   void* user_data BIND("kind=context");
   mln_delivery_payload payload

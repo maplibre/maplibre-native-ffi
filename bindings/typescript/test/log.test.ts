@@ -11,7 +11,7 @@ import {
   logSetAsyncSeverityMask,
   logSetCallback,
   LogSeverity as LogSeverities,
-  LogSeverityMask,
+  LogSeverityFlag,
   type MapHandle,
 } from "../src/index.ts";
 import { openRuntime } from "./support/fixture.ts";
@@ -44,7 +44,7 @@ async function openLoggingMap(): Promise<MapHandle> {
   logSetAsyncSeverityMask(0);
   teardown(async () => {
     logClearCallback();
-    logSetAsyncSeverityMask(LogSeverityMask.defaultValue);
+    logSetAsyncSeverityMask(LogSeverityFlag.defaultValue);
     // The release arrives through the realm's queue; a later case that counts roots
     // must not see it.
     await released(() => liveRoots() === roots, "the log registration release");

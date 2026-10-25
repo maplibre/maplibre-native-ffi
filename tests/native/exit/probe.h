@@ -221,7 +221,7 @@ static inline void probe_start(void) {
     mln_log_set_callback(&handler, NULL), "installing the log callback"
   );
   probe_require(
-    mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_MASK_ALL, NULL),
+    mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_FLAG_ALL, NULL),
     "making every log severity asynchronous"
   );
 }

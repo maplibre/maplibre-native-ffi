@@ -471,12 +471,12 @@ class Values:
     def has_bit(self, plan: ValuePlan, mask: str, bit: str) -> str:
         if self.mask_enum(plan, mask):
             return f"value.{member(mask)}.HasFlag({bit})"
-        return f"(value.{member(mask)} & ({self.mask_type(plan, mask)}){self.constant(bit)}) != 0"
+        return f"(value.{member(mask)} & {self.typed_constant(self.mask_type(plan, mask), bit)}) != 0"
 
     def bit(self, plan: ValuePlan, mask: str, bit: str) -> str:
         if self.mask_enum(plan, mask):
             return bit
-        return f"({self.mask_type(plan, mask)}){self.constant(bit)}"
+        return self.typed_constant(self.mask_type(plan, mask), bit)
 
     def needs_scope(self, plan: ValuePlan) -> bool:
         return (
@@ -512,6 +512,14 @@ class Values:
                 return f"{enum.name}.{name}"
         raise Unsupported(f"unknown enum constant {name}")
 
+    def typed_constant(self, native: str, name: str) -> str:
+        """An enum constant as the raw type `native`, cast unless it is
+        already that enum's member."""
+        constant = self.constant(name)
+        return (
+            constant if constant.startswith(native + ".") else f"({native}){constant}"
+        )
+
     def flag_name(self, flag) -> str:
         return pascal(flag.member)
 
@@ -537,12 +545,12 @@ class Values:
                 union = field.value
                 tag = next(item for item in plan.fields if item.name == union.tag)
                 arms = [
-                    f"({self.native_type(tag.value)}){self.constant(variant.presence.variant)} => new {self.member_type(plan, name, field)}.{pascal(variant.name)}({self.copy(variant.value, f'value.{member(field.name)}.{member(variant.name)}')})"
+                    f"{self.typed_constant(self.native_type(tag.value), variant.presence.variant)} => new {self.member_type(plan, name, field)}.{pascal(variant.name)}({self.copy(variant.value, f'value.{member(field.name)}.{member(variant.name)}')})"
                     for variant in union.fields
                 ]
                 if union.empty_variant:
                     arms.append(
-                        f"({self.native_type(tag.value)}){self.constant(union.empty_variant[0])} => new {self.member_type(plan, name, field)}.None()"
+                        f"{self.typed_constant(self.native_type(tag.value), union.empty_variant[0])} => new {self.member_type(plan, name, field)}.None()"
                     )
                 raw_bytes = (
                     f"NativeCallScope.CopyValueBytes(value.{member(field.name)})"
@@ -867,7 +875,7 @@ class Values:
                 encoded.extend(
                     [
                         f"{indent}    case {self.member_type(plan, name, field)}.{pascal(variant.name)} selected:",
-                        f"{indent}        native.{member(field.value.tag)} = ({self.native_type(tag.value)}){self.constant(variant.presence.variant)};",
+                        f"{indent}        native.{member(field.value.tag)} = {self.typed_constant(self.native_type(tag.value), variant.presence.variant)};",
                         f"{indent}        native.{member(field.name)}.{member(variant.name)} = {self.encode(variant.value, 'selected.Value')};",
                         f"{indent}        break;",
                     ]

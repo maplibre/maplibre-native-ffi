@@ -49,10 +49,10 @@ class Completion;
 // A map event raised inside a map transaction. It waits there for the
 // generation that the transaction publishes.
 struct HeldMapEvent {
-  uint32_t type = 0;
-  uint32_t payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE;
+  mln_runtime_event_type type{};
+  mln_runtime_event_payload_type payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE;
   mln_runtime_event_payload payload{};
-  int32_t code = 0;
+  uint32_t code = 0;
   std::string message;
 };
 
@@ -60,7 +60,8 @@ struct HeldMapEvent {
 // generation of the snapshot that shows where they left the camera.
 struct EndedCameraTransition {
   std::shared_ptr<CameraTransitionEnd> end;
-  uint32_t outcome = MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED;
+  mln_camera_transition_outcome outcome =
+    MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED;
 };
 
 // The camera transitions that the C API is cancelling, so that their finish
@@ -138,8 +139,8 @@ static_assert(
   "producer hot path"
 );
 static_assert(
-  MLN_RUNTIME_EVENT_MASK_ALL == (MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS |
-                                 MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS),
+  MLN_RUNTIME_EVENT_FLAG_ALL == (MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS |
+                                 MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS),
   "every event type needs a mask bit in one of the two groups"
 );
 static_assert(
@@ -159,7 +160,7 @@ static_assert(
 // synchronisation edge: the documented semantics gate events queued after a
 // setter returns and say nothing about events already in flight.
 [[nodiscard]] inline auto event_selected(
-  const std::atomic<uint64_t>& mask, uint32_t type
+  const std::atomic<uint64_t>& mask, mln_runtime_event_type type
 ) noexcept -> bool {
   return ((mask.load(std::memory_order_relaxed) >> type) & 1U) != 0U;
 }
@@ -286,7 +287,7 @@ class ResourceProviderLease {
   // Whether the provider's routes claim a request. A request they do not
   // claim passes through to native loading.
   [[nodiscard]] auto matches(
-    std::uint32_t kind, std::string_view resolved_url
+    mln_resource_kind kind, std::string_view resolved_url
   ) const noexcept -> bool {
     return provider_.routes == nullptr ||
            provider_.routes->matches(kind, resolved_url);
@@ -378,15 +379,16 @@ auto clear_http_header_transform(
   mln_runtime runtime, const mln_completion* completion
 ) -> mln_status;
 auto invoke_http_header_transform(
-  void* platform_context, uint32_t kind, const char* url
+  void* platform_context, mln_resource_kind kind, const char* url
 ) noexcept -> HttpHeaders;
 // Answers finished with the transformed URL, now or once the host answers.
 auto invoke_resource_transform(
-  void* platform_context, uint32_t kind, const std::string& url,
+  void* platform_context, mln_resource_kind kind, const std::string& url,
   mln::ResourceTransform::FinishedCallback finished
 ) -> void;
 auto run_ambient_cache_operation_start(
-  mln_runtime runtime, uint32_t operation, const mln_completion* completion
+  mln_runtime runtime, mln_ambient_cache_operation operation,
+  const mln_completion* completion
 ) -> mln_status;
 auto set_maximum_ambient_cache_size_start(
   mln_runtime runtime, std::uint64_t size, const mln_completion* completion
@@ -422,7 +424,7 @@ auto offline_region_set_observed_start(
 
 struct OfflineRegionDownloadStateRequest {
   mln_offline_region_id region_id;
-  uint32_t state;
+  mln_offline_region_download_state state;
 };
 
 auto offline_region_set_download_state_start(
@@ -519,8 +521,9 @@ auto has_resource_transform_for_platform_context(
 // test their subscription mask before they build an event.
 auto push_runtime_map_event_payload(
   const std::shared_ptr<RuntimeEventState>& state, mln_map map,
-  uint64_t generation, uint32_t type, uint32_t payload_type,
-  const mln_runtime_event_payload& payload, int32_t code = 0,
+  uint64_t generation, mln_runtime_event_type type,
+  mln_runtime_event_payload_type payload_type,
+  const mln_runtime_event_payload& payload, uint32_t code = 0,
   std::string message = {}
 ) -> void;
 auto push_runtime_map_events(

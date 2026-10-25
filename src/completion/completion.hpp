@@ -39,7 +39,7 @@ class CompletionSink final {
   // Delivers one terminal result. A value that a queue cannot copy turns into
   // MLN_STATUS_NATIVE_ERROR, and its owned handles are disposed.
   auto deliver(
-    mln_status status, std::uint32_t disposition,
+    mln_status status, mln_command_disposition disposition,
     CommandGenerations generations, std::string_view diagnostic,
     const void* value, std::size_t value_count, std::uint32_t value_size,
     const delivery::CompletionCapture* capture
@@ -148,13 +148,14 @@ auto complete_failure(
 ) noexcept -> void;
 
 auto complete_command(
-  Completion* completion, std::uint32_t disposition, mln_status status,
-  CommandGenerations generations = {}, std::string diagnostic = {}
-) noexcept -> void;
-auto complete_command(
-  const std::shared_ptr<Completion>& completion, std::uint32_t disposition,
+  Completion* completion, mln_command_disposition disposition,
   mln_status status, CommandGenerations generations = {},
   std::string diagnostic = {}
+) noexcept -> void;
+auto complete_command(
+  const std::shared_ptr<Completion>& completion,
+  mln_command_disposition disposition, mln_status status,
+  CommandGenerations generations = {}, std::string diagnostic = {}
 ) noexcept -> void;
 
 }  // namespace mln::core

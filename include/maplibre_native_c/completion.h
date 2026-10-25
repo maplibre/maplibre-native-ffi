@@ -41,9 +41,8 @@ typedef enum mln_command_disposition : uint32_t {
 typedef struct mln_completion_result {
   uint32_t size;
   /** Terminal status, one of mln_status. */
-  int32_t status MLN_BINDING("enum=mln_status");
-  /** One of mln_command_disposition. */
-  uint32_t disposition MLN_BINDING("enum=mln_command_disposition");
+  mln_status status;
+  mln_command_disposition disposition;
   /**
    * Byte stride of one element of value: sizeof the result record in the
    * native build, at least sizeof in the caller's header. Zero when value is

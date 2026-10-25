@@ -190,13 +190,13 @@ public extension MapHandle {
   /// See `mln_map_set_event_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   @discardableResult
-  func setEventMask(_ bindingArg0: RuntimeEventMask) async throws
+  func setEventMask(_ bindingArg0: RuntimeEventFlag) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, _, completion, diagnostic in
       mln_map_set_event_mask(
         raw,
-        bindingArg0.nativeValue(),
+        bindingArg0.rawValue,
         completion,
         diagnostic
       )
@@ -302,10 +302,10 @@ public extension MapHandleDiscarding {
     ) }
   }
 
-  func setEventMask(_ bindingArg0: RuntimeEventMask) throws {
+  func setEventMask(_ bindingArg0: RuntimeEventFlag) throws {
     try owner.nativeInvoke { raw, _, diagnostic in mln_map_set_event_mask(
       raw,
-      bindingArg0.nativeValue(),
+      bindingArg0.rawValue,
       nil,
       diagnostic
     ) }

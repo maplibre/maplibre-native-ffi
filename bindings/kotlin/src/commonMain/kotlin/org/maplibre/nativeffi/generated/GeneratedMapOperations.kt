@@ -1047,7 +1047,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_set_debug_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setDebugOptions(options: MapDebugOption): Deferred<CommandCompletion> =
+  public fun setDebugOptions(options: MapDebugFlag): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_set_debug_options(handle, options.rawValue.toInt(), completion, diagnostic))
     }
@@ -1058,7 +1058,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_set_event_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun setEventMask(mask: RuntimeEventMask): Deferred<CommandCompletion> =
+  public fun setEventMask(mask: RuntimeEventFlag): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_set_event_mask(handle, mask.rawValue.toLong(), completion, diagnostic))
     }
@@ -1816,13 +1816,13 @@ public value class MapDiscarding internal constructor(internal val owner: Genera
     }
 
   /** [MapHandle.setDebugOptions] without its completion. */
-  public fun setDebugOptions(options: MapDebugOption): Unit =
+  public fun setDebugOptions(options: MapDebugFlag): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_set_debug_options(handle, options.rawValue.toInt(), completion, diagnostic))
     }
 
   /** [MapHandle.setEventMask] without its completion. */
-  public fun setEventMask(mask: RuntimeEventMask): Unit =
+  public fun setEventMask(mask: RuntimeEventFlag): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_set_event_mask(handle, mask.rawValue.toLong(), completion, diagnostic))
     }

@@ -1000,13 +1000,13 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_network_get_status(
-        uint* out_status,
+        mln_network_status* out_status,
         mln_diagnostic* out_diagnostic
     );
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_network_set_status(
-        uint status,
+        mln_network_status status,
         mln_diagnostic* out_diagnostic
     );
 
@@ -1404,7 +1404,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_runtime_run_ambient_cache_operation(
         MlnRuntime runtime,
-        uint operation,
+        mln_ambient_cache_operation operation,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -1444,7 +1444,7 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_runtime_set_offline_region_download_state(
         MlnRuntime runtime,
         long region_id,
-        uint state,
+        mln_offline_region_download_state state,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

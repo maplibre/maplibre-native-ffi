@@ -15,10 +15,6 @@ public sealed record StyleSourceInfo
     /// Source ID.
     /// </summary>
     public required string Id { get; init; }
-
-    /// <summary>
-    /// One of <c>mln_style_source_type</c>.
-    /// </summary>
     public StyleSourceType Type { get; init; }
 
     /// <summary>

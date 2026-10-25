@@ -97,7 +97,6 @@ public struct RenderAbandonDisposition: RawRepresentable,
 }
 
 public struct RenderAbandonResult: Equatable, Hashable, Sendable {
-  /// One `mln_render_abandon_disposition` value.
   public var disposition: RenderAbandonDisposition
   /// Backend resource groups intentionally retained until process exit.
   public var quarantinedResourceCount: UInt32
@@ -116,7 +115,7 @@ public struct RenderAbandonResult: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_render_abandon_result) {
-    disposition = RenderAbandonDisposition(rawValue: raw.disposition)
+    disposition = RenderAbandonDisposition(rawValue: raw.disposition.rawValue)
     quarantinedResourceCount = raw.quarantined_resource_count
   }
 }
@@ -127,7 +126,6 @@ public struct RenderAbandonResult: Equatable, Hashable, Sendable {
 /// See `mln_render_frame_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 public struct RenderFrameResult: Equatable, Hashable, Sendable {
-  /// One `mln_render_result` value.
   public var disposition: RenderResult
   public var token: UInt64
   /// Generation of the map render update the demand evaluated. When disposition
@@ -178,7 +176,7 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_render_frame_result) {
-    disposition = RenderResult(rawValue: raw.disposition)
+    disposition = RenderResult(rawValue: raw.disposition.rawValue)
     token = raw.token
     mapUpdateGeneration = raw.map_update_generation
     generation = raw.generation
@@ -212,15 +210,15 @@ public struct RenderResult: RawRepresentable, CustomStringConvertible,
   /// later demand with the same flags renders what this one would have. This
   /// result does not cause a map update, so the host demands again when the
   /// target can be ready, such as after a paced delay.
-  public static let targetNotReady: RenderResult = .init(rawValue: 3)
+  public static let targetNotReady: RenderResult = .init(rawValue: 2)
   /// A newer IF_NEEDED demand with the same flags replaced this demand.
-  public static let superseded: RenderResult = .init(rawValue: 4)
+  public static let superseded: RenderResult = .init(rawValue: 3)
   public var description: String {
     switch rawValue {
     case 0: return "rendered"
     case 1: return "noUpdate"
-    case 3: return "targetNotReady"
-    case 4: return "superseded"
+    case 2: return "targetNotReady"
+    case 3: return "superseded"
     default: return "RenderResult(\(rawValue))"
     }
   }
@@ -231,7 +229,6 @@ public struct RenderResult: RawRepresentable, CustomStringConvertible,
 /// See `mln_render_session_snapshot` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
-  /// One `mln_render_session_state` value.
   public var state: RenderSessionState
   /// Logical extent applied by the driver.
   public var extent: LogicalExtent
@@ -278,7 +275,7 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_render_session_snapshot) {
-    state = RenderSessionState(rawValue: raw.state)
+    state = RenderSessionState(rawValue: raw.state.rawValue)
     extent = LogicalExtent(raw: raw.extent)
     generation = raw.generation
     mapUpdateGeneration = raw.map_update_generation

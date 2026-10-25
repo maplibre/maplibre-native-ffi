@@ -260,7 +260,7 @@ fn presentAcquired(session: *render_target.Session, compositor: *MetalTextureCom
     const Context = struct {
         compositor: *MetalTextureCompositor,
         frame: maplibre.AcquiredFrame,
-        sync: maplibre.GpuSync = .{ .kind = .cpu_complete, .object = 0 },
+        sync: maplibre.GpuSync = .{ .kind = .cpu_complete, .handle = 0 },
         fn producer(context: @This(), sync: maplibre.GpuSync) anyerror!bool {
             var with_sync = context;
             with_sync.sync = sync;

@@ -48,9 +48,10 @@ auto copy_result(
 }  // namespace
 
 auto CompletionSink::deliver(
-  mln_status status, std::uint32_t disposition, CommandGenerations generations,
-  std::string_view diagnostic, const void* value, std::size_t value_count,
-  std::uint32_t value_size, const delivery::CompletionCapture* capture
+  mln_status status, mln_command_disposition disposition,
+  CommandGenerations generations, std::string_view diagnostic,
+  const void* value, std::size_t value_count, std::uint32_t value_size,
+  const delivery::CompletionCapture* capture
 ) const noexcept -> void {
   const auto result = mln_completion_result{
     .size = sizeof(mln_completion_result),
@@ -319,8 +320,9 @@ auto complete_failure(
 }
 
 auto complete_command(
-  const std::shared_ptr<Completion>& completion, std::uint32_t disposition,
-  mln_status status, CommandGenerations generations, std::string diagnostic
+  const std::shared_ptr<Completion>& completion,
+  mln_command_disposition disposition, mln_status status,
+  CommandGenerations generations, std::string diagnostic
 ) noexcept -> void {
   complete_command(
     completion.get(), disposition, status, generations, std::move(diagnostic)
@@ -328,8 +330,8 @@ auto complete_command(
 }
 
 auto complete_command(
-  Completion* completion, std::uint32_t disposition, mln_status status,
-  CommandGenerations generations, std::string diagnostic
+  Completion* completion, mln_command_disposition disposition,
+  mln_status status, CommandGenerations generations, std::string diagnostic
 ) noexcept -> void {
   if (status != MLN_STATUS_OK) {
     disposition = status == MLN_STATUS_CANCELLED

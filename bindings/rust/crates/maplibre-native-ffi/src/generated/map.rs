@@ -1418,7 +1418,7 @@ impl MapHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn set_debug_options(
         &self,
-        options: MapDebugOption,
+        options: MapDebugFlag,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let call = self.inner.call();
         call.command(|map, completion, out_diagnostic| unsafe {
@@ -1432,7 +1432,7 @@ impl MapHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn set_event_mask(
         &self,
-        mask: RuntimeEventMask,
+        mask: RuntimeEventFlag,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let call = self.inner.call();
         call.command(|map, completion, out_diagnostic| unsafe {
@@ -2374,7 +2374,7 @@ impl MapHandleDiscarding<'_> {
     ///
     /// See `mln_map_set_debug_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn set_debug_options(&self, options: MapDebugOption) -> Result<()> {
+    pub fn set_debug_options(&self, options: MapDebugFlag) -> Result<()> {
         let call = self.0.inner.call();
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_debug_options(map, options.bits(), completion, out_diagnostic)
@@ -2385,7 +2385,7 @@ impl MapHandleDiscarding<'_> {
     ///
     /// See `mln_map_set_event_mask` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn set_event_mask(&self, mask: RuntimeEventMask) -> Result<()> {
+    pub fn set_event_mask(&self, mask: RuntimeEventFlag) -> Result<()> {
         let call = self.0.inner.call();
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_event_mask(map, mask.bits(), completion, out_diagnostic)

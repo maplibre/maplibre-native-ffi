@@ -240,7 +240,7 @@ public object GeneratedApi {
    * See `mln_log_set_async_severity_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
    */
-  public fun logSetAsyncSeverityMask(mask: LogSeverityMask): Unit =
+  public fun logSetAsyncSeverityMask(mask: LogSeverityFlag): Unit =
     nativeCall(null, null) {
       check(C.mln_log_set_async_severity_mask(mask.rawValue.toInt(), diagnostic))
     }

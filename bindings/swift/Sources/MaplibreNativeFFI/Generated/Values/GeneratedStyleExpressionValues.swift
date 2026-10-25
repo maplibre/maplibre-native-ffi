@@ -194,7 +194,6 @@ public struct StyleExpressionOptions: Equatable, Hashable, Sendable {
 /// See `mln_style_expression_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 public struct StyleExpressionType: Equatable, Hashable, Sendable {
-  /// One of `mln_style_expression_type_kind`.
   public var kind: StyleExpressionTypeKind
   /// For an array, its items' kind; ignored for any other kind.
   public var itemKind: StyleExpressionTypeKind
@@ -215,15 +214,15 @@ public struct StyleExpressionType: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_style_expression_type) {
-    kind = StyleExpressionTypeKind(rawValue: raw.kind)
-    itemKind = StyleExpressionTypeKind(rawValue: raw.item_kind)
+    kind = StyleExpressionTypeKind(rawValue: raw.kind.rawValue)
+    itemKind = StyleExpressionTypeKind(rawValue: raw.item_kind.rawValue)
     itemCount = raw.item_count
   }
 
   func nativeValue() -> mln_style_expression_type {
     var raw = mln_style_expression_type()
-    raw.kind = kind.rawValue
-    raw.item_kind = itemKind.rawValue
+    raw.kind = mln_style_expression_type_kind(rawValue: kind.rawValue)
+    raw.item_kind = mln_style_expression_type_kind(rawValue: itemKind.rawValue)
     raw.item_count = itemCount
     return raw
   }

@@ -5,11 +5,11 @@ namespace Maplibre.NativeFfi;
 /// Debug overlay mask values for <c>mln_map_set_debug_options()</c>.
 /// </summary>
 /// <remarks>
-/// See <c>mln_map_debug_option</c> in the <see
+/// See <c>mln_map_debug_flag</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
 /// </remarks>
 [Flags]
-public enum MapDebugOption : uint
+public enum MapDebugFlag : uint
 {
     TileBorders = 2,
     ParseStatus = 4,

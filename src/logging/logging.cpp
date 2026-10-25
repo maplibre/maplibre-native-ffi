@@ -56,8 +56,8 @@ class CallbackLogObserver final : public mln::Log::Observer {
 
     const auto forbid = mln::core::ForbidReentry{log_reentry_diagnostic};
     return callback_(
-      user_data_, static_cast<std::uint32_t>(severity),
-      static_cast<std::uint32_t>(event), code, message.c_str()
+      user_data_, static_cast<mln_log_severity>(severity),
+      static_cast<mln_log_event>(event), code, message.c_str()
     );
   }
 
@@ -70,7 +70,7 @@ class CallbackLogObserver final : public mln::Log::Observer {
 // Consumes each record and queues a copy, or leaves a record the queue
 // refuses to the platform logger.
 auto queue_log_record(
-  void* registration, std::uint32_t severity, std::uint32_t event,
+  void* registration, mln_log_severity severity, mln_log_event event,
   std::int64_t code, const char* message
 ) noexcept -> bool {
   const auto record = mln_log_delivery{
@@ -84,7 +84,7 @@ auto queue_log_record(
 }
 
 auto set_severity_async(
-  std::uint32_t mask, mln_log_severity_mask bit, mln::EventSeverity severity
+  std::uint32_t mask, mln_log_severity_flag bit, mln::EventSeverity severity
 ) -> void {
   mln::Log::useLogThread((mask & bit) != 0U, severity);
 }
@@ -140,19 +140,19 @@ auto clear_log_callback() -> mln_status {
 }
 
 auto set_log_async_severity_mask(std::uint32_t mask) -> mln_status {
-  if ((mask & ~MLN_LOG_SEVERITY_MASK_ALL) != 0U) {
+  if ((mask & ~MLN_LOG_SEVERITY_FLAG_ALL) != 0U) {
     set_thread_error("log async severity mask contains unknown bits");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   set_severity_async(
-    mask, MLN_LOG_SEVERITY_MASK_INFO, mln::EventSeverity::Info
+    mask, MLN_LOG_SEVERITY_FLAG_INFO, mln::EventSeverity::Info
   );
   set_severity_async(
-    mask, MLN_LOG_SEVERITY_MASK_WARNING, mln::EventSeverity::Warning
+    mask, MLN_LOG_SEVERITY_FLAG_WARNING, mln::EventSeverity::Warning
   );
   set_severity_async(
-    mask, MLN_LOG_SEVERITY_MASK_ERROR, mln::EventSeverity::Error
+    mask, MLN_LOG_SEVERITY_FLAG_ERROR, mln::EventSeverity::Error
   );
   return MLN_STATUS_OK;
 }

@@ -1,5 +1,5 @@
 // The URL language that provider routes and transform rules share: the glob
-// patterns that mln_url_match_flags documents, and which URL a route
+// patterns that mln_url_match_flag documents, and which URL a route
 // compares. A loader cannot produce every candidate URL, so these cases call
 // the matchers directly.
 
@@ -72,7 +72,7 @@ void globs_match_the_documented_pattern_language() {
   }
   // Without the glob flag, metacharacters compare literally.
   const auto exact = mln::core::UrlPattern{
-    MLN_RESOURCE_KIND_MASK_ALL, MLN_URL_MATCH_EXACT, "**"
+    MLN_RESOURCE_KIND_FLAG_ALL, MLN_URL_MATCH_EXACT, "**"
   };
   TEST_ASSERT_FALSE(exact.matches(MLN_RESOURCE_KIND_STYLE, style_url));
   TEST_ASSERT_TRUE(exact.matches(MLN_RESOURCE_KIND_STYLE, "**"));
@@ -87,7 +87,7 @@ auto table_of(mln_resource_route route) -> mln::core::RouteTable {
 // Routes compare the resolved URL and match the kinds that their masks name.
 void routes_match_resolved_urls_and_selected_kinds() {
   const auto resolved = table_of({
-    .kinds = MLN_RESOURCE_KIND_MASK_STYLE | MLN_RESOURCE_KIND_MASK_SOURCE,
+    .kinds = MLN_RESOURCE_KIND_FLAG_STYLE | MLN_RESOURCE_KIND_FLAG_SOURCE,
     .flags = MLN_URL_MATCH_EXACT,
     .url = MLN_BUFFER_LITERAL("https://maps.localhost/style.json"),
   });
@@ -95,7 +95,9 @@ void routes_match_resolved_urls_and_selected_kinds() {
   TEST_ASSERT_TRUE(resolved.matches(MLN_RESOURCE_KIND_SOURCE, style_url));
   TEST_ASSERT_FALSE(resolved.matches(MLN_RESOURCE_KIND_TILE, style_url));
   // A kind past the mask's width never matches a route that names kinds.
-  TEST_ASSERT_FALSE(resolved.matches(UINT32_MAX, style_url));
+  TEST_ASSERT_FALSE(
+    resolved.matches(static_cast<mln_resource_kind>(UINT32_MAX), style_url)
+  );
 
   // A table without routes claims every request.
   TEST_ASSERT_TRUE(

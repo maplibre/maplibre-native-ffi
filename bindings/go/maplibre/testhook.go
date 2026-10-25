@@ -43,8 +43,8 @@ type runtimeEventForTest struct {
 
 func newRuntimeEventForTest(eventType RuntimeEventType, sourceType RuntimeEventSourceType, source uint64) runtimeEventForTest {
 	return runtimeEventForTest{raw: C.mln_runtime_event{
-		_type:       C.uint32_t(eventType),
-		source_type: C.uint32_t(sourceType),
+		_type:       C.mln_runtime_event_type(eventType),
+		source_type: C.mln_runtime_event_source_type(sourceType),
 		source:      C.uint64_t(source),
 	}}
 }
@@ -61,7 +61,7 @@ func (event runtimeEventForTest) withMessage(message string) runtimeEventForTest
 
 // withPayload writes payload into the event's payload union, as native does
 // for the arm payloadType names.
-func withPayload[T any](event runtimeEventForTest, payloadType C.uint32_t, payload T) runtimeEventForTest {
+func withPayload[T any](event runtimeEventForTest, payloadType C.mln_runtime_event_payload_type, payload T) runtimeEventForTest {
 	event.raw.payload_type = payloadType
 	*(*T)(unsafe.Pointer(&event.raw.payload)) = payload
 	return event
@@ -69,14 +69,14 @@ func withPayload[T any](event runtimeEventForTest, payloadType C.uint32_t, paylo
 
 func (event runtimeEventForTest) withRenderFrame(payload RuntimeEventRenderFrame) runtimeEventForTest {
 	return withPayload(event, C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME, C.mln_runtime_event_render_frame{
-		mode:          C.uint32_t(payload.Mode),
+		mode:          C.mln_render_mode(payload.Mode),
 		needs_repaint: C.bool(payload.NeedsRepaint),
 	})
 }
 
 func (event runtimeEventForTest) withTileAction(payload RuntimeEventTileAction) runtimeEventForTest {
 	return withPayload(event, C.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION, C.mln_runtime_event_tile_action{
-		operation: C.uint32_t(payload.Operation),
+		operation: C.mln_tile_operation(payload.Operation),
 		tile_id: C.mln_tile_id{
 			overscaled_z: C.uint32_t(payload.TileId.OverscaledZ),
 			wrap:         C.int32_t(payload.TileId.Wrap),
@@ -90,7 +90,7 @@ func (event runtimeEventForTest) withTileAction(payload RuntimeEventTileAction) 
 // withRawPayload fills the payload window with bytes under a payload type this
 // binding version does not define.
 func (event runtimeEventForTest) withRawPayload(payloadType uint32, bytes []byte) runtimeEventForTest {
-	event.raw.payload_type = C.uint32_t(payloadType)
+	event.raw.payload_type = C.mln_runtime_event_payload_type(payloadType)
 	window := event.raw.payload[:]
 	clear(window)
 	copy(window, bytes)
@@ -145,7 +145,7 @@ func int32CompletionForTest(convert func(int32) (int32, error)) (*Future[int32],
 		return convert(int32(value))
 	}}
 	deliver := func(status int32, value *int32) {
-		result := C.mln_completion_result{status: C.int32_t(status)}
+		result := C.mln_completion_result{status: C.mln_status(status)}
 		if value != nil {
 			native := C.int32_t(*value)
 			result.value = unsafe.Pointer(&native)

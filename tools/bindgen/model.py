@@ -133,6 +133,25 @@ class Api:
     def typedefs_by_name(self) -> dict[str, Typedef]:
         return {typedef.name: typedef for typedef in self.typedefs}
 
+    @property
+    def enums_by_name(self) -> dict[str, Enum]:
+        return {enum.name: enum for enum in self.enums}
+
+    def enum_for(self, type_name: str) -> Enum | None:
+        """The enum whose values a type holds: the enum's own type, or for a
+        bitmask enum, the `<enum>s` integer typedef that holds a set of them."""
+        enums = self.enums_by_name
+        if type_name in enums:
+            return enums[type_name]
+        enum = enums.get(type_name.removesuffix("s"))
+        if (
+            type_name.endswith("s")
+            and enum is not None
+            and enum.metadata.get("kind") == "bitmask"
+        ):
+            return enum
+        return None
+
 
 class ModelError(ValueError):
     """An input cannot be represented safely by the common model."""

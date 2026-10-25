@@ -11,13 +11,13 @@ fn discarded_commands_are_fenced_and_sync_rejections_return_errors() {
     fixture
         .map()
         .discarding()
-        .set_debug_options(MapDebugOption::TILE_BORDERS)
+        .set_debug_options(MapDebugFlag::TILE_BORDERS)
         .unwrap();
     // A later command on the same map completes after the discarded one.
     wait_for(fixture.map().request_repaint());
     assert_eq!(
         fixture.map().get_snapshot().unwrap().debug_options,
-        MapDebugOption::TILE_BORDERS
+        MapDebugFlag::TILE_BORDERS
     );
     let error = fixture
         .map()
@@ -101,12 +101,12 @@ fn open_enums_keep_unknown_values_and_64_bit_masks_cross_whole() {
     // and be accepted.
     let error = fixture
         .runtime()
-        .set_event_mask(RuntimeEventMask::from_bits_retain(1 << 63))
+        .set_event_mask(RuntimeEventFlag::from_bits_retain(1 << 63))
         .unwrap_err();
     assert_eq!(error.status(), Status::InvalidArgument);
     assert_eq!(
         fixture.runtime().get_event_mask().unwrap(),
-        RuntimeEventMask::ALL
+        RuntimeEventFlag::ALL
     );
 }
 

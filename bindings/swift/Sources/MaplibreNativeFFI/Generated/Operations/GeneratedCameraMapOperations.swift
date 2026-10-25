@@ -210,13 +210,13 @@ public extension MapHandle {
   /// See `mln_map_set_debug_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
-  func setDebugOptions(_ bindingArg0: MapDebugOption) async throws
+  func setDebugOptions(_ bindingArg0: MapDebugFlag) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, _, completion, diagnostic in
       mln_map_set_debug_options(
         raw,
-        bindingArg0.nativeValue(),
+        bindingArg0.rawValue,
         completion,
         diagnostic
       )
@@ -378,10 +378,10 @@ public extension MapHandleDiscarding {
     ) }
   }
 
-  func setDebugOptions(_ bindingArg0: MapDebugOption) throws {
+  func setDebugOptions(_ bindingArg0: MapDebugFlag) throws {
     try owner.nativeInvoke { raw, _, diagnostic in mln_map_set_debug_options(
       raw,
-      bindingArg0.nativeValue(),
+      bindingArg0.rawValue,
       nil,
       diagnostic
     ) }

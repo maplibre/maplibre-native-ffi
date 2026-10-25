@@ -132,11 +132,11 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * See `mln_runtime_get_event_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun getEventMask(): RuntimeEventMask =
+  public fun getEventMask(): RuntimeEventFlag =
     nativeCall(this, binding) {
       val out = allocate(8, 8)
       check(C.mln_runtime_get_event_mask(handle, out, diagnostic))
-      RuntimeEventMask(readU64(out))
+      RuntimeEventFlag(readU64(out))
     }
 
   /**
@@ -284,7 +284,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * See `mln_runtime_set_event_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun setEventMask(mask: RuntimeEventMask): Unit =
+  public fun setEventMask(mask: RuntimeEventFlag): Unit =
     nativeCall(this, binding) {
       check(C.mln_runtime_set_event_mask(handle, mask.rawValue.toLong(), diagnostic))
     }

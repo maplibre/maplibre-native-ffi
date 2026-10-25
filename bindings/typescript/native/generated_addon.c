@@ -489,7 +489,7 @@ static napi_value mln_ts_export_mln_log_set_async_severity_mask(
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
-  uint32_t arg_mask;
+  mln_log_severity_flags arg_mask;
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 1)) return NULL;
@@ -500,7 +500,7 @@ static napi_value mln_ts_export_mln_log_set_async_severity_mask(
           call, call->argv[0], 0LL, 4294967295LL, &number, "mask"
         ))
       goto done;
-    arg_mask = (uint32_t)number;
+    arg_mask = (mln_log_severity_flags)number;
   }
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
@@ -3395,7 +3395,7 @@ static napi_value mln_ts_export_mln_map_set_debug_options(
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_map arg_map = 0;
-  uint32_t arg_options;
+  mln_map_debug_flags arg_options;
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
@@ -3413,7 +3413,7 @@ static napi_value mln_ts_export_mln_map_set_debug_options(
           call, call->argv[1], 0LL, 4294967295LL, &number, "options"
         ))
       goto done;
-    arg_options = (uint32_t)number;
+    arg_options = (mln_map_debug_flags)number;
   }
   if (!mln_ts_read_completion(
         call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
@@ -3436,7 +3436,7 @@ static napi_value mln_ts_export_mln_map_set_event_mask(
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_map arg_map = 0;
-  uint64_t arg_mask;
+  mln_runtime_event_flags arg_mask;
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
@@ -3451,7 +3451,7 @@ static napi_value mln_ts_export_mln_map_set_event_mask(
   {
     uint64_t number = 0;
     if (!mln_ts_read_u64(call, call->argv[1], &number, "mask")) goto done;
-    arg_mask = (uint64_t)number;
+    arg_mask = (mln_runtime_event_flags)number;
   }
   if (!mln_ts_read_completion(
         call, call->argv[2], true, MLN_TS_NO_DECODER, &arg_completion,
@@ -4392,7 +4392,7 @@ static napi_value mln_ts_export_mln_network_get_status(
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
-  uint32_t arg_out_status;
+  mln_network_status arg_out_status;
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 0)) return NULL;
@@ -4411,7 +4411,7 @@ static napi_value mln_ts_export_mln_network_set_status(
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
-  uint32_t arg_status;
+  mln_network_status arg_status;
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 1)) return NULL;
@@ -4422,7 +4422,7 @@ static napi_value mln_ts_export_mln_network_set_status(
           call, call->argv[0], 0LL, 4294967295LL, &number, "status"
         ))
       goto done;
-    arg_status = (uint32_t)number;
+    arg_status = (mln_network_status)number;
   }
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
@@ -4464,7 +4464,7 @@ static napi_value mln_ts_export_mln_opengl_supported_context_provider_mask(
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
-  uint32_t result;
+  mln_opengl_context_provider_flags result;
   if (!mln_ts_begin(call, env, info, 0)) return NULL;
   result = mln_opengl_supported_context_provider_mask();
   call->result = mln_ts_number(env, (double)(result));
@@ -5919,7 +5919,7 @@ static napi_value mln_ts_export_mln_runtime_get_event_mask(
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_runtime arg_runtime = 0;
-  uint64_t arg_out_mask;
+  mln_runtime_event_flags arg_out_mask;
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 1)) return NULL;
@@ -6168,7 +6168,7 @@ static napi_value mln_ts_export_mln_runtime_run_ambient_cache_operation(
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_runtime arg_runtime = 0;
-  uint32_t arg_operation;
+  mln_ambient_cache_operation arg_operation;
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
@@ -6186,7 +6186,7 @@ static napi_value mln_ts_export_mln_runtime_run_ambient_cache_operation(
           call, call->argv[1], 0LL, 4294967295LL, &number, "operation"
         ))
       goto done;
-    arg_operation = (uint32_t)number;
+    arg_operation = (mln_ambient_cache_operation)number;
   }
   if (!mln_ts_read_completion(
         call, call->argv[2], false, MLN_TS_NO_DECODER, &arg_completion,
@@ -6252,7 +6252,7 @@ static napi_value mln_ts_export_mln_runtime_set_event_mask(
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_runtime arg_runtime = 0;
-  uint64_t arg_mask;
+  mln_runtime_event_flags arg_mask;
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 2)) return NULL;
@@ -6265,7 +6265,7 @@ static napi_value mln_ts_export_mln_runtime_set_event_mask(
   {
     uint64_t number = 0;
     if (!mln_ts_read_u64(call, call->argv[1], &number, "mask")) goto done;
-    arg_mask = (uint64_t)number;
+    arg_mask = (mln_runtime_event_flags)number;
   }
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
@@ -6360,7 +6360,7 @@ static napi_value mln_ts_export_mln_runtime_set_offline_region_download_state(
   mln_ts_call* call = &call_state;
   mln_runtime arg_runtime = 0;
   mln_offline_region_id arg_region_id;
-  uint32_t arg_state;
+  mln_offline_region_download_state arg_state;
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
@@ -6384,7 +6384,7 @@ static napi_value mln_ts_export_mln_runtime_set_offline_region_download_state(
           call, call->argv[2], 0LL, 4294967295LL, &number, "state"
         ))
       goto done;
-    arg_state = (uint32_t)number;
+    arg_state = (mln_offline_region_download_state)number;
   }
   if (!mln_ts_read_completion(
         call, call->argv[3], false, MLN_TS_NO_DECODER, &arg_completion,
@@ -6781,7 +6781,7 @@ static napi_value mln_ts_export_mln_supported_render_backend_mask(
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
-  uint32_t result;
+  mln_render_backend_flags result;
   if (!mln_ts_begin(call, env, info, 0)) return NULL;
   result = mln_supported_render_backend_mask();
   call->result = mln_ts_number(env, (double)(result));

@@ -414,7 +414,6 @@ impl FromNative<sys::mln_camera_query_result> for CameraQueryResult {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct CameraTransitionEnd {
-    /// One of `mln_camera_transition_outcome`.
     pub outcome: CameraTransitionOutcome,
     /// Generation of the published snapshot that shows the camera where the
     /// transitions left it. The map events of the change that ended them carry
@@ -1322,10 +1321,9 @@ impl Default for GesturePhase {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GpuSync {
-    /// One `mln_gpu_sync_kind` value.
     pub kind: GpuSyncKind,
     /// Bit pattern of the GLsync pointer.
-    pub object: u64,
+    pub handle: u64,
 }
 impl Default for GpuSync {
     fn default() -> Self {
@@ -1338,7 +1336,7 @@ impl ToNative<sys::mln_gpu_sync> for GpuSync {
         let mut raw: sys::mln_gpu_sync = unsafe { sys::mln_gpu_sync_default() };
         raw.size = std::mem::size_of::<sys::mln_gpu_sync>() as _;
         raw.kind = to_native(&self.kind, arena)?;
-        raw.object = self.object;
+        raw.handle = self.handle;
         Ok(raw)
     }
 }
@@ -1346,7 +1344,7 @@ impl FromNative<sys::mln_gpu_sync> for GpuSync {
     unsafe fn from_native(raw: sys::mln_gpu_sync) -> Result<Self> {
         Ok(Self {
             kind: GpuSyncKind::from_raw(raw.kind),
-            object: raw.object,
+            handle: raw.handle,
         })
     }
 }
@@ -1362,8 +1360,8 @@ pub enum GpuSyncKind: u32 {
     /// acquirable or before the release call.
     CpuComplete = 0,
     /// GLsync in the shared EGL or WGL context's share group, used only by a
-    /// caller-graphics-thread driver. object is nonzero.
-    OpenglFence = 3,
+    /// caller-graphics-thread driver. handle is nonzero.
+    OpenglFence = 1,
 } Unknown
 }
 impl Default for GpuSyncKind {
@@ -1405,9 +1403,8 @@ impl FromNative<sys::mln_http_header> for HttpHeader {
 #[derive(Debug, Clone, PartialEq)]
 pub struct HttpHeaderRule {
     /// The resource kinds to match.
-    pub kinds: ResourceKindMask,
-    /// A bitwise OR of `mln_url_match_flags` values.
-    pub flags: UrlMatchFlags,
+    pub kinds: ResourceKindFlag,
+    pub flags: UrlMatchFlag,
     /// The URL or glob pattern to compare.
     pub url: String,
     /// The headers to set. Registration validates each one as
@@ -1434,8 +1431,8 @@ impl ToNative<sys::mln_http_header_rule> for HttpHeaderRule {
 impl FromNative<sys::mln_http_header_rule> for HttpHeaderRule {
     unsafe fn from_native(raw: sys::mln_http_header_rule) -> Result<Self> {
         Ok(Self {
-            kinds: ResourceKindMask::from_bits_retain(raw.kinds),
-            flags: UrlMatchFlags::from_bits_retain(raw.flags),
+            kinds: ResourceKindFlag::from_bits_retain(raw.kinds),
+            flags: UrlMatchFlag::from_bits_retain(raw.flags),
             url: unsafe { from_native(raw.url) }?,
             headers: unsafe { convert::copy_array(raw.headers, raw.header_count) }?,
         })
@@ -1494,7 +1491,7 @@ impl HttpHeaderTransform {
     }
     unsafe extern "C" fn callback_trampoline(
         user_data: *mut std::ffi::c_void,
-        kind: u32,
+        kind: sys::mln_resource_kind,
         url: *const std::ffi::c_char,
         out_response: *mut sys::mln_http_header_transform_response,
     ) -> sys::mln_status {
@@ -1776,8 +1773,8 @@ impl LogHandler {
     }
     unsafe extern "C" fn callback_trampoline(
         user_data: *mut std::ffi::c_void,
-        severity: u32,
-        event: u32,
+        severity: sys::mln_log_severity,
+        event: sys::mln_log_event,
         code: i64,
         message: *const std::ffi::c_char,
     ) -> bool {
@@ -1827,9 +1824,9 @@ pub enum LogSeverity: u32 {
 native_flags! {
 /// Bitmask values for log severities dispatched asynchronously.
 ///
-/// See `mln_log_severity_mask` in the
+/// See `mln_log_severity_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-pub struct LogSeverityMask: u32 {
+pub struct LogSeverityFlag: u32 {
     const INFO = 2;
     const WARNING = 4;
     const ERROR = 8;
@@ -1888,9 +1885,9 @@ impl FromNative<sys::mln_logical_extent> for LogicalExtent {
 native_flags! {
 /// Debug overlay mask values for `mln_map_set_debug_options()`.
 ///
-/// See `mln_map_debug_option` in the
+/// See `mln_map_debug_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub struct MapDebugOption: u32 {
+pub struct MapDebugFlag: u32 {
     const TILE_BORDERS = 2;
     const PARSE_STATUS = 4;
     const TIMESTAMPS = 8;
@@ -1931,14 +1928,14 @@ pub struct MapOptions {
     /// scale_factor must be finite and positive. scale_factor is fixed for the
     /// map's lifetime.
     pub initial_extent: LogicalExtent,
-    /// One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`.
+    /// Defaults to `MLN_MAP_MODE_CONTINUOUS`.
     pub map_mode: MapMode,
     /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
     /// encodings. Defaults to false.
     pub fast_pfor_enabled: bool,
     /// Map-originated event types this map queues, as a bitwise OR of
-    /// `mln_runtime_event_mask` values.
-    pub event_mask: RuntimeEventMask,
+    /// `mln_runtime_event_flag` values.
+    pub event_mask: RuntimeEventFlag,
 }
 impl Default for MapOptions {
     fn default() -> Self {
@@ -1963,7 +1960,7 @@ impl FromNative<sys::mln_map_options> for MapOptions {
             initial_extent: unsafe { from_native(raw.initial_extent) }?,
             map_mode: MapMode::from_raw(raw.map_mode),
             fast_pfor_enabled: raw.fast_pfor_enabled,
-            event_mask: RuntimeEventMask::from_bits_retain(raw.event_mask),
+            event_mask: RuntimeEventFlag::from_bits_retain(raw.event_mask),
         })
     }
 }
@@ -1974,8 +1971,8 @@ impl FromNative<sys::mln_map_options> for MapOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct MapSnapshot {
-    /// Debug overlay mask of `mln_map_debug_option` values.
-    pub debug_options: MapDebugOption,
+    /// Debug overlay mask of `mln_map_debug_flag` values.
+    pub debug_options: MapDebugFlag,
     pub generation: u64,
     /// True once every requested style and tile resource finished loading.
     pub fully_loaded: bool,
@@ -1984,7 +1981,7 @@ pub struct MapSnapshot {
     pub gesture_in_progress: bool,
     /// True while a camera command with a duration is still animating.
     pub transition_in_progress: bool,
-    pub event_mask: RuntimeEventMask,
+    pub event_mask: RuntimeEventFlag,
     /// Generation of the latest render update the map published. A rendered
     /// frame at or past it draws map state that includes every command this
     /// snapshot observes, though animations and resource loads finish in later
@@ -2000,13 +1997,13 @@ pub struct MapSnapshot {
 impl FromNative<sys::mln_map_snapshot> for MapSnapshot {
     unsafe fn from_native(raw: sys::mln_map_snapshot) -> Result<Self> {
         Ok(Self {
-            debug_options: MapDebugOption::from_bits_retain(raw.debug_options),
+            debug_options: MapDebugFlag::from_bits_retain(raw.debug_options),
             generation: raw.generation,
             fully_loaded: raw.fully_loaded,
             rendering_stats_view_enabled: raw.rendering_stats_view_enabled,
             gesture_in_progress: raw.gesture_in_progress,
             transition_in_progress: raw.transition_in_progress,
-            event_mask: RuntimeEventMask::from_bits_retain(raw.event_mask),
+            event_mask: RuntimeEventFlag::from_bits_retain(raw.event_mask),
             latest_render_update_generation: raw.latest_render_update_generation,
             tile: unsafe { from_native(raw.tile) }?,
             bounds: unsafe { from_native(raw.bounds) }?,
@@ -2028,7 +2025,6 @@ pub struct MapTileOptions {
     pub lod_scale: Option<f64>,
     pub lod_pitch_threshold: Option<f64>,
     pub lod_zoom_shift: Option<f64>,
-    /// One of `mln_tile_lod_mode`.
     pub lod_mode: Option<TileLodMode>,
 }
 impl Default for MapTileOptions {
@@ -2139,11 +2135,8 @@ impl FromNative<sys::mln_map_view> for MapView {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MapViewportOptions {
-    /// One of `mln_north_orientation`.
     pub north_orientation: Option<NorthOrientation>,
-    /// One of `mln_constrain_mode`.
     pub constrain_mode: Option<ConstrainMode>,
-    /// One of `mln_viewport_mode`.
     pub viewport_mode: Option<ViewportMode>,
     pub frustum_offset: Option<EdgeInsets>,
 }
@@ -2618,7 +2611,6 @@ impl FromNative<sys::mln_offline_region_info> for OfflineRegionInfo {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct OfflineRegionStatus {
-    /// One of `mln_offline_region_download_state`.
     pub download_state: OfflineRegionDownloadState,
     pub completed_resource_count: u64,
     pub completed_resource_size: u64,
@@ -3299,7 +3291,6 @@ impl Default for RenderAbandonDisposition {
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RenderAbandonResult {
-    /// One `mln_render_abandon_disposition` value.
     pub disposition: RenderAbandonDisposition,
     /// Backend resource groups intentionally retained until process exit.
     pub quarantined_resource_count: u32,
@@ -3348,7 +3339,6 @@ pub enum RenderDriverKind: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RenderFrameResult {
-    /// One `mln_render_result` value.
     pub disposition: RenderResult,
     pub token: u64,
     /// Generation of the map render update the demand evaluated. When
@@ -3426,9 +3416,9 @@ pub enum RenderResult: u32 {
     /// later demand with the same flags renders what this one would have. This
     /// result does not cause a map update, so the host demands again when the
     /// target can be ready, such as after a paced delay.
-    TargetNotReady = 3,
+    TargetNotReady = 2,
     /// A newer IF_NEEDED demand with the same flags replaced this demand.
-    Superseded = 4,
+    Superseded = 3,
 } Unknown
 }
 impl Default for RenderResult {
@@ -3443,8 +3433,7 @@ impl Default for RenderResult {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone)]
 pub struct RenderSessionAttachOptions {
-    /// One `mln_render_driver_kind` value. Defaults to
-    /// `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
+    /// Defaults to `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
     pub driver: RenderDriverKind,
     /// Requested slot count of a session-owned texture ring, from one to
     /// `MLN_TEXTURE_RING_MAX_DEPTH`. Private targets grant one slot regardless
@@ -3507,12 +3496,10 @@ impl FromNative<sys::mln_render_session_attach_options> for RenderSessionAttachO
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RenderSessionCapabilities {
-    /// One `mln_render_driver_kind` value.
     pub driver: RenderDriverKind,
     /// Granted texture ring depth: the slot count of a session-owned ring, or
     /// the texture count of a borrowed one. Zero for a surface.
     pub texture_ring_depth: u32,
-    /// A bitwise OR of `mln_render_session_capability_flag` values.
     pub flags: RenderSessionCapabilityFlag,
 }
 impl FromNative<sys::mln_render_session_capabilities> for RenderSessionCapabilities {
@@ -3544,7 +3531,6 @@ pub struct RenderSessionCapabilityFlag: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RenderSessionSnapshot {
-    /// One `mln_render_session_state` value.
     pub state: RenderSessionState,
     /// Logical extent applied by the driver.
     pub extent: LogicalExtent,
@@ -3825,11 +3811,11 @@ impl Default for ResourceKind {
 native_flags! {
 /// The resource kinds that a route or rule matches, one bit per
 /// `mln_resource_kind` value. Registration requires at least one known bit.
-/// `MLN_RESOURCE_KIND_MASK_ALL` selects every resource kind.
+/// `MLN_RESOURCE_KIND_FLAG_ALL` selects every resource kind.
 ///
-/// See `mln_resource_kind_mask` in the
+/// See `mln_resource_kind_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub struct ResourceKindMask: u32 {
+pub struct ResourceKindFlag: u32 {
     const UNKNOWN = 1;
     const STYLE = 2;
     const SOURCE = 4;
@@ -4131,9 +4117,8 @@ impl Default for ResourceResponseStatus {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResourceRoute {
     /// The resource kinds to match.
-    pub kinds: ResourceKindMask,
-    /// A bitwise OR of `mln_url_match_flags` values.
-    pub flags: UrlMatchFlags,
+    pub kinds: ResourceKindFlag,
+    pub flags: UrlMatchFlag,
     /// The URL or glob pattern to compare.
     pub url: String,
 }
@@ -4155,8 +4140,8 @@ impl ToNative<sys::mln_resource_route> for ResourceRoute {
 impl FromNative<sys::mln_resource_route> for ResourceRoute {
     unsafe fn from_native(raw: sys::mln_resource_route) -> Result<Self> {
         Ok(Self {
-            kinds: ResourceKindMask::from_bits_retain(raw.kinds),
-            flags: UrlMatchFlags::from_bits_retain(raw.flags),
+            kinds: ResourceKindFlag::from_bits_retain(raw.kinds),
+            flags: UrlMatchFlag::from_bits_retain(raw.flags),
             url: unsafe { from_native(raw.url) }?,
         })
     }
@@ -4210,7 +4195,7 @@ impl ResourceTransform {
     }
     unsafe extern "C" fn callback_trampoline(
         user_data: *mut std::ffi::c_void,
-        kind: u32,
+        kind: sys::mln_resource_kind,
         url: *const std::ffi::c_char,
         request: sys::mln_resource_transform_request,
     ) {
@@ -4263,9 +4248,7 @@ impl Default for ResourceUsage {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct RuntimeEvent {
-    /// One of `mln_runtime_event_type`.
     pub r#type: RuntimeEventType,
-    /// One of `mln_runtime_event_source_type`.
     pub source_type: RuntimeEventSourceType,
     /// Source handle selected by source_type: an `mln_runtime` or an `mln_map`.
     pub source: u64,
@@ -4274,7 +4257,7 @@ pub struct RuntimeEvent {
     pub generation: u64,
     /// Secondary event detail whose meaning type selects; see
     /// `mln_runtime_event_type`.
-    pub code: i32,
+    pub code: u32,
     /// Borrowed UTF-8 message bytes, empty when this event carries no message.
     pub message: String,
     /// Typed payload selected by payload_type.
@@ -4323,6 +4306,40 @@ impl FromNative<sys::mln_runtime_event> for RuntimeEvent {
             },
         })
     }
+}
+
+native_flags! {
+/// Bit values for the map and runtime event subscription masks.
+///
+/// See `mln_runtime_event_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub struct RuntimeEventFlag: u64 {
+    const MAP_CAMERA_WILL_CHANGE = 2;
+    const MAP_CAMERA_IS_CHANGING = 4;
+    const MAP_CAMERA_DID_CHANGE = 8;
+    const MAP_STYLE_LOADED = 16;
+    const MAP_LOADING_STARTED = 32;
+    const MAP_LOADING_FINISHED = 64;
+    const MAP_LOADING_FAILED = 128;
+    const MAP_IDLE = 256;
+    const MAP_RENDER_ERROR = 512;
+    const MAP_RENDER_FRAME_STARTED = 1024;
+    const MAP_RENDER_FRAME_FINISHED = 2048;
+    const MAP_RENDER_MAP_STARTED = 4096;
+    const MAP_RENDER_MAP_FINISHED = 8192;
+    const MAP_STYLE_IMAGE_MISSING = 16384;
+    const MAP_TILE_ACTION = 32768;
+    const MAP_SOURCE_CHANGED = 65536;
+    const OFFLINE_REGION_STATUS_CHANGED = 131072;
+    const OFFLINE_REGION_RESPONSE_ERROR = 262144;
+    const OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 524288;
+    /// Selects every map-originated event type this version defines.
+    const ALL_MAP_EVENTS = 131070;
+    /// Selects every runtime-originated event type this version defines.
+    const ALL_RUNTIME_EVENTS = 917504;
+    /// Selects every event type this version defines.
+    const ALL = 1048574;
+}
 }
 
 /// Runtime and map event delivery. Set either callback or queue.
@@ -4388,40 +4405,6 @@ impl ToNative<sys::mln_runtime_event_handler> for RuntimeEventHandler {
     }
 }
 
-native_flags! {
-/// Bit values for the map and runtime event subscription masks.
-///
-/// See `mln_runtime_event_mask` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub struct RuntimeEventMask: u64 {
-    const MAP_CAMERA_WILL_CHANGE = 2;
-    const MAP_CAMERA_IS_CHANGING = 4;
-    const MAP_CAMERA_DID_CHANGE = 8;
-    const MAP_STYLE_LOADED = 16;
-    const MAP_LOADING_STARTED = 32;
-    const MAP_LOADING_FINISHED = 64;
-    const MAP_LOADING_FAILED = 128;
-    const MAP_IDLE = 256;
-    const MAP_RENDER_ERROR = 1024;
-    const MAP_RENDER_FRAME_STARTED = 8192;
-    const MAP_RENDER_FRAME_FINISHED = 16384;
-    const MAP_RENDER_MAP_STARTED = 32768;
-    const MAP_RENDER_MAP_FINISHED = 65536;
-    const MAP_STYLE_IMAGE_MISSING = 131072;
-    const MAP_TILE_ACTION = 262144;
-    const OFFLINE_REGION_STATUS_CHANGED = 524288;
-    const OFFLINE_REGION_RESPONSE_ERROR = 1048576;
-    const OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152;
-    const MAP_SOURCE_CHANGED = 8388608;
-    /// Selects every map-originated event type this version defines.
-    const ALL_MAP_EVENTS = 8906238;
-    /// Selects every runtime-originated event type this version defines.
-    const ALL_RUNTIME_EVENTS = 3670016;
-    /// Selects every event type this version defines.
-    const ALL = 12576254;
-}
-}
-
 /// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
 ///
 /// See `mln_runtime_event_offline_region_response_error` in the
@@ -4429,7 +4412,6 @@ pub struct RuntimeEventMask: u64 {
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RuntimeEventOfflineRegionResponseError {
     pub region_id: i64,
-    /// One of `mln_resource_error_reason`.
     pub reason: ResourceErrorReason,
 }
 impl FromNative<sys::mln_runtime_event_offline_region_response_error>
@@ -4512,7 +4494,6 @@ impl Default for RuntimeEventPayload {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RuntimeEventRenderFrame {
-    /// One of `mln_render_mode`.
     pub mode: RenderMode,
     /// Whether MapLibre needs another frame after this one.
     pub needs_repaint: bool,
@@ -4537,7 +4518,6 @@ impl FromNative<sys::mln_runtime_event_render_frame> for RuntimeEventRenderFrame
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RuntimeEventRenderMap {
-    /// One of `mln_render_mode`.
     pub mode: RenderMode,
 }
 impl FromNative<sys::mln_runtime_event_render_map> for RuntimeEventRenderMap {
@@ -4570,7 +4550,6 @@ impl Default for RuntimeEventSourceType {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RuntimeEventTileAction {
-    /// One of `mln_tile_operation`.
     pub operation: TileOperation,
     pub tile_id: TileId,
 }
@@ -4597,17 +4576,17 @@ pub enum RuntimeEventType: u32 {
     MapLoadingFinished = 6,
     MapLoadingFailed = 7,
     MapIdle = 8,
-    MapRenderError = 10,
-    MapRenderFrameStarted = 13,
-    MapRenderFrameFinished = 14,
-    MapRenderMapStarted = 15,
-    MapRenderMapFinished = 16,
-    MapStyleImageMissing = 17,
-    MapTileAction = 18,
-    OfflineRegionStatusChanged = 19,
-    OfflineRegionResponseError = 20,
-    OfflineRegionTileCountLimitExceeded = 21,
-    MapSourceChanged = 23,
+    MapRenderError = 9,
+    MapRenderFrameStarted = 10,
+    MapRenderFrameFinished = 11,
+    MapRenderMapStarted = 12,
+    MapRenderMapFinished = 13,
+    MapStyleImageMissing = 14,
+    MapTileAction = 15,
+    MapSourceChanged = 16,
+    OfflineRegionStatusChanged = 17,
+    OfflineRegionResponseError = 18,
+    OfflineRegionTileCountLimitExceeded = 19,
 } Unknown
 }
 
@@ -5002,7 +4981,6 @@ impl FromNative<sys::mln_style_expression_options> for StyleExpressionOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct StyleExpressionType {
-    /// One of `mln_style_expression_type_kind`.
     pub kind: StyleExpressionTypeKind,
     /// For an array, its items' kind; ignored for any other kind.
     pub item_kind: StyleExpressionTypeKind,
@@ -5125,9 +5103,9 @@ pub struct StyleImageOptions {
     pub stretch_y: Option<Vec<ImageStretch>>,
     /// Content box used when icon-text-fit applies.
     pub content: Option<ImageContent>,
-    /// One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK.
+    /// Defaults to STRETCH_OR_SHRINK.
     pub text_fit_width: Option<StyleImageTextFit>,
-    /// One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK.
+    /// Defaults to STRETCH_OR_SHRINK.
     pub text_fit_height: Option<StyleImageTextFit>,
     /// Sprite pixel ratio. Defaults to 1.
     pub pixel_ratio: Option<f32>,
@@ -5249,7 +5227,6 @@ pub struct StyleLayerInfo {
     pub min_zoom: f64,
     /// Highest zoom at which the layer draws; INFINITY with no upper bound.
     pub max_zoom: f64,
-    /// One of `mln_style_layer_visibility`.
     pub visibility: StyleLayerVisibility,
 }
 impl FromNative<sys::mln_style_layer_info> for StyleLayerInfo {
@@ -5306,7 +5283,6 @@ impl Default for StyleRasterDemEncoding {
 pub struct StyleSourceInfo {
     /// Source ID.
     pub id: String,
-    /// One of `mln_style_source_type`.
     pub r#type: StyleSourceType,
     /// Whether the source is marked volatile.
     pub is_volatile: bool,
@@ -5377,7 +5353,6 @@ pub struct StyleSourceTileInfo {
     pub min_zoom: f64,
     /// Highest zoom level the TileJSON provides tiles for.
     pub max_zoom: f64,
-    /// One of `mln_style_tile_scheme`.
     pub scheme: StyleTileScheme,
 }
 impl FromNative<sys::mln_style_source_tile_info> for StyleSourceTileInfo {
@@ -5652,9 +5627,9 @@ impl FromNative<sys::mln_unit_bezier> for UnitBezier {
 native_flags! {
 /// How a rule or route compares its url against a request URL.
 ///
-/// See `mln_url_match_flags` in the
+/// See `mln_url_match_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub struct UrlMatchFlags: u32 {
+pub struct UrlMatchFlag: u32 {
     /// Reads url as a glob pattern.
     const GLOB = 1;
 }
@@ -6058,7 +6033,6 @@ impl ToNative<sys::mln_wake> for Wake {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct WebglContextDescriptor {
-    /// One `mln_webgl_context_kind` value.
     pub kind: WebglContextKind,
     /// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
     pub context: i32,
