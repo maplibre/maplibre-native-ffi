@@ -1,7 +1,8 @@
 # Rubberstamp (https://github.com/sargunv/rubberstamp) labels new issues and
 # pull requests, and plans which CI units each pull request runs. A label means
-# its GitHub description unless `describe` overrides it, and a group that
+# its GitHub description unless its group gives it a meaning, and a group that
 # already has a label keeps it.
+version: 1
 context: >-
   A C API for MapLibre Native, the C++ map renderer, which is vendored as a git
   submodule with carried patches. Bindings for Dart, Go, Kotlin, .NET, Python,
@@ -13,85 +14,131 @@ labels:
   context: >-
     Labels record what work is about so maintainers can find related work.
   groups:
-    kind: { labels: [bug, feature, perf, chore, research], min: 1, max: 1 }
-    area:
-      labels: ["area:*"]
+    kind:
       min: 1
-      rule:
+      max: 1
+      labels:
+        bug: >-
+          Broken behavior: a crash, a wrong result, a failing build or CI job, a
+          violated contract, or a regression.
+        feature: >-
+          A new or changed capability for users of the C API, a binding, an
+          example, or the tooling, including new targets and packages.
+        perf: >-
+          Faster or leaner runtime, smaller binaries, or faster builds and CI,
+          without changing behavior.
+        chore: >-
+          Maintenance that adds nothing and fixes nothing: refactoring, cleanup,
+          tests, documentation, routine dependency updates, and process.
+        research: >-
+          An investigation, design evaluation, or prototype whose outcome is a
+          decision rather than shipped code.
+    area:
+      min: 1
+      guidance:
         A patch to MapLibre Native takes the area of the behavior it changes.
+      labels:
+        "area:*": ~
+        area:api: >-
+          What hosts program against: the C declarations and their contracts,
+          the bindings with their runtimes, generated code, generator, and
+          tests, and the example apps. A capability belongs to core or
+          rendering, and also to api only when the interface design or the
+          binding layer is the subject.
+        area:core: >-
+          The library's behavior behind the API: the runtime, threads, wakes,
+          and event delivery; maps, the camera, styles, sources, layers, and
+          feature state; queries and projection; resource providers, cache, and
+          offline; and logging.
+        area:rendering: >-
+          Turning a map into pixels: render sessions and drivers, targets,
+          surfaces, textures, readback, frame pacing, the OpenGL, Vulkan, Metal,
+          and WebGPU backends, and layer plugins.
+        area:platform: >-
+          The OS services under `src/platform/` that MapLibre Native runs on:
+          the run loop, threads, HTTP and TLS, image decoding, locale and text,
+          assets, and log sinks.
+        area:tooling: >-
+          Building, checking, and shipping: CMake, mise, Gradle, CI and its
+          runners, packaging, publishing, releases, formatters, linters, and
+          dependency management.
+        area:docs: >-
+          Documentation as the subject: the docs site, specifications, header
+          comments, API reference generation, and repository guidance such as
+          AGENTS.md. Updating docs to describe what a change ships doesn't
+          count.
+    # Each label is asked about alone, so only a question about the whole
+    # group can tell work on a few members from work that reaches them all.
     binding:
       labels: ["binding:*"]
-      rule: >-
+      guidance: >-
         Only for work specific to this binding. Work that several bindings pick
         up alike, such as a C API addition that every binding exposes, doesn't
         qualify.
+      rules:
+        - unless:
+            threshold: 0.3
+            ask: >-
+              Does this work concern particular bindings rather than the
+              bindings in general? It does when it changes, fixes, or reports
+              something in one or a few named bindings that the others don't
+              share. It doesn't when most or all bindings pick it up alike, such
+              as a C API change that every binding exposes, a generator change,
+              or a policy that every binding meets.
+          then: skip
     platform:
       labels: ["platform:*"]
-      rule: >-
+      guidance: >-
         Only for work specific to this platform, not work several platforms
         share alike. EGL and WGL are renderer subjects, not platform ones.
+      rules:
+        - unless:
+            threshold: 0.3
+            ask: >-
+              Does this work concern particular platforms rather than platforms
+              in general? It does when it changes, fixes, or reports something
+              on one or a few named platforms that the others don't share. EGL
+              and WGL are renderer subjects, not platform ones.
+          then: skip
     renderer:
       labels: ["renderer:*"]
-      rule: >-
+      guidance: >-
         Only for work specific to this backend, not work several backends share
         alike.
-    upstream: { labels: [upstream] }
-    dependencies: { labels: [dependencies] }
-  describe:
-    bug: >-
-      Broken behavior: a crash, a wrong result, a failing build or CI job, a
-      violated contract, or a regression.
-    feature: >-
-      A new or changed capability for users of the C API, a binding, an example,
-      or the tooling, including new targets and packages.
-    perf: >-
-      Faster or leaner runtime, smaller binaries, or faster builds and CI,
-      without changing behavior.
-    chore: >-
-      Maintenance that adds nothing and fixes nothing: refactoring, cleanup,
-      tests, documentation, routine dependency updates, and process.
-    research: >-
-      An investigation, design evaluation, or prototype whose outcome is a
-      decision rather than shipped code.
-    "area:api": >-
-      What hosts program against: the C declarations and their contracts, the
-      bindings with their runtimes, generated code, generator, and tests, and
-      the example apps. A capability belongs to core or rendering, and also to
-      api only when the interface design or the binding layer is the subject.
-    "area:core": >-
-      The library's behavior behind the API: the runtime, threads, wakes, and
-      event delivery; maps, the camera, styles, sources, layers, and feature
-      state; queries and projection; resource providers, cache, and offline; and
-      logging.
-    "area:rendering": >-
-      Turning a map into pixels: render sessions and drivers, targets, surfaces,
-      textures, readback, frame pacing, the OpenGL, Vulkan, Metal, and WebGPU
-      backends, and layer plugins.
-    "area:platform": >-
-      The OS services under `src/platform/` that MapLibre Native runs on: the
-      run loop, threads, HTTP and TLS, image decoding, locale and text, assets,
-      and log sinks.
-    "area:tooling": >-
-      Building, checking, and shipping: CMake, mise, Gradle, CI and its runners,
-      packaging, publishing, releases, formatters, linters, and dependency
-      management.
-    "area:docs": >-
-      Documentation as the subject: the docs site, specifications, header
-      comments, API reference generation, and repository guidance such as
-      AGENTS.md. Updating docs to describe what a change ships doesn't count.
-    upstream: >-
-      The work is in MapLibre Native's own code. A pull request qualifies when
-      it changes a patch under `patches/maplibre-native/` or moves the
-      `third_party/maplibre-native` submodule; the C++ in `src/` is ours even
-      where it wraps MapLibre Native. An issue qualifies when it says the engine
-      causes the bug or lacks the capability, or proposes the work upstream;
-      asking the C API to expose what the engine already has does not.
-    dependencies: >-
-      A third-party dependency's version, addition, or removal is the subject.
-      Versioning or pinning this repository's own packages doesn't count.
+      rules:
+        - unless:
+            threshold: 0.3
+            ask: >-
+              Does this work concern particular render backends rather than
+              rendering in general? It does when it changes, fixes, or reports
+              something in one or a few named backends that the others don't
+              share.
+          then: skip
+    # Whether the engine causes an issue is a judgment the labeler gets wrong,
+    # so only pull requests are labeled, by what they change.
+    upstream:
+      labels:
+        upstream:
+          meaning: >-
+            The work changes MapLibre Native's own code: a patch under
+            `patches/maplibre-native/` or the `third_party/maplibre-native`
+            submodule.
+          rules:
+            - if:
+                files:
+                  - patches/maplibre-native/*
+                  - third_party/maplibre-native
+              then: apply
+            - then: skip
+    dependencies:
+      labels:
+        dependencies: >-
+          A third-party dependency's version, addition, or removal is the
+          subject. Versioning or pinning this repository's own packages doesn't
+          count.
 
-# `ci/workflow.toml` maps each unit to its jobs. A changed file matching a
-# unit's `paths` runs it regardless of the plan; `*` also matches `/`.
+# `ci/workflow.toml` maps each unit to its jobs. A unit's rule runs it
+# regardless of the plan when a changed file matches; `*` also matches `/`.
 ci:
   workflow: .github/workflows/ci-coverage.yml
   threshold: 0.6
@@ -116,14 +163,17 @@ ci:
         Builds the Astro docs site, which hygiene only formats, and generates
         each binding's API reference with its own tool (Doxygen, Dokka, DocC,
         DocFX, dart doc, and others) from the C headers and binding sources.
-      paths: ["docs/*"]
+      rules: [{ if: { files: ["docs/*"] }, then: apply }]
     linux-x64:
       covers: >-
         Linux x64 glibc with OpenGL (EGL) and Vulkan. Runs the C tests, every
         binding's suite, the Dart build, and the example builds: the general
         check for shared native code, bindings, examples, and build logic.
-      paths:
-        - third_party/maplibre-native
+      rules:
+        - if:
+            files:
+              - third_party/maplibre-native
+          then: apply
     linux-arm64:
       covers: >-
         Linux ARM64 glibc with OpenGL (EGL) and Vulkan, running Linux x64's
@@ -132,31 +182,40 @@ ci:
         or build logic, a tool or dependency fetched per architecture, and the
         ARM runner setup. Linux platform, renderer, and binding changes that
         Linux x64 already builds and tests don't need it.
-      paths:
-        - third_party/maplibre-native
+      rules:
+        - if:
+            files:
+              - third_party/maplibre-native
+          then: apply
     linux-musl:
       covers: >-
         Linux musl on x64 and ARM64. Builds the native library, checks its musl
         ABI, and runs the Rust and .NET tests in Alpine. Catches libc
         assumptions and musl packaging problems. Platform-independent code that
         Linux x64 tests doesn't need it.
-      paths:
-        - third_party/maplibre-native
+      rules:
+        - if:
+            files:
+              - third_party/maplibre-native
+          then: apply
     macos:
       covers: >-
         macOS ARM64 with Metal, Vulkan (MoltenVK), and OpenGL (ANGLE). Runs the
         C tests and the desktop binding suites, including Swift. Catches Apple
         Clang, Apple SDK, Metal, and macOS packaging problems.
         Platform-independent code that Linux x64 tests doesn't need it.
-      paths:
-        - src/platform/apple/*
-        - src/render/metal/*
-        - cmake/apple/*
-        - cmake/platform/apple.cmake
-        - mise.macos.toml
-        - bindings/kotlin/src/macosTest/*
-        - examples/swift-map/*
-        - third_party/maplibre-native
+      rules:
+        - if:
+            files:
+              - src/platform/apple/*
+              - src/render/metal/*
+              - cmake/apple/*
+              - cmake/platform/apple.cmake
+              - mise.macos.toml
+              - bindings/kotlin/src/macosTest/*
+              - examples/swift-map/*
+              - third_party/maplibre-native
+          then: apply
     apple-mobile:
       covers: >-
         iOS, Mac Catalyst, and tvOS with Metal, on devices and simulators.
@@ -165,35 +224,41 @@ ci:
         XCFramework. Catches mobile SDK, cross-compilation, and framework
         packaging problems. Platform-independent code that Linux x64 tests
         doesn't need it.
-      paths:
-        - src/platform/apple/*
-        - src/render/metal/*
-        - cmake/apple/*
-        - cmake/platform/apple.cmake
-        - cmake/toolchains/apple.cmake
-        - cmake/mln_ffi_apple_framework.cmake
-        - .mise/tasks/package-xcframework
-        - bindings/kotlin/src/iosTest/*
-        - bindings/kotlin/src/tvosTest/*
-        - examples/swift-map/Package.swift
-        - examples/swift-map/mise.toml
-        - examples/swift-map/.mise/*
-        - examples/swift-map/Sources/SwiftMapIOS/*
-        - third_party/maplibre-native
+      rules:
+        - if:
+            files:
+              - src/platform/apple/*
+              - src/render/metal/*
+              - cmake/apple/*
+              - cmake/platform/apple.cmake
+              - cmake/toolchains/apple.cmake
+              - cmake/mln_ffi_apple_framework.cmake
+              - .mise/tasks/package-xcframework
+              - bindings/kotlin/src/iosTest/*
+              - bindings/kotlin/src/tvosTest/*
+              - examples/swift-map/Package.swift
+              - examples/swift-map/mise.toml
+              - examples/swift-map/.mise/*
+              - examples/swift-map/Sources/SwiftMapIOS/*
+              - third_party/maplibre-native
+          then: apply
     windows-x64:
       covers: >-
         Windows x64 with OpenGL (WGL) and Vulkan, built with MSVC. Runs the C
         tests and the desktop binding suites. Catches MSVC, Windows API, path,
         shell, and toolchain installation problems. Platform-independent code
         that Linux x64 tests doesn't need it.
-      paths:
-        - src/platform/windows/*
-        - src/render/opengl/wgl_*
-        - cmake/platform/windows.cmake
-        - mise.windows.toml
-        - .github/actions/setup-windows-*
-        - .github/actions/setup-ci-deps/*
-        - third_party/maplibre-native
+      rules:
+        - if:
+            files:
+              - src/platform/windows/*
+              - src/render/opengl/wgl_*
+              - cmake/platform/windows.cmake
+              - mise.windows.toml
+              - .github/actions/setup-windows-*
+              - .github/actions/setup-ci-deps/*
+              - third_party/maplibre-native
+          then: apply
     windows-arm64:
       covers: >-
         Windows ARM64 with OpenGL (WGL) and Vulkan, running Windows x64's suites
@@ -202,11 +267,14 @@ ci:
         dependency fetched per architecture, and the ARM runner setup. Windows
         platform, renderer, and binding changes that Windows x64 already builds
         and tests don't need it.
-      paths:
-        - cmake/platform/windows.cmake
-        - mise.windows.toml
-        - .github/actions/setup-windows-*
-        - third_party/maplibre-native
+      rules:
+        - if:
+            files:
+              - cmake/platform/windows.cmake
+              - mise.windows.toml
+              - .github/actions/setup-windows-*
+              - third_party/maplibre-native
+          then: apply
     android:
       covers: >-
         Android on ARM, ARM64, and x64 with OpenGL ES and Vulkan, built with the
@@ -215,14 +283,17 @@ ci:
         multi-ABI packaging. Catches NDK, Android API, JNI, emulator, and AAR
         problems. Platform-independent code that Linux x64 tests doesn't need
         it.
-      paths:
-        - src/platform/android/*
-        - cmake/platform/android.cmake
-        - mise.android.*
-        - bindings/kotlin/src/android*
-        - .mise/tasks/kotlin/check-android-api-floor
-        - .mise/tasks/kotlin/verify-android-multi-abi
-        - third_party/maplibre-native
+      rules:
+        - if:
+            files:
+              - src/platform/android/*
+              - cmake/platform/android.cmake
+              - mise.android.*
+              - bindings/kotlin/src/android*
+              - .mise/tasks/kotlin/check-android-api-floor
+              - .mise/tasks/kotlin/verify-android-multi-abi
+              - third_party/maplibre-native
+          then: apply
     ohos:
       covers: >-
         OpenHarmony on ARM64 and x64 with OpenGL ES and Vulkan. The x64 jobs run
@@ -231,38 +302,44 @@ ci:
         Platform-independent code that Linux x64 tests doesn't need it. Nor does
         a C API change that only regenerates the TypeScript binding; a change to
         its handwritten runtime, native addon, or ArkTS harness does.
-      paths:
-        - cmake/platform/ohos.cmake
-        - mise.ohos.*
-        - src/platform/ohos/*
-        - tests/native/abi/platform/transport.c
-        - bindings/typescript/native/CMake*
-        - bindings/typescript/native/exports.map
-        - bindings/typescript/native/realm.c
-        - bindings/typescript/native/runtime.*
-        - bindings/typescript/scripts/build-hap.sh
-        - bindings/typescript/scripts/test-arkts.sh
-        - bindings/typescript/src/arkts.ts
-        - bindings/typescript/src/internal/*
-        - bindings/typescript/test/arkts/*
-        - third_party/maplibre-native
+      rules:
+        - if:
+            files:
+              - cmake/platform/ohos.cmake
+              - mise.ohos.*
+              - src/platform/ohos/*
+              - tests/native/abi/platform/transport.c
+              - bindings/typescript/native/CMake*
+              - bindings/typescript/native/exports.map
+              - bindings/typescript/native/realm.c
+              - bindings/typescript/native/runtime.*
+              - bindings/typescript/scripts/build-hap.sh
+              - bindings/typescript/scripts/test-arkts.sh
+              - bindings/typescript/src/arkts.ts
+              - bindings/typescript/src/internal/*
+              - bindings/typescript/test/arkts/*
+              - third_party/maplibre-native
+          then: apply
     web:
       covers: >-
         The browser, built with Emscripten for WebGL and WebGPU. Runs the C,
         Rust, and Kotlin/Wasm tests in a browser. Catches Emscripten, wasm32,
         and browser rendering problems. Platform-independent code that Linux x64
         tests doesn't need it.
-      paths:
-        - src/platform/emscripten/*
-        - src/render/webgpu/*
-        - cmake/platform/emscripten.cmake
-        - cmake/toolchains/emscripten.cmake
-        - cmake/mln_ffi_emscripten.cmake
-        - mise.emscripten.*
-        - bindings/kotlin/src/wasmJs*
-        - bindings/kotlin/wasm/*
-        - bindings/kotlin/karma.config.d/*
-        - third_party/maplibre-native
+      rules:
+        - if:
+            files:
+              - src/platform/emscripten/*
+              - src/render/webgpu/*
+              - cmake/platform/emscripten.cmake
+              - cmake/toolchains/emscripten.cmake
+              - cmake/mln_ffi_emscripten.cmake
+              - mise.emscripten.*
+              - bindings/kotlin/src/wasmJs*
+              - bindings/kotlin/wasm/*
+              - bindings/kotlin/karma.config.d/*
+              - third_party/maplibre-native
+          then: apply
     maven:
       covers: >-
         Assembles and verifies the Kotlin Maven repository from every target's
@@ -270,6 +347,9 @@ ci:
         contains or how it is staged and verified need it: the module set, POM
         metadata, and artifact contents. Ordinary Kotlin changes and one
         platform's native packaging don't.
-      paths:
-        - .mise/tasks/kotlin/publish
-        - .mise/tasks/kotlin/verify-staging
+      rules:
+        - if:
+            files:
+              - .mise/tasks/kotlin/publish
+              - .mise/tasks/kotlin/verify-staging
+          then: apply

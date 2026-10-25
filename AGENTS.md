@@ -51,7 +51,10 @@ need and the code cannot say:
 
 [Rubberstamp](https://github.com/apps/rubberstamp-bot) labels each new issue and
 pull request from `.config/rubberstamp.yml`. Don't label by hand; correct a
-wrong label instead, and leave GitHub's native issue type unset.
+wrong label instead, and leave GitHub's native issue type unset. The one
+exception is `upstream`, which Rubberstamp gives only to pull requests that
+change MapLibre Native's code: add it to an issue yourself when the engine
+causes the bug or lacks the capability.
 
 PR titles follow Conventional Commits, since they become the squash-merge commit
 message. Write a short title and description for a reviewer who will read the
