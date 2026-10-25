@@ -23,10 +23,8 @@ public sealed class LeakReportTests
         using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
         var (map, mapId, undisposable) = Abandon(runtime);
 
-        Gc.Collect();
+        Gc.CollectUntilReclaimed("the abandoned handles", map, undisposable);
 
-        Assert.False(map.IsAlive);
-        Assert.False(undisposable.IsAlive);
         var report = $"Leaked MapHandle native handle 0x{mapId:x}; it was disposed when collected.";
         Assert.Contains(report, reports.Text, StringComparison.Ordinal);
         Assert.Equal(1, Occurrences(reports.Text, report));
@@ -63,12 +61,8 @@ public sealed class LeakReportTests
         using var reports = new LeakCapture();
         var (runtime, runtimeId, map, mapId) = CreateUnreachableRuntimeAndMap();
 
-        Gc.Collect();
-        // The map's finalizer lets the runtime finish disposing, so a second pass collects it.
-        Gc.Collect();
-
-        Assert.False(runtime.IsAlive);
-        Assert.False(map.IsAlive);
+        // The map's finalizer lets the runtime finish disposing, so a later pass collects it.
+        Gc.CollectUntilReclaimed("the unreachable runtime and map", runtime, map);
         Assert.Equal(
             1,
             Occurrences(reports.Text, $"Leaked RuntimeHandle native handle 0x{runtimeId:x};")
@@ -90,7 +84,8 @@ public sealed class LeakReportTests
     }
 
     // The creation's completion roots the map until native releases it on the runtime worker.
-    // An ordered query on the map runs after that release.
+    // An ordered query on the map runs after that release, though its own completion may still
+    // root the map briefly, which the collection waits out.
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static MapHandle CreateMapReleased(RuntimeHandle runtime)
     {

@@ -59,4 +59,23 @@ internal static class Gc
         Collect();
         return value.IsAlive;
     }
+
+    /// <summary>
+    /// Collects until every value is reclaimed, failing the test at the shared deadline.
+    /// </summary>
+    /// <remarks>
+    /// A completion's task finishes inside its callback, but native releases the completion's GC
+    /// handle afterwards on the runtime worker, so an object the completion reaches can stay
+    /// rooted for a moment after the awaited call returns. Each pass's collections and finalizer
+    /// wait give the worker that moment.
+    /// </remarks>
+    internal static void CollectUntilReclaimed(string what, params WeakReference[] values)
+    {
+        var elapsed = Stopwatch.StartNew();
+        while (values.Any(IsAlive))
+        {
+            if (elapsed.Elapsed >= TestWaits.Deadline)
+                throw new TimeoutException($"Timed out waiting for {what} to be collected.");
+        }
+    }
 }
