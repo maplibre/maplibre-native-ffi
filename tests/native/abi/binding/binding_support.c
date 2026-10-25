@@ -139,7 +139,7 @@ typedef struct finalization_failure_probe {
   char message[256];
 } finalization_failure_probe;
 
-static uint32_t record_finalization_failure(
+static bool record_finalization_failure(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   const char* message
 ) {
@@ -151,7 +151,7 @@ static uint32_t record_finalization_failure(
     snprintf(probe->message, sizeof(probe->message), "%s", message);
     atomic_fetch_add(&probe->errors, 1);
   }
-  return 1;
+  return true;
 }
 
 // Finalizing a token whose owner no longer exists reports the failed disposal
