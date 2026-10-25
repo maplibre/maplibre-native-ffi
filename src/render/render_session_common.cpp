@@ -1122,10 +1122,16 @@ auto driver_work_runnable_locked(
 
 // Wakes the driver when it can take work. Work queued behind a pending driver
 // result wakes nothing until resume_driver_work() reports the result ready.
+// A frame that the frames in flight hold back wakes a caller driver once,
+// since only a service asks the backend to report their end.
 auto publish_driver_work_locked(
   mln_render_session_object& session, DeferredWakes& wakes
 ) noexcept -> void {
-  if (!driver_work_runnable_locked(session)) return;
+  if (
+    !driver_work_runnable_locked(session) &&
+    (!frame_waits_for_gpu_locked(session) || session.texture.gpu_wait_pending)
+  )
+    return;
   if (session.capabilities.driver == MLN_RENDER_DRIVER_CORE_WORKER) {
     session.worker_condition.notify_one();
   } else if (session.driver_wake != nullptr && !session.driver_wake_pending) {
