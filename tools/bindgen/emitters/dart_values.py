@@ -211,6 +211,17 @@ class Values:
     def native_only(self, value):
         return async_hosts.native_only(self.bound, value)
 
+    def single_callback(self, value):
+        """The callback field of a queued registration that holds nothing else,
+        which Dart takes as the callback itself, as `Stream.listen` does."""
+        if not value.registration or self.wake(value) or self.native_only(value):
+            return None
+        callbacks = self.queue_callbacks(value)
+        fields = self.fields(value)
+        if len(callbacks) == 1 and [f.name for f in fields] == [callbacks[0].name]:
+            return callbacks[0]
+        return None
+
     def check_delivery(self, callback):
         """Accept a delivered callback whose copied arguments Dart can decode."""
         for parameter in callback.arguments:
@@ -251,9 +262,18 @@ class Values:
         # A registration that only native code supplies may be absent, which
         # keeps the record's initial value: its native default, or zero. Both
         # leave the registration disabled.
+        # A lone optional callback stands for its registration, so the
+        # registration is optional too.
         return tuple(
             replace(f, value=replace(f.value, nullable=True))
-            if f.value.registration and self.native_only(f.value)
+            if f.value.registration
+            and (
+                self.native_only(f.value)
+                or (
+                    (callback := self.single_callback(f.value))
+                    and callback.value.nullable
+                )
+            )
             else f
             for f in value.fields
             if f.name not in controls
@@ -277,6 +297,10 @@ class Values:
             )
         elif value.native in self.bound.slices:
             name = self.public(self.bound.slices[value.native].value)
+        elif callback := self.single_callback(value):
+            name = self.public(replace(callback.value, nullable=False))
+            if callback.value.nullable:
+                name += "?"
         elif value.kind in {"record", "callback"}:
             name = public_name(value.native)
         elif value.kind == "reference":
@@ -288,7 +312,7 @@ class Values:
             return "Object?"
         else:
             name = "String" if value.encoding == "utf8" else "Uint8List"
-        return name + "?" if value.nullable else name
+        return name + "?" if value.nullable and not name.endswith("?") else name
 
     def ffi(self, value):
         if value.kind == "native_pointer":
@@ -444,6 +468,10 @@ class Values:
         )
 
     def copy(self, value, expression, count=None):
+        if self.single_callback(value):
+            # Native never returns callbacks, so a copy is the caller's.
+            required = required_callbacks(value)
+            return identifier(required[0].name) if required else "null"
         if value.registration:
             public = public_name(value.native)
             # Native never returns callbacks. A registration's own default
@@ -724,11 +752,18 @@ class Values:
         members, args, initializers, writes = self.registration_members(
             value, skip=names
         )
+        single = self.single_callback(value)
+        # A lone callback is the value itself, which the null check promotes.
+        member = (
+            (lambda name, nullable: "value")
+            if single
+            else (lambda name, nullable: f"value.{name}{'!' if nullable else ''}")
+        )
         handlers = []
         for index, field in enumerate(fields):
             callback = self.bound.callbacks[field.value.native]
             name = identifier(field.name)
-            invoke = f"_deliver{public_name(callback.native)}(value.{name}{'!' if field.value.nullable else ''}, batch, index, delivery)"
+            invoke = f"_deliver{public_name(callback.native)}({member(name, field.value.nullable)}, batch, index, delivery)"
             invoke = f"=> {invoke}"
             handlers.append(
                 (
@@ -740,13 +775,18 @@ class Values:
             )
         disabled = (
             "    if ("
-            + f"value.{identifier(fields[0].name)} == null"
+            + f"{member(identifier(fields[0].name), False)} == null"
             + ") { return _NativeRegistration(result, () {}, arena.releaseAll); }\n"
             if fields[0].value.nullable
             else ""
         )
+        parameter = (
+            self.public(replace(value, nullable=single.value.nullable))
+            if single
+            else public
+        )
         conversion = (
-            f"_NativeRegistration<raw.{value.native}> _prepare{public}({public} value, _CallbackRoots roots) {{\n  final arena = Arena();\n  DeliveryRegistration? registration;\n  try {{\n    final result = arena<raw.{value.native}>();\n"
+            f"_NativeRegistration<raw.{value.native}> _prepare{public}({parameter} value, _CallbackRoots roots) {{\n  final arena = Arena();\n  DeliveryRegistration? registration;\n  try {{\n    final result = arena<raw.{value.native}>();\n"
             + self.registration_initializer(value)
             + "".join(line + "\n" for line in writes)
             + disabled
@@ -776,11 +816,13 @@ class Values:
                 ]
             )
             + ");\n"
-            if value.native in self.bound.returned
+            if value.native in self.bound.returned and not single
             else ""
         )
         return (
-            self.registration_class(value, members, args, initializers),
+            ""
+            if single
+            else self.registration_class(value, members, args, initializers),
             conversion + reader,
         )
 
@@ -1134,7 +1176,8 @@ class Values:
                 continue
             if value.registration and self.queue_callbacks(value):
                 declaration, conversion = self.render_queue_registration(value)
-                declarations.append(declaration)
+                if declaration:
+                    declarations.append(declaration)
                 conversions.append(conversion)
                 continue
             if value.registration:

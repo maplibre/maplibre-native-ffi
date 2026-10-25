@@ -18,13 +18,9 @@ bool _isDumpRule(String message) => message.startsWith('-----');
 /// Installs a log callback that collects dump rules, and returns them.
 List<(LogSeverity, LogEvent)> _collectDumpRules() {
   final rules = <(LogSeverity, LogEvent)>[];
-  logSetCallback(
-    LogHandler(
-      callback: (severity, event, _, message) {
-        if (_isDumpRule(message)) rules.add((severity, event));
-      },
-    ),
-  );
+  logSetCallback((severity, event, _, message) {
+    if (_isDumpRule(message)) rules.add((severity, event));
+  });
   return rules;
 }
 

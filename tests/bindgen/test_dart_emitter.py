@@ -113,6 +113,16 @@ class DartEmitterTests(unittest.TestCase):
             dart.generate(real_api()),
         )
 
+    def test_a_registration_of_one_callback_is_the_callback(self):
+        values = dart.generate_values(real_api())
+        operations = dart.generate(real_api())
+        self.assertNotIn("class RuntimeEventHandler", values)
+        self.assertIn("setEventHandler(RuntimeEventCallback handler)", operations)
+        # An optional lone callback makes its record member optional.
+        self.assertIn("final CameraTransitionEndCallback? endHandler;", values)
+        # A registration with more than its callback stays a class.
+        self.assertIn("final class ResourceProvider {", values)
+
     def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
         values = dart.generate_values(real_api())
         self.assertIn("sealed class RenderedQueryGeometry {", values)

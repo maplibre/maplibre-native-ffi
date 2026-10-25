@@ -297,24 +297,19 @@ void _deliverCameraTransitionEndCallback(
 
 _NativeRegistration<raw.mln_camera_transition_handler>
 _prepareCameraTransitionHandler(
-  CameraTransitionHandler value,
+  CameraTransitionEndCallback? value,
   _CallbackRoots roots,
 ) {
   final arena = Arena();
   DeliveryRegistration? registration;
   try {
     final result = arena<raw.mln_camera_transition_handler>();
-    if (value.callback == null) {
+    if (value == null) {
       return _NativeRegistration(result, () {}, arena.releaseAll);
     }
     final registered = registration = roots.registerQueued({
       raw.MLN_DELIVERY_TYPE_CAMERA_TRANSITION_END: (batch, index, delivery) =>
-          _deliverCameraTransitionEndCallback(
-            value.callback!,
-            batch,
-            index,
-            delivery,
-          ),
+          _deliverCameraTransitionEndCallback(value, batch, index, delivery),
     });
     result.ref.queue = isolateDeliveryQueue.handle;
     result.ref.user_data = Pointer.fromAddress(registered.token);
@@ -354,11 +349,16 @@ Pointer<raw.mln_animation_options> _writeAnimationOptions(
     result.ref.fields |= raw.MLN_ANIMATION_OPTION_TRANSITION_ID;
     result.ref.transition_id = value.transitionId!;
   }
-  result.ref.end_handler = registrations
-      .add(
-        _prepareCameraTransitionHandler(value.endHandler, registrations.roots),
-      )
-      .ref;
+  if (value.endHandler != null) {
+    result.ref.end_handler = registrations
+        .add(
+          _prepareCameraTransitionHandler(
+            value.endHandler!,
+            registrations.roots,
+          ),
+        )
+        .ref;
+  }
   return result;
 }
 
@@ -380,7 +380,7 @@ AnimationOptions _readAnimationOptions(raw.mln_animation_options source) =>
           (source.fields & raw.MLN_ANIMATION_OPTION_TRANSITION_ID) != 0
           ? source.transition_id
           : null,
-      endHandler: const CameraTransitionHandler(),
+      endHandler: null,
     );
 
 Pointer<raw.mln_lat_lng_bounds> _writeLatLngBounds(
@@ -1087,7 +1087,7 @@ void _deliverLogCallback(
 }
 
 _NativeRegistration<raw.mln_log_handler> _prepareLogHandler(
-  LogHandler value,
+  LogCallback value,
   _CallbackRoots roots,
 ) {
   final arena = Arena();
@@ -1097,7 +1097,7 @@ _NativeRegistration<raw.mln_log_handler> _prepareLogHandler(
     result.ref.size = sizeOf<raw.mln_log_handler>();
     final registered = registration = roots.registerQueued({
       raw.MLN_DELIVERY_TYPE_LOG_RECORD: (batch, index, delivery) =>
-          _deliverLogCallback(value.callback, batch, index, delivery),
+          _deliverLogCallback(value, batch, index, delivery),
     });
     result.ref.queue = isolateDeliveryQueue.handle;
     result.ref.user_data = Pointer.fromAddress(registered.token);
@@ -2350,7 +2350,7 @@ void _deliverResourceRequestCancelCallback(
 
 _NativeRegistration<raw.mln_resource_request_cancel_handler>
 _prepareResourceRequestCancelHandler(
-  ResourceRequestCancelHandler value,
+  ResourceRequestCancelCallback value,
   _CallbackRoots roots,
 ) {
   final arena = Arena();
@@ -2360,12 +2360,7 @@ _prepareResourceRequestCancelHandler(
     result.ref.size = sizeOf<raw.mln_resource_request_cancel_handler>();
     final registered = registration = roots.registerQueued({
       raw.MLN_DELIVERY_TYPE_RESOURCE_REQUEST_CANCEL: (batch, index, delivery) =>
-          _deliverResourceRequestCancelCallback(
-            value.callback,
-            batch,
-            index,
-            delivery,
-          ),
+          _deliverResourceRequestCancelCallback(value, batch, index, delivery),
     });
     result.ref.queue = isolateDeliveryQueue.handle;
     result.ref.user_data = Pointer.fromAddress(registered.token);
@@ -2684,7 +2679,7 @@ void _deliverRuntimeEventCallback(
 }
 
 _NativeRegistration<raw.mln_runtime_event_handler> _prepareRuntimeEventHandler(
-  RuntimeEventHandler value,
+  RuntimeEventCallback value,
   _CallbackRoots roots,
 ) {
   final arena = Arena();
@@ -2694,7 +2689,7 @@ _NativeRegistration<raw.mln_runtime_event_handler> _prepareRuntimeEventHandler(
     result.ref.size = sizeOf<raw.mln_runtime_event_handler>();
     final registered = registration = roots.registerQueued({
       raw.MLN_DELIVERY_TYPE_RUNTIME_EVENTS: (batch, index, delivery) =>
-          _deliverRuntimeEventCallback(value.callback, batch, index, delivery),
+          _deliverRuntimeEventCallback(value, batch, index, delivery),
     });
     result.ref.queue = isolateDeliveryQueue.handle;
     result.ref.user_data = Pointer.fromAddress(registered.token);
@@ -2845,7 +2840,7 @@ void _deliverResourceTransformCallback(
 }
 
 _NativeRegistration<raw.mln_resource_transform> _prepareResourceTransform(
-  ResourceTransform value,
+  ResourceTransformCallback value,
   _CallbackRoots roots,
 ) {
   final arena = Arena();
@@ -2855,12 +2850,7 @@ _NativeRegistration<raw.mln_resource_transform> _prepareResourceTransform(
     result.ref.size = sizeOf<raw.mln_resource_transform>();
     final registered = registration = roots.registerQueued({
       raw.MLN_DELIVERY_TYPE_RESOURCE_TRANSFORM: (batch, index, delivery) =>
-          _deliverResourceTransformCallback(
-            value.callback,
-            batch,
-            index,
-            delivery,
-          ),
+          _deliverResourceTransformCallback(value, batch, index, delivery),
     });
     result.ref.queue = isolateDeliveryQueue.handle;
     result.ref.user_data = Pointer.fromAddress(registered.token);
@@ -3292,7 +3282,7 @@ void logSetAsyncSeverityMask(LogSeverityFlag mask) {
 ///
 /// See `mln_log_set_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-void logSetCallback(LogHandler handler) {
+void logSetCallback(LogCallback handler) {
   ensureAbiVersion();
   final registrations = _NativeRegistrations(_globalCallbackRoots);
   _check(
@@ -6798,7 +6788,7 @@ final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_resource_request_set_cancel_callback` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  bool setCancelCallback(ResourceRequestCancelHandler handler) =>
+  bool setCancelCallback(ResourceRequestCancelCallback handler) =>
       withNativeArena((arena) {
         final outCancelled = arena<Bool>();
         final registrations = _NativeRegistrations(_callbackRoots);
@@ -6906,7 +6896,7 @@ extension type RuntimeHandleDiscarding._(RuntimeHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void setEventHandler(RuntimeEventHandler handler) =>
+  void setEventHandler(RuntimeEventCallback handler) =>
       _discard((arena, completion) {
         final registrations = _NativeRegistrations(_callbackRoots);
         return registrations.run(
@@ -6946,7 +6936,7 @@ extension type RuntimeHandleDiscarding._(RuntimeHandle _owner) {
           ),
         );
       });
-  void setResourceTransform(ResourceTransform transform) =>
+  void setResourceTransform(ResourceTransformCallback transform) =>
       _discard((arena, completion) {
         final registrations = _NativeRegistrations(_callbackRoots);
         return registrations.run(
@@ -7216,7 +7206,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_set_event_handler` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  Future<CommandCompletion> setEventHandler(RuntimeEventHandler handler) =>
+  Future<CommandCompletion> setEventHandler(RuntimeEventCallback handler) =>
       _command((arena, completion) {
         final registrations = _NativeRegistrations(_callbackRoots);
         return registrations.run(
@@ -7328,20 +7318,21 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_set_resource_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  Future<CommandCompletion> setResourceTransform(ResourceTransform transform) =>
-      _command((arena, completion) {
-        final registrations = _NativeRegistrations(_callbackRoots);
-        return registrations.run(
-          () => raw.mln_runtime_set_resource_transform(
-            _handle.raw,
-            registrations.add(
-              _prepareResourceTransform(transform, registrations.roots),
-            ),
-            completion,
-            nativeDiagnostic,
-          ),
-        );
-      });
+  Future<CommandCompletion> setResourceTransform(
+    ResourceTransformCallback transform,
+  ) => _command((arena, completion) {
+    final registrations = _NativeRegistrations(_callbackRoots);
+    return registrations.run(
+      () => raw.mln_runtime_set_resource_transform(
+        _handle.raw,
+        registrations.add(
+          _prepareResourceTransform(transform, registrations.roots),
+        ),
+        completion,
+        nativeDiagnostic,
+      ),
+    );
+  });
 
   /// Starts updating opaque binary metadata for an offline region.
   ///

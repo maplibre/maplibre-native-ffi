@@ -69,7 +69,7 @@ void main() {
             animation: AnimationOptions(
               durationMs: 60000,
               transitionId: 3,
-              endHandler: CameraTransitionHandler(callback: ended.complete),
+              endHandler: ended.complete,
             ),
           ),
         ),
@@ -87,9 +87,7 @@ void main() {
         () => map.applyCameraDelta(
           CameraDelta(
             scale: -1,
-            animation: AnimationOptions(
-              endHandler: CameraTransitionHandler(callback: (_) {}),
-            ),
+            animation: AnimationOptions(endHandler: (_) {}),
           ),
         ),
         throwsA(

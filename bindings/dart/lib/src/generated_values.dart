@@ -1935,16 +1935,6 @@ final class CameraTransitionEnd extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 typedef CameraTransitionEndCallback = void Function(CameraTransitionEnd end);
 
-/// Callback or queue state that one camera command copies to report the end of
-/// its transitions.
-///
-/// See `mln_camera_transition_handler` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class CameraTransitionHandler {
-  const CameraTransitionHandler({this.callback});
-  final CameraTransitionEndCallback? callback;
-}
-
 /// Optional animation controls for camera transitions.
 ///
 /// See `mln_animation_options` in the
@@ -1956,8 +1946,8 @@ final class AnimationOptions extends _Value {
     this.minZoom,
     this.easing,
     this.transitionId,
-    CameraTransitionHandler? endHandler,
-  }) : endHandler = endHandler ?? animationOptionsDefault().endHandler;
+    this.endHandler,
+  });
 
   /// Duration in milliseconds. Must be finite, non-negative, and short enough
   /// to represent as a duration.
@@ -1978,7 +1968,7 @@ final class AnimationOptions extends _Value {
   final int? transitionId;
 
   /// Reports the end of the command's transitions. Disabled by default.
-  final CameraTransitionHandler endHandler;
+  final CameraTransitionEndCallback? endHandler;
 
   /// A copy of this value with the given members replaced.
   AnimationOptions copyWith({
@@ -1987,7 +1977,7 @@ final class AnimationOptions extends _Value {
     double? minZoom,
     UnitBezier? easing,
     int? transitionId,
-    CameraTransitionHandler? endHandler,
+    CameraTransitionEndCallback? endHandler,
   }) => AnimationOptions(
     durationMs: durationMs ?? this.durationMs,
     velocity: velocity ?? this.velocity,
@@ -2750,17 +2740,6 @@ typedef LogCallback =
       int code,
       String message,
     );
-
-/// Process-global log callback or queue state.
-///
-/// See `mln_log_handler` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-final class LogHandler {
-  const LogHandler({required this.callback});
-
-  /// Receives each record.
-  final LogCallback callback;
-}
 
 /// Caller-owned premultiplied RGBA8 image pixels.
 ///
@@ -4986,17 +4965,6 @@ final class ResourceResponse extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 typedef ResourceRequestCancelCallback = void Function();
 
-/// Cancel callback or queue state for one handled resource request.
-///
-/// See `mln_resource_request_cancel_handler` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class ResourceRequestCancelHandler {
-  const ResourceRequestCancelHandler({required this.callback});
-
-  /// Required in callback mode; null in queue mode.
-  final ResourceRequestCancelCallback callback;
-}
-
 /// One request pattern that a resource provider claims.
 ///
 /// See `mln_resource_route` in the
@@ -5604,17 +5572,6 @@ final class RuntimeEventPayloadUnknown extends RuntimeEventPayload {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 typedef RuntimeEventCallback = void Function(List<RuntimeEvent> events);
 
-/// Runtime and map event delivery. Exactly one of callback and queue is set.
-///
-/// See `mln_runtime_event_handler` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class RuntimeEventHandler {
-  const RuntimeEventHandler({required this.callback});
-
-  /// Receives each event batch.
-  final RuntimeEventCallback callback;
-}
-
 /// HTTP header transform state: a callback, or native header rules.
 ///
 /// See `mln_http_header_transform` in the
@@ -5749,17 +5706,6 @@ typedef ResourceTransformCallback =
       String url,
       ResourceTransformRequestHandle request,
     );
-
-/// Resource transform state.
-///
-/// See `mln_resource_transform` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class ResourceTransform {
-  const ResourceTransform({required this.callback});
-
-  /// Required in callback mode; null in queue mode.
-  final ResourceTransformCallback callback;
-}
 
 /// A style expression type.
 ///

@@ -27,13 +27,9 @@ _Unreachable _unreachable(RuntimeHandle runtime) {
 
 Future<_Unreachable> _unreachableRuntimeWithEvents() async {
   final runtime = runtimeCreate(runtimeOptionsDefault());
-  await runtime.setEventHandler(
-    RuntimeEventHandler(
-      callback: (_) {
-        runtime.id;
-      },
-    ),
-  );
+  await runtime.setEventHandler((_) {
+    runtime.id;
+  });
   return _unreachable(runtime);
 }
 

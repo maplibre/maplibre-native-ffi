@@ -225,7 +225,7 @@ void main() {
           animation: AnimationOptions(
             durationMs: 60000,
             transitionId: maximum,
-            endHandler: CameraTransitionHandler(callback: ended.complete),
+            endHandler: ended.complete,
           ),
         ),
       ),
