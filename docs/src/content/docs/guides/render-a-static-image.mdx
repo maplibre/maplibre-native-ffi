@@ -1,6 +1,6 @@
 ---
 title: Render a static image
-description: Attach an owned texture target, request one frame, and read the finished pixels.
+description: Attach an owned texture target, request one still image, and read the finished pixels.
 sidebar:
   order: 7
 ---
@@ -22,14 +22,13 @@ CPU readback, use OpenGL on a private EGL or WGL context.
 
 <Code code={region(stillImage, "attach")} lang="c" title="still-image.c" />
 
-After attachment completes, load the style, request a still image on the map,
-and demand a frame on the session. Drain frame results when the frame wake
-fires, until the frame renders.
+After attachment completes, load the style and request a still image on the
+map. The request renders its own frame on the session once the map has loaded
+what the image shows.
 
-<Code code={region(stillImage, "drain-result")} lang="c" title="still-image.c" />
+<Code code={region(stillImage, "request")} lang="c" title="still-image.c" />
 
-Start readback once both the rendered frame and the still-image completion have
-arrived.
+Start readback once the still-image completion arrives.
 
 <Code code={region(stillImage, "start-readback")} lang="c" title="still-image.c" />
 

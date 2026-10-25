@@ -14,7 +14,8 @@ namespace Maplibre.NativeFfi;
 /// <c>MLN_FRAME_DEMAND_IF_NEEDED</c>.
 /// </param>
 /// <param name="Token">
-/// Host identity returned with the terminal frame result.
+/// Host identity returned with the terminal frame result. Any value except
+/// <c>MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE</c>, the maximum uint64_t value.
 /// </param>
 public readonly partial record struct FrameDemand(FrameDemandFlag Flags, ulong Token)
 {

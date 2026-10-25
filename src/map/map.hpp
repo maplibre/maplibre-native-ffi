@@ -594,12 +594,19 @@ auto map_post_resize(
   const mln_completion* completion = nullptr
 ) -> mln_status;
 auto map_post_trigger_repaint(mln_map map) -> mln_status;
-// Installs the hook through which the map announces each render update to its
-// attached session, with the update's generation. The map calls it on the
-// runtime worker; an empty function removes it.
-auto map_set_render_session_publish_callback(
-  mln_map map, std::function<void(uint64_t)> callback
-) -> mln_status;
+// The hooks through which the map tells its attached session about render
+// work. The map calls them on the runtime worker, and an empty one does
+// nothing.
+struct RenderSessionNotices {
+  // Announces each render update, with its generation.
+  std::function<void(uint64_t)> update;
+  // Reports that a still image became pending or stopped being pending, which
+  // map_still_image_pending() then tells.
+  std::function<void()> still_image;
+};
+// Installs the session's notices; empty notices remove them.
+auto map_set_render_session_notices(mln_map map, RenderSessionNotices notices)
+  -> mln_status;
 
 // The render-facing helpers below take the map object that
 // map_attach_render_target_session() returned. The attachment holds a child of
@@ -615,6 +622,9 @@ struct RenderUpdateSnapshot {
 };
 // The update, feature state, and generation share one publication boundary.
 auto map_latest_update_snapshot(MapObject& map) -> RenderUpdateSnapshot;
+// Whether a still image waits for a frame. The session renders one while it
+// does.
+auto map_still_image_pending(MapObject& map) -> bool;
 auto map_renderer_observer(MapObject& map) -> mln::RendererObserver*;
 // Tells the map which update generation the session is about to render, so a
 // frame of an update older than a pending still image request cannot complete

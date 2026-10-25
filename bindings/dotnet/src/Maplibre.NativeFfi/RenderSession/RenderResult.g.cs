@@ -33,7 +33,8 @@ public enum RenderResult : uint
     TargetNotReady = 2,
 
     /// <summary>
-    /// A newer IF_NEEDED demand with the same flags replaced this demand.
+    /// A newer IF_NEEDED demand with the same flags replaced this demand. A
+    /// still image's demand is never replaced, and never replaces one.
     /// </summary>
     Superseded = 3,
 }

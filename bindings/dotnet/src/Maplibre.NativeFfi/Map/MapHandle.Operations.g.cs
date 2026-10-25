@@ -1495,7 +1495,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Requests one still image for a static or tile map.
+    /// Requests one still image for a static or tile map, which renders itself.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_request_still_image</c> in the <see

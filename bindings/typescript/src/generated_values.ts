@@ -441,7 +441,8 @@ export interface FrameDemand {
    */
   flags?: FrameDemandFlag;
   /**
-   * Host identity returned with the terminal frame result.
+   * Host identity returned with the terminal frame result. Any value except
+   * `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE`, the maximum uint64_t value.
    */
   token?: bigint;
 }
@@ -1791,7 +1792,8 @@ export const RenderResult = {
    */
   targetNotReady: 2,
   /**
-   * A newer IF_NEEDED demand with the same flags replaced this demand.
+   * A newer IF_NEEDED demand with the same flags replaced this demand. A still
+   * image's demand is never replaced, and never replaces one.
    */
   superseded: 3,
 } as const;

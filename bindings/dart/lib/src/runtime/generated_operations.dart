@@ -5557,7 +5557,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
         raw.mln_map_request_repaint(_handle.raw, completion, nativeDiagnostic),
   );
 
-  /// Requests one still image for a static or tile map.
+  /// Requests one still image for a static or tile map, which renders itself.
   ///
   /// See `mln_map_request_still_image` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -6372,7 +6372,8 @@ final class RenderSessionHandle implements Finalizable {
   /// `MLN_RENDER_RESULT_NO_UPDATE` and completes after earlier driver work has
   /// finished. A running demand finishes its attempt and ends any wait for a
   /// map update or a free slot. After completion, a new frame demand is
-  /// required to render again.
+  /// required to render again, except that a pending still image submits its
+  /// next demand itself; see `mln_map_request_still_image()`.
   ///
   /// See `mln_render_session_barrier` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

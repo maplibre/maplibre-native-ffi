@@ -1270,7 +1270,7 @@ impl MapHandle {
         })
     }
 
-    /// Requests one still image for a static or tile map.
+    /// Requests one still image for a static or tile map, which renders itself.
     ///
     /// See `mln_map_request_still_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

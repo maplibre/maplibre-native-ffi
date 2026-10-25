@@ -7,6 +7,7 @@
 #include <assert.h>
 
 #include "support/frames.h"
+#include "support/map.h"
 #include "support/resources.h"
 #include "support/style.h"
 #include "support/test_support.h"
@@ -567,23 +568,15 @@ static mln_map create_static_map(mln_runtime runtime, uint64_t event_mask) {
   return mln_test_create_map_with_options(runtime, &options);
 }
 
-// Requests a still image and renders until its completion arrives.
+// Requests a still image and services the session until it completes.
 static mln_status render_still_image(
-  mln_test_render_fixture* fixture, mln_runtime runtime, mln_map map,
-  char* out_diagnostic, size_t diagnostic_capacity
+  mln_test_render_fixture* fixture, mln_map map, char* out_diagnostic,
+  size_t diagnostic_capacity
 ) {
   mln_test_completion still = mln_test_completion_default(0);
   MLN_TEST_OK(mln_map_request_still_image(map, &still.descriptor, NULL));
-  const mln_test_deadline deadline = mln_test_deadline_default();
-  mln_test_watchdog_note("rendering until a still image completes");
-  while (!mln_test_completion_poll(&still)) {
-    TEST_ASSERT_FALSE_MESSAGE(
-      mln_test_deadline_passed(deadline), "the still image never completed"
-    );
-    render_one_frame(fixture, runtime, NULL);
-  }
-  mln_test_watchdog_note(NULL);
-  const mln_status status = mln_test_completion_status(&still);
+  const mln_status status =
+    mln_test_render_pending_still_image(fixture, &still);
   if (out_diagnostic != NULL) {
     snprintf(
       out_diagnostic, diagnostic_capacity, "%s",
@@ -662,7 +655,7 @@ static void failed_loads_report_their_text(void) {
   MLN_TEST_STATUS(
     MLN_STATUS_NATIVE_ERROR,
     render_still_image(
-      &fixture, runtime, map, still_diagnostic, sizeof(still_diagnostic)
+      &fixture, map, still_diagnostic, sizeof(still_diagnostic)
     )
   );
   // The failed style command queued its loading-failed event before completing.
@@ -816,7 +809,7 @@ static void a_map_created_with_an_empty_mask_queues_nothing(void) {
   submit_camera(map, MLN_CAMERA_UPDATE_MODE_JUMP, 2.0, 0, 0.0);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  MLN_TEST_OK(render_still_image(&fixture, runtime, map, NULL, 0));
+  MLN_TEST_OK(render_still_image(&fixture, map, NULL, 0));
 
   event_log* log = &scenario_log;
   log_reset(log);

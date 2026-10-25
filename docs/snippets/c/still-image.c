@@ -15,12 +15,9 @@ typedef struct still_image_job {
   void* egl_config;
   uint32_t width;
   uint32_t height;
-  atomic_bool frames_ready;
   atomic_bool attach_ready;
   atomic_bool still_image_ready;
   bool requested;
-  bool frame_pending;
-  bool rendered;
   bool reading;
   mln_status status;
   uint8_t* pixels;
@@ -61,12 +58,6 @@ static void ignore_completion(
   (void)result;
 }
 
-static void frames_ready(void* user_data) {
-  still_image_job* job = user_data;
-  atomic_store_explicit(&job->frames_ready, true, memory_order_release);
-  schedule_job(job);
-}
-
 static mln_status attach_owned_texture(still_image_job* job) {
   // #region attach
   mln_opengl_owned_texture_descriptor descriptor =
@@ -83,10 +74,6 @@ static mln_status attach_owned_texture(still_image_job* job) {
     mln_render_session_attach_options_default();
   options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
   options.requested_texture_ring_depth = 1;
-  options.frame_wake = (mln_wake){
-    .callback = frames_ready,
-    .user_data = job,
-  };
   const mln_completion completion = {
     .size = sizeof(mln_completion),
     .callback = attach_finished,
@@ -147,13 +134,6 @@ static void readback_finished(
   // #endregion read
 }
 
-static void request_frame(still_image_job* job) {
-  mln_frame_demand demand = mln_frame_demand_default();
-  demand.token = 1;
-  job->status = mln_render_session_request_frame(job->session, &demand, NULL);
-  job->frame_pending = job->status == MLN_STATUS_OK;
-}
-
 void advance_still_image(still_image_job* job) {
   // Both flags stay set once raised, so a turn that arrives early simply runs
   // again when the next wake or completion schedules one.
@@ -165,6 +145,7 @@ void advance_still_image(still_image_job* job) {
     job->finished(job->user_data, job);
     return;
   }
+  // #region request
   if (attached && !job->requested) {
     job->requested = true;
     const mln_completion style = {
@@ -175,6 +156,8 @@ void advance_still_image(still_image_job* job) {
       job->map, mln_buffer_view_from_cstr(job->style_url), &style, NULL
     );
     if (job->status == MLN_STATUS_OK) {
+      // The request renders its image on the attached session, so the job
+      // demands no frame of its own.
       const mln_completion still = {
         .size = sizeof(mln_completion),
         .callback = still_image_finished,
@@ -186,39 +169,11 @@ void advance_still_image(still_image_job* job) {
       job->finished(job->user_data, job);
       return;
     }
-    request_frame(job);
   }
-
-  // #region drain-result
-  if (
-    atomic_exchange_explicit(&job->frames_ready, false, memory_order_acq_rel)
-  ) {
-    mln_render_frame_batch batch = MLN_HANDLE_NULL;
-    mln_render_frame_batch_view view = {.size = sizeof(view)};
-    if (
-      mln_render_session_drain_frame_results(
-        job->session, &batch, &view, NULL
-      ) == MLN_STATUS_OK
-    ) {
-      for (size_t index = 0; index < view.result_count; ++index) {
-        const mln_render_frame_result* frame = MLN_STRIDED_AT(
-          mln_render_frame_result, view.results, view.result_size, index
-        );
-        if (frame->token == 1) {
-          job->frame_pending = false;
-          job->rendered = frame->disposition == MLN_RENDER_RESULT_RENDERED;
-        }
-      }
-      mln_render_frame_batch_release(batch);
-    }
-  }
-  if (job->requested && !job->rendered && !job->frame_pending) {
-    request_frame(job);
-  }
-  // #endregion drain-result
+  // #endregion request
 
   // #region start-readback
-  if (job->rendered && imaged && !job->reading) {
+  if (imaged && !job->reading) {
     job->reading = true;
     const mln_completion readback = {
       .size = sizeof(mln_completion),

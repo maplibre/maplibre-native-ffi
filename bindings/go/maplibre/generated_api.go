@@ -686,7 +686,8 @@ const (
 	// result does not cause a map update, so the host demands again when the target
 	// can be ready, such as after a paced delay.
 	RenderResultTargetNotReady RenderResult = RenderResult(C.MLN_RENDER_RESULT_TARGET_NOT_READY)
-	// A newer IF_NEEDED demand with the same flags replaced this demand.
+	// A newer IF_NEEDED demand with the same flags replaced this demand. A still
+	// image's demand is never replaced, and never replaces one.
 	RenderResultSuperseded RenderResult = RenderResult(C.MLN_RENDER_RESULT_SUPERSEDED)
 )
 
@@ -2216,7 +2217,8 @@ type FrameDemand struct {
 	// A bitwise OR of mln_frame_demand_flag values. Defaults to
 	// MLN_FRAME_DEMAND_IF_NEEDED.
 	Flags FrameDemandFlag
-	// Host identity returned with the terminal frame result.
+	// Host identity returned with the terminal frame result. Any value except
+	// MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE, the maximum uint64_t value.
 	Token uint64
 }
 
@@ -7100,7 +7102,8 @@ func (receiver *MapHandle) RequestRepaint() (*Future[CommandCompletion], error) 
 	}, completionCommand)
 }
 
-// RequestStillImage requests one still image for a static or tile map.
+// RequestStillImage requests one still image for a static or tile map, which
+// renders itself.
 //
 // See mln_map_request_still_image in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -7508,7 +7511,8 @@ func (receiver *RenderSessionHandle) AcquireFrame() (*AcquiredFrameHandle, error
 // MLN_RENDER_RESULT_NO_UPDATE and completes after earlier driver work has
 // finished. A running demand finishes its attempt and ends any wait for a map
 // update or a free slot. After completion, a new frame demand is required to
-// render again.
+// render again, except that a pending still image submits its next demand
+// itself; see mln_map_request_still_image().
 //
 // See mln_render_session_barrier in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html

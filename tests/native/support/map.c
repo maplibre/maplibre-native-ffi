@@ -11,26 +11,34 @@
 typedef struct still_image_wait {
   const mln_test_render_fixture* fixture;
   mln_test_completion* still;
-  bool demand_pending;
+  bool frame_arrived;
   mln_status failure;
 } still_image_wait;
 
-// Collects the pending demand's result, if it has arrived, and releases any
-// frame it rendered so the texture ring never fills.
-static bool collect_demand(still_image_wait* wait) {
+// Drains queued frame results, noting the still image's, and releases any
+// frame rendered meanwhile so the texture ring never fills.
+static void collect_frames(still_image_wait* wait) {
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   const mln_status drained = mln_test_drain_frame_results(
     wait->fixture->session, &batch, MLN_TEST_DIAGNOSTIC
   );
   if (drained == MLN_STATUS_NOT_READY) {
-    return false;
+    return;
   }
   if (drained != MLN_STATUS_OK) {
     wait->failure = drained;
-    return false;
+    return;
+  }
+  const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
+  for (size_t index = 0; index < view.result_count; ++index) {
+    if (
+      mln_test_render_view_result(&view, index)->token ==
+      MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE
+    ) {
+      wait->frame_arrived = true;
+    }
   }
   mln_render_frame_batch_release(batch);
-  wait->demand_pending = false;
   mln_acquired_frame frame = MLN_HANDLE_NULL;
   while (mln_render_session_acquire_frame(
            wait->fixture->session, &frame, MLN_TEST_DIAGNOSTIC
@@ -39,36 +47,21 @@ static bool collect_demand(still_image_wait* wait) {
       mln_acquired_frame_release(frame, NULL, MLN_TEST_DIAGNOSTIC);
     if (released != MLN_STATUS_OK) {
       wait->failure = released;
-      return false;
+      return;
     }
     frame = MLN_HANDLE_NULL;
   }
-  return true;
 }
 
-// Holds once the still image has completed and the last demand has settled.
-// Until then it keeps exactly one demand in flight, since a static map renders
-// its still image only inside a frame. The demands are forced, so each renders
-// the latest update whether or not it is new.
+// Holds once the still image has completed and the frame result of the demand
+// that rendered it has arrived. The request submits that demand itself.
 static bool still_image_settled(void* context) {
   still_image_wait* wait = context;
-  if (wait->demand_pending && !collect_demand(wait)) {
-    return wait->failure != MLN_STATUS_OK;
-  }
-  if (mln_test_completion_poll(wait->still)) {
-    return true;
-  }
-  mln_frame_demand demand = mln_frame_demand_default();
-  demand.flags = 0;
-  const mln_status requested = mln_render_session_request_frame(
-    wait->fixture->session, &demand, MLN_TEST_DIAGNOSTIC
-  );
-  if (requested != MLN_STATUS_OK) {
-    wait->failure = requested;
-    return true;
-  }
-  wait->demand_pending = true;
-  return false;
+  collect_frames(wait);
+  return wait->failure != MLN_STATUS_OK ||
+         (mln_test_completion_poll(wait->still) &&
+          (wait->frame_arrived ||
+           mln_test_completion_status(wait->still) != MLN_STATUS_OK));
 }
 
 mln_status mln_test_render_pending_still_image(
@@ -77,7 +70,7 @@ mln_status mln_test_render_pending_still_image(
   still_image_wait wait = {
     .fixture = fixture,
     .still = still,
-    .demand_pending = false,
+    .frame_arrived = false,
     .failure = MLN_STATUS_OK,
   };
   const mln_status status = mln_test_render_step_until(

@@ -1388,7 +1388,9 @@ class FrameDemand:
     """
 
     token: int = field(default_factory=lambda: FrameDemand.default().token)
-    """Host identity returned with the terminal frame result."""
+    """Host identity returned with the terminal frame result. Any value except
+    `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE`, the maximum uint64_t value.
+    """
 
     @classmethod
     def _from_native(cls, raw):

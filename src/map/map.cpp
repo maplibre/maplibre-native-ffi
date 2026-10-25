@@ -1101,7 +1101,7 @@ class HeadlessFrontend final : public mln::RendererFrontend {
     {
       const std::scoped_lock lock(latest_update_mutex_);
       generation = latest_update_generation_;
-      notify_session = session_publish_;
+      notify_session = session_notices_.update;
     }
     // Publish asynchronous camera and loading changes before the session sees
     // their update, including when the host selects no events.
@@ -1129,10 +1129,9 @@ class HeadlessFrontend final : public mln::RendererFrontend {
     const std::scoped_lock lock(latest_update_mutex_);
     return {latest_update_, latest_feature_state_, latest_update_generation_};
   }
-  auto set_session_publish_callback(std::function<void(uint64_t)> publish)
-    -> void {
+  auto set_session_notices(RenderSessionNotices notices) -> void {
     const std::scoped_lock lock(latest_update_mutex_);
-    session_publish_ = std::move(publish);
+    session_notices_ = std::move(notices);
   }
 
   [[nodiscard]] auto latest_update_generation() const -> uint64_t {
@@ -1171,11 +1170,25 @@ class HeadlessFrontend final : public mln::RendererFrontend {
     if (observer_ != nullptr) observer_->begin_render(update_generation);
   }
 
-  // Runs on the map's run loop. Zero means no still image is pending.
+  // Runs on the map's run loop, and tells the attached session, which renders
+  // the image. Zero means no still image is pending.
   auto set_still_image_request_generation(uint64_t generation) -> void {
     if (observer_ != nullptr) {
       observer_->still_image_frames().set_request_generation(generation);
     }
+    auto notify_session = std::function<void()>{};
+    {
+      const std::scoped_lock lock(latest_update_mutex_);
+      if (still_image_pending_ == (generation != 0)) return;
+      still_image_pending_ = generation != 0;
+      notify_session = session_notices_.still_image;
+    }
+    if (notify_session) notify_session();
+  }
+
+  [[nodiscard]] auto still_image_pending() const -> bool {
+    const std::scoped_lock lock(latest_update_mutex_);
+    return still_image_pending_;
   }
 
   // Must run before the map that backs the delegate is torn down.
@@ -1215,7 +1228,7 @@ class HeadlessFrontend final : public mln::RendererFrontend {
   FeatureStateStore& feature_state_;
   std::unique_ptr<ForwardingRendererObserver> observer_;
   mln::TaggedScheduler thread_pool_;
-  // Guards every field from latest_update_ through latest_update_generation_.
+  // Guards every field from latest_update_ through still_image_pending_.
   // Render sessions read the published update from their own threads, and
   // reset() can touch held_update_ outside a command when a disposed map
   // retires.
@@ -1224,8 +1237,9 @@ class HeadlessFrontend final : public mln::RendererFrontend {
   std::shared_ptr<mln::UpdateParameters> held_update_;
   std::shared_ptr<const FeatureStateSnapshot> latest_feature_state_;
   std::shared_ptr<const FeatureStateSnapshot> held_feature_state_;
-  std::function<void(uint64_t)> session_publish_;
+  RenderSessionNotices session_notices_;
   uint64_t latest_update_generation_ = 0;
+  bool still_image_pending_ = false;
   // Runtime-worker only.
   bool update_stored_ = false;
   bool announcement_scheduled_ = false;
@@ -3646,6 +3660,7 @@ auto finish_map_retirement(RetirementTask* task) noexcept -> void {
 auto begin_map_retirement(RetirementTask* task) noexcept -> void {
   auto& map = *static_cast<MapObject*>(task->context);
   if (map.still_image_operation != nullptr) {
+    map.frontend->set_still_image_request_generation(0);
     map.still_image_operation->complete(MLN_STATUS_CANCELLED, {}, {});
   }
   close_camera_transitions(*map.event_state);
@@ -3902,12 +3917,11 @@ auto map_post_trigger_repaint(mln_map map) -> mln_status {
   return map_request_repaint(map, nullptr);
 }
 
-auto map_set_render_session_publish_callback(
-  mln_map map, std::function<void(uint64_t)> callback
-) -> mln_status {
+auto map_set_render_session_notices(mln_map map, RenderSessionNotices notices)
+  -> mln_status {
   const auto live = handle_table<MapObject>().lease(map);
   if (live == nullptr) return recorded_handle_fault_status();
-  live->frontend->set_session_publish_callback(std::move(callback));
+  live->frontend->set_session_notices(std::move(notices));
   return MLN_STATUS_OK;
 }
 
@@ -3922,6 +3936,10 @@ auto map_latest_update_generation(MapObject& map) noexcept -> uint64_t {
 
 auto map_latest_update_snapshot(MapObject& map) -> RenderUpdateSnapshot {
   return map.frontend->latest_update_snapshot();
+}
+
+auto map_still_image_pending(MapObject& map) -> bool {
+  return map.frontend->still_image_pending();
 }
 
 auto map_begin_render(MapObject& map, uint64_t update_generation) noexcept

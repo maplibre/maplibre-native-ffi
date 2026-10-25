@@ -480,11 +480,11 @@ static bool still_completed_under_keepalive(void* context) {
   return wait->failed;
 }
 
-// A pending still image on a static map must complete while the host's
-// keep-alive demands all resolve on the render-if-needed fast path. Worker
-// results and the observer delivery that completes the still run on the
-// session scheduler, so a demand that resolves without rendering still drains
-// that scheduler.
+// A pending still image on a static map completes while the host keeps its
+// own render-if-needed demands in flight, which mostly resolve on the fast
+// path. Worker results and the observer delivery that completes the still run
+// on the session scheduler, so a demand that resolves without rendering still
+// drains that scheduler rather than strand them.
 static void still_image_completes_under_if_needed_keepalive_demands(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_map_options_default();

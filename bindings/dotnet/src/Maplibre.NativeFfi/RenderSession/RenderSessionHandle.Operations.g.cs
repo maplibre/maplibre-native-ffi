@@ -137,7 +137,9 @@ public sealed unsafe partial class RenderSessionHandle
     /// <c>MLN_RENDER_RESULT_NO_UPDATE</c> and completes after earlier driver
     /// work has finished. A running demand finishes its attempt and ends any
     /// wait for a map update or a free slot. After completion, a new frame
-    /// demand is required to render again.
+    /// demand is required to render again, except that a pending still image
+    /// submits its next demand itself; see
+    /// <c>mln_map_request_still_image()</c>.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_barrier</c> in the <see

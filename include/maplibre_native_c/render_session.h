@@ -46,7 +46,10 @@ typedef enum mln_render_result : uint32_t {
    * target can be ready, such as after a paced delay.
    */
   MLN_RENDER_RESULT_TARGET_NOT_READY = 2,
-  /** A newer IF_NEEDED demand with the same flags replaced this demand. */
+  /**
+   * A newer IF_NEEDED demand with the same flags replaced this demand. A still
+   * image's demand is never replaced, and never replaces one.
+   */
   MLN_RENDER_RESULT_SUPERSEDED = 3,
 } mln_render_result;
 
@@ -96,6 +99,14 @@ typedef enum MLN_BINDING("kind=bitmask") mln_frame_demand_flag : uint32_t {
 /** A set of mln_frame_demand_flag bits. */
 typedef uint32_t mln_frame_demand_flags;
 
+/**
+ * Token of the frame demands that mln_map_request_still_image() submits.
+ *
+ * A host demand cannot carry it, so a frame result that does belongs to a still
+ * image rather than to any demand the host made.
+ */
+#define MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE UINT64_MAX
+
 /** One nonblocking request for a frame. */
 typedef struct mln_frame_demand {
   uint32_t size;
@@ -104,7 +115,10 @@ typedef struct mln_frame_demand {
    * MLN_FRAME_DEMAND_IF_NEEDED.
    */
   mln_frame_demand_flags flags;
-  /** Host identity returned with the terminal frame result. */
+  /**
+   * Host identity returned with the terminal frame result. Any value except
+   * MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE, the maximum uint64_t value.
+   */
   uint64_t token;
 } mln_frame_demand;
 
@@ -268,9 +282,10 @@ MLN_API mln_status mln_render_session_get_snapshot(
  * Returns:
  * - MLN_STATUS_OK when the demand is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, demand is
- *   null or undersized, or demand->flags carries a bit outside
+ *   null or undersized, demand->flags carries a bit outside
  *   mln_frame_demand_flag, or carries MLN_FRAME_DEMAND_WAIT_FOR_UPDATE without
- *   MLN_FRAME_DEMAND_IF_NEEDED.
+ *   MLN_FRAME_DEMAND_IF_NEEDED, or demand->token is
+ *   MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or every slot of its texture ring is quarantined.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
@@ -487,7 +502,9 @@ MLN_API mln_status mln_render_session_resize(
  * Ends every frame demand that has not started with MLN_RENDER_RESULT_NO_UPDATE
  * and completes after earlier driver work has finished. A running demand
  * finishes its attempt and ends any wait for a map update or a free slot.
- * After completion, a new frame demand is required to render again.
+ * After completion, a new frame demand is required to render again, except
+ * that a pending still image submits its next demand itself; see
+ * mln_map_request_still_image().
  *
  * Returns:
  * - MLN_STATUS_OK when the barrier is accepted.

@@ -1361,17 +1361,33 @@ MLN_API mln_status mln_map_remove_feature_state(
 ) MLN_NOEXCEPT;
 
 /**
- * Requests one still image for a static or tile map.
+ * Requests one still image for a static or tile map, which renders itself.
  *
- * Keep servicing the selected render driver while this request is pending.
- * Submit frame demands with mln_render_session_request_frame() and drain their
- * terminal results with mln_render_session_drain_frame_results(). A
- * caller-graphics-thread driver also requires calls to
- * mln_render_session_service_driver_work() on its graphics thread. Any demand
- * may complete the image, but only with a fully loaded frame that rendered
- * the update this request published or a later one; a frame of an earlier
- * update never does. That frame may be acquired or read back after the
- * completion runs.
+ * Once the request runs, it submits a frame demand on the map's attached
+ * render session, or, while none is attached, on the next session that
+ * finishes attaching. The demand renders once the map has loaded what the
+ * image shows, and presents on a target that supports presentation. A
+ * caller-graphics-thread session still needs
+ * mln_render_session_service_driver_work() on its graphics thread meanwhile.
+ * Read the image back with mln_render_session_read_texture() once the
+ * completion runs, or acquire it once its frame result arrives.
+ *
+ * Every frame result of such a demand carries
+ * MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE, which no host demand can, and the
+ * image's frame reports MLN_RENDER_RESULT_RENDERED. Host demands neither
+ * replace the request's demand nor are replaced by it. A host demand can
+ * complete the image first, since any fully loaded frame of the update this
+ * request published or a later one completes it, and a frame of an earlier
+ * update never does. The request's demand then ends with
+ * MLN_RENDER_RESULT_NO_UPDATE.
+ *
+ * A demand that ends before the image renders is followed by another once the
+ * session can render again. After mln_render_session_barrier() ends one, the
+ * next follows when the barrier completes. After one ends with
+ * MLN_RENDER_RESULT_TARGET_NOT_READY on an attached session, the next follows
+ * the map's next update, a target replacement, or an applied resize. After
+ * the session detaches, is disposed, or loses its target, the request waits
+ * for the next session to attach.
  *
  * Returns:
  * - MLN_STATUS_OK when the request was accepted.

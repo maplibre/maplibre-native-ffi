@@ -94,9 +94,19 @@ internal class RenderSessionFixture(
     complete(mapFixture.map.setStyleJson(json.encodeToByteArray()), "the style")
   }
 
-  /** Renders the still image [still] owes a static map, and waits for it to complete. */
+  /**
+   * Services the session until the still image [still] owes a static map completes and the result
+   * of the demand that rendered it arrives. The request submits that demand itself, and it is the
+   * only one in flight, since [renderUntil] returns with none of its own. Where the session hands
+   * out frames, each rendered frame is acquired and released so the texture ring never fills.
+   */
   suspend fun renderStill(still: Deferred<Unit> = mapFixture.map.requestStillImage()) {
-    renderUntil("a still image") { still.isCompleted }
+    var rendered = false
+    serviceUntil("a still image") {
+      if (drainResults().isNotEmpty()) rendered = true
+      if (acquiresFrames) releaseFrames()
+      still.isCompleted && (rendered || still.isCancelled)
+    }
     still.await()
   }
 

@@ -183,8 +183,10 @@ fn renderWithDriver(
 
     var still_image = try map.requestStillImage(null);
     defer still_image.deinit();
+    // The request renders its image through a frame demand of its own, so
+    // the session only needs servicing until the completion settles.
     try still_image.notify(signal.wake());
-    try renderStillImage(allocator, session, &still_image, signal);
+    try waitForSessionFuture(session, &still_image, signal, null);
 
     var readback = try session.readTexture(allocator, null);
     defer readback.deinit();
@@ -193,39 +195,6 @@ fn renderWithDriver(
 
     try writePpm(io, allocator, output_path, image.value.data, image.value.info);
     std.debug.print("wrote {s} ({d}x{d})\n", .{ output_path, image.value.info.width, image.value.info.height });
-}
-
-/// Keeps a waiting demand until the still-image completion settles. The
-/// thread sleeps between wakes.
-fn renderStillImage(
-    allocator: std.mem.Allocator,
-    session: maplibre.RenderSession,
-    still_image: *maplibre.Future(void),
-    signal: *WakeSignal,
-) !void {
-    const deadline = std.Io.Clock.Timestamp.now(signal.io, .awake).addDuration(native_work_timeout);
-    var next_token: u64 = 1;
-    try session.requestFrame(.{ .token = next_token, .flags = .{ .if_needed = true, .wait_for_update = true } }, null);
-    while (true) {
-        signal.reset();
-        if (uses_caller_driver) _ = try session.serviceDriverWork(null);
-        if (try still_image.poll()) return still_image.wait(null);
-        var demand = false;
-        var results = try session.drainFrameResults(allocator, null);
-        defer results.deinit();
-        for (results.value) |result| {
-            switch (result.disposition) {
-                .rendered => demand = true,
-                .superseded => {},
-                else => return error.FrameNotRendered,
-            }
-        }
-        if (demand) {
-            next_token += 1;
-            try session.requestFrame(.{ .token = next_token, .flags = .{ .if_needed = true, .wait_for_update = true } }, null);
-        }
-        try signal.wait(deadline);
-    }
 }
 
 fn logAndValidateRenderBackend() !void {
