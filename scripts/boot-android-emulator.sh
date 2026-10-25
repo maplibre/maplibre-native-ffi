@@ -40,7 +40,7 @@ adb="$sdk_root/platform-tools/adb"
 # Prints the serial of the emulator that runs the AVD once it has booted. A
 # serial that the caller selected names some other device, so it is ignored.
 ready_serial() {
-  ANDROID_SERIAL='' "$serial_script" "$image_arch" "$api" 2>/dev/null
+  ANDROID_SERIAL='' "$serial_script" "$image_arch" "$api"
 }
 
 # Succeeds while an emulator process runs the AVD, including one that has only

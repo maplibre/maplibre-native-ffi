@@ -20,9 +20,17 @@ adb="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}/platform-tools/a
 
 # A call to an emulator that is still booting can block indefinitely, and a
 # boot waits by asking again, so each call that misses its deadline answers
-# that no emulator is ready yet.
+# that no emulator is ready yet. The call is named, since which one blocks is
+# not yet known.
 bounded_adb() {
-  perl -e 'alarm shift; exec @ARGV' 30 "$adb" "$@" </dev/null 2>/dev/null
+  local status=0
+  # The group also takes the shell's report of the alarm that ends the call.
+  { perl -e 'alarm shift; exec @ARGV' 30 "$adb" "$@" </dev/null 2>/dev/null; } 2>/dev/null ||
+    status=$?
+  if ((status == 128 + 14)); then
+    echo "android-device-serial.sh: adb $* missed its 30-second deadline." >&2
+  fi
+  return "$status"
 }
 
 # Whoever started the emulator, its console names the AVD it runs.
