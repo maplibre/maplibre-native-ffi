@@ -337,6 +337,16 @@ def operation(plan, values, *, discard=False, dispose=False):
                 convert = f"{helper}({copier(values, result.element)})"
                 if result.nullable:
                     convert = f"func(result *C.mln_completion_result) ({completion_type}, error) {{ if result.value == nil {{ return nil, nil }}; return {convert}(result) }}"
+            elif (
+                result.nullable
+                and result.kind == "buffer"
+                and result.encoding in {None, "json"}
+            ):
+                # Absent bytes are a nil slice, and absent JSON, which is
+                # never empty, is "", so neither needs a pointer.
+                completion_type = values.type(result, optional=False)
+                content = replace(result, nullable=False)
+                convert = f"completionOrZero(completionOf({copier(values, content)}))"
             else:
                 content = replace(result, nullable=False)
                 convert = f"completionOf({copier(values, content)})"

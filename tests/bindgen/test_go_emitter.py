@@ -86,6 +86,17 @@ class GoEmitterTests(unittest.TestCase):
         # The log callback's failure is false, which a panic answers too.
         self.assertIn("(result C.bool) { result = false; ", source)
 
+    def test_an_absent_json_result_is_an_empty_string(self):
+        source = go.generate(real_api())["generated_api.go"]
+        self.assertIn(
+            "GetStyleLayerProperty(layerId string, propertyName string) "
+            "(*Future[string], error) {",
+            source,
+        )
+        self.assertIn("completionOrZero(completionOf(copyViewText))", source)
+        # A nullable record still distinguishes absence with a pointer.
+        self.assertIn("(*Future[*StyleSourceInfo], error)", source)
+
     def test_a_status_callback_returns_an_error_that_the_trampoline_maps(self):
         source = go.generate(real_api())["generated_api.go"]
         self.assertIn(

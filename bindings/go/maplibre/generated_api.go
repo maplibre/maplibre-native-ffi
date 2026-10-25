@@ -6576,10 +6576,10 @@ func (receiver *MapHandle) GetStyleLayer(layerId string) (*Future[*StyleLayerInf
 //
 // See mln_map_get_style_layer_json in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetStyleLayerJson(layerId string) (*Future[*string], error) {
+func (receiver *MapHandle) GetStyleLayerJson(layerId string) (*Future[string], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_layer_json(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewText)))
+	}, completionOrZero(completionOf(copyViewText)))
 }
 
 // GetStyleLayerProperty serializes one layer property as a style-spec JSON
@@ -6587,10 +6587,10 @@ func (receiver *MapHandle) GetStyleLayerJson(layerId string) (*Future[*string], 
 //
 // See mln_map_get_style_layer_property in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetStyleLayerProperty(layerId string, propertyName string) (*Future[*string], error) {
+func (receiver *MapHandle) GetStyleLayerProperty(layerId string, propertyName string) (*Future[string], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_layer_property(C.mln_map(raw), bindingView(layerId, arena), bindingView(propertyName, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewText)))
+	}, completionOrZero(completionOf(copyViewText)))
 }
 
 // GetStyleLightProperty serializes one style light property as a style-spec
@@ -6598,10 +6598,10 @@ func (receiver *MapHandle) GetStyleLayerProperty(layerId string, propertyName st
 //
 // See mln_map_get_style_light_property in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetStyleLightProperty(propertyName string) (*Future[*string], error) {
+func (receiver *MapHandle) GetStyleLightProperty(propertyName string) (*Future[string], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_light_property(C.mln_map(raw), bindingView(propertyName, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewText)))
+	}, completionOrZero(completionOf(copyViewText)))
 }
 
 // GetStyleSource copies the complete metadata of one style source.

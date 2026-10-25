@@ -217,6 +217,18 @@ func completionNullable[T any](convert func(*C.mln_completion_result) (T, error)
 	}
 }
 
+// completionOrZero reads an absent value as T's zero value, which no present
+// value takes.
+func completionOrZero[T any](convert func(*C.mln_completion_result) (T, error)) func(*C.mln_completion_result) (T, error) {
+	return func(result *C.mln_completion_result) (T, error) {
+		if result.value == nil {
+			var zero T
+			return zero, nil
+		}
+		return convert(result)
+	}
+}
+
 func completionListOf[N, T any](copy func(N) T) func(*C.mln_completion_result) ([]T, error) {
 	return func(result *C.mln_completion_result) ([]T, error) {
 		if result.value_count == 0 {

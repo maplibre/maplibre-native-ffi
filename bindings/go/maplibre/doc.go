@@ -25,6 +25,9 @@
 // Native code releases the context of a call that it accepts, and the binding
 // calls the release for any other call.
 //
+// JSON crosses as a string. An absent JSON result, such as an undefined layer
+// property, is "", since present JSON is never empty.
+//
 // A callback whose C type returns a status returns an error instead. Nil
 // answers [StatusOk], and a failure [Status] or an [*Error] with one, or an
 // error that wraps either, answers that status on purpose. Any other error is
