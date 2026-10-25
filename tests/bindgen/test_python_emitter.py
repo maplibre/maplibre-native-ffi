@@ -336,6 +336,20 @@ mln_status mln_map_scene(mln_map map, const mln_completion *completion, mln_diag
         )
         self.assertEqual(present.shape, values.ShapeDotVariant(values.Dot(2.5)))
 
+    def test_a_parameter_keeps_its_c_name_when_the_glue_renames_its_local(self):
+        api = self.parse(
+            """
+mln_status mln_set_level(int32_t state, int32_t status, mln_diagnostic *out_diagnostic);
+""",
+            groups=("standard_types",),
+        )
+        generated = python.generate(api)
+        facade = generated["python/maplibre_native_ffi/_generated_operations.py"]
+        self.assertIn("def set_level(state: int, status: int) -> None:", facade)
+        self.assertIn("_native.set_level(state, status)", facade)
+        # The Rust glue renames its own locals, which the facade never shows.
+        self.assertIn("input_state: i32", generated["src/generated_operations.rs"])
+
     def test_an_owned_callback_handle_arrives_as_its_owner(self):
         api = self.parse(groups=("owned_argument",))
         self.assertEqual(python.coverage(api)["unsupported"], {})

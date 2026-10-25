@@ -956,14 +956,14 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_event_mask(mask)
 
     def set_feature_state(
-        self, selector: FeatureStateSelector, input_state: Any
+        self, selector: FeatureStateSelector, state: Any
     ) -> Future[CommandCompletion]:
         """Submits a copied per-feature-state command.
 
         See `mln_map_set_feature_state` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
         """
-        return self._native.set_feature_state(selector, input_state)
+        return self._native.set_feature_state(selector, state)
 
     def set_free_camera_options(
         self, options: FreeCameraOptions | None = None
@@ -1800,14 +1800,14 @@ class _RuntimeHandleOperations(GeneratedOperations):
         return self._native.set_maximum_ambient_cache_size(size)
 
     def set_offline_region_download_state(
-        self, region_id: int, input_state: OfflineRegionDownloadState
+        self, region_id: int, state: OfflineRegionDownloadState
     ) -> Future[None]:
         """Sets an offline region's native download state.
 
         See `mln_runtime_set_offline_region_download_state` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
         """
-        return self._native.set_offline_region_download_state(region_id, input_state)
+        return self._native.set_offline_region_download_state(region_id, state)
 
     def set_offline_region_observed(
         self, region_id: int, observed: bool
@@ -1991,13 +1991,13 @@ def network_get_status() -> NetworkStatus:
     return NetworkStatus(_native.network_get_status())
 
 
-def network_set_status(input_status: NetworkStatus) -> None:
+def network_set_status(status: NetworkStatus) -> None:
     """Sets MapLibre Native's process-global network status.
 
     See `mln_network_set_status` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
-    return _native.network_set_status(input_status)
+    return _native.network_set_status(status)
 
 
 def opengl_supported_context_provider_mask() -> OpenglContextProviderFlag:
@@ -2367,15 +2367,13 @@ class MapHandleDiscarding:
         """
         return self._native._discard_set_event_mask(mask)
 
-    def set_feature_state(
-        self, selector: FeatureStateSelector, input_state: Any
-    ) -> None:
+    def set_feature_state(self, selector: FeatureStateSelector, state: Any) -> None:
         """Submits a copied per-feature-state command.
 
         See `mln_map_set_feature_state` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
         """
-        return self._native._discard_set_feature_state(selector, input_state)
+        return self._native._discard_set_feature_state(selector, state)
 
     def set_free_camera_options(self, options: FreeCameraOptions | None = None) -> None:
         """Submits a copied free-camera command.

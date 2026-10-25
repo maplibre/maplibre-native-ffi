@@ -100,6 +100,17 @@ LOCAL_NAMES = {
 }
 
 
+def python_identifier(name: str) -> bool:
+    """Whether a C name can be a Python parameter of a facade method as is."""
+    return (
+        name.isascii()
+        and name.isidentifier()
+        and not name.startswith("_")
+        and not iskeyword(name)
+        and name != "self"
+    )
+
+
 def safe_identifier(name: str) -> bool:
     return (
         name.isascii()
@@ -249,12 +260,15 @@ def operation(
             and record.default
             and (release or exit or record.native.endswith("_options"))
         )
+        # The Python facade keeps the C name. Only the Rust glue's local is
+        # renamed, when it would shadow a name the glue itself uses.
         local = parameter.name
         if not safe_identifier(local) or local in LOCAL_NAMES:
             local = "input_" + local
             while local in used_names:
                 local += "_"
         used_names.add(local)
+        python_name = parameter.name if python_identifier(parameter.name) else local
         if value.kind == "handle" and value.native in OWNERS:
             public = OWNERS[value.native]
             rust = f"&{public}"
@@ -324,8 +338,10 @@ def operation(
         absent = value.nullable or has_default
         if has_default and "None" not in public:
             public += " | None"
-        py_parameters.append(f"{local}: {public}" + (" = None" if absent else ""))
-        python_arguments.append(local + "._native" if value.kind == "handle" else local)
+        py_parameters.append(f"{python_name}: {public}" + (" = None" if absent else ""))
+        python_arguments.append(
+            python_name + "._native" if value.kind == "handle" else python_name
+        )
         native_signature.append(local + ("=None" if absent else ""))
     for i, declaration in enumerate(py_parameters):
         if declaration.endswith(" = None") and any(
