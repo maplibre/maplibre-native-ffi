@@ -72,10 +72,6 @@ import type {
   VulkanOwnedTextureDescriptor,
   VulkanSurfaceDescriptor,
   VulkanTextureFrame,
-  WebgpuBorrowedTextureDescriptor,
-  WebgpuOwnedTextureDescriptor,
-  WebgpuSurfaceDescriptor,
-  WebgpuTextureFrame,
 } from "./generated_values.ts";
 
 /** The addon function of each generated operation, by C function name. */
@@ -86,13 +82,11 @@ export interface NativeOperations {
   mln_acquired_frame_get_producer_sync(frame: bigint): GpuSync;
   mln_acquired_frame_get_result(frame: bigint): RenderFrameResult;
   mln_acquired_frame_get_vulkan_texture(frame: bigint): VulkanTextureFrame;
-  mln_acquired_frame_get_webgpu_texture(frame: bigint): WebgpuTextureFrame;
   mln_acquired_frame_release(
     frame: bigint,
     token: object | undefined,
     consumerCompletion: GpuSync | undefined,
   ): void;
-  mln_android_init(jniEnv: bigint, context: bigint): void;
   mln_animation_options_default(): AnimationOptions;
   mln_bound_options_default(): BoundOptions;
   mln_c_version(): number;
@@ -231,24 +225,6 @@ export interface NativeOperations {
   mln_map_attach_vulkan_surface(
     map: bigint,
     descriptor: VulkanSurfaceDescriptor | undefined,
-    options: RenderSessionAttachOptions | undefined,
-    completion: number,
-  ): bigint;
-  mln_map_attach_webgpu_borrowed_texture(
-    map: bigint,
-    descriptor: WebgpuBorrowedTextureDescriptor | undefined,
-    options: RenderSessionAttachOptions | undefined,
-    completion: number,
-  ): bigint;
-  mln_map_attach_webgpu_owned_texture(
-    map: bigint,
-    descriptor: WebgpuOwnedTextureDescriptor | undefined,
-    options: RenderSessionAttachOptions | undefined,
-    completion: number,
-  ): bigint;
-  mln_map_attach_webgpu_surface(
-    map: bigint,
-    descriptor: WebgpuSurfaceDescriptor | undefined,
     options: RenderSessionAttachOptions | undefined,
     completion: number,
   ): bigint;
@@ -709,16 +685,6 @@ export interface NativeOperations {
     descriptor: VulkanSurfaceDescriptor | undefined,
     completion: number,
   ): void;
-  mln_render_session_set_webgpu_borrowed_texture_target(
-    session: bigint,
-    descriptor: WebgpuBorrowedTextureDescriptor | undefined,
-    completion: number,
-  ): void;
-  mln_render_session_set_webgpu_surface_target(
-    session: bigint,
-    descriptor: WebgpuSurfaceDescriptor | undefined,
-    completion: number,
-  ): void;
   mln_rendered_feature_query_options_default(): RenderedFeatureQueryOptions;
   mln_resource_request_complete(
     handle: bigint,
@@ -878,9 +844,6 @@ export interface NativeOperations {
   mln_vulkan_borrowed_texture_descriptor_default(): VulkanBorrowedTextureDescriptor;
   mln_vulkan_owned_texture_descriptor_default(): VulkanOwnedTextureDescriptor;
   mln_vulkan_surface_descriptor_default(): VulkanSurfaceDescriptor;
-  mln_webgpu_borrowed_texture_descriptor_default(): WebgpuBorrowedTextureDescriptor;
-  mln_webgpu_owned_texture_descriptor_default(): WebgpuOwnedTextureDescriptor;
-  mln_webgpu_surface_descriptor_default(): WebgpuSurfaceDescriptor;
   mln_acquired_frame_view_begin(handle: bigint): bigint;
   mln_acquired_frame_view_end(scope: bigint): void;
 }

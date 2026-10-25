@@ -313,6 +313,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_attach_metal_borrowed_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
     public RenderSessionHandle AttachMetalBorrowedTexture(
         MetalBorrowedTextureDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -343,6 +344,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_attach_metal_owned_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
     public RenderSessionHandle AttachMetalOwnedTexture(
         MetalOwnedTextureDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -373,6 +375,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_attach_metal_surface</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
     /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
     public RenderSessionHandle AttachMetalSurface(
         MetalSurfaceDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -564,96 +567,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         MlnRenderSession outSession = default;
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_attach_vulkan_surface(
-            Handle,
-            &nativeDescriptor,
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
-    /// Starts attachment of a ring of caller-owned WebGPU textures.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_attach_webgpu_borrowed_texture</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
-    /// </remarks>
-    public RenderSessionHandle AttachWebgpuBorrowedTexture(
-        WebgpuBorrowedTextureDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeWebgpuBorrowedTextureDescriptor(descriptor, scope);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_webgpu_borrowed_texture(
-            Handle,
-            &nativeDescriptor,
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
-    /// Starts attachment of a session-owned WebGPU texture ring.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_attach_webgpu_owned_texture</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
-    /// </remarks>
-    public RenderSessionHandle AttachWebgpuOwnedTexture(
-        WebgpuOwnedTextureDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeWebgpuOwnedTextureDescriptor(descriptor);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_webgpu_owned_texture(
-            Handle,
-            &nativeDescriptor,
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
-    /// Starts attachment of a WebGPU surface target.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_attach_webgpu_surface</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
-    /// </remarks>
-    public RenderSessionHandle AttachWebgpuSurface(
-        WebgpuSurfaceDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeWebgpuSurfaceDescriptor(descriptor);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_webgpu_surface(
             Handle,
             &nativeDescriptor,
             &nativeOptions,

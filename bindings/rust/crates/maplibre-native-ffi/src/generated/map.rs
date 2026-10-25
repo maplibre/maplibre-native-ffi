@@ -227,6 +227,7 @@ impl MapHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "tvos"))]
     pub unsafe fn attach_metal_borrowed_texture(
         &self,
         descriptor: &MetalBorrowedTextureDescriptor,
@@ -260,6 +261,7 @@ impl MapHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "tvos"))]
     pub unsafe fn attach_metal_owned_texture(
         &self,
         descriptor: &MetalOwnedTextureDescriptor,
@@ -293,6 +295,7 @@ impl MapHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "tvos"))]
     pub unsafe fn attach_metal_surface(
         &self,
         descriptor: &MetalSurfaceDescriptor,
@@ -425,6 +428,12 @@ impl MapHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(any(
+        target_os = "android",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "windows"
+    ))]
     pub unsafe fn attach_vulkan_borrowed_texture(
         &self,
         descriptor: &VulkanBorrowedTextureDescriptor,
@@ -458,6 +467,12 @@ impl MapHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(any(
+        target_os = "android",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "windows"
+    ))]
     pub unsafe fn attach_vulkan_owned_texture(
         &self,
         descriptor: &VulkanOwnedTextureDescriptor,
@@ -491,6 +506,12 @@ impl MapHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(any(
+        target_os = "android",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "windows"
+    ))]
     pub unsafe fn attach_vulkan_surface(
         &self,
         descriptor: &VulkanSurfaceDescriptor,
@@ -524,6 +545,7 @@ impl MapHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(target_os = "emscripten")]
     pub unsafe fn attach_webgpu_borrowed_texture(
         &self,
         descriptor: &WebgpuBorrowedTextureDescriptor,
@@ -557,6 +579,7 @@ impl MapHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(target_os = "emscripten")]
     pub unsafe fn attach_webgpu_owned_texture(
         &self,
         descriptor: &WebgpuOwnedTextureDescriptor,
@@ -590,6 +613,7 @@ impl MapHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(target_os = "emscripten")]
     pub unsafe fn attach_webgpu_surface(
         &self,
         descriptor: &WebgpuSurfaceDescriptor,

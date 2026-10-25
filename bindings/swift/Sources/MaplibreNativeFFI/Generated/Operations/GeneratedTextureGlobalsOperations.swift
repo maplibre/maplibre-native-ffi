@@ -89,33 +89,4 @@ public extension Maplibre {
       )
     }
   }
-
-  /// Returns WebGPU borrowed-texture descriptor defaults for this C API
-  /// version.
-  ///
-  /// See `mln_webgpu_borrowed_texture_descriptor_default` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  static func webgpuBorrowedTextureDescriptorDefault() throws
-    -> WebgpuBorrowedTextureDescriptor
-  {
-    try nativeDirect { _ in
-      try WebgpuBorrowedTextureDescriptor(
-        raw: mln_webgpu_borrowed_texture_descriptor_default()
-      )
-    }
-  }
-
-  /// Returns WebGPU owned-texture descriptor defaults for this C API version.
-  ///
-  /// See `mln_webgpu_owned_texture_descriptor_default` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  static func webgpuOwnedTextureDescriptorDefault() throws
-    -> WebgpuOwnedTextureDescriptor
-  {
-    try nativeDirect { _ in
-      WebgpuOwnedTextureDescriptor(
-        raw: mln_webgpu_owned_texture_descriptor_default()
-      )
-    }
-  }
 }

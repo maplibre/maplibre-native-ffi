@@ -37,16 +37,4 @@ public extension Maplibre {
       VulkanSurfaceDescriptor(raw: mln_vulkan_surface_descriptor_default())
     }
   }
-
-  /// Returns WebGPU surface descriptor defaults for this C API version.
-  ///
-  /// See `mln_webgpu_surface_descriptor_default` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  static func webgpuSurfaceDescriptorDefault() throws
-    -> WebgpuSurfaceDescriptor
-  {
-    try nativeDirect { _ in
-      WebgpuSurfaceDescriptor(raw: mln_webgpu_surface_descriptor_default())
-    }
-  }
 }

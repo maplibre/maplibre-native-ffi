@@ -14,6 +14,7 @@ public static unsafe partial class Maplibre
     /// See <c>mln_android_init</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html">C API reference</see>.
     /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
     public static void AndroidInit(NativePointer jniEnv, NativePointer context)
     {
         using var call = Enter(null);

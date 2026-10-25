@@ -40,6 +40,9 @@ SCALARS = {
 }
 OWNERS: dict[str, str] = {}
 RUNTIME_EXPORTS: set[str] = set()
+# The platforms that runtime wheels serve. One API wheel serves them all, so it
+# leaves out only what none of them can use.
+TARGETS = frozenset({"android", "linux", "macos", "windows"})
 
 
 def ctype(type_: CType) -> str:
@@ -823,7 +826,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     rust, facade, stubs = defaultdict(list), defaultdict(list), defaultdict(list)
     generated, errors, records = [], {}, set()
     discards = defaultdict(list)
-    bound = compile_api(api)
+    bound = compile_api(api, TARGETS)
     api = bound.source
     OWNERS.clear()
     OWNERS.update(
@@ -1149,7 +1152,7 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
 
 
 def coverage(api: Api | BoundApi) -> dict:
-    bound = compile_api(api)
+    bound = compile_api(api, TARGETS)
     _, generated, errors = lower(bound)
     support = [
         plan.name

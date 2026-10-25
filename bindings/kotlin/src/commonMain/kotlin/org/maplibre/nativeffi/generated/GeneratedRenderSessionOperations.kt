@@ -321,44 +321,6 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     }
 
   /**
-   * Starts an ordered replacement of every texture of a caller-owned Metal ring.
-   *
-   * See `mln_render_session_set_metal_borrowed_texture_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun setMetalBorrowedTextureTarget(
-    descriptor: MetalBorrowedTextureDescriptor,
-  ): Deferred<Unit> =
-    nativeUnit(this, binding) {
-      check(
-        C.mln_render_session_set_metal_borrowed_texture_target(
-          handle,
-          writeMetalBorrowedTextureDescriptor(descriptor),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
-   * Starts an ordered Metal surface replacement.
-   *
-   * See `mln_render_session_set_metal_surface_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  public fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor): Deferred<Unit> =
-    nativeUnit(this, binding) {
-      check(
-        C.mln_render_session_set_metal_surface_target(
-          handle,
-          writeMetalSurfaceDescriptor(descriptor),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
    * Starts an ordered replacement of every texture of a caller-owned OpenGL ring.
    *
    * See `mln_render_session_set_opengl_borrowed_texture_target` in the
@@ -390,82 +352,6 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
         C.mln_render_session_set_opengl_surface_target(
           handle,
           writeOpenglSurfaceDescriptor(descriptor),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
-   * Starts an ordered replacement of every image of a caller-owned Vulkan ring.
-   *
-   * See `mln_render_session_set_vulkan_borrowed_texture_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun setVulkanBorrowedTextureTarget(
-    descriptor: VulkanBorrowedTextureDescriptor,
-  ): Deferred<Unit> =
-    nativeUnit(this, binding) {
-      check(
-        C.mln_render_session_set_vulkan_borrowed_texture_target(
-          handle,
-          writeVulkanBorrowedTextureDescriptor(descriptor),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
-   * Starts an ordered Vulkan surface replacement.
-   *
-   * See `mln_render_session_set_vulkan_surface_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  public fun setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor): Deferred<Unit> =
-    nativeUnit(this, binding) {
-      check(
-        C.mln_render_session_set_vulkan_surface_target(
-          handle,
-          writeVulkanSurfaceDescriptor(descriptor),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
-   * Starts an ordered replacement of every texture of a caller-owned WebGPU ring.
-   *
-   * See `mln_render_session_set_webgpu_borrowed_texture_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun setWebgpuBorrowedTextureTarget(
-    descriptor: WebgpuBorrowedTextureDescriptor,
-  ): Deferred<Unit> =
-    nativeUnit(this, binding) {
-      check(
-        C.mln_render_session_set_webgpu_borrowed_texture_target(
-          handle,
-          writeWebgpuBorrowedTextureDescriptor(descriptor),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
-   * Starts an ordered WebGPU surface replacement.
-   *
-   * See `mln_render_session_set_webgpu_surface_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  public fun setWebgpuSurfaceTarget(descriptor: WebgpuSurfaceDescriptor): Deferred<Unit> =
-    nativeUnit(this, binding) {
-      check(
-        C.mln_render_session_set_webgpu_surface_target(
-          handle,
-          writeWebgpuSurfaceDescriptor(descriptor),
           completion,
           diagnostic,
         ),

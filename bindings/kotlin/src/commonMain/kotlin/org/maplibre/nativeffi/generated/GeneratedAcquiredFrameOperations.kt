@@ -20,24 +20,6 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
     nativeClose(this, binding) { check(C.mln_acquired_frame_discard(handle, diagnostic)) }
 
   /**
-   * Copies Metal-native metadata from an acquired frame.
-   *
-   * See `mln_acquired_frame_get_metal_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun <T> withMetalTexture(block: (MetalTextureFrame) -> T): T =
-    nativeCall(this, binding) {
-      borrowView(
-        { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
-        { C.mln_acquired_frame_view_end(it) },
-      ) { scope ->
-        val out = sized(w(64, 72), 8)
-        check(C.mln_acquired_frame_get_metal_texture(handle, out, diagnostic))
-        block(readMetalTextureFrame(out, scope))
-      }
-    }
-
-  /**
    * Copies OpenGL-native metadata from an acquired frame.
    *
    * See `mln_acquired_frame_get_opengl_texture` in the
@@ -84,42 +66,6 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
       val out = sized(280, 8)
       check(C.mln_acquired_frame_get_result(handle, out, diagnostic))
       readRenderFrameResult(out)
-    }
-
-  /**
-   * Copies Vulkan-native metadata from an acquired frame.
-   *
-   * See `mln_acquired_frame_get_vulkan_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun <T> withVulkanTexture(block: (VulkanTextureFrame) -> T): T =
-    nativeCall(this, binding) {
-      borrowView(
-        { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
-        { C.mln_acquired_frame_view_end(it) },
-      ) { scope ->
-        val out = sized(80, 8)
-        check(C.mln_acquired_frame_get_vulkan_texture(handle, out, diagnostic))
-        block(readVulkanTextureFrame(out, scope))
-      }
-    }
-
-  /**
-   * Copies WebGPU-native metadata from an acquired frame.
-   *
-   * See `mln_acquired_frame_get_webgpu_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun <T> withWebgpuTexture(block: (WebgpuTextureFrame) -> T): T =
-    nativeCall(this, binding) {
-      borrowView(
-        { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
-        { C.mln_acquired_frame_view_end(it) },
-      ) { scope ->
-        val out = sized(w(64, 80), 8)
-        check(C.mln_acquired_frame_get_webgpu_texture(handle, out, diagnostic))
-        block(readWebgpuTextureFrame(out, scope))
-      }
     }
 
   /**

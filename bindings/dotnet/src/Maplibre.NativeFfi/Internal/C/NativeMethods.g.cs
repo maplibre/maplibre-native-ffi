@@ -47,13 +47,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_acquired_frame_get_webgpu_texture(
-        MlnAcquiredFrame frame,
-        mln_webgpu_texture_frame* out_frame,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_acquired_frame_release(
         MlnAcquiredFrame frame,
         mln_gpu_sync* consumer_completion,
@@ -340,36 +333,6 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_map_attach_vulkan_surface(
         MlnMap map,
         mln_vulkan_surface_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_webgpu_borrowed_texture(
-        MlnMap map,
-        mln_webgpu_borrowed_texture_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_webgpu_owned_texture(
-        MlnMap map,
-        mln_webgpu_owned_texture_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_webgpu_surface(
-        MlnMap map,
-        mln_webgpu_surface_descriptor* descriptor,
         mln_render_session_attach_options* options,
         MlnRenderSession* out_session,
         mln_completion* completion,
@@ -1270,22 +1233,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_set_webgpu_borrowed_texture_target(
-        MlnRenderSession session,
-        mln_webgpu_borrowed_texture_descriptor* descriptor,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_set_webgpu_surface_target(
-        MlnRenderSession session,
-        mln_webgpu_surface_descriptor* descriptor,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_rendered_feature_query_options mln_rendered_feature_query_options_default();
 
     [LibraryImport(LibraryName)]
@@ -1595,13 +1542,4 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial mln_vulkan_surface_descriptor mln_vulkan_surface_descriptor_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_webgpu_borrowed_texture_descriptor mln_webgpu_borrowed_texture_descriptor_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_webgpu_owned_texture_descriptor mln_webgpu_owned_texture_descriptor_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_webgpu_surface_descriptor mln_webgpu_surface_descriptor_default();
 }

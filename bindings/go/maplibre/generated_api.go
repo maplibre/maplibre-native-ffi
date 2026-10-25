@@ -5545,251 +5545,6 @@ func nativeWebglContextDescriptor(input WebglContextDescriptor, arena *bindingAr
 	return raw
 }
 
-// WebgpuBorrowedTexture corresponds to mln_webgpu_borrowed_texture. One
-// caller-owned WebGPU texture of a borrowed texture ring.
-//
-// See mln_webgpu_borrowed_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type WebgpuBorrowedTexture struct {
-	// Borrowed WGPUTexture. Required.
-	Texture uintptr
-	// Borrowed WGPUTextureView for texture. Required. The view must be a 2D color
-	// view compatible with texture and the descriptor's format.
-	TextureView uintptr
-}
-
-func copyWebgpuBorrowedTexture(raw C.mln_webgpu_borrowed_texture) WebgpuBorrowedTexture {
-	var result WebgpuBorrowedTexture
-	result.Texture = uintptr(unsafe.Pointer(raw.texture))
-	result.TextureView = uintptr(unsafe.Pointer(raw.texture_view))
-	return result
-}
-
-func nativeWebgpuBorrowedTexture(input WebgpuBorrowedTexture, arena *bindingArena) C.mln_webgpu_borrowed_texture {
-	raw := C.mln_webgpu_borrowed_texture{}
-	raw.texture = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Texture)))
-	raw.texture_view = unsafe.Pointer(C.binding_address(C.uintptr_t(input.TextureView)))
-	return raw
-}
-
-// WebgpuBorrowedTextureDescriptor corresponds to
-// mln_webgpu_borrowed_texture_descriptor. WebGPU attachment options for a
-// borrowed texture target.
-//
-// See mln_webgpu_borrowed_texture_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type WebgpuBorrowedTextureDescriptor struct {
-	// Logical texture extent; physical_width and physical_height give the texture's
-	// size. A scale_factor that differs from the map's is accepted and logged as a
-	// warning.
-	Extent LogicalExtent
-	// Physical texture width in device pixels. Defaults to 256.
-	PhysicalWidth uint32
-	// Physical texture height in device pixels. Defaults to 256.
-	PhysicalHeight uint32
-	// Borrowed WebGPU context. device is required. Rendering is submitted through
-	// context.queue or that device's default queue.
-	Context WebgpuContextDescriptor
-	// The ring's textures, one per slot, in slot order. Required.
-	Textures []WebgpuBorrowedTexture
-	// Backend-native WGPUTextureFormat value of every texture. Undefined is
-	// invalid.
-	Format uint32
-}
-
-func copyWebgpuBorrowedTextureDescriptor(raw C.mln_webgpu_borrowed_texture_descriptor) WebgpuBorrowedTextureDescriptor {
-	var result WebgpuBorrowedTextureDescriptor
-	result.Extent = copyLogicalExtent(raw.extent)
-	result.PhysicalWidth = uint32(raw.physical_width)
-	result.PhysicalHeight = uint32(raw.physical_height)
-	result.Context = copyWebgpuContextDescriptor(raw.context)
-	result.Textures = func() []WebgpuBorrowedTexture {
-		length := bindingLength(uint64(raw.texture_count))
-		result := make([]WebgpuBorrowedTexture, length)
-		for i := range result {
-			item := *(*C.mln_webgpu_borrowed_texture)(bindingElement(unsafe.Pointer(raw.textures), i, uint64(unsafe.Sizeof(C.mln_webgpu_borrowed_texture{})), unsafe.Sizeof(*raw.textures), unsafe.Alignof(*raw.textures)))
-			result[i] = copyWebgpuBorrowedTexture(item)
-		}
-		return result
-	}()
-	result.Format = uint32(raw.format)
-	return result
-}
-
-func nativeWebgpuBorrowedTextureDescriptor(input WebgpuBorrowedTextureDescriptor, arena *bindingArena) C.mln_webgpu_borrowed_texture_descriptor {
-	raw := C.mln_webgpu_borrowed_texture_descriptor_default()
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeLogicalExtent(input.Extent, arena)
-	raw.physical_width = C.uint32_t(input.PhysicalWidth)
-	raw.physical_height = C.uint32_t(input.PhysicalHeight)
-	raw.context = nativeWebgpuContextDescriptor(input.Context, arena)
-	{
-		raw.textures = (*C.mln_webgpu_borrowed_texture)(arena.array(len(input.Textures), unsafe.Sizeof(*raw.textures)))
-		items := unsafe.Slice(raw.textures, len(input.Textures))
-		raw.texture_count = bindingCountLike(raw.texture_count, len(input.Textures))
-		for i, item := range input.Textures {
-			items[i] = nativeWebgpuBorrowedTexture(item, arena)
-		}
-	}
-	raw.format = C.uint32_t(input.Format)
-	return raw
-}
-
-func DefaultWebgpuBorrowedTextureDescriptor() WebgpuBorrowedTextureDescriptor {
-	return copyWebgpuBorrowedTextureDescriptor(C.mln_webgpu_borrowed_texture_descriptor_default())
-}
-
-// WebgpuContextDescriptor corresponds to mln_webgpu_context_descriptor. WebGPU
-// backend context fields shared by WebGPU render targets.
-//
-// See mln_webgpu_context_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-type WebgpuContextDescriptor struct {
-	// Borrowed WGPUInstance. Optional for texture targets.
-	Instance uintptr
-	// Borrowed WGPUDevice. Required.
-	Device uintptr
-	// Borrowed WGPUQueue. Optional; null uses the device default queue. A non-null
-	// queue must belong to device.
-	Queue uintptr
-}
-
-func copyWebgpuContextDescriptor(raw C.mln_webgpu_context_descriptor) WebgpuContextDescriptor {
-	var result WebgpuContextDescriptor
-	result.Instance = uintptr(unsafe.Pointer(raw.instance))
-	result.Device = uintptr(unsafe.Pointer(raw.device))
-	result.Queue = uintptr(unsafe.Pointer(raw.queue))
-	return result
-}
-
-func nativeWebgpuContextDescriptor(input WebgpuContextDescriptor, arena *bindingArena) C.mln_webgpu_context_descriptor {
-	raw := C.mln_webgpu_context_descriptor{}
-	raw.instance = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Instance)))
-	raw.device = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Device)))
-	raw.queue = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Queue)))
-	return raw
-}
-
-// WebgpuOwnedTextureDescriptor corresponds to
-// mln_webgpu_owned_texture_descriptor. WebGPU attachment options for an owned
-// texture target.
-//
-// See mln_webgpu_owned_texture_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type WebgpuOwnedTextureDescriptor struct {
-	// Logical texture extent. A scale_factor that differs from the map's is
-	// accepted and logged as a warning.
-	Extent LogicalExtent
-	// Borrowed WebGPU context. device is required.
-	Context WebgpuContextDescriptor
-}
-
-func copyWebgpuOwnedTextureDescriptor(raw C.mln_webgpu_owned_texture_descriptor) WebgpuOwnedTextureDescriptor {
-	var result WebgpuOwnedTextureDescriptor
-	result.Extent = copyLogicalExtent(raw.extent)
-	result.Context = copyWebgpuContextDescriptor(raw.context)
-	return result
-}
-
-func nativeWebgpuOwnedTextureDescriptor(input WebgpuOwnedTextureDescriptor, arena *bindingArena) C.mln_webgpu_owned_texture_descriptor {
-	raw := C.mln_webgpu_owned_texture_descriptor_default()
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeLogicalExtent(input.Extent, arena)
-	raw.context = nativeWebgpuContextDescriptor(input.Context, arena)
-	return raw
-}
-
-func DefaultWebgpuOwnedTextureDescriptor() WebgpuOwnedTextureDescriptor {
-	return copyWebgpuOwnedTextureDescriptor(C.mln_webgpu_owned_texture_descriptor_default())
-}
-
-// WebgpuSurfaceDescriptor corresponds to mln_webgpu_surface_descriptor. WebGPU
-// attachment options for a native surface.
-//
-// See mln_webgpu_surface_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-type WebgpuSurfaceDescriptor struct {
-	// Logical surface extent. A scale_factor that differs from the map's is
-	// accepted and logged as a warning.
-	Extent LogicalExtent
-	// Borrowed WebGPU context. device is required.
-	Context WebgpuContextDescriptor
-	// Borrowed WGPUSurface. Required, and must stay alive for the session. The
-	// session configures it for this device and extent, and unconfigures it when
-	// the session ends.
-	Surface uintptr
-	// WGPUTextureFormat to configure the surface with. Required. A browser host
-	// takes it from navigator.gpu.getPreferredCanvasFormat().
-	Format uint32
-}
-
-func copyWebgpuSurfaceDescriptor(raw C.mln_webgpu_surface_descriptor) WebgpuSurfaceDescriptor {
-	var result WebgpuSurfaceDescriptor
-	result.Extent = copyLogicalExtent(raw.extent)
-	result.Context = copyWebgpuContextDescriptor(raw.context)
-	result.Surface = uintptr(unsafe.Pointer(raw.surface))
-	result.Format = uint32(raw.format)
-	return result
-}
-
-func nativeWebgpuSurfaceDescriptor(input WebgpuSurfaceDescriptor, arena *bindingArena) C.mln_webgpu_surface_descriptor {
-	raw := C.mln_webgpu_surface_descriptor_default()
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeLogicalExtent(input.Extent, arena)
-	raw.context = nativeWebgpuContextDescriptor(input.Context, arena)
-	raw.surface = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Surface)))
-	raw.format = C.uint32_t(input.Format)
-	return raw
-}
-
-func DefaultWebgpuSurfaceDescriptor() WebgpuSurfaceDescriptor {
-	return copyWebgpuSurfaceDescriptor(C.mln_webgpu_surface_descriptor_default())
-}
-
-// WebgpuTextureFrame corresponds to mln_webgpu_texture_frame. WebGPU frame
-// acquired from a texture ring.
-//
-// See mln_webgpu_texture_frame in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type WebgpuTextureFrame struct {
-	// Session generation that produced this frame.
-	Generation uint64
-	// Physical WebGPU texture width in device pixels.
-	Width uint32
-	// Physical WebGPU texture height in device pixels.
-	Height uint32
-	// UI-to-device pixel scale used for this frame.
-	ScaleFactor float64
-	// Opaque identity of this frame.
-	FrameId uint64
-	// Ring slot that holds this frame. For a borrowed target, the index of its
-	// texture in the descriptor's textures array.
-	Slot uint32
-	// Borrowed WGPUTexture. Valid until frame release.
-	Texture uintptr
-	// Borrowed WGPUTextureView. Valid until frame release.
-	TextureView uintptr
-	// Borrowed WGPUDevice. Valid until frame release.
-	Device uintptr
-	// Backend-native WGPUTextureFormat value.
-	Format uint32
-}
-
-func copyWebgpuTextureFrame(raw C.mln_webgpu_texture_frame) WebgpuTextureFrame {
-	var result WebgpuTextureFrame
-	result.Generation = uint64(raw.generation)
-	result.Width = uint32(raw.width)
-	result.Height = uint32(raw.height)
-	result.ScaleFactor = float64(raw.scale_factor)
-	result.FrameId = uint64(raw.frame_id)
-	result.Slot = uint32(raw.slot)
-	result.Texture = uintptr(unsafe.Pointer(raw.texture))
-	result.TextureView = uintptr(unsafe.Pointer(raw.texture_view))
-	result.Device = uintptr(unsafe.Pointer(raw.device))
-	result.Format = uint32(raw.format)
-	return result
-}
-
 // WglContextDescriptor corresponds to mln_wgl_context_descriptor. WGL context
 // fields shared by OpenGL render targets on Windows.
 //
@@ -6137,101 +5892,6 @@ func (view VulkanTextureFrameView) Layout() (uint32, error) {
 		defer runtime.UnlockOSThread()
 		view.scope.check()
 		return view.value.Layout
-	})
-}
-
-type WebgpuTextureFrameView struct {
-	value WebgpuTextureFrame
-	scope *bindingScope
-}
-
-func (view WebgpuTextureFrameView) Generation() (uint64, error) {
-	return bindingCall(func() uint64 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Generation
-	})
-}
-
-func (view WebgpuTextureFrameView) Width() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Width
-	})
-}
-
-func (view WebgpuTextureFrameView) Height() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Height
-	})
-}
-
-func (view WebgpuTextureFrameView) ScaleFactor() (float64, error) {
-	return bindingCall(func() float64 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.ScaleFactor
-	})
-}
-
-func (view WebgpuTextureFrameView) FrameId() (uint64, error) {
-	return bindingCall(func() uint64 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.FrameId
-	})
-}
-
-func (view WebgpuTextureFrameView) Slot() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Slot
-	})
-}
-
-func (view WebgpuTextureFrameView) UnsafeTexture() (uintptr, error) {
-	return bindingCall(func() uintptr {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Texture
-	})
-}
-
-func (view WebgpuTextureFrameView) UnsafeTextureView() (uintptr, error) {
-	return bindingCall(func() uintptr {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.TextureView
-	})
-}
-
-func (view WebgpuTextureFrameView) UnsafeDevice() (uintptr, error) {
-	return bindingCall(func() uintptr {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Device
-	})
-}
-
-func (view WebgpuTextureFrameView) Format() (uint32, error) {
-	return bindingCall(func() uint32 {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		view.scope.check()
-		return view.value.Format
 	})
 }
 
@@ -6590,22 +6250,6 @@ func (receiver *AcquiredFrameHandle) Discard() error {
 	})
 }
 
-// WithMetalTexture copies Metal-native metadata from an acquired frame.
-//
-// See mln_acquired_frame_get_metal_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *AcquiredFrameHandle) WithMetalTexture(callback func(MetalTextureFrameView) error) error {
-	var outFrame C.mln_metal_texture_frame
-	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
-	return bindingWithView(bindingOwned(receiver.owner()), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
-	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_acquired_frame_get_metal_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
-	}, func(scope *bindingScope) MetalTextureFrameView {
-		return MetalTextureFrameView{value: copyMetalTextureFrame(outFrame), scope: scope}
-	})
-}
-
 // WithOpenglTexture copies OpenGL-native metadata from an acquired frame.
 //
 // See mln_acquired_frame_get_opengl_texture in the C API reference:
@@ -6667,22 +6311,6 @@ func (receiver *AcquiredFrameHandle) WithVulkanTexture(callback func(VulkanTextu
 	})
 }
 
-// WithWebgpuTexture copies WebGPU-native metadata from an acquired frame.
-//
-// See mln_acquired_frame_get_webgpu_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *AcquiredFrameHandle) WithWebgpuTexture(callback func(WebgpuTextureFrameView) error) error {
-	var outFrame C.mln_webgpu_texture_frame
-	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
-	return bindingWithView(bindingOwned(receiver.owner()), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
-	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_acquired_frame_get_webgpu_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
-	}, func(scope *bindingScope) WebgpuTextureFrameView {
-		return WebgpuTextureFrameView{value: copyWebgpuTextureFrame(outFrame), scope: scope}
-	})
-}
-
 // Close releases an acquired frame after the host's GPU work that reads it.
 //
 // See mln_acquired_frame_release in the C API reference:
@@ -6690,16 +6318,6 @@ func (receiver *AcquiredFrameHandle) WithWebgpuTexture(callback func(WebgpuTextu
 func (receiver *AcquiredFrameHandle) Close(consumerCompletion *GpuSync) error {
 	return bindingDo(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_release(C.mln_acquired_frame(raw), bindingStoreOptional(consumerCompletion, arena, nativeGpuSync), diagnostic))
-	})
-}
-
-// AndroidInit initializes Android platform services.
-//
-// See mln_android_init in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
-func AndroidInit(jniEnv uintptr, context uintptr) error {
-	return bindingDo(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_android_init(unsafe.Pointer(C.binding_address(C.uintptr_t(jniEnv))), unsafe.Pointer(C.binding_address(C.uintptr_t(context))), diagnostic))
 	})
 }
 
@@ -6909,74 +6527,6 @@ func (receiver *MapHandle) ApplyCameraDelta(delta CameraDelta) (*Future[CommandC
 	}, completionCommand)
 }
 
-// AttachMetalBorrowedTexture starts attachment of a ring of caller-owned Metal
-// textures.
-//
-// See mln_map_attach_metal_borrowed_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *MapHandle) AttachMetalBorrowedTexture(descriptor MetalBorrowedTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_metal_borrowed_texture(C.mln_map(raw), bindingStore(nativeMetalBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
-// AttachMetalOwnedTexture starts attachment of a session-owned Metal texture
-// ring.
-//
-// See mln_map_attach_metal_owned_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *MapHandle) AttachMetalOwnedTexture(descriptor MetalOwnedTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_metal_owned_texture(C.mln_map(raw), bindingStore(nativeMetalOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
-// AttachMetalSurface starts attachment of a Metal surface target.
-//
-// See mln_map_attach_metal_surface in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-func (receiver *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_metal_surface(C.mln_map(raw), bindingStore(nativeMetalSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
 // AttachOpenglBorrowedTexture starts attachment of a ring of caller-owned
 // OpenGL textures.
 //
@@ -7099,74 +6649,6 @@ func (receiver *MapHandle) AttachVulkanSurface(descriptor VulkanSurfaceDescripto
 	var outSession C.mln_render_session
 	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_attach_vulkan_surface(C.mln_map(raw), bindingStore(nativeVulkanSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
-// AttachWebgpuBorrowedTexture starts attachment of a ring of caller-owned
-// WebGPU textures.
-//
-// See mln_map_attach_webgpu_borrowed_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *MapHandle) AttachWebgpuBorrowedTexture(descriptor WebgpuBorrowedTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_webgpu_borrowed_texture(C.mln_map(raw), bindingStore(nativeWebgpuBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
-// AttachWebgpuOwnedTexture starts attachment of a session-owned WebGPU texture
-// ring.
-//
-// See mln_map_attach_webgpu_owned_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *MapHandle) AttachWebgpuOwnedTexture(descriptor WebgpuOwnedTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_webgpu_owned_texture(C.mln_map(raw), bindingStore(nativeWebgpuOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
-// AttachWebgpuSurface starts attachment of a WebGPU surface target.
-//
-// See mln_map_attach_webgpu_surface in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-func (receiver *MapHandle) AttachWebgpuSurface(descriptor WebgpuSurfaceDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_webgpu_surface(C.mln_map(raw), bindingStore(nativeWebgpuSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
 		session *RenderSessionHandle
 		ready   *Future[struct{}]
@@ -8351,27 +7833,6 @@ func (receiver *RenderSessionHandle) ServiceDriverWork() error {
 	})
 }
 
-// SetMetalBorrowedTextureTarget starts an ordered replacement of every texture
-// of a caller-owned Metal ring.
-//
-// See mln_render_session_set_metal_borrowed_texture_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *RenderSessionHandle) SetMetalBorrowedTextureTarget(descriptor MetalBorrowedTextureDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_set_metal_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeMetalBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
-}
-
-// SetMetalSurfaceTarget starts an ordered Metal surface replacement.
-//
-// See mln_render_session_set_metal_surface_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-func (receiver *RenderSessionHandle) SetMetalSurfaceTarget(descriptor MetalSurfaceDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_set_metal_surface_target(C.mln_render_session(raw), bindingStore(nativeMetalSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
-}
-
 // SetOpenglBorrowedTextureTarget starts an ordered replacement of every texture
 // of a caller-owned OpenGL ring.
 //
@@ -8411,27 +7872,6 @@ func (receiver *RenderSessionHandle) SetVulkanBorrowedTextureTarget(descriptor V
 func (receiver *RenderSessionHandle) SetVulkanSurfaceTarget(descriptor VulkanSurfaceDescriptor) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_vulkan_surface_target(C.mln_render_session(raw), bindingStore(nativeVulkanSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
-}
-
-// SetWebgpuBorrowedTextureTarget starts an ordered replacement of every texture
-// of a caller-owned WebGPU ring.
-//
-// See mln_render_session_set_webgpu_borrowed_texture_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *RenderSessionHandle) SetWebgpuBorrowedTextureTarget(descriptor WebgpuBorrowedTextureDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_set_webgpu_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeWebgpuBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
-}
-
-// SetWebgpuSurfaceTarget starts an ordered WebGPU surface replacement.
-//
-// See mln_render_session_set_webgpu_surface_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-func (receiver *RenderSessionHandle) SetWebgpuSurfaceTarget(descriptor WebgpuSurfaceDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_set_webgpu_surface_target(C.mln_render_session(raw), bindingStore(nativeWebgpuSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
 	}, completionUnit)
 }
 

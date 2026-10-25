@@ -237,7 +237,7 @@ internal sealed class RenderFixture : IDisposable
         var context = Graphics.Context;
         return Backend switch
         {
-            TestGraphicsBackend.Metal => Map.AttachMetalOwnedTexture(
+            TestGraphicsBackend.Metal when OperatingSystem.IsMacOS() => Map.AttachMetalOwnedTexture(
                 new MetalOwnedTextureDescriptor
                 {
                     Extent = extent,

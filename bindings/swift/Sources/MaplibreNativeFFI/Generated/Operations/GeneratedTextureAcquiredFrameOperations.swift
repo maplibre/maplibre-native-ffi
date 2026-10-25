@@ -4,33 +4,35 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension AcquiredFrameHandle {
-  /// Copies Metal-native metadata from an acquired frame.
-  ///
-  /// See `mln_acquired_frame_get_metal_texture` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func withMetalTexture<Result>(_ body: (MetalTextureFrameView) throws
-    -> Result) throws -> Result
-  {
-    var raw = mln_metal_texture_frame()
-    raw.size = UInt32(MemoryLayout<mln_metal_texture_frame>.size)
-    return try nativeView(
-      reading: raw,
-      begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
-        raw,
-        token,
-        diagnostic
-      ) },
-      end: { mln_acquired_frame_view_end($0) },
-      get: { raw, value, diagnostic in mln_acquired_frame_get_metal_texture(
-        raw,
-        value,
-        diagnostic
-      ) }
-    ) { raw, scope in try body(MetalTextureFrameView(
-      MetalTextureFrame(raw: raw),
-      scope: scope
-    )) }
-  }
+  #if os(iOS) || os(macOS) || os(tvOS)
+    /// Copies Metal-native metadata from an acquired frame.
+    ///
+    /// See `mln_acquired_frame_get_metal_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    func withMetalTexture<Result>(_ body: (MetalTextureFrameView) throws
+      -> Result) throws -> Result
+    {
+      var raw = mln_metal_texture_frame()
+      raw.size = UInt32(MemoryLayout<mln_metal_texture_frame>.size)
+      return try nativeView(
+        reading: raw,
+        begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
+          raw,
+          token,
+          diagnostic
+        ) },
+        end: { mln_acquired_frame_view_end($0) },
+        get: { raw, value, diagnostic in mln_acquired_frame_get_metal_texture(
+          raw,
+          value,
+          diagnostic
+        ) }
+      ) { raw, scope in try body(MetalTextureFrameView(
+        MetalTextureFrame(raw: raw),
+        scope: scope
+      )) }
+    }
+  #endif
 
   /// Copies OpenGL-native metadata from an acquired frame.
   ///
@@ -60,59 +62,33 @@ public extension AcquiredFrameHandle {
     )) }
   }
 
-  /// Copies Vulkan-native metadata from an acquired frame.
-  ///
-  /// See `mln_acquired_frame_get_vulkan_texture` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func withVulkanTexture<Result>(_ body: (VulkanTextureFrameView) throws
-    -> Result) throws -> Result
-  {
-    var raw = mln_vulkan_texture_frame()
-    raw.size = UInt32(MemoryLayout<mln_vulkan_texture_frame>.size)
-    return try nativeView(
-      reading: raw,
-      begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
-        raw,
-        token,
-        diagnostic
-      ) },
-      end: { mln_acquired_frame_view_end($0) },
-      get: { raw, value, diagnostic in mln_acquired_frame_get_vulkan_texture(
-        raw,
-        value,
-        diagnostic
-      ) }
-    ) { raw, scope in try body(VulkanTextureFrameView(
-      VulkanTextureFrame(raw: raw),
-      scope: scope
-    )) }
-  }
-
-  /// Copies WebGPU-native metadata from an acquired frame.
-  ///
-  /// See `mln_acquired_frame_get_webgpu_texture` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func withWebgpuTexture<Result>(_ body: (WebgpuTextureFrameView) throws
-    -> Result) throws -> Result
-  {
-    var raw = mln_webgpu_texture_frame()
-    raw.size = UInt32(MemoryLayout<mln_webgpu_texture_frame>.size)
-    return try nativeView(
-      reading: raw,
-      begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
-        raw,
-        token,
-        diagnostic
-      ) },
-      end: { mln_acquired_frame_view_end($0) },
-      get: { raw, value, diagnostic in mln_acquired_frame_get_webgpu_texture(
-        raw,
-        value,
-        diagnostic
-      ) }
-    ) { raw, scope in try body(WebgpuTextureFrameView(
-      WebgpuTextureFrame(raw: raw),
-      scope: scope
-    )) }
-  }
+  #if os(Linux) || os(macOS)
+    /// Copies Vulkan-native metadata from an acquired frame.
+    ///
+    /// See `mln_acquired_frame_get_vulkan_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    func withVulkanTexture<Result>(_ body: (VulkanTextureFrameView) throws
+      -> Result) throws -> Result
+    {
+      var raw = mln_vulkan_texture_frame()
+      raw.size = UInt32(MemoryLayout<mln_vulkan_texture_frame>.size)
+      return try nativeView(
+        reading: raw,
+        begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
+          raw,
+          token,
+          diagnostic
+        ) },
+        end: { mln_acquired_frame_view_end($0) },
+        get: { raw, value, diagnostic in mln_acquired_frame_get_vulkan_texture(
+          raw,
+          value,
+          diagnostic
+        ) }
+      ) { raw, scope in try body(VulkanTextureFrameView(
+        VulkanTextureFrame(raw: raw),
+        scope: scope
+      )) }
+    }
+  #endif
 }

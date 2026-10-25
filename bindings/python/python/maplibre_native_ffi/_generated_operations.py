@@ -88,10 +88,6 @@ from ._generated_values import (
     VulkanOwnedTextureDescriptor,
     VulkanSurfaceDescriptor,
     VulkanTextureFrame,
-    WebgpuBorrowedTextureDescriptor,
-    WebgpuOwnedTextureDescriptor,
-    WebgpuSurfaceDescriptor,
-    WebgpuTextureFrame,
     _maybe,
 )
 from ._operation import GeneratedOperations, _adopt_value, _view
@@ -155,21 +151,6 @@ class MapAttachVulkanOwnedTextureResult(NamedTuple):
 
 
 class MapAttachVulkanSurfaceResult(NamedTuple):
-    session: RenderSessionHandle
-    ready: Future[None]
-
-
-class MapAttachWebgpuBorrowedTextureResult(NamedTuple):
-    session: RenderSessionHandle
-    ready: Future[None]
-
-
-class MapAttachWebgpuOwnedTextureResult(NamedTuple):
-    session: RenderSessionHandle
-    ready: Future[None]
-
-
-class MapAttachWebgpuSurfaceResult(NamedTuple):
     session: RenderSessionHandle
     ready: Future[None]
 
@@ -253,20 +234,6 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
             self,
             lambda: self._native.vulkan_texture(),
             lambda raw: VulkanTextureFrame._from_native(raw),
-        )
-
-    def webgpu_texture(self) -> AbstractContextManager[WebgpuTextureFrame]:
-        """Copies WebGPU-native metadata from an acquired frame.
-
-        See `mln_acquired_frame_get_webgpu_texture` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-
-        Native resources remain valid only inside the `with` block.
-        """
-        return _view(
-            self,
-            lambda: self._native.webgpu_texture(),
-            lambda raw: WebgpuTextureFrame._from_native(raw),
         )
 
     def close(self, consumer_completion: GpuSync | None = None) -> None:
@@ -537,54 +504,6 @@ class _MapHandleOperations(GeneratedOperations):
         """
         raw = self._native.attach_vulkan_surface(descriptor, options)
         return MapAttachVulkanSurfaceResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            ready=raw["ready"],
-        )
-
-    def attach_webgpu_borrowed_texture(
-        self,
-        descriptor: WebgpuBorrowedTextureDescriptor,
-        options: RenderSessionAttachOptions | None = None,
-    ) -> MapAttachWebgpuBorrowedTextureResult:
-        """Starts attachment of a ring of caller-owned WebGPU textures.
-
-        See `mln_map_attach_webgpu_borrowed_texture` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-        """
-        raw = self._native.attach_webgpu_borrowed_texture(descriptor, options)
-        return MapAttachWebgpuBorrowedTextureResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            ready=raw["ready"],
-        )
-
-    def attach_webgpu_owned_texture(
-        self,
-        descriptor: WebgpuOwnedTextureDescriptor,
-        options: RenderSessionAttachOptions | None = None,
-    ) -> MapAttachWebgpuOwnedTextureResult:
-        """Starts attachment of a session-owned WebGPU texture ring.
-
-        See `mln_map_attach_webgpu_owned_texture` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-        """
-        raw = self._native.attach_webgpu_owned_texture(descriptor, options)
-        return MapAttachWebgpuOwnedTextureResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            ready=raw["ready"],
-        )
-
-    def attach_webgpu_surface(
-        self,
-        descriptor: WebgpuSurfaceDescriptor,
-        options: RenderSessionAttachOptions | None = None,
-    ) -> MapAttachWebgpuSurfaceResult:
-        """Starts attachment of a WebGPU surface target.
-
-        See `mln_map_attach_webgpu_surface` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-        """
-        raw = self._native.attach_webgpu_surface(descriptor, options)
-        return MapAttachWebgpuSurfaceResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
             ready=raw["ready"],
         )
@@ -1640,27 +1559,6 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
         """
         return self._native.set_vulkan_surface_target(descriptor)
-
-    def set_webgpu_borrowed_texture_target(
-        self, descriptor: WebgpuBorrowedTextureDescriptor
-    ) -> Future[None]:
-        """Starts an ordered replacement of every texture of a caller-owned
-        WebGPU ring.
-
-        See `mln_render_session_set_webgpu_borrowed_texture_target` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-        """
-        return self._native.set_webgpu_borrowed_texture_target(descriptor)
-
-    def set_webgpu_surface_target(
-        self, descriptor: WebgpuSurfaceDescriptor
-    ) -> Future[None]:
-        """Starts an ordered WebGPU surface replacement.
-
-        See `mln_render_session_set_webgpu_surface_target` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-        """
-        return self._native.set_webgpu_surface_target(descriptor)
 
     @property
     def discarding(self) -> RenderSessionHandleDiscarding:

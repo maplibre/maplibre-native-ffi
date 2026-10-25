@@ -2623,115 +2623,6 @@ fn generated_copy_mln_webgl_context_descriptor(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_webgpu_borrowed_texture(
-    py: Python<'_>,
-    value: &sys::mln_webgpu_borrowed_texture,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("texture", generated_value(py, value.texture as usize)?)?;
-    dict.set_item(
-        "texture_view",
-        generated_value(py, value.texture_view as usize)?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_webgpu_borrowed_texture_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_webgpu_borrowed_texture_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "extent",
-        generated_copy_mln_logical_extent(py, &value.extent)?,
-    )?;
-    dict.set_item("physical_width", generated_value(py, value.physical_width)?)?;
-    dict.set_item(
-        "physical_height",
-        generated_value(py, value.physical_height)?,
-    )?;
-    dict.set_item(
-        "context",
-        generated_copy_mln_webgpu_context_descriptor(py, &value.context)?,
-    )?;
-    dict.set_item(
-        "textures",
-        generated_list(
-            py,
-            unsafe { generated_slice(value.textures, value.texture_count)? },
-            |element| generated_copy_mln_webgpu_borrowed_texture(py, element),
-        )?,
-    )?;
-    dict.set_item("format", generated_value(py, value.format)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_webgpu_context_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_webgpu_context_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("instance", generated_value(py, value.instance as usize)?)?;
-    dict.set_item("device", generated_value(py, value.device as usize)?)?;
-    dict.set_item("queue", generated_value(py, value.queue as usize)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_webgpu_owned_texture_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_webgpu_owned_texture_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "extent",
-        generated_copy_mln_logical_extent(py, &value.extent)?,
-    )?;
-    dict.set_item(
-        "context",
-        generated_copy_mln_webgpu_context_descriptor(py, &value.context)?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_webgpu_surface_descriptor(
-    py: Python<'_>,
-    value: &sys::mln_webgpu_surface_descriptor,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "extent",
-        generated_copy_mln_logical_extent(py, &value.extent)?,
-    )?;
-    dict.set_item(
-        "context",
-        generated_copy_mln_webgpu_context_descriptor(py, &value.context)?,
-    )?;
-    dict.set_item("surface", generated_value(py, value.surface as usize)?)?;
-    dict.set_item("format", generated_value(py, value.format)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_webgpu_texture_frame(
-    py: Python<'_>,
-    value: &sys::mln_webgpu_texture_frame,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("generation", generated_value(py, value.generation)?)?;
-    dict.set_item("width", generated_value(py, value.width)?)?;
-    dict.set_item("height", generated_value(py, value.height)?)?;
-    dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
-    dict.set_item("frame_id", generated_value(py, value.frame_id)?)?;
-    dict.set_item("slot", generated_value(py, value.slot)?)?;
-    dict.set_item("texture", generated_value(py, value.texture as usize)?)?;
-    dict.set_item(
-        "texture_view",
-        generated_value(py, value.texture_view as usize)?,
-    )?;
-    dict.set_item("device", generated_value(py, value.device as usize)?)?;
-    dict.set_item("format", generated_value(py, value.format)?)?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_wgl_context_descriptor(
     py: Python<'_>,
     value: &sys::mln_wgl_context_descriptor,
@@ -4440,89 +4331,6 @@ fn generated_input_mln_webgl_context_descriptor<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_webgpu_borrowed_texture<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_webgpu_borrowed_texture> {
-    let _ = storage;
-    let mut raw: sys::mln_webgpu_borrowed_texture = unsafe { std::mem::zeroed() };
-    raw.texture = value.getattr("texture")?.extract::<usize>()? as _;
-    raw.texture_view = value.getattr("texture_view")?.extract::<usize>()? as _;
-    Ok(raw)
-}
-
-fn generated_input_mln_webgpu_borrowed_texture_descriptor<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_webgpu_borrowed_texture_descriptor> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_webgpu_borrowed_texture_descriptor_default() });
-    }
-    let mut raw: sys::mln_webgpu_borrowed_texture_descriptor =
-        unsafe { sys::mln_webgpu_borrowed_texture_descriptor_default() };
-    raw.size = std::mem::size_of::<sys::mln_webgpu_borrowed_texture_descriptor>() as _;
-    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
-    raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
-    raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
-    raw.context =
-        generated_input_mln_webgpu_context_descriptor(&value.getattr("context")?, storage)?;
-    raw.textures = {
-        let items = generated_items(&value.getattr("textures")?, |item| {
-            generated_input_mln_webgpu_borrowed_texture(&item, storage)
-        })?;
-        raw.texture_count = generated_length(items.len())?;
-        storage.keep_array(items)
-    };
-    raw.format = value.getattr("format")?.extract::<u32>()?;
-    Ok(raw)
-}
-
-fn generated_input_mln_webgpu_context_descriptor<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_webgpu_context_descriptor> {
-    let _ = storage;
-    let mut raw: sys::mln_webgpu_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.instance = value.getattr("instance")?.extract::<usize>()? as _;
-    raw.device = value.getattr("device")?.extract::<usize>()? as _;
-    raw.queue = value.getattr("queue")?.extract::<usize>()? as _;
-    Ok(raw)
-}
-
-fn generated_input_mln_webgpu_owned_texture_descriptor<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_webgpu_owned_texture_descriptor> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_webgpu_owned_texture_descriptor_default() });
-    }
-    let mut raw: sys::mln_webgpu_owned_texture_descriptor =
-        unsafe { sys::mln_webgpu_owned_texture_descriptor_default() };
-    raw.size = std::mem::size_of::<sys::mln_webgpu_owned_texture_descriptor>() as _;
-    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
-    raw.context =
-        generated_input_mln_webgpu_context_descriptor(&value.getattr("context")?, storage)?;
-    Ok(raw)
-}
-
-fn generated_input_mln_webgpu_surface_descriptor<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_webgpu_surface_descriptor> {
-    if value.is_none() {
-        return Ok(unsafe { sys::mln_webgpu_surface_descriptor_default() });
-    }
-    let mut raw: sys::mln_webgpu_surface_descriptor =
-        unsafe { sys::mln_webgpu_surface_descriptor_default() };
-    raw.size = std::mem::size_of::<sys::mln_webgpu_surface_descriptor>() as _;
-    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
-    raw.context =
-        generated_input_mln_webgpu_context_descriptor(&value.getattr("context")?, storage)?;
-    raw.surface = value.getattr("surface")?.extract::<usize>()? as _;
-    raw.format = value.getattr("format")?.extract::<u32>()?;
-    Ok(raw)
-}
-
 fn generated_input_mln_wgl_context_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -4756,24 +4564,6 @@ fn _default_vulkan_surface_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
     generated_copy_mln_vulkan_surface_descriptor(py, &value)
 }
 
-#[pyfunction]
-fn _default_webgpu_borrowed_texture_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_webgpu_borrowed_texture_descriptor_default() };
-    generated_copy_mln_webgpu_borrowed_texture_descriptor(py, &value)
-}
-
-#[pyfunction]
-fn _default_webgpu_owned_texture_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_webgpu_owned_texture_descriptor_default() };
-    generated_copy_mln_webgpu_owned_texture_descriptor(py, &value)
-}
-
-#[pyfunction]
-fn _default_webgpu_surface_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let value = unsafe { sys::mln_webgpu_surface_descriptor_default() };
-    generated_copy_mln_webgpu_surface_descriptor(py, &value)
-}
-
 unsafe extern "C" fn generated_dispose_mln_acquired_frame(
     handle: sys::mln_acquired_frame,
 ) -> sys::mln_status {
@@ -4913,19 +4703,6 @@ impl AcquiredFrameHandle {
             })
         }?;
         generated_copy_mln_vulkan_texture_frame(py, &out_frame)
-    }
-    #[pyo3(signature = ())]
-    fn webgpu_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let handle = self.input();
-        let mut out_frame: sys::mln_webgpu_texture_frame = unsafe { std::mem::zeroed() };
-        out_frame.size = std::mem::size_of::<sys::mln_webgpu_texture_frame>() as _;
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_acquired_frame_get_webgpu_texture(handle, &mut out_frame, diagnostic)
-            })
-        }?;
-        generated_copy_mln_webgpu_texture_frame(py, &out_frame)
     }
     #[pyo3(signature = (consumer_completion=None))]
     fn close(
@@ -5856,135 +5633,6 @@ impl MapHandle {
             call.complete(
                 |completion, diagnostic| {
                     sys::mln_map_attach_vulkan_surface(
-                        handle,
-                        &descriptor_value,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, options=None))]
-    fn attach_webgpu_borrowed_texture(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_webgpu_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_webgpu_borrowed_texture(
-                        handle,
-                        &descriptor_value,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, options=None))]
-    fn attach_webgpu_owned_texture(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_webgpu_owned_texture_descriptor(&descriptor.clone(), storage)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_webgpu_owned_texture(
-                        handle,
-                        &descriptor_value,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, options=None))]
-    fn attach_webgpu_surface(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_webgpu_surface_descriptor(&descriptor.clone(), storage)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_webgpu_surface(
                         handle,
                         &descriptor_value,
                         &options_value,
@@ -9059,58 +8707,6 @@ impl RenderSessionHandle {
             )
         }
     }
-    #[pyo3(signature = (descriptor))]
-    fn set_webgpu_borrowed_texture_target(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_webgpu_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
-        let handle = self.input();
-        let convert = py_none;
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_render_session_set_webgpu_borrowed_texture_target(
-                        handle,
-                        &descriptor_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
-    #[pyo3(signature = (descriptor))]
-    fn set_webgpu_surface_target(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_webgpu_surface_descriptor(&descriptor.clone(), storage)?;
-        let handle = self.input();
-        let convert = py_none;
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_render_session_set_webgpu_surface_target(
-                        handle,
-                        &descriptor_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
 }
 
 #[pymethods]
@@ -10360,18 +9956,6 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     module.add_function(wrap_pyfunction!(
         _default_vulkan_surface_descriptor,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_webgpu_borrowed_texture_descriptor,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_webgpu_owned_texture_descriptor,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        _default_webgpu_surface_descriptor,
         module
     )?)?;
     module.add_function(wrap_pyfunction!(android_init, module)?)?;

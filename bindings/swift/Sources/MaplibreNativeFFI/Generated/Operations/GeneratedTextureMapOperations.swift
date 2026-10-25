@@ -4,51 +4,55 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Starts attachment of a ring of caller-owned Metal textures.
-  ///
-  /// See `mln_map_attach_metal_borrowed_texture` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func attachMetalBorrowedTexture(
-    descriptor bindingArg0: MetalBorrowedTextureDescriptor,
-    options bindingArg1: RenderSessionAttachOptions
-  ) throws -> NewRenderSession {
-    var value0: mln_render_session = 0
-    return try nativeAttach(as: NewRenderSession
-      .init)
-    { raw, arena, completion, diagnostic in
-      try mln_map_attach_metal_borrowed_texture(
-        raw,
-        arena.store(bindingArg0.nativeValue(arena: arena)),
-        arena.store(bindingArg1.nativeValue(arena: arena)),
-        &value0,
-        completion,
-        diagnostic
-      )
-    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
-  }
+  #if os(iOS) || os(macOS) || os(tvOS)
+    /// Starts attachment of a ring of caller-owned Metal textures.
+    ///
+    /// See `mln_map_attach_metal_borrowed_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    func attachMetalBorrowedTexture(
+      descriptor bindingArg0: MetalBorrowedTextureDescriptor,
+      options bindingArg1: RenderSessionAttachOptions
+    ) throws -> NewRenderSession {
+      var value0: mln_render_session = 0
+      return try nativeAttach(as: NewRenderSession
+        .init)
+      { raw, arena, completion, diagnostic in
+        try mln_map_attach_metal_borrowed_texture(
+          raw,
+          arena.store(bindingArg0.nativeValue(arena: arena)),
+          arena.store(bindingArg1.nativeValue(arena: arena)),
+          &value0,
+          completion,
+          diagnostic
+        )
+      } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
+    }
+  #endif
 
-  /// Starts attachment of a session-owned Metal texture ring.
-  ///
-  /// See `mln_map_attach_metal_owned_texture` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func attachMetalOwnedTexture(
-    descriptor bindingArg0: MetalOwnedTextureDescriptor,
-    options bindingArg1: RenderSessionAttachOptions
-  ) throws -> NewRenderSession {
-    var value0: mln_render_session = 0
-    return try nativeAttach(as: NewRenderSession
-      .init)
-    { raw, arena, completion, diagnostic in
-      try mln_map_attach_metal_owned_texture(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        arena.store(bindingArg1.nativeValue(arena: arena)),
-        &value0,
-        completion,
-        diagnostic
-      )
-    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
-  }
+  #if os(iOS) || os(macOS) || os(tvOS)
+    /// Starts attachment of a session-owned Metal texture ring.
+    ///
+    /// See `mln_map_attach_metal_owned_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    func attachMetalOwnedTexture(
+      descriptor bindingArg0: MetalOwnedTextureDescriptor,
+      options bindingArg1: RenderSessionAttachOptions
+    ) throws -> NewRenderSession {
+      var value0: mln_render_session = 0
+      return try nativeAttach(as: NewRenderSession
+        .init)
+      { raw, arena, completion, diagnostic in
+        try mln_map_attach_metal_owned_texture(
+          raw,
+          arena.store(bindingArg0.nativeValue()),
+          arena.store(bindingArg1.nativeValue(arena: arena)),
+          &value0,
+          completion,
+          diagnostic
+        )
+      } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
+    }
+  #endif
 
   /// Starts attachment of a ring of caller-owned OpenGL textures.
   ///
@@ -96,95 +100,53 @@ public extension MapHandle {
     } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
-  /// Starts attachment of a ring of caller-owned Vulkan images.
-  ///
-  /// See `mln_map_attach_vulkan_borrowed_texture` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func attachVulkanBorrowedTexture(
-    descriptor bindingArg0: VulkanBorrowedTextureDescriptor,
-    options bindingArg1: RenderSessionAttachOptions
-  ) throws -> NewRenderSession {
-    var value0: mln_render_session = 0
-    return try nativeAttach(as: NewRenderSession
-      .init)
-    { raw, arena, completion, diagnostic in
-      try mln_map_attach_vulkan_borrowed_texture(
-        raw,
-        arena.store(bindingArg0.nativeValue(arena: arena)),
-        arena.store(bindingArg1.nativeValue(arena: arena)),
-        &value0,
-        completion,
-        diagnostic
-      )
-    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
-  }
+  #if os(Linux) || os(macOS)
+    /// Starts attachment of a ring of caller-owned Vulkan images.
+    ///
+    /// See `mln_map_attach_vulkan_borrowed_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    func attachVulkanBorrowedTexture(
+      descriptor bindingArg0: VulkanBorrowedTextureDescriptor,
+      options bindingArg1: RenderSessionAttachOptions
+    ) throws -> NewRenderSession {
+      var value0: mln_render_session = 0
+      return try nativeAttach(as: NewRenderSession
+        .init)
+      { raw, arena, completion, diagnostic in
+        try mln_map_attach_vulkan_borrowed_texture(
+          raw,
+          arena.store(bindingArg0.nativeValue(arena: arena)),
+          arena.store(bindingArg1.nativeValue(arena: arena)),
+          &value0,
+          completion,
+          diagnostic
+        )
+      } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
+    }
+  #endif
 
-  /// Starts attachment of a session-owned Vulkan texture ring.
-  ///
-  /// See `mln_map_attach_vulkan_owned_texture` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func attachVulkanOwnedTexture(
-    descriptor bindingArg0: VulkanOwnedTextureDescriptor,
-    options bindingArg1: RenderSessionAttachOptions
-  ) throws -> NewRenderSession {
-    var value0: mln_render_session = 0
-    return try nativeAttach(as: NewRenderSession
-      .init)
-    { raw, arena, completion, diagnostic in
-      try mln_map_attach_vulkan_owned_texture(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        arena.store(bindingArg1.nativeValue(arena: arena)),
-        &value0,
-        completion,
-        diagnostic
-      )
-    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
-  }
-
-  /// Starts attachment of a ring of caller-owned WebGPU textures.
-  ///
-  /// See `mln_map_attach_webgpu_borrowed_texture` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func attachWebgpuBorrowedTexture(
-    descriptor bindingArg0: WebgpuBorrowedTextureDescriptor,
-    options bindingArg1: RenderSessionAttachOptions
-  ) throws -> NewRenderSession {
-    var value0: mln_render_session = 0
-    return try nativeAttach(as: NewRenderSession
-      .init)
-    { raw, arena, completion, diagnostic in
-      try mln_map_attach_webgpu_borrowed_texture(
-        raw,
-        arena.store(bindingArg0.nativeValue(arena: arena)),
-        arena.store(bindingArg1.nativeValue(arena: arena)),
-        &value0,
-        completion,
-        diagnostic
-      )
-    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
-  }
-
-  /// Starts attachment of a session-owned WebGPU texture ring.
-  ///
-  /// See `mln_map_attach_webgpu_owned_texture` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func attachWebgpuOwnedTexture(
-    descriptor bindingArg0: WebgpuOwnedTextureDescriptor,
-    options bindingArg1: RenderSessionAttachOptions
-  ) throws -> NewRenderSession {
-    var value0: mln_render_session = 0
-    return try nativeAttach(as: NewRenderSession
-      .init)
-    { raw, arena, completion, diagnostic in
-      try mln_map_attach_webgpu_owned_texture(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        arena.store(bindingArg1.nativeValue(arena: arena)),
-        &value0,
-        completion,
-        diagnostic
-      )
-    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
-  }
+  #if os(Linux) || os(macOS)
+    /// Starts attachment of a session-owned Vulkan texture ring.
+    ///
+    /// See `mln_map_attach_vulkan_owned_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    func attachVulkanOwnedTexture(
+      descriptor bindingArg0: VulkanOwnedTextureDescriptor,
+      options bindingArg1: RenderSessionAttachOptions
+    ) throws -> NewRenderSession {
+      var value0: mln_render_session = 0
+      return try nativeAttach(as: NewRenderSession
+        .init)
+      { raw, arena, completion, diagnostic in
+        try mln_map_attach_vulkan_owned_texture(
+          raw,
+          arena.store(bindingArg0.nativeValue()),
+          arena.store(bindingArg1.nativeValue(arena: arena)),
+          &value0,
+          completion,
+          diagnostic
+        )
+      } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
+    }
+  #endif
 }

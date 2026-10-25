@@ -12,7 +12,7 @@ from collections import defaultdict
 from dataclasses import dataclass, replace
 
 from tools.bindgen import docs
-from tools.bindgen.compiler import compile_api
+from tools.bindgen.compiler import compile_api, served
 from tools.bindgen.managed_contracts import KEYWORDS, LOCALS
 from tools.bindgen.model import Api, Function
 from tools.bindgen.names import camel, pascal, type_name
@@ -28,6 +28,27 @@ from tools.bindgen.semantic import (
 
 from . import dotnet_native
 from .dotnet_values import Unsupported, Values, member, raw_handle, typed_mask
+
+# The platform analyzer's name for each platform that the package serves.
+PLATFORMS = {
+    "android": "android",
+    "linux": "linux",
+    "macos": "macos",
+    "windows": "windows",
+}
+TARGETS = frozenset(PLATFORMS)
+
+
+def supported_platforms(plan: OperationPlan, indent: str = "    ") -> str:
+    """The attributes that tell the platform analyzer where a call can work."""
+    platforms = served(plan.function, TARGETS)
+    if platforms is None:
+        return ""
+    return "".join(
+        f'{indent}[global::System.Runtime.Versioning.SupportedOSPlatform("{PLATFORMS[name]}")]\n'
+        for name in sorted(platforms)
+    )
+
 
 # The handles that `mln_runtime_event_source_type` names as an event's source.
 EVENT_SOURCES = frozenset({"mln_runtime", "mln_map"})
@@ -1000,7 +1021,7 @@ def emit(api: Api | BoundApi) -> Emission:
     discards: dict[str, list[str]] = defaultdict(list)
     records: dict[str, set[str]] = defaultdict(set)
     supported = []
-    bound = compile_api(api)
+    bound = compile_api(api, TARGETS)
     api = bound.source
     owners = {name: owner_name(handle) for name, handle in bound.handles.items()}
     unsupported = {
@@ -1027,16 +1048,18 @@ def emit(api: Api | BoundApi) -> Emission:
         if owner == "Maplibre":
             directory = directory_for(function.location.path)
             globals_by_directory[directory].append(
-                doc(bound, function.name, "    ") + emitted
+                doc(bound, function.name, "    ") + supported_platforms(plan) + emitted
             )
             records[owner].update(used_records)
             supported.append(function.name)
             continue
         if emitted:
-            methods[owner].append(doc(bound, function.name, "    ") + emitted)
+            methods[owner].append(
+                doc(bound, function.name, "    ") + supported_platforms(plan) + emitted
+            )
         if plan.receiver and plan.completion and plan.completion.discardable:
             _, discarded, _ = emit_operation(plan, bound, discard=True)
-            discards[owner].append(discarded)
+            discards[owner].append(supported_platforms(plan) + discarded)
         records[owner].update(used_records)
         supported.append(function.name)
         owner_headers.setdefault(owner, function.location.path)
@@ -1374,7 +1397,7 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
 
 
 def coverage(api: Api | BoundApi) -> dict:
-    bound = compile_api(api)
+    bound = compile_api(api, TARGETS)
     result = emit(bound)
     return {
         "generated": list(result.functions),

@@ -2241,19 +2241,6 @@ external int mln_acquired_frame_get_vulkan_texture(
 @Native<
   Int32 Function(
     mln_acquired_frame,
-    Pointer<mln_webgpu_texture_frame>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_acquired_frame_get_webgpu_texture(
-  int frame,
-  Pointer<mln_webgpu_texture_frame> out_frame,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_acquired_frame,
     Pointer<mln_gpu_sync>,
     Pointer<mln_diagnostic>,
   )
@@ -2814,63 +2801,6 @@ external int mln_map_attach_vulkan_owned_texture(
 external int mln_map_attach_vulkan_surface(
   int map,
   Pointer<mln_vulkan_surface_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_webgpu_borrowed_texture_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_webgpu_borrowed_texture(
-  int map,
-  Pointer<mln_webgpu_borrowed_texture_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_webgpu_owned_texture_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_webgpu_owned_texture(
-  int map,
-  Pointer<mln_webgpu_owned_texture_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_webgpu_surface_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_webgpu_surface(
-  int map,
-  Pointer<mln_webgpu_surface_descriptor> descriptor,
   Pointer<mln_render_session_attach_options> options,
   Pointer<mln_render_session> out_session,
   Pointer<mln_completion> completion,
@@ -4437,36 +4367,6 @@ external int mln_render_session_set_vulkan_surface_target(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_webgpu_borrowed_texture_descriptor>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_render_session_set_webgpu_borrowed_texture_target(
-  int session,
-  Pointer<mln_webgpu_borrowed_texture_descriptor> descriptor,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_webgpu_surface_descriptor>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_render_session_set_webgpu_surface_target(
-  int session,
-  Pointer<mln_webgpu_surface_descriptor> descriptor,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<mln_rendered_feature_query_options Function()>()
 external mln_rendered_feature_query_options
 mln_rendered_feature_query_options_default();
@@ -4959,14 +4859,3 @@ mln_vulkan_owned_texture_descriptor_default();
 
 @Native<mln_vulkan_surface_descriptor Function()>()
 external mln_vulkan_surface_descriptor mln_vulkan_surface_descriptor_default();
-
-@Native<mln_webgpu_borrowed_texture_descriptor Function()>()
-external mln_webgpu_borrowed_texture_descriptor
-mln_webgpu_borrowed_texture_descriptor_default();
-
-@Native<mln_webgpu_owned_texture_descriptor Function()>()
-external mln_webgpu_owned_texture_descriptor
-mln_webgpu_owned_texture_descriptor_default();
-
-@Native<mln_webgpu_surface_descriptor Function()>()
-external mln_webgpu_surface_descriptor mln_webgpu_surface_descriptor_default();

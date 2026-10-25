@@ -4,22 +4,24 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension RenderSessionHandle {
-  /// Starts an ordered Metal surface replacement.
-  ///
-  /// See `mln_render_session_set_metal_surface_target` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  func setMetalSurfaceTarget(
-    descriptor bindingArg0: MetalSurfaceDescriptor
-  ) async throws {
-    try await nativeUnit { raw, arena, completion, diagnostic in
-      mln_render_session_set_metal_surface_target(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        completion,
-        diagnostic
-      )
+  #if os(iOS) || os(macOS) || os(tvOS)
+    /// Starts an ordered Metal surface replacement.
+    ///
+    /// See `mln_render_session_set_metal_surface_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    func setMetalSurfaceTarget(
+      descriptor bindingArg0: MetalSurfaceDescriptor
+    ) async throws {
+      try await nativeUnit { raw, arena, completion, diagnostic in
+        mln_render_session_set_metal_surface_target(
+          raw,
+          arena.store(bindingArg0.nativeValue()),
+          completion,
+          diagnostic
+        )
+      }
     }
-  }
+  #endif
 
   /// Starts an ordered OpenGL surface replacement.
   ///
@@ -38,37 +40,22 @@ public extension RenderSessionHandle {
     }
   }
 
-  /// Starts an ordered Vulkan surface replacement.
-  ///
-  /// See `mln_render_session_set_vulkan_surface_target` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  func setVulkanSurfaceTarget(
-    descriptor bindingArg0: VulkanSurfaceDescriptor
-  ) async throws {
-    try await nativeUnit { raw, arena, completion, diagnostic in
-      mln_render_session_set_vulkan_surface_target(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        completion,
-        diagnostic
-      )
+  #if os(Linux) || os(macOS)
+    /// Starts an ordered Vulkan surface replacement.
+    ///
+    /// See `mln_render_session_set_vulkan_surface_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    func setVulkanSurfaceTarget(
+      descriptor bindingArg0: VulkanSurfaceDescriptor
+    ) async throws {
+      try await nativeUnit { raw, arena, completion, diagnostic in
+        mln_render_session_set_vulkan_surface_target(
+          raw,
+          arena.store(bindingArg0.nativeValue()),
+          completion,
+          diagnostic
+        )
+      }
     }
-  }
-
-  /// Starts an ordered WebGPU surface replacement.
-  ///
-  /// See `mln_render_session_set_webgpu_surface_target` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  func setWebgpuSurfaceTarget(
-    descriptor bindingArg0: WebgpuSurfaceDescriptor
-  ) async throws {
-    try await nativeUnit { raw, arena, completion, diagnostic in
-      mln_render_session_set_webgpu_surface_target(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        completion,
-        diagnostic
-      )
-    }
-  }
+  #endif
 }

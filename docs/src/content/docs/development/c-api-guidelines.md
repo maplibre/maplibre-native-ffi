@@ -62,6 +62,12 @@ Follow these rules, which keep the ABI open to growth:
 parameter counts an array. Copy them from a similar declaration; the generator
 rejects an annotation that restates a default.
 
+A function that only some platforms' builds can use, such as one that takes a
+Metal object, lists those platforms in `platforms=`, as `mln_android_init()`
+does. Each binding leaves it out on targets that cannot use it, along with any
+record that only such functions take. Leave a record's default unannotated; it
+follows its record.
+
 ## Document a declaration
 
 The header comment is the caller's contract. List every status that a function

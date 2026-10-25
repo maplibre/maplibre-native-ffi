@@ -34,6 +34,7 @@ extern "C" {
  * - MLN_STATUS_UNSUPPORTED when this library was not built for Android;
  * - MLN_STATUS_NATIVE_ERROR when platform initialization fails.
  */
+MLN_BINDING("platforms=android")
 MLN_API mln_status mln_android_init(
   void* jni_env, void* context, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;

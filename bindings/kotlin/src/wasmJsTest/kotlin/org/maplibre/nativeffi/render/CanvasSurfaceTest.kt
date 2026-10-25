@@ -17,6 +17,7 @@ import org.maplibre.nativeffi.generated.WebglContextDescriptor
 import org.maplibre.nativeffi.generated.WebglContextKind
 import org.maplibre.nativeffi.generated.WebgpuContextDescriptor
 import org.maplibre.nativeffi.generated.WebgpuSurfaceDescriptor
+import org.maplibre.nativeffi.generated.attachWebgpuSurface
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.smallMapOptions
 import org.maplibre.nativeffi.withMap

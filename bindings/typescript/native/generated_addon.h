@@ -2,7 +2,6 @@
 #ifndef MAPLIBRE_NATIVE_FFI_NODE_GENERATED_ADDON_H
 #define MAPLIBRE_NATIVE_FFI_NODE_GENERATED_ADDON_H
 
-#include "maplibre_native_c/android.h"
 #include "maplibre_native_c/base.h"
 #include "maplibre_native_c/camera.h"
 #include "maplibre_native_c/logging.h"
@@ -473,28 +472,6 @@ napi_value mln_ts_read_vulkan_texture_frame(
 napi_value mln_ts_read_webgl_context_descriptor(
   napi_env env, const mln_webgl_context_descriptor* source, size_t size
 );
-napi_value mln_ts_read_webgpu_borrowed_texture(
-  napi_env env, const mln_webgpu_borrowed_texture* source, size_t size
-);
-napi_value mln_ts_read_webgpu_borrowed_texture_descriptor(
-  napi_env env, const mln_webgpu_borrowed_texture_descriptor* source,
-  size_t size
-);
-napi_value mln_ts_read_webgpu_borrowed_texture_descriptor_textures(
-  napi_env env, const mln_webgpu_borrowed_texture_descriptor* source
-);
-napi_value mln_ts_read_webgpu_context_descriptor(
-  napi_env env, const mln_webgpu_context_descriptor* source, size_t size
-);
-napi_value mln_ts_read_webgpu_owned_texture_descriptor(
-  napi_env env, const mln_webgpu_owned_texture_descriptor* source, size_t size
-);
-napi_value mln_ts_read_webgpu_surface_descriptor(
-  napi_env env, const mln_webgpu_surface_descriptor* source, size_t size
-);
-napi_value mln_ts_read_webgpu_texture_frame(
-  napi_env env, const mln_webgpu_texture_frame* source, size_t size
-);
 napi_value mln_ts_read_wgl_context_descriptor(
   napi_env env, const mln_wgl_context_descriptor* source, size_t size
 );
@@ -617,10 +594,6 @@ bool mln_ts_write_list_screen_point(
 bool mln_ts_write_list_vulkan_borrowed_texture(
   mln_ts_call* call, napi_value value, size_t maximum,
   mln_vulkan_borrowed_texture** out, size_t* out_count, const char* path
-);
-bool mln_ts_write_list_webgpu_borrowed_texture(
-  mln_ts_call* call, napi_value value, size_t maximum,
-  mln_webgpu_borrowed_texture** out, size_t* out_count, const char* path
 );
 bool mln_ts_write_logical_extent(
   mln_ts_call* call, napi_value value, mln_logical_extent* out, const char* path
@@ -795,26 +768,6 @@ bool mln_ts_write_vulkan_surface_descriptor(
 );
 bool mln_ts_write_webgl_context_descriptor(
   mln_ts_call* call, napi_value value, mln_webgl_context_descriptor* out,
-  const char* path
-);
-bool mln_ts_write_webgpu_borrowed_texture(
-  mln_ts_call* call, napi_value value, mln_webgpu_borrowed_texture* out,
-  const char* path
-);
-bool mln_ts_write_webgpu_borrowed_texture_descriptor(
-  mln_ts_call* call, napi_value value,
-  mln_webgpu_borrowed_texture_descriptor* out, const char* path
-);
-bool mln_ts_write_webgpu_context_descriptor(
-  mln_ts_call* call, napi_value value, mln_webgpu_context_descriptor* out,
-  const char* path
-);
-bool mln_ts_write_webgpu_owned_texture_descriptor(
-  mln_ts_call* call, napi_value value, mln_webgpu_owned_texture_descriptor* out,
-  const char* path
-);
-bool mln_ts_write_webgpu_surface_descriptor(
-  mln_ts_call* call, napi_value value, mln_webgpu_surface_descriptor* out,
   const char* path
 );
 bool mln_ts_write_wgl_context_descriptor(

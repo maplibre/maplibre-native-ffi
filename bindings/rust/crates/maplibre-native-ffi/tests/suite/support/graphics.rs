@@ -172,6 +172,7 @@ impl Graphics {
         // outlives the session.
         unsafe {
             match BACKEND {
+                #[cfg(mln_render_backend = "metal")]
                 BACKEND_METAL => map.attach_metal_owned_texture(
                     &MetalOwnedTextureDescriptor {
                         extent,
@@ -183,6 +184,7 @@ impl Graphics {
                     },
                     options,
                 ),
+                #[cfg(mln_render_backend = "vulkan")]
                 BACKEND_VULKAN => map.attach_vulkan_owned_texture(
                     &VulkanOwnedTextureDescriptor {
                         extent,
@@ -257,7 +259,9 @@ pub fn with_frame_view<R>(
     inside: impl FnOnce() -> R,
 ) -> Result<((u32, u32), R)> {
     match BACKEND {
+        #[cfg(mln_render_backend = "metal")]
         BACKEND_METAL => frame.get_metal_texture(|view| ((view.width, view.height), inside())),
+        #[cfg(mln_render_backend = "vulkan")]
         BACKEND_VULKAN => frame.get_vulkan_texture(|view| ((view.width, view.height), inside())),
         _ => frame.get_opengl_texture(|view| ((view.width, view.height), inside())),
     }

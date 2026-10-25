@@ -7,7 +7,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from tools.bindgen import docs
-from tools.bindgen.compiler import compile_api
+from tools.bindgen.compiler import compile_api, served
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
 from tools.bindgen.names import camel
 from tools.bindgen.semantic import (
@@ -15,6 +15,14 @@ from tools.bindgen.semantic import (
     OperationPlan,
     output_member,
 )
+
+# The condition that selects each platform the package builds for.
+PLATFORMS = {
+    "ios": "os(iOS)",
+    "linux": "os(Linux)",
+    "macos": "os(macOS)",
+    "tvos": "os(tvOS)",
+}
 
 SCALARS = {
     "double": "Double",
@@ -540,6 +548,15 @@ def operation(
     raise unsupported(function, "execution/handle lifecycle needs a supported rule")
 
 
+def gated(plan: OperationPlan, code: str) -> str:
+    """An operation's declaration, compiled only for the platforms it serves."""
+    platforms = served(plan.function, frozenset(PLATFORMS))
+    if platforms is None:
+        return code
+    condition = " || ".join(PLATFORMS[name] for name in sorted(platforms))
+    return f"#if {condition}\n{code}#endif\n"
+
+
 # Headers outside the umbrella header import as explicit submodules, as they do
 # from MaplibreNativeC.framework.
 SUBMODULES = {"plugin": "MaplibreNativeC.Plugin"}
@@ -549,7 +566,7 @@ def lower(
     api: Api | BoundApi,
 ) -> tuple[dict[str, list[str]], dict[str, set[str]], list[str], dict[str, str]]:
     chunks, imports, generated, failures = defaultdict(list), defaultdict(set), [], {}
-    bound = compile_api(api)
+    bound = compile_api(api, frozenset(PLATFORMS))
     api = bound.source
     from .swift_values import Values
 
@@ -565,6 +582,7 @@ def lower(
         previous = dict(value_types.used)
         try:
             chunk, extended = operation(plan, value_types)
+            chunk = gated(plan, chunk)
             if extended:
                 chunk = (extended, chunk)
             receiver = next(
@@ -582,7 +600,7 @@ def lower(
             chunks[path].append(chunk)
             if plan.receiver and plan.completion and plan.completion.discardable:
                 discarded, view = operation(plan, value_types, discard=True)
-                chunks[path].append((view, discarded))
+                chunks[path].append((view, gated(plan, discarded)))
             if stem in SUBMODULES:
                 imports[path].add(SUBMODULES[stem])
             generated.append(function.name)
@@ -660,7 +678,7 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
 
 
 def coverage(api: Api | BoundApi) -> dict:
-    bound = compile_api(api)
+    bound = compile_api(api, frozenset(PLATFORMS))
     _, _, generated, failures = lower(bound)
     return {
         "generated": generated,

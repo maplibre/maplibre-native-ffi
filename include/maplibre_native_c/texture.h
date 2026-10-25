@@ -530,7 +530,7 @@ mln_webgpu_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle")
+MLN_BINDING("execution=lifecycle;platforms=ios,macos,tvos")
 MLN_API mln_status mln_map_attach_metal_owned_texture(
   mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
@@ -573,7 +573,7 @@ MLN_API mln_status mln_map_attach_metal_owned_texture(
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle")
+MLN_BINDING("execution=lifecycle;platforms=ios,macos,tvos")
 MLN_API mln_status mln_map_attach_metal_borrowed_texture(
   mln_map map, const mln_metal_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
@@ -609,7 +609,7 @@ MLN_API mln_status mln_map_attach_metal_borrowed_texture(
  *   graphics_queue_family_index that names no graphics queue family.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle")
+MLN_BINDING("execution=lifecycle;platforms=android,linux,macos,ohos,windows")
 MLN_API mln_status mln_map_attach_vulkan_owned_texture(
   mln_map map, const mln_vulkan_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
@@ -645,7 +645,7 @@ MLN_API mln_status mln_map_attach_vulkan_owned_texture(
  *   graphics_queue_family_index that names no graphics queue family.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle")
+MLN_BINDING("execution=lifecycle;platforms=android,linux,macos,ohos,windows")
 MLN_API mln_status mln_map_attach_vulkan_borrowed_texture(
   mln_map map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
@@ -757,7 +757,7 @@ MLN_API mln_status mln_map_attach_opengl_borrowed_texture(
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle")
+MLN_BINDING("execution=lifecycle;platforms=web")
 MLN_API mln_status mln_map_attach_webgpu_owned_texture(
   mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
@@ -793,7 +793,7 @@ MLN_API mln_status mln_map_attach_webgpu_owned_texture(
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle")
+MLN_BINDING("execution=lifecycle;platforms=web")
 MLN_API mln_status mln_map_attach_webgpu_borrowed_texture(
   mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
@@ -836,7 +836,7 @@ MLN_API mln_status mln_map_attach_webgpu_borrowed_texture(
  *   one the session attached with.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation")
+MLN_BINDING("execution=operation;platforms=ios,macos,tvos")
 MLN_API mln_status mln_render_session_set_metal_borrowed_texture_target(
   mln_render_session session,
   const mln_metal_borrowed_texture_descriptor* descriptor,
@@ -874,7 +874,7 @@ MLN_API mln_status mln_render_session_set_metal_borrowed_texture_target(
  *   those the session attached with.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation")
+MLN_BINDING("execution=operation;platforms=android,linux,macos,ohos,windows")
 MLN_API mln_status mln_render_session_set_vulkan_borrowed_texture_target(
   mln_render_session session,
   const mln_vulkan_borrowed_texture_descriptor* descriptor,
@@ -951,7 +951,7 @@ MLN_API mln_status mln_render_session_set_opengl_borrowed_texture_target(
  *   the session attached with.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation")
+MLN_BINDING("execution=operation;platforms=web")
 MLN_API mln_status mln_render_session_set_webgpu_borrowed_texture_target(
   mln_render_session session,
   const mln_webgpu_borrowed_texture_descriptor* descriptor,
@@ -1011,7 +1011,7 @@ MLN_API mln_status mln_render_session_read_texture(
  * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
-MLN_BINDING("view_owner=frame")
+MLN_BINDING("view_owner=frame;platforms=ios,macos,tvos")
 MLN_API mln_status mln_acquired_frame_get_metal_texture(
   mln_acquired_frame frame,
   mln_metal_texture_frame* out_frame MLN_BINDING("direction=out"),
@@ -1036,7 +1036,7 @@ MLN_API mln_status mln_acquired_frame_get_metal_texture(
  * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
-MLN_BINDING("view_owner=frame")
+MLN_BINDING("view_owner=frame;platforms=android,linux,macos,ohos,windows")
 MLN_API mln_status mln_acquired_frame_get_vulkan_texture(
   mln_acquired_frame frame,
   mln_vulkan_texture_frame* out_frame MLN_BINDING("direction=out"),
@@ -1086,7 +1086,7 @@ MLN_API mln_status mln_acquired_frame_get_opengl_texture(
  * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target.
  * - MLN_STATUS_NATIVE_ERROR when native code fails.
  */
-MLN_BINDING("view_owner=frame")
+MLN_BINDING("view_owner=frame;platforms=web")
 MLN_API mln_status mln_acquired_frame_get_webgpu_texture(
   mln_acquired_frame frame,
   mln_webgpu_texture_frame* out_frame MLN_BINDING("direction=out"),

@@ -4,28 +4,30 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Starts attachment of a Metal surface target.
-  ///
-  /// See `mln_map_attach_metal_surface` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  func attachMetalSurface(
-    descriptor bindingArg0: MetalSurfaceDescriptor,
-    options bindingArg1: RenderSessionAttachOptions
-  ) throws -> NewRenderSession {
-    var value0: mln_render_session = 0
-    return try nativeAttach(as: NewRenderSession
-      .init)
-    { raw, arena, completion, diagnostic in
-      try mln_map_attach_metal_surface(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        arena.store(bindingArg1.nativeValue(arena: arena)),
-        &value0,
-        completion,
-        diagnostic
-      )
-    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
-  }
+  #if os(iOS) || os(macOS) || os(tvOS)
+    /// Starts attachment of a Metal surface target.
+    ///
+    /// See `mln_map_attach_metal_surface` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    func attachMetalSurface(
+      descriptor bindingArg0: MetalSurfaceDescriptor,
+      options bindingArg1: RenderSessionAttachOptions
+    ) throws -> NewRenderSession {
+      var value0: mln_render_session = 0
+      return try nativeAttach(as: NewRenderSession
+        .init)
+      { raw, arena, completion, diagnostic in
+        try mln_map_attach_metal_surface(
+          raw,
+          arena.store(bindingArg0.nativeValue()),
+          arena.store(bindingArg1.nativeValue(arena: arena)),
+          &value0,
+          completion,
+          diagnostic
+        )
+      } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
+    }
+  #endif
 
   /// Starts attachment of an OpenGL surface target.
   ///
@@ -50,49 +52,28 @@ public extension MapHandle {
     } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
-  /// Starts attachment of a Vulkan surface target.
-  ///
-  /// See `mln_map_attach_vulkan_surface` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  func attachVulkanSurface(
-    descriptor bindingArg0: VulkanSurfaceDescriptor,
-    options bindingArg1: RenderSessionAttachOptions
-  ) throws -> NewRenderSession {
-    var value0: mln_render_session = 0
-    return try nativeAttach(as: NewRenderSession
-      .init)
-    { raw, arena, completion, diagnostic in
-      try mln_map_attach_vulkan_surface(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        arena.store(bindingArg1.nativeValue(arena: arena)),
-        &value0,
-        completion,
-        diagnostic
-      )
-    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
-  }
-
-  /// Starts attachment of a WebGPU surface target.
-  ///
-  /// See `mln_map_attach_webgpu_surface` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  func attachWebgpuSurface(
-    descriptor bindingArg0: WebgpuSurfaceDescriptor,
-    options bindingArg1: RenderSessionAttachOptions
-  ) throws -> NewRenderSession {
-    var value0: mln_render_session = 0
-    return try nativeAttach(as: NewRenderSession
-      .init)
-    { raw, arena, completion, diagnostic in
-      try mln_map_attach_webgpu_surface(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        arena.store(bindingArg1.nativeValue(arena: arena)),
-        &value0,
-        completion,
-        diagnostic
-      )
-    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
-  }
+  #if os(Linux) || os(macOS)
+    /// Starts attachment of a Vulkan surface target.
+    ///
+    /// See `mln_map_attach_vulkan_surface` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    func attachVulkanSurface(
+      descriptor bindingArg0: VulkanSurfaceDescriptor,
+      options bindingArg1: RenderSessionAttachOptions
+    ) throws -> NewRenderSession {
+      var value0: mln_render_session = 0
+      return try nativeAttach(as: NewRenderSession
+        .init)
+      { raw, arena, completion, diagnostic in
+        try mln_map_attach_vulkan_surface(
+          raw,
+          arena.store(bindingArg0.nativeValue()),
+          arena.store(bindingArg1.nativeValue(arena: arena)),
+          &value0,
+          completion,
+          diagnostic
+        )
+      } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
+    }
+  #endif
 }

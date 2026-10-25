@@ -534,6 +534,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
     public Task SetMetalBorrowedTextureTargetAsync(MetalBorrowedTextureDescriptor descriptor)
     {
         using var scope = new NativeCallScope(this);
@@ -555,6 +556,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// See <c>mln_render_session_set_metal_surface_target</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
     /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
     public Task SetMetalSurfaceTargetAsync(MetalSurfaceDescriptor descriptor)
     {
         using var scope = new NativeCallScope(this);
@@ -649,50 +651,6 @@ public sealed unsafe partial class RenderSessionHandle
         var nativeDescriptor = NativeVulkanSurfaceDescriptor(descriptor);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_set_vulkan_surface_target(
-            Handle,
-            &nativeDescriptor,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
-    /// Starts an ordered replacement of every texture of a caller-owned WebGPU
-    /// ring.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_render_session_set_webgpu_borrowed_texture_target</c> in the
-    /// <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task SetWebgpuBorrowedTextureTargetAsync(WebgpuBorrowedTextureDescriptor descriptor)
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeWebgpuBorrowedTextureDescriptor(descriptor, scope);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_render_session_set_webgpu_borrowed_texture_target(
-            Handle,
-            &nativeDescriptor,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
-    /// Starts an ordered WebGPU surface replacement.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_render_session_set_webgpu_surface_target</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task SetWebgpuSurfaceTargetAsync(WebgpuSurfaceDescriptor descriptor)
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeWebgpuSurfaceDescriptor(descriptor);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_render_session_set_webgpu_surface_target(
             Handle,
             &nativeDescriptor,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),

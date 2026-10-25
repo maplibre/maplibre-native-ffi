@@ -73,21 +73,26 @@ final class TestGraphics: @unchecked Sendable {
         throw FixtureError("a Metal backend needs the Metal framework")
       #endif
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
-      return try map.attachVulkanOwnedTexture(
-        descriptor: VulkanOwnedTextureDescriptor(
-          extent: extent,
-          context: VulkanContextDescriptor(
-            instance: pointer(context.vulkan_instance),
-            physicalDevice: pointer(context.vulkan_physical_device),
-            device: pointer(context.vulkan_device),
-            graphicsQueue: pointer(context.vulkan_queue),
-            graphicsQueueFamilyIndex: context.vulkan_queue_family_index,
-            getInstanceProcAddr: pointer(context.vulkan_get_instance_proc_addr),
-            getDeviceProcAddr: pointer(context.vulkan_get_device_proc_addr)
-          )
-        ),
-        options: options
-      )
+      #if os(Linux) || os(macOS)
+        return try map.attachVulkanOwnedTexture(
+          descriptor: VulkanOwnedTextureDescriptor(
+            extent: extent,
+            context: VulkanContextDescriptor(
+              instance: pointer(context.vulkan_instance),
+              physicalDevice: pointer(context.vulkan_physical_device),
+              device: pointer(context.vulkan_device),
+              graphicsQueue: pointer(context.vulkan_queue),
+              graphicsQueueFamilyIndex: context.vulkan_queue_family_index,
+              getInstanceProcAddr: pointer(context
+                .vulkan_get_instance_proc_addr),
+              getDeviceProcAddr: pointer(context.vulkan_get_device_proc_addr)
+            )
+          ),
+          options: options
+        )
+      #else
+        throw FixtureError("a Vulkan backend needs Linux or macOS")
+      #endif
     default:
       let dedicated = options.driver == .coreWorker
       return try map.attachOpenglOwnedTexture(
@@ -115,9 +120,17 @@ final class TestGraphics: @unchecked Sendable {
   ) throws -> Result {
     switch backend {
     case MLN_TEST_GRAPHICS_BACKEND_METAL:
-      try frame.withMetalTexture { try body($0) }
+      #if canImport(Metal)
+        try frame.withMetalTexture { try body($0) }
+      #else
+        throw FixtureError("a Metal backend needs the Metal framework")
+      #endif
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
-      try frame.withVulkanTexture { try body($0) }
+      #if os(Linux) || os(macOS)
+        try frame.withVulkanTexture { try body($0) }
+      #else
+        throw FixtureError("a Vulkan backend needs Linux or macOS")
+      #endif
     default:
       try frame.withOpenglTexture { try body($0) }
     }

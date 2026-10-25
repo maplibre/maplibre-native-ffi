@@ -6,7 +6,7 @@ from collections import defaultdict
 from dataclasses import replace
 
 from tools.bindgen import docs
-from tools.bindgen.compiler import compile_api
+from tools.bindgen.compiler import compile_api, served
 from tools.bindgen.semantic import (
     BoundApi,
     OperationPlan,
@@ -34,8 +34,43 @@ SCALARS = {
 }
 
 
+# The cfg predicate that selects each platform. OpenHarmony targets are Linux
+# targets with their own environment.
+PLATFORM_CFG = {
+    "android": 'target_os = "android"',
+    "ios": 'target_os = "ios"',
+    "linux": 'all(target_os = "linux", not(target_env = "ohos"))',
+    "macos": 'target_os = "macos"',
+    "ohos": 'target_env = "ohos"',
+    "tvos": 'target_os = "tvos"',
+    "web": 'target_os = "emscripten"',
+    "windows": 'target_os = "windows"',
+}
+
+
 class Unsupported(ValueError):
     pass
+
+
+def gated(plan: OperationPlan, code: str) -> str:
+    """An operation's code, limited by cfg to the platforms that it serves."""
+    platforms = served(plan.function, frozenset(PLATFORM_CFG))
+    if platforms is None:
+        return code
+    predicates = [PLATFORM_CFG[name] for name in sorted(platforms)]
+    if {"linux", "ohos"} <= platforms:
+        predicates.remove(PLATFORM_CFG["ohos"])
+        predicates[predicates.index(PLATFORM_CFG["linux"])] = 'target_os = "linux"'
+    predicate = (
+        predicates[0] if len(predicates) == 1 else f"any({', '.join(predicates)})"
+    )
+    lines = code.splitlines(keepends=True)
+    item = next(
+        i for i, line in enumerate(lines) if not line.lstrip().startswith("///")
+    )
+    indent = lines[item][: len(lines[item]) - len(lines[item].lstrip())]
+    lines.insert(item, f"{indent}#[cfg({predicate})]\n")
+    return "".join(lines)
 
 
 def doc(bound: BoundApi, native: str, indent: str = "") -> str:
@@ -788,9 +823,11 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         try:
             module, code = operation(plan, value_types)
             if code:
-                chunks[module].append(code)
+                chunks[module].append(gated(plan, code))
             if plan.completion and plan.completion.optional:
-                chunks[module].append(operation(plan, value_types, discard=True)[1])
+                chunks[module].append(
+                    gated(plan, operation(plan, value_types, discard=True)[1])
+                )
             generated.append(function.name)
         except Unsupported as error:
             value_types.used = previous_values
@@ -833,7 +870,8 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
                 f"impl {owner} {{ pub fn discarding(&self) -> {view}<'_> {{ {view}(self) }} }}\n"
                 f"impl {view}<'_> {{\n"
                 + "\n".join(
-                    operation(p, value_types, discard=True)[1] for p in commands
+                    gated(p, operation(p, value_types, discard=True)[1])
+                    for p in commands
                 )
                 + "}\n"
             )

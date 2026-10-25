@@ -364,6 +364,7 @@ impl RenderSessionHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "tvos"))]
     pub unsafe fn set_metal_borrowed_texture_target(
         &self,
         descriptor: &MetalBorrowedTextureDescriptor,
@@ -390,6 +391,7 @@ impl RenderSessionHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "tvos"))]
     pub unsafe fn set_metal_surface_target(
         &self,
         descriptor: &MetalSurfaceDescriptor,
@@ -470,6 +472,12 @@ impl RenderSessionHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(any(
+        target_os = "android",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "windows"
+    ))]
     pub unsafe fn set_vulkan_borrowed_texture_target(
         &self,
         descriptor: &VulkanBorrowedTextureDescriptor,
@@ -496,6 +504,12 @@ impl RenderSessionHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(any(
+        target_os = "android",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "windows"
+    ))]
     pub unsafe fn set_vulkan_surface_target(
         &self,
         descriptor: &VulkanSurfaceDescriptor,
@@ -523,6 +537,7 @@ impl RenderSessionHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(target_os = "emscripten")]
     pub unsafe fn set_webgpu_borrowed_texture_target(
         &self,
         descriptor: &WebgpuBorrowedTextureDescriptor,
@@ -549,6 +564,7 @@ impl RenderSessionHandle {
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(target_os = "emscripten")]
     pub unsafe fn set_webgpu_surface_target(
         &self,
         descriptor: &WebgpuSurfaceDescriptor,

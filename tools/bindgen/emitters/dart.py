@@ -28,6 +28,9 @@ from .dart_values import (
 # `JNIEnv*` and a `Context`, which an isolate has no safe way to obtain, so a
 # Flutter app's Android host code calls it before the isolate starts.
 HOST_ONLY = {"mln_android_init"}
+# The platforms that the package builds for. Its library serves them all, so it
+# leaves out only what none of them can use.
+TARGETS = frozenset({"android", "ios", "linux", "macos", "windows"})
 
 # The handles that mln_runtime_event_source_type names as an event's source.
 EVENT_SOURCES = {"mln_runtime", "mln_map"}
@@ -524,7 +527,7 @@ def attachment_name(owned):
 
 def lower(api: Api | BoundApi):
     methods, generated, unsupported = defaultdict(list), [], {}
-    bound = compile_api(api)
+    bound = compile_api(api, TARGETS)
     values = Values(bound)
     root_owners = values.root_owners
     unsupported.update(

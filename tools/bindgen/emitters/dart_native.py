@@ -9,6 +9,7 @@ as an `@Array`.
 
 from __future__ import annotations
 
+from tools.bindgen.compiler import compile_api
 from tools.bindgen.managed_contracts import DART_RESERVED
 from tools.bindgen.model import CType, Function, Record
 from tools.bindgen.semantic import BoundApi
@@ -186,6 +187,9 @@ def identifier(name: str) -> str:
 
 
 def generate(bound: BoundApi) -> str:
+    from .dart import TARGETS
+
+    bound = compile_api(bound, TARGETS)
     declarations = Declarations(bound)
     api = declarations.api
     handles = "".join(

@@ -72,6 +72,7 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// See <c>mln_acquired_frame_get_metal_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
     public void WithMetalTexture(Action<MetalTextureFrameView> callback)
     {
         using var call = Enter(this);
@@ -195,38 +196,6 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
                 NativeMethods.mln_acquired_frame_get_vulkan_texture(Handle, &outFrame, Diagnostic)
             );
             callback(new VulkanTextureFrameView(CopyVulkanTextureFrame(outFrame), viewScope));
-        }
-        finally
-        {
-            viewScope.Expire();
-            NativeMethods.mln_acquired_frame_view_end(token);
-        }
-    }
-
-    /// <summary>
-    /// Copies WebGPU-native metadata from an acquired frame.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_acquired_frame_get_webgpu_texture</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
-    /// </remarks>
-    public void WithWebgpuTexture(Action<WebgpuTextureFrameView> callback)
-    {
-        using var call = Enter(this);
-        var outFrame = new mln_webgpu_texture_frame
-        {
-            size = (uint)sizeof(mln_webgpu_texture_frame),
-        };
-        ArgumentNullException.ThrowIfNull(callback);
-        var viewScope = new NativeViewScope();
-        void* token = null;
-        Check(NativeMethods.mln_acquired_frame_view_begin(Handle, &token, Diagnostic));
-        try
-        {
-            Check(
-                NativeMethods.mln_acquired_frame_get_webgpu_texture(Handle, &outFrame, Diagnostic)
-            );
-            callback(new WebgpuTextureFrameView(CopyWebgpuTextureFrame(outFrame), viewScope));
         }
         finally
         {

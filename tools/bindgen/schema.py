@@ -38,6 +38,11 @@ EXECUTIONS = frozenset(
 )
 COMPLETION_EXECUTIONS = frozenset({"command", "query", "operation", "lifecycle"})
 ENCODINGS = frozenset({"utf8", "json", "bytes"})
+# The operating systems that a native build targets, as the presets name them.
+# A `platforms=` annotation lists, in this order and without repeats, the ones
+# where a function can do its work; a function without one serves them all. A
+# record default is never annotated: it serves wherever its record does.
+PLATFORMS = ("android", "ios", "linux", "macos", "ohos", "tvos", "web", "windows")
 # The values that a header annotation may write for each key. Conventions fill
 # in most of the rest of a key's vocabulary, such as direction=in, shape=none,
 # ownership=value, encoding=utf8, so a header never writes
@@ -75,6 +80,7 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "enum",
         "blocks",
         "consumes",
+        "platforms",
     }
 )
 PARAMETER_KEYS = COMMON_KEYS | frozenset(
@@ -151,6 +157,29 @@ INTEGER_RANGES = {
     "long long": (-(2**63), 2**63 - 1),
     "unsigned long long": (0, 2**64 - 1),
 }
+
+
+def platforms(function: Function) -> frozenset[str]:
+    """The platforms where a function can do its work."""
+    value = function.metadata.get("platforms")
+    return frozenset(value.split(",")) if value else frozenset(PLATFORMS)
+
+
+def platform_errors(function: Function, defaults: set[str], context: str) -> list[str]:
+    value = function.metadata.get("platforms")
+    if value is None:
+        return []
+    names = value.split(",")
+    unknown = [name for name in names if name not in PLATFORMS]
+    if unknown:
+        return [f"{context}: unknown platforms {', '.join(map(repr, unknown))}"]
+    if names != sorted(set(names), key=PLATFORMS.index):
+        return [f"{context}: platforms must list each platform once, in order"]
+    if len(names) == len(PLATFORMS):
+        return [f"{context}: platforms={value} restates the default"]
+    if function.name in defaults:
+        return [f"{context}: a record default serves wherever its record does"]
+    return []
 
 
 def has_completion(function: Function) -> bool:
@@ -615,12 +644,18 @@ def validate(api: Api) -> None:
         "intptr_t",
         "uintptr_t",
     }
+    record_defaults = {
+        typedef.metadata["default_function"]
+        for typedef in api.typedefs
+        if "default_function" in typedef.metadata
+    }
     for function in api.functions:
         context = f"{function.location}: {function.name}"
         metadata = function.metadata
         errors.extend(
             metadata_errors(metadata, FUNCTION_KEYS, context, KINDS["function"])
         )
+        errors.extend(platform_errors(function, record_defaults, context))
         if "view_owner" in metadata:
             owner = next(
                 (

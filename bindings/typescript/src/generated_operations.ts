@@ -82,10 +82,6 @@ import type {
   VulkanOwnedTextureDescriptor,
   VulkanSurfaceDescriptor,
   VulkanTextureFrame,
-  WebgpuBorrowedTextureDescriptor,
-  WebgpuOwnedTextureDescriptor,
-  WebgpuSurfaceDescriptor,
-  WebgpuTextureFrame,
 } from "./generated_values.ts";
 import { native } from "./internal/addon.ts";
 import {
@@ -115,16 +111,6 @@ import {
   defineDeliveries,
   withRegistrations,
 } from "./internal/realm.ts";
-
-/**
- * Initializes Android platform services.
- *
- * See `mln_android_init` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
- */
-export function androidInit(jniEnv: bigint, context: bigint): void {
-  native.mln_android_init(jniEnv, context);
-}
 
 /**
  * Returns empty animation options initialized for this C API version.
@@ -695,36 +681,6 @@ export function vulkanSurfaceDescriptorDefault(): VulkanSurfaceDescriptor {
 }
 
 /**
- * Returns WebGPU borrowed-texture descriptor defaults for this C API version.
- *
- * See `mln_webgpu_borrowed_texture_descriptor_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-export function webgpuBorrowedTextureDescriptorDefault(): WebgpuBorrowedTextureDescriptor {
-  return native.mln_webgpu_borrowed_texture_descriptor_default();
-}
-
-/**
- * Returns WebGPU owned-texture descriptor defaults for this C API version.
- *
- * See `mln_webgpu_owned_texture_descriptor_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-export function webgpuOwnedTextureDescriptorDefault(): WebgpuOwnedTextureDescriptor {
-  return native.mln_webgpu_owned_texture_descriptor_default();
-}
-
-/**
- * Returns WebGPU surface descriptor defaults for this C API version.
- *
- * See `mln_webgpu_surface_descriptor_default` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-export function webgpuSurfaceDescriptorDefault(): WebgpuSurfaceDescriptor {
-  return native.mln_webgpu_surface_descriptor_default();
-}
-
-/**
  * A rendered frame that a render session lends until its release.
  *
  * See `mln_acquired_frame` in the
@@ -867,29 +823,6 @@ export class AcquiredFrameHandle extends Owner {
           ADOPT,
           scope,
           native.mln_acquired_frame_get_vulkan_texture(this.id),
-        ),
-      ),
-    );
-  }
-
-  /**
-   * Copies WebGPU-native metadata from an acquired frame.
-   *
-   * See `mln_acquired_frame_get_webgpu_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  withWebgpuTexture<T>(use: (view: ScopedWebgpuTextureFrame) => T): T {
-    return new ViewScope(
-      ADOPT,
-      this,
-      (handle) => native.mln_acquired_frame_view_begin(handle),
-      (scope) => native.mln_acquired_frame_view_end(scope),
-    ).use((scope) =>
-      use(
-        new ScopedWebgpuTextureFrame(
-          ADOPT,
-          scope,
-          native.mln_acquired_frame_get_webgpu_texture(this.id),
         ),
       ),
     );
@@ -1429,99 +1362,6 @@ export class MapHandle extends Owner {
       const [session, ready] = attach(
         (completion) =>
           native.mln_map_attach_vulkan_surface(
-            this.id,
-            descriptor,
-            options,
-            completion,
-          ),
-        (handle) =>
-          adopt(
-            handle,
-            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined, undefined),
-          ),
-      );
-      return { session, ready };
-    });
-  }
-
-  /**
-   * Starts attachment of a ring of caller-owned WebGPU textures.
-   *
-   * See `mln_map_attach_webgpu_borrowed_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  attachWebgpuBorrowedTexture(
-    descriptor: WebgpuBorrowedTextureDescriptor = {},
-    options: RenderSessionAttachOptions = {},
-  ): NewRenderSession {
-    return withRegistrations((registrations) => {
-      const [session, ready] = attach(
-        (completion) =>
-          native.mln_map_attach_webgpu_borrowed_texture(
-            this.id,
-            descriptor,
-            options,
-            completion,
-          ),
-        (handle) =>
-          adopt(
-            handle,
-            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined, undefined),
-          ),
-      );
-      return { session, ready };
-    });
-  }
-
-  /**
-   * Starts attachment of a session-owned WebGPU texture ring.
-   *
-   * See `mln_map_attach_webgpu_owned_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  attachWebgpuOwnedTexture(
-    descriptor: WebgpuOwnedTextureDescriptor = {},
-    options: RenderSessionAttachOptions = {},
-  ): NewRenderSession {
-    return withRegistrations((registrations) => {
-      const [session, ready] = attach(
-        (completion) =>
-          native.mln_map_attach_webgpu_owned_texture(
-            this.id,
-            descriptor,
-            options,
-            completion,
-          ),
-        (handle) =>
-          adopt(
-            handle,
-            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined, undefined),
-          ),
-      );
-      return { session, ready };
-    });
-  }
-
-  /**
-   * Starts attachment of a WebGPU surface target.
-   *
-   * See `mln_map_attach_webgpu_surface` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  attachWebgpuSurface(
-    descriptor: WebgpuSurfaceDescriptor = {},
-    options: RenderSessionAttachOptions = {},
-  ): NewRenderSession {
-    return withRegistrations((registrations) => {
-      const [session, ready] = attach(
-        (completion) =>
-          native.mln_map_attach_webgpu_surface(
             this.id,
             descriptor,
             options,
@@ -3983,43 +3823,6 @@ export class RenderSessionHandle extends Owner {
       ),
     );
   }
-
-  /**
-   * Starts an ordered replacement of every texture of a caller-owned WebGPU
-   * ring.
-   *
-   * See `mln_render_session_set_webgpu_borrowed_texture_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  setWebgpuBorrowedTextureTarget(
-    descriptor: WebgpuBorrowedTextureDescriptor = {},
-  ): Promise<void> {
-    return run((completion) =>
-      native.mln_render_session_set_webgpu_borrowed_texture_target(
-        this.id,
-        descriptor,
-        completion,
-      ),
-    );
-  }
-
-  /**
-   * Starts an ordered WebGPU surface replacement.
-   *
-   * See `mln_render_session_set_webgpu_surface_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  setWebgpuSurfaceTarget(
-    descriptor: WebgpuSurfaceDescriptor = {},
-  ): Promise<void> {
-    return run((completion) =>
-      native.mln_render_session_set_webgpu_surface_target(
-        this.id,
-        descriptor,
-        completion,
-      ),
-    );
-  }
 }
 defineDisposers(RenderSessionHandle, "close", "dispose");
 
@@ -5040,66 +4843,6 @@ export class ScopedVulkanTextureFrame {
 
   get layout(): VulkanTextureFrame["layout"] {
     return this.#scope.active(this.#value).layout;
-  }
-}
-
-/**
- * A `WebgpuTextureFrame` whose native objects stay valid only while the
- * callback of {@link AcquiredFrameHandle.withWebgpuTexture} runs.
- */
-export class ScopedWebgpuTextureFrame {
-  readonly #value: WebgpuTextureFrame;
-  readonly #scope: ViewScope;
-
-  /**
-   * Created by the API, which passes a key that only it holds.
-   *
-   * @internal
-   */
-  constructor(key: AdoptKey, scope: ViewScope, value: WebgpuTextureFrame) {
-    checkKey(key);
-    this.#value = value;
-    this.#scope = scope;
-  }
-
-  get generation(): WebgpuTextureFrame["generation"] {
-    return this.#scope.active(this.#value).generation;
-  }
-
-  get width(): WebgpuTextureFrame["width"] {
-    return this.#scope.active(this.#value).width;
-  }
-
-  get height(): WebgpuTextureFrame["height"] {
-    return this.#scope.active(this.#value).height;
-  }
-
-  get scaleFactor(): WebgpuTextureFrame["scaleFactor"] {
-    return this.#scope.active(this.#value).scaleFactor;
-  }
-
-  get frameId(): WebgpuTextureFrame["frameId"] {
-    return this.#scope.active(this.#value).frameId;
-  }
-
-  get slot(): WebgpuTextureFrame["slot"] {
-    return this.#scope.active(this.#value).slot;
-  }
-
-  get texture(): WebgpuTextureFrame["texture"] {
-    return this.#scope.active(this.#value).texture;
-  }
-
-  get textureView(): WebgpuTextureFrame["textureView"] {
-    return this.#scope.active(this.#value).textureView;
-  }
-
-  get device(): WebgpuTextureFrame["device"] {
-    return this.#scope.active(this.#value).device;
-  }
-
-  get format(): WebgpuTextureFrame["format"] {
-    return this.#scope.active(this.#value).format;
   }
 }
 

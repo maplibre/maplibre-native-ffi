@@ -8,6 +8,7 @@ use super::*;
 ///
 /// # Safety
 /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+#[cfg(target_os = "android")]
 pub unsafe fn android_init(
     jni_env: *mut std::ffi::c_void,
     context: *mut std::ffi::c_void,

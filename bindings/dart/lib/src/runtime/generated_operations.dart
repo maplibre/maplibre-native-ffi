@@ -322,21 +322,6 @@ VulkanTextureFrame _readVulkanTextureFrame(
   layout: source.layout,
 );
 
-WebgpuTextureFrame _readWebgpuTextureFrame(
-  raw.mln_webgpu_texture_frame source,
-) => WebgpuTextureFrame(
-  generation: source.generation,
-  width: source.width,
-  height: source.height,
-  scaleFactor: source.scale_factor,
-  frameId: source.frame_id,
-  slot: source.slot,
-  texture: NativePointer(source.texture.address),
-  textureView: NativePointer(source.texture_view.address),
-  device: NativePointer(source.device.address),
-  format: source.format,
-);
-
 Pointer<raw.mln_unit_bezier> _writeUnitBezier(
   UnitBezier value,
   Allocator arena, {
@@ -1710,142 +1695,6 @@ VulkanSurfaceDescriptor _readVulkanSurfaceDescriptor(
   extent: _readLogicalExtent(source.extent),
   context: _readVulkanContextDescriptor(source.context),
   surface: source.surface,
-);
-
-Pointer<raw.mln_webgpu_context_descriptor> _writeWebgpuContextDescriptor(
-  WebgpuContextDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_webgpu_context_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_webgpu_context_descriptor>();
-  result.ref.instance = Pointer<Void>.fromAddress(
-    value.instance.address,
-  ).cast();
-  result.ref.device = Pointer<Void>.fromAddress(value.device.address).cast();
-  result.ref.queue = Pointer<Void>.fromAddress(value.queue.address).cast();
-  return result;
-}
-
-WebgpuContextDescriptor _readWebgpuContextDescriptor(
-  raw.mln_webgpu_context_descriptor source,
-) => WebgpuContextDescriptor(
-  instance: NativePointer(source.instance.address),
-  device: NativePointer(source.device.address),
-  queue: NativePointer(source.queue.address),
-);
-
-Pointer<raw.mln_webgpu_borrowed_texture> _writeWebgpuBorrowedTexture(
-  WebgpuBorrowedTexture value,
-  Allocator arena, {
-  Pointer<raw.mln_webgpu_borrowed_texture>? into,
-}) {
-  final result = into ?? arena<raw.mln_webgpu_borrowed_texture>();
-  result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
-  result.ref.texture_view = Pointer<Void>.fromAddress(
-    value.textureView.address,
-  ).cast();
-  return result;
-}
-
-WebgpuBorrowedTexture _readWebgpuBorrowedTexture(
-  raw.mln_webgpu_borrowed_texture source,
-) => WebgpuBorrowedTexture(
-  texture: NativePointer(source.texture.address),
-  textureView: NativePointer(source.texture_view.address),
-);
-
-Pointer<raw.mln_webgpu_borrowed_texture_descriptor>
-_writeWebgpuBorrowedTextureDescriptor(
-  WebgpuBorrowedTextureDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_webgpu_borrowed_texture_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_webgpu_borrowed_texture_descriptor>();
-  result.ref = raw.mln_webgpu_borrowed_texture_descriptor_default();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.physical_width = _nativeInteger(
-    value.physicalWidth,
-    0,
-    4294967295,
-  );
-  result.ref.physical_height = _nativeInteger(
-    value.physicalHeight,
-    0,
-    4294967295,
-  );
-  result.ref.context = _writeWebgpuContextDescriptor(value.context, arena).ref;
-  result.ref.textures = arena<raw.mln_webgpu_borrowed_texture>(
-    value.textures.isEmpty ? 1 : value.textures.length,
-  );
-  result.ref.texture_count = value.textures.length;
-  for (var index = 0; index < value.textures.length; index++) {
-    _writeWebgpuBorrowedTexture(
-      value.textures[index],
-      arena,
-      into: result.ref.textures + index,
-    );
-  }
-  result.ref.format = _nativeInteger(value.format, 0, 4294967295);
-  return result;
-}
-
-WebgpuBorrowedTextureDescriptor _readWebgpuBorrowedTextureDescriptor(
-  raw.mln_webgpu_borrowed_texture_descriptor source,
-) => WebgpuBorrowedTextureDescriptor(
-  extent: _readLogicalExtent(source.extent),
-  physicalWidth: source.physical_width,
-  physicalHeight: source.physical_height,
-  context: _readWebgpuContextDescriptor(source.context),
-  textures: List<WebgpuBorrowedTexture>.unmodifiable(
-    List.generate(
-      source.texture_count,
-      (index) => _readWebgpuBorrowedTexture(source.textures[index]),
-    ),
-  ),
-  format: source.format,
-);
-
-Pointer<raw.mln_webgpu_owned_texture_descriptor>
-_writeWebgpuOwnedTextureDescriptor(
-  WebgpuOwnedTextureDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_webgpu_owned_texture_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_webgpu_owned_texture_descriptor>();
-  result.ref = raw.mln_webgpu_owned_texture_descriptor_default();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.context = _writeWebgpuContextDescriptor(value.context, arena).ref;
-  return result;
-}
-
-WebgpuOwnedTextureDescriptor _readWebgpuOwnedTextureDescriptor(
-  raw.mln_webgpu_owned_texture_descriptor source,
-) => WebgpuOwnedTextureDescriptor(
-  extent: _readLogicalExtent(source.extent),
-  context: _readWebgpuContextDescriptor(source.context),
-);
-
-Pointer<raw.mln_webgpu_surface_descriptor> _writeWebgpuSurfaceDescriptor(
-  WebgpuSurfaceDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_webgpu_surface_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_webgpu_surface_descriptor>();
-  result.ref = raw.mln_webgpu_surface_descriptor_default();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.context = _writeWebgpuContextDescriptor(value.context, arena).ref;
-  result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
-  result.ref.format = _nativeInteger(value.format, 0, 4294967295);
-  return result;
-}
-
-WebgpuSurfaceDescriptor _readWebgpuSurfaceDescriptor(
-  raw.mln_webgpu_surface_descriptor source,
-) => WebgpuSurfaceDescriptor(
-  extent: _readLogicalExtent(source.extent),
-  context: _readWebgpuContextDescriptor(source.context),
-  surface: NativePointer(source.surface.address),
-  format: source.format,
 );
 
 CameraQueryResult _readCameraQueryResult(raw.mln_camera_query_result source) =>
@@ -3900,37 +3749,6 @@ VulkanSurfaceDescriptor vulkanSurfaceDescriptorDefault() {
   return _readVulkanSurfaceDescriptor(nativeResult);
 }
 
-/// Returns WebGPU borrowed-texture descriptor defaults for this C API
-/// version.
-///
-/// See `mln_webgpu_borrowed_texture_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-WebgpuBorrowedTextureDescriptor webgpuBorrowedTextureDescriptorDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_webgpu_borrowed_texture_descriptor_default();
-  return _readWebgpuBorrowedTextureDescriptor(nativeResult);
-}
-
-/// Returns WebGPU owned-texture descriptor defaults for this C API version.
-///
-/// See `mln_webgpu_owned_texture_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-WebgpuOwnedTextureDescriptor webgpuOwnedTextureDescriptorDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_webgpu_owned_texture_descriptor_default();
-  return _readWebgpuOwnedTextureDescriptor(nativeResult);
-}
-
-/// Returns WebGPU surface descriptor defaults for this C API version.
-///
-/// See `mln_webgpu_surface_descriptor_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-WebgpuSurfaceDescriptor webgpuSurfaceDescriptorDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_webgpu_surface_descriptor_default();
-  return _readWebgpuSurfaceDescriptor(nativeResult);
-}
-
 /// Issued `mln_acquired_frame` handle id.
 extension type const _NativeAcquiredFrame(int raw) implements NativeHandle {}
 
@@ -4085,32 +3903,6 @@ final class AcquiredFrameHandle implements Finalizable {
       ),
     );
     return _readVulkanTextureFrame(outFrame.ref);
-  });
-
-  /// Copies WebGPU-native metadata from an acquired frame.
-  ///
-  /// See `mln_acquired_frame_get_webgpu_texture` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  T withWebgpuTexture<T>(T Function(ScopedWebgpuTextureFrame view) use) =>
-      _NativeViewScope(
-        _state,
-        raw.mln_acquired_frame_view_begin,
-        raw.mln_acquired_frame_view_end,
-      ).use(
-        (scope) => use(ScopedWebgpuTextureFrame._(scope, _getWebgpuTexture())),
-      );
-
-  WebgpuTextureFrame _getWebgpuTexture() => withNativeArena((arena) {
-    final outFrame = arena<raw.mln_webgpu_texture_frame>();
-    outFrame.ref.size = sizeOf<raw.mln_webgpu_texture_frame>();
-    _check(
-      raw.mln_acquired_frame_get_webgpu_texture(
-        _handle.raw,
-        outFrame,
-        nativeDiagnostic,
-      ),
-    );
-    return _readWebgpuTextureFrame(outFrame.ref);
   });
 
   /// Releases an acquired frame after the host's GPU work that reads it.
@@ -5236,111 +5028,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
         () => raw.mln_map_attach_vulkan_surface(
           _handle.raw,
           _writeVulkanSurfaceDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, _NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(
-            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
-          );
-        },
-      ),
-      NewRenderSession.new,
-    );
-  }
-
-  /// Starts attachment of a ring of caller-owned WebGPU textures.
-  ///
-  /// See `mln_map_attach_webgpu_borrowed_texture` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  NewRenderSession attachWebgpuBorrowedTexture(
-    WebgpuBorrowedTextureDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_CallbackRoots());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_map_attach_webgpu_borrowed_texture(
-          _handle.raw,
-          _writeWebgpuBorrowedTextureDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, _NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(
-            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
-          );
-        },
-      ),
-      NewRenderSession.new,
-    );
-  }
-
-  /// Starts attachment of a session-owned WebGPU texture ring.
-  ///
-  /// See `mln_map_attach_webgpu_owned_texture` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  NewRenderSession attachWebgpuOwnedTexture(
-    WebgpuOwnedTextureDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_CallbackRoots());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_map_attach_webgpu_owned_texture(
-          _handle.raw,
-          _writeWebgpuOwnedTextureDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, _NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(
-            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
-          );
-        },
-      ),
-      NewRenderSession.new,
-    );
-  }
-
-  /// Starts attachment of a WebGPU surface target.
-  ///
-  /// See `mln_map_attach_webgpu_surface` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  NewRenderSession attachWebgpuSurface(
-    WebgpuSurfaceDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_CallbackRoots());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_map_attach_webgpu_surface(
-          _handle.raw,
-          _writeWebgpuSurfaceDescriptor(descriptor, arena),
           _writeRenderSessionAttachOptions(options, arena, registrations),
           outSession,
           completion,
@@ -7112,37 +6799,6 @@ final class RenderSessionHandle implements Finalizable {
           nativeDiagnostic,
         ),
       );
-
-  /// Starts an ordered replacement of every texture of a caller-owned WebGPU
-  /// ring.
-  ///
-  /// See `mln_render_session_set_webgpu_borrowed_texture_target` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  Future<void> setWebgpuBorrowedTextureTarget(
-    WebgpuBorrowedTextureDescriptor descriptor,
-  ) => _run(
-    (arena, completion) =>
-        raw.mln_render_session_set_webgpu_borrowed_texture_target(
-          _handle.raw,
-          _writeWebgpuBorrowedTextureDescriptor(descriptor, arena),
-          completion,
-          nativeDiagnostic,
-        ),
-  );
-
-  /// Starts an ordered WebGPU surface replacement.
-  ///
-  /// See `mln_render_session_set_webgpu_surface_target` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  Future<void> setWebgpuSurfaceTarget(WebgpuSurfaceDescriptor descriptor) =>
-      _run(
-        (arena, completion) => raw.mln_render_session_set_webgpu_surface_target(
-          _handle.raw,
-          _writeWebgpuSurfaceDescriptor(descriptor, arena),
-          completion,
-          nativeDiagnostic,
-        ),
-      );
 }
 
 /// Issued `mln_resource_request` handle id.
@@ -7970,34 +7626,4 @@ final class ScopedVulkanTextureFrame {
   );
   int get format => _scope.active(_value).format;
   int get layout => _scope.active(_value).layout;
-}
-
-/// A `WebgpuTextureFrame` that is readable only while the callback of
-/// `AcquiredFrameHandle.withWebgpuTexture` runs.
-final class ScopedWebgpuTextureFrame {
-  ScopedWebgpuTextureFrame._(this._scope, this._value);
-  final WebgpuTextureFrame _value;
-  final _NativeViewScope _scope;
-  int get generation => _scope.active(_value).generation;
-  int get width => _scope.active(_value).width;
-  int get height => _scope.active(_value).height;
-  double get scaleFactor => _scope.active(_value).scaleFactor;
-  int get frameId => _scope.active(_value).frameId;
-  int get slot => _scope.active(_value).slot;
-  ScopedNativePointer get texture => ScopedNativePointer(
-    _value.texture.address,
-    checkValid: _scope.checkActive,
-    debugName: 'WebgpuTextureFrame.texture',
-  );
-  ScopedNativePointer get textureView => ScopedNativePointer(
-    _value.textureView.address,
-    checkValid: _scope.checkActive,
-    debugName: 'WebgpuTextureFrame.textureView',
-  );
-  ScopedNativePointer get device => ScopedNativePointer(
-    _value.device.address,
-    checkValid: _scope.checkActive,
-    debugName: 'WebgpuTextureFrame.device',
-  );
-  int get format => _scope.active(_value).format;
 }

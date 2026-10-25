@@ -205,32 +205,6 @@ internal object TestGraphics {
     }
     val context = context()
     return when (backend) {
-      TestBackend.METAL ->
-        map.attachMetalOwnedTexture(
-          MetalOwnedTextureDescriptor(
-            extent,
-            MetalContextDescriptor(pointer(context.metalDevice)),
-            // MTLPixelFormatBGRA8Unorm.
-            pixelFormat = 80uL,
-          ),
-          options,
-        )
-      TestBackend.VULKAN ->
-        map.attachVulkanOwnedTexture(
-          VulkanOwnedTextureDescriptor(
-            extent,
-            VulkanContextDescriptor(
-              pointer(context.vulkanInstance),
-              pointer(context.vulkanPhysicalDevice),
-              pointer(context.vulkanDevice),
-              pointer(context.vulkanQueue),
-              context.vulkanQueueFamilyIndex,
-              pointer(context.vulkanGetInstanceProcAddr),
-              pointer(context.vulkanGetDeviceProcAddr),
-            ),
-          ),
-          options,
-        )
       TestBackend.EGL ->
         map.attachOpenglOwnedTexture(
           OpenglOwnedTextureDescriptor(
@@ -280,33 +254,73 @@ internal object TestGraphics {
           ),
           options,
         )
-      TestBackend.WEBGPU ->
-        map.attachWebgpuOwnedTexture(
-          WebgpuOwnedTextureDescriptor(
-            extent,
-            // Sessions use no instance, and null names the device's default queue, as a browser
-            // host without a queue of its own hands over.
-            WebgpuContextDescriptor(
-              NativePointer.NULL_POINTER,
-              pointer(context.webgpuDevice),
-              NativePointer.NULL_POINTER,
-            ),
-          ),
-          options,
-        )
+      TestBackend.METAL,
+      TestBackend.VULKAN,
+      TestBackend.WEBGPU -> attachBackendOwnedTexture(map, extent, context, options)
     }
   }
 
   /** Reads the size of the backend texture behind [frame] through its typed view. */
   fun frameTextureSize(frame: AcquiredFrameHandle): Pair<UInt, UInt> =
     when (backend) {
-      TestBackend.METAL -> frame.withMetalTexture { it.width to it.height }
-      TestBackend.VULKAN -> frame.withVulkanTexture { it.width to it.height }
       TestBackend.EGL,
       TestBackend.WGL,
       TestBackend.WEBGL -> frame.withOpenglTexture { it.width to it.height }
-      TestBackend.WEBGPU -> frame.withWebgpuTexture { it.width to it.height }
+      TestBackend.METAL,
+      TestBackend.VULKAN,
+      TestBackend.WEBGPU -> backendTextureSize(frame)
     }
+
+  /** A Metal owned texture of [extent] on [context]'s device. */
+  fun metalOwnedTexture(extent: LogicalExtent, context: TestGraphicsContext) =
+    MetalOwnedTextureDescriptor(
+      extent,
+      MetalContextDescriptor(pointer(context.metalDevice)),
+      // MTLPixelFormatBGRA8Unorm.
+      pixelFormat = 80uL,
+    )
+
+  /** A Vulkan owned texture of [extent] on [context]'s device. */
+  fun vulkanOwnedTexture(extent: LogicalExtent, context: TestGraphicsContext) =
+    VulkanOwnedTextureDescriptor(
+      extent,
+      VulkanContextDescriptor(
+        pointer(context.vulkanInstance),
+        pointer(context.vulkanPhysicalDevice),
+        pointer(context.vulkanDevice),
+        pointer(context.vulkanQueue),
+        context.vulkanQueueFamilyIndex,
+        pointer(context.vulkanGetInstanceProcAddr),
+        pointer(context.vulkanGetDeviceProcAddr),
+      ),
+    )
+
+  /** A WebGPU owned texture of [extent] on [context]'s device. */
+  fun webgpuOwnedTexture(extent: LogicalExtent, context: TestGraphicsContext) =
+    WebgpuOwnedTextureDescriptor(
+      extent,
+      // Sessions use no instance, and null names the device's default queue, as a browser host
+      // without a queue of its own hands over.
+      WebgpuContextDescriptor(
+        NativePointer.NULL_POINTER,
+        pointer(context.webgpuDevice),
+        NativePointer.NULL_POINTER,
+      ),
+    )
 
   private fun pointer(address: Long): NativePointer = NativePointer.ofAddress(address)
 }
+
+/**
+ * Submits an owned-texture attach on a backend whose attach only some targets declare. Each target
+ * attaches the backends that its source sets declare and rejects the others.
+ */
+internal expect fun TestGraphics.attachBackendOwnedTexture(
+  map: MapHandle,
+  extent: LogicalExtent,
+  context: TestGraphicsContext,
+  options: RenderSessionAttachOptions,
+): NewRenderSession
+
+/** Reads the texture size of [frame] on a backend whose view only some targets declare. */
+internal expect fun TestGraphics.backendTextureSize(frame: AcquiredFrameHandle): Pair<UInt, UInt>

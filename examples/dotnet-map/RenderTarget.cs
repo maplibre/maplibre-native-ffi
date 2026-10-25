@@ -388,7 +388,7 @@ internal abstract class TextureRenderTarget : RenderTarget
         var presented = false;
         switch (Graphics)
         {
-            case MetalContext:
+            case MetalContext when OperatingSystem.IsMacOS():
                 newest.WithMetalTexture(view => presented = Compositor.Draw(view));
                 break;
             case VulkanContext:
@@ -466,15 +466,16 @@ internal sealed class OwnedTextureRenderTarget : TextureRenderTarget
                 options =>
                     graphics switch
                     {
-                        MetalContext metal => map.AttachMetalOwnedTexture(
-                            new MetalOwnedTextureDescriptor
-                            {
-                                Extent = viewport.LogicalExtent,
-                                Context = metal.Descriptor(),
-                                PixelFormat = MetalContext.MtlPixelFormatBgra8Unorm,
-                            },
-                            options
-                        ),
+                        MetalContext metal when OperatingSystem.IsMacOS() =>
+                            map.AttachMetalOwnedTexture(
+                                new MetalOwnedTextureDescriptor
+                                {
+                                    Extent = viewport.LogicalExtent,
+                                    Context = metal.Descriptor(),
+                                    PixelFormat = MetalContext.MtlPixelFormatBgra8Unorm,
+                                },
+                                options
+                            ),
                         VulkanContext vulkan => map.AttachVulkanOwnedTexture(
                             new VulkanOwnedTextureDescriptor
                             {
@@ -554,10 +555,11 @@ internal sealed class BorrowedTextureRenderTarget : TextureRenderTarget
                     options =>
                         graphics switch
                         {
-                            MetalContext => map.AttachMetalBorrowedTexture(
-                                DescribeMetal(ring, viewport),
-                                options
-                            ),
+                            MetalContext when OperatingSystem.IsMacOS() =>
+                                map.AttachMetalBorrowedTexture(
+                                    DescribeMetal(ring, viewport),
+                                    options
+                                ),
                             VulkanContext vulkan => map.AttachVulkanBorrowedTexture(
                                 DescribeVulkan(vulkan, ring, viewport),
                                 options
@@ -602,9 +604,10 @@ internal sealed class BorrowedTextureRenderTarget : TextureRenderTarget
         {
             handover = Graphics switch
             {
-                MetalContext => Session.SetMetalBorrowedTextureTargetAsync(
-                    DescribeMetal(replacement, viewport)
-                ),
+                MetalContext when OperatingSystem.IsMacOS() =>
+                    Session.SetMetalBorrowedTextureTargetAsync(
+                        DescribeMetal(replacement, viewport)
+                    ),
                 VulkanContext vulkan => Session.SetVulkanBorrowedTextureTargetAsync(
                     DescribeVulkan(vulkan, replacement, viewport)
                 ),
@@ -768,7 +771,7 @@ internal sealed class NativeSurfaceRenderTarget : RenderTarget
             options =>
                 graphics switch
                 {
-                    MetalContext metal => map.AttachMetalSurface(
+                    MetalContext metal when OperatingSystem.IsMacOS() => map.AttachMetalSurface(
                         new MetalSurfaceDescriptor
                         {
                             Extent = viewport.LogicalExtent,

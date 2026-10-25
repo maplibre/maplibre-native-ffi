@@ -24,6 +24,8 @@ import org.maplibre.nativeffi.generated.WebglContextKind
 import org.maplibre.nativeffi.generated.WebgpuBorrowedTexture
 import org.maplibre.nativeffi.generated.WebgpuBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.WebgpuContextDescriptor
+import org.maplibre.nativeffi.generated.attachWebgpuBorrowedTexture
+import org.maplibre.nativeffi.generated.withWebgpuTexture
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.smallMapOptions
 import org.maplibre.nativeffi.withMap

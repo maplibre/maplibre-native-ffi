@@ -151,7 +151,7 @@ public sealed class RenderTests
                 }
                 switch (backend)
                 {
-                    case TestGraphicsBackend.Metal:
+                    case TestGraphicsBackend.Metal when OperatingSystem.IsMacOS():
                         frame.WithMetalTexture(view => Inside(() => view.Width));
                         break;
                     case TestGraphicsBackend.Vulkan:

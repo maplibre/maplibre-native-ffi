@@ -14,7 +14,7 @@ the shared code uses (see kotlin_native).
 import dataclasses
 
 from tools.bindgen import docs
-from tools.bindgen.compiler import compile_api
+from tools.bindgen.compiler import compile_api, served
 from tools.bindgen.model import Api
 from tools.bindgen.semantic import BoundApi, DeliverySupport
 
@@ -48,6 +48,52 @@ PLATFORMS = {
     "androidMain": "android",
     "wasmJsMain": "wasm",
 }
+# The source sets of the default hierarchy that hold others, and the platforms
+# of the targets that each remaining source set compiles for. An operation that
+# serves only some platforms goes in the fewest source sets that compile for
+# exactly the targets that serve it.
+SOURCE_SET_CHILDREN = {
+    "commonMain": ("threadedMain", "wasmJsMain"),
+    "threadedMain": ("jvmAndroidMain", "nativeMain"),
+    "jvmAndroidMain": ("jvmMain", "androidMain"),
+    "nativeMain": ("androidNativeMain", "appleMain", "linuxMain"),
+    "appleMain": ("iosMain", "macosMain", "tvosMain"),
+}
+TARGET_PLATFORMS = {
+    "jvmMain": frozenset({"linux", "macos", "windows"}),
+    "androidMain": frozenset({"android"}),
+    "androidNativeMain": frozenset({"android"}),
+    "iosMain": frozenset({"ios"}),
+    "macosMain": frozenset({"macos"}),
+    "tvosMain": frozenset({"tvos"}),
+    "linuxMain": frozenset({"linux"}),
+    "wasmJsMain": frozenset({"web"}),
+}
+TARGETS = frozenset().union(*TARGET_PLATFORMS.values())
+
+
+def source_sets(platforms: frozenset[str], source_set: str = "commonMain") -> list[str]:
+    """The fewest source sets whose targets are those that serve `platforms`."""
+
+    def targets(name: str) -> list[str]:
+        children = SOURCE_SET_CHILDREN.get(name)
+        return [t for child in children for t in targets(child)] if children else [name]
+
+    if all(TARGET_PLATFORMS[target] & platforms for target in targets(source_set)):
+        return [source_set]
+    return [
+        name
+        for child in SOURCE_SET_CHILDREN.get(source_set, ())
+        for name in source_sets(platforms, child)
+    ]
+
+
+def placement(plan) -> list[str] | None:
+    """The source sets of an operation that serves only some platforms."""
+    platforms = served(plan.function, TARGETS)
+    return None if platforms is None else source_sets(platforms)
+
+
 # The C functions that the handwritten `Maplibre` objects own, on the targets
 # that can call them, so the generated API leaves them out. Their native
 # declarations stay, because those objects call them.
@@ -108,7 +154,7 @@ def lowered(api: Api | BoundApi):
     The split operations of each lowering are in `split[lowering]`.
     """
     unsupported = {}
-    bound = compile_api(api)
+    bound = compile_api(api, TARGETS)
     values = Values(bound)
     native = Native(bound)
     bodies = {}
@@ -128,6 +174,14 @@ def lowered(api: Api | BoundApi):
         groups.setdefault(receiver, []).append(plan)
     for plan in (plan for plans in groups.values() for plan in plans):
         function = plan.function
+        if placement(plan) and (
+            plan.scoped_receiver or kotlin_callbacks.split_registration(plan, values)
+        ):
+            unsupported[function.name] = (
+                f"{function.location}: an operation that serves only some "
+                "platforms takes no split registration"
+            )
+            continue
         if plan.scoped_receiver:
             lowerings = [kotlin_callbacks.THREADED]
         elif kotlin_callbacks.split_registration(plan, values):
@@ -180,11 +234,23 @@ def callback_owner(bound, receiver):
 
 
 def extension(source: str, receiver: str) -> str:
-    """A member method's source as an extension of [receiver], which a split source set declares."""
+    """A member method's source as an extension of [receiver], which a split or
+    platform source set declares."""
     for head in ("public suspend fun ", "public fun "):
         if source.startswith("  " + head):
-            return head + receiver + "." + source[len(head) + 2 :]
+            rest = source[len(head) + 2 :]
+            generics = ""
+            if rest.startswith("<"):
+                generics, rest = rest.split("> ", 1)
+                generics += "> "
+            return head + generics + receiver + "." + rest
     raise ValueError(f"not a member method: {source[:40]}")
+
+
+def platform_extension(source: str, receiver: str, method: str) -> str:
+    """A member method's source as an extension of [receiver] that a platform
+    source set declares, where the receiver's label is the method's name."""
+    return extension(source, receiver).replace(f"this@{receiver}", f"this@{method}")
 
 
 def delivery_functions(bound):
@@ -197,8 +263,10 @@ def delivery_functions(bound):
 
 
 def generate(api: Api | BoundApi) -> dict[str, str]:
-    bound = compile_api(api)
+    bound = compile_api(api, TARGETS)
     functions, _, rendered, split, values, native = lowered(bound)
+    # The extensions that each platform source set declares.
+    platform_extensions: dict[str, list[str]] = {}
     groups = {}
     for function in functions:
         if function.name not in rendered:
@@ -210,16 +278,36 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         groups.setdefault(owner, [])
     outputs = {}
     for receiver, plans in groups.items():
+        family = value_name(receiver) if receiver else None
+        class_name = f"Generated{family}Operations" if receiver else "GeneratedApi"
+        for plan in plans:
+            if (sets := placement(plan)) is None:
+                continue
+            method = method_name(plan)
+            extensions = [
+                operation_doc(bound, plan)
+                + platform_extension(rendered[plan.name], class_name, method)
+            ]
+            if plan.receiver and plan.completion and plan.completion.discardable:
+                extensions.append(
+                    f"/** [{owner_name(bound.handles[receiver])}.{method}] without its completion. */\n"
+                    + extension(
+                        operation(plan, values, native, discard=True),
+                        f"{family}Discarding",
+                    )
+                )
+            for name in sets:
+                platform_extensions.setdefault(name, []).extend(extensions)
+        gated = [plan for plan in plans if placement(plan)]
+        common = [plan for plan in plans if not placement(plan)]
         bodies = [
-            operation_doc(bound, plan, "  ") + rendered[plan.name] for plan in plans
+            operation_doc(bound, plan, "  ") + rendered[plan.name] for plan in common
         ]
         header = (
             "// Generated from the C headers by tools/bindgen. Do not edit.\n"
             "package org.maplibre.nativeffi.generated\n\n" + OPERATION_IMPORTS + "\n"
         )
         if receiver:
-            family = value_name(receiver)
-            class_name = f"Generated{family}Operations"
             members = [
                 f"  internal abstract val binding: {kotlin_owners.state_type(receiver, plans)}\n"
             ]
@@ -234,14 +322,17 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                 + "\n".join(bodies)
                 + "}\n"
             )
-            commands = [p for p in plans if p.completion and p.completion.discardable]
+            commands = [p for p in common if p.completion and p.completion.discardable]
             split_commands = any(
                 p.name in discards
                 for p in bound.operations
                 if p.receiver and receiver_value(p).native == receiver
                 for discards in values.split_discards.values()
             )
-            if commands or split_commands:
+            gated_commands = any(
+                p.completion and p.completion.discardable for p in gated
+            )
+            if commands or split_commands or gated_commands:
                 view = f"{family}Discarding"
                 owner = owner_name(bound.handles[receiver])
                 source = source.removesuffix("}\n") + (
@@ -266,11 +357,22 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                     + "}\n"
                 )
         else:
-            class_name = "GeneratedApi"
             source = (
                 header + "public object GeneratedApi {\n" + "\n".join(bodies) + "}\n"
             )
         outputs[f"{COMMON}/generated/{class_name}.kt"] = source
+    for name, extensions in sorted(platform_extensions.items()):
+        stem = name.removesuffix("Main")
+        outputs[
+            f"src/{name}/kotlin/org/maplibre/nativeffi/generated/"
+            f"Generated{stem[0].upper()}{stem[1:]}Operations.kt"
+        ] = (
+            "// Generated from the C headers by tools/bindgen. Do not edit.\n"
+            "package org.maplibre.nativeffi.generated\n\n"
+            + OPERATION_IMPORTS
+            + "\n"
+            + "\n".join(extensions)
+        )
     # The split forms come first: their writers can name records whose common
     # codecs and values are emitted below.
     for lowering, (directory, file) in SPLIT.items():
@@ -361,7 +463,7 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
 
 
 def coverage(api: Api | BoundApi) -> dict:
-    bound = compile_api(api)
+    bound = compile_api(api, TARGETS)
     functions, unsupported = lower(bound)
     generated = [function.name for function in functions]
     return {

@@ -140,7 +140,7 @@ mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle")
+MLN_BINDING("execution=lifecycle;platforms=ios,macos,tvos")
 MLN_API mln_status mln_map_attach_metal_surface(
   mln_map map, const mln_metal_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
@@ -176,7 +176,7 @@ MLN_API mln_status mln_map_attach_metal_surface(
  *   graphics_queue_family_index that names no graphics queue family.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle")
+MLN_BINDING("execution=lifecycle;platforms=android,linux,macos,ohos,windows")
 MLN_API mln_status mln_map_attach_vulkan_surface(
   mln_map map, const mln_vulkan_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
@@ -247,7 +247,7 @@ MLN_API mln_status mln_map_attach_opengl_surface(
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle")
+MLN_BINDING("execution=lifecycle;platforms=web")
 MLN_API mln_status mln_map_attach_webgpu_surface(
   mln_map map, const mln_webgpu_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
@@ -278,7 +278,7 @@ MLN_API mln_status mln_map_attach_webgpu_surface(
  * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another device.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation")
+MLN_BINDING("execution=operation;platforms=ios,macos,tvos")
 MLN_API mln_status mln_render_session_set_metal_surface_target(
   mln_render_session session, const mln_metal_surface_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -311,7 +311,7 @@ MLN_API mln_status mln_render_session_set_metal_surface_target(
  * - MLN_STATUS_NATIVE_ERROR when querying the replacement surface fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation")
+MLN_BINDING("execution=operation;platforms=android,linux,macos,ohos,windows")
 MLN_API mln_status mln_render_session_set_vulkan_surface_target(
   mln_render_session session, const mln_vulkan_surface_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -372,7 +372,7 @@ MLN_API mln_status mln_render_session_set_opengl_surface_target(
  *   the session attached with.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation")
+MLN_BINDING("execution=operation;platforms=web")
 MLN_API mln_status mln_render_session_set_webgpu_surface_target(
   mln_render_session session, const mln_webgpu_surface_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic

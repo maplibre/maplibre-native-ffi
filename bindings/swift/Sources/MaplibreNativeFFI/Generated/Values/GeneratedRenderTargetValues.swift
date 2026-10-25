@@ -686,50 +686,6 @@ public struct WebglContextKind: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// WebGPU backend context fields shared by WebGPU render targets.
-///
-/// See `mln_webgpu_context_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-public struct WebgpuContextDescriptor: Equatable, Hashable, Sendable {
-  /// Borrowed WGPUInstance. Optional for texture targets.
-  public var instance: NativePointer
-  /// Borrowed WGPUDevice. Required.
-  public var device: NativePointer
-  /// Borrowed WGPUQueue. Optional; null uses the device default queue. A
-  /// non-null queue must belong to device.
-  public var queue: NativePointer
-  public static var `default`: Self {
-    Self(raw: mln_webgpu_context_descriptor())
-  }
-
-  public init(
-    instance: NativePointer = WebgpuContextDescriptor.default.instance,
-    device: NativePointer = WebgpuContextDescriptor.default.device,
-    queue: NativePointer = WebgpuContextDescriptor.default.queue
-  ) {
-    self.instance = instance
-    self.device = device
-    self.queue = queue
-  }
-
-  init(raw: mln_webgpu_context_descriptor) {
-    instance = NativePointer(bitPattern: unsafeBitCast(
-      raw.instance,
-      to: UInt.self
-    ))
-    device = NativePointer(bitPattern: unsafeBitCast(raw.device, to: UInt.self))
-    queue = NativePointer(bitPattern: unsafeBitCast(raw.queue, to: UInt.self))
-  }
-
-  func nativeValue() -> mln_webgpu_context_descriptor {
-    var raw = mln_webgpu_context_descriptor()
-    raw.instance = instance.unsafeMutableRawPointer
-    raw.device = device.unsafeMutableRawPointer
-    raw.queue = queue.unsafeMutableRawPointer
-    return raw
-  }
-}
-
 /// WGL context fields shared by OpenGL render targets on Windows.
 ///
 /// See `mln_wgl_context_descriptor` in the

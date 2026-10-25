@@ -488,7 +488,7 @@ def lower(bound):
     for plan in bound.operations:
         try:
             chunks.append(
-                documented_operation(bound, plan.name, operation(plan, values))
+                (plan, documented_operation(bound, plan.name, operation(plan, values)))
             )
             generated.append(plan.name)
         except ModelError as error:
