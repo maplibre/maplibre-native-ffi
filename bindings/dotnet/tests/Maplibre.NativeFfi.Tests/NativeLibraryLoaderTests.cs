@@ -24,7 +24,9 @@ public sealed class NativeLibraryLoaderTests
     public void AnExplicitPathAfterTheStandardLookupIsRefused()
     {
         var error = Assert.Throws<InvalidOperationException>(() =>
-            Maplibre.LoadNativeLibrary(Path.Combine(AppContext.BaseDirectory, "missing-library"))
+            MaplibreNative.LoadNativeLibrary(
+                Path.Combine(AppContext.BaseDirectory, "missing-library")
+            )
         );
 
         Assert.Contains("already been resolved", error.Message, StringComparison.Ordinal);

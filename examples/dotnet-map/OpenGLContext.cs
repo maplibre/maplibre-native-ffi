@@ -36,7 +36,7 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
 
     public static OpenGLContext Create(string title, int width, int height, bool visible)
     {
-        var providers = Maplibre.OpenglSupportedContextProviderMask();
+        var providers = MaplibreNative.OpenglSupportedContextProviderMask();
         if (providers.HasFlag(OpenglContextProviderFlag.Egl))
         {
             return CreateEgl(title, width, height, visible);
@@ -482,7 +482,11 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
 
     private static OpenGLContext CreateEgl(string title, int width, int height, bool visible)
     {
-        if (!Maplibre.OpenglSupportedContextProviderMask().HasFlag(OpenglContextProviderFlag.Egl))
+        if (
+            !MaplibreNative
+                .OpenglSupportedContextProviderMask()
+                .HasFlag(OpenglContextProviderFlag.Egl)
+        )
         {
             throw new InvalidOperationException("Native library does not support EGL.");
         }
@@ -537,7 +541,11 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
 
     private static OpenGLContext CreateWgl(string title, int width, int height, bool visible)
     {
-        if (!Maplibre.OpenglSupportedContextProviderMask().HasFlag(OpenglContextProviderFlag.Wgl))
+        if (
+            !MaplibreNative
+                .OpenglSupportedContextProviderMask()
+                .HasFlag(OpenglContextProviderFlag.Wgl)
+        )
         {
             throw new InvalidOperationException("Native library does not support WGL.");
         }

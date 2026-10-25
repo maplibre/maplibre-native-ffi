@@ -5,7 +5,7 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 
 namespace Maplibre.NativeFfi;
 
-public static unsafe partial class Maplibre
+public static unsafe partial class MaplibreNative
 {
     /// <summary>
     /// Initializes Android platform services.

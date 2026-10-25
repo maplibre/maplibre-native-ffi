@@ -95,7 +95,7 @@ public sealed class ResourceTransformTests
             );
         }
 
-        Maplibre.CallbackException += record;
+        MaplibreNative.CallbackException += record;
         try
         {
             Assert.Equal(mln_status.MLN_STATUS_OK, Invoke(null));
@@ -110,7 +110,7 @@ public sealed class ResourceTransformTests
         }
         finally
         {
-            Maplibre.CallbackException -= record;
+            MaplibreNative.CallbackException -= record;
         }
     }
 

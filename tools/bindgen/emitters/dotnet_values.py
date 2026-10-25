@@ -269,13 +269,13 @@ class Values:
                 "Returning succeeds. Throwing a `MaplibreException` whose status "
                 "is not `Status.Ok` fails the call with that status. Any other "
                 f"exception fails it with `Status.{fallback}` and is reported to "
-                "`Maplibre.CallbackException`."
+                "`MaplibreNative.CallbackException`."
             )
         if callback.result.ctype.kind == "void":
             return None
         return (
             f"A thrown exception answers `{callback.failure}` and is reported to "
-            "`Maplibre.CallbackException`."
+            "`MaplibreNative.CallbackException`."
         )
 
     def raw_failure(self, callback) -> str:

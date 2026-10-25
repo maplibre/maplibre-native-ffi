@@ -33,14 +33,14 @@ internal sealed class RenderFixture : IDisposable
         get
         {
             var data = new TheoryData<TestGraphicsBackend>();
-            var backends = Maplibre.SupportedRenderBackendMask();
+            var backends = MaplibreNative.SupportedRenderBackendMask();
             if (backends.HasFlag(RenderBackendFlag.Metal))
                 data.Add(TestGraphicsBackend.Metal);
             if (backends.HasFlag(RenderBackendFlag.Vulkan))
                 data.Add(TestGraphicsBackend.Vulkan);
             if (backends.HasFlag(RenderBackendFlag.Opengl))
             {
-                var providers = Maplibre.OpenglSupportedContextProviderMask();
+                var providers = MaplibreNative.OpenglSupportedContextProviderMask();
                 if (providers.HasFlag(OpenglContextProviderFlag.Egl))
                     data.Add(TestGraphicsBackend.Egl);
                 if (providers.HasFlag(OpenglContextProviderFlag.Wgl))

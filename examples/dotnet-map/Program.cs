@@ -19,8 +19,8 @@ internal static class Program
 
         try
         {
-            Maplibre.LoadNativeLibrary();
-            var backends = Maplibre.SupportedRenderBackendMask();
+            MaplibreNative.LoadNativeLibrary();
+            var backends = MaplibreNative.SupportedRenderBackendMask();
             Console.WriteLine($"native render backends: {backends}");
             if (!SupportsUsableBackend(backends))
             {
@@ -30,16 +30,16 @@ internal static class Program
                 return 1;
             }
 
-            Maplibre.LogSetAsyncSeverityMask(LogSeverityFlag.All);
-            Maplibre.LogSetCallback(new LogHandler(PrintNativeLog));
+            MaplibreNative.LogSetAsyncSeverityMask(LogSeverityFlag.All);
+            MaplibreNative.LogSetCallback(new LogHandler(PrintNativeLog));
             try
             {
                 return Shell.Run(parseResult.Mode.Value, backends, parseResult.Smoke) ? 0 : 1;
             }
             finally
             {
-                Maplibre.LogClearCallback();
-                Maplibre.LogSetAsyncSeverityMask(LogSeverityFlag.Default);
+                MaplibreNative.LogClearCallback();
+                MaplibreNative.LogSetAsyncSeverityMask(LogSeverityFlag.Default);
             }
         }
         catch (Exception error)

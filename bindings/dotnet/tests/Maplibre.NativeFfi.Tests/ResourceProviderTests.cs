@@ -133,7 +133,7 @@ public sealed class ResourceProviderTests
             lock (reports)
                 reports.Add(report);
             // This callback permits status-returning native calls.
-            reentry = Record.Exception(() => Maplibre.NetworkGetStatus());
+            reentry = Record.Exception(() => MaplibreNative.NetworkGetStatus());
         };
         using var scope = new NativeCallScope();
         var native = GeneratedValues.NativeResourceProvider(
@@ -160,14 +160,14 @@ public sealed class ResourceProviderTests
             prior_data_size = bytes.size,
         };
 
-        Maplibre.CallbackException += record;
+        MaplibreNative.CallbackException += record;
         try
         {
             native.callback(native.user_data, &request, SyntheticHandles.ResourceRequest(1));
         }
         finally
         {
-            Maplibre.CallbackException -= record;
+            MaplibreNative.CallbackException -= record;
         }
 
         var report = Assert.Single(reports);

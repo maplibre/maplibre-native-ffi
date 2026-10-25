@@ -9,7 +9,7 @@ public sealed class PublicApiSurfaceTests
     [Fact]
     public void NativeImplementationTypesStayOutOfPublicSurface()
     {
-        var publicTypes = typeof(Maplibre).Assembly.GetExportedTypes();
+        var publicTypes = typeof(MaplibreNative).Assembly.GetExportedTypes();
 
         Assert.DoesNotContain(publicTypes, type => type.Namespace?.Contains(".Internal") == true);
         Assert.DoesNotContain(
@@ -23,7 +23,7 @@ public sealed class PublicApiSurfaceTests
     public void PublicSurfaceDoesNotExposeRawPointersOrNativeSizedCarriers()
     {
         var violations = new List<string>();
-        foreach (var type in typeof(Maplibre).Assembly.GetExportedTypes())
+        foreach (var type in typeof(MaplibreNative).Assembly.GetExportedTypes())
         {
             if (!typeof(Delegate).IsAssignableFrom(type))
             {
@@ -77,7 +77,7 @@ public sealed class PublicApiSurfaceTests
     public void PublicSurfaceDefaultsOnlyCancellationTokensAndOmittableValues()
     {
         var violations = new List<string>();
-        foreach (var type in typeof(Maplibre).Assembly.GetExportedTypes())
+        foreach (var type in typeof(MaplibreNative).Assembly.GetExportedTypes())
         {
             foreach (var constructor in type.GetConstructors())
             {
@@ -105,7 +105,7 @@ public sealed class PublicApiSurfaceTests
     {
         var violations = new List<string>();
 
-        foreach (var type in typeof(Maplibre).Assembly.GetExportedTypes())
+        foreach (var type in typeof(MaplibreNative).Assembly.GetExportedTypes())
         {
             foreach (
                 var method in type.GetMethods(
@@ -147,7 +147,7 @@ public sealed class PublicApiSurfaceTests
     [Fact]
     public void OwnedNativeHandlesDoNotExposePublicConstructors()
     {
-        var ownedHandleTypes = typeof(Maplibre)
+        var ownedHandleTypes = typeof(MaplibreNative)
             .Assembly.GetExportedTypes()
             .Where(type =>
                 type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)

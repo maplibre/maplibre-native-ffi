@@ -389,7 +389,7 @@ def emit_operation(
         if receiver
         else owners[factory]
         if factory
-        else "Maplibre"
+        else "MaplibreNative"
     )
     handle_plan = bound.handles.get(receiver)
     if handle_plan and function.name == handle_plan.discard:
@@ -1056,7 +1056,7 @@ def emit(api: Api | BoundApi) -> Emission:
         except Unsupported as error:
             unsupported[function.name] = f"{function.location}: {error}"
             continue
-        if owner == "Maplibre":
+        if owner == "MaplibreNative":
             directory = directory_for(function.location.path)
             globals_by_directory[directory].append(
                 doc(bound, function.name, "    ") + supported_platforms(plan) + emitted
@@ -1301,11 +1301,11 @@ def emit(api: Api | BoundApi) -> Emission:
             + "}\n"
         )
     for directory, body in sorted(globals_by_directory.items()):
-        files[f"{directory}/Maplibre.Operations.g.cs"] = (
+        files[f"{directory}/MaplibreNative.Operations.g.cs"] = (
             HEADER
             + OPERATION_HELPERS
             + f"namespace {NAMESPACE};\n\n"
-            + "public static unsafe partial class Maplibre\n{\n"
+            + "public static unsafe partial class MaplibreNative\n{\n"
             + "\n".join(body)
             + "}\n"
         )

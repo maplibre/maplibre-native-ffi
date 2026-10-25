@@ -8,7 +8,7 @@ namespace Maplibre.NativeFfi;
 /// through <see cref="System.Diagnostics.Trace.TraceWarning(string)" />, or on standard error
 /// when the host has added no trace listener.
 /// </remarks>
-public static unsafe partial class Maplibre
+public static unsafe partial class MaplibreNative
 {
     /// <summary>
     /// Raised when a native callback throws, or when the binding cannot convert a callback's

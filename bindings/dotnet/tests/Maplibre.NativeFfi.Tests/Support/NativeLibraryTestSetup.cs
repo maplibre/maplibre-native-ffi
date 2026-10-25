@@ -7,6 +7,6 @@ internal static class NativeLibraryTestSetup
     [ModuleInitializer]
     internal static void LoadNativeLibrary()
     {
-        global::Maplibre.NativeFfi.Maplibre.LoadNativeLibrary();
+        global::Maplibre.NativeFfi.MaplibreNative.LoadNativeLibrary();
     }
 }

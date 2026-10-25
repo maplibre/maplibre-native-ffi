@@ -2,11 +2,10 @@
 // returns from Main. The test suite runs this and expects a clean exit: native threads still
 // running at exit must not call into a runtime that is shutting down.
 using Maplibre.NativeFfi;
-using NativeMaplibre = Maplibre.NativeFfi.Maplibre;
 
-NativeMaplibre.LoadNativeLibrary();
-NativeMaplibre.LogSetAsyncSeverityMask(LogSeverityFlag.All);
-NativeMaplibre.LogSetCallback(new LogHandler((_, _, _, _) => false));
+MaplibreNative.LoadNativeLibrary();
+MaplibreNative.LogSetAsyncSeverityMask(LogSeverityFlag.All);
+MaplibreNative.LogSetCallback(new LogHandler((_, _, _, _) => false));
 
 var held = new TaskCompletionSource<ResourceRequestHandle>(
     TaskCreationOptions.RunContinuationsAsynchronously

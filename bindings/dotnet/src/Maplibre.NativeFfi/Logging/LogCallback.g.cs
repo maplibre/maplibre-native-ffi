@@ -7,7 +7,7 @@ namespace Maplibre.NativeFfi;
 /// </summary>
 /// <remarks>
 /// <para>A thrown exception answers <c>false</c> and is reported to
-/// <c>Maplibre.CallbackException</c>.</para>
+/// <c>MaplibreNative.CallbackException</c>.</para>
 /// <para>See <c>mln_log_callback</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html">C API reference</see>.</para>
 /// </remarks>

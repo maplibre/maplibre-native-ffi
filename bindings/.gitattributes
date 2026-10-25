@@ -3,8 +3,8 @@
 /dart/lib/src/generated_values.dart linguist-generated=true
 /dart/lib/src/internal/c/maplibre_native_c.g.dart linguist-generated=true
 /dart/lib/src/runtime/generated_operations.dart linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Android/Maplibre.Operations.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Base/Maplibre.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Android/MaplibreNative.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Base/MaplibreNative.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Base/RenderBackendFlag.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Base/Status.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/GlobalUsings.g.cs linguist-generated=true
@@ -16,7 +16,7 @@
 /dotnet/src/Maplibre.NativeFfi/Logging/LogHandler.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Logging/LogSeverity.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Logging/LogSeverityFlag.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Logging/Maplibre.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Logging/MaplibreNative.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/AnimationOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/BoundOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/Camera.g.cs linguist-generated=true
@@ -59,9 +59,9 @@
 /dotnet/src/Maplibre.NativeFfi/Map/UnitBezier.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/Vec3.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/ViewportMode.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Plugin/Maplibre.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Plugin/MaplibreNative.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Projection/MapProjectionHandle.Operations.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Projection/Maplibre.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Projection/MaplibreNative.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Query/RenderedFeature.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Query/RenderedFeatureQueryOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Query/RenderedQueryGeometry.g.cs linguist-generated=true
@@ -83,7 +83,7 @@
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/GpuSync.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/GpuSyncKind.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/GpuSyncView.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/RenderTarget/Maplibre.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/RenderTarget/MaplibreNative.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/MetalContextDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/OpenglClientApi.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/OpenglContextDescriptor.g.cs linguist-generated=true
@@ -107,7 +107,7 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransformCallback.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransformResponse.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransformResponse.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Runtime/Maplibre.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/MaplibreNative.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/NetworkStatus.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/OfflineRegionDownloadState.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/OfflineRegionStatus.g.cs linguist-generated=true
