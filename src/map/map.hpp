@@ -601,7 +601,7 @@ struct RenderSessionNotices {
   // Announces each render update, with its generation.
   std::function<void(uint64_t)> update;
   // Reports that a still image became pending or stopped being pending, which
-  // map_still_image_pending() then tells.
+  // map_still_image_generation() then tells.
   std::function<void()> still_image;
 };
 // Installs the session's notices; empty notices remove them.
@@ -622,9 +622,10 @@ struct RenderUpdateSnapshot {
 };
 // The update, feature state, and generation share one publication boundary.
 auto map_latest_update_snapshot(MapObject& map) -> RenderUpdateSnapshot;
-// Whether a still image waits for a frame. The session renders one while it
-// does.
-auto map_still_image_pending(MapObject& map) -> bool;
+// The generation of the update that the pending still image published, or
+// zero when none is pending. Any fully loaded frame of that update or a later
+// one completes the image, so the session renders one until it has.
+auto map_still_image_generation(MapObject& map) -> uint64_t;
 auto map_renderer_observer(MapObject& map) -> mln::RendererObserver*;
 // Tells the map which update generation the session is about to render, so a
 // frame of an update older than a pending still image request cannot complete

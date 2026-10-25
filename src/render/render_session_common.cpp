@@ -1204,10 +1204,11 @@ auto requeue_update_waiting_demands_locked(mln_render_session_object& session)
 }
 
 // Submits the demand that renders the map's pending still image, unless one is
-// outstanding or the session cannot render now. Called wherever the session
-// can render again: the request itself, attachment, a barrier's completion,
-// and wherever waiting demands resume. A demand that cannot be allocated
-// leaves the image for the next of those.
+// outstanding, the session cannot render now, or the session already rendered
+// a frame that completes the image and the map has yet to say so. Called
+// wherever the session can render again: the request itself, attachment, a
+// barrier's completion, and wherever waiting demands resume. A demand that
+// cannot be allocated leaves the image for the next of those.
 auto arm_still_image_demand_locked(
   mln_render_session_object& session, DeferredWakes& wakes
 ) noexcept -> void {
@@ -1215,10 +1216,11 @@ auto arm_still_image_demand_locked(
     session.still_image_demand_outstanding ||
     session.state != MLN_RENDER_SESSION_STATE_ATTACHED ||
     session.pending_frame_barriers != 0 ||
-    every_slot_quarantined_locked(session) ||
-    !map_still_image_pending(*session.map_object)
+    every_slot_quarantined_locked(session)
   )
     return;
+  const auto image = map_still_image_generation(*session.map_object);
+  if (image == 0 || session.rendered_update_generation >= image) return;
   try {
     session.demands.push_back(
       std::make_shared<const mln_frame_demand>(mln_frame_demand{
@@ -1899,7 +1901,7 @@ auto notify_render_session_still_image(
   auto wakes = DeferredWakes{};
   const auto lock = std::scoped_lock{session->control_mutex};
   if (session->state != MLN_RENDER_SESSION_STATE_ATTACHED) return;
-  if (map_still_image_pending(*session->map_object)) {
+  if (map_still_image_generation(*session->map_object) != 0) {
     arm_still_image_demand_locked(*session, wakes);
     return;
   }
@@ -2868,7 +2870,7 @@ auto wait_for_map_update(
   // notice ends a wait that outlasts the image.
   if (
     pending->token == MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE &&
-    !map_still_image_pending(*session->map_object)
+    map_still_image_generation(*session->map_object) == 0
   )
     return true;
   // Waiting and queueing allocate. A demand that can do neither finishes as it

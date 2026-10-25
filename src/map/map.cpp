@@ -1179,16 +1179,16 @@ class HeadlessFrontend final : public mln::RendererFrontend {
     auto notify_session = std::function<void()>{};
     {
       const std::scoped_lock lock(latest_update_mutex_);
-      if (still_image_pending_ == (generation != 0)) return;
-      still_image_pending_ = generation != 0;
+      if (std::exchange(still_image_generation_, generation) == generation)
+        return;
       notify_session = session_notices_.still_image;
     }
     if (notify_session) notify_session();
   }
 
-  [[nodiscard]] auto still_image_pending() const -> bool {
+  [[nodiscard]] auto still_image_generation() const -> uint64_t {
     const std::scoped_lock lock(latest_update_mutex_);
-    return still_image_pending_;
+    return still_image_generation_;
   }
 
   // Must run before the map that backs the delegate is torn down.
@@ -1228,7 +1228,7 @@ class HeadlessFrontend final : public mln::RendererFrontend {
   FeatureStateStore& feature_state_;
   std::unique_ptr<ForwardingRendererObserver> observer_;
   mln::TaggedScheduler thread_pool_;
-  // Guards every field from latest_update_ through still_image_pending_.
+  // Guards every field from latest_update_ through still_image_generation_.
   // Render sessions read the published update from their own threads, and
   // reset() can touch held_update_ outside a command when a disposed map
   // retires.
@@ -1239,7 +1239,7 @@ class HeadlessFrontend final : public mln::RendererFrontend {
   std::shared_ptr<const FeatureStateSnapshot> held_feature_state_;
   RenderSessionNotices session_notices_;
   uint64_t latest_update_generation_ = 0;
-  bool still_image_pending_ = false;
+  uint64_t still_image_generation_ = 0;
   // Runtime-worker only.
   bool update_stored_ = false;
   bool announcement_scheduled_ = false;
@@ -3938,8 +3938,8 @@ auto map_latest_update_snapshot(MapObject& map) -> RenderUpdateSnapshot {
   return map.frontend->latest_update_snapshot();
 }
 
-auto map_still_image_pending(MapObject& map) -> bool {
-  return map.frontend->still_image_pending();
+auto map_still_image_generation(MapObject& map) -> uint64_t {
+  return map.frontend->still_image_generation();
 }
 
 auto map_begin_render(MapObject& map, uint64_t update_generation) noexcept
